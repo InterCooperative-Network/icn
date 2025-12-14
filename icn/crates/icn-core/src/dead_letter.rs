@@ -64,7 +64,7 @@ impl std::fmt::Display for FailureType {
             FailureType::GovernanceExecutionFailed => write!(f, "governance_execution_failed"),
             FailureType::GossipPublishFailed => write!(f, "gossip_publish_failed"),
             FailureType::StorageFailure => write!(f, "storage_failure"),
-            FailureType::Other(s) => write!(f, "other:{}", s),
+            FailureType::Other(s) => write!(f, "other:{s}"),
         }
     }
 }
@@ -136,7 +136,7 @@ impl FailedOperation {
         error: &str,
     ) -> Self {
         Self::new(
-            format!("audit:{}", proposal_id),
+            format!("audit:{proposal_id}"),
             FailureType::AuditTrailWrite,
             serde_json::json!({
                 "proposal_id": proposal_id,
@@ -152,7 +152,7 @@ impl FailedOperation {
     /// Create from idempotency check failure
     pub fn idempotency_check_failure(proposal_id: &str, error: &str) -> Self {
         Self::new(
-            format!("idem:{}", proposal_id),
+            format!("idem:{proposal_id}"),
             FailureType::IdempotencyCheckFailed,
             serde_json::json!({
                 "proposal_id": proposal_id,
@@ -372,7 +372,7 @@ mod tests {
         // Add some operations
         for i in 0..3 {
             let op = FailedOperation::new(
-                format!("op-{}", i),
+                format!("op-{i}"),
                 FailureType::StorageFailure,
                 serde_json::json!({}),
                 "Error",

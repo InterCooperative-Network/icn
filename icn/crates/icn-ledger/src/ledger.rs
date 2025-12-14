@@ -915,8 +915,7 @@ impl Ledger {
             }
         }
         anyhow::bail!(
-            "Balance recomputation failed after {} retries due to concurrent modifications",
-            max_retries
+            "Balance recomputation failed after {max_retries} retries due to concurrent modifications"
         );
     }
 
@@ -991,7 +990,7 @@ impl Ledger {
                     let did_str = &rest[..last_colon];
                     let currency = &rest[last_colon + 1..];
 
-                    if let Ok(did) = serde_json::from_str::<Did>(&format!("\"{}\"", did_str)) {
+                    if let Ok(did) = serde_json::from_str::<Did>(&format!("\"{did_str}\"")) {
                         if let Ok(volume) = serde_json::from_slice::<i64>(&value) {
                             self.cleared_volume_index
                                 .insert((did, currency.to_string()), volume);
@@ -1012,7 +1011,7 @@ impl Ledger {
     fn save_cleared_volume_index(&self) -> Result<()> {
         for ((account_id, currency), volume) in &self.cleared_volume_index {
             // Store with composite key: "{prefix}{did}:{currency}"
-            let key = format!("{}{}:{}", CLEARED_VOLUME_PREFIX, account_id, currency);
+            let key = format!("{CLEARED_VOLUME_PREFIX}{account_id}:{currency}");
             let value = serde_json::to_vec(volume)?;
             self.store.put(key.as_bytes(), &value)?;
         }

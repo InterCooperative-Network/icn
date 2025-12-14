@@ -75,8 +75,7 @@ fn test_multi_graph_complete_trust_network() {
     assert!(bob_economic > 0.7, "Bob should be economically trusted");
     assert!(
         bob_technical < 0.1,
-        "Bob has no technical trust: {}",
-        bob_technical
+        "Bob has no technical trust: {bob_technical}"
     );
 
     // Carol: transitive social via Bob, direct technical
@@ -85,8 +84,7 @@ fn test_multi_graph_complete_trust_network() {
 
     assert!(
         carol_social > 0.0 && carol_social < 0.4,
-        "Carol should have transitive social trust: {}",
-        carol_social
+        "Carol should have transitive social trust: {carol_social}"
     );
     assert!(
         carol_technical > 0.5,
@@ -98,8 +96,7 @@ fn test_multi_graph_complete_trust_network() {
     // Expected: social(0.48) * 0.5 + economic(0.72) * 0.3 + technical(0) * 0.2
     assert!(
         bob_combined > 0.3,
-        "Bob should have good combined trust: {}",
-        bob_combined
+        "Bob should have good combined trust: {bob_combined}"
     );
 }
 
@@ -159,24 +156,21 @@ fn test_multi_graph_dimension_specific_operations() {
     let social_score = multi.social().compute_trust_score(bob.did()).unwrap();
     assert!(
         (social_score - 0.54).abs() < 0.01,
-        "Social score: {}",
-        social_score
+        "Social score: {social_score}"
     );
 
     // Economic: 80% direct = 0.3 * 0.8 = 0.24
     let economic_score = multi.economic().compute_trust_score(bob.did()).unwrap();
     assert!(
         (economic_score - 0.24).abs() < 0.01,
-        "Economic score: {}",
-        economic_score
+        "Economic score: {economic_score}"
     );
 
     // Technical: 90% direct = 0.5 * 0.9 = 0.45
     let technical_score = multi.technical().compute_trust_score(bob.did()).unwrap();
     assert!(
         (technical_score - 0.45).abs() < 0.01,
-        "Technical score: {}",
-        technical_score
+        "Technical score: {technical_score}"
     );
 }
 
@@ -357,13 +351,12 @@ fn test_complex_transitive_trust_network() {
 
     // Direct trust scores (70% direct, 30% transitive)
     let bob_score = graph.compute_trust_score(bob.did()).unwrap();
-    assert!((bob_score - 0.56).abs() < 0.01, "Bob score: {}", bob_score); // 0.8 * 0.7
+    assert!((bob_score - 0.56).abs() < 0.01, "Bob score: {bob_score}"); // 0.8 * 0.7
 
     let carol_score = graph.compute_trust_score(carol.did()).unwrap();
     assert!(
         (carol_score - 0.42).abs() < 0.01,
-        "Carol score: {}",
-        carol_score
+        "Carol score: {carol_score}"
     ); // 0.6 * 0.7
 
     // Dave has no direct trust from Alice, only transitive via Bob and Carol
@@ -371,8 +364,7 @@ fn test_complex_transitive_trust_network() {
     let dave_score = graph.compute_trust_score(dave.did()).unwrap();
     assert!(
         dave_score > 0.1 && dave_score < 0.25,
-        "Dave score: {}",
-        dave_score
+        "Dave score: {dave_score}"
     );
 
     // Eve has transitive only via Bob
@@ -380,8 +372,7 @@ fn test_complex_transitive_trust_network() {
     let eve_score = graph.compute_trust_score(eve.did()).unwrap();
     assert!(
         eve_score > 0.1 && eve_score < 0.15,
-        "Eve score: {}",
-        eve_score
+        "Eve score: {eve_score}"
     );
 }
 
@@ -409,8 +400,7 @@ fn test_custom_scoring_weights() {
         .unwrap();
     assert!(
         carol_direct_only < 0.01,
-        "Carol direct-only: {}",
-        carol_direct_only
+        "Carol direct-only: {carol_direct_only}"
     );
 
     // Clear cache before testing different weights
@@ -424,8 +414,7 @@ fn test_custom_scoring_weights() {
         .unwrap();
     assert!(
         carol_transitive_only > 0.9,
-        "Carol transitive-only: {}",
-        carol_transitive_only
+        "Carol transitive-only: {carol_transitive_only}"
     );
 }
 
@@ -888,9 +877,7 @@ fn test_trust_graph_type_weights_sum_to_one() {
         let sum = weights.direct + weights.transitive;
         assert!(
             (sum - 1.0).abs() < 0.001,
-            "{:?} weights don't sum to 1.0: {}",
-            graph_type,
-            sum
+            "{graph_type:?} weights don't sum to 1.0: {sum}"
         );
     }
 }

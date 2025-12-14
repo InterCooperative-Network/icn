@@ -71,7 +71,7 @@ fn test_domain_id_generation() {
     // Custom ID should work
     let custom_id = GovernanceDomainId::new("my-coop");
     assert_eq!(custom_id.0, "my-coop");
-    assert_eq!(format!("{}", custom_id), "my-coop");
+    assert_eq!(format!("{custom_id}"), "my-coop");
 }
 
 // =============================================================================
@@ -546,7 +546,7 @@ fn test_store_multiple_domains() {
 
     for i in 0..5 {
         let config = GovernanceConfig::cooperative_default();
-        let domain = GovernanceDomain::new(format!("Coop {}", i), config);
+        let domain = GovernanceDomain::new(format!("Coop {i}"), config);
         store.store_domain(&domain).unwrap();
     }
 
@@ -594,7 +594,7 @@ fn test_store_proposals_by_domain() {
         let proposal = Proposal::new(
             domain_a.clone(),
             did.clone(),
-            format!("Proposal A{}", i),
+            format!("Proposal A{i}"),
             "Desc".to_string(),
             ProposalPayload::Text {
                 body: "Test".to_string(),
@@ -608,7 +608,7 @@ fn test_store_proposals_by_domain() {
         let proposal = Proposal::new(
             domain_b.clone(),
             did.clone(),
-            format!("Proposal B{}", i),
+            format!("Proposal B{i}"),
             "Desc".to_string(),
             ProposalPayload::Text {
                 body: "Test".to_string(),

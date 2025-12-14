@@ -281,7 +281,7 @@ async fn test_actor_registry_state_updates() {
 
     // Update state multiple times
     for i in 0..5 {
-        let state = format!("state-{}", i).into_bytes();
+        let state = format!("state-{i}").into_bytes();
         registry
             .update_state(&actor_id, state)
             .await
@@ -602,10 +602,10 @@ async fn test_checkpoint_store_concurrent_access() {
             let checkpoint = ActorCheckpoint {
                 actor_id,
                 sequence: i + 1,
-                state: format!("state-{}", i).into_bytes(),
+                state: format!("state-{i}").into_bytes(),
                 created_at: 1000 + i,
                 executor: "did:icn:executor".to_string(),
-                state_hash: ActorCheckpoint::compute_state_hash(format!("state-{}", i).as_bytes()),
+                state_hash: ActorCheckpoint::compute_state_hash(format!("state-{i}").as_bytes()),
                 signature: vec![],
             };
 

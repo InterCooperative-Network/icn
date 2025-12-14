@@ -167,7 +167,7 @@ fn test_bloom_filter_anti_entropy() {
 
     // Alice has entries 1-50
     let entries_a: Vec<[u8; 32]> = (1..=50)
-        .map(|i| compute_hash(format!("entry-{}", i).as_bytes()))
+        .map(|i| compute_hash(format!("entry-{i}").as_bytes()))
         .collect();
 
     for entry in &entries_a {
@@ -176,7 +176,7 @@ fn test_bloom_filter_anti_entropy() {
 
     // Bob has entries 40-80 (overlap with Alice: 40-50)
     let entries_b: Vec<[u8; 32]> = (40..=80)
-        .map(|i| compute_hash(format!("entry-{}", i).as_bytes()))
+        .map(|i| compute_hash(format!("entry-{i}").as_bytes()))
         .collect();
 
     for entry in &entries_b {
@@ -210,15 +210,13 @@ fn test_bloom_filter_anti_entropy() {
     // Due to false positives, actual count may be slightly lower
     assert!(
         bob_missing >= 25,
-        "Bob should have ~30 entries Alice doesn't have: {}",
-        bob_missing
+        "Bob should have ~30 entries Alice doesn't have: {bob_missing}"
     );
 
     // Bob is missing entries 1-39 (39 entries)
     assert!(
         alice_missing >= 35,
-        "Alice should have ~39 entries Bob doesn't have: {}",
-        alice_missing
+        "Alice should have ~39 entries Bob doesn't have: {alice_missing}"
     );
 }
 
@@ -228,7 +226,7 @@ fn test_bloom_filter_no_false_negatives() {
 
     // Insert 5000 entries
     let entries: Vec<[u8; 32]> = (0..5000)
-        .map(|i| compute_hash(format!("entry-{}", i).as_bytes()))
+        .map(|i| compute_hash(format!("entry-{i}").as_bytes()))
         .collect();
 
     for entry in &entries {
@@ -255,14 +253,14 @@ fn test_bloom_filter_false_positive_bounded() {
 
     // Insert 500 entries
     for i in 0..500 {
-        let hash = compute_hash(format!("entry-{}", i).as_bytes());
+        let hash = compute_hash(format!("entry-{i}").as_bytes());
         filter.insert(&hash);
     }
 
     // Test 1000 entries that were never inserted
     let mut false_positives = 0;
     for i in 10000..11000 {
-        let hash = compute_hash(format!("entry-{}", i).as_bytes());
+        let hash = compute_hash(format!("entry-{i}").as_bytes());
         if filter.contains(&hash) {
             false_positives += 1;
         }
@@ -551,7 +549,7 @@ fn test_gossip_message_bloom_filter_request() {
 #[test]
 fn test_gossip_message_request_missing() {
     let hashes: Vec<[u8; 32]> = (0..5)
-        .map(|i| compute_hash(format!("entry-{}", i).as_bytes()))
+        .map(|i| compute_hash(format!("entry-{i}").as_bytes()))
         .collect();
 
     let msg = GossipMessage::RequestMissing {
@@ -595,9 +593,9 @@ fn test_vector_clock_with_many_participants() {
     // First 10 should be at 2, rest at 1
     for (i, kp) in participants.iter().enumerate() {
         if i < 10 {
-            assert_eq!(clock.get(kp.did()), 2, "Participant {} should be at 2", i);
+            assert_eq!(clock.get(kp.did()), 2, "Participant {i} should be at 2");
         } else {
-            assert_eq!(clock.get(kp.did()), 1, "Participant {} should be at 1", i);
+            assert_eq!(clock.get(kp.did()), 1, "Participant {i} should be at 1");
         }
     }
 }
@@ -608,7 +606,7 @@ fn test_bloom_filter_high_volume() {
 
     // Insert 50000 entries
     let entries: Vec<[u8; 32]> = (0..50000)
-        .map(|i| compute_hash(format!("entry-{}", i).as_bytes()))
+        .map(|i| compute_hash(format!("entry-{i}").as_bytes()))
         .collect();
 
     for entry in &entries {

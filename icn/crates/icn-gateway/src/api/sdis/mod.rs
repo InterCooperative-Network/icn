@@ -256,8 +256,12 @@ pub struct GenerateProofRequest {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ProofTypeRequest {
-    Age { threshold: u8 },
-    Citizenship { country_code: String },
+    Age {
+        threshold: u8,
+    },
+    Citizenship {
+        country_code: String,
+    },
     #[serde(rename = "non_revocation")]
     NonRevocation,
 }
@@ -294,9 +298,7 @@ pub struct GenerateProofResponse {
 
 /// POST /v1/sdis/ephemeral/generate - Generate an ephemeral proof
 #[post("/ephemeral/generate")]
-pub async fn generate_ephemeral(
-    req: web::Json<GenerateProofRequest>,
-) -> Result<HttpResponse> {
+pub async fn generate_ephemeral(req: web::Json<GenerateProofRequest>) -> Result<HttpResponse> {
     use base64::Engine;
     use icn_identity::{Anchor, KeyBundle};
     use std::time::Duration;
@@ -324,8 +326,9 @@ pub async fn generate_ephemeral(
     let proof_type: icn_zkp::ProofType = req.proof_type.clone().into();
     let validity = Duration::from_secs(req.validity_secs.min(86400)); // Max 24 hours
 
-    let (proof, _binding) = EphemeralProof::generate(&keybundle, proof_type.clone(), validity, channels)
-        .map_err(|e| GatewayError::InternalError(format!("Failed to generate proof: {e}")))?;
+    let (proof, _binding) =
+        EphemeralProof::generate(&keybundle, proof_type.clone(), validity, channels)
+            .map_err(|e| GatewayError::InternalError(format!("Failed to generate proof: {e}")))?;
 
     // Encode for QR
     let qr_bytes = encode_for_qr(&proof)
@@ -488,8 +491,7 @@ mod tests {
     #[actix_web::test]
     async fn test_generate_ephemeral() {
         let app = test::init_service(
-            App::new()
-                .service(web::scope("/v1/sdis").service(generate_ephemeral)),
+            App::new().service(web::scope("/v1/sdis").service(generate_ephemeral)),
         )
         .await;
 
@@ -503,7 +505,11 @@ mod tests {
             .to_request();
         let resp = test::call_service(&app, req).await;
 
-        assert!(resp.status().is_success(), "Expected 200, got {}", resp.status());
+        assert!(
+            resp.status().is_success(),
+            "Expected 200, got {}",
+            resp.status()
+        );
         let body: serde_json::Value = test::read_body_json(resp).await;
         assert!(body["qr_data"].as_str().is_some());
         assert!(body["expires_at"].as_u64().is_some());

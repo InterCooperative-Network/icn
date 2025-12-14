@@ -244,7 +244,7 @@ impl TurnClient {
 
         let (len, from) = response;
         if from != self.config.server {
-            anyhow::bail!("Response from unexpected source: {}", from);
+            anyhow::bail!("Response from unexpected source: {from}");
         }
 
         // Parse response
@@ -517,10 +517,10 @@ impl TurnClient {
         let msg_type = u16::from_be_bytes([data[0], data[1]]);
         if msg_type == message_type::ALLOCATE_ERROR {
             let error_code = self.extract_error_code(data);
-            anyhow::bail!("TURN allocation failed with error: {}", error_code);
+            anyhow::bail!("TURN allocation failed with error: {error_code}");
         }
         if msg_type != message_type::ALLOCATE_RESPONSE {
-            anyhow::bail!("Unexpected TURN message type: 0x{:04x}", msg_type);
+            anyhow::bail!("Unexpected TURN message type: 0x{msg_type:04x}");
         }
 
         // Verify magic cookie
@@ -604,7 +604,7 @@ impl TurnClient {
         let msg_type = u16::from_be_bytes([data[0], data[1]]);
         if msg_type != message_type::REFRESH_RESPONSE {
             let error_code = self.extract_error_code(data);
-            anyhow::bail!("TURN refresh failed with error: {}", error_code);
+            anyhow::bail!("TURN refresh failed with error: {error_code}");
         }
 
         // Verify transaction ID
@@ -628,7 +628,7 @@ impl TurnClient {
         let msg_type = u16::from_be_bytes([data[0], data[1]]);
         if msg_type != message_type::CREATE_PERMISSION_RESPONSE {
             let error_code = self.extract_error_code(data);
-            anyhow::bail!("TURN permission request failed with error: {}", error_code);
+            anyhow::bail!("TURN permission request failed with error: {error_code}");
         }
 
         // Verify transaction ID
@@ -662,7 +662,7 @@ impl TurnClient {
                 } else {
                     String::new()
                 };
-                return format!("{}: {}", code, reason);
+                return format!("{code}: {reason}");
             }
 
             pos += 4 + ((attr_len + 3) & !3);
@@ -746,7 +746,7 @@ impl TurnClient {
                 let ip = std::net::Ipv6Addr::from(ip_bytes);
                 Ok(SocketAddr::new(std::net::IpAddr::V6(ip), port))
             }
-            _ => anyhow::bail!("Unknown address family: {}", family),
+            _ => anyhow::bail!("Unknown address family: {family}"),
         }
     }
 }
