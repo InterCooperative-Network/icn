@@ -236,7 +236,9 @@ pub async fn verify_level1(
     verifying_key
         .verify(req.enrollment_id.as_bytes(), &signature)
         .map_err(|_| {
-            GatewayError::AuthenticationFailed("Device proof signature verification failed".to_string())
+            GatewayError::AuthenticationFailed(
+                "Device proof signature verification failed".to_string(),
+            )
         })?;
 
     // Signature verified - store ephemeral DID and upgrade level
@@ -267,11 +269,13 @@ pub async fn verify_level2(
         .headers()
         .get("Authorization")
         .and_then(|h| h.to_str().ok())
-        .ok_or_else(|| GatewayError::AuthenticationFailed("Missing Authorization header".to_string()))?;
+        .ok_or_else(|| {
+            GatewayError::AuthenticationFailed("Missing Authorization header".to_string())
+        })?;
 
-    let token = auth_header
-        .strip_prefix("Bearer ")
-        .ok_or_else(|| GatewayError::AuthenticationFailed("Invalid Authorization format".to_string()))?;
+    let token = auth_header.strip_prefix("Bearer ").ok_or_else(|| {
+        GatewayError::AuthenticationFailed("Invalid Authorization format".to_string())
+    })?;
 
     let claims = auth.verify_token(token)?;
     let steward_did: Did = claims
@@ -388,7 +392,9 @@ pub async fn complete_enrollment(
     verifying_key
         .verify(message.as_bytes(), &signature)
         .map_err(|_| {
-            GatewayError::AuthenticationFailed("Completion signature verification failed".to_string())
+            GatewayError::AuthenticationFailed(
+                "Completion signature verification failed".to_string(),
+            )
         })?;
 
     // The DID is the ephemeral_did - in SDIS, keys are created on the device
@@ -655,11 +661,13 @@ pub async fn get_steward_stats(
         .headers()
         .get("Authorization")
         .and_then(|h| h.to_str().ok())
-        .ok_or_else(|| GatewayError::AuthenticationFailed("Missing Authorization header".to_string()))?;
+        .ok_or_else(|| {
+            GatewayError::AuthenticationFailed("Missing Authorization header".to_string())
+        })?;
 
-    let token = auth_header
-        .strip_prefix("Bearer ")
-        .ok_or_else(|| GatewayError::AuthenticationFailed("Invalid Authorization format".to_string()))?;
+    let token = auth_header.strip_prefix("Bearer ").ok_or_else(|| {
+        GatewayError::AuthenticationFailed("Invalid Authorization format".to_string())
+    })?;
 
     let claims = auth.verify_token(token)?;
     let steward_did: Did = claims
