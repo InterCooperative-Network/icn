@@ -42,6 +42,7 @@ import {
   Cooperative,
   CreateCoopRequest,
   UpdateCoopRequest,
+  CoopStatsResponse,
   Member,
   MemberProfile,
   AddMemberRequest,
@@ -416,6 +417,23 @@ export class ICNClient {
    */
   async deleteCoop(coopId: string): Promise<void> {
     return this.delete<void>(`/coops/${coopId}`);
+  }
+
+  /**
+   * Get public statistics for a cooperative (no authentication required)
+   *
+   * Returns aggregate statistics like total members, transaction count,
+   * and hours exchanged. Safe to expose publicly as it only contains
+   * aggregate data, not individual transaction details.
+   *
+   * @example
+   * ```typescript
+   * const stats = await client.getCoopStats('food-coop');
+   * console.log(`${stats.total_members} members, ${stats.transaction_count} transactions`);
+   * ```
+   */
+  async getCoopStats(coopId: string): Promise<CoopStatsResponse> {
+    return this.get<CoopStatsResponse>(`/coops/${coopId}/stats`, false);
   }
 
   /**

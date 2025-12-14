@@ -795,6 +795,7 @@ impl NetworkActor {
         fallback_config: Option<RateLimitConfig>,
         topology_config: Option<TopologyConfig>,
         stun_servers: Option<Vec<SocketAddr>>,
+        turn_config: Option<crate::TurnConfig>,
         misbehavior_detector: Option<Arc<RwLock<icn_security::MisbehaviorDetector>>>,
     ) -> Result<NetworkHandle> {
         let did = identity_bundle.did().clone();
@@ -820,6 +821,7 @@ impl NetworkActor {
                 trust_graph.clone(),
                 tls_trust_threshold,
                 stun_servers,
+                turn_config,
             )
             .await
             .context("Failed to start session manager")?;
@@ -2415,13 +2417,14 @@ mod tests {
             identity_bundle,
             addr,
             shutdown_tx.clone(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None, // No misbehavior detector for tests
+            None, // incoming_handler
+            None, // trust_graph
+            None, // trust_gated_config
+            None, // fallback_config
+            None, // topology_config
+            None, // stun_servers
+            None, // turn_config
+            None, // misbehavior_detector
         )
         .await
         .unwrap();

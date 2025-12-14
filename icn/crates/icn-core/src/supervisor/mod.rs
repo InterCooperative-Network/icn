@@ -1,7 +1,9 @@
 //! Supervisor for managing actors
 
+pub mod background_tasks;
 pub mod init_gossip;
 pub mod init_ledger;
+pub mod init_rpc;
 pub mod init_trust;
 pub mod registry;
 pub mod shutdown;
@@ -10,11 +12,9 @@ use anyhow::{bail, Context, Result};
 use icn_identity::{Did, IdentityBundle, RecoveryMessage, IDENTITY_RECOVERY_TOPIC};
 use icn_rpc::RpcServer;
 use icn_store::SledStore;
-use icn_time::ClockSync;
 use serde_json;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use std::time::Duration;
 use tokio::select;
 use tokio::task::JoinSet;
 use tracing::{debug, error, info, warn};
@@ -559,6 +559,9 @@ impl Supervisor {
                 None
             };
 
+            // Get TURN config for NAT traversal fallback (Phase 4 M1)
+            let turn_config = self.config.network.turn_config();
+
             let network_handle = icn_net::NetworkActor::spawn(
                 identity_bundle.clone(),
                 listen_addr,
@@ -569,6 +572,7 @@ impl Supervisor {
                 fallback_config,
                 Some(self.config.topology.clone()),
                 stun_servers,
+                turn_config,
                 Some(misbehavior_detector.clone()), // Shared Byzantine fault detector
             )
             .await?;
@@ -2807,30 +2811,10 @@ impl Supervisor {
             info!("Partition checker spawned");
 
             // Start clock synchronization background task
-            let clock_sync = ClockSync::new();
-            let sync_interval = Duration::from_secs(600); // 10 minutes
-            let mut clock_sync_shutdown = self.shutdown_tx.subscribe();
-            background_tasks.spawn(async move {
-                let mut sync = clock_sync;
-                loop {
-                    // Perform sync
-                    if let Err(e) = sync.sync().await {
-                        warn!("Clock sync failed: {}", e);
-                        icn_obs::metrics::scalability::clock_sync_failed_inc();
-                    }
-
-                    // Wait for next sync interval or shutdown
-                    select! {
-                        _ = tokio::time::sleep(sync_interval) => {
-                            // Continue to next sync
-                        }
-                        _ = clock_sync_shutdown.recv() => {
-                            info!("Clock sync task shutting down");
-                            break;
-                        }
-                    }
-                }
-            });
+            let _clock_sync_handle = background_tasks::spawn_clock_sync_task(
+                background_tasks::ClockSyncConfig::default(),
+                self.shutdown_tx.subscribe(),
+            );
 
             info!("Clock sync background task spawned (interval: 10 minutes)");
 
@@ -2970,52 +2954,13 @@ impl Supervisor {
             }
 
             // Spawn metrics update task
-            let start_time = std::time::Instant::now();
-            let network_handle_metrics = network_handle.clone();
-            let did_for_metrics = did.clone();
-            let mut last_uptime_recorded: u64 = 0;
-            let mut metrics_shutdown = self.shutdown_tx.subscribe();
-            background_tasks.spawn(async move {
-                let mut interval = tokio::time::interval(std::time::Duration::from_secs(10));
-                loop {
-                    tokio::select! {
-                        _ = interval.tick() => {
-                            // Update uptime
-                            let uptime_secs = start_time.elapsed().as_secs();
-                            icn_obs::metrics::system::uptime_seconds_set(uptime_secs);
-
-                            // Record uptime contribution (Phase 21.1)
-                            // Track the delta since last recording to avoid double-counting
-                            let uptime_delta = uptime_secs - last_uptime_recorded;
-                            if uptime_delta > 0 {
-                                icn_obs::metrics::contribution::uptime_seconds_add(
-                                    did_for_metrics.as_str(),
-                                    uptime_delta,
-                                );
-                                // Record heartbeat timestamp for liveness tracking
-                                let now = std::time::SystemTime::now()
-                                    .duration_since(std::time::UNIX_EPOCH)
-                                    .unwrap_or_default()
-                                    .as_secs();
-                                icn_obs::metrics::contribution::uptime_heartbeat_record(
-                                    did_for_metrics.as_str(),
-                                    now,
-                                );
-                                last_uptime_recorded = uptime_secs;
-                            }
-
-                            // Count active actors (network + gossip + ledger + rpc + anti-entropy + digest-emitter + cache-cleanup = 7)
-                            icn_obs::metrics::system::actors_active_set(7);
-
-                            // Update network stats (this also updates metrics via GetStats handler)
-                            let _ = network_handle_metrics.get_stats().await;
-                        }
-                        _ = metrics_shutdown.recv() => {
-                            break;
-                        }
-                    }
-                }
-            });
+            let _metrics_handle = background_tasks::spawn_metrics_update_task(
+                background_tasks::MetricsUpdateConfig::default(),
+                network_handle.clone(),
+                did.clone(),
+                std::time::Instant::now(),
+                self.shutdown_tx.subscribe(),
+            );
 
             info!("Metrics update task spawned");
 

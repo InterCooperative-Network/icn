@@ -75,6 +75,7 @@ impl TestNode {
             None, // No fallback config for tests
             None, // No topology config
             None, // No STUN servers
+            None, // No TURN config
             None, // No misbehavior detector for tests
         )
         .await?;
@@ -181,11 +182,12 @@ impl TestNode {
             listen_addr,
             shutdown_tx.clone(),
             Some(incoming_handler),
-            None,
-            None,
-            None,
-            None,
-            None,
+            None, // No trust graph
+            None, // No trust-gated config
+            None, // No fallback config
+            None, // No topology config
+            None, // No STUN servers
+            None, // No TURN config
             None, // No misbehavior detector for tests
         )
         .await?;

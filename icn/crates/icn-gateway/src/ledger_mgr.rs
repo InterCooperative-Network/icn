@@ -210,6 +210,37 @@ impl LedgerManager {
         let end = offset.saturating_add(limit).min(total);
         Ok(entries[offset..end].to_vec())
     }
+
+    /// Get aggregate transaction statistics for a cooperative
+    ///
+    /// Returns (transaction_count, total_hours_exchanged) for public stats display.
+    /// This endpoint is safe to expose publicly as it only returns aggregate data.
+    pub fn get_transaction_stats(&self, coop_id: &CoopId) -> Result<(usize, f64)> {
+        let ledger_arc = self.get_ledger(coop_id)?;
+        let ledger = ledger_arc
+            .read()
+            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
+
+        // Get all entries
+        let entries = ledger
+            .get_all_entries()
+            .map_err(GatewayError::SubstrateError)?;
+
+        let transaction_count = entries.len();
+
+        // Sum up all transaction amounts (absolute values)
+        let mut total_hours_exchanged = 0.0;
+        for entry in &entries {
+            for delta in &entry.accounts {
+                // Use credit amounts (positive side of double-entry)
+                if let Some(credit) = delta.credit {
+                    total_hours_exchanged += credit as f64;
+                }
+            }
+        }
+
+        Ok((transaction_count, total_hours_exchanged))
+    }
 }
 
 #[cfg(test)]

@@ -1707,6 +1707,11 @@ pub mod ledger {
     pub fn entries_rejected_low_trust_inc() {
         counter!("icn_ledger_entries_rejected_low_trust_total").increment(1);
     }
+
+    /// Increment counter when balance recomputation is aborted due to version mismatch (M7 fix)
+    pub fn recompute_aborted_version_mismatch_inc() {
+        counter!("icn_ledger_recompute_aborted_version_mismatch_total").increment(1);
+    }
 }
 
 /// Governance execution metrics
@@ -2172,6 +2177,11 @@ pub mod gateway {
         counter!("icn_gateway_members_removed_total").increment(1);
     }
 
+    /// Track public stats endpoint access
+    pub fn stats_accessed_inc() {
+        counter!("icn_gateway_stats_accessed_total").increment(1);
+    }
+
     pub fn payments_created_inc() {
         counter!("icn_gateway_payments_created_total").increment(1);
     }
@@ -2307,7 +2317,41 @@ pub mod nat_traversal {
     pub fn hole_punch_success_inc() {
         counter!("icn_nat_hole_punch_success_total").increment(1);
     }
+
+    // TURN relay metrics (Phase 4 - M1)
+    pub fn turn_allocation_inc() {
+        counter!("icn_turn_allocations_total").increment(1);
+    }
+
+    pub fn turn_allocation_failure_inc(reason: &str) {
+        counter!("icn_turn_allocation_failures_total",
+                 "reason" => reason.to_string())
+        .increment(1);
+    }
+
+    pub fn turn_permission_refresh_inc() {
+        counter!("icn_turn_permission_refresh_total").increment(1);
+    }
+
+    pub fn relay_connection_attempt_inc() {
+        counter!("icn_relay_connection_attempts_total").increment(1);
+    }
+
+    pub fn relay_connection_success_inc() {
+        counter!("icn_relay_connection_success_total").increment(1);
+    }
+
+    pub fn relay_data_bytes_sent(bytes: u64) {
+        counter!("icn_relay_data_bytes_sent_total").increment(bytes);
+    }
+
+    pub fn relay_data_bytes_received(bytes: u64) {
+        counter!("icn_relay_data_bytes_received_total").increment(bytes);
+    }
 }
+
+/// Alias for nat_traversal module for convenience
+pub use nat_traversal as nat;
 
 /// Compute metrics
 pub mod compute {

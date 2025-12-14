@@ -324,6 +324,7 @@ impl RecoveryTestNode {
             None, // No fallback config
             None, // No topology config
             None, // No STUN servers
+            None, // No TURN config
             None, // No misbehavior detector for tests
         )
         .await?;

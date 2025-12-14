@@ -54,6 +54,12 @@ pub struct SessionManager {
     /// Discovered public endpoint (if NAT traversal enabled)
     public_endpoint: Arc<RwLock<Option<SocketAddr>>>,
 
+    /// TURN relay client for NAT traversal fallback
+    turn_client: Arc<RwLock<Option<crate::TurnClient>>>,
+
+    /// TURN relay address (if allocation is active)
+    relay_addr: Arc<RwLock<Option<SocketAddr>>>,
+
     /// Shutdown channel receiver
     _shutdown_rx: mpsc::Receiver<()>,
 }
@@ -67,6 +73,8 @@ impl SessionManager {
             endpoint: Arc::new(RwLock::new(None)),
             connections: Arc::new(RwLock::new(HashMap::new())),
             public_endpoint: Arc::new(RwLock::new(None)),
+            turn_client: Arc::new(RwLock::new(None)),
+            relay_addr: Arc::new(RwLock::new(None)),
             _shutdown_rx: shutdown_rx,
         }
     }
@@ -81,6 +89,9 @@ impl SessionManager {
     ///
     /// If stun_servers is provided, performs NAT traversal discovery to determine
     /// the node's public endpoint (IP and port visible from the internet).
+    ///
+    /// If turn_config is provided, creates a TURN relay allocation for NAT traversal
+    /// fallback when direct connections fail.
     pub async fn start(
         &mut self,
         keypair: &KeyPair,
@@ -88,6 +99,7 @@ impl SessionManager {
         trust_graph: Option<Arc<RwLock<icn_trust::TrustGraph>>>,
         min_trust_threshold: Option<f64>,
         stun_servers: Option<Vec<SocketAddr>>,
+        turn_config: Option<crate::TurnConfig>,
     ) -> Result<()> {
         info!("Session manager starting on {}", listen_addr);
 
@@ -158,6 +170,46 @@ impl SessionManager {
                     tracing::warn!("Failed to discover public endpoint via STUN: {}. Node will only be reachable on local network.", e);
                 }
             }
+        }
+
+        // Initialize TURN relay if configured (NAT traversal fallback)
+        if let Some(config) = turn_config {
+            info!("TURN relay fallback enabled - server: {}", config.server);
+            let turn_client = crate::TurnClient::new(config.clone());
+
+            // Create a UDP socket for TURN communication
+            // We bind to 0.0.0.0:0 to get an ephemeral port
+            match tokio::net::UdpSocket::bind("0.0.0.0:0").await {
+                Ok(turn_socket) => {
+                    // Try to create a TURN allocation
+                    match turn_client.allocate(&turn_socket).await {
+                        Ok(allocation) => {
+                            info!(
+                                "✅ TURN relay allocated: {} (mapped: {})",
+                                allocation.relay_addr, allocation.mapped_addr
+                            );
+                            *self.relay_addr.write().await = Some(allocation.relay_addr);
+                            icn_obs::metrics::nat::turn_allocation_inc();
+                        }
+                        Err(e) => {
+                            warn!(
+                                "Failed to create TURN allocation: {}. Relay fallback will not be available.",
+                                e
+                            );
+                            icn_obs::metrics::nat::turn_allocation_failure_inc("allocation_failed");
+                        }
+                    }
+                }
+                Err(e) => {
+                    warn!(
+                        "Failed to create UDP socket for TURN: {}. Relay fallback will not be available.",
+                        e
+                    );
+                    icn_obs::metrics::nat::turn_allocation_failure_inc("socket_bind_failed");
+                }
+            }
+
+            *self.turn_client.write().await = Some(turn_client);
         }
 
         // Store endpoint
@@ -281,6 +333,13 @@ impl SessionManager {
         *self.public_endpoint.read().await
     }
 
+    /// Get the TURN relay address (if allocation is active)
+    ///
+    /// Returns None if TURN is disabled or allocation failed.
+    pub async fn relay_addr(&self) -> Option<SocketAddr> {
+        *self.relay_addr.read().await
+    }
+
     /// Generate a connection candidate for gossip announcement
     ///
     /// Creates a ConnectionCandidate message that can be published to the
@@ -299,8 +358,8 @@ impl SessionManager {
         let local_addr = endpoint.local_addr()?;
         let public_addr = *self.public_endpoint.read().await;
 
-        // For Phase 2, relay_addr is always None (TURN relay comes in Phase 4)
-        let relay_addr = None;
+        // Include relay address if TURN allocation is active (Phase 4 M1)
+        let relay_addr = *self.relay_addr.read().await;
 
         Ok(crate::candidate::ConnectionCandidate::new(
             did,
@@ -341,6 +400,8 @@ impl SessionManager {
             endpoint: self.endpoint.clone(),
             connections: self.connections.clone(),
             public_endpoint: self.public_endpoint.clone(),
+            turn_client: self.turn_client.clone(),
+            relay_addr: self.relay_addr.clone(),
             _shutdown_rx: mpsc::channel(1).1,
         }
     }
@@ -364,7 +425,7 @@ mod tests {
         let addr = "127.0.0.1:0".parse().unwrap();
 
         manager
-            .start(&keypair, addr, None, None, None)
+            .start(&keypair, addr, None, None, None, None)
             .await
             .unwrap();
 
@@ -384,7 +445,7 @@ mod tests {
         let server_addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
 
         server_manager
-            .start(&server_keypair, server_addr, None, None, None)
+            .start(&server_keypair, server_addr, None, None, None, None)
             .await
             .unwrap();
 
@@ -403,7 +464,7 @@ mod tests {
         let client_addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
 
         client_manager
-            .start(&client_keypair, client_addr, None, None, None)
+            .start(&client_keypair, client_addr, None, None, None, None)
             .await
             .unwrap();
 

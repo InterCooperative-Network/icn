@@ -260,6 +260,8 @@ impl GatewayServer {
                         )
                         // Public member profiles (read-only)
                         .service(api::members::get_member_profile)
+                        // Public cooperative statistics (no auth required)
+                        .service(api::coops::get_coop_stats)
                         // Public SDIS endpoints (verification + enrollment)
                         .service(
                             web::scope("/sdis")

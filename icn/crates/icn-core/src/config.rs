@@ -150,6 +150,30 @@ pub struct NetworkConfig {
     /// For controlled/trusted environments, set to 0.0 to disable trust gating
     #[serde(default = "default_min_trust_threshold")]
     pub min_trust_threshold: f64,
+
+    /// TURN relay server for NAT traversal fallback (format: "IP:PORT")
+    /// Used when direct connection fails (e.g., symmetric NAT)
+    #[serde(default)]
+    pub turn_server: Option<String>,
+
+    /// TURN server username (optional, for authenticated TURN)
+    #[serde(default)]
+    pub turn_username: Option<String>,
+
+    /// TURN server password (optional, for authenticated TURN)
+    #[serde(default)]
+    pub turn_password: Option<String>,
+}
+
+impl NetworkConfig {
+    /// Convert to TurnConfig if TURN server is configured
+    pub fn turn_config(&self) -> Option<icn_net::TurnConfig> {
+        let server = self.turn_server.as_ref()?;
+        let server_addr = server.parse().ok()?;
+        Some(icn_net::TurnConfig::new(server_addr)
+            .with_username(self.turn_username.clone())
+            .with_password(self.turn_password.clone()))
+    }
 }
 
 fn default_rpc_port() -> u16 {
@@ -570,6 +594,9 @@ impl Default for Config {
                 bootstrap_peers: vec![],
                 stun_servers: default_stun_servers(),
                 min_trust_threshold: default_min_trust_threshold(),
+                turn_server: None,
+                turn_username: None,
+                turn_password: None,
             },
             observability: ObservabilityConfig {
                 metrics_port: 9100,

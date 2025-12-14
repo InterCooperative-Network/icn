@@ -15,6 +15,7 @@ pub mod session;
 pub mod stun;
 pub mod tls;
 pub mod topology;
+pub mod turn;
 pub mod version;
 
 pub use actor::{IncomingMessageHandler, NetworkActor, NetworkHandle, NetworkMsg, NetworkStats};
@@ -32,6 +33,7 @@ pub use rate_limit::{RateLimitConfig, RateLimiter, TrustGatedRateLimitConfig};
 pub use replay_guard::ReplayGuard;
 pub use session::SessionManager;
 pub use stun::StunClient;
+pub use turn::{TurnAllocation, TurnClient, TurnConfig};
 pub use topology::{
     FanoutConfig, NeighborLimitsConfig, NeighborMetrics, NeighborSets, NetworkMetrics, NodeRole,
     PeerId, TopologyConfig, TopologyInfo,

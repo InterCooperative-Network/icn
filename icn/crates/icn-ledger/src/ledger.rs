@@ -55,6 +55,9 @@ pub struct ArchiveRecord {
 /// Default: 0.1 (requires at least Known trust class)
 const DEFAULT_MIN_TRUST_FOR_ENTRY: f64 = 0.1;
 
+/// Key for storing journal version in storage
+const JOURNAL_VERSION_KEY: &str = "ledger:journal_version";
+
 /// Ledger manager for double-entry mutual credit accounting
 pub struct Ledger {
     /// Storage backend
@@ -93,6 +96,10 @@ pub struct Ledger {
 
     /// Minimum trust score for entry acceptance
     min_trust_for_entry: f64,
+
+    /// Journal version counter for snapshot isolation (M7 fix)
+    /// Incremented on each entry append to detect concurrent modifications
+    journal_version: u64,
 }
 
 impl Ledger {
@@ -100,6 +107,9 @@ impl Ledger {
     pub fn new(store: Arc<dyn Store>) -> Result<Self> {
         let quarantine = QuarantineStore::new(store.clone());
         let freeze_manager = FreezeManager::with_store(store.clone())?;
+
+        // Load journal version from storage (or default to 0)
+        let journal_version = Self::load_journal_version_from_store(&store)?;
 
         let mut ledger = Ledger {
             store,
@@ -114,6 +124,7 @@ impl Ledger {
             freeze_manager,
             trust_graph: None,
             min_trust_for_entry: DEFAULT_MIN_TRUST_FOR_ENTRY,
+            journal_version,
         };
 
         // Load cached balances from storage
@@ -126,6 +137,33 @@ impl Ledger {
         ledger.rebuild_fork_index()?;
 
         Ok(ledger)
+    }
+
+    /// Load journal version from storage
+    fn load_journal_version_from_store(store: &Arc<dyn Store>) -> Result<u64> {
+        match store.get(JOURNAL_VERSION_KEY.as_bytes())? {
+            Some(bytes) => {
+                let version: u64 = serde_json::from_slice(&bytes)?;
+                debug!(version, "Loaded journal version from storage");
+                Ok(version)
+            }
+            None => {
+                debug!("No journal version in storage, starting at 0");
+                Ok(0)
+            }
+        }
+    }
+
+    /// Save journal version to storage
+    fn save_journal_version(&self) -> Result<()> {
+        let bytes = serde_json::to_vec(&self.journal_version)?;
+        self.store.put(JOURNAL_VERSION_KEY.as_bytes(), &bytes)?;
+        Ok(())
+    }
+
+    /// Get the current journal version (for snapshot isolation)
+    pub fn journal_version(&self) -> u64 {
+        self.journal_version
     }
 
     /// Set the trust graph for trust-weighted fork resolution and entry validation
@@ -263,10 +301,15 @@ impl Ledger {
         self.save_cached_balances()?;
         self.save_cleared_volume_index()?;
 
+        // Increment and persist journal version for snapshot isolation (M7 fix)
+        self.journal_version += 1;
+        self.save_journal_version()?;
+
         info!(
             entry_hash = %hash,
             account_count = entry.accounts.len(),
             timestamp = entry.timestamp,
+            journal_version = self.journal_version,
             "Ledger entry appended"
         );
 
@@ -787,13 +830,24 @@ impl Ledger {
     }
 
     /// Recompute all balances and cleared volumes from journal entries (for verification)
+    ///
+    /// This method uses snapshot isolation to prevent race conditions (M7 fix):
+    /// 1. Capture the journal version at snapshot time
+    /// 2. Compute new balances from the snapshot
+    /// 3. Validate the version hasn't changed before applying
+    /// 4. If version changed, return error (caller should retry)
     pub fn recompute_balances(&mut self) -> Result<()> {
+        // M7 Fix: Capture journal version at snapshot time for isolation
+        let snapshot_version = self.journal_version;
+
         info!(
             cached_account_count = self.cached_balances.len(),
             cleared_volume_count = self.cleared_volume_index.len(),
+            snapshot_version,
             "Recomputing all balances and cleared volumes from journal"
         );
 
+        // Take snapshot of entries
         let entries = self.get_all_entries()?;
         let balances = compute_all_balances(&entries);
 
@@ -808,6 +862,24 @@ impl Ledger {
             }
         }
 
+        // M7 Fix: Validate journal version hasn't changed during recomputation
+        // This prevents the race condition where concurrent entry appends are lost
+        if self.journal_version != snapshot_version {
+            warn!(
+                snapshot_version,
+                current_version = self.journal_version,
+                "Journal modified during balance recomputation - aborting to prevent data loss"
+            );
+            icn_obs::metrics::ledger::recompute_aborted_version_mismatch_inc();
+            anyhow::bail!(
+                "Journal modified during balance recomputation (version {} -> {}). \
+                 Retry the operation to ensure data consistency.",
+                snapshot_version,
+                self.journal_version
+            );
+        }
+
+        // Safe to apply - journal hasn't changed during our computation
         self.cached_balances = balances;
         self.cleared_volume_index = cleared_volumes;
         self.save_cached_balances()?;
@@ -817,9 +889,36 @@ impl Ledger {
             entry_count = entries.len(),
             account_count = self.cached_balances.len(),
             cleared_volume_count = self.cleared_volume_index.len(),
+            snapshot_version,
             "Balance and cleared volume recomputation complete"
         );
         Ok(())
+    }
+
+    /// Recompute balances with automatic retry on version mismatch
+    ///
+    /// This is a convenience wrapper around `recompute_balances` that handles
+    /// the race condition by retrying up to `max_retries` times.
+    pub fn recompute_balances_with_retry(&mut self, max_retries: usize) -> Result<()> {
+        for attempt in 0..=max_retries {
+            match self.recompute_balances() {
+                Ok(()) => return Ok(()),
+                Err(e) if attempt < max_retries && e.to_string().contains("Journal modified") => {
+                    warn!(
+                        attempt = attempt + 1,
+                        max_retries,
+                        "Balance recomputation retry due to concurrent modification"
+                    );
+                    // Small delay to reduce contention
+                    std::thread::sleep(std::time::Duration::from_millis(10));
+                }
+                Err(e) => return Err(e),
+            }
+        }
+        anyhow::bail!(
+            "Balance recomputation failed after {} retries due to concurrent modifications",
+            max_retries
+        );
     }
 
     /// Verify ledger integrity

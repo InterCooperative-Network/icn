@@ -75,6 +75,7 @@ impl TestNode {
             None, // No fallback config for tests
             None, // No topology config
             None, // No STUN servers
+            None, // No TURN config
             None, // No misbehavior detector for tests
         )
         .await?;
@@ -252,11 +253,12 @@ async fn test_graceful_restart_preserves_state() -> Result<()> {
         listen_addr2,
         shutdown_tx2.clone(),
         Some(incoming_handler2),
-        None,
-        None,
-        None,
-        None,
-        None,
+        None, // No trust graph
+        None, // No trust-gated config
+        None, // No fallback config
+        None, // No topology config
+        None, // No STUN servers
+        None, // No TURN config
         None, // No misbehavior detector for tests
     )
     .await?;
@@ -453,11 +455,12 @@ async fn test_x25519_keys_persist_across_restart() -> Result<()> {
         listen_addr_restart,
         shutdown_tx_restart.clone(),
         Some(incoming_handler),
-        None,
-        None,
-        None,
-        None,
-        None,
+        None, // No trust graph
+        None, // No trust-gated config
+        None, // No fallback config
+        None, // No topology config
+        None, // No STUN servers
+        None, // No TURN config
         None, // No misbehavior detector for tests
     )
     .await?;

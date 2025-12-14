@@ -69,6 +69,26 @@ export interface UpdateCoopRequest {
   settings?: CoopSettings;
 }
 
+/**
+ * Public statistics for a cooperative (no authentication required)
+ */
+export interface CoopStatsResponse {
+  /** Cooperative ID */
+  coop_id: string;
+  /** Cooperative name */
+  name: string;
+  /** Total number of members */
+  total_members: number;
+  /** Total hours exchanged across all transactions */
+  total_hours_exchanged: number;
+  /** Total number of transactions */
+  transaction_count: number;
+  /** Average transaction size in hours */
+  avg_transaction_size: number;
+  /** Cooperative creation timestamp */
+  created_at: number;
+}
+
 export type MemberRole = 'owner' | 'admin' | 'member';
 
 export interface Member {

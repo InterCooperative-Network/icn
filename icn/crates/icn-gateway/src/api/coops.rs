@@ -296,6 +296,73 @@ pub async fn update_member_role(
     Ok(HttpResponse::Ok().json(coop))
 }
 
+/// Public statistics response for a cooperative
+#[derive(serde::Serialize)]
+pub struct CoopStatsResponse {
+    /// Cooperative ID
+    pub coop_id: String,
+
+    /// Cooperative name
+    pub name: String,
+
+    /// Total number of members
+    pub total_members: usize,
+
+    /// Total hours exchanged (absolute sum of all transactions)
+    pub total_hours_exchanged: f64,
+
+    /// Number of transactions
+    pub transaction_count: usize,
+
+    /// Average transaction size
+    pub avg_transaction_size: f64,
+
+    /// When the cooperative was created (unix timestamp)
+    pub created_at: u64,
+}
+
+/// GET /coops/:id/stats - Get public statistics for a cooperative
+///
+/// This endpoint is PUBLIC (no authentication required) and returns
+/// aggregate statistics that are safe to share publicly.
+#[get("/coops/{id}/stats")]
+pub async fn get_coop_stats(
+    coop_mgr: web::Data<Arc<CoopManager>>,
+    ledger_mgr: web::Data<Arc<crate::ledger_mgr::LedgerManager>>,
+    id: web::Path<String>,
+) -> Result<HttpResponse> {
+    let coop_id = id.into_inner();
+
+    // Get cooperative info
+    let coop = coop_mgr.get_coop(&coop_id)?;
+
+    // Get transaction statistics from ledger
+    let (transaction_count, total_hours_exchanged) = ledger_mgr
+        .get_transaction_stats(&coop_id)
+        .unwrap_or((0, 0.0));
+
+    let avg_transaction_size = if transaction_count > 0 {
+        total_hours_exchanged / transaction_count as f64
+    } else {
+        0.0
+    };
+
+    let stats = CoopStatsResponse {
+        coop_id: coop.id.clone(),
+        name: coop.name.clone(),
+        total_members: coop.members.len(),
+        total_hours_exchanged,
+        transaction_count,
+        avg_transaction_size,
+        created_at: coop.created_at,
+    };
+
+    // Track stats access
+    gateway::stats_accessed_inc();
+
+    Ok(HttpResponse::Ok().json(stats))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
