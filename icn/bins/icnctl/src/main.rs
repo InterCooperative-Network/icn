@@ -5089,11 +5089,10 @@ async fn handle_auth_command(cmd: AuthCommands, data_dir: &Path) -> Result<()> {
                 .as_str()
                 .context("Missing token in response")?;
 
-            let expires_at = token_data["expires_at"].as_i64().unwrap_or(0);
-
-            let expiry_time = chrono::DateTime::from_timestamp(expires_at, 0)
-                .map(|dt| dt.format("%Y-%m-%d %H:%M:%S UTC").to_string())
-                .unwrap_or_else(|| "unknown".to_string());
+            // Gateway returns expires_in (relative seconds), calculate absolute expiry
+            let expires_in = token_data["expires_in"].as_u64().unwrap_or(3600);
+            let expiry_time = chrono::Utc::now() + chrono::Duration::seconds(expires_in as i64);
+            let expiry_str = expiry_time.format("%Y-%m-%d %H:%M:%S UTC").to_string();
 
             println!("✓ Token obtained successfully!");
             println!();
@@ -5102,7 +5101,7 @@ async fn handle_auth_command(cmd: AuthCommands, data_dir: &Path) -> Result<()> {
             println!("{token}");
             println!("────────────────────────────────────────");
             println!();
-            println!("Expires: {expiry_time}");
+            println!("Expires: {expiry_str}");
         }
     }
 
