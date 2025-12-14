@@ -1,4 +1,4 @@
-# Phase 4: NAT Traversal & Supervisor Modularization
+# Phase 4: NAT Traversal, Supervisor Modularization & Locality Integration
 
 **Date:** 2025-12-13
 **Status:** Complete
@@ -10,6 +10,7 @@ This session completed several key infrastructure improvements:
 - Supervisor modularization with extracted modules (A1)
 - TypeScript SDK public statistics endpoint
 - Balance recomputation race fix (M7)
+- Locality/RTT integration for compute placement (M5)
 
 ## Changes Made
 
@@ -140,9 +141,32 @@ supervisor/
 └── shutdown.rs         # Graceful shutdown helpers
 ```
 
+### 5. Locality/RTT Integration (M5)
+
+Integrated network topology RTT data into compute placement scoring.
+
+**New Types** (`icn-compute/src/actor.rs`):
+- `LocalityCallback`: Callback type for querying locality data
+- Takes peer DID, returns `LocalityContext` with RTT, blob info, region data
+
+**ComputeActor Changes**:
+- Added `locality_callback: Option<LocalityCallback>` field
+- Added `set_locality_callback()` setter method
+- `on_placement_request()` now uses callback instead of `LocalityContext::empty()`
+
+**Supervisor Integration** (`icn-core/src/supervisor/mod.rs`):
+- Creates locality callback that queries `NeighborSets.get_rtt(peer)`
+- Wires callback to compute actor before spawning
+- Uses `blocking_read()` for sync callback execution
+
+**Impact**:
+- Placement offers now include real RTT data when available
+- Better placement decisions based on network latency
+- Foundation for full data locality scoring
+
 ## Next Steps
 
 From ROADMAP.md and SYSTEM_GAPS.md:
-- M5: Locality constraints for distributed compute
+- M9: Deliberation period clock skew (use relative timing)
 - A1 continuation: Further supervisor refactoring if needed
 - Track C1: Pilot community selection (business track)

@@ -37,8 +37,8 @@ mod wasm_executor;
 mod wasm_registry;
 
 pub use actor::{
-    ComputeActor, ComputeEvent, ComputeHandle, EventCallback, PaymentCallback, PaymentRequest,
-    SendCallback, TrustCallback,
+    ComputeActor, ComputeEvent, ComputeHandle, EventCallback, LocalityCallback, PaymentCallback,
+    PaymentRequest, SendCallback, TrustCallback,
 };
 pub use actor_model::{
     ActorCheckpoint, ActorEvent, ActorId, ActorMode, ActorRuntimeState, MigrationDecision,

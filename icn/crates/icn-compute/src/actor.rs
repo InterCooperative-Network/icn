@@ -86,6 +86,15 @@ pub enum ComputeEvent {
 /// Callback for broadcasting compute events (e.g., to WebSocket clients)
 pub type EventCallback = Arc<dyn Fn(ComputeEvent) + Send + Sync>;
 
+/// Callback for querying network locality data for a peer (Phase 16C M5 integration)
+///
+/// Takes a peer DID and returns locality context including:
+/// - RTT to the peer (from network topology)
+/// - Blob locality information
+/// - Region information
+pub type LocalityCallback =
+    Arc<dyn Fn(&str) -> crate::scheduler::LocalityContext + Send + Sync>;
+
 /// Convert an ExecutionOutcome to a CCL Value for dispute evidence
 fn outcome_to_value(outcome: &crate::types::ExecutionOutcome) -> icn_ccl::Value {
     match outcome {
@@ -433,6 +442,8 @@ pub struct ComputeActor {
     dispute_resolution: Option<Arc<tokio::sync::RwLock<icn_ccl::DisputeResolutionSystem>>>,
     /// Byzantine fault detector for compute verification failures (Phase 18)
     misbehavior_detector: Option<Arc<tokio::sync::RwLock<icn_security::MisbehaviorDetector>>>,
+    /// Locality callback for network topology data (Phase 16C M5)
+    locality_callback: Option<LocalityCallback>,
 }
 
 impl ComputeActor {
@@ -457,6 +468,7 @@ impl ComputeActor {
             policy_manager: None,
             dispute_resolution: None,   // Phase 18 Week 4
             misbehavior_detector: None, // Set via set_misbehavior_detector()
+            locality_callback: None,    // Phase 16C M5: Set via set_locality_callback()
         }
     }
 
@@ -489,6 +501,14 @@ impl ComputeActor {
         detector: Arc<tokio::sync::RwLock<icn_security::MisbehaviorDetector>>,
     ) {
         self.misbehavior_detector = Some(detector);
+    }
+
+    /// Set locality callback for network topology data (Phase 16C M5)
+    ///
+    /// This callback provides RTT and data locality information for task placement.
+    /// When set, placement offers will use real network topology data instead of defaults.
+    pub fn set_locality_callback(&mut self, cb: LocalityCallback) {
+        self.locality_callback = Some(cb);
     }
 
     /// Set maximum concurrent tasks this executor will claim
@@ -1908,9 +1928,13 @@ impl ComputeActor {
         // Check if we have a placement policy (for now, use default)
         let policy = crate::scheduler::DefaultPlacementPolicy::default();
 
-        // Build locality context (Phase 16C)
-        // TODO: Integrate with network layer for RTT and blob registry for data locality
-        let locality_ctx = crate::scheduler::LocalityContext::empty();
+        // Build locality context (Phase 16C / M5)
+        // Use locality callback if available, otherwise use empty context
+        let locality_ctx = if let Some(ref locality_cb) = self.locality_callback {
+            (locality_cb)(&submitter)
+        } else {
+            crate::scheduler::LocalityContext::empty()
+        };
 
         // Check placement constraints from policy (Phase 16E)
         // Look up task to get its placement_constraints

@@ -2610,6 +2610,38 @@ impl Supervisor {
             // Set misbehavior detector for Byzantine fault detection (Phase 18)
             compute_actor.set_misbehavior_detector(misbehavior_detector.clone());
 
+            // Set locality callback for network topology data (Phase 16C / M5)
+            // This enables placement scoring based on RTT to submitter
+            if let Some(ref neighbor_sets) = network_handle.neighbor_sets() {
+                let neighbor_sets_for_locality = neighbor_sets.clone();
+                let locality_callback: icn_compute::LocalityCallback =
+                    Arc::new(move |submitter_did: &str| {
+                        // Parse DID and get RTT if available
+                        let submitter_rtt_ms: Option<u64> = serde_json::from_value::<Did>(
+                            serde_json::Value::String(submitter_did.to_string()),
+                        )
+                        .ok()
+                        .and_then(|did| {
+                            let peer = icn_net::PeerId(did);
+                            // Use blocking_read for sync callback
+                            let sets = neighbor_sets_for_locality.blocking_read();
+                            sets.get_rtt(&peer)
+                        });
+
+                        icn_compute::LocalityContext {
+                            submitter_rtt_ms,
+                            // Blob locality would require task input analysis
+                            // For now, we provide empty blob context
+                            local_blob_count: 0,
+                            total_blob_count: 0,
+                            own_region: None,
+                            submitter_region: None,
+                        }
+                    });
+                compute_actor.set_locality_callback(locality_callback);
+                info!("✓ Locality callback set for compute placement");
+            }
+
             let compute_handle = compute_actor.spawn();
 
             // Fill compute handle holder for notification callback

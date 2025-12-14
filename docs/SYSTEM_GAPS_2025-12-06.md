@@ -18,7 +18,7 @@ Deep audit of ICN core systems revealed **47 significant gaps** across:
 **Critical Finding**: The infrastructure is ~90% complete, but the remaining 10% includes **critical consistency bugs** and **security model gaps** that would cause production failures.
 
 **Update 2025-12-07**: All 8 Critical issues and all 9 High priority issues have been addressed. See status below.
-**Update 2025-12-13**: C3 (Actor Pause/Resume) verified as implemented. M8 (Floating Point Selection) fixed with deterministic tie-breaking. M3 (Dead-Letter Queue) implemented. M6 (Fork Detection) and A7 (Panics) verified as non-issues. M2 (Profile Query Responses) implemented. M4 (Executor Capacity) implemented. A1 Phase 1 complete (supervisor modularization started).
+**Update 2025-12-13**: C3 (Actor Pause/Resume) verified as implemented. M8 (Floating Point Selection) fixed with deterministic tie-breaking. M3 (Dead-Letter Queue) implemented. M6 (Fork Detection) and A7 (Panics) verified as non-issues. M2 (Profile Query Responses) implemented. M4 (Executor Capacity) implemented. A1 Phase 1 complete (supervisor modularization started). M1 (TURN Relay) implemented with RFC 5766 protocol. M7 (Balance Recomputation Race) fixed with journal versioning. A1 Phase 2 (init_rpc.rs extraction) complete. M5 (Locality/RTT) integrated via LocalityCallback.
 
 ---
 
@@ -133,10 +133,11 @@ These cause incorrect behavior but may not immediately crash the system.
 
 These affect robustness but system can function.
 
-### M1. NAT Traversal Relay Fallback Missing
-**Location**: `icn-core/src/supervisor.rs:1422`
+### M1. NAT Traversal Relay Fallback Missing - FIXED
+**Location**: `icn-net/src/turn.rs`, `icn-net/src/session.rs`
 **Issue**: TURN relay not implemented (Phase 4 TODO)
 **Impact**: Nodes behind symmetric NAT can't connect
+**Fix**: Implemented `TurnClient` with RFC 5766 protocol (allocate, refresh, create_permission). Added `TurnConfig` with builder pattern to `NetworkConfig`. `SessionManager` creates allocation on startup if configured and includes relay address in connection candidates. Added TURN metrics.
 
 ### M2. Profile Query Responses Not Implemented - FIXED
 **Location**: `icn-core/src/supervisor/mod.rs:1363`
@@ -153,20 +154,20 @@ These affect robustness but system can function.
 **Issue**: Scheduler can't make informed placement decisions
 **Fix**: Added `capacity` field to `ExecutorInfo` struct. `on_capacity_announce()` now stores capacity in the executor registry. Added `get_executor_capacity()` and `get_all_executor_capacities()` methods for scheduler placement decisions.
 
-### M5. Locality/Region Constraints Incomplete
-**Location**: `icn-compute/src/actor.rs:1881-1896`
+### M5. Locality/Region Constraints Incomplete - FIXED
+**Location**: `icn-compute/src/actor.rs:1931-1937`, `icn-core/src/supervisor/mod.rs:2613-2643`
 **Issue**: Network RTT and blob registry integration missing
-**Fix**: Implement data locality scoring
+**Fix**: Added `LocalityCallback` type to ComputeActor that queries network topology for RTT data. Supervisor wires up callback to NeighborSets for live RTT lookup. Placement scoring now uses real network latency data when available.
 
 ### M6. Fork Detection Index Not Atomic - VERIFIED NON-ISSUE
 **Location**: `icn-ledger/src/ledger.rs:119-176`
 **Issue**: Entry stored before fork index updated - crash window
 **Status**: The ForkDetector is an in-memory structure that is rebuilt from persistent entries on startup via `rebuild_fork_index()`. Any crash window is recovered on restart. Not a data consistency issue.
 
-### M7. Balance Recomputation Race
+### M7. Balance Recomputation Race - FIXED
 **Location**: `icn-ledger/src/ledger.rs:531-578`
 **Issue**: Full recompute during quarantine can cause lost updates
-**Fix**: Use async recompute with snapshot isolation
+**Fix**: Added `journal_version` tracking to Ledger. `recompute_balances()` validates snapshot isolation via version check before applying. Added `recompute_balances_with_retry()` convenience method that retries on version mismatch.
 
 ### M8. Floating Point Offer Selection - FIXED
 **Location**: `icn-compute/src/actor.rs:2118-2126`
