@@ -79,8 +79,13 @@ export function EnrollmentDetailScreen({ navigation, route }: Props) {
   if (error) {
     return (
       <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={refresh}>
+        <Text style={styles.errorText} accessibilityRole="alert">{error}</Text>
+        <TouchableOpacity
+          style={styles.retryButton}
+          onPress={refresh}
+          accessibilityRole="button"
+          accessibilityLabel="Retry loading enrollment"
+        >
           <Text style={styles.retryText}>Retry</Text>
         </TouchableOpacity>
       </View>
@@ -90,8 +95,13 @@ export function EnrollmentDetailScreen({ navigation, route }: Props) {
   if (!enrollment) {
     return (
       <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>Enrollment not found</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={() => navigation.goBack()}>
+        <Text style={styles.errorText} accessibilityRole="alert">Enrollment not found</Text>
+        <TouchableOpacity
+          style={styles.retryButton}
+          onPress={() => navigation.goBack()}
+          accessibilityRole="button"
+          accessibilityLabel="Go back to previous screen"
+        >
           <Text style={styles.retryText}>Go Back</Text>
         </TouchableOpacity>
       </View>
@@ -198,6 +208,15 @@ export function EnrollmentDetailScreen({ navigation, route }: Props) {
             style={[styles.vouchButton, !canVouch && styles.disabledButton]}
             onPress={handleVouch}
             disabled={!canVouch}
+            accessibilityRole="button"
+            accessibilityLabel={
+              enrollment.has_steward_vouch
+                ? 'Already vouched for this identity'
+                : enrollment.level < 1
+                ? 'Awaiting device verification before vouching'
+                : `Vouch for ${enrollment.identity_name}`
+            }
+            accessibilityState={{ disabled: !canVouch }}
           >
             <Text style={styles.vouchButtonText}>
               {enrollment.has_steward_vouch
@@ -212,6 +231,9 @@ export function EnrollmentDetailScreen({ navigation, route }: Props) {
             style={[styles.rejectButton, !canReject && styles.disabledButton]}
             onPress={() => setShowRejectModal(true)}
             disabled={!canReject}
+            accessibilityRole="button"
+            accessibilityLabel={`Reject ${enrollment.identity_name}'s enrollment`}
+            accessibilityState={{ disabled: !canReject }}
           >
             <Text style={styles.rejectButtonText}>Reject Enrollment</Text>
           </TouchableOpacity>
@@ -234,6 +256,8 @@ export function EnrollmentDetailScreen({ navigation, route }: Props) {
               multiline
               numberOfLines={4}
               textAlignVertical="top"
+              accessibilityLabel="Reason for rejection"
+              accessibilityHint="Enter the reason for rejecting this enrollment"
             />
             <View style={styles.modalActions}>
               <TouchableOpacity
@@ -242,6 +266,8 @@ export function EnrollmentDetailScreen({ navigation, route }: Props) {
                   setShowRejectModal(false);
                   setRejectReason('');
                 }}
+                accessibilityRole="button"
+                accessibilityLabel="Cancel rejection"
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
@@ -249,6 +275,9 @@ export function EnrollmentDetailScreen({ navigation, route }: Props) {
                 style={[styles.confirmRejectButton, isRejecting && styles.disabledButton]}
                 onPress={handleReject}
                 disabled={isRejecting}
+                accessibilityRole="button"
+                accessibilityLabel={isRejecting ? 'Rejecting enrollment' : 'Confirm rejection'}
+                accessibilityState={{ disabled: isRejecting }}
               >
                 <Text style={styles.confirmRejectText}>
                   {isRejecting ? 'Rejecting...' : 'Confirm Rejection'}

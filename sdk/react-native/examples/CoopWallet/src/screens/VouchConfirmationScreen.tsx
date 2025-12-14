@@ -70,8 +70,8 @@ export function VouchConfirmationScreen({ navigation, route }: Props) {
         </View>
 
         {/* Warning */}
-        <View style={styles.warningCard}>
-          <Text style={styles.warningIcon}>⚠️</Text>
+        <View style={styles.warningCard} accessibilityRole="alert">
+          <Text style={styles.warningIcon} accessibilityLabel="Warning">⚠️</Text>
           <Text style={styles.warningText}>
             By vouching for this identity, you are attesting that you have verified this person's
             identity through a trusted process. Your reputation as a steward is affected by the
@@ -105,9 +105,12 @@ export function VouchConfirmationScreen({ navigation, route }: Props) {
           <TouchableOpacity
             style={styles.checkboxRow}
             onPress={() => setCheck1(!check1)}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: check1 }}
+            accessibilityLabel="I have personally verified this person's identity through a trusted process"
           >
             <View style={[styles.checkbox, check1 && styles.checkboxChecked]}>
-              {check1 && <Text style={styles.checkmark}>✓</Text>}
+              {check1 && <Text style={styles.checkmark} accessibilityLabel="">✓</Text>}
             </View>
             <Text style={styles.checkboxLabel}>
               I have personally verified this person's identity through a trusted process
@@ -116,9 +119,12 @@ export function VouchConfirmationScreen({ navigation, route }: Props) {
           <TouchableOpacity
             style={styles.checkboxRow}
             onPress={() => setCheck2(!check2)}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: check2 }}
+            accessibilityLabel="I understand that false vouches may result in loss of steward privileges"
           >
             <View style={[styles.checkbox, check2 && styles.checkboxChecked]}>
-              {check2 && <Text style={styles.checkmark}>✓</Text>}
+              {check2 && <Text style={styles.checkmark} accessibilityLabel="">✓</Text>}
             </View>
             <Text style={styles.checkboxLabel}>
               I understand that false vouches may result in loss of steward privileges
@@ -138,6 +144,8 @@ export function VouchConfirmationScreen({ navigation, route }: Props) {
           <TouchableOpacity
             style={styles.cancelButton}
             onPress={() => navigation.goBack()}
+            accessibilityRole="button"
+            accessibilityLabel="Cancel vouch"
           >
             <Text style={styles.cancelButtonText}>Cancel</Text>
           </TouchableOpacity>
@@ -145,6 +153,9 @@ export function VouchConfirmationScreen({ navigation, route }: Props) {
             style={[styles.submitButton, !isValid && styles.disabledButton]}
             onPress={handleSubmit}
             disabled={!isValid || isSubmitting}
+            accessibilityRole="button"
+            accessibilityLabel={isSubmitting ? 'Submitting vouch' : 'Submit vouch'}
+            accessibilityState={{ disabled: !isValid || isSubmitting }}
           >
             <Text style={styles.submitButtonText}>
               {isSubmitting ? 'Submitting...' : 'Submit Vouch'}

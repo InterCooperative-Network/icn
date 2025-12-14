@@ -53,6 +53,8 @@ export function StewardDashboardScreen({ navigation }: Props) {
     <TouchableOpacity
       style={styles.enrollmentCard}
       onPress={() => navigation.navigate('EnrollmentDetail', { enrollmentId: item.enrollment_id })}
+      accessibilityRole="button"
+      accessibilityLabel={`Review ${item.identity_name}'s enrollment, level ${item.level}, ${formatStatus(item.status)}`}
     >
       <View style={styles.cardHeader}>
         <Text style={styles.identityName}>{item.identity_name}</Text>
@@ -79,8 +81,13 @@ export function StewardDashboardScreen({ navigation }: Props) {
         <ActivityIndicator size="large" color={theme.colors.primary} />
       ) : statsError ? (
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{statsError}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={refreshStats}>
+          <Text style={styles.errorText} accessibilityRole="alert">{statsError}</Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={refreshStats}
+            accessibilityRole="button"
+            accessibilityLabel="Retry loading statistics"
+          >
             <Text style={styles.retryText}>Retry</Text>
           </TouchableOpacity>
         </View>
@@ -115,6 +122,8 @@ export function StewardDashboardScreen({ navigation }: Props) {
           <TouchableOpacity
             style={styles.historyButton}
             onPress={() => navigation.navigate('VouchHistory')}
+            accessibilityRole="button"
+            accessibilityLabel="View your vouch history"
           >
             <Text style={styles.historyButtonText}>View Vouch History</Text>
           </TouchableOpacity>
@@ -128,16 +137,19 @@ export function StewardDashboardScreen({ navigation }: Props) {
   return (
     <View style={styles.container}>
       {/* Tab Bar */}
-      <View style={styles.tabBar}>
+      <View style={styles.tabBar} accessibilityRole="tablist">
         <TouchableOpacity
           style={[styles.tab, activeTab === 'pending' && styles.activeTab]}
           onPress={() => setActiveTab('pending')}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: activeTab === 'pending' }}
+          accessibilityLabel={`Pending enrollments${pendingCount > 0 ? `, ${pendingCount} pending` : ''}`}
         >
           <Text style={[styles.tabText, activeTab === 'pending' && styles.activeTabText]}>
             Pending
           </Text>
           {pendingCount > 0 && (
-            <View style={styles.badge}>
+            <View style={styles.badge} accessibilityLabel="">
               <Text style={styles.badgeText}>{pendingCount}</Text>
             </View>
           )}
@@ -145,6 +157,9 @@ export function StewardDashboardScreen({ navigation }: Props) {
         <TouchableOpacity
           style={[styles.tab, activeTab === 'stats' && styles.activeTab]}
           onPress={() => setActiveTab('stats')}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: activeTab === 'stats' }}
+          accessibilityLabel="Statistics"
         >
           <Text style={[styles.tabText, activeTab === 'stats' && styles.activeTabText]}>
             Statistics
@@ -170,8 +185,13 @@ export function StewardDashboardScreen({ navigation }: Props) {
               </View>
             ) : enrollmentsError ? (
               <View style={styles.errorContainer}>
-                <Text style={styles.errorText}>{enrollmentsError}</Text>
-                <TouchableOpacity style={styles.retryButton} onPress={refreshEnrollments}>
+                <Text style={styles.errorText} accessibilityRole="alert">{enrollmentsError}</Text>
+                <TouchableOpacity
+                  style={styles.retryButton}
+                  onPress={refreshEnrollments}
+                  accessibilityRole="button"
+                  accessibilityLabel="Retry loading enrollments"
+                >
                   <Text style={styles.retryText}>Retry</Text>
                 </TouchableOpacity>
               </View>
