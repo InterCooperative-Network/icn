@@ -815,3 +815,363 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         .service(get_steward_stats)
         .service(get_vouch_history);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_enrollment_store_creation() {
+        let store = EnrollmentStore::new();
+        // Should be empty initially
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            let enrollments = store.enrollments.read().await;
+            assert!(enrollments.is_empty());
+        });
+    }
+
+    #[test]
+    fn test_enrollment_store_default() {
+        let store = EnrollmentStore::default();
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            let enrollments = store.enrollments.read().await;
+            assert!(enrollments.is_empty());
+        });
+    }
+
+    #[test]
+    fn test_verification_code_format() {
+        let code = generate_verification_code();
+        assert!(code.starts_with("VERIFY-"));
+        assert_eq!(code.len(), 11); // "VERIFY-" (7) + 4 digits
+                                    // Parse the numeric part
+        let num_part = &code[7..];
+        assert!(num_part.parse::<u32>().is_ok());
+        let num: u32 = num_part.parse().unwrap();
+        assert!(num >= 1000 && num <= 9999);
+    }
+
+    #[test]
+    fn test_recovery_codes_generation() {
+        let codes = generate_recovery_codes(5);
+        assert_eq!(codes.len(), 5);
+        for code in &codes {
+            assert_eq!(code.len(), 8);
+            // Check all characters are valid (ABCDEFGHJKLMNPQRSTUVWXYZ23456789)
+            for c in code.chars() {
+                assert!(
+                    c.is_ascii_uppercase() || c.is_ascii_digit(),
+                    "Invalid character: {c}"
+                );
+                assert!(c != '0' && c != '1' && c != 'I' && c != 'O');
+            }
+        }
+    }
+
+    #[test]
+    fn test_recovery_codes_unique() {
+        let codes = generate_recovery_codes(10);
+        let unique: std::collections::HashSet<_> = codes.iter().collect();
+        assert_eq!(unique.len(), codes.len(), "Recovery codes should be unique");
+    }
+
+    #[test]
+    fn test_format_timestamp() {
+        let ts = 1704067200; // 2024-01-01 00:00:00 UTC
+        let formatted = format_timestamp(ts);
+        assert!(formatted.contains("2024-01-01"));
+        assert!(formatted.contains("00:00:00"));
+    }
+
+    #[test]
+    fn test_enrollment_session_status_levels() {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        let session = EnrollmentSession {
+            enrollment_id: "test-123".to_string(),
+            identity_name: "Alice".to_string(),
+            coop_id: "test-coop".to_string(),
+            verification_code: "VERIFY-1234".to_string(),
+            level: 0,
+            created_at: now,
+            expires_at: now + 86400,
+            ephemeral_did: None,
+            steward_vouch: None,
+            steward_did: None,
+            vouched_at: None,
+            rejected: false,
+            rejection_reason: None,
+            rejected_at: None,
+            rejected_by: None,
+        };
+
+        // Level 0 = pending device verification
+        assert_eq!(session.level, 0);
+        assert!(!session.rejected);
+    }
+
+    #[test]
+    fn test_enrollment_session_level1() {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        let session = EnrollmentSession {
+            enrollment_id: "test-123".to_string(),
+            identity_name: "Alice".to_string(),
+            coop_id: "test-coop".to_string(),
+            verification_code: "VERIFY-1234".to_string(),
+            level: 1,
+            created_at: now,
+            expires_at: now + 86400,
+            ephemeral_did: Some("did:icn:test123".to_string()),
+            steward_vouch: None,
+            steward_did: None,
+            vouched_at: None,
+            rejected: false,
+            rejection_reason: None,
+            rejected_at: None,
+            rejected_by: None,
+        };
+
+        assert_eq!(session.level, 1);
+        assert!(session.ephemeral_did.is_some());
+        assert!(session.steward_vouch.is_none());
+    }
+
+    #[test]
+    fn test_enrollment_session_level2() {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        let session = EnrollmentSession {
+            enrollment_id: "test-123".to_string(),
+            identity_name: "Alice".to_string(),
+            coop_id: "test-coop".to_string(),
+            verification_code: "VERIFY-1234".to_string(),
+            level: 2,
+            created_at: now,
+            expires_at: now + 86400,
+            ephemeral_did: Some("did:icn:test123".to_string()),
+            steward_vouch: Some("I vouch for Alice".to_string()),
+            steward_did: Some("did:icn:steward456".to_string()),
+            vouched_at: Some(now + 100),
+            rejected: false,
+            rejection_reason: None,
+            rejected_at: None,
+            rejected_by: None,
+        };
+
+        assert_eq!(session.level, 2);
+        assert!(session.ephemeral_did.is_some());
+        assert!(session.steward_vouch.is_some());
+        assert!(session.vouched_at.is_some());
+    }
+
+    #[test]
+    fn test_enrollment_session_rejected() {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        let session = EnrollmentSession {
+            enrollment_id: "test-123".to_string(),
+            identity_name: "Alice".to_string(),
+            coop_id: "test-coop".to_string(),
+            verification_code: "VERIFY-1234".to_string(),
+            level: 1,
+            created_at: now,
+            expires_at: now + 86400,
+            ephemeral_did: Some("did:icn:test123".to_string()),
+            steward_vouch: None,
+            steward_did: None,
+            vouched_at: None,
+            rejected: true,
+            rejection_reason: Some("Suspicious activity".to_string()),
+            rejected_at: Some(now + 50),
+            rejected_by: Some("did:icn:steward789".to_string()),
+        };
+
+        assert!(session.rejected);
+        assert!(session.rejection_reason.is_some());
+        assert_eq!(
+            session.rejection_reason.as_ref().unwrap(),
+            "Suspicious activity"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_enrollment_store_insert_and_get() {
+        let store = EnrollmentStore::new();
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        let session = EnrollmentSession {
+            enrollment_id: "test-abc".to_string(),
+            identity_name: "Bob".to_string(),
+            coop_id: "test-coop".to_string(),
+            verification_code: "VERIFY-5678".to_string(),
+            level: 0,
+            created_at: now,
+            expires_at: now + 86400,
+            ephemeral_did: None,
+            steward_vouch: None,
+            steward_did: None,
+            vouched_at: None,
+            rejected: false,
+            rejection_reason: None,
+            rejected_at: None,
+            rejected_by: None,
+        };
+
+        // Insert
+        store
+            .enrollments
+            .write()
+            .await
+            .insert("test-abc".to_string(), session);
+
+        // Get
+        let enrollments = store.enrollments.read().await;
+        let retrieved = enrollments.get("test-abc");
+        assert!(retrieved.is_some());
+        assert_eq!(retrieved.unwrap().identity_name, "Bob");
+    }
+
+    #[tokio::test]
+    async fn test_enrollment_expiry_check() {
+        let store = EnrollmentStore::new();
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        // Create expired session
+        let expired_session = EnrollmentSession {
+            enrollment_id: "expired-123".to_string(),
+            identity_name: "Charlie".to_string(),
+            coop_id: "test-coop".to_string(),
+            verification_code: "VERIFY-1111".to_string(),
+            level: 0,
+            created_at: now - 200000,
+            expires_at: now - 100000, // Expired
+            ephemeral_did: None,
+            steward_vouch: None,
+            steward_did: None,
+            vouched_at: None,
+            rejected: false,
+            rejection_reason: None,
+            rejected_at: None,
+            rejected_by: None,
+        };
+
+        // Create valid session
+        let valid_session = EnrollmentSession {
+            enrollment_id: "valid-456".to_string(),
+            identity_name: "Dave".to_string(),
+            coop_id: "test-coop".to_string(),
+            verification_code: "VERIFY-2222".to_string(),
+            level: 0,
+            created_at: now,
+            expires_at: now + 86400, // Not expired
+            ephemeral_did: None,
+            steward_vouch: None,
+            steward_did: None,
+            vouched_at: None,
+            rejected: false,
+            rejection_reason: None,
+            rejected_at: None,
+            rejected_by: None,
+        };
+
+        {
+            let mut enrollments = store.enrollments.write().await;
+            enrollments.insert("expired-123".to_string(), expired_session);
+            enrollments.insert("valid-456".to_string(), valid_session);
+        }
+
+        // Filter non-expired
+        let enrollments = store.enrollments.read().await;
+        let valid: Vec<_> = enrollments
+            .values()
+            .filter(|s| s.expires_at > now)
+            .collect();
+
+        assert_eq!(valid.len(), 1);
+        assert_eq!(valid[0].identity_name, "Dave");
+    }
+
+    #[test]
+    fn test_steward_min_trust_score_constant() {
+        // Verify the constant is reasonable
+        assert!(STEWARD_MIN_TRUST_SCORE >= 0.0);
+        assert!(STEWARD_MIN_TRUST_SCORE <= 1.0);
+        assert_eq!(STEWARD_MIN_TRUST_SCORE, 0.4); // Partner level
+    }
+
+    #[test]
+    fn test_device_proof_structure() {
+        // Test DeviceProof deserialization
+        let json = r#"{
+            "ephemeral_did": "did:icn:test123",
+            "signature": "abcd1234"
+        }"#;
+
+        let proof: DeviceProof = serde_json::from_str(json).unwrap();
+        assert_eq!(proof.ephemeral_did, "did:icn:test123");
+        assert_eq!(proof.signature, "abcd1234");
+    }
+
+    #[test]
+    fn test_start_enrollment_request_structure() {
+        let json = r#"{
+            "identity_name": "Alice",
+            "coop_id": "my-coop"
+        }"#;
+
+        let req: StartEnrollmentRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.identity_name, "Alice");
+        assert_eq!(req.coop_id, "my-coop");
+    }
+
+    #[test]
+    fn test_device_info_structure() {
+        let json = r#"{
+            "device_type": "mobile",
+            "os": "iOS 17",
+            "app_version": "1.0.0"
+        }"#;
+
+        let info: DeviceInfo = serde_json::from_str(json).unwrap();
+        assert_eq!(info.device_type, "mobile");
+        assert_eq!(info.os, "iOS 17");
+        assert_eq!(info.app_version, "1.0.0");
+    }
+
+    #[test]
+    fn test_history_query_defaults() {
+        let json = r#"{}"#;
+        let query: HistoryQuery = serde_json::from_str(json).unwrap();
+        assert!(query.limit.is_none());
+        assert!(query.offset.is_none());
+    }
+
+    #[test]
+    fn test_history_query_with_values() {
+        let json = r#"{"limit": 10, "offset": 5}"#;
+        let query: HistoryQuery = serde_json::from_str(json).unwrap();
+        assert_eq!(query.limit, Some(10));
+        assert_eq!(query.offset, Some(5));
+    }
+}
