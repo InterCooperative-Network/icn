@@ -3375,3 +3375,182 @@ footer .sync-status.syncing {
 footer .sync-status.error {
     color: var(--danger);
 }
+
+/* ============================================================================
+   Advanced Transaction Filters
+   ========================================================================== */
+
+.history-filters {
+    padding: 1rem;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+}
+
+.filter-row {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.filter-row:last-child {
+    margin-bottom: 0;
+}
+
+.filter-group {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.filter-group label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+    color: var(--text);
+}
+
+.filter-group input,
+.filter-group select {
+    padding: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 0.875rem;
+}
+
+.filter-group input:focus,
+.filter-group select:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.filter-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-end;
+}
+
+.filter-actions button {
+    white-space: nowrap;
+}
+
+.advanced-filters {
+    padding: 1rem;
+    background: var(--bg-light);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    animation: slideDown 0.3s ease-out;
+}
+
+.advanced-filters.hidden {
+    display: none;
+}
+
+.filter-summary {
+    padding: 0.75rem 1rem;
+    background: var(--info-bg);
+    border-bottom: 1px solid var(--info);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.filter-summary.hidden {
+    display: none;
+}
+
+.filter-label {
+    font-weight: 600;
+    color: var(--info);
+    font-size: 0.875rem;
+}
+
+.filter-tags {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.filter-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.75rem;
+    background: white;
+    border: 1px solid var(--info);
+    border-radius: 12px;
+    font-size: 0.875rem;
+    color: var(--info);
+}
+
+.filter-tag button {
+    background: none;
+    border: none;
+    color: var(--info);
+    cursor: pointer;
+    padding: 0;
+    font-size: 1rem;
+    line-height: 1;
+}
+
+.filter-tag button:hover {
+    color: var(--danger);
+}
+
+.export-controls {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+}
+
+/* Transaction Search */
+#transaction-search {
+    width: 100%;
+}
+
+#transaction-search::placeholder {
+    color: var(--text-muted);
+}
+
+/* Mobile responsive filters */
+@media (max-width: 768px) {
+    .filter-row {
+        flex-direction: column;
+    }
+
+    .filter-actions {
+        flex-direction: row;
+        justify-content: stretch;
+    }
+
+    .filter-actions button {
+        flex: 1;
+    }
+
+    .export-controls {
+        flex-wrap: wrap;
+    }
+}
+
+/* Empty state for filtered results */
+.no-results {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--text-muted);
+}
+
+.no-results h3 {
+    margin: 0 0 0.5rem 0;
+    color: var(--text);
+}
+
+.no-results p {
+    margin: 0 0 1rem 0;
+}
+
+.no-results button {
+    margin-top: 0.5rem;
+}

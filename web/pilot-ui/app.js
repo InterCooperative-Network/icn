@@ -4672,3 +4672,399 @@ document.addEventListener('DOMContentLoaded', async () => {
 window.syncNow = syncNow;
 
 console.log('Offline support initialized');
+
+// ============================================================================
+// Advanced Transaction Filtering
+// ============================================================================
+
+const filterState = {
+    search: '',
+    fromDid: '',
+    toDid: '',
+    minAmount: null,
+    maxAmount: null,
+    currency: 'all',
+    startDate: null,
+    endDate: null,
+    activeFilters: [],
+};
+
+function toggleAdvancedFilters() {
+    const advancedFilters = document.getElementById('advanced-transaction-filters');
+    const toggleBtn = document.getElementById('toggle-advanced-filters');
+    
+    if (advancedFilters.classList.contains('hidden')) {
+        advancedFilters.classList.remove('hidden');
+        toggleBtn.textContent = 'Hide Advanced Filters';
+    } else {
+        advancedFilters.classList.add('hidden');
+        toggleBtn.textContent = 'Advanced Filters';
+    }
+}
+
+function applyTransactionFilters() {
+    // Gather filter values
+    filterState.search = document.getElementById('transaction-search')?.value.trim().toLowerCase() || '';
+    filterState.fromDid = document.getElementById('filter-from-did')?.value.trim().toLowerCase() || '';
+    filterState.toDid = document.getElementById('filter-to-did')?.value.trim().toLowerCase() || '';
+    filterState.minAmount = parseFloat(document.getElementById('filter-min-amount')?.value) || null;
+    filterState.maxAmount = parseFloat(document.getElementById('filter-max-amount')?.value) || null;
+    filterState.currency = document.getElementById('filter-currency')?.value || 'all';
+    filterState.startDate = document.getElementById('filter-start-date')?.value || null;
+    filterState.endDate = document.getElementById('filter-end-date')?.value || null;
+
+    // Build active filters list
+    filterState.activeFilters = [];
+
+    if (filterState.search) {
+        filterState.activeFilters.push({ type: 'search', label: `Search: "${filterState.search}"` });
+    }
+    if (filterState.fromDid) {
+        filterState.activeFilters.push({ type: 'fromDid', label: `From: ${truncateDid(filterState.fromDid)}` });
+    }
+    if (filterState.toDid) {
+        filterState.activeFilters.push({ type: 'toDid', label: `To: ${truncateDid(filterState.toDid)}` });
+    }
+    if (filterState.minAmount !== null) {
+        filterState.activeFilters.push({ type: 'minAmount', label: `Min: ${filterState.minAmount}` });
+    }
+    if (filterState.maxAmount !== null) {
+        filterState.activeFilters.push({ type: 'maxAmount', label: `Max: ${filterState.maxAmount}` });
+    }
+    if (filterState.currency !== 'all') {
+        filterState.activeFilters.push({ type: 'currency', label: `Currency: ${filterState.currency}` });
+    }
+    if (filterState.startDate) {
+        filterState.activeFilters.push({ type: 'startDate', label: `From: ${filterState.startDate}` });
+    }
+    if (filterState.endDate) {
+        filterState.activeFilters.push({ type: 'endDate', label: `To: ${filterState.endDate}` });
+    }
+
+    // Update filter summary UI
+    updateFilterSummary();
+
+    // Apply filters to transaction list
+    filterTransactions();
+
+    // Enable export filtered button if filters are active
+    const exportFilteredBtn = document.getElementById('export-filtered-csv');
+    if (exportFilteredBtn) {
+        exportFilteredBtn.disabled = filterState.activeFilters.length === 0;
+    }
+}
+
+function updateFilterSummary() {
+    const summary = document.getElementById('filter-summary');
+    const tagsContainer = document.getElementById('active-filter-tags');
+
+    if (!summary || !tagsContainer) return;
+
+    if (filterState.activeFilters.length === 0) {
+        summary.classList.add('hidden');
+        return;
+    }
+
+    summary.classList.remove('hidden');
+    tagsContainer.innerHTML = filterState.activeFilters.map(filter => `
+        <span class="filter-tag">
+            ${filter.label}
+            <button onclick="removeFilter('${filter.type}')" aria-label="Remove ${filter.label} filter">&times;</button>
+        </span>
+    `).join('');
+}
+
+function removeFilter(filterType) {
+    // Clear the specific filter
+    switch (filterType) {
+        case 'search':
+            filterState.search = '';
+            if (document.getElementById('transaction-search')) {
+                document.getElementById('transaction-search').value = '';
+            }
+            break;
+        case 'fromDid':
+            filterState.fromDid = '';
+            if (document.getElementById('filter-from-did')) {
+                document.getElementById('filter-from-did').value = '';
+            }
+            break;
+        case 'toDid':
+            filterState.toDid = '';
+            if (document.getElementById('filter-to-did')) {
+                document.getElementById('filter-to-did').value = '';
+            }
+            break;
+        case 'minAmount':
+            filterState.minAmount = null;
+            if (document.getElementById('filter-min-amount')) {
+                document.getElementById('filter-min-amount').value = '';
+            }
+            break;
+        case 'maxAmount':
+            filterState.maxAmount = null;
+            if (document.getElementById('filter-max-amount')) {
+                document.getElementById('filter-max-amount').value = '';
+            }
+            break;
+        case 'currency':
+            filterState.currency = 'all';
+            if (document.getElementById('filter-currency')) {
+                document.getElementById('filter-currency').value = 'all';
+            }
+            break;
+        case 'startDate':
+            filterState.startDate = null;
+            if (document.getElementById('filter-start-date')) {
+                document.getElementById('filter-start-date').value = '';
+            }
+            break;
+        case 'endDate':
+            filterState.endDate = null;
+            if (document.getElementById('filter-end-date')) {
+                document.getElementById('filter-end-date').value = '';
+            }
+            break;
+    }
+
+    // Reapply filters
+    applyTransactionFilters();
+}
+
+function clearAllFilters() {
+    // Clear all filter inputs
+    if (document.getElementById('transaction-search')) {
+        document.getElementById('transaction-search').value = '';
+    }
+    if (document.getElementById('filter-from-did')) {
+        document.getElementById('filter-from-did').value = '';
+    }
+    if (document.getElementById('filter-to-did')) {
+        document.getElementById('filter-to-did').value = '';
+    }
+    if (document.getElementById('filter-min-amount')) {
+        document.getElementById('filter-min-amount').value = '';
+    }
+    if (document.getElementById('filter-max-amount')) {
+        document.getElementById('filter-max-amount').value = '';
+    }
+    if (document.getElementById('filter-currency')) {
+        document.getElementById('filter-currency').value = 'all';
+    }
+    if (document.getElementById('filter-start-date')) {
+        document.getElementById('filter-start-date').value = '';
+    }
+    if (document.getElementById('filter-end-date')) {
+        document.getElementById('filter-end-date').value = '';
+    }
+
+    // Reset filter state
+    filterState.search = '';
+    filterState.fromDid = '';
+    filterState.toDid = '';
+    filterState.minAmount = null;
+    filterState.maxAmount = null;
+    filterState.currency = 'all';
+    filterState.startDate = null;
+    filterState.endDate = null;
+    filterState.activeFilters = [];
+
+    // Update UI
+    updateFilterSummary();
+    filterTransactions();
+
+    // Disable export filtered button
+    const exportFilteredBtn = document.getElementById('export-filtered-csv');
+    if (exportFilteredBtn) {
+        exportFilteredBtn.disabled = true;
+    }
+
+    showToast('Filters cleared', 'info', 2000);
+}
+
+function filterTransactions() {
+    if (!state.transactions || state.transactions.length === 0) {
+        return;
+    }
+
+    let filtered = [...state.transactions];
+
+    // Apply search filter (searches memo, DIDs, and amount)
+    if (filterState.search) {
+        filtered = filtered.filter(tx => {
+            const searchLower = filterState.search.toLowerCase();
+            return (
+                (tx.memo && tx.memo.toLowerCase().includes(searchLower)) ||
+                tx.from.toLowerCase().includes(searchLower) ||
+                tx.to.toLowerCase().includes(searchLower) ||
+                tx.amount.toString().includes(searchLower)
+            );
+        });
+    }
+
+    // Apply from DID filter
+    if (filterState.fromDid) {
+        filtered = filtered.filter(tx => 
+            tx.from.toLowerCase().includes(filterState.fromDid.toLowerCase())
+        );
+    }
+
+    // Apply to DID filter
+    if (filterState.toDid) {
+        filtered = filtered.filter(tx => 
+            tx.to.toLowerCase().includes(filterState.toDid.toLowerCase())
+        );
+    }
+
+    // Apply amount range filters
+    if (filterState.minAmount !== null) {
+        filtered = filtered.filter(tx => tx.amount >= filterState.minAmount);
+    }
+    if (filterState.maxAmount !== null) {
+        filtered = filtered.filter(tx => tx.amount <= filterState.maxAmount);
+    }
+
+    // Apply currency filter
+    if (filterState.currency !== 'all') {
+        filtered = filtered.filter(tx => tx.currency === filterState.currency);
+    }
+
+    // Apply date range filters
+    if (filterState.startDate) {
+        const startTimestamp = new Date(filterState.startDate).getTime() / 1000;
+        filtered = filtered.filter(tx => tx.timestamp >= startTimestamp);
+    }
+    if (filterState.endDate) {
+        const endTimestamp = new Date(filterState.endDate).getTime() / 1000 + 86400; // End of day
+        filtered = filtered.filter(tx => tx.timestamp < endTimestamp);
+    }
+
+    // Render filtered results
+    renderFilteredTransactions(filtered);
+}
+
+function renderFilteredTransactions(transactions) {
+    const listElement = document.getElementById('transaction-list');
+    if (!listElement) return;
+
+    if (transactions.length === 0) {
+        listElement.innerHTML = `
+            <div class="no-results">
+                <h3>No transactions found</h3>
+                <p>Try adjusting your filters or search terms.</p>
+                <button class="btn btn-secondary" onclick="clearAllFilters()">Clear Filters</button>
+            </div>
+        `;
+        return;
+    }
+
+    listElement.innerHTML = transactions.map(tx => `
+        <div class="transaction-item">
+            <div class="transaction-details">
+                <div class="transaction-from">${truncateDid(tx.from)}</div>
+                <div class="transaction-arrow">→</div>
+                <div class="transaction-to">${truncateDid(tx.to)}</div>
+            </div>
+            <div class="transaction-amount">${tx.amount} ${tx.currency}</div>
+            <div class="transaction-memo">${tx.memo || '—'}</div>
+            <div class="transaction-date">${formatDateTime(tx.timestamp)}</div>
+        </div>
+    `).join('');
+
+    // Update pagination info
+    const pageInfo = document.getElementById('transaction-page-info');
+    if (pageInfo) {
+        pageInfo.textContent = `Showing ${transactions.length} transaction${transactions.length !== 1 ? 's' : ''}`;
+    }
+}
+
+function exportFilteredTransactions() {
+    if (filterState.activeFilters.length === 0) {
+        showToast('No filters active', 'warning');
+        return;
+    }
+
+    // Get filtered transactions
+    let filtered = [...state.transactions];
+
+    // Apply all filters (same logic as filterTransactions)
+    if (filterState.search) {
+        filtered = filtered.filter(tx => {
+            const searchLower = filterState.search.toLowerCase();
+            return (
+                (tx.memo && tx.memo.toLowerCase().includes(searchLower)) ||
+                tx.from.toLowerCase().includes(searchLower) ||
+                tx.to.toLowerCase().includes(searchLower) ||
+                tx.amount.toString().includes(searchLower)
+            );
+        });
+    }
+
+    if (filterState.fromDid) {
+        filtered = filtered.filter(tx => tx.from.toLowerCase().includes(filterState.fromDid.toLowerCase()));
+    }
+    if (filterState.toDid) {
+        filtered = filtered.filter(tx => tx.to.toLowerCase().includes(filterState.toDid.toLowerCase()));
+    }
+    if (filterState.minAmount !== null) {
+        filtered = filtered.filter(tx => tx.amount >= filterState.minAmount);
+    }
+    if (filterState.maxAmount !== null) {
+        filtered = filtered.filter(tx => tx.amount <= filterState.maxAmount);
+    }
+    if (filterState.currency !== 'all') {
+        filtered = filtered.filter(tx => tx.currency === filterState.currency);
+    }
+    if (filterState.startDate) {
+        const startTimestamp = new Date(filterState.startDate).getTime() / 1000;
+        filtered = filtered.filter(tx => tx.timestamp >= startTimestamp);
+    }
+    if (filterState.endDate) {
+        const endTimestamp = new Date(filterState.endDate).getTime() / 1000 + 86400;
+        filtered = filtered.filter(tx => tx.timestamp < endTimestamp);
+    }
+
+    // Export to CSV
+    if (filtered.length === 0) {
+        showToast('No transactions match your filters', 'warning');
+        return;
+    }
+
+    const csv = [
+        'Date,From,To,Amount,Currency,Memo',
+        ...filtered.map(tx => 
+            `${formatDateTime(tx.timestamp)},"${tx.from}","${tx.to}",${tx.amount},${tx.currency},"${tx.memo || ''}"`
+        )
+    ].join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `transactions-filtered-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    showToast(`Exported ${filtered.length} filtered transactions`, 'success');
+}
+
+// Event Listeners for Filters
+document.getElementById('toggle-advanced-filters')?.addEventListener('click', toggleAdvancedFilters);
+document.getElementById('apply-transaction-filters')?.addEventListener('click', applyTransactionFilters);
+document.getElementById('clear-transaction-filters')?.addEventListener('click', clearAllFilters);
+document.getElementById('export-filtered-csv')?.addEventListener('click', exportFilteredTransactions);
+
+// Real-time search (debounced)
+let searchDebounceTimer;
+document.getElementById('transaction-search')?.addEventListener('input', (e) => {
+    clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(() => {
+        applyTransactionFilters();
+    }, 300); // 300ms debounce
+});
+
+// Make removeFilter available globally for onclick handlers
+window.removeFilter = removeFilter;
+window.clearAllFilters = clearAllFilters;
+
+console.log('Transaction filtering initialized');

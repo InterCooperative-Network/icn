@@ -676,24 +676,134 @@
                 <div class="card">
                     <div class="card-header">
                         <h2>Transaction History</h2>
-                        <div class="history-filters">
-                            <select id="history-filter">
-                                <option value="all">All Time</option>
-                                <option value="today">Today</option>
-                                <option value="week">This Week</option>
-                                <option value="month" selected>This Month</option>
-                                <option value="year">This Year</option>
-                            </select>
-                            <select id="transaction-sort">
-                                <option value="date-desc">Newest First</option>
-                                <option value="date-asc">Oldest First</option>
-                                <option value="amount-desc">Highest Amount</option>
-                                <option value="amount-asc">Lowest Amount</option>
-                            </select>
-                            <button id="import-batch-btn" class="btn btn-small btn-primary">Import Batch</button>
-                            <button id="export-csv" class="btn btn-small">Export CSV</button>
+                        <button id="toggle-advanced-filters" class="btn btn-small">Advanced Filters</button>
+                    </div>
+
+                    <!-- Basic Filters -->
+                    <div class="history-filters">
+                        <div class="filter-row">
+                            <div class="filter-group">
+                                <label for="transaction-search">Search</label>
+                                <input 
+                                    type="text" 
+                                    id="transaction-search" 
+                                    placeholder="Search by memo, DID, or amount..." 
+                                    aria-label="Search transactions"
+                                />
+                            </div>
+                            <div class="filter-group">
+                                <label for="history-filter">Time Period</label>
+                                <select id="history-filter" aria-label="Filter by time period">
+                                    <option value="all">All Time</option>
+                                    <option value="today">Today</option>
+                                    <option value="week">This Week</option>
+                                    <option value="month" selected>This Month</option>
+                                    <option value="year">This Year</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label for="transaction-sort">Sort By</label>
+                                <select id="transaction-sort" aria-label="Sort transactions">
+                                    <option value="date-desc">Newest First</option>
+                                    <option value="date-asc">Oldest First</option>
+                                    <option value="amount-desc">Highest Amount</option>
+                                    <option value="amount-asc">Lowest Amount</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
+
+                    <!-- Advanced Filters (Hidden by default) -->
+                    <div id="advanced-transaction-filters" class="advanced-filters hidden">
+                        <div class="filter-row">
+                            <div class="filter-group">
+                                <label for="filter-from-did">From (Sender)</label>
+                                <input 
+                                    type="text" 
+                                    id="filter-from-did" 
+                                    placeholder="DID or member name..." 
+                                    aria-label="Filter by sender"
+                                />
+                            </div>
+                            <div class="filter-group">
+                                <label for="filter-to-did">To (Recipient)</label>
+                                <input 
+                                    type="text" 
+                                    id="filter-to-did" 
+                                    placeholder="DID or member name..." 
+                                    aria-label="Filter by recipient"
+                                />
+                            </div>
+                        </div>
+                        <div class="filter-row">
+                            <div class="filter-group">
+                                <label for="filter-min-amount">Min Amount</label>
+                                <input 
+                                    type="number" 
+                                    id="filter-min-amount" 
+                                    min="0" 
+                                    step="0.5" 
+                                    placeholder="0" 
+                                    aria-label="Minimum amount"
+                                />
+                            </div>
+                            <div class="filter-group">
+                                <label for="filter-max-amount">Max Amount</label>
+                                <input 
+                                    type="number" 
+                                    id="filter-max-amount" 
+                                    min="0" 
+                                    step="0.5" 
+                                    placeholder="Any" 
+                                    aria-label="Maximum amount"
+                                />
+                            </div>
+                            <div class="filter-group">
+                                <label for="filter-currency">Currency</label>
+                                <select id="filter-currency" aria-label="Filter by currency">
+                                    <option value="all">All Currencies</option>
+                                    <option value="hours">Hours</option>
+                                    <option value="credits">Credits</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="filter-row">
+                            <div class="filter-group">
+                                <label for="filter-start-date">Start Date</label>
+                                <input 
+                                    type="date" 
+                                    id="filter-start-date" 
+                                    aria-label="Start date"
+                                />
+                            </div>
+                            <div class="filter-group">
+                                <label for="filter-end-date">End Date</label>
+                                <input 
+                                    type="date" 
+                                    id="filter-end-date" 
+                                    aria-label="End date"
+                                />
+                            </div>
+                            <div class="filter-actions">
+                                <button id="apply-transaction-filters" class="btn btn-primary">Apply Filters</button>
+                                <button id="clear-transaction-filters" class="btn btn-secondary">Clear</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Filter Summary -->
+                    <div id="filter-summary" class="filter-summary hidden">
+                        <span class="filter-label">Active Filters:</span>
+                        <div id="active-filter-tags" class="filter-tags"></div>
+                    </div>
+
+                    <!-- Export Controls -->
+                    <div class="export-controls">
+                        <button id="import-batch-btn" class="btn btn-small btn-primary">Import Batch</button>
+                        <button id="export-csv" class="btn btn-small">Export CSV</button>
+                        <button id="export-filtered-csv" class="btn btn-small" disabled>Export Filtered</button>
+                    </div>
+
                     <div id="transaction-list" class="transaction-list">
                         <p class="loading">Loading...</p>
                     </div>
