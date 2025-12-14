@@ -280,7 +280,7 @@ export function TransactionsScreen({ client, coopId, userDid, navigation }: Tran
 
       {isLoading && transactions.length > 0 && (
         <View style={styles.loadingOverlay}>
-          <ActivityIndicator color="#4A90A4" />
+          <ActivityIndicator color={theme.colors.primary} />
         </View>
       )}
     </View>

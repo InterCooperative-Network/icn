@@ -249,7 +249,7 @@ export function ContactsScreen({ client, coopId }: ContactsScreenProps) {
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4A90A4" />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
   }

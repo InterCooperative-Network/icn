@@ -104,7 +104,7 @@ export function IdentityScreen({ navigation }: Props) {
       <View style={styles.qrContainer}>
         {isGenerating ? (
           <View style={styles.qrPlaceholder}>
-            <ActivityIndicator size="large" color="#4A90A4" />
+            <ActivityIndicator size="large" color={theme.colors.primary} />
             <Text style={styles.qrPlaceholderText}>Generating proof...</Text>
           </View>
         ) : qrData && !isExpired ? (

@@ -103,7 +103,7 @@ export function VerifyScreen({ navigation }: Props) {
   if (hasPermission === null || !CameraView) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#4A90A4" />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
         <Text style={styles.message}>Requesting camera permission...</Text>
       </View>
     );
@@ -162,7 +162,7 @@ export function VerifyScreen({ navigation }: Props) {
           <View style={styles.resultContainer}>
             {isVerifying ? (
               <>
-                <ActivityIndicator size="large" color="#4A90A4" />
+                <ActivityIndicator size="large" color={theme.colors.primary} />
                 <Text style={styles.resultText}>Verifying...</Text>
               </>
             ) : result ? (
@@ -170,13 +170,13 @@ export function VerifyScreen({ navigation }: Props) {
                 <View
                   style={[
                     styles.resultIcon,
-                    { backgroundColor: result.valid ? '#4CAF50' : '#F44336' },
+                    { backgroundColor: result.valid ? theme.colors.success : theme.colors.error },
                   ]}
                 >
                   <Text style={styles.resultIconText}>{result.valid ? '\u2713' : '\u2717'}</Text>
                 </View>
                 <Text
-                  style={[styles.resultTitle, { color: result.valid ? '#4CAF50' : '#F44336' }]}
+                  style={[styles.resultTitle, { color: result.valid ? theme.colors.success : theme.colors.error }]}
                 >
                   {result.valid ? 'VALID' : 'INVALID'}
                 </Text>

@@ -58,7 +58,7 @@ export function ProposalScreen({ route, navigation }: Props) {
   if (isLoading || !proposal) {
     return (
       <View style={styles.loading}>
-        <ActivityIndicator size="large" color="#4A90A4" />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
   }

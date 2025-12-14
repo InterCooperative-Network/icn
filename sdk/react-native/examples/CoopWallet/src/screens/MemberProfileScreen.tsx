@@ -121,7 +121,7 @@ export function MemberProfileScreen({ client, coopId, memberDid, userDid }: Memb
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4A90A4" />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
         <Text style={styles.loadingText}>Loading profile...</Text>
       </View>
     );
