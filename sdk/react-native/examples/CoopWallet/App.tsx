@@ -2217,10 +2217,18 @@ export interface TransactionParam {
 }
 
 export type RootStackParamList = {
-  Login: { coopId?: string; gateway?: string; coopName?: string } | undefined;
+  Login: {
+    coopId?: string;
+    gateway?: string;
+    coopName?: string;
+    // Enrollment params (when scanning enrollment QR)
+    enrollmentId?: string;
+    challenge?: string;
+    isEnrollment?: boolean;
+  } | undefined;
   Home: undefined;
   Payment: { recipient?: string; amount?: string; memo?: string; recipientDid?: string } | undefined;
-  Scan: { mode?: 'all' | 'payment' | 'contact' | 'join' } | undefined;
+  Scan: { mode?: 'all' | 'payment' | 'contact' | 'join' | 'enrollment' } | undefined;
   Receive: undefined;
   Governance: undefined;
   Identity: undefined;

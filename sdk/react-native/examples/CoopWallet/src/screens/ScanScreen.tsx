@@ -139,6 +139,16 @@ export function ScanScreen({ navigation, route }: Props) {
         handleJoinCoop(result.data);
         break;
 
+      case 'enrollment':
+        if (scanMode !== 'all' && scanMode !== 'enrollment') {
+          Alert.alert('Wrong QR Type', 'This is an enrollment QR code. Please scan the correct type.', [
+            { text: 'Try Again', onPress: () => setScanned(false) },
+          ]);
+          return;
+        }
+        handleEnrollment(result.data);
+        break;
+
       default:
         Alert.alert('Invalid QR Code', 'This QR code is not recognized as an ICN code.', [
           { text: 'Try Again', onPress: () => setScanned(false) },
@@ -208,6 +218,39 @@ export function ScanScreen({ navigation, route }: Props) {
     );
   };
 
+  const handleEnrollment = (enrollmentData: { enrollment_id: string; challenge: string; gateway_url: string }) => {
+    Alert.alert(
+      'Device Enrollment',
+      'This QR code will enroll your device with the cooperative. Continue?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+          onPress: () => setScanned(false),
+        },
+        {
+          text: 'Enroll',
+          onPress: () => {
+            navigation.reset({
+              index: 0,
+              routes: [
+                {
+                  name: 'Login',
+                  params: {
+                    enrollmentId: enrollmentData.enrollment_id,
+                    challenge: enrollmentData.challenge,
+                    gateway: enrollmentData.gateway_url,
+                    isEnrollment: true,
+                  },
+                },
+              ],
+            });
+          },
+        },
+      ]
+    );
+  };
+
   const getHintText = () => {
     switch (scanMode) {
       case 'payment':
@@ -216,6 +259,8 @@ export function ScanScreen({ navigation, route }: Props) {
         return 'Point camera at contact QR code';
       case 'join':
         return 'Point camera at coop QR code';
+      case 'enrollment':
+        return 'Point camera at enrollment QR code';
       default:
         return 'Point camera at any ICN QR code';
     }
@@ -310,7 +355,7 @@ export function ScanScreen({ navigation, route }: Props) {
           <Text style={styles.hint}>{getHintText()}</Text>
 
           {scanMode === 'all' && (
-            <Text style={styles.subHint}>Payments • Contacts • Join Coop</Text>
+            <Text style={styles.subHint}>Payments • Contacts • Join Coop • Enrollment</Text>
           )}
 
           <TouchableOpacity

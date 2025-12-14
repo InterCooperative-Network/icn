@@ -34,10 +34,16 @@ export function LoginScreen({ navigation, route }: Props) {
   const [coopId, setCoopId] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isEnrollmentMode, setIsEnrollmentMode] = useState(false);
+  const [enrollmentStatus, setEnrollmentStatus] = useState<string>('');
 
-  // Handle pre-filled data from QR scan
+  // Handle pre-filled data from QR scan (regular join or enrollment)
   useEffect(() => {
-    if (route.params?.coopId) {
+    if (route.params?.isEnrollment && route.params?.enrollmentId) {
+      // Enrollment flow from QR scan
+      setIsEnrollmentMode(true);
+      handleEnrollmentVerification();
+    } else if (route.params?.coopId) {
       setCoopId(route.params.coopId);
       // If we have gateway info from QR, show a message
       if (route.params?.coopName) {
@@ -49,6 +55,66 @@ export function LoginScreen({ navigation, route }: Props) {
       }
     }
   }, [route.params]);
+
+  const handleEnrollmentVerification = async () => {
+    const { enrollmentId, challenge, gateway } = route.params || {};
+    if (!enrollmentId || !gateway) {
+      setError('Invalid enrollment data');
+      return;
+    }
+
+    setIsLoading(true);
+    setEnrollmentStatus('Generating device proof...');
+
+    try {
+      // Get wallet/keypair from client
+      if (!client) {
+        throw new Error('Client not initialized');
+      }
+
+      setEnrollmentStatus('Verifying with cooperative...');
+
+      // Call the enrollment verification endpoint
+      const response = await fetch(`${gateway}/api/v1/sdis/enrollment/${enrollmentId}/verify-device`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          device_public_key: await client.getPublicKey(),
+          challenge_response: challenge,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Verification failed: ${response.status}`);
+      }
+
+      setEnrollmentStatus('Enrollment verified!');
+      Alert.alert(
+        'Enrollment Successful',
+        'Your device has been enrolled. You can now complete your membership setup.',
+        [
+          {
+            text: 'Continue',
+            onPress: () => {
+              setIsEnrollmentMode(false);
+              // Could navigate to a setup screen or stay on login
+            },
+          },
+        ]
+      );
+    } catch (err) {
+      const message = (err as Error).message;
+      setError(message);
+      setEnrollmentStatus('');
+      Alert.alert('Enrollment Failed', message, [
+        { text: 'Try Again', onPress: () => handleEnrollmentVerification() },
+        { text: 'Cancel', onPress: () => setIsEnrollmentMode(false) },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleLogin = async () => {
     if (!coopId.trim()) {
@@ -85,6 +151,41 @@ export function LoginScreen({ navigation, route }: Props) {
   const handleScanToJoin = () => {
     navigation.navigate('Scan', { mode: 'join' });
   };
+
+  // Enrollment mode UI
+  if (isEnrollmentMode) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <View style={styles.enrollmentCard}>
+          <Text style={styles.enrollmentTitle}>Device Enrollment</Text>
+          {isLoading ? (
+            <>
+              <ActivityIndicator size="large" color={theme.colors.primary} style={{ marginVertical: 20 }} />
+              <Text style={styles.enrollmentStatus}>{enrollmentStatus}</Text>
+            </>
+          ) : error ? (
+            <>
+              <Text style={styles.enrollmentError}>{error}</Text>
+              <TouchableOpacity
+                style={styles.button}
+                onPress={handleEnrollmentVerification}
+              >
+                <Text style={styles.buttonText}>Retry</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <Text style={styles.enrollmentStatus}>Preparing enrollment...</Text>
+          )}
+          <TouchableOpacity
+            style={[styles.scanButton, { marginTop: 20 }]}
+            onPress={() => setIsEnrollmentMode(false)}
+          >
+            <Text style={styles.scanButtonText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView
@@ -251,5 +352,37 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
     marginTop: 24,
+  },
+  // Enrollment styles
+  enrollmentCard: {
+    backgroundColor: theme.colors.card,
+    borderRadius: 16,
+    padding: 32,
+    margin: 24,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    minWidth: 280,
+  },
+  enrollmentTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+    marginBottom: 16,
+  },
+  enrollmentStatus: {
+    fontSize: 16,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  enrollmentError: {
+    fontSize: 14,
+    color: theme.colors.error,
+    textAlign: 'center',
+    marginBottom: 16,
   },
 });
