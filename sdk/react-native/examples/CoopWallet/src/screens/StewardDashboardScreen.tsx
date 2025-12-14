@@ -56,7 +56,7 @@ export function StewardDashboardScreen({ navigation }: Props) {
     >
       <View style={styles.cardHeader}>
         <Text style={styles.identityName}>{item.identity_name}</Text>
-        <View style={[styles.levelBadge, getLevelStyle(item.level)]}>
+        <View style={[styles.levelBadge, getLevelStyle(item.level, theme)]}>
           <Text style={styles.levelText}>Level {item.level}</Text>
         </View>
       </View>
@@ -76,7 +76,7 @@ export function StewardDashboardScreen({ navigation }: Props) {
   const renderStatsTab = () => (
     <View style={styles.statsContainer}>
       {statsLoading ? (
-        <ActivityIndicator size="large" color="#4A90A4" />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       ) : statsError ? (
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{statsError}</Text>
@@ -165,7 +165,7 @@ export function StewardDashboardScreen({ navigation }: Props) {
           ListEmptyComponent={
             enrollmentsLoading ? (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#4A90A4" />
+                <ActivityIndicator size="large" color={theme.colors.primary} />
                 <Text style={styles.loadingText}>Loading enrollments...</Text>
               </View>
             ) : enrollmentsError ? (
@@ -201,16 +201,16 @@ function formatStatus(status: string): string {
   return statusMap[status] || status;
 }
 
-function getLevelStyle(level: number) {
+function getLevelStyle(level: number, theme: Theme) {
   switch (level) {
     case 0:
-      return { backgroundColor: '#ffcdd2' };
+      return { backgroundColor: theme.colors.errorBackground };
     case 1:
-      return { backgroundColor: '#fff9c4' };
+      return { backgroundColor: theme.colors.warningBackground };
     case 2:
-      return { backgroundColor: '#c8e6c9' };
+      return { backgroundColor: theme.colors.successBackground };
     default:
-      return { backgroundColor: '#e0e0e0' };
+      return { backgroundColor: theme.colors.border };
   }
 }
 
@@ -246,7 +246,7 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     fontWeight: '600',
   },
   badge: {
-    backgroundColor: '#e53935',
+    backgroundColor: theme.colors.error,
     borderRadius: 10,
     minWidth: 20,
     height: 20,
@@ -255,7 +255,7 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     paddingHorizontal: 6,
   },
   badgeText: {
-    color: '#fff',
+    color: theme.colors.primaryText,
     fontSize: 12,
     fontWeight: 'bold',
   },
@@ -291,18 +291,18 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     borderRadius: 12,
   },
   level0: {
-    backgroundColor: '#ffcdd2',
+    backgroundColor: theme.colors.errorBackground,
   },
   level1: {
-    backgroundColor: '#fff9c4',
+    backgroundColor: theme.colors.warningBackground,
   },
   level2: {
-    backgroundColor: '#c8e6c9',
+    backgroundColor: theme.colors.successBackground,
   },
   levelText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#333',
+    color: theme.colors.text,
   },
   cardMeta: {
     flexDirection: 'row',
@@ -352,7 +352,7 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     borderRadius: 8,
   },
   retryText: {
-    color: '#fff',
+    color: theme.colors.primaryText,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -362,7 +362,7 @@ const createStyles = (theme: Theme) => StyleSheet.create({
   },
   emptyIcon: {
     fontSize: 48,
-    color: '#4caf50',
+    color: theme.colors.success,
     marginBottom: 16,
   },
   emptyTitle: {
@@ -438,7 +438,7 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     alignItems: 'center',
   },
   historyButtonText: {
-    color: '#fff',
+    color: theme.colors.primaryText,
     fontSize: 16,
     fontWeight: '600',
   },

@@ -28,8 +28,16 @@ export const lightTheme = {
 
     // Accents
     success: '#4caf50',
+    successBackground: '#c8e6c9',
+    successDark: '#2e7d32',
     error: '#f44336',
+    errorBackground: '#ffcdd2',
+    errorDark: '#c62828',
     warning: '#ff9800',
+    warningBackground: '#fff9c4',
+    warningCardBackground: '#FFF3E0',
+    warningDark: '#E65100',
+    infoBackground: '#E3F2FD',
 
     // Borders
     border: '#e0e0e0',
@@ -59,8 +67,16 @@ export const darkTheme = {
 
     // Accents
     success: '#66bb6a',
+    successBackground: '#1b3d1b',
+    successDark: '#66bb6a',
     error: '#ef5350',
+    errorBackground: '#3d1b1b',
+    errorDark: '#ef5350',
     warning: '#ffb74d',
+    warningBackground: '#3d3d1b',
+    warningCardBackground: '#3d2b1b',
+    warningDark: '#ffb74d',
+    infoBackground: '#1b2d3d',
 
     // Borders
     border: '#404040',

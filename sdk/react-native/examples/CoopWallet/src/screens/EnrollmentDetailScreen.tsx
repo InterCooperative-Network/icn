@@ -70,7 +70,7 @@ export function EnrollmentDetailScreen({ navigation, route }: Props) {
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4A90A4" />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
         <Text style={styles.loadingText}>Loading enrollment...</Text>
       </View>
     );
@@ -137,7 +137,7 @@ export function EnrollmentDetailScreen({ navigation, route }: Props) {
         <View style={styles.infoCard}>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Level</Text>
-            <View style={[styles.levelBadge, getLevelStyle(enrollment.level)]}>
+            <View style={[styles.levelBadge, getLevelStyle(enrollment.level, theme)]}>
               <Text style={styles.levelText}>Level {enrollment.level}</Text>
             </View>
           </View>
@@ -283,16 +283,16 @@ function isExpiringSoon(expiresAt: string): boolean {
   return hoursUntilExpiry < 24;
 }
 
-function getLevelStyle(level: number) {
+function getLevelStyle(level: number, theme: Theme) {
   switch (level) {
     case 0:
-      return { backgroundColor: '#ffcdd2' };
+      return { backgroundColor: theme.colors.errorBackground };
     case 1:
-      return { backgroundColor: '#fff9c4' };
+      return { backgroundColor: theme.colors.warningBackground };
     case 2:
-      return { backgroundColor: '#c8e6c9' };
+      return { backgroundColor: theme.colors.successBackground };
     default:
-      return { backgroundColor: '#e0e0e0' };
+      return { backgroundColor: theme.colors.border };
   }
 }
 
@@ -312,56 +312,56 @@ function getLevelDescription(level: number): string {
 const createStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.background,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.background,
   },
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: '#666',
+    color: theme.colors.textSecondary,
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.background,
   },
   errorText: {
     fontSize: 14,
-    color: '#e53935',
+    color: theme.colors.error,
     textAlign: 'center',
     marginBottom: 16,
   },
   retryButton: {
-    backgroundColor: '#4A90A4',
+    backgroundColor: theme.colors.primary,
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
   },
   retryText: {
-    color: '#fff',
+    color: theme.colors.primaryText,
     fontSize: 14,
     fontWeight: '600',
   },
   rejectedBanner: {
-    backgroundColor: '#ffcdd2',
+    backgroundColor: theme.colors.errorBackground,
     padding: 16,
     marginBottom: 16,
   },
   rejectedText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#c62828',
+    color: theme.colors.errorDark,
   },
   rejectionReason: {
     fontSize: 14,
-    color: '#c62828',
+    color: theme.colors.errorDark,
     marginTop: 4,
   },
   section: {
@@ -371,18 +371,18 @@ const createStyles = (theme: Theme) => StyleSheet.create({
   sectionTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#666',
+    color: theme.colors.textSecondary,
     marginBottom: 8,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   infoCard: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     borderRadius: 12,
     padding: 16,
-    shadowColor: '#000',
+    shadowColor: theme.mode === 'dark' ? '#000' : '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
+    shadowOpacity: theme.mode === 'dark' ? 0.3 : 0.05,
     shadowRadius: 4,
     elevation: 2,
   },
@@ -392,15 +392,15 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: theme.colors.borderLight,
   },
   infoLabel: {
     fontSize: 14,
-    color: '#666',
+    color: theme.colors.textSecondary,
   },
   infoValue: {
     fontSize: 14,
-    color: '#333',
+    color: theme.colors.text,
     fontWeight: '500',
   },
   monospace: {
@@ -415,31 +415,31 @@ const createStyles = (theme: Theme) => StyleSheet.create({
   levelText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#333',
+    color: theme.colors.text,
   },
   statusText: {
     fontSize: 14,
-    color: '#4A90A4',
+    color: theme.colors.primary,
     fontWeight: '500',
   },
   verified: {
-    color: '#4caf50',
+    color: theme.colors.success,
     fontWeight: '600',
   },
   pending: {
-    color: '#666',
+    color: theme.colors.textSecondary,
   },
   warning: {
-    color: '#ff9800',
+    color: theme.colors.warning,
   },
   descriptionCard: {
-    backgroundColor: '#E3F2FD',
+    backgroundColor: theme.colors.infoBackground,
     borderRadius: 12,
     padding: 16,
   },
   descriptionText: {
     fontSize: 14,
-    color: '#333',
+    color: theme.colors.text,
     lineHeight: 20,
   },
   actions: {
@@ -449,26 +449,26 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     marginBottom: 32,
   },
   vouchButton: {
-    backgroundColor: '#4caf50',
+    backgroundColor: theme.colors.success,
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
   },
   vouchButtonText: {
-    color: '#fff',
+    color: theme.colors.primaryText,
     fontSize: 16,
     fontWeight: '600',
   },
   rejectButton: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#e53935',
+    borderColor: theme.colors.error,
   },
   rejectButtonText: {
-    color: '#e53935',
+    color: theme.colors.error,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -481,7 +481,7 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surface,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 24,
@@ -489,21 +489,22 @@ const createStyles = (theme: Theme) => StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#333',
+    color: theme.colors.text,
     marginBottom: 8,
   },
   modalSubtitle: {
     fontSize: 14,
-    color: '#666',
+    color: theme.colors.textSecondary,
     marginBottom: 16,
   },
   reasonInput: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.background,
     borderRadius: 12,
     padding: 16,
     fontSize: 14,
     minHeight: 100,
     marginBottom: 16,
+    color: theme.colors.text,
   },
   modalActions: {
     flexDirection: 'row',
@@ -511,25 +512,25 @@ const createStyles = (theme: Theme) => StyleSheet.create({
   },
   cancelButton: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.background,
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
   },
   cancelButtonText: {
-    color: '#666',
+    color: theme.colors.textSecondary,
     fontSize: 16,
     fontWeight: '600',
   },
   confirmRejectButton: {
     flex: 1,
-    backgroundColor: '#e53935',
+    backgroundColor: theme.colors.error,
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
   },
   confirmRejectText: {
-    color: '#fff',
+    color: theme.colors.primaryText,
     fontSize: 16,
     fontWeight: '600',
   },

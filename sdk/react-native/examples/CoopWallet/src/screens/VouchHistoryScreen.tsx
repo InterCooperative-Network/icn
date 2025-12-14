@@ -63,7 +63,7 @@ export function VouchHistoryScreen() {
         ListEmptyComponent={
           isLoading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#4A90A4" />
+              <ActivityIndicator size="large" color={theme.colors.primary} />
               <Text style={styles.loadingText}>Loading history...</Text>
             </View>
           ) : error ? (
@@ -98,29 +98,29 @@ function formatDate(dateString: string): string {
 const createStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.background,
   },
   header: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: theme.colors.border,
   },
   headerText: {
     fontSize: 14,
-    color: '#666',
+    color: theme.colors.textSecondary,
   },
   listContent: {
     padding: 16,
   },
   vouchCard: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.card,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
+    shadowOpacity: theme.mode === 'dark' ? 0.3 : 0.05,
     shadowRadius: 4,
     elevation: 2,
   },
@@ -133,11 +133,11 @@ const createStyles = (theme: Theme) => StyleSheet.create({
   identityName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: theme.colors.text,
     flex: 1,
   },
   vouchedBadge: {
-    backgroundColor: '#c8e6c9',
+    backgroundColor: theme.colors.successBackground,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
@@ -145,7 +145,7 @@ const createStyles = (theme: Theme) => StyleSheet.create({
   vouchedText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#2e7d32',
+    color: theme.colors.successDark,
   },
   cardMeta: {
     flexDirection: 'row',
@@ -154,22 +154,22 @@ const createStyles = (theme: Theme) => StyleSheet.create({
   },
   metaText: {
     fontSize: 13,
-    color: '#666',
+    color: theme.colors.textSecondary,
   },
   statementContainer: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.background,
     borderRadius: 8,
     padding: 12,
     marginTop: 8,
   },
   statementLabel: {
     fontSize: 12,
-    color: '#666',
+    color: theme.colors.textSecondary,
     marginBottom: 4,
   },
   statementText: {
     fontSize: 13,
-    color: '#333',
+    color: theme.colors.text,
     fontStyle: 'italic',
   },
   loadingContainer: {
@@ -179,7 +179,7 @@ const createStyles = (theme: Theme) => StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: '#666',
+    color: theme.colors.textSecondary,
   },
   errorContainer: {
     padding: 40,
@@ -187,7 +187,7 @@ const createStyles = (theme: Theme) => StyleSheet.create({
   },
   errorText: {
     fontSize: 14,
-    color: '#e53935',
+    color: theme.colors.error,
     textAlign: 'center',
   },
   emptyContainer: {
@@ -201,12 +201,12 @@ const createStyles = (theme: Theme) => StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#333',
+    color: theme.colors.text,
     marginBottom: 8,
   },
   emptyText: {
     fontSize: 14,
-    color: '#666',
+    color: theme.colors.textSecondary,
     textAlign: 'center',
   },
 });

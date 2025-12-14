@@ -75,7 +75,7 @@ export function VerificationHistoryScreen({ navigation }: Props) {
         <View
           style={[
             styles.statusIndicator,
-            { backgroundColor: item.result.valid ? '#4CAF50' : '#F44336' },
+            { backgroundColor: item.result.valid ? theme.colors.success : theme.colors.error },
           ]}
         />
         <View style={styles.historyInfo}>
@@ -120,14 +120,14 @@ export function VerificationHistoryScreen({ navigation }: Props) {
       </View>
       <View style={styles.statDivider} />
       <View style={styles.statItem}>
-        <Text style={[styles.statValue, { color: '#4CAF50' }]}>
+        <Text style={[styles.statValue, { color: theme.colors.success }]}>
           {history.filter((h) => h.result.valid).length}
         </Text>
         <Text style={styles.statLabel}>Valid</Text>
       </View>
       <View style={styles.statDivider} />
       <View style={styles.statItem}>
-        <Text style={[styles.statValue, { color: '#F44336' }]}>
+        <Text style={[styles.statValue, { color: theme.colors.error }]}>
           {history.filter((h) => !h.result.valid).length}
         </Text>
         <Text style={styles.statLabel}>Invalid</Text>
@@ -287,7 +287,7 @@ const createStyles = (theme: Theme) => StyleSheet.create({
     borderRadius: 8,
   },
   primaryButtonText: {
-    color: 'white',
+    color: theme.colors.primaryText,
     fontSize: 16,
     fontWeight: '600',
   },
