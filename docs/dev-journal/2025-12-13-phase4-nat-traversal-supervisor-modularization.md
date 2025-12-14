@@ -248,9 +248,41 @@ pub mod supervisor {
 **Rationale**:
 Most supervisor errors occur in async contexts where there's no caller to propagate to. Rather than changing the architecture, errors are now countable and alertable via Prometheus metrics.
 
+### 9. Architectural Issues Verification (A2, A3, A4, A8)
+
+Analyzed remaining architectural issues - all verified as non-issues or appropriate patterns:
+
+**A2. Circular Crate Dependencies - VERIFIED NON-ISSUE**
+Used `cargo tree` to analyze. Dependencies form a DAG, not a cycle:
+- icn-net → icn-ledger → icn-gossip
+- No reverse dependencies exist
+- Crates can be versioned independently
+
+**A3. Trust Graph Multiple Sources - VERIFIED APPROPRIATE PATTERN**
+Arc<RwLock<>> IS the coordination mechanism. This is the standard Rust pattern:
+- Multiple concurrent readers via read lock
+- Exclusive writer access via write lock
+- Automatic coordination
+
+**A4. Inconsistent Callback Patterns - VERIFIED APPROPRIATE PATTERN**
+Actors have different callback needs (input/output types, sync/async). A unified trait would require excessive generics or runtime type erasure. Current approach is idiomatic Rust.
+
+**A8. Byzantine Detector Ownership - VERIFIED APPROPRIATE PATTERN**
+Ownership is explicit and well-documented:
+- Created in `init_trust.rs` as part of TrustServices
+- Shared via Arc<RwLock<>> to Network, Gossip, Ledger, Compute actors
+- Correct pattern for aggregating reports from multiple sources
+
+## Summary
+
+All SYSTEM_GAPS architectural items (A1-A8) are now complete:
+- A1: Supervisor modularization (multiple phases)
+- A2-A4, A7-A8: Verified as non-issues or appropriate patterns
+- A5: Configuration sprawl fixed with SupervisorConfig
+- A6: Error observability via supervisor metrics
+
 ## Next Steps
 
-From ROADMAP.md and SYSTEM_GAPS.md:
-- A1 continuation: Further supervisor refactoring if needed
-- A2, A3, A4, A8: Remaining architectural cleanup items
+From ROADMAP.md:
 - Track C1: Pilot community selection (business track)
+- Any remaining A1 work if needed

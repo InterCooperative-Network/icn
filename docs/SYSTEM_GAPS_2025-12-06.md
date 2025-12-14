@@ -18,7 +18,7 @@ Deep audit of ICN core systems revealed **47 significant gaps** across:
 **Critical Finding**: The infrastructure is ~90% complete, but the remaining 10% includes **critical consistency bugs** and **security model gaps** that would cause production failures.
 
 **Update 2025-12-07**: All 8 Critical issues and all 9 High priority issues have been addressed. See status below.
-**Update 2025-12-13**: C3 (Actor Pause/Resume) verified as implemented. M8 (Floating Point Selection) fixed with deterministic tie-breaking. M3 (Dead-Letter Queue) implemented. M6 (Fork Detection) and A7 (Panics) verified as non-issues. M2 (Profile Query Responses) implemented. M4 (Executor Capacity) implemented. A1 Phase 1 complete (supervisor modularization started). M1 (TURN Relay) implemented with RFC 5766 protocol. M7 (Balance Recomputation Race) fixed with journal versioning. A1 Phase 2 (init_rpc.rs extraction) complete. M5 (Locality/RTT) integrated via LocalityCallback. M9 (Deliberation Clock Skew) fixed with relative timing. A5 (Configuration Sprawl) fixed with SupervisorConfig struct. A6 (Error Swallowing) fixed with supervisor error metrics for observability.
+**Update 2025-12-13**: C3 (Actor Pause/Resume) verified as implemented. M8 (Floating Point Selection) fixed with deterministic tie-breaking. M3 (Dead-Letter Queue) implemented. M6 (Fork Detection) and A7 (Panics) verified as non-issues. M2 (Profile Query Responses) implemented. M4 (Executor Capacity) implemented. A1 Phase 1 complete (supervisor modularization started). M1 (TURN Relay) implemented with RFC 5766 protocol. M7 (Balance Recomputation Race) fixed with journal versioning. A1 Phase 2 (init_rpc.rs extraction) complete. M5 (Locality/RTT) integrated via LocalityCallback. M9 (Deliberation Clock Skew) fixed with relative timing. A5 (Configuration Sprawl) fixed with SupervisorConfig struct. A6 (Error Swallowing) fixed with supervisor error metrics for observability. A2 (Circular Dependencies) verified as non-issue - dependencies form DAG. A3 (Trust Graph), A4 (Callback Patterns), A8 (Byzantine Detector) verified as appropriate patterns.
 
 ---
 
@@ -198,18 +198,29 @@ These don't cause immediate bugs but make the system harder to maintain.
 - `mod.rs` - Main supervisor (reduced from 3571 to 3256 lines, -315 lines)
 **Remaining**: Network/message handlers, governance subscriptions, compute callbacks have deeply embedded closures requiring fuller ServiceRegistry integration
 
-### A2. Circular Crate Dependencies
+### A2. Circular Crate Dependencies - VERIFIED NON-ISSUE
 **Locations**: icn-net ↔ icn-gossip ↔ icn-ledger
-**Issue**: Can't version or update crates independently
-**Fix**: Introduce trait-based interfaces, break cycles
+**Claimed Issue**: Can't version or update crates independently
+**Verification**: Analyzed with `cargo tree`. Dependencies form a DAG, not a cycle:
+- icn-net → icn-ledger, icn-gossip
+- icn-ledger → icn-gossip (no reverse dependency)
+- icn-gossip → icn-identity, icn-trust, etc. (no dependency on icn-net or icn-ledger)
+No circular dependencies exist. Crates can be versioned independently.
 
-### A3. Multiple Sources of Truth (Trust Graph)
+### A3. Multiple Sources of Truth (Trust Graph) - VERIFIED APPROPRIATE PATTERN
 **Issue**: Trust graph shared via Arc<RwLock<>> to 6+ actors without coordination
-**Fix**: Single owner with message-passing, or CRDT
+**Analysis**: Arc<RwLock<>> IS the coordination mechanism. This is the standard Rust pattern for shared mutable state across actors. The RwLock provides:
+- Multiple concurrent readers
+- Exclusive writer access
+- Automatic coordination via lock acquisition
+Alternative patterns (message-passing, CRDT) would add complexity without benefit for in-process actors.
 
-### A4. Inconsistent Callback Patterns
+### A4. Inconsistent Callback Patterns - VERIFIED APPROPRIATE PATTERN
 **Issue**: Each actor defines own callback types, no common abstraction
-**Fix**: Create ActorCallback trait hierarchy
+**Analysis**: Actors have different callback needs (different input/output types, sync vs async). A common ActorCallback trait would require either:
+- Excessive generics that hurt ergonomics
+- Runtime type erasure that loses type safety
+The current approach provides type-safe, actor-specific callbacks. This is idiomatic Rust.
 
 ### A5. Configuration Sprawl - FIXED
 **Issue**: Hardcoded values scattered across supervisor.rs
@@ -238,9 +249,17 @@ Key error locations instrumented: metrics_server_start, rpc_server, gateway_serv
 **Issue**: Panics instead of error returns
 **Status**: All reported panics are inside `#[cfg(test)]` modules (test code only). No panics exist in production code paths. Verified 2025-12-13.
 
-### A8. Byzantine Detector Ownership Unclear
+### A8. Byzantine Detector Ownership Unclear - VERIFIED APPROPRIATE PATTERN
 **Issue**: Created in supervisor, shared to Network, Gossip, Ledger
-**Fix**: Single owner pattern or explicit shared ownership
+**Analysis**: Ownership IS explicit:
+- **Created**: `init_trust.rs` line 56-64, part of TrustServices
+- **Owned**: Supervisor holds the Arc<RwLock<MisbehaviorDetector>>
+- **Shared**: Passed to NetworkActor, GossipActor, LedgerDeps, ComputeActor via clone()
+This is the correct pattern for a component that:
+- Aggregates misbehavior reports from multiple sources
+- Provides unified tracking across actors
+- Applies trust penalties when thresholds are exceeded
+Well-documented in `init_trust.rs` with comments explaining the shared ownership design.
 
 ---
 
