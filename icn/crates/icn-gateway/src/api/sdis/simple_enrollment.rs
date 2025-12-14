@@ -850,7 +850,7 @@ mod tests {
         let num_part = &code[7..];
         assert!(num_part.parse::<u32>().is_ok());
         let num: u32 = num_part.parse().unwrap();
-        assert!(num >= 1000 && num <= 9999);
+        assert!((1000..=9999).contains(&num));
     }
 
     #[test]
@@ -1114,10 +1114,8 @@ mod tests {
 
     #[test]
     fn test_steward_min_trust_score_constant() {
-        // Verify the constant is reasonable
-        assert!(STEWARD_MIN_TRUST_SCORE >= 0.0);
-        assert!(STEWARD_MIN_TRUST_SCORE <= 1.0);
-        assert_eq!(STEWARD_MIN_TRUST_SCORE, 0.4); // Partner level
+        // Verify the constant is at Partner level (0.4)
+        assert_eq!(STEWARD_MIN_TRUST_SCORE, 0.4);
     }
 
     #[test]
