@@ -100,6 +100,13 @@ pub const MIN_TRUST_SUBMIT: f64 = 0.1;
 /// Minimum trust score to execute tasks (0.0 - 1.0)
 pub const MIN_TRUST_EXECUTE: f64 = 0.3;
 
+/// Deliberation period for placement offers in milliseconds (Phase 16B)
+///
+/// Executors wait this duration after receiving a PlacementRequest before
+/// broadcasting their offers. Uses relative timing based on request timestamp
+/// to avoid clock skew issues (M9 fix).
+pub const DELIBERATION_PERIOD_MS: u64 = 500;
+
 #[cfg(test)]
 mod tests {
     use super::*;

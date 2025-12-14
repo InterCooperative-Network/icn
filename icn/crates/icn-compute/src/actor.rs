@@ -1865,7 +1865,7 @@ impl ComputeActor {
         resource_profile: crate::scheduler::ResourceProfile,
         locality_hints: Vec<crate::scheduler::LocalityHint>,
         _max_cost: Option<u64>,
-        _requested_at: u64,
+        requested_at: u64,
     ) -> Result<(), ComputeError> {
         let task_hash_str = hex::encode(task_hash);
 
@@ -2042,15 +2042,26 @@ impl ComputeActor {
         // Track placement score
         icn_obs::metrics::compute::placement_score_observe(offer.score);
 
-        // Deliberation window: wait 500ms before broadcasting offer
-        // This allows all executors to compute scores simultaneously,
-        // reducing race conditions where fastest network wins
+        // Deliberation window: wait until deadline before broadcasting offer
+        // Uses relative timing based on request timestamp to avoid clock skew (M9 fix)
+        // This allows all executors to broadcast at approximately the same wall-clock time,
+        // regardless of network latency in receiving the request
         let send_callback = self.send_callback.clone();
         let task_manager = self.task_manager.clone();
 
+        // Calculate deadline based on request timestamp
+        let deadline = requested_at + crate::DELIBERATION_PERIOD_MS;
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+        let remaining_ms = deadline.saturating_sub(now);
+
         tokio::spawn(async move {
-            // Wait deliberation period
-            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+            // Wait remaining deliberation period (relative to request timestamp)
+            if remaining_ms > 0 {
+                tokio::time::sleep(tokio::time::Duration::from_millis(remaining_ms)).await;
+            }
 
             // Check if task was already claimed by someone else
             let mgr = task_manager.lock().await;

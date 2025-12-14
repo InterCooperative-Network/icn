@@ -11,6 +11,7 @@ This session completed several key infrastructure improvements:
 - TypeScript SDK public statistics endpoint
 - Balance recomputation race fix (M7)
 - Locality/RTT integration for compute placement (M5)
+- Deliberation period clock skew fix (M9)
 
 ## Changes Made
 
@@ -164,9 +165,30 @@ Integrated network topology RTT data into compute placement scoring.
 - Better placement decisions based on network latency
 - Foundation for full data locality scoring
 
+### 6. Deliberation Period Clock Skew Fix (M9)
+
+Fixed timing issue in placement offer deliberation period.
+
+**Problem**:
+- Executors waited a fixed 500ms before broadcasting placement offers
+- This used local wall-clock time, ignoring network latency
+- Nodes receiving requests late would broadcast late, disadvantaging them
+
+**Solution** (`icn-compute/src/actor.rs`):
+- Added `DELIBERATION_PERIOD_MS` constant (500ms)
+- Use `requested_at` timestamp from `PlacementRequest` as reference
+- Calculate `deadline = requested_at + DELIBERATION_PERIOD_MS`
+- Calculate `remaining_ms = deadline - now()` (saturating)
+- Sleep only the remaining time, not full 500ms
+
+**Result**:
+- All executors broadcast at approximately the same wall-clock time
+- Network latency no longer disadvantages distant executors
+- More fair placement competition
+
 ## Next Steps
 
 From ROADMAP.md and SYSTEM_GAPS.md:
-- M9: Deliberation period clock skew (use relative timing)
 - A1 continuation: Further supervisor refactoring if needed
+- A2-A6: Architectural cleanup items
 - Track C1: Pilot community selection (business track)

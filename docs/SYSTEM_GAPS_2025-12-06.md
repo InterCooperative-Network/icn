@@ -18,7 +18,7 @@ Deep audit of ICN core systems revealed **47 significant gaps** across:
 **Critical Finding**: The infrastructure is ~90% complete, but the remaining 10% includes **critical consistency bugs** and **security model gaps** that would cause production failures.
 
 **Update 2025-12-07**: All 8 Critical issues and all 9 High priority issues have been addressed. See status below.
-**Update 2025-12-13**: C3 (Actor Pause/Resume) verified as implemented. M8 (Floating Point Selection) fixed with deterministic tie-breaking. M3 (Dead-Letter Queue) implemented. M6 (Fork Detection) and A7 (Panics) verified as non-issues. M2 (Profile Query Responses) implemented. M4 (Executor Capacity) implemented. A1 Phase 1 complete (supervisor modularization started). M1 (TURN Relay) implemented with RFC 5766 protocol. M7 (Balance Recomputation Race) fixed with journal versioning. A1 Phase 2 (init_rpc.rs extraction) complete. M5 (Locality/RTT) integrated via LocalityCallback.
+**Update 2025-12-13**: C3 (Actor Pause/Resume) verified as implemented. M8 (Floating Point Selection) fixed with deterministic tie-breaking. M3 (Dead-Letter Queue) implemented. M6 (Fork Detection) and A7 (Panics) verified as non-issues. M2 (Profile Query Responses) implemented. M4 (Executor Capacity) implemented. A1 Phase 1 complete (supervisor modularization started). M1 (TURN Relay) implemented with RFC 5766 protocol. M7 (Balance Recomputation Race) fixed with journal versioning. A1 Phase 2 (init_rpc.rs extraction) complete. M5 (Locality/RTT) integrated via LocalityCallback. M9 (Deliberation Clock Skew) fixed with relative timing.
 
 ---
 
@@ -174,10 +174,10 @@ These affect robustness but system can function.
 **Issue**: f64 comparison non-deterministic across platforms
 **Fix**: Implemented deterministic tie-breaking with epsilon-based float comparison (1e-9 threshold) and lexicographic DID comparison as tie-breaker for equal scores.
 
-### M9. Deliberation Period Clock Skew
-**Location**: `icn-compute/src/actor.rs:1990-2036`
+### M9. Deliberation Period Clock Skew - FIXED
+**Location**: `icn-compute/src/actor.rs:2052-2063`
 **Issue**: 500ms wait uses local wall-clock, not synchronized
-**Fix**: Use relative timing or logical clock
+**Fix**: Implemented relative timing based on `requested_at` timestamp from PlacementRequest. Executors calculate `deadline = requested_at + DELIBERATION_PERIOD_MS` and wait only the remaining time, ensuring all executors broadcast at approximately the same wall-clock time regardless of network latency.
 
 ---
 
