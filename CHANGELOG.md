@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Tested - End-to-End Pilot UI Validation (2025-12-14)
+
+**Deployment Verification**:
+- All CI checks passing (formatting, clippy, tests)
+- K3s deployment successful with image `icn:b84f0d4`
+- Gateway health endpoint operational at `http://10.8.10.40:30080/v1/health`
+
+**Authentication Flow**:
+- Created new identity with `icnctl id init`
+- DID: `did:icn:z8p6hkHaFFM2aMjWfhsksvUx3AWt7ZVFhjTsxLn93MaRR`
+- Token generation via `icnctl auth token` working
+- JWT authentication with gateway verified
+
+**Cooperative Creation**:
+- Created `test-coop` cooperative via REST API
+- User set as Steward with full permissions
+- Cooperative persisted and retrievable via `/v1/coops/test-coop`
+
+**Known Issues Discovered**:
+- `icnctl auth token` expires display shows "1970-01-01" (cosmetic bug in timestamp formatting)
+- Pilot UI needs token with `coop:write,coop:admin` scopes to create/manage coops (documented)
+
 ### Fixed - System Gap Resolutions (2025-12-13)
 
 **Profile Query Responses (M2)** ([icn/crates/icn-core/src/supervisor/mod.rs](icn/crates/icn-core/src/supervisor/mod.rs)):
