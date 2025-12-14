@@ -390,9 +390,10 @@ async fn test_scope_aware_peer_sampling() -> Result<()> {
 
     // Wait for connections to be established with retry logic for CI environments
     // CI is slower, so we poll with fixed delays until all peers connect
+    // Increased attempts and delay to handle port conflicts when tests run concurrently
     let mut global_peers = Vec::new();
-    for attempt in 1..=20 {
-        tokio::time::sleep(Duration::from_millis(200)).await;
+    for attempt in 1..=40 {
+        tokio::time::sleep(Duration::from_millis(250)).await;
         global_peers = node_a.network_handle.sample_peers(Scope::Global, 10).await;
         if global_peers.len() >= 3 {
             info!("All 3 peers connected after {} attempts", attempt);

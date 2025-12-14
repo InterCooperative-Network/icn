@@ -119,6 +119,70 @@ Retries are automatic for transient errors (5xx, 429 rate limiting).
 
 ## API Reference
 
+### Batch Operations
+
+Efficiently process multiple operations at once:
+
+```typescript
+// Batch payments
+const results = await client.batchPay('food-coop', [
+  { from: 'admin', to: 'alice', amount: 10, currency: 'hours', memo: 'January work' },
+  { from: 'admin', to: 'bob', amount: 5, currency: 'hours', memo: 'Website help' },
+]);
+console.log(`${results.succeeded} succeeded, ${results.failed} failed`);
+
+// Batch add members
+await client.batchAddMembers('food-coop', [
+  { did: 'did:icn:dave', role: 'member' },
+  { did: 'did:icn:eve', role: 'member' },
+]);
+
+// Batch update members
+await client.batchUpdateMembers('food-coop', [
+  { did: 'did:icn:alice', updates: { role: 'admin' } },
+  { did: 'did:icn:bob', updates: { role: 'admin' } },
+]);
+```
+
+### Query Builder
+
+Fluent API for filtering transaction history:
+
+```typescript
+// Get last 30 days of high-value transactions from Alice
+const history = await client.queryHistory('food-coop')
+  .fromDid('did:icn:alice')
+  .minAmount(10)
+  .lastDays(30)
+  .limit(50)
+  .execute();
+
+// Complex date range query
+const january = await client.queryHistory('food-coop')
+  .startDate('2025-01-01T00:00:00Z')
+  .endDate('2025-01-31T23:59:59Z')
+  .toDid('did:icn:bob')
+  .execute();
+
+// Pagination
+const page = await client.queryHistory('food-coop')
+  .offset(100)
+  .limit(50)
+  .execute();
+```
+
+Available query methods:
+- `.fromDid(did)` - Filter by sender
+- `.toDid(did)` - Filter by recipient
+- `.minAmount(amount)` - Minimum transaction amount
+- `.maxAmount(amount)` - Maximum transaction amount
+- `.startDate(date)` - Start of date range (ISO 8601)
+- `.endDate(date)` - End of date range (ISO 8601)
+- `.lastDays(days)` - Last N days
+- `.offset(n)` - Pagination offset
+- `.limit(n)` - Result limit
+- `.execute()` - Execute the query
+
 ### Cooperatives
 
 ```typescript
@@ -267,6 +331,56 @@ const ws = client.connectWebSocket('food-coop', {
 ws.close();
 ```
 
+#### Event Filters
+
+Use `EventFilter` helpers to process specific event types:
+
+```typescript
+import { ICNClient, EventFilter } from '@icn/client';
+
+subscription.onEvent((event) => {
+  // Filter only payment events
+  if (EventFilter.payments()(event)) {
+    console.log('Payment event:', event);
+  }
+  
+  // Filter events involving specific DID
+  if (EventFilter.byDid('did:icn:alice')(event)) {
+    console.log('Event involving Alice:', event);
+  }
+  
+  // Filter proposal-related events
+  if (EventFilter.proposals()(event)) {
+    console.log('Governance event:', event);
+  }
+  
+  // Combine filters with AND
+  if (EventFilter.and(
+    EventFilter.payments(),
+    EventFilter.byDid('did:icn:alice')
+  )(event)) {
+    console.log('Payment involving Alice:', event);
+  }
+  
+  // Combine filters with OR
+  if (EventFilter.or(
+    EventFilter.payments(),
+    EventFilter.proposals()
+  )(event)) {
+    console.log('Payment or proposal:', event);
+  }
+});
+```
+
+Available filters:
+- `EventFilter.payments()` - Payment events
+- `EventFilter.proposals()` - Proposal/voting events
+- `EventFilter.members()` - Member management events
+- `EventFilter.byType(eventType)` - Specific event type
+- `EventFilter.byDid(did)` - Events involving a DID
+- `EventFilter.and(...filters)` - Combine with AND
+- `EventFilter.or(...filters)` - Combine with OR
+
 #### Managed Subscription with Auto-Reconnect
 
 Use `ICNSubscription` for production apps that need resilient connections:
@@ -377,6 +491,19 @@ npm test
 
 # Regenerate types from OpenAPI spec
 npm run generate-types
+```
+
+### Examples
+
+See the [examples](./examples/) directory for practical demonstrations:
+
+- **[batch-operations.ts](./examples/batch-operations.ts)** - Batch payments and member management
+- **[query-builder.ts](./examples/query-builder.ts)** - Advanced transaction history queries
+- **[websocket-filters.ts](./examples/websocket-filters.ts)** - Real-time event filtering
+
+Run examples with:
+```bash
+npx ts-node examples/batch-operations.ts
 ```
 
 ### Type Generation

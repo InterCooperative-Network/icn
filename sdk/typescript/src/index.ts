@@ -714,6 +714,123 @@ export class ICNClient {
   }
 
   // ===========================================================================
+  // Batch Operations
+  // ===========================================================================
+
+  /**
+   * Execute multiple payments in a batch
+   *
+   * @example
+   * ```typescript
+   * const results = await client.batchPay('food-coop', [
+   *   { from: 'did:icn:alice', to: 'did:icn:bob', amount: 2.5, currency: 'hours', memo: 'Garden help' },
+   *   { from: 'did:icn:alice', to: 'did:icn:carol', amount: 1.0, currency: 'hours', memo: 'Bookkeeping' },
+   * ]);
+   * console.log(`${results.succeeded} succeeded, ${results.failed} failed`);
+   * ```
+   */
+  async batchPay(coopId: string, payments: PaymentRequest[]): Promise<{
+    succeeded: number;
+    failed: number;
+    results: Array<{ success: boolean; payment?: PaymentResponse; error?: string }>;
+  }> {
+    const results = await Promise.allSettled(
+      payments.map(payment => this.pay(coopId, payment))
+    );
+
+    return {
+      succeeded: results.filter(r => r.status === 'fulfilled').length,
+      failed: results.filter(r => r.status === 'rejected').length,
+      results: results.map(r => 
+        r.status === 'fulfilled' 
+          ? { success: true, payment: r.value }
+          : { success: false, error: (r.reason as Error).message }
+      ),
+    };
+  }
+
+  /**
+   * Add multiple members to a cooperative in a batch
+   *
+   * @example
+   * ```typescript
+   * const results = await client.batchAddMembers('food-coop', [
+   *   { did: 'did:icn:bob', role: 'member' },
+   *   { did: 'did:icn:carol', role: 'member' },
+   * ]);
+   * ```
+   */
+  async batchAddMembers(coopId: string, members: AddMemberRequest[]): Promise<{
+    succeeded: number;
+    failed: number;
+    results: Array<{ success: boolean; member?: Member; error?: string }>;
+  }> {
+    const results = await Promise.allSettled(
+      members.map(member => this.addMember(coopId, member))
+    );
+
+    return {
+      succeeded: results.filter(r => r.status === 'fulfilled').length,
+      failed: results.filter(r => r.status === 'rejected').length,
+      results: results.map(r => 
+        r.status === 'fulfilled' 
+          ? { success: true, member: r.value }
+          : { success: false, error: (r.reason as Error).message }
+      ),
+    };
+  }
+
+  /**
+   * Update multiple members in a batch
+   *
+   * @example
+   * ```typescript
+   * const results = await client.batchUpdateMembers('food-coop', [
+   *   { did: 'did:icn:bob', updates: { role: 'admin' } },
+   *   { did: 'did:icn:carol', updates: { role: 'admin' } },
+   * ]);
+   * ```
+   */
+  async batchUpdateMembers(coopId: string, updates: Array<{ did: string; updates: UpdateMemberRequest }>): Promise<{
+    succeeded: number;
+    failed: number;
+    results: Array<{ success: boolean; member?: Member; error?: string }>;
+  }> {
+    const results = await Promise.allSettled(
+      updates.map(({ did, updates }) => this.updateMember(coopId, did, updates))
+    );
+
+    return {
+      succeeded: results.filter(r => r.status === 'fulfilled').length,
+      failed: results.filter(r => r.status === 'rejected').length,
+      results: results.map(r => 
+        r.status === 'fulfilled' 
+          ? { success: true, member: r.value }
+          : { success: false, error: (r.reason as Error).message }
+      ),
+    };
+  }
+
+  // ===========================================================================
+  // Query Builders
+  // ===========================================================================
+
+  /**
+   * Create a query builder for transaction history
+   *
+   * @example
+   * ```typescript
+   * const history = await client.queryHistory('food-coop')
+   *   .fromDid('did:icn:alice')
+   *   .limit(50)
+   *   .execute();
+   * ```
+   */
+  queryHistory(coopId: string): HistoryQueryBuilder {
+    return new HistoryQueryBuilder(this, coopId);
+  }
+
+  // ===========================================================================
   // WebSocket
   // ===========================================================================
 
@@ -913,6 +1030,186 @@ export class ICNSubscription {
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(message));
     }
+  }
+}
+
+/**
+ * Event filter helpers for WebSocket subscriptions
+ */
+export class EventFilter {
+  /**
+   * Filter events by type
+   */
+  static byType(eventType: string): (message: WsMessage) => boolean {
+    return (message) => {
+      return message.type === 'Event' && (message as any).event_type === eventType;
+    };
+  }
+
+  /**
+   * Filter events by DID (sender or participant)
+   */
+  static byDid(did: string): (message: WsMessage) => boolean {
+    return (message) => {
+      if (message.type !== 'Event') return false;
+      const payload = (message as any).payload;
+      return payload?.from === did || payload?.to === did || 
+             payload?.sender === did || payload?.did === did;
+    };
+  }
+
+  /**
+   * Filter payment events
+   */
+  static payments(): (message: WsMessage) => boolean {
+    return EventFilter.byType('Payment');
+  }
+
+  /**
+   * Filter proposal events
+   */
+  static proposals(): (message: WsMessage) => boolean {
+    return (message) => {
+      if (message.type !== 'Event') return false;
+      const eventType = (message as any).event_type;
+      return eventType === 'ProposalCreated' || 
+             eventType === 'ProposalOpened' || 
+             eventType === 'ProposalClosed' ||
+             eventType === 'VoteCast';
+    };
+  }
+
+  /**
+   * Filter member events
+   */
+  static members(): (message: WsMessage) => boolean {
+    return (message) => {
+      if (message.type !== 'Event') return false;
+      const eventType = (message as any).event_type;
+      return eventType === 'MemberAdded' || 
+             eventType === 'MemberRemoved' || 
+             eventType === 'MemberUpdated';
+    };
+  }
+
+  /**
+   * Combine multiple filters with AND logic
+   */
+  static and(...filters: Array<(message: WsMessage) => boolean>): (message: WsMessage) => boolean {
+    return (message) => filters.every(f => f(message));
+  }
+
+  /**
+   * Combine multiple filters with OR logic
+   */
+  static or(...filters: Array<(message: WsMessage) => boolean>): (message: WsMessage) => boolean {
+    return (message) => filters.some(f => f(message));
+  }
+}
+
+/**
+ * Query builder for transaction history with fluent API
+ */
+export class HistoryQueryBuilder {
+  private client: ICNClient;
+  private coopId: string;
+  private filters: {
+    from_did?: string;
+    to_did?: string;
+    offset?: number;
+    limit?: number;
+    min_amount?: number;
+    max_amount?: number;
+    start_date?: string;
+    end_date?: string;
+  } = {};
+
+  constructor(client: ICNClient, coopId: string) {
+    this.client = client;
+    this.coopId = coopId;
+  }
+
+  /**
+   * Filter by sender DID
+   */
+  fromDid(did: string): this {
+    this.filters.from_did = did;
+    return this;
+  }
+
+  /**
+   * Filter by recipient DID
+   */
+  toDid(did: string): this {
+    this.filters.to_did = did;
+    return this;
+  }
+
+  /**
+   * Set pagination offset
+   */
+  offset(offset: number): this {
+    this.filters.offset = offset;
+    return this;
+  }
+
+  /**
+   * Set result limit
+   */
+  limit(limit: number): this {
+    this.filters.limit = limit;
+    return this;
+  }
+
+  /**
+   * Filter by minimum amount
+   */
+  minAmount(amount: number): this {
+    this.filters.min_amount = amount;
+    return this;
+  }
+
+  /**
+   * Filter by maximum amount
+   */
+  maxAmount(amount: number): this {
+    this.filters.max_amount = amount;
+    return this;
+  }
+
+  /**
+   * Filter by start date (ISO 8601 format)
+   */
+  startDate(date: string): this {
+    this.filters.start_date = date;
+    return this;
+  }
+
+  /**
+   * Filter by end date (ISO 8601 format)
+   */
+  endDate(date: string): this {
+    this.filters.end_date = date;
+    return this;
+  }
+
+  /**
+   * Filter transactions for the last N days
+   */
+  lastDays(days: number): this {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - days);
+    this.filters.start_date = start.toISOString();
+    this.filters.end_date = end.toISOString();
+    return this;
+  }
+
+  /**
+   * Execute the query and return transaction history
+   */
+  async execute(): Promise<TransactionHistory> {
+    return this.client.getHistory(this.coopId, this.filters);
   }
 }
 
