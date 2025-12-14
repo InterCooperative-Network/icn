@@ -1553,6 +1553,30 @@ setInterval(() => {
 
 // Load saved credentials
 document.addEventListener('DOMContentLoaded', () => {
+    // Check for magic link parameters in URL hash
+    // Format: #gateway=URL&coop=ID&did=DID&token=TOKEN
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const magicGateway = hashParams.get('gateway');
+    const magicCoop = hashParams.get('coop');
+    const magicDid = hashParams.get('did');
+    const magicToken = hashParams.get('token');
+
+    // If magic link has all params, use them and clear hash for security
+    if (magicGateway && magicCoop && magicDid && magicToken) {
+        elements.gatewayUrl.value = decodeURIComponent(magicGateway);
+        elements.coopId.value = decodeURIComponent(magicCoop);
+        elements.did.value = decodeURIComponent(magicDid);
+        elements.token.value = decodeURIComponent(magicToken);
+
+        // Clear the hash to hide credentials from URL bar
+        history.replaceState(null, '', window.location.pathname);
+
+        // Show toast and auto-login
+        showToast('Magic link detected - logging in...', 'info', 2000);
+        setTimeout(() => login(), 500);
+        return;
+    }
+
     const savedGateway = localStorage.getItem('icn-gateway');
     const savedCoop = localStorage.getItem('icn-coop');
     const savedDid = localStorage.getItem('icn-did');
