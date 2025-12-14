@@ -260,7 +260,10 @@ async fn test_actor_registry_restore_from_checkpoint() {
         .await
         .expect("Should restore");
 
-    let info = registry.get(&checkpoint.actor_id).await.expect("Should exist");
+    let info = registry
+        .get(&checkpoint.actor_id)
+        .await
+        .expect("Should exist");
     assert_eq!(info.state, StatefulActorState::Running);
     assert_eq!(info.current_state, b"restored state data");
     assert_eq!(info.last_checkpoint_seq, 10);

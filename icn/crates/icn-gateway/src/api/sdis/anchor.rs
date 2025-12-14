@@ -16,8 +16,8 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use uuid::Uuid;
 
-use crate::error::{GatewayError, Result};
 use super::enrollment::{AnchorDto, EnrollmentPathwayDto, KeyBundleDto};
+use crate::error::{GatewayError, Result};
 
 // ============================================================================
 // Request/Response Models
@@ -158,24 +158,27 @@ impl AnchorStore {
     }
 
     pub fn store_anchor(&self, anchor_id: String, record: AnchorRecord) -> Result<()> {
-        let mut anchors = self.anchors.write().map_err(|_| {
-            GatewayError::InternalError("Failed to acquire write lock".to_string())
-        })?;
+        let mut anchors = self
+            .anchors
+            .write()
+            .map_err(|_| GatewayError::InternalError("Failed to acquire write lock".to_string()))?;
         anchors.insert(anchor_id, record);
         Ok(())
     }
 
     pub fn get_anchor(&self, anchor_id: &str) -> Result<Option<AnchorRecord>> {
-        let anchors = self.anchors.read().map_err(|_| {
-            GatewayError::InternalError("Failed to acquire read lock".to_string())
-        })?;
+        let anchors = self
+            .anchors
+            .read()
+            .map_err(|_| GatewayError::InternalError("Failed to acquire read lock".to_string()))?;
         Ok(anchors.get(anchor_id).cloned())
     }
 
     pub fn update_anchor(&self, anchor_id: &str, record: AnchorRecord) -> Result<()> {
-        let mut anchors = self.anchors.write().map_err(|_| {
-            GatewayError::InternalError("Failed to acquire write lock".to_string())
-        })?;
+        let mut anchors = self
+            .anchors
+            .write()
+            .map_err(|_| GatewayError::InternalError("Failed to acquire write lock".to_string()))?;
         anchors.insert(anchor_id.to_string(), record);
         Ok(())
     }

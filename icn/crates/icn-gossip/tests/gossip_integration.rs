@@ -66,7 +66,10 @@ fn test_vector_clock_causal_ordering() {
         !clock_a.happened_after(&clock_c),
         "Alice's clock should not happen after Carol's"
     );
-    assert!(clock_c.is_concurrent(&clock_a), "Clocks should be concurrent");
+    assert!(
+        clock_c.is_concurrent(&clock_a),
+        "Clocks should be concurrent"
+    );
 }
 
 #[test]
@@ -432,7 +435,9 @@ fn test_gossip_entry_decompress() {
     let alice = KeyPair::generate().unwrap();
 
     // Create compressible data
-    let data = "Repeated pattern for compression. ".repeat(100).into_bytes();
+    let data = "Repeated pattern for compression. "
+        .repeat(100)
+        .into_bytes();
 
     let mut entry = GossipEntry {
         hash: compute_hash(&data),

@@ -134,8 +134,7 @@ impl Supervisor {
             );
 
             // Initialize trust graph, recovery store, and misbehavior detector
-            let trust_services =
-                init_trust::init_trust_services(&self.config, did.clone()).await?;
+            let trust_services = init_trust::init_trust_services(&self.config, did.clone()).await?;
             let trust_graph_handle = trust_services.trust_graph.clone();
             let misbehavior_detector = trust_services.misbehavior_detector.clone();
             let recovery_store = trust_services.recovery_store.clone();
@@ -1378,8 +1377,11 @@ impl Supervisor {
                                         };
 
                                         // Publish response
-                                        let response_msg = crate::node::ProfileMessage::Response(profile_opt.clone());
-                                        if let Ok(response_data) = serde_json::to_vec(&response_msg) {
+                                        let response_msg = crate::node::ProfileMessage::Response(
+                                            profile_opt.clone(),
+                                        );
+                                        if let Ok(response_data) = serde_json::to_vec(&response_msg)
+                                        {
                                             let mut gossip_write = gossip.write().await;
                                             if let Err(e) = gossip_write.publish(
                                                 crate::node::TOPIC_NODE_PROFILES,
@@ -1390,7 +1392,11 @@ impl Supervisor {
                                                 debug!(
                                                     "Published profile response for {}: {}",
                                                     queried_did,
-                                                    if profile_opt.is_some() { "found" } else { "not found" }
+                                                    if profile_opt.is_some() {
+                                                        "found"
+                                                    } else {
+                                                        "not found"
+                                                    }
                                                 );
                                             }
                                         }
@@ -1735,7 +1741,10 @@ impl Supervisor {
             let dlq_store_path = self.config.store_path().join("dead_letter");
             let dlq_store = Arc::new(SledStore::open(&dlq_store_path)?);
             let dead_letter_queue = Arc::new(DeadLetterQueue::new(dlq_store));
-            info!("✓ Dead-letter queue initialized at {}", dlq_store_path.display());
+            info!(
+                "✓ Dead-letter queue initialized at {}",
+                dlq_store_path.display()
+            );
 
             // Subscribe to governance events for ledger execution
             // CRITICAL: Must store handle to keep subscription alive for daemon lifetime

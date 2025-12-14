@@ -45,8 +45,8 @@ pub use actor_model::{
     MigrationReason, MigrationState, TerminationReason,
 };
 pub use actor_runtime::{
-    ActorRuntimeCallback, ActorRuntimeCommand, PauseReason, StatefulActorInfo, StatefulActorRegistry,
-    StatefulActorState,
+    ActorRuntimeCallback, ActorRuntimeCommand, PauseReason, StatefulActorInfo,
+    StatefulActorRegistry, StatefulActorState,
 };
 pub use checkpoint_store::{
     CheckpointBackend, CheckpointStore, InMemoryBackend, SledCheckpointBackend,

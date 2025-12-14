@@ -46,7 +46,8 @@ pub async fn init_trust_services(config: &Config, did: Did) -> anyhow::Result<Tr
 
     // Create recovery store for social recovery events
     let recovery_store_path = config.store_path().join("recovery");
-    let recovery_store: Arc<dyn icn_store::Store> = Arc::new(SledStore::open(&recovery_store_path)?);
+    let recovery_store: Arc<dyn icn_store::Store> =
+        Arc::new(SledStore::open(&recovery_store_path)?);
     info!(
         "Recovery store initialized at {}",
         recovery_store_path.display()

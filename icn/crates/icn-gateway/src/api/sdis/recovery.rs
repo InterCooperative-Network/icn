@@ -16,8 +16,8 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use uuid::Uuid;
 
-use crate::error::{GatewayError, Result};
 use super::enrollment::KeyBundleDto;
+use crate::error::{GatewayError, Result};
 
 // ============================================================================
 // Request/Response Models
@@ -121,24 +121,27 @@ impl RecoveryStore {
 
     pub fn create_ceremony(&self, ceremony: RecoveryCeremony) -> Result<String> {
         let id = Uuid::new_v4().to_string();
-        let mut ceremonies = self.ceremonies.write().map_err(|_| {
-            GatewayError::InternalError("Failed to acquire write lock".to_string())
-        })?;
+        let mut ceremonies = self
+            .ceremonies
+            .write()
+            .map_err(|_| GatewayError::InternalError("Failed to acquire write lock".to_string()))?;
         ceremonies.insert(id.clone(), ceremony);
         Ok(id)
     }
 
     pub fn get_ceremony(&self, id: &str) -> Result<Option<RecoveryCeremony>> {
-        let ceremonies = self.ceremonies.read().map_err(|_| {
-            GatewayError::InternalError("Failed to acquire read lock".to_string())
-        })?;
+        let ceremonies = self
+            .ceremonies
+            .read()
+            .map_err(|_| GatewayError::InternalError("Failed to acquire read lock".to_string()))?;
         Ok(ceremonies.get(id).cloned())
     }
 
     pub fn update_ceremony(&self, id: &str, ceremony: RecoveryCeremony) -> Result<()> {
-        let mut ceremonies = self.ceremonies.write().map_err(|_| {
-            GatewayError::InternalError("Failed to acquire write lock".to_string())
-        })?;
+        let mut ceremonies = self
+            .ceremonies
+            .write()
+            .map_err(|_| GatewayError::InternalError("Failed to acquire write lock".to_string()))?;
         ceremonies.insert(id.to_string(), ceremony);
         Ok(())
     }
@@ -299,7 +302,10 @@ pub async fn complete_recovery(
     // 4. Update anchor → DID mapping
     // 5. Notify all devices
 
-    let anchor_id = ceremony.anchor_id.clone().unwrap_or_else(|| "anchor_recovered".to_string());
+    let anchor_id = ceremony
+        .anchor_id
+        .clone()
+        .unwrap_or_else(|| "anchor_recovered".to_string());
     let new_did = format!("did:icn:{}", Uuid::new_v4().to_string().replace("-", ""));
     let old_version = ceremony.old_keybundle_version.unwrap_or(1);
     let new_version = old_version + 1;
@@ -310,7 +316,8 @@ pub async fn complete_recovery(
         anchor_id,
         new_did,
         keybundle_version: new_version,
-        update_instructions: "Use the new DID on all your devices. Your Anchor ID remains the same.".to_string(),
+        update_instructions:
+            "Use the new DID on all your devices. Your Anchor ID remains the same.".to_string(),
     };
 
     Ok(HttpResponse::Ok().json(response))

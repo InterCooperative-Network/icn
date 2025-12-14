@@ -1527,7 +1527,9 @@ impl ComputeActor {
         executor_did: &str,
     ) -> Option<crate::scheduler::NodeCapacity> {
         let registry = self.executor_registry.lock().await;
-        registry.get(executor_did).and_then(|info| info.capacity.clone())
+        registry
+            .get(executor_did)
+            .and_then(|info| info.capacity.clone())
     }
 
     /// Get capacity information for all registered executors

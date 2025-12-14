@@ -187,9 +187,7 @@ pub async fn verify_level1(
         .unwrap()
         .as_secs();
     if now > session.expires_at {
-        return Err(GatewayError::BadRequest(
-            "Enrollment expired".to_string(),
-        ));
+        return Err(GatewayError::BadRequest("Enrollment expired".to_string()));
     }
 
     // TODO: Verify device_proof signature
@@ -303,14 +301,16 @@ pub async fn list_pending_enrollments(
     let pending: Vec<_> = enrollments
         .values()
         .filter(|s| s.level < 2 && !s.rejected && s.expires_at > now)
-        .map(|s| serde_json::json!({
-            "enrollment_id": s.enrollment_id,
-            "identity_name": s.identity_name,
-            "coop_id": s.coop_id,
-            "level": s.level,
-            "created_at": format_timestamp(s.created_at),
-            "expires_at": format_timestamp(s.expires_at),
-        }))
+        .map(|s| {
+            serde_json::json!({
+                "enrollment_id": s.enrollment_id,
+                "identity_name": s.identity_name,
+                "coop_id": s.coop_id,
+                "level": s.level,
+                "created_at": format_timestamp(s.created_at),
+                "expires_at": format_timestamp(s.expires_at),
+            })
+        })
         .collect();
 
     Ok(HttpResponse::Ok().json(serde_json::json!({
@@ -461,9 +461,7 @@ pub struct RejectRequest {
 
 /// GET /steward/stats - Get steward statistics
 #[actix_web::get("/steward/stats")]
-pub async fn get_steward_stats(
-    store: web::Data<Arc<EnrollmentStore>>,
-) -> Result<HttpResponse> {
+pub async fn get_steward_stats(store: web::Data<Arc<EnrollmentStore>>) -> Result<HttpResponse> {
     let enrollments = store.enrollments.read().await;
 
     // Count vouched enrollments
@@ -489,9 +487,7 @@ pub async fn get_steward_stats(
     // Calculate average response time (time from created_at to vouched_at)
     let response_times: Vec<u64> = vouched
         .iter()
-        .filter_map(|s| {
-            s.vouched_at.map(|v| v.saturating_sub(s.created_at))
-        })
+        .filter_map(|s| s.vouched_at.map(|v| v.saturating_sub(s.created_at)))
         .collect();
 
     let avg_response_hours = if response_times.is_empty() {
@@ -502,10 +498,7 @@ pub async fn get_steward_stats(
     };
 
     // Count rejections
-    let total_rejections = enrollments
-        .values()
-        .filter(|s| s.rejected)
-        .count();
+    let total_rejections = enrollments.values().filter(|s| s.rejected).count();
 
     Ok(HttpResponse::Ok().json(serde_json::json!({
         "total_vouches": total_vouches,
@@ -543,14 +536,16 @@ pub async fn get_vouch_history(
         .into_iter()
         .skip(offset)
         .take(limit)
-        .map(|s| serde_json::json!({
-            "enrollment_id": s.enrollment_id,
-            "identity_name": s.identity_name,
-            "coop_id": s.coop_id,
-            "vouch_statement": s.steward_vouch,
-            "vouched_at": format_timestamp(s.vouched_at.unwrap_or(0)),
-            "steward_did": s.steward_did,
-        }))
+        .map(|s| {
+            serde_json::json!({
+                "enrollment_id": s.enrollment_id,
+                "identity_name": s.identity_name,
+                "coop_id": s.coop_id,
+                "vouch_statement": s.steward_vouch,
+                "vouched_at": format_timestamp(s.vouched_at.unwrap_or(0)),
+                "steward_did": s.steward_did,
+            })
+        })
         .collect();
 
     Ok(HttpResponse::Ok().json(serde_json::json!({

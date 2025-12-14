@@ -208,10 +208,11 @@ where
     /// Enqueue a failed operation
     pub fn enqueue(&self, operation: FailedOperation) -> Result<()> {
         let key = Self::entry_key(&operation.id);
-        let value = serde_json::to_vec(&operation)
-            .context("Failed to serialize failed operation")?;
+        let value =
+            serde_json::to_vec(&operation).context("Failed to serialize failed operation")?;
 
-        self.store.put(&key, &value)
+        self.store
+            .put(&key, &value)
             .context("Failed to store failed operation")?;
 
         // Update metrics
@@ -243,10 +244,11 @@ where
     /// Update an existing entry
     pub fn update(&self, operation: &FailedOperation) -> Result<()> {
         let key = Self::entry_key(&operation.id);
-        let value = serde_json::to_vec(operation)
-            .context("Failed to serialize failed operation")?;
+        let value =
+            serde_json::to_vec(operation).context("Failed to serialize failed operation")?;
 
-        self.store.put(&key, &value)
+        self.store
+            .put(&key, &value)
             .context("Failed to update failed operation")?;
 
         Ok(())
@@ -255,7 +257,8 @@ where
     /// Remove an entry (after resolution)
     pub fn remove(&self, id: &str) -> Result<()> {
         let key = Self::entry_key(id);
-        self.store.delete(&key)
+        self.store
+            .delete(&key)
             .context("Failed to remove failed operation")?;
 
         icn_obs::metrics::core::dead_letter_resolved_inc();
@@ -269,8 +272,8 @@ where
         let mut result = Vec::new();
 
         for (_key, value) in entries {
-            let operation: FailedOperation = serde_json::from_slice(&value)
-                .context("Failed to deserialize failed operation")?;
+            let operation: FailedOperation =
+                serde_json::from_slice(&value).context("Failed to deserialize failed operation")?;
             if operation.status == status {
                 result.push(operation);
             }
@@ -292,8 +295,8 @@ where
         let mut result = Vec::new();
 
         for (_key, value) in entries {
-            let operation: FailedOperation = serde_json::from_slice(&value)
-                .context("Failed to deserialize failed operation")?;
+            let operation: FailedOperation =
+                serde_json::from_slice(&value).context("Failed to deserialize failed operation")?;
             result.push(operation);
         }
 
@@ -308,8 +311,8 @@ where
         let mut counts = std::collections::HashMap::new();
 
         for (_key, value) in entries {
-            let operation: FailedOperation = serde_json::from_slice(&value)
-                .context("Failed to deserialize failed operation")?;
+            let operation: FailedOperation =
+                serde_json::from_slice(&value).context("Failed to deserialize failed operation")?;
             let status_str = format!("{:?}", operation.status);
             *counts.entry(status_str).or_insert(0) += 1;
         }
@@ -400,7 +403,10 @@ mod tests {
 
         let retrieved = dlq.get("test-op").unwrap().unwrap();
         assert_eq!(retrieved.status, EntryStatus::Resolved);
-        assert_eq!(retrieved.resolution_notes, Some("Fixed manually".to_string()));
+        assert_eq!(
+            retrieved.resolution_notes,
+            Some("Fixed manually".to_string())
+        );
     }
 
     #[test]
@@ -471,11 +477,21 @@ mod tests {
         let dlq = DeadLetterQueue::new(store);
 
         // Add operation with 0 retries
-        let op1 = FailedOperation::new("op1", FailureType::StorageFailure, serde_json::json!({}), "E");
+        let op1 = FailedOperation::new(
+            "op1",
+            FailureType::StorageFailure,
+            serde_json::json!({}),
+            "E",
+        );
         dlq.enqueue(op1).unwrap();
 
         // Add operation with max retries
-        let mut op2 = FailedOperation::new("op2", FailureType::StorageFailure, serde_json::json!({}), "E");
+        let mut op2 = FailedOperation::new(
+            "op2",
+            FailureType::StorageFailure,
+            serde_json::json!({}),
+            "E",
+        );
         op2.retry_count = 5;
         dlq.enqueue(op2).unwrap();
 

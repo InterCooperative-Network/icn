@@ -285,7 +285,9 @@ fn test_proposal_veto_from_draft() {
         },
     );
 
-    proposal.veto("Security vulnerability detected".to_string()).unwrap();
+    proposal
+        .veto("Security vulnerability detected".to_string())
+        .unwrap();
 
     assert!(proposal.state.is_closed());
     if let ProposalState::Vetoed { reason, .. } = &proposal.state {
@@ -424,7 +426,11 @@ fn test_tally_from_votes() {
     let mut votes = Vec::new();
     for _ in 0..3 {
         let kp = KeyPair::generate().unwrap();
-        votes.push(Vote::new(proposal_id.clone(), kp.did().clone(), VoteChoice::For));
+        votes.push(Vote::new(
+            proposal_id.clone(),
+            kp.did().clone(),
+            VoteChoice::For,
+        ));
     }
     for _ in 0..2 {
         let kp = KeyPair::generate().unwrap();
@@ -478,7 +484,11 @@ fn test_tally_unanimous() {
     let mut votes = Vec::new();
     for _ in 0..5 {
         let kp = KeyPair::generate().unwrap();
-        votes.push(Vote::new(proposal_id.clone(), kp.did().clone(), VoteChoice::For));
+        votes.push(Vote::new(
+            proposal_id.clone(),
+            kp.did().clone(),
+            VoteChoice::For,
+        ));
     }
 
     let tally = VoteTally::from(votes);
@@ -517,8 +527,8 @@ fn test_tally_all_abstain() {
 fn test_store_domain_roundtrip() {
     let store = InMemoryGovernanceStore::new();
     let config = GovernanceConfig::cooperative_default();
-    let domain =
-        GovernanceDomain::new("Test Coop".to_string(), config).with_description("A test".to_string());
+    let domain = GovernanceDomain::new("Test Coop".to_string(), config)
+        .with_description("A test".to_string());
 
     store.store_domain(&domain).unwrap();
 
@@ -764,7 +774,10 @@ fn test_complete_governance_flow_accepted() {
 
     // Verify final state
     let final_proposal = store.get_proposal(&proposal.id).unwrap().unwrap();
-    assert!(matches!(final_proposal.state, ProposalState::Accepted { .. }));
+    assert!(matches!(
+        final_proposal.state,
+        ProposalState::Accepted { .. }
+    ));
 }
 
 #[test]

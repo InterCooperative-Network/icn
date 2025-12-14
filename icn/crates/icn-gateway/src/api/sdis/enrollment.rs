@@ -167,24 +167,27 @@ impl EnrollmentStore {
 
     pub fn create_ceremony(&self, ceremony: EnrollmentCeremony) -> Result<String> {
         let id = Uuid::new_v4().to_string();
-        let mut ceremonies = self.ceremonies.write().map_err(|_| {
-            GatewayError::InternalError("Failed to acquire write lock".to_string())
-        })?;
+        let mut ceremonies = self
+            .ceremonies
+            .write()
+            .map_err(|_| GatewayError::InternalError("Failed to acquire write lock".to_string()))?;
         ceremonies.insert(id.clone(), ceremony);
         Ok(id)
     }
 
     pub fn get_ceremony(&self, id: &str) -> Result<Option<EnrollmentCeremony>> {
-        let ceremonies = self.ceremonies.read().map_err(|_| {
-            GatewayError::InternalError("Failed to acquire read lock".to_string())
-        })?;
+        let ceremonies = self
+            .ceremonies
+            .read()
+            .map_err(|_| GatewayError::InternalError("Failed to acquire read lock".to_string()))?;
         Ok(ceremonies.get(id).cloned())
     }
 
     pub fn update_ceremony(&self, id: &str, ceremony: EnrollmentCeremony) -> Result<()> {
-        let mut ceremonies = self.ceremonies.write().map_err(|_| {
-            GatewayError::InternalError("Failed to acquire write lock".to_string())
-        })?;
+        let mut ceremonies = self
+            .ceremonies
+            .write()
+            .map_err(|_| GatewayError::InternalError("Failed to acquire write lock".to_string()))?;
         ceremonies.insert(id.to_string(), ceremony);
         Ok(())
     }
@@ -429,7 +432,13 @@ fn generate_recovery_codes() -> Vec<String> {
     // Generate 12 recovery codes
     // In production, these would be derived from steward shares
     (0..12)
-        .map(|i| format!("RECOVERY-{}-{}", i + 1, Uuid::new_v4().to_string()[..8].to_uppercase()))
+        .map(|i| {
+            format!(
+                "RECOVERY-{}-{}",
+                i + 1,
+                Uuid::new_v4().to_string()[..8].to_uppercase()
+            )
+        })
         .collect()
 }
 
@@ -462,11 +471,7 @@ mod tests {
             x25519_pub: "test_x25519".to_string(),
         };
 
-        let ceremony = EnrollmentCeremony::new(
-            pathway,
-            serde_json::json!({}),
-            keybundle,
-        );
+        let ceremony = EnrollmentCeremony::new(pathway, serde_json::json!({}), keybundle);
 
         assert_eq!(ceremony.status, CeremonyStatus::PendingStewardVerification);
         assert_eq!(ceremony.steward_approvals, 0);
@@ -484,11 +489,7 @@ mod tests {
             x25519_pub: "test_x25519".to_string(),
         };
 
-        let mut ceremony = EnrollmentCeremony::new(
-            pathway,
-            serde_json::json!({}),
-            keybundle,
-        );
+        let mut ceremony = EnrollmentCeremony::new(pathway, serde_json::json!({}), keybundle);
 
         assert!(!ceremony.is_approved());
 
@@ -517,11 +518,7 @@ mod tests {
             x25519_pub: "test_x25519".to_string(),
         };
 
-        let mut ceremony = EnrollmentCeremony::new(
-            pathway,
-            serde_json::json!({}),
-            keybundle,
-        );
+        let mut ceremony = EnrollmentCeremony::new(pathway, serde_json::json!({}), keybundle);
 
         ceremony.reject("Invalid documentation".to_string());
         assert_eq!(ceremony.status, CeremonyStatus::Rejected);

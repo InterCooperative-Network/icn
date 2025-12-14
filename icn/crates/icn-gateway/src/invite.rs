@@ -4,7 +4,7 @@
 
 use anyhow::Result;
 use icn_identity::Did;
-use rand::{Rng, thread_rng};
+use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::RwLock;
@@ -170,7 +170,7 @@ impl InviteManager {
     fn generate_code() -> String {
         const CHARSET: &[u8] = b"ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
         let mut rng = thread_rng();
-        
+
         (0..12)
             .map(|_| {
                 let idx = rng.gen_range(0..CHARSET.len());
@@ -214,7 +214,12 @@ mod tests {
         let joiner = joiner_kp.did();
 
         let invite = mgr
-            .create_invite("coop1".to_string(), "member".to_string(), creator.clone(), 3600)
+            .create_invite(
+                "coop1".to_string(),
+                "member".to_string(),
+                creator.clone(),
+                3600,
+            )
             .await
             .unwrap();
 

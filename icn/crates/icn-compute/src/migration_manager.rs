@@ -139,9 +139,16 @@ impl ActorMigrationManager {
     }
 
     /// Restore an actor from checkpoint (target executor).
-    fn restore_actor(&self, actor_id: ActorId, checkpoint: ActorCheckpoint) -> Result<(), ComputeError> {
+    fn restore_actor(
+        &self,
+        actor_id: ActorId,
+        checkpoint: ActorCheckpoint,
+    ) -> Result<(), ComputeError> {
         if let Some(ref callback) = self.actor_runtime {
-            callback(ActorRuntimeCommand::Restore { actor_id, checkpoint })?;
+            callback(ActorRuntimeCommand::Restore {
+                actor_id,
+                checkpoint,
+            })?;
             tracing::debug!(
                 actor_id = %hex::encode(actor_id),
                 "Actor restored from checkpoint"

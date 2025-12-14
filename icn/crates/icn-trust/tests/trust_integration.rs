@@ -54,7 +54,11 @@ fn test_multi_graph_complete_trust_network() {
     // Technical reliability: Alice trusts Carol's node, Carol trusts Dave's node
     multi
         .technical_mut()
-        .add_edge(TrustEdge::new(alice.did().clone(), carol.did().clone(), 0.7))
+        .add_edge(TrustEdge::new(
+            alice.did().clone(),
+            carol.did().clone(),
+            0.7,
+        ))
         .unwrap();
     multi
         .technical_mut()
@@ -84,7 +88,10 @@ fn test_multi_graph_complete_trust_network() {
         "Carol should have transitive social trust: {}",
         carol_social
     );
-    assert!(carol_technical > 0.5, "Carol should have direct technical trust");
+    assert!(
+        carol_technical > 0.5,
+        "Carol should have direct technical trust"
+    );
 
     // Combined score considers all three dimensions
     let bob_combined = multi.compute_combined_trust_score(bob.did()).unwrap();
@@ -237,9 +244,21 @@ fn test_attestation_typed_graph_routing() {
     }
 
     // Verify each graph got its attestation
-    assert!(multi.social().get_edge(alice.did(), bob.did()).unwrap().is_some());
-    assert!(multi.economic().get_edge(alice.did(), bob.did()).unwrap().is_some());
-    assert!(multi.technical().get_edge(alice.did(), bob.did()).unwrap().is_some());
+    assert!(multi
+        .social()
+        .get_edge(alice.did(), bob.did())
+        .unwrap()
+        .is_some());
+    assert!(multi
+        .economic()
+        .get_edge(alice.did(), bob.did())
+        .unwrap()
+        .is_some());
+    assert!(multi
+        .technical()
+        .get_edge(alice.did(), bob.did())
+        .unwrap()
+        .is_some());
 }
 
 #[test]
@@ -320,7 +339,11 @@ fn test_complex_transitive_trust_network() {
         .add_edge(TrustEdge::new(alice.did().clone(), bob.did().clone(), 0.8))
         .unwrap();
     graph
-        .add_edge(TrustEdge::new(alice.did().clone(), carol.did().clone(), 0.6))
+        .add_edge(TrustEdge::new(
+            alice.did().clone(),
+            carol.did().clone(),
+            0.6,
+        ))
         .unwrap();
     graph
         .add_edge(TrustEdge::new(bob.did().clone(), dave.did().clone(), 0.7))
@@ -437,7 +460,11 @@ fn test_trust_class_from_graph() {
         .add_edge(TrustEdge::new(alice.did().clone(), bob.did().clone(), 0.95))
         .unwrap(); // → Federated
     graph
-        .add_edge(TrustEdge::new(alice.did().clone(), carol.did().clone(), 0.5))
+        .add_edge(TrustEdge::new(
+            alice.did().clone(),
+            carol.did().clone(),
+            0.5,
+        ))
         .unwrap(); // → Known
     graph
         .add_edge(TrustEdge::new(alice.did().clone(), dave.did().clone(), 0.1))
@@ -498,9 +525,7 @@ fn test_cache_lru_eviction() {
 fn test_cache_warm() {
     let cache = TrustCache::new();
 
-    let dids: Vec<_> = (0..10)
-        .map(|_| KeyPair::generate().unwrap())
-        .collect();
+    let dids: Vec<_> = (0..10).map(|_| KeyPair::generate().unwrap()).collect();
 
     let warm_data: Vec<_> = dids
         .iter()
@@ -572,16 +597,10 @@ fn test_did_recovery_single_graph() {
         .is_none());
 
     // New edges should exist
-    let new_outgoing = graph
-        .get_edge(alice_new.did(), bob.did())
-        .unwrap()
-        .unwrap();
+    let new_outgoing = graph.get_edge(alice_new.did(), bob.did()).unwrap().unwrap();
     assert!((new_outgoing.score - 0.8).abs() < 0.001);
 
-    let new_incoming_bob = graph
-        .get_edge(bob.did(), alice_new.did())
-        .unwrap()
-        .unwrap();
+    let new_incoming_bob = graph.get_edge(bob.did(), alice_new.did()).unwrap().unwrap();
     assert!((new_incoming_bob.score - 0.7).abs() < 0.001);
 
     let new_incoming_carol = graph
@@ -675,8 +694,8 @@ fn test_edge_expiry_filtering() {
         .as_secs();
 
     // Add expired edge
-    let expired_edge = TrustEdge::new(alice.did().clone(), bob.did().clone(), 0.8)
-        .with_expiry(now - 100); // Expired 100 seconds ago
+    let expired_edge =
+        TrustEdge::new(alice.did().clone(), bob.did().clone(), 0.8).with_expiry(now - 100); // Expired 100 seconds ago
 
     graph.add_edge(expired_edge).unwrap();
 
@@ -706,15 +725,13 @@ fn test_outgoing_edges_expiry_filtering() {
     // Add valid and expired edges
     graph
         .add_edge(
-            TrustEdge::new(alice.did().clone(), bob.did().clone(), 0.8)
-                .with_expiry(now + 3600), // Valid for 1 hour
+            TrustEdge::new(alice.did().clone(), bob.did().clone(), 0.8).with_expiry(now + 3600), // Valid for 1 hour
         )
         .unwrap();
 
     graph
         .add_edge(
-            TrustEdge::new(alice.did().clone(), carol.did().clone(), 0.7)
-                .with_expiry(now - 100), // Already expired
+            TrustEdge::new(alice.did().clone(), carol.did().clone(), 0.7).with_expiry(now - 100), // Already expired
         )
         .unwrap();
 
@@ -746,10 +763,18 @@ fn test_get_dids_above_threshold() {
         .add_edge(TrustEdge::new(alice.did().clone(), bob.did().clone(), 0.9))
         .unwrap();
     graph
-        .add_edge(TrustEdge::new(alice.did().clone(), carol.did().clone(), 0.5))
+        .add_edge(TrustEdge::new(
+            alice.did().clone(),
+            carol.did().clone(),
+            0.5,
+        ))
         .unwrap();
     graph
-        .add_edge(TrustEdge::new(alice.did().clone(), dave.did().clone(), 0.15))
+        .add_edge(TrustEdge::new(
+            alice.did().clone(),
+            dave.did().clone(),
+            0.15,
+        ))
         .unwrap();
 
     // Threshold 0.5: only Bob
@@ -785,7 +810,11 @@ fn test_get_all_known_dids_multi_graph() {
         .unwrap();
     multi
         .economic_mut()
-        .add_edge(TrustEdge::new(alice.did().clone(), carol.did().clone(), 0.5))
+        .add_edge(TrustEdge::new(
+            alice.did().clone(),
+            carol.did().clone(),
+            0.5,
+        ))
         .unwrap();
     multi
         .technical_mut()

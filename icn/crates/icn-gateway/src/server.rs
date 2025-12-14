@@ -123,7 +123,8 @@ impl GatewayServer {
 
         // Create SDIS state for identity verification
         let sdis_state = Arc::new(crate::api::sdis::SdisState::new());
-        let enrollment_store = Arc::new(crate::api::sdis::simple_enrollment::EnrollmentStore::new());
+        let enrollment_store =
+            Arc::new(crate::api::sdis::simple_enrollment::EnrollmentStore::new());
 
         // Create ledger manager with persistent storage if data_dir is set
         let ledger_manager = if let Some(data_dir) = self.data_dir {

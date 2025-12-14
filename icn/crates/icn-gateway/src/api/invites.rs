@@ -9,7 +9,9 @@ use crate::auth::AuthManager;
 use crate::error::Result;
 use crate::invite::InviteManager;
 use crate::middleware::{get_claims, require_scope};
-use crate::models::{CreateInviteRequest, InviteInfo, InviteListResponse, InviteResponse, JoinRequest, JoinResponse};
+use crate::models::{
+    CreateInviteRequest, InviteInfo, InviteListResponse, InviteResponse, JoinRequest, JoinResponse,
+};
 use crate::validation;
 use icn_identity::Did;
 use icn_obs::metrics::gateway;
@@ -53,7 +55,12 @@ pub async fn create_invite(
 
     // Create invite
     let invite = invite_mgr
-        .create_invite(req.coop_id.clone(), req.role.clone(), creator_did, expires_in)
+        .create_invite(
+            req.coop_id.clone(),
+            req.role.clone(),
+            creator_did,
+            expires_in,
+        )
         .await
         .map_err(|e| {
             crate::error::GatewayError::InternalError(format!("Failed to create invite: {e}"))
@@ -63,7 +70,8 @@ pub async fn create_invite(
     let coop_name = format!("Coop {}", req.coop_id);
 
     // Construct invite URL
-    let base_url = std::env::var("GATEWAY_BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
+    let base_url =
+        std::env::var("GATEWAY_BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
     let invite_url = format!("{}/join?code={}", base_url, invite.code);
 
     // Record metrics
@@ -90,9 +98,9 @@ pub async fn list_invites(
     require_scope(&http_req, "coop:read")?;
 
     // Get coop_id from query params
-    let coop_id = query
-        .get("coop_id")
-        .ok_or_else(|| crate::error::GatewayError::BadRequest("Missing coop_id parameter".to_string()))?;
+    let coop_id = query.get("coop_id").ok_or_else(|| {
+        crate::error::GatewayError::BadRequest("Missing coop_id parameter".to_string())
+    })?;
 
     validation::validate_coop_id(coop_id)?;
 
@@ -127,19 +135,24 @@ pub async fn join_via_invite(
     req: web::Json<JoinRequest>,
 ) -> Result<HttpResponse> {
     // Validate invite code
-    let invite = invite_mgr.validate_invite(&req.invite_code).await.map_err(|e| {
-        crate::error::GatewayError::BadRequest(format!("Invalid invite: {e}"))
-    })?;
+    let invite = invite_mgr
+        .validate_invite(&req.invite_code)
+        .await
+        .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid invite: {e}")))?;
 
     // Validate the provided DID
-    let did: Did = req.did.parse().map_err(|e| {
-        crate::error::GatewayError::BadRequest(format!("Invalid DID: {e}"))
-    })?;
+    let did: Did = req
+        .did
+        .parse()
+        .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
 
     // Mark invite as used
-    invite_mgr.mark_used(&req.invite_code, did.clone()).await.map_err(|e| {
-        crate::error::GatewayError::InternalError(format!("Failed to mark invite as used: {e}"))
-    })?;
+    invite_mgr
+        .mark_used(&req.invite_code, did.clone())
+        .await
+        .map_err(|e| {
+            crate::error::GatewayError::InternalError(format!("Failed to mark invite as used: {e}"))
+        })?;
 
     // Generate capability token
     let scopes = vec![

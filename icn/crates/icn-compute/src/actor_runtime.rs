@@ -689,9 +689,7 @@ mod tests {
             .await
             .unwrap();
 
-        let result = registry
-            .pause(actor_id, PauseReason::UserRequest)
-            .await;
+        let result = registry.pause(actor_id, PauseReason::UserRequest).await;
         assert!(result.is_err());
     }
 

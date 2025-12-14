@@ -1940,7 +1940,8 @@ pub mod core {
 
     /// Increment dead-letter queue enqueue counter by failure type
     pub fn dead_letter_enqueued_inc(failure_type: &str) {
-        counter!("icn_core_dead_letter_enqueued_total", "failure_type" => failure_type.to_string()).increment(1);
+        counter!("icn_core_dead_letter_enqueued_total", "failure_type" => failure_type.to_string())
+            .increment(1);
     }
 
     /// Increment dead-letter queue resolved counter
