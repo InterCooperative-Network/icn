@@ -5,11 +5,19 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Alert, TouchableOpacity, Platform } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Alert,
+  TouchableOpacity,
+  Platform,
+  ActivityIndicator,
+} from 'react-native';
 import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
-import { parseQR, isICNQR } from '@icn/react-native';
+import { parseQR } from '@icn/react-native';
 import { RootStackParamList } from '../../App';
 import { useTheme, Theme } from '../contexts/ThemeContext';
 import { saveContact } from '../storage';
@@ -24,15 +32,26 @@ export function ScanScreen({ navigation, route }: Props) {
   const styles = createStyles(theme);
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Optional: scan mode can be passed as param to filter QR types
   const scanMode = route.params?.mode || 'all';
 
+  // Request permission on mount
   useEffect(() => {
-    if (!permission) {
-      requestPermission();
-    }
-  }, [permission, requestPermission]);
+    const setupCamera = async () => {
+      try {
+        if (!permission?.granted) {
+          await requestPermission();
+        }
+      } catch (error) {
+        console.error('Camera permission error:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    setupCamera();
+  }, []);
 
   const handleBarCodeScanned = ({ data }: BarcodeScanningResult) => {
     if (scanned) return;
@@ -63,7 +82,6 @@ export function ScanScreen({ navigation, route }: Props) {
           ]);
           return;
         }
-        // Add contact and navigate to their profile
         handleAddContact(result.data);
         break;
 
@@ -74,7 +92,6 @@ export function ScanScreen({ navigation, route }: Props) {
           ]);
           return;
         }
-        // Handle coop joining
         handleJoinCoop(result.data);
         break;
 
@@ -88,7 +105,6 @@ export function ScanScreen({ navigation, route }: Props) {
 
   const handleAddContact = async (contactData: { did: string; name?: string; coopId?: string }) => {
     try {
-      // Add to contacts using local storage
       await saveContact({
         did: contactData.did,
         name: contactData.name || `Member ${contactData.did.slice(-8)}`,
@@ -129,8 +145,6 @@ export function ScanScreen({ navigation, route }: Props) {
         {
           text: 'Join',
           onPress: () => {
-            // Navigate back to login with pre-filled data
-            // The login screen will handle the actual join
             navigation.reset({
               index: 0,
               routes: [
@@ -163,27 +177,12 @@ export function ScanScreen({ navigation, route }: Props) {
     }
   };
 
-  if (!permission) {
+  // Loading state
+  if (isLoading) {
     return (
       <View style={styles.container}>
-        <Text style={styles.message}>Requesting camera permission...</Text>
-      </View>
-    );
-  }
-
-  if (!permission.granted) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.message}>Camera access is required to scan QR codes.</Text>
-        <TouchableOpacity style={styles.button} onPress={requestPermission}>
-          <Text style={styles.buttonText}>Grant Permission</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.button, { marginTop: 12, backgroundColor: '#666' }]}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.buttonText}>Go Back</Text>
-        </TouchableOpacity>
+        <ActivityIndicator size="large" color="#fff" />
+        <Text style={styles.message}>Starting camera...</Text>
       </View>
     );
   }
@@ -203,6 +202,26 @@ export function ScanScreen({ navigation, route }: Props) {
     );
   }
 
+  // Permission not granted
+  if (!permission?.granted) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>📷</Text>
+        <Text style={styles.message}>Camera access is required to scan QR codes.</Text>
+        <TouchableOpacity style={styles.button} onPress={requestPermission}>
+          <Text style={styles.buttonText}>Grant Camera Permission</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.button, styles.secondaryButton]}
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={styles.buttonText}>Go Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  // Camera view
   return (
     <View style={styles.container}>
       <CameraView
@@ -223,10 +242,15 @@ export function ScanScreen({ navigation, route }: Props) {
           <Text style={styles.hint}>{getHintText()}</Text>
 
           {scanMode === 'all' && (
-            <Text style={styles.subHint}>
-              Payments • Contacts • Join Coop
-            </Text>
+            <Text style={styles.subHint}>Payments • Contacts • Join Coop</Text>
           )}
+
+          <TouchableOpacity
+            style={styles.cancelButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
         </View>
       </CameraView>
     </View>
@@ -285,6 +309,10 @@ const createStyles = (theme: Theme) =>
       borderBottomWidth: 4,
       borderRightWidth: 4,
     },
+    title: {
+      fontSize: 48,
+      marginBottom: 16,
+    },
     hint: {
       color: '#fff',
       fontSize: 16,
@@ -301,18 +329,35 @@ const createStyles = (theme: Theme) =>
       color: '#fff',
       fontSize: 16,
       textAlign: 'center',
+      marginTop: 16,
       marginBottom: 24,
       paddingHorizontal: 32,
     },
     button: {
       backgroundColor: theme.colors.primary,
       paddingHorizontal: 24,
-      paddingVertical: 12,
+      paddingVertical: 14,
       borderRadius: 8,
+      minWidth: 200,
+      alignItems: 'center',
+    },
+    secondaryButton: {
+      marginTop: 12,
+      backgroundColor: '#666',
     },
     buttonText: {
       color: '#fff',
       fontSize: 16,
       fontWeight: '600',
+    },
+    cancelButton: {
+      marginTop: 40,
+      paddingHorizontal: 32,
+      paddingVertical: 12,
+    },
+    cancelButtonText: {
+      color: '#fff',
+      fontSize: 16,
+      opacity: 0.8,
     },
   });

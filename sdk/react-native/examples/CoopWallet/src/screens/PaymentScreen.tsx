@@ -238,9 +238,9 @@ export function PaymentScreen({ navigation, route }: Props) {
 
           <TouchableOpacity
             style={styles.scanButton}
-            onPress={() => navigation.navigate('Scan')}
+            onPress={() => navigation.navigate('Scan', { mode: 'payment' })}
           >
-            <Text style={styles.scanButtonText}>Scan QR Code Instead</Text>
+            <Text style={styles.scanButtonText}>📷 Scan Payment QR</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
