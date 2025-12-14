@@ -6,3 +6,7 @@ secret.yaml
 *.tar
 *.bak
 
+# Deployment logs and backups
+deploy.log
+backups/
+

@@ -46,6 +46,25 @@ logs-recent: ## Show recent ICN daemon logs
 restart: ## Restart ICN deployment
 	ssh $(K3S_HOST) "sudo kubectl -n $(NAMESPACE) rollout restart deployment/icn-daemon"
 
+rollback: ## Rollback to previous deployment
+	@echo "Rolling back ICN deployment..."
+	ssh $(K3S_HOST) "sudo kubectl -n $(NAMESPACE) rollout undo deployment/icn-daemon"
+	@echo "Waiting for rollback to complete..."
+	ssh $(K3S_HOST) "sudo kubectl -n $(NAMESPACE) rollout status deployment/icn-daemon --timeout=120s"
+
+rollback-history: ## Show deployment rollout history
+	ssh $(K3S_HOST) "sudo kubectl -n $(NAMESPACE) rollout history deployment/icn-daemon"
+
+verify: ## Verify deployment is healthy
+	@echo "Verifying ICN deployment health..."
+	@ssh $(K3S_HOST) "sudo kubectl -n $(NAMESPACE) rollout status deployment/icn-daemon --timeout=120s" && \
+		echo '✓ Deployment rolled out successfully' || \
+		(echo '✗ Deployment failed!' && exit 1)
+	@echo "Testing health endpoint..."
+	@ssh $(K3S_HOST) "curl -sf http://localhost:30080/v1/health" && \
+		echo '✓ Health check passed' || \
+		(echo '✗ Health check failed!' && exit 1)
+
 clean: ## Remove ICN deployment (keeps PVC)
 	@echo "Removing ICN deployment..."
 	ssh $(K3S_HOST) "sudo kubectl delete deployment,svc,configmap -n $(NAMESPACE) -l app=icn || true"
@@ -62,8 +81,51 @@ clean-all: clean ## Remove ICN deployment and PVC (WARNING: deletes data)
 build-dev: ## Build with git hash tag
 	$(MAKE) build IMAGE_TAG=$(shell git rev-parse --short HEAD)
 
+build-fresh: ## Build without Docker cache (force fresh build)
+	@echo "Building fresh image without cache..."
+	./scripts/build-image.sh $(IMAGE_TAG) --no-cache
+
 full-deploy-dev: ## Full deploy with git hash tag
 	$(MAKE) full-deploy IMAGE_TAG=$(shell git rev-parse --short HEAD)
+
+full-deploy-fresh: ## Full deploy with fresh build (no cache)
+	@echo "Running fresh deployment (no cache)..."
+	./scripts/build-image.sh $(IMAGE_TAG) --no-cache
+	./scripts/sync-image.sh $(IMAGE_TAG) $(K3S_HOST)
+	./scripts/deploy.sh $(K3S_HOST) $(IMAGE_TAG)
+	$(MAKE) verify
+
+# ============================================================================
+# Backup & Restore
+# ============================================================================
+
+backup: ## Backup ICN data from cluster
+	@echo "Creating backup of ICN data..."
+	@BACKUP_NAME="icn-backup-$$(date +%Y%m%d-%H%M%S).tar.gz"; \
+	ssh $(K3S_HOST) "sudo kubectl -n $(NAMESPACE) exec deployment/icn-daemon -- tar czf - /data 2>/dev/null" > "$$BACKUP_NAME" && \
+	echo "✓ Backup saved to $$BACKUP_NAME" || \
+	echo "✗ Backup failed"
+
+backup-before-deploy: ## Create backup before deployment
+	@echo "Creating pre-deployment backup..."
+	@mkdir -p backups
+	@BACKUP_NAME="backups/icn-pre-deploy-$$(date +%Y%m%d-%H%M%S).tar.gz"; \
+	ssh $(K3S_HOST) "sudo kubectl -n $(NAMESPACE) exec deployment/icn-daemon -- tar czf - /data 2>/dev/null" > "$$BACKUP_NAME" && \
+	echo "✓ Pre-deployment backup: $$BACKUP_NAME" || \
+	echo "⚠ Backup skipped (pod may not be running)"
+
+safe-deploy: backup-before-deploy full-deploy verify ## Deploy with backup and verification
+	@echo ""
+	@echo "✓ Safe deployment complete!"
+
+deploy-history: ## Show deployment audit log
+	@if [ -f deploy.log ]; then \
+		echo "Deployment History:"; \
+		echo ""; \
+		cat deploy.log | tail -20; \
+	else \
+		echo "No deployment history found (deploy.log not present)"; \
+	fi
 
 # ============================================================================
 # Pilot UI Targets
