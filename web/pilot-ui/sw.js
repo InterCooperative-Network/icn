@@ -14,6 +14,7 @@ const STATIC_ASSETS = [
     '/index.html',
     '/style.css',
     '/app.js',
+    '/offline-storage.js',
     '/manifest.json',
     '/offline.html' // Fallback page for offline
 ];
@@ -200,6 +201,10 @@ async function limitCacheSize(cacheName, maxSize) {
 // ============================================================================
 // Background Sync (for offline transactions)
 // ============================================================================
+
+// Import offline storage (in service worker context)
+importScripts('offline-storage.js');
+
 self.addEventListener('sync', (event) => {
     console.log('[Service Worker] Background sync:', event.tag);
 
@@ -209,14 +214,69 @@ self.addEventListener('sync', (event) => {
 });
 
 async function syncPendingTransactions() {
-    // Get pending transactions from IndexedDB (if implemented)
-    // This would sync transactions that were created while offline
-
     console.log('[Service Worker] Syncing pending transactions...');
 
-    // TODO: Implement IndexedDB storage for pending transactions
-    // TODO: Send pending transactions to server
-    // TODO: Clear pending transactions after successful sync
+    try {
+        // Get pending transactions from IndexedDB
+        const pending = await OfflineStorage.getPendingTransactions();
+        const pendingOnly = pending.filter(tx => tx.status === 'pending');
+
+        console.log(`[Service Worker] Found ${pendingOnly.length} pending transactions`);
+
+        if (pendingOnly.length === 0) {
+            return;
+        }
+
+        // Try to sync each transaction
+        for (const tx of pendingOnly) {
+            try {
+                // Make the API request
+                const response = await fetch(`${tx.gateway_url}/v1/coops/${tx.coop_id}/ledger/pay`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${tx.token}`,
+                    },
+                    body: JSON.stringify({
+                        from: tx.from,
+                        to: tx.to,
+                        amount: tx.amount,
+                        currency: tx.currency,
+                        memo: tx.memo,
+                    }),
+                });
+
+                if (response.ok) {
+                    console.log(`[Service Worker] Successfully synced transaction ${tx.id}`);
+                    await OfflineStorage.markTransactionSynced(tx.id);
+
+                    // Notify the main thread
+                    const clients = await self.clients.matchAll();
+                    clients.forEach(client => {
+                        client.postMessage({
+                            type: 'TRANSACTION_SYNCED',
+                            transaction: tx,
+                        });
+                    });
+                } else {
+                    const error = await response.text();
+                    console.error(`[Service Worker] Failed to sync transaction ${tx.id}:`, error);
+                    await OfflineStorage.markTransactionFailed(tx.id, error);
+                }
+            } catch (error) {
+                console.error(`[Service Worker] Error syncing transaction ${tx.id}:`, error);
+                await OfflineStorage.markTransactionFailed(tx.id, error.message);
+            }
+        }
+
+        // Clean up synced transactions (older than 24 hours)
+        await OfflineStorage.clearSyncedTransactions();
+
+        console.log('[Service Worker] Sync complete');
+    } catch (error) {
+        console.error('[Service Worker] Sync failed:', error);
+        throw error;
+    }
 }
 
 // ============================================================================
