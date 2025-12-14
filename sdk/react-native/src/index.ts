@@ -73,6 +73,9 @@ export {
   generateJoinQR,
   parseJoinQR,
   isJoinQR,
+  // Enrollment QR
+  parseEnrollmentQR,
+  isEnrollmentQR,
 } from './qr';
 export type { QRType, ContactQRData, JoinQRData, ParsedQRData } from './qr';
 

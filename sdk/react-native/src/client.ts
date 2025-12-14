@@ -852,6 +852,182 @@ export class ICNMobileClient extends ICNClient {
   }
 
   // ===========================================================================
+  // Enrollment Methods (for enrollees)
+  // ===========================================================================
+
+  /**
+   * Start an enrollment process
+   *
+   * This creates a new enrollment session and returns a QR code for device verification.
+   *
+   * @param identityName - Display name for the identity
+   * @param coopId - Cooperative to join
+   * @returns Enrollment response with QR code data
+   */
+  async startEnrollment(
+    identityName: string,
+    coopId: string
+  ): Promise<import('./steward-types').StartEnrollmentResponse> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/enrollment/start`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        identity_name: identityName,
+        coop_id: coopId,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to start enrollment: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Submit device proof for Level 1 verification
+   *
+   * The device proof contains:
+   * - ephemeral_did: A DID created on this device
+   * - signature: Hex-encoded Ed25519 signature over the enrollment_id
+   *
+   * @param enrollmentId - Enrollment ID from startEnrollment or QR scan
+   * @param deviceProof - Device proof with ephemeral DID and signature
+   * @returns Verification response
+   */
+  async verifyDevice(
+    enrollmentId: string,
+    deviceProof: import('./steward-types').DeviceProof
+  ): Promise<import('./steward-types').VerifyDeviceResponse> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/verify/level1`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        enrollment_id: enrollmentId,
+        device_proof: deviceProof,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Device verification failed: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Complete enrollment after steward vouch
+   *
+   * This finalizes the enrollment and returns:
+   * - The new DID (same as ephemeral_did)
+   * - Recovery codes for backup
+   * - Auth token for immediate use
+   *
+   * @param enrollmentId - Enrollment ID
+   * @param ephemeralDid - The ephemeral DID from device verification
+   * @param ephemeralSignature - Hex-encoded signature over "complete:{enrollmentId}"
+   * @param deviceInfo - Information about the device
+   * @returns Completion response with DID, recovery codes, and auth token
+   */
+  async completeEnrollment(
+    enrollmentId: string,
+    ephemeralDid: string,
+    ephemeralSignature: string,
+    deviceInfo: import('./steward-types').DeviceInfo
+  ): Promise<import('./steward-types').CompleteEnrollmentResponse> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/enrollment/complete`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        enrollment_id: enrollmentId,
+        ephemeral_did: ephemeralDid,
+        ephemeral_signature: ephemeralSignature,
+        device_info: deviceInfo,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Enrollment completion failed: ${error}`);
+    }
+
+    const result = await response.json();
+
+    // Store the auth token and update state
+    if (result.auth_token && this.storage) {
+      const token = result.auth_token.replace(/^Bearer\s+/i, '');
+      this.setToken(token);
+
+      // Persist auth state - enrollment doesn't return expiry, use 1 hour default
+      const expiresAt = Date.now() + 3600000;
+      await this.persistAuth(token, result.did, deviceInfo.os, expiresAt);
+
+      this.updateAuthState({
+        isAuthenticated: true,
+        did: result.did,
+        coopId: null, // Will be set when user selects coop
+        expiresAt,
+      });
+    }
+
+    return result;
+  }
+
+  /**
+   * Helper to create device proof using the wallet
+   *
+   * @param enrollmentId - Enrollment ID to sign
+   * @returns Device proof ready for verifyDevice()
+   */
+  async createDeviceProof(
+    enrollmentId: string
+  ): Promise<import('./steward-types').DeviceProof> {
+    if (!this.wallet) {
+      throw new Error('No wallet configured');
+    }
+
+    // Get or generate ephemeral keypair
+    let keyPair = await this.wallet.getKeyPair();
+    if (!keyPair) {
+      keyPair = await this.wallet.generateKeyPair();
+    }
+
+    // Sign the enrollment_id
+    const signature = await this.wallet.sign(enrollmentId);
+
+    return {
+      ephemeral_did: keyPair.did,
+      signature,
+    };
+  }
+
+  /**
+   * Helper to create completion signature using the wallet
+   *
+   * @param enrollmentId - Enrollment ID
+   * @returns Hex-encoded signature for completeEnrollment()
+   */
+  async createCompletionSignature(enrollmentId: string): Promise<string> {
+    if (!this.wallet) {
+      throw new Error('No wallet configured');
+    }
+
+    const message = `complete:${enrollmentId}`;
+    return this.wallet.sign(message);
+  }
+
+  // ===========================================================================
   // Member Methods
   // ===========================================================================
 

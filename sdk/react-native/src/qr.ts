@@ -11,6 +11,8 @@
 
 import { PaymentQRData } from './types';
 
+import { EnrollmentQRData } from './steward-types';
+
 // QR URL prefixes
 const QR_PREFIX_PAY = 'icn://pay';
 const QR_PREFIX_CONTACT = 'icn://contact';
@@ -18,7 +20,7 @@ const QR_PREFIX_JOIN = 'icn://join';
 const QR_VERSION = '1';
 
 /** Type of QR code */
-export type QRType = 'payment' | 'contact' | 'join' | 'unknown';
+export type QRType = 'payment' | 'contact' | 'join' | 'enrollment' | 'unknown';
 
 /** Data from a contact QR code */
 export interface ContactQRData {
@@ -39,6 +41,7 @@ export type ParsedQRData =
   | { type: 'payment'; data: PaymentQRData }
   | { type: 'contact'; data: ContactQRData }
   | { type: 'join'; data: JoinQRData }
+  | { type: 'enrollment'; data: EnrollmentQRData }
   | { type: 'unknown'; data: null };
 
 /**
@@ -50,6 +53,13 @@ export function detectQRType(qrData: string): QRType {
   if (qrData.startsWith(QR_PREFIX_JOIN)) return 'join';
   // Also check for raw DIDs
   if (qrData.startsWith('did:icn:')) return 'contact';
+  // Check for enrollment QR (JSON with type: icn-enrollment)
+  try {
+    const parsed = JSON.parse(qrData);
+    if (parsed.type === 'icn-enrollment') return 'enrollment';
+  } catch {
+    // Not JSON, continue
+  }
   return 'unknown';
 }
 
@@ -87,6 +97,10 @@ export function parseQR(qrData: string): ParsedQRData {
     case 'join': {
       const data = parseJoinQR(qrData);
       return data ? { type: 'join', data } : { type: 'unknown', data: null };
+    }
+    case 'enrollment': {
+      const data = parseEnrollmentQR(qrData);
+      return data ? { type: 'enrollment', data } : { type: 'unknown', data: null };
     }
     default:
       return { type: 'unknown', data: null };
@@ -371,5 +385,67 @@ export function isJoinQR(qrData: string): boolean {
  * Check if a string is any valid ICN QR code
  */
 export function isICNQR(qrData: string): boolean {
-  return isPaymentQR(qrData) || isContactQR(qrData) || isJoinQR(qrData);
+  return isPaymentQR(qrData) || isContactQR(qrData) || isJoinQR(qrData) || isEnrollmentQR(qrData);
+}
+
+// ============================================
+// Enrollment QR Code Functions
+// ============================================
+
+/**
+ * Parse an enrollment QR code
+ *
+ * Enrollment QR codes are JSON with the structure:
+ * {
+ *   "type": "icn-enrollment",
+ *   "enrollment_id": "uuid",
+ *   "challenge": "base64-encoded-challenge",
+ *   "gateway_url": "http://..."
+ * }
+ *
+ * @example
+ * ```typescript
+ * const result = parseQR(scannedData);
+ * if (result.type === 'enrollment') {
+ *   const { enrollment_id, gateway_url } = result.data;
+ *   // Generate device proof and verify
+ *   const proof = await client.createDeviceProof(enrollment_id);
+ *   await client.verifyDevice(enrollment_id, proof);
+ * }
+ * ```
+ */
+export function parseEnrollmentQR(qrData: string): EnrollmentQRData | null {
+  try {
+    const parsed = JSON.parse(qrData);
+
+    if (parsed.type !== 'icn-enrollment') {
+      return null;
+    }
+
+    if (!parsed.enrollment_id || !parsed.gateway_url) {
+      return null;
+    }
+
+    return {
+      type: 'icn-enrollment',
+      enrollment_id: parsed.enrollment_id,
+      challenge: parsed.challenge || '',
+      gateway_url: parsed.gateway_url,
+    };
+  } catch (error) {
+    console.warn('Failed to parse enrollment QR:', error);
+    return null;
+  }
+}
+
+/**
+ * Check if a string is an enrollment QR code
+ */
+export function isEnrollmentQR(qrData: string): boolean {
+  try {
+    const parsed = JSON.parse(qrData);
+    return parsed.type === 'icn-enrollment';
+  } catch {
+    return false;
+  }
 }
