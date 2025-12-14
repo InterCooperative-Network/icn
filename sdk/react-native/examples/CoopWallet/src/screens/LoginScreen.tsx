@@ -57,7 +57,7 @@ export function LoginScreen({ navigation, route }: Props) {
   }, [route.params]);
 
   const handleEnrollmentVerification = async () => {
-    const { enrollmentId, challenge, gateway } = route.params || {};
+    const { enrollmentId, gateway } = route.params || {};
     if (!enrollmentId || !gateway) {
       setError('Invalid enrollment data');
       return;
@@ -72,15 +72,21 @@ export function LoginScreen({ navigation, route }: Props) {
         throw new Error('Client not initialized');
       }
 
+      // Create device proof using wallet
+      const deviceProof = await client.createDeviceProof(enrollmentId);
+
       setEnrollmentStatus('Verifying with cooperative...');
 
-      // Call the enrollment verification endpoint
-      const response = await fetch(`${gateway}/api/v1/sdis/enrollment/${enrollmentId}/verify-device`, {
+      // Call the enrollment verification endpoint (Level 1)
+      const response = await fetch(`${gateway}/v1/sdis/verify/level1`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          device_public_key: await client.getPublicKey(),
-          challenge_response: challenge,
+          enrollment_id: enrollmentId,
+          device_proof: {
+            ephemeral_did: deviceProof.ephemeral_did,
+            signature: deviceProof.signature,
+          },
         }),
       });
 
