@@ -1,10 +1,10 @@
 # ICN Glossary
 
 **Status**: Reference Document
-**Version**: 1.1.0
-**Last Updated**: 2025-12-05
+**Version**: 1.2.0
+**Last Updated**: 2025-12-14
 
-*Expanded with contribution credits terminology (Phase 21)*
+*Expanded with contribution credits terminology (Phase 21) and proposed Commons Evolution terms (RFC)*
 
 This glossary defines the authoritative terminology for ICN. All documentation, code, and user-facing text should use these terms consistently.
 
@@ -21,6 +21,7 @@ This glossary defines the authoritative terminology for ICN. All documentation, 
 7. [Technical Terms](#technical-terms)
 8. [Disambiguation](#disambiguation)
 9. [Related Documents](#related-documents)
+10. [Proposed Terms (Commons Evolution RFC)](#proposed-terms-commons-evolution-rfc)
 
 ---
 
@@ -403,6 +404,86 @@ Both are first-class ICN entities. Individuals typically belong to both.
 - [Contribution Credits Design](contribution-credits-design.md) - Full economic design specification
 - [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture
 - [governance-primitives.md](governance-primitives.md) - Governance layer design
+
+---
+
+## Proposed Terms (Commons Evolution RFC)
+
+*These terms are proposed in [COMMONS_EVOLUTION.md](COMMONS_EVOLUTION.md) and are under review for v0.3.x+. They are not yet implemented.*
+
+### The Commons
+**Status**: Proposed (v0.3.0+)
+
+The shared global coordination layer of ICN: identity, rights, governance, and economic participation held in common by all participants. The Commons provides baseline infrastructure that individual jurisdictions (cooperatives, communities, federations) build upon.
+
+### Commons Holder
+**Status**: Proposed (v0.3.0+)
+
+A human participant recognized by the network as holding baseline rights and responsibilities in the commons. Commons Holder status is independent of membership in any specific cooperative or community. A Commons Holder may have multiple affiliations (memberships) with different jurisdictions.
+
+**Key property**: Jurisdictions can revoke membership; they cannot revoke Commons Holder status.
+
+### Personhood Anchor
+**Status**: Proposed (v0.3.0+)
+
+The cryptographic root of a Commons Holder's identity, independent of key rotation. A Personhood Anchor proves that a unique human controls the associated keys, enabling Sybil resistance at the network level.
+
+**Requires**: Proof-of-personhood attestations from stewards or existing verified holders.
+
+### Charter
+**Status**: Proposed (v0.3.0+)
+
+The founding document that creates a cooperative, community, or federation as a jurisdiction within the commons. A Charter specifies:
+- Organization type (coop, community, federation)
+- Governance profile
+- Membership policy
+- Economic policy (if applicable)
+- Dispute resolution rules
+
+### Jurisdiction
+**Status**: Proposed (v0.3.0+)
+
+A coop, community, or federation with its own charter, governance, and membership rules. Jurisdictions operate within the commons framework and cannot override baseline Commons Rights.
+
+**Relationship to current terms**: This term generalizes "cooperative" and "community" into a unified concept.
+
+### Steward (Commons Context)
+**Status**: Proposed (v0.3.0+)
+
+A trusted operator who performs identity verification (proof-of-personhood attestation), infrastructure maintenance, or governance functions on behalf of the network. Stewards are:
+- Commons Holders themselves
+- Term-limited (not permanent positions)
+- Bonded (stake against misbehavior)
+- Subject to governance oversight
+
+**Note**: This extends the existing "Steward" role definition in the Governance section.
+
+### Commons Rights
+**Status**: Proposed (v0.3.0+)
+
+The baseline rights held by all Commons Holders, which cannot be revoked by individual jurisdictions:
+- **Voice**: Vote in commons-level governance
+- **Petition**: Propose constitutional changes
+- **Fuel Floor**: Guaranteed minimum fuel for civic participation
+- **Due Process**: Right to appeal before suspension/revocation
+- **Exit**: Leave any jurisdiction freely
+- **Audit**: Access public records
+
+### Affiliation
+**Status**: Proposed (v0.3.0+)
+
+A Commons Holder's membership relationship with a specific jurisdiction, granting additional capabilities (voting, transacting, holding office) within that scope. A Commons Holder may have multiple affiliations simultaneously.
+
+**Relationship to current terms**: This replaces the simpler "membership" concept with a more precise model.
+
+### Proof-of-Personhood (POP)
+**Status**: Proposed (v0.3.0+)
+
+Verification that a Commons Holder represents a unique human, not a bot or duplicate identity. POP methods include:
+- **In-person**: Verification by a steward
+- **Sponsored**: Vouched for by existing verified holders
+- **Biometric**: Privacy-preserving biometric verification
+- **Ceremony**: Community key-signing events
 
 ---
 
