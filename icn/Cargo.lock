@@ -2756,6 +2756,7 @@ dependencies = [
  "hex",
  "icn-crypto-pq",
  "icn-obs",
+ "lru",
  "multibase",
  "pem",
  "rand 0.8.5",

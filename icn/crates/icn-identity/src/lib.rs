@@ -16,6 +16,7 @@ pub mod keybundle;
 pub mod keystore;
 pub mod multi_device;
 pub mod personhood;
+pub mod personhood_store;
 pub mod recovery;
 pub mod sync;
 pub mod vui;
@@ -42,6 +43,7 @@ pub use personhood::{
     POPMethod, PersonhoodAnchor, RecoverySignature, UniquenessAttestation, UniquenessProof,
     UniquenessProofType,
 };
+pub use personhood_store::{InMemoryPersonhoodStore, PersonhoodAnchorStore, PersonhoodStore};
 pub use recovery::{
     RecoveryAttestation, RecoveryEvent, RecoveryMessage, RecoveryStatus, IDENTITY_RECOVERY_TOPIC,
 };
