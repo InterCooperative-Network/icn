@@ -42,5 +42,8 @@ pub use commons_store::SledCommonsStore;
 pub use compute_events::{create_forwarding_callback, forward_compute_event};
 pub use error::{GatewayError, Result};
 pub use events::{EventBroadcaster, GatewayEvent, SequencedEvent};
-pub use rate_limit::{RateLimitConfig, RateLimiter};
+pub use rate_limit::{
+    category_rate_limit_middleware, CategoryRateLimiter, EndpointCategory, RateLimitConfig,
+    RateLimiter,
+};
 pub use server::GatewayServer;
