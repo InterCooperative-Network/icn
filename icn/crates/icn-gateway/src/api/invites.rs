@@ -6,6 +6,7 @@ use actix_web::{get, post, web, HttpRequest, HttpResponse};
 use std::sync::Arc;
 
 use crate::auth::AuthManager;
+use crate::commons_mgr::CommonsManager;
 use crate::error::Result;
 use crate::invite::InviteManager;
 use crate::middleware::{get_claims, require_scope};
@@ -25,6 +26,7 @@ use icn_obs::metrics::gateway;
 pub async fn create_invite(
     http_req: HttpRequest,
     invite_mgr: web::Data<Arc<InviteManager>>,
+    commons_mgr: web::Data<Arc<CommonsManager>>,
     req: web::Json<CreateInviteRequest>,
 ) -> Result<HttpResponse> {
     // Check authorization
@@ -66,8 +68,11 @@ pub async fn create_invite(
             crate::error::GatewayError::InternalError(format!("Failed to create invite: {e}"))
         })?;
 
-    // Get coop name (placeholder - in full implementation would fetch from coop manager)
-    let coop_name = format!("Coop {}", req.coop_id);
+    // Get coop name from charter
+    let coop_name = match commons_mgr.get_charter_by_domain(&req.coop_id).await {
+        Ok(Some(charter)) => charter.name,
+        _ => format!("Coop {}", req.coop_id), // Fallback if charter not found
+    };
 
     // Construct invite URL
     let base_url =
