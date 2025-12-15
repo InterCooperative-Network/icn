@@ -142,8 +142,13 @@ impl BudgetStore {
         let budgets = self.budgets.read().await;
         
         for budget in budgets.values() {
-            if budget.account == account && budget.status == BudgetStatus::Active {
-                if budget.spent + amount > budget.limit {
+            if budget.account == account {
+                // Deny if budget is exceeded
+                if budget.status == BudgetStatus::Exceeded {
+                    return Ok(false);
+                }
+                // Deny if spending would exceed limit
+                if budget.status == BudgetStatus::Active && budget.spent + amount > budget.limit {
                     return Ok(false);
                 }
             }
