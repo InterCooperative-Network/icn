@@ -13,6 +13,12 @@
 //! - POST /v1/constitutional/amendments/{id}/ratify - Add ratification
 //! - POST /v1/constitutional/amendments/{id}/withdraw - Withdraw amendment
 //!
+//! # Voting Endpoints (UI-friendly)
+//! - POST /v1/constitutional/amendments/{id}/votes - Cast a vote
+//! - GET /v1/constitutional/amendments/{id}/votes - List all votes
+//! - GET /v1/constitutional/amendments/{id}/results - Get voting results
+//! - GET /v1/constitutional/amendments/{id}/my-vote - Get user's vote status
+//!
 //! # Appeal Endpoints
 //! - POST /v1/constitutional/appeals - File appeal
 //! - GET /v1/constitutional/appeals - List appeals
@@ -22,6 +28,8 @@
 //! - POST /v1/constitutional/appeals/{id}/review - Begin review
 //! - POST /v1/constitutional/appeals/{id}/resolve - Resolve appeal
 //! - POST /v1/constitutional/appeals/{id}/withdraw - Withdraw appeal
+
+pub mod voting;
 
 use actix_web::{get, post, web, HttpRequest, HttpResponse};
 use serde::{Deserialize, Serialize};
@@ -1236,6 +1244,9 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         .service(begin_appeal_review)
         .service(resolve_appeal)
         .service(withdraw_appeal);
+
+    // UI-friendly voting endpoints
+    voting::configure(cfg);
 }
 
 #[cfg(test)]
