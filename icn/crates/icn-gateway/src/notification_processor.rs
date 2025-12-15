@@ -10,16 +10,18 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tracing::{debug, error, info, warn};
 
+use crate::fcm_client::{create_notification_message, FcmClient, FcmConfig, FcmResult};
 use crate::notification_queue::{
-    calculate_backoff, DeliveryStatus, NotificationChannel, NotificationQueue, QueuedNotification,
+    calculate_backoff, DeliveryStatus, NotificationChannel, NotificationPriority,
+    NotificationQueue, QueuedNotification,
 };
 use crate::notifications::NotificationService;
 
 /// Configuration for the notification processor
 #[derive(Debug, Clone)]
 pub struct ProcessorConfig {
-    /// FCM server key for push notifications
-    pub fcm_server_key: Option<String>,
+    /// FCM configuration for push notifications
+    pub fcm_config: Option<FcmConfig>,
     /// SMTP configuration for email
     pub smtp_config: Option<SmtpConfig>,
     /// Maximum concurrent deliveries per channel
@@ -35,7 +37,7 @@ pub struct ProcessorConfig {
 impl Default for ProcessorConfig {
     fn default() -> Self {
         Self {
-            fcm_server_key: None,
+            fcm_config: None,
             smtp_config: None,
             max_concurrent: 10,
             enable_push: true,
@@ -95,8 +97,10 @@ pub struct InAppNotification {
 pub struct NotificationProcessor {
     /// Notification queue reference
     queue: Arc<NotificationQueue>,
-    /// Notification service for FCM
+    /// Notification service for device token management
     notification_service: Arc<NotificationService>,
+    /// FCM client for push notifications (optional)
+    fcm_client: Option<Arc<FcmClient>>,
     /// In-app notification storage (recipient -> notifications)
     in_app_store: Arc<DashMap<String, Vec<InAppNotification>>>,
     /// Processor configuration
@@ -110,9 +114,16 @@ impl NotificationProcessor {
         notification_service: Arc<NotificationService>,
         config: ProcessorConfig,
     ) -> Self {
+        // Create FCM client if config is provided
+        let fcm_client = config.fcm_config.as_ref().map(|fcm_config| {
+            info!("FCM client initialized for project: {}", fcm_config.project_id);
+            Arc::new(FcmClient::new(fcm_config.clone()))
+        });
+
         Self {
             queue,
             notification_service,
+            fcm_client,
             in_app_store: Arc::new(DashMap::new()),
             config,
         }
@@ -213,31 +224,76 @@ impl NotificationProcessor {
         if tokens.is_empty() {
             // No devices registered - not an error, just skip
             debug!(notification_id = %id, "No push devices registered for recipient");
-            self.queue
-                .mark_delivered(id, NotificationChannel::Push);
+            self.queue.mark_delivered(id, NotificationChannel::Push);
             return;
         }
 
-        // Create FCM notification
-        let fcm_notification = crate::notifications::Notification {
-            title: notification.title.clone(),
-            body: notification.body.clone(),
-            data: notification.data.clone(),
-        };
+        // Use FCM client if available, otherwise fall back to notification service
+        if let Some(ref fcm_client) = self.fcm_client {
+            // Send via FCM HTTP v1 API
+            let is_high_priority = notification.priority == NotificationPriority::High;
+            let mut all_success = true;
+            let mut last_error = None;
+            let mut invalid_tokens = Vec::new();
 
-        // Send to all devices
-        match self
-            .notification_service
-            .send_to_did(&did, fcm_notification)
-            .await
-        {
-            Ok(sent) => {
-                debug!(notification_id = %id, devices = sent, "Push notification sent");
-                self.queue.mark_delivered(id, NotificationChannel::Push);
+            for token in &tokens {
+                let message = create_notification_message(
+                    token.clone(),
+                    notification.title.clone(),
+                    notification.body.clone(),
+                    notification.data.clone(),
+                    is_high_priority,
+                );
+
+                match fcm_client.send(message).await {
+                    FcmResult::Success { message_id } => {
+                        debug!(
+                            notification_id = %id,
+                            token = %token,
+                            message_id = %message_id,
+                            "Push notification sent via FCM"
+                        );
+                    }
+                    FcmResult::InvalidToken => {
+                        warn!(
+                            notification_id = %id,
+                            token = %token,
+                            "Invalid FCM token, marking for removal"
+                        );
+                        invalid_tokens.push(token.clone());
+                        // Don't mark as failure - token is just invalid
+                    }
+                    FcmResult::TemporaryFailure { error } => {
+                        warn!(
+                            notification_id = %id,
+                            token = %token,
+                            error = %error,
+                            "Temporary FCM failure, will retry"
+                        );
+                        all_success = false;
+                        last_error = Some(error);
+                    }
+                    FcmResult::PermanentFailure { error } => {
+                        error!(
+                            notification_id = %id,
+                            token = %token,
+                            error = %error,
+                            "Permanent FCM failure"
+                        );
+                        all_success = false;
+                        last_error = Some(error);
+                    }
+                }
             }
-            Err(e) => {
-                error!(notification_id = %id, error = %e, "Push notification failed");
-                // Get current retry count
+
+            // Unregister invalid tokens
+            for token in invalid_tokens {
+                self.notification_service.unregister_device(&token);
+            }
+
+            if all_success {
+                self.queue.mark_delivered(id, NotificationChannel::Push);
+            } else if let Some(error) = last_error {
                 let retries = notification
                     .status
                     .get(&NotificationChannel::Push)
@@ -247,18 +303,43 @@ impl NotificationProcessor {
                     })
                     .unwrap_or(0);
 
-                self.queue
-                    .mark_failed(id, NotificationChannel::Push, &e, retries + 1);
+                self.queue.mark_failed(id, NotificationChannel::Push, &error, retries + 1);
 
-                // Schedule retry if not abandoned
                 if retries < 5 {
                     let backoff = calculate_backoff(retries);
                     debug!(
                         notification_id = %id,
                         retry = retries + 1,
                         backoff_ms = backoff.as_millis(),
-                        "Scheduling push retry"
+                        "Scheduling FCM retry"
                     );
+                }
+            }
+        } else {
+            // Fall back to notification service (legacy mode)
+            let fcm_notification = crate::notifications::Notification {
+                title: notification.title.clone(),
+                body: notification.body.clone(),
+                data: notification.data.clone(),
+            };
+
+            match self.notification_service.send_to_did(&did, fcm_notification).await {
+                Ok(sent) => {
+                    debug!(notification_id = %id, devices = sent, "Push notification sent (legacy)");
+                    self.queue.mark_delivered(id, NotificationChannel::Push);
+                }
+                Err(e) => {
+                    error!(notification_id = %id, error = %e, "Push notification failed (legacy)");
+                    let retries = notification
+                        .status
+                        .get(&NotificationChannel::Push)
+                        .map(|s| match s.value() {
+                            DeliveryStatus::Failed { retries, .. } => *retries,
+                            _ => 0,
+                        })
+                        .unwrap_or(0);
+
+                    self.queue.mark_failed(id, NotificationChannel::Push, &e, retries + 1);
                 }
             }
         }
