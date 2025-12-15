@@ -68,6 +68,27 @@ import {
   CancelTaskResponse,
   RetryOptions,
   WebSocketOptions,
+  // Commons Evolution types
+  Charter,
+  CharterSummary,
+  CreateCharterRequest,
+  CharterSignResponse,
+  CharterActionResponse,
+  CommonsHolder,
+  MemberListResponse,
+  MembershipActionResponse,
+  CapabilityCheckResponse,
+  Amendment,
+  AmendmentListResponse,
+  CreateAmendmentRequest,
+  AddAmendmentChangeRequest,
+  RatifyAmendmentRequest,
+  Appeal,
+  AppealListResponse,
+  FileAppealRequest,
+  AddEvidenceRequest,
+  AddResponseRequest,
+  ResolveAppealRequest,
 } from './types';
 
 export * from './types';
@@ -729,6 +750,408 @@ export class ICNClient {
       `/compute/cancel/${taskHash}`,
       req || {}
     );
+  }
+
+  // ===========================================================================
+  // Charter (Commons Evolution)
+  // ===========================================================================
+
+  /**
+   * Create a new charter
+   */
+  async createCharter(req: CreateCharterRequest): Promise<Charter> {
+    return this.post<Charter>('/charter', req);
+  }
+
+  /**
+   * Get charter by ID
+   */
+  async getCharter(charterId: string): Promise<Charter> {
+    return this.get<Charter>(`/charter/${charterId}`, false);
+  }
+
+  /**
+   * Get charter by domain ID
+   */
+  async getCharterByDomain(domainId: string): Promise<Charter> {
+    return this.get<Charter>(`/charter/by-domain/${domainId}`, false);
+  }
+
+  /**
+   * List charters
+   */
+  async listCharters(orgType?: string, status?: string): Promise<CharterSummary[]> {
+    const params = new URLSearchParams();
+    if (orgType) params.set('org_type', orgType);
+    if (status) params.set('status', status);
+    const query = params.toString();
+    return this.get<CharterSummary[]>(`/charter${query ? `?${query}` : ''}`, false);
+  }
+
+  /**
+   * Sign a charter as a founder
+   */
+  async signCharter(
+    charterId: string,
+    signature: string,
+    role?: string
+  ): Promise<CharterSignResponse> {
+    return this.post<CharterSignResponse>(`/charter/${charterId}/sign`, { signature, role });
+  }
+
+  /**
+   * Activate a charter
+   */
+  async activateCharter(charterId: string): Promise<CharterActionResponse> {
+    return this.post<CharterActionResponse>(`/charter/${charterId}/activate`);
+  }
+
+  /**
+   * Update charter status
+   */
+  async updateCharterStatus(
+    charterId: string,
+    status: string,
+    reason?: string
+  ): Promise<CharterActionResponse> {
+    return this.put<CharterActionResponse>(`/charter/${charterId}/status`, { status, reason });
+  }
+
+  // ===========================================================================
+  // Membership (Commons Evolution)
+  // ===========================================================================
+
+  /**
+   * Apply for membership in a jurisdiction
+   */
+  async applyForMembership(
+    jurisdictionId: string,
+    capabilitiesRequested?: string[]
+  ): Promise<CommonsHolder> {
+    return this.post<CommonsHolder>('/membership/apply', {
+      jurisdiction_id: jurisdictionId,
+      capabilities_requested: capabilitiesRequested || [],
+    });
+  }
+
+  /**
+   * Get membership status
+   */
+  async getMembershipStatus(jurisdictionId: string): Promise<CommonsHolder> {
+    return this.get<CommonsHolder>(`/membership/status/${jurisdictionId}`);
+  }
+
+  /**
+   * List members of a jurisdiction
+   */
+  async listJurisdictionMembers(
+    jurisdictionId: string,
+    status?: string
+  ): Promise<MemberListResponse> {
+    const params = new URLSearchParams();
+    if (status) params.set('status', status);
+    const query = params.toString();
+    return this.get<MemberListResponse>(
+      `/membership/list/${jurisdictionId}${query ? `?${query}` : ''}`
+    );
+  }
+
+  /**
+   * Approve a membership application (admin)
+   */
+  async approveMembership(
+    holderId: string,
+    jurisdictionId: string
+  ): Promise<MembershipActionResponse> {
+    return this.post<MembershipActionResponse>('/membership/approve', {
+      holder_id: holderId,
+      jurisdiction_id: jurisdictionId,
+    });
+  }
+
+  /**
+   * Promote a member (admin)
+   */
+  async promoteMember(
+    holderId: string,
+    jurisdictionId: string
+  ): Promise<MembershipActionResponse> {
+    return this.post<MembershipActionResponse>('/membership/promote', {
+      holder_id: holderId,
+      jurisdiction_id: jurisdictionId,
+    });
+  }
+
+  /**
+   * Suspend a member (admin)
+   */
+  async suspendMember(
+    holderId: string,
+    jurisdictionId: string
+  ): Promise<MembershipActionResponse> {
+    return this.post<MembershipActionResponse>('/membership/suspend', {
+      holder_id: holderId,
+      jurisdiction_id: jurisdictionId,
+    });
+  }
+
+  /**
+   * Reinstate a member (admin)
+   */
+  async reinstateMember(
+    holderId: string,
+    jurisdictionId: string
+  ): Promise<MembershipActionResponse> {
+    return this.post<MembershipActionResponse>('/membership/reinstate', {
+      holder_id: holderId,
+      jurisdiction_id: jurisdictionId,
+    });
+  }
+
+  /**
+   * Exit membership voluntarily
+   */
+  async exitMembership(
+    holderId: string,
+    jurisdictionId: string
+  ): Promise<MembershipActionResponse> {
+    return this.post<MembershipActionResponse>('/membership/exit', {
+      holder_id: holderId,
+      jurisdiction_id: jurisdictionId,
+    });
+  }
+
+  /**
+   * Grant a capability (admin)
+   */
+  async grantCapability(
+    holderId: string,
+    jurisdictionId: string,
+    capability: string
+  ): Promise<MembershipActionResponse> {
+    return this.post<MembershipActionResponse>('/membership/capability/grant', {
+      holder_id: holderId,
+      jurisdiction_id: jurisdictionId,
+      capability,
+    });
+  }
+
+  /**
+   * Revoke a capability (admin)
+   */
+  async revokeCapability(
+    holderId: string,
+    jurisdictionId: string,
+    capability: string
+  ): Promise<MembershipActionResponse> {
+    return this.post<MembershipActionResponse>('/membership/capability/revoke', {
+      holder_id: holderId,
+      jurisdiction_id: jurisdictionId,
+      capability,
+    });
+  }
+
+  /**
+   * Check if a member has a capability
+   */
+  async checkCapability(
+    holderId: string,
+    jurisdictionId: string,
+    capability: string
+  ): Promise<CapabilityCheckResponse> {
+    const params = new URLSearchParams({
+      holder_id: holderId,
+      jurisdiction_id: jurisdictionId,
+      capability,
+    });
+    return this.get<CapabilityCheckResponse>(`/membership/capability/check?${params}`);
+  }
+
+  /**
+   * Add a role to a member (admin)
+   */
+  async addMemberRole(
+    holderId: string,
+    jurisdictionId: string,
+    role: string
+  ): Promise<MembershipActionResponse> {
+    return this.post<MembershipActionResponse>('/membership/role/add', {
+      holder_id: holderId,
+      jurisdiction_id: jurisdictionId,
+      role,
+    });
+  }
+
+  /**
+   * Remove a role from a member (admin)
+   */
+  async removeMemberRole(
+    holderId: string,
+    jurisdictionId: string,
+    role: string
+  ): Promise<MembershipActionResponse> {
+    return this.post<MembershipActionResponse>('/membership/role/remove', {
+      holder_id: holderId,
+      jurisdiction_id: jurisdictionId,
+      role,
+    });
+  }
+
+  // ===========================================================================
+  // Amendments (Commons Evolution)
+  // ===========================================================================
+
+  /**
+   * Create a new amendment
+   */
+  async createAmendment(req: CreateAmendmentRequest): Promise<Amendment> {
+    return this.post<Amendment>('/constitutional/amendments', req);
+  }
+
+  /**
+   * Get amendment by ID
+   */
+  async getAmendment(amendmentId: string): Promise<Amendment> {
+    return this.get<Amendment>(`/constitutional/amendments/${amendmentId}`);
+  }
+
+  /**
+   * List amendments
+   */
+  async listAmendments(
+    status?: string,
+    scope?: string,
+    type?: string
+  ): Promise<AmendmentListResponse> {
+    const params = new URLSearchParams();
+    if (status) params.set('status', status);
+    if (scope) params.set('scope', scope);
+    if (type) params.set('type', type);
+    const query = params.toString();
+    return this.get<AmendmentListResponse>(
+      `/constitutional/amendments${query ? `?${query}` : ''}`
+    );
+  }
+
+  /**
+   * Add a change to a draft amendment
+   */
+  async addAmendmentChange(
+    amendmentId: string,
+    change: AddAmendmentChangeRequest
+  ): Promise<Amendment> {
+    return this.post<Amendment>(`/constitutional/amendments/${amendmentId}/changes`, change);
+  }
+
+  /**
+   * Submit amendment for review
+   */
+  async submitAmendment(amendmentId: string): Promise<Amendment> {
+    return this.post<Amendment>(`/constitutional/amendments/${amendmentId}/submit`);
+  }
+
+  /**
+   * Open voting on an amendment
+   */
+  async openAmendmentVoting(amendmentId: string): Promise<Amendment> {
+    return this.post<Amendment>(`/constitutional/amendments/${amendmentId}/vote`);
+  }
+
+  /**
+   * Ratify an amendment
+   */
+  async ratifyAmendment(
+    amendmentId: string,
+    req: RatifyAmendmentRequest
+  ): Promise<Amendment> {
+    return this.post<Amendment>(`/constitutional/amendments/${amendmentId}/ratify`, req);
+  }
+
+  /**
+   * Withdraw an amendment
+   */
+  async withdrawAmendment(amendmentId: string, reason?: string): Promise<Amendment> {
+    return this.post<Amendment>(`/constitutional/amendments/${amendmentId}/withdraw`, { reason });
+  }
+
+  // ===========================================================================
+  // Appeals (Commons Evolution)
+  // ===========================================================================
+
+  /**
+   * File an appeal
+   */
+  async fileAppeal(req: FileAppealRequest): Promise<Appeal> {
+    return this.post<Appeal>('/constitutional/appeals', req);
+  }
+
+  /**
+   * Get appeal by ID
+   */
+  async getAppeal(appealId: string): Promise<Appeal> {
+    return this.get<Appeal>(`/constitutional/appeals/${appealId}`);
+  }
+
+  /**
+   * List appeals
+   */
+  async listAppeals(
+    status?: string,
+    scope?: string,
+    appellant?: string
+  ): Promise<AppealListResponse> {
+    const params = new URLSearchParams();
+    if (status) params.set('status', status);
+    if (scope) params.set('scope', scope);
+    if (appellant) params.set('appellant', appellant);
+    const query = params.toString();
+    return this.get<AppealListResponse>(
+      `/constitutional/appeals${query ? `?${query}` : ''}`
+    );
+  }
+
+  /**
+   * Add evidence to an appeal
+   */
+  async addAppealEvidence(
+    appealId: string,
+    evidence: AddEvidenceRequest
+  ): Promise<Appeal> {
+    return this.post<Appeal>(`/constitutional/appeals/${appealId}/evidence`, evidence);
+  }
+
+  /**
+   * Add response to an appeal
+   */
+  async addAppealResponse(
+    appealId: string,
+    response: AddResponseRequest
+  ): Promise<Appeal> {
+    return this.post<Appeal>(`/constitutional/appeals/${appealId}/respond`, response);
+  }
+
+  /**
+   * Begin review of an appeal (admin)
+   */
+  async beginAppealReview(appealId: string): Promise<Appeal> {
+    return this.post<Appeal>(`/constitutional/appeals/${appealId}/review`);
+  }
+
+  /**
+   * Resolve an appeal (admin)
+   */
+  async resolveAppeal(
+    appealId: string,
+    resolution: ResolveAppealRequest
+  ): Promise<Appeal> {
+    return this.post<Appeal>(`/constitutional/appeals/${appealId}/resolve`, resolution);
+  }
+
+  /**
+   * Withdraw an appeal
+   */
+  async withdrawAppeal(appealId: string, reason?: string): Promise<Appeal> {
+    return this.post<Appeal>(`/constitutional/appeals/${appealId}/withdraw`, { reason });
   }
 
   // ===========================================================================
