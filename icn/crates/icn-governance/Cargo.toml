@@ -17,6 +17,8 @@ icn-identity = { path = "../icn-identity" }
 icn-trust = { path = "../icn-trust" }
 tokio = { workspace = true }
 uuid = { version = "1.0", features = ["v4", "serde"] }
+sha2.workspace = true
+hex = "0.4"
 
 [dev-dependencies]
 icn-store = { path = "../icn-store" }

@@ -2735,11 +2735,13 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "hex",
  "icn-identity",
  "icn-store",
  "icn-trust",
  "serde",
  "serde_json",
+ "sha2",
  "tokio",
  "uuid",
 ]

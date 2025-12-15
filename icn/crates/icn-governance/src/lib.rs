@@ -24,6 +24,7 @@
 //! );
 //! ```
 
+pub mod charter;
 pub mod config;
 pub mod domain;
 pub mod handle;
@@ -55,6 +56,11 @@ pub use sdis::{
 pub use store::{GovernanceStore, InMemoryGovernanceStore};
 pub use tally::VoteTally;
 pub use vote::{Vote, VoteChoice};
+pub use charter::{
+    AmendmentRef, ArbitratorSelection, Charter, CharterId, CharterStatus, ContributionRouting,
+    DisputePolicy, EconomicPolicy, FeePeriod, FounderSignature, MembershipFee, MembershipPolicy,
+    OrgType,
+};
 
 /// Unix timestamp in seconds
 pub type Timestamp = u64;
