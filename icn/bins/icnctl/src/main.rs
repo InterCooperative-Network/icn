@@ -6950,8 +6950,8 @@ async fn handle_steward_command(
                             "  Steward ID: {}",
                             data["steward_id"].as_str().unwrap_or("unknown")
                         );
-                        println!("  Term: {} days", term_days);
-                        println!("  Bond: {} credits", bond);
+                        println!("  Term: {term_days} days");
+                        println!("  Bond: {bond} credits");
                     } else {
                         let text = resp.text().await.unwrap_or_default();
                         println!("Registration failed: {status} - {text}");
@@ -7931,7 +7931,7 @@ async fn handle_amendment_command(
 
             let client = reqwest::Client::new();
             let url = format!("{gateway}/v1/constitutional/amendments/{amendment_id}/vote");
-            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, &keypair).await?;
+            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, keypair).await?;
 
             match client
                 .post(&url)
@@ -7991,7 +7991,7 @@ async fn handle_amendment_command(
             let did = keypair.did();
 
             // Sign the vote
-            let vote_data = format!("{}:{}:{}", amendment_id, approved, did);
+            let vote_data = format!("{amendment_id}:{approved}:{did}");
             let signature = keypair.sign(vote_data.as_bytes());
 
             let request = serde_json::json!({
@@ -8004,7 +8004,7 @@ async fn handle_amendment_command(
 
             let client = reqwest::Client::new();
             let url = format!("{gateway}/v1/constitutional/amendments/{amendment_id}/ratify");
-            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, &keypair).await?;
+            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, keypair).await?;
 
             match client
                 .post(&url)
@@ -8061,7 +8061,7 @@ async fn handle_amendment_command(
 
             let client = reqwest::Client::new();
             let url = format!("{gateway}/v1/constitutional/amendments/{amendment_id}/withdraw");
-            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, &keypair).await?;
+            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, keypair).await?;
 
             match client
                 .post(&url)
@@ -8205,7 +8205,7 @@ async fn handle_appeal_command(
 
             let client = reqwest::Client::new();
             let url = format!("{gateway}/v1/constitutional/appeals");
-            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, &keypair).await?;
+            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, keypair).await?;
 
             match client
                 .post(&url)
@@ -8423,7 +8423,7 @@ async fn handle_appeal_command(
 
             let client = reqwest::Client::new();
             let url = format!("{gateway}/v1/constitutional/appeals/{appeal_id}/evidence");
-            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, &keypair).await?;
+            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, keypair).await?;
 
             match client
                 .post(&url)
@@ -8480,7 +8480,7 @@ async fn handle_appeal_command(
 
             let client = reqwest::Client::new();
             let url = format!("{gateway}/v1/constitutional/appeals/{appeal_id}/respond");
-            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, &keypair).await?;
+            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, keypair).await?;
 
             match client
                 .post(&url)
@@ -8534,7 +8534,7 @@ async fn handle_appeal_command(
 
             let client = reqwest::Client::new();
             let url = format!("{gateway}/v1/constitutional/appeals/{appeal_id}/withdraw");
-            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, &keypair).await?;
+            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, keypair).await?;
 
             match client
                 .post(&url)
@@ -8640,6 +8640,6 @@ fn print_qr_placeholder(data: &str) {
     println!("│  [QR CODE WOULD BE  │");
     println!("│   DISPLAYED HERE]   │");
     println!("│                     │");
-    println!("│  Data: {:.12}...│", data);
+    println!("│  Data: {data:.12}...│");
     println!("└─────────────────────┘");
 }
