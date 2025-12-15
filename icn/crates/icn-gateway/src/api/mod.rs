@@ -9,6 +9,7 @@ pub mod coops;
 pub mod devices;
 pub mod federation;
 pub mod governance;
+pub mod governance_dashboard;
 pub mod health;
 pub mod identity;
 pub mod invites;

@@ -490,6 +490,15 @@ impl GatewayServer {
                                     crate::rate_limit::rate_limit_middleware,
                                 ))
                                 .wrap(auth.clone()),
+                        )
+                        // Governance dashboard (auth + rate limiting)
+                        .service(
+                            web::scope("")
+                                .configure(api::governance_dashboard::configure)
+                                .wrap(middleware::from_fn(
+                                    crate::rate_limit::rate_limit_middleware,
+                                ))
+                                .wrap(auth.clone()),
                         ),
                 )
                 // Static files and root route
