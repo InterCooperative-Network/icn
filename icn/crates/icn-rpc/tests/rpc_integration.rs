@@ -16,35 +16,76 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
 
-/// Find an available port for testing
-fn find_available_port() -> u16 {
+/// Find an available port for testing by binding to port 0
+/// Returns the port and keeps the listener open to prevent reuse
+fn find_available_port_with_listener() -> (u16, std::net::TcpListener) {
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-    listener.local_addr().unwrap().port()
+    let port = listener.local_addr().unwrap().port();
+    (port, listener)
 }
 
 /// Start an RPC server and return the address
+/// Uses retry mechanism to handle port collisions in parallel test execution
 async fn start_test_server(with_auth: bool) -> Result<(SocketAddr, tokio::task::JoinHandle<()>)> {
-    let port = find_available_port();
-    let addr: SocketAddr = format!("127.0.0.1:{}", port).parse()?;
+    const MAX_RETRIES: u32 = 5;
 
-    let server = if with_auth {
-        // Use a test secret for JWT signing
-        let jwt_secret = b"test-secret-for-rpc-integration-tests-32bytes".to_vec();
-        RpcServer::new_with_auth(addr, jwt_secret)
-    } else {
-        RpcServer::new(addr)
-    };
+    for attempt in 0..MAX_RETRIES {
+        // Get a port and hold the listener until we're ready to bind
+        let (port, listener) = find_available_port_with_listener();
+        let addr: SocketAddr = format!("127.0.0.1:{port}").parse()?;
 
-    let handle = tokio::spawn(async move {
-        if let Err(e) = server.run().await {
-            eprintln!("Server error: {e}");
+        // Drop the listener to free the port just before server starts
+        drop(listener);
+
+        let server = if with_auth {
+            let jwt_secret = b"test-secret-for-rpc-integration-tests-32bytes".to_vec();
+            RpcServer::new_with_auth(addr, jwt_secret)
+        } else {
+            RpcServer::new(addr)
+        };
+
+        // Use a channel to detect if the server started successfully
+        let (tx, mut rx) = tokio::sync::mpsc::channel::<bool>(1);
+
+        let handle = tokio::spawn(async move {
+            match server.run().await {
+                Ok(()) => {}
+                Err(e) => {
+                    let _ = tx.send(false).await;
+                    eprintln!("Server error: {e}");
+                }
+            }
+        });
+
+        // Give server time to start (or fail)
+        sleep(Duration::from_millis(50)).await;
+
+        // Check if server failed to start
+        match rx.try_recv() {
+            Ok(false) => {
+                // Server failed, abort and retry
+                handle.abort();
+                if attempt < MAX_RETRIES - 1 {
+                    sleep(Duration::from_millis(10)).await;
+                    continue;
+                }
+            }
+            Err(tokio::sync::mpsc::error::TryRecvError::Empty) => {
+                // No error received - server is running
+                // Give a bit more time for the server to be fully ready
+                sleep(Duration::from_millis(50)).await;
+                return Ok((addr, handle));
+            }
+            _ => {}
         }
-    });
 
-    // Give server time to start
-    sleep(Duration::from_millis(100)).await;
+        // If we got here on last attempt, return anyway
+        if attempt == MAX_RETRIES - 1 {
+            return Ok((addr, handle));
+        }
+    }
 
-    Ok((addr, handle))
+    anyhow::bail!("Failed to start test server after {MAX_RETRIES} attempts")
 }
 
 #[tokio::test]
