@@ -2,7 +2,7 @@
 
 **Date**: 2024-12-15
 **Sprint**: Pilot-Ready Platform Features
-**Status**: 9/17 tasks completed
+**Status**: 13/17 tasks completed (76%)
 
 ## Sprint Overview
 
@@ -84,69 +84,43 @@ This sprint implements pilot-ready features across four areas:
   - `GET /v1/constitutional/amendments/{id}/results` - Vote results with percentages
   - `GET /v1/constitutional/amendments/{id}/my-vote` - User's vote status
 
+#### Task 3.3: Appeals Management UI Support  
+- **Commit**: `8e847d6`
+- **Files**: `icn-gateway/src/api/constitutional/appeals_ui.rs`
+- **Endpoints**:
+  - `GET /v1/constitutional/appeals/{id}/timeline` - Event timeline with all appeal history
+  - `GET /v1/constitutional/appeals/{id}/status` - Detailed status with next steps
+  - `POST /v1/constitutional/appeals/{id}/assign-reviewer` - Assign reviewer (admin)
+  - `GET /v1/constitutional/appeals/dashboard` - Dashboard stats
+
+#### Task 3.4: Governance Dashboard Data
+- **Commit**: `83f98ac`
+- **Files**: `icn-gateway/src/api/governance_dashboard.rs`
+- **Endpoint**:
+  - `GET /v1/governance/{charter_id}/dashboard` - Aggregate statistics (amendments, appeals breakdown, recent activity)
+
+### Phase 4: Economic Features (Partial)
+
+#### Task 4.1: Recurring Payments
+- **Commit**: `66db8bb`
+- **Files**: `icn-gateway/src/api/recurring_payments.rs`
+- **Endpoints**:
+  - `POST /v1/payments/recurring` - Create recurring payment
+  - `GET /v1/payments/recurring` - List payments with status filtering
+  - `GET /v1/payments/recurring/{id}` - Get payment details
+  - `PUT /v1/payments/recurring/{id}` - Update payment (amount, frequency, status)
+  - `DELETE /v1/payments/recurring/{id}` - Cancel payment
+- **Features**: Daily/weekly/monthly/yearly frequency, status management (active/paused/cancelled/completed)
+
 ---
 
 ## Remaining Tasks
-
-### Task 3.3: Appeals Management UI Support (P1, 8-10 hours)
-**Goal**: Add appeal workflow endpoints for UI
-
-**Suggested Implementation**:
-1. Create `icn-gateway/src/api/constitutional/appeals_ui.rs`
-2. Add endpoints:
-   - `GET /v1/constitutional/appeals/{id}/timeline` - Appeal event timeline
-   - `GET /v1/constitutional/appeals/{id}/status` - Detailed status with next steps
-   - `POST /v1/constitutional/appeals/{id}/assign-reviewer` - Assign reviewer (admin)
-   - `GET /v1/constitutional/appeals/dashboard` - Appeals dashboard data
-
-**Reference**: Existing appeal endpoints in `icn-gateway/src/api/constitutional/mod.rs` (lines 850-1200)
-
-### Task 3.4: Governance Dashboard Data (P2, 6-8 hours)
-**Goal**: Aggregate governance statistics endpoint
-
-**Suggested Implementation**:
-1. Create `icn-gateway/src/api/governance_dashboard.rs`
-2. Add endpoint:
-   - `GET /v1/governance/{domain}/dashboard` - Returns:
-     - `active_proposals`: count
-     - `pending_amendments`: count
-     - `open_appeals`: count
-     - `participation_rate`: percentage
-     - `recent_activity`: list of events
-
-### Task 4.1: Recurring Payments (P1, 12-16 hours)
-**Goal**: Support subscriptions and scheduled payments
-
-**Suggested Implementation**:
-1. Create `icn-gateway/src/api/ledger/recurring.rs`
-2. Create `icn-gateway/src/scheduler/payments.rs`
-3. Add endpoints:
-   - `POST /v1/payments/recurring` - Create recurring payment
-   - `GET /v1/payments/recurring` - List recurring payments
-   - `PUT /v1/payments/recurring/{id}` - Modify payment
-   - `DELETE /v1/payments/recurring/{id}` - Cancel payment
-4. Add scheduler to execute due payments
-
-**Schema suggestion**:
-```rust
-struct RecurringPayment {
-    id: String,
-    from_account: String,
-    to_account: String,
-    amount: i64,
-    currency: String,
-    frequency: PaymentFrequency, // Daily, Weekly, Monthly, Yearly
-    next_execution: u64,
-    end_date: Option<u64>,
-    status: RecurringStatus, // Active, Paused, Cancelled, Completed
-}
-```
 
 ### Task 4.2: Payment Escrow (P2, 10-12 hours)
 **Goal**: Hold funds for conditional release
 
 **Suggested Implementation**:
-1. Create `icn-gateway/src/api/ledger/escrow.rs`
+1. Create `icn-gateway/src/api/escrow.rs`
 2. Add endpoints:
    - `POST /v1/escrow` - Create escrow
    - `GET /v1/escrow/{id}` - Get escrow details
