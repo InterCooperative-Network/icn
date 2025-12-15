@@ -202,6 +202,10 @@ impl GatewayServer {
         let escrow_store = Arc::new(crate::api::escrow::EscrowStore::new());
         info!("Escrow store initialized");
 
+        // Create budget store
+        let budget_store = Arc::new(crate::api::budgets::BudgetStore::new());
+        info!("Budget store initialized");
+
         // Create shutdown channel
         let (shutdown_tx, _shutdown_rx) = tokio::sync::broadcast::channel::<()>(1);
 
@@ -287,6 +291,7 @@ impl GatewayServer {
                 .app_data(web::Data::new(governance_trigger.clone()))
                 .app_data(web::Data::new(recurring_payment_store.clone()))
                 .app_data(web::Data::new(escrow_store.clone()))
+                .app_data(web::Data::new(budget_store.clone()))
                 .app_data(web::Data::new(rate_limiter.clone()))
                 .app_data(web::Data::new(ip_rate_limiter.clone()))
                 // JSON payload size limit (256KB - we're not handling file uploads)
@@ -371,6 +376,15 @@ impl GatewayServer {
                         .service(
                             web::scope("")
                                 .configure(api::escrow::configure)
+                                .wrap(middleware::from_fn(
+                                    crate::rate_limit::rate_limit_middleware,
+                                ))
+                                .wrap(auth.clone()),
+                        )
+                        // Budget endpoints (auth + rate limiting)
+                        .service(
+                            web::scope("")
+                                .configure(api::budgets::configure)
                                 .wrap(middleware::from_fn(
                                     crate::rate_limit::rate_limit_middleware,
                                 ))
