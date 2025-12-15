@@ -447,3 +447,256 @@ See [examples/](./examples/) for a complete React Native example app.
 ## License
 
 MIT OR Apache-2.0
+
+## Pilot Features (v0.9.0+)
+
+### Real-Time Notifications
+
+React hooks for notification management:
+
+```tsx
+import { useNotifications, useNotificationCount } from '@icn/react-native';
+
+function NotificationsScreen() {
+  const { notifications, loading, markAsRead, deleteNotification } = useNotifications({
+    read: false, // unread only
+    limit: 20
+  });
+
+  const { total, unread } = useNotificationCount();
+
+  return (
+    <View>
+      <Text>Unread: {unread} / {total}</Text>
+      {notifications.map(notif => (
+        <NotificationCard
+          key={notif.id}
+          notification={notif}
+          onRead={() => markAsRead(notif.id)}
+          onDelete={() => deleteNotification(notif.id)}
+        />
+      ))}
+    </View>
+  );
+}
+```
+
+### Recurring Payments
+
+Manage subscription-style payments:
+
+```tsx
+import { useRecurringPayments, useCreateRecurringPayment } from '@icn/react-native';
+
+function RecurringPaymentsScreen() {
+  const { payments, loading, updatePayment, cancelPayment } = useRecurringPayments({
+    status: 'active'
+  });
+
+  const { create, creating } = useCreateRecurringPayment();
+
+  const handleCreate = async () => {
+    await create({
+      from_account: 'alice-checking',
+      to_account: 'netflix',
+      amount: 1599, // $15.99
+      currency: 'USD',
+      frequency: 'monthly',
+      description: 'Netflix subscription'
+    });
+  };
+
+  return (
+    <ScrollView>
+      {payments.map(payment => (
+        <PaymentCard
+          key={payment.id}
+          payment={payment}
+          onPause={() => updatePayment(payment.id, { status: 'paused' })}
+          onCancel={() => cancelPayment(payment.id)}
+        />
+      ))}
+      <Button title="Add Payment" onPress={handleCreate} disabled={creating} />
+    </ScrollView>
+  );
+}
+```
+
+### Payment Escrow
+
+Conditional fund holding:
+
+```tsx
+import { useEscrows, useCreateEscrow } from '@icn/react-native';
+
+function EscrowScreen() {
+  const { escrows, loading, releaseEscrow, refundEscrow } = useEscrows();
+  const { create } = useCreateEscrow();
+
+  const handleCreateEscrow = async () => {
+    await create({
+      from_account: 'buyer-account',
+      to_account: 'seller-account',
+      amount: 50000,
+      currency: 'USD',
+      description: 'House deposit',
+      conditions: [
+        { requires_approval: { did: 'did:icn:escrow-agent' } }
+      ],
+      expires_at: Date.now() / 1000 + (30 * 24 * 60 * 60) // 30 days
+    });
+  };
+
+  return (
+    <View>
+      {escrows.map(escrow => (
+        <EscrowCard
+          key={escrow.id}
+          escrow={escrow}
+          onRelease={() => releaseEscrow(escrow.id)}
+          onRefund={() => refundEscrow(escrow.id)}
+        />
+      ))}
+    </View>
+  );
+}
+```
+
+### Budget Management
+
+Spending limits with visual indicators:
+
+```tsx
+import { useBudgets, useCreateBudget } from '@icn/react-native';
+
+function BudgetScreen() {
+  const { budgets, loading, updateBudget, deleteBudget } = useBudgets();
+  const { create } = useCreateBudget();
+
+  return (
+    <View>
+      {budgets.map(budget => (
+        <BudgetCard
+          key={budget.id}
+          budget={budget}
+          percentageUsed={budget.percentage_used}
+          remaining={budget.remaining}
+          isExceeded={budget.is_exceeded}
+          onUpdate={(updates) => updateBudget(budget.id, updates)}
+          onDelete={() => deleteBudget(budget.id)}
+        />
+      ))}
+    </View>
+  );
+}
+```
+
+### Governance UI
+
+Enhanced governance features:
+
+```tsx
+import {
+  useCharterSummary,
+  useAmendmentVoting,
+  useGovernanceDashboard
+} from '@icn/react-native';
+
+function GovernanceScreen({ charterId }) {
+  const { summary, founders, timeline } = useCharterSummary(charterId);
+  const { dashboard } = useGovernanceDashboard(charterId);
+
+  return (
+    <ScrollView>
+      <CharterSummary data={summary} founders={founders} />
+      <GovernanceStats
+        pendingAmendments={dashboard.pending_amendments}
+        openAppeals={dashboard.open_appeals}
+      />
+      <Timeline events={timeline} />
+    </ScrollView>
+  );
+}
+
+function AmendmentVoteScreen({ amendmentId }) {
+  const { vote, loading } = useAmendmentVoting(amendmentId);
+
+  return (
+    <View>
+      <Button
+        title="Approve"
+        onPress={() => vote('approve', 'I support this change')}
+        disabled={loading}
+      />
+      <Button
+        title="Reject"
+        onPress={() => vote('reject', 'I have concerns')}
+        disabled={loading}
+      />
+      <Button
+        title="Abstain"
+        onPress={() => vote('abstain')}
+        disabled={loading}
+      />
+    </View>
+  );
+}
+```
+
+## Push Notifications (FCM)
+
+Configure push notifications for mobile apps:
+
+```tsx
+import messaging from '@react-native-firebase/messaging';
+import { registerDeviceForNotifications } from '@icn/react-native';
+
+// Request permission and register device
+async function setupPushNotifications() {
+  const authStatus = await messaging().requestPermission();
+  const enabled =
+    authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+    authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+
+  if (enabled) {
+    const fcmToken = await messaging().getToken();
+    
+    // Register with ICN gateway
+    await registerDeviceForNotifications({
+      fcm_token: fcmToken,
+      device_id: DeviceInfo.getUniqueId(),
+      platform: Platform.OS,
+    });
+  }
+}
+
+// Handle foreground notifications
+messaging().onMessage(async remoteMessage => {
+  console.log('Notification received:', remoteMessage);
+  // Show in-app notification
+});
+
+// Handle background notifications
+messaging().setBackgroundMessageHandler(async remoteMessage => {
+  console.log('Background notification:', remoteMessage);
+});
+```
+
+## TypeScript Support
+
+All hooks and components are fully typed:
+
+```tsx
+import type {
+  RecurringPayment,
+  Escrow,
+  Budget,
+  Notification,
+} from '@icn/react-native';
+
+const payment: RecurringPayment = await createRecurringPayment(data);
+```
+
+## License
+
+MIT

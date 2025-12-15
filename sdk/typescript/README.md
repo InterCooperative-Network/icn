@@ -524,3 +524,209 @@ This uses [openapi-typescript](https://github.com/openapi-ts/openapi-typescript)
 ## License
 
 MIT OR Apache-2.0
+
+## Pilot Features (v0.9.0+)
+
+### Notifications
+
+Subscribe to real-time notifications via WebSocket:
+
+```typescript
+// Connect to notification stream
+const ws = client.connectNotifications((notification) => {
+  console.log('Received:', notification);
+  if (notification.type === 'payment_received') {
+    alert(`Payment received: ${notification.data.amount}`);
+  }
+});
+
+// List in-app notifications
+const notifications = await client.listNotifications({
+  read: false, // unread only
+  type: 'payment_received',
+  limit: 20
+});
+
+// Mark as read
+await client.markNotificationRead(notificationId);
+
+// Get unread count
+const { total, unread } = await client.getNotificationCount();
+```
+
+### Recurring Payments
+
+Automate recurring payments with flexible scheduling:
+
+```typescript
+// Create recurring payment
+const payment = await client.createRecurringPayment({
+  from_account: 'alice-checking',
+  to_account: 'bob-savings',
+  amount: 100,
+  currency: 'USD',
+  frequency: 'monthly', // daily, weekly, monthly, yearly
+  start_date: Date.now() / 1000,
+  end_date: (Date.now() / 1000) + (365 * 24 * 60 * 60), // 1 year
+});
+
+// List recurring payments
+const payments = await client.listRecurringPayments({
+  status: 'active' // active, paused, cancelled, completed
+});
+
+// Update payment
+await client.updateRecurringPayment(paymentId, {
+  amount: 150, // increase amount
+  status: 'paused' // pause temporarily
+});
+
+// Cancel payment
+await client.cancelRecurringPayment(paymentId);
+```
+
+### Payment Escrow
+
+Hold funds with conditional release:
+
+```typescript
+// Create escrow
+const escrow = await client.createEscrow({
+  from_account: 'alice',
+  to_account: 'bob',
+  amount: 500,
+  currency: 'USD',
+  description: 'Payment for freelance work',
+  conditions: [
+    {
+      requires_approval: { did: 'did:icn:charlie' } // arbitrator
+    },
+    {
+      time_release: { timestamp: futureTimestamp } // auto-release
+    }
+  ],
+  expires_at: expirationTimestamp
+});
+
+// List escrows
+const escrows = await client.listEscrows({
+  status: 'pending' // pending, locked, released, refunded, expired
+});
+
+// Release funds (with approval)
+await client.releaseEscrow(escrowId, {
+  proof: 'delivery-confirmation-hash'
+});
+
+// Refund to sender
+await client.refundEscrow(escrowId);
+```
+
+### Budget Limits
+
+Set spending limits with automatic enforcement:
+
+```typescript
+// Create budget
+const budget = await client.createBudget({
+  account: 'alice-spending',
+  currency: 'USD',
+  limit: 1000,
+  period: 'monthly', // daily, weekly, monthly, yearly
+  description: 'Monthly discretionary spending',
+  notification_thresholds: [80, 90, 100] // notify at 80%, 90%, 100%
+});
+
+// List budgets
+const budgets = await client.listBudgets({
+  status: 'active' // active, paused, exceeded, expired
+});
+
+// Get budget details with usage
+const details = await client.getBudget(budgetId);
+console.log(`Used: ${details.percentage_used}%`);
+console.log(`Remaining: $${details.remaining}`);
+
+// Update budget
+await client.updateBudget(budgetId, {
+  limit: 1500, // increase limit
+  status: 'active'
+});
+
+// Delete budget
+await client.deleteBudget(budgetId);
+```
+
+### Governance UI Support
+
+Enhanced governance endpoints for building UIs:
+
+```typescript
+// Charter viewing
+const summary = await client.getCharterSummary(charterId);
+const founders = await client.getCharterFounders(charterId);
+const timeline = await client.getCharterTimeline(charterId);
+
+// Amendment voting
+await client.castAmendmentVote(amendmentId, {
+  vote: 'approve', // approve, reject, abstain
+  comment: 'Fully support this change'
+});
+
+const results = await client.getAmendmentResults(amendmentId);
+console.log(`Votes: ${results.approve_count} / ${results.total_votes}`);
+console.log(`Quorum: ${results.has_quorum ? 'Met' : 'Not met'}`);
+
+// Appeals management
+const appealTimeline = await client.getAppealTimeline(appealId);
+const appealStatus = await client.getAppealStatus(appealId);
+console.log(`Next steps: ${appealStatus.next_steps.join(', ')}`);
+
+// Governance dashboard
+const dashboard = await client.getGovernanceDashboard(charterId);
+console.log(`Active amendments: ${dashboard.pending_amendments}`);
+console.log(`Open appeals: ${dashboard.open_appeals}`);
+console.log('Recent activity:', dashboard.recent_activity);
+```
+
+## API Reference
+
+See the full API documentation at [docs/api](../../docs/api/README.md).
+
+## TypeScript Types
+
+All API responses are fully typed. Import types as needed:
+
+```typescript
+import type {
+  RecurringPayment,
+  PaymentFrequency,
+  Escrow,
+  EscrowCondition,
+  Budget,
+  BudgetPeriod,
+  Notification,
+} from '@icn/client';
+```
+
+## Error Handling
+
+```typescript
+try {
+  await client.createRecurringPayment(paymentData);
+} catch (error) {
+  if (error.status === 401) {
+    console.error('Not authenticated');
+  } else if (error.status === 403) {
+    console.error('Insufficient permissions');
+  } else if (error.status === 429) {
+    console.error('Rate limit exceeded');
+  } else {
+    console.error('API error:', error.message);
+  }
+}
+```
+
+## License
+
+MIT
