@@ -194,6 +194,10 @@ impl GatewayServer {
         // Create governance notification trigger (for proposal/amendment/appeal notifications)
         let governance_trigger = Arc::new(GovernanceNotificationTrigger::new(notification_queue.clone()));
 
+        // Create recurring payment store
+        let recurring_payment_store = Arc::new(crate::api::recurring_payments::RecurringPaymentStore::new());
+        info!("Recurring payment store initialized");
+
         // Create shutdown channel
         let (shutdown_tx, _shutdown_rx) = tokio::sync::broadcast::channel::<()>(1);
 
@@ -277,6 +281,7 @@ impl GatewayServer {
                 .app_data(web::Data::new(notification_queue.clone()))
                 .app_data(web::Data::new(notification_processor.clone()))
                 .app_data(web::Data::new(governance_trigger.clone()))
+                .app_data(web::Data::new(recurring_payment_store.clone()))
                 .app_data(web::Data::new(rate_limiter.clone()))
                 .app_data(web::Data::new(ip_rate_limiter.clone()))
                 // JSON payload size limit (256KB - we're not handling file uploads)
@@ -343,6 +348,15 @@ impl GatewayServer {
                                 .service(api::ledger::create_payment)
                                 .service(api::ledger::get_history)
                                 // Apply auth first, then rate limiting (wrapping order: last runs first)
+                                .wrap(middleware::from_fn(
+                                    crate::rate_limit::rate_limit_middleware,
+                                ))
+                                .wrap(auth.clone()),
+                        )
+                        // Recurring payments endpoints (auth + rate limiting)
+                        .service(
+                            web::scope("")
+                                .configure(api::recurring_payments::configure)
                                 .wrap(middleware::from_fn(
                                     crate::rate_limit::rate_limit_middleware,
                                 ))
