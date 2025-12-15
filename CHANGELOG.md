@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Testing & UX (2025-12-15)
+
+**Constitutional Governance Integration Tests** ([icn/crates/icn-gateway/tests/constitutional_integration.rs](icn/crates/icn-gateway/tests/constitutional_integration.rs)):
+- `test_amendment_full_lifecycle` - Create → Submit → Vote → Ratify workflow
+- `test_amendment_withdrawal` - Proposer can withdraw submitted amendments
+- `test_amendment_withdrawal_requires_proposer` - Authorization check
+- `test_appeal_full_lifecycle` - File → Review → Resolve workflow
+- `test_appeal_withdrawal` - Appellant can withdraw filed appeals
+- `test_appeal_withdrawal_requires_appellant` - Authorization check
+- `test_list_amendments_by_status` - Filter amendments by scope
+- `test_list_appeals_by_scope` - Filter appeals by jurisdiction
+- `test_appeal_outcomes` - Test all outcome types (Upheld, Denied, etc.)
+- 9 new integration tests for constitutional governance
+
+**CLI Error Message Improvements** ([icn/bins/icnctl/src/main.rs](icn/bins/icnctl/src/main.rs)):
+- `print_gateway_error()` - Connection troubleshooting with actionable hints
+- `print_http_error()` - Extract and format API error responses
+- JSON message/error field extraction for clearer error messages
+- Applied to amendment and appeal commands
+
+**RPC Test Reliability** ([icn/crates/icn-rpc/tests/rpc_integration.rs](icn/crates/icn-rpc/tests/rpc_integration.rs)):
+- Fixed port collision issues in parallel test execution
+- Retry mechanism with channel-based failure detection
+- Hold listener until ready to bind for race-free port allocation
+- 32 RPC tests now pass consistently
+
 ### Added - Production Hardening (v0.8.x) (2025-12-15)
 
 **Per-Category Rate Limiting** ([icn/crates/icn-gateway/src/rate_limit.rs](icn/crates/icn-gateway/src/rate_limit.rs)):

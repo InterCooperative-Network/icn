@@ -1,7 +1,7 @@
 # Commons Evolution Implementation Summary
 
 **Document ID**: ICN-DEV-COMMONS-SUMMARY
-**Version**: 0.8.0
+**Version**: 0.8.1
 **Date**: 2025-12-15
 **Author**: ICN Development Team
 
@@ -9,7 +9,7 @@
 
 ## Overview
 
-The Commons Evolution transforms ICN from a "cooperative coordination tool" into a "global commons infrastructure." This document summarizes the implementation completed over versions 0.3.0 through 0.8.0.
+The Commons Evolution transforms ICN from a "cooperative coordination tool" into a "global commons infrastructure." This document summarizes the implementation completed over versions 0.3.0 through 0.8.x.
 
 **Core Insight**: Commons Holder is the root identity; membership is scoped capability grants under that identity.
 
@@ -24,8 +24,8 @@ The Commons Evolution transforms ICN from a "cooperative coordination tool" into
 | v0.5.0 | Membership & Rights | 1 | ~2,400 |
 | v0.6.0 | Constitutional Governance | 1 | ~3,800 |
 | v0.7.x | Integration & Testing | 1 | ~500 |
-| v0.8.x | Production Hardening | 4 | ~1,200 |
-| **Total** | | **15** | **~11,600** |
+| v0.8.x | Production Hardening & UX | 7 | ~1,900 |
+| **Total** | | **18** | **~12,300** |
 
 ---
 
@@ -538,6 +538,8 @@ For the pilot community (Track C), the minimum required functionality:
    - Basic monitoring/observability (50+ Commons metrics)
    - Audit logging for governance compliance
    - Per-category rate limiting for API protection
+   - 20+ integration tests for governance flows
+   - Improved CLI error messages with troubleshooting hints
 
 2. **Can Wait Until Post-Pilot**:
    - Multiple POP pathways (InPerson, VideoCall, Ceremony)
@@ -550,7 +552,10 @@ For the pilot community (Track C), the minimum required functionality:
 ## Commit History
 
 ```
-# v0.8.x - Production Hardening
+# v0.8.x - Production Hardening & UX
+a7931b6 improve(cli): enhance error messages with actionable hints
+1fff804 test(gateway): add constitutional governance integration tests
+e0ed173 fix(rpc): make integration tests resilient to port collisions
 6ac5f30 feat(gateway): add per-category rate limiting for endpoint protection
 b407042 feat(gateway): add comprehensive audit logging for governance actions
 0ea62b6 feat(obs): add Commons Evolution metrics for monitoring
