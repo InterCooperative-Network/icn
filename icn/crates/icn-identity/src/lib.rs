@@ -12,6 +12,7 @@
 pub mod anchor;
 pub mod batch_verify;
 pub mod bundle;
+pub mod commons;
 pub mod keybundle;
 pub mod keystore;
 pub mod multi_device;
@@ -44,6 +45,10 @@ pub use personhood::{
     UniquenessProofType,
 };
 pub use personhood_store::{InMemoryPersonhoodStore, PersonhoodAnchorStore, PersonhoodStore};
+pub use commons::{
+    Affiliation, CommonsHolderRecord, CommonsRight, CommonsRights, HolderStatus,
+    JurisdictionId, JurisdictionType, MembershipCapability, MembershipStatus,
+};
 pub use recovery::{
     RecoveryAttestation, RecoveryEvent, RecoveryMessage, RecoveryStatus, IDENTITY_RECOVERY_TOPIC,
 };
