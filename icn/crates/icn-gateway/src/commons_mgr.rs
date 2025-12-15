@@ -8,8 +8,8 @@
 
 use anyhow::{bail, Result};
 use icn_governance::{
-    Amendment, AmendmentId, AmendmentStatus, Appeal, AppealEvidence, AppealId, AppealOutcome,
-    AppealResponse, Charter, CharterStatus, OrgType, Ratification, StewardRecord,
+    Amendment, AmendmentChange, AmendmentId, AmendmentStatus, Appeal, AppealEvidence, AppealId,
+    AppealOutcome, AppealResponse, Charter, CharterStatus, OrgType, Ratification, StewardRecord,
 };
 use icn_identity::{
     Affiliation, Anchor, AnchorStatus, CommonsHolderRecord, CommonsRevocationReason, Did,
@@ -606,6 +606,56 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
         results.sort_by(|a, b| b.created_at.cmp(&a.created_at));
 
         Ok(results)
+    }
+
+    /// Add a founder signature to a charter
+    ///
+    /// Requirements:
+    /// - Charter must be in Draft status
+    /// - Signer must not have already signed
+    ///
+    /// Returns the updated charter with the new signature count
+    pub async fn add_charter_signature(
+        &self,
+        charter_id: &str,
+        signature: icn_governance::FounderSignature,
+    ) -> Result<Charter> {
+        let mut charter = self
+            .store
+            .get_charter(charter_id)?
+            .ok_or_else(|| anyhow::anyhow!("Charter not found: {charter_id}"))?;
+
+        // Validate charter is in Draft status
+        if !matches!(charter.status, CharterStatus::Draft) {
+            bail!(
+                "Cannot sign charter in status {:?}, must be Draft",
+                charter.status
+            );
+        }
+
+        // Check if already signed by this DID
+        if charter.founders.iter().any(|f| f.did == signature.did) {
+            bail!("Signer has already signed this charter");
+        }
+
+        // Add the signature
+        let signer_did = signature.did.to_string();
+        charter.add_founder(signature);
+
+        // Persist updated charter
+        self.store.put_charter(&charter)?;
+
+        // Audit log
+        info!(
+            target: "commons_audit",
+            action = "charter_signed",
+            charter_id = %charter_id,
+            signer = %signer_did,
+            total_founders = charter.founders.len(),
+            "Charter signed by founder"
+        );
+
+        Ok(charter)
     }
 
     /// Update charter status
@@ -1503,6 +1553,50 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
         );
 
         Ok(())
+    }
+
+    /// Add a change to a draft amendment
+    ///
+    /// Requirements:
+    /// - Amendment must exist
+    /// - Amendment must be in Draft status
+    /// - Caller should be the proposer (validation done at API layer)
+    pub async fn add_amendment_change(
+        &self,
+        amendment_id: &str,
+        change: AmendmentChange,
+    ) -> Result<Amendment> {
+        let mut amendment = self
+            .store
+            .get_amendment(amendment_id)?
+            .ok_or_else(|| anyhow::anyhow!("Amendment not found: {amendment_id}"))?;
+
+        // Validate amendment is in Draft status
+        if !matches!(amendment.status, AmendmentStatus::Draft) {
+            bail!(
+                "Cannot add changes to amendment in status {:?}, must be Draft",
+                amendment.status
+            );
+        }
+
+        // Add the change
+        let change_desc = change.description.clone();
+        amendment.add_change(change);
+
+        // Persist updated amendment
+        self.store.put_amendment(&amendment)?;
+
+        // Audit log
+        info!(
+            target: "commons_audit",
+            action = "amendment_change_added",
+            amendment_id = %amendment_id,
+            change = %change_desc,
+            total_changes = amendment.changes.len(),
+            "Change added to amendment"
+        );
+
+        Ok(amendment)
     }
 
     /// Get an amendment by ID

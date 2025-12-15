@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Wire Up Remaining Features (2025-12-15)
+
+**Charter Signing Flow** ([icn/crates/icn-gateway/src/commons_mgr.rs](icn/crates/icn-gateway/src/commons_mgr.rs)):
+- `CommonsManager::add_charter_signature()` - Add founder signatures to draft charters
+- Validates draft status, prevents duplicate signatures, persists to storage
+- Fixed `/v1/charter/{id}/sign` endpoint to actually persist signatures (was placeholder)
+- `icnctl charter sign` command now makes actual API calls with signature generation
+- `icnctl charter ratify` command now calls activation endpoint
+
+**Amendment Add-Change** ([icn/crates/icn-gateway/src/api/constitutional/mod.rs](icn/crates/icn-gateway/src/api/constitutional/mod.rs)):
+- `CommonsManager::add_amendment_change()` - Add changes to draft amendments
+- `POST /v1/constitutional/amendments/{id}/changes` - New API endpoint
+- Validates draft status, verifies caller is proposer
+- `icnctl amendment add-change` command now makes actual API calls
+
+**Authorization Checks** ([icn/crates/icn-gateway/src/api/](icn/crates/icn-gateway/src/api/)):
+- Steward bond slashing now requires `HoldOffice` capability in jurisdiction
+- Membership approval now requires `HoldOffice` capability in jurisdiction
+- Prevents unauthorized governance actions
+
+**New Integration Tests** ([icn/crates/icn-gateway/tests/governance_flows_integration.rs](icn/crates/icn-gateway/tests/governance_flows_integration.rs)):
+- `test_charter_signing_flow` - Multiple founders sign sequentially → activation
+- `test_charter_duplicate_signature_rejected` - Duplicate signatures rejected
+- `test_amendment_add_change_flow` - Add multiple changes to draft amendment
+- `test_amendment_add_change_fails_after_submit` - Changes blocked after submission
+
 ### Added - Testing & UX (2025-12-15)
 
 **Constitutional Governance Integration Tests** ([icn/crates/icn-gateway/tests/constitutional_integration.rs](icn/crates/icn-gateway/tests/constitutional_integration.rs)):

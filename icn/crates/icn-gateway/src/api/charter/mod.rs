@@ -280,30 +280,26 @@ pub async fn sign_charter(
 
     let charter_id = path.into_inner();
 
-    // Get charter
-    let charter = commons_manager
-        .get_charter(&charter_id)
-        .await?
-        .ok_or_else(|| GatewayError::NotFound("Charter not found".to_string()))?;
-
-    // Check if already signed
-    if charter.founders.iter().any(|f| f.did == signer_did) {
-        return Err(GatewayError::BadRequest(
-            "Already signed this charter".to_string(),
-        ));
-    }
-
-    // Create signature
-    let signature = hex::decode(&body.signature).unwrap_or_default();
-    let mut sig = FounderSignature::new(signer_did, signature);
+    // Create founder signature
+    let signature_bytes = hex::decode(&body.signature).unwrap_or_default();
+    let mut sig = FounderSignature::new(signer_did, signature_bytes);
     sig.role = body.role.clone();
 
-    // Note: In production, we'd update the charter in storage
-    // For now, return success with current count + 1
+    // Add signature to charter (validates status, checks duplicates, persists)
+    let updated_charter = commons_manager
+        .add_charter_signature(&charter_id, sig)
+        .await?;
+
+    // Check if charter is ready for activation (default: 3 founders)
+    let min_founders = 3;
+    let ready_for_activation = updated_charter.founders.len() >= min_founders;
+
     Ok(HttpResponse::Ok().json(serde_json::json!({
         "status": "signed",
         "charter_id": charter_id,
-        "total_founders": charter.founders.len() + 1,
+        "total_founders": updated_charter.founders.len(),
+        "ready_for_activation": ready_for_activation,
+        "founders_needed": if ready_for_activation { 0 } else { min_founders - updated_charter.founders.len() },
     })))
 }
 

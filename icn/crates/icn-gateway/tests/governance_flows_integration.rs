@@ -377,3 +377,275 @@ async fn test_e2e_coop_formation() {
         assert_eq!(affiliations[0].membership_status, MembershipStatus::Member);
     }
 }
+
+/// Test charter signing flow (signatures added one at a time)
+#[actix_web::test]
+async fn test_charter_signing_flow() {
+    use icn_governance::FounderSignature;
+
+    let commons_mgr = CommonsManager::new();
+
+    // Create founding members
+    let founder1 = KeyPair::generate().unwrap();
+    let founder2 = KeyPair::generate().unwrap();
+    let founder3 = KeyPair::generate().unwrap();
+
+    // Create a draft charter with one founder
+    let mut charter = Charter::new(
+        OrgType::Cooperative,
+        "coop:signing-test-coop".to_string(),
+        "Signing Test Cooperative".to_string(),
+        GovernanceConfig::cooperative_default(),
+        MembershipPolicy::default(),
+        DisputePolicy::default(),
+    );
+
+    // Add first founder during creation
+    charter.add_founder(create_founder_signature(founder1.did().clone(), 1));
+    let charter_id = charter.charter_id.to_hex();
+
+    // Store as draft
+    commons_mgr.store_charter(charter).await.unwrap();
+
+    // Verify initial state
+    let stored = commons_mgr.get_charter(&charter_id).await.unwrap().unwrap();
+    assert!(matches!(stored.status, CharterStatus::Draft));
+    assert_eq!(stored.founders.len(), 1);
+
+    // Add second founder signature using the new method
+    let sig2 = FounderSignature {
+        did: founder2.did().clone(),
+        signature: vec![2u8; 64],
+        timestamp: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs(),
+        role: Some("founder".to_string()),
+    };
+    let updated = commons_mgr
+        .add_charter_signature(&charter_id, sig2)
+        .await
+        .unwrap();
+    assert_eq!(updated.founders.len(), 2);
+    assert!(matches!(updated.status, CharterStatus::Draft));
+
+    // Add third founder signature
+    let sig3 = FounderSignature {
+        did: founder3.did().clone(),
+        signature: vec![3u8; 64],
+        timestamp: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs(),
+        role: Some("founder".to_string()),
+    };
+    let updated = commons_mgr
+        .add_charter_signature(&charter_id, sig3)
+        .await
+        .unwrap();
+    assert_eq!(updated.founders.len(), 3);
+
+    // Now has enough founders to activate (min 3)
+    commons_mgr
+        .update_charter_status(&charter_id, CharterStatus::Active)
+        .await
+        .unwrap();
+
+    let final_charter = commons_mgr.get_charter(&charter_id).await.unwrap().unwrap();
+    assert!(matches!(final_charter.status, CharterStatus::Active));
+    assert_eq!(final_charter.founders.len(), 3);
+}
+
+/// Test duplicate signature is rejected
+#[actix_web::test]
+async fn test_charter_duplicate_signature_rejected() {
+    use icn_governance::FounderSignature;
+
+    let commons_mgr = CommonsManager::new();
+
+    let founder1 = KeyPair::generate().unwrap();
+
+    // Create a draft charter with one founder
+    let mut charter = Charter::new(
+        OrgType::Cooperative,
+        "coop:dup-sig-test".to_string(),
+        "Duplicate Signature Test".to_string(),
+        GovernanceConfig::cooperative_default(),
+        MembershipPolicy::default(),
+        DisputePolicy::default(),
+    );
+    charter.add_founder(create_founder_signature(founder1.did().clone(), 1));
+    let charter_id = charter.charter_id.to_hex();
+    commons_mgr.store_charter(charter).await.unwrap();
+
+    // Try to add duplicate signature (same DID)
+    let dup_sig = FounderSignature {
+        did: founder1.did().clone(),
+        signature: vec![99u8; 64],
+        timestamp: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs(),
+        role: Some("founder".to_string()),
+    };
+
+    let result = commons_mgr.add_charter_signature(&charter_id, dup_sig).await;
+    assert!(result.is_err());
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("already signed"));
+}
+
+/// Test amendment add-change flow
+#[actix_web::test]
+async fn test_amendment_add_change_flow() {
+    use icn_governance::{
+        Amendment, AmendmentChange, AmendmentScope, AmendmentType, ChangeTarget, ChangeType,
+    };
+
+    let commons_mgr = CommonsManager::new();
+
+    let proposer = KeyPair::generate().unwrap();
+    let proposer_did = proposer.did().clone();
+
+    // Create a draft amendment
+    let amendment = Amendment::new(
+        AmendmentType::Policy,
+        AmendmentScope::Jurisdiction {
+            domain_id: "coop:add-change-test".to_string(),
+        },
+        "Test Amendment".to_string(),
+        "An amendment to test add-change functionality".to_string(),
+        proposer_did,
+    );
+    let amendment_id = amendment.id.to_hex();
+
+    // Store the amendment
+    commons_mgr.store_amendment(amendment).await.unwrap();
+
+    // Verify initial state - no changes yet
+    let amendment_bytes: [u8; 32] = hex::decode(&amendment_id)
+        .unwrap()
+        .try_into()
+        .unwrap();
+    let stored = commons_mgr
+        .get_amendment(&icn_governance::AmendmentId::new(amendment_bytes))
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(stored.changes.len(), 0);
+
+    // Add first change
+    let change1 = AmendmentChange {
+        target: ChangeTarget::GovernanceRules,
+        change_type: ChangeType::Modify,
+        description: "Increase quorum requirement".to_string(),
+        old_value: Some("50%".to_string()),
+        new_value: "67%".to_string(),
+    };
+    let updated = commons_mgr
+        .add_amendment_change(&amendment_id, change1)
+        .await
+        .unwrap();
+    assert_eq!(updated.changes.len(), 1);
+    assert_eq!(updated.changes[0].description, "Increase quorum requirement");
+
+    // Add second change
+    let change2 = AmendmentChange {
+        target: ChangeTarget::MembershipPolicy,
+        change_type: ChangeType::Add,
+        description: "Add probation period".to_string(),
+        old_value: None,
+        new_value: "90 days".to_string(),
+    };
+    let updated = commons_mgr
+        .add_amendment_change(&amendment_id, change2)
+        .await
+        .unwrap();
+    assert_eq!(updated.changes.len(), 2);
+    assert_eq!(updated.changes[1].description, "Add probation period");
+
+    // Add third change
+    let change3 = AmendmentChange {
+        target: ChangeTarget::EconomicPolicy,
+        change_type: ChangeType::Modify,
+        description: "Update fee structure".to_string(),
+        old_value: Some("$10/month".to_string()),
+        new_value: "$15/month".to_string(),
+    };
+    let updated = commons_mgr
+        .add_amendment_change(&amendment_id, change3)
+        .await
+        .unwrap();
+    assert_eq!(updated.changes.len(), 3);
+
+    // Verify final state
+    let final_amendment = commons_mgr
+        .get_amendment(&icn_governance::AmendmentId::new(amendment_bytes))
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(final_amendment.changes.len(), 3);
+}
+
+/// Test add-change fails for non-draft amendments
+#[actix_web::test]
+async fn test_amendment_add_change_fails_after_submit() {
+    use icn_governance::{
+        Amendment, AmendmentChange, AmendmentScope, AmendmentType, ChangeTarget, ChangeType,
+    };
+
+    let commons_mgr = CommonsManager::new();
+
+    let proposer = KeyPair::generate().unwrap();
+    let proposer_did = proposer.did().clone();
+
+    // Create amendment with a change (required for submission)
+    let mut amendment = Amendment::new(
+        AmendmentType::Policy,
+        AmendmentScope::Jurisdiction {
+            domain_id: "coop:submit-test".to_string(),
+        },
+        "Submitted Amendment".to_string(),
+        "An amendment to test add-change after submit".to_string(),
+        proposer_did.clone(),
+    );
+    amendment.add_change(AmendmentChange {
+        target: ChangeTarget::GovernanceRules,
+        change_type: ChangeType::Modify,
+        description: "Initial change".to_string(),
+        old_value: None,
+        new_value: "new".to_string(),
+    });
+    amendment.requirements.review_period_secs = 0;
+    let amendment_id = amendment.id.to_hex();
+
+    // Store and submit
+    commons_mgr.store_amendment(amendment).await.unwrap();
+    let amendment_bytes: [u8; 32] = hex::decode(&amendment_id)
+        .unwrap()
+        .try_into()
+        .unwrap();
+    commons_mgr
+        .submit_amendment(
+            &icn_governance::AmendmentId::new(amendment_bytes),
+            &proposer_did,
+        )
+        .await
+        .unwrap();
+
+    // Try to add change after submission - should fail
+    let new_change = AmendmentChange {
+        target: ChangeTarget::MembershipPolicy,
+        change_type: ChangeType::Add,
+        description: "Late change".to_string(),
+        old_value: None,
+        new_value: "too late".to_string(),
+    };
+    let result = commons_mgr
+        .add_amendment_change(&amendment_id, new_change)
+        .await;
+    assert!(result.is_err());
+    assert!(result.unwrap_err().to_string().contains("Draft"));
+}

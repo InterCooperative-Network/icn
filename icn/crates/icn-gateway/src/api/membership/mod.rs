@@ -222,11 +222,40 @@ pub async fn approve_membership(
     body: web::Json<MembershipActionRequest>,
     commons_manager: web::Data<Arc<CommonsManager>>,
 ) -> Result<HttpResponse> {
-    // TODO: Verify caller has admin rights in jurisdiction
-    let _claims = get_claims(&http_req)
+    let claims = get_claims(&http_req)
         .ok_or_else(|| GatewayError::AuthenticationFailed("Authentication required".to_string()))?;
 
+    let caller_did: Did = claims
+        .sub
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
+
     let jurisdiction_id = JurisdictionId::new(&body.jurisdiction_id);
+
+    // Authorization: Caller must have HoldOffice capability in the jurisdiction
+    let caller_holder = commons_manager
+        .get_holder_by_did(&caller_did)
+        .await
+        .map_err(|e| GatewayError::InternalError(e.to_string()))?
+        .ok_or_else(|| {
+            GatewayError::AuthorizationFailed("Caller is not a commons holder".to_string())
+        })?;
+
+    let holder_id_hex = hex::encode(caller_holder.holder_id);
+    let has_authority = commons_manager
+        .member_has_capability(
+            &holder_id_hex,
+            &jurisdiction_id,
+            MembershipCapability::HoldOffice,
+        )
+        .await
+        .unwrap_or(false);
+
+    if !has_authority {
+        return Err(GatewayError::AuthorizationFailed(
+            "Caller does not have admin rights (HoldOffice capability required)".to_string(),
+        ));
+    }
 
     commons_manager
         .approve_membership(&body.holder_id, &jurisdiction_id)

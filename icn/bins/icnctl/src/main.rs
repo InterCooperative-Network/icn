@@ -1344,15 +1344,27 @@ enum CharterCommands {
         /// Charter ID (hex)
         charter_id: String,
 
+        /// Cooperative/domain ID for authentication context
+        #[arg(short, long)]
+        coop_id: String,
+
         /// Gateway URL
         #[arg(short, long, default_value = "http://localhost:8080")]
         gateway: String,
+
+        /// Role of the founder (e.g., "founder", "officer", "advisor")
+        #[arg(short, long, default_value = "founder")]
+        role: String,
     },
 
-    /// Ratify a charter (requires sufficient founder signatures)
+    /// Ratify (activate) a charter (requires sufficient founder signatures)
     Ratify {
         /// Charter ID (hex)
         charter_id: String,
+
+        /// Cooperative/domain ID for authentication context
+        #[arg(short, long)]
+        coop_id: String,
 
         /// Gateway URL
         #[arg(short, long, default_value = "http://localhost:8080")]
@@ -1503,7 +1515,7 @@ enum AmendmentCommands {
         /// Amendment ID
         amendment_id: String,
 
-        /// Target of the change: governance, membership, economic, rights, charter, custom
+        /// Target of the change: governance_rules, membership_policy, economic_policy, rights, charter_article, or custom name
         #[arg(short, long)]
         target: String,
 
@@ -1522,6 +1534,10 @@ enum AmendmentCommands {
         /// Old value (for modify/replace)
         #[arg(short, long)]
         old_value: Option<String>,
+
+        /// Cooperative/domain ID for authentication context
+        #[arg(short, long)]
+        coop_id: String,
 
         /// Gateway URL
         #[arg(short, long, default_value = "http://localhost:8080")]
@@ -7610,7 +7626,9 @@ async fn handle_charter_command(
 
         CharterCommands::Sign {
             charter_id,
+            coop_id,
             gateway,
+            role,
         } => {
             println!("Sign Charter");
             println!("============\n");
@@ -7628,34 +7646,116 @@ async fn handle_charter_command(
 
             println!("Your DID:    {did}");
             println!("Charter ID:  {charter_id}");
+            println!("Role:        {role}");
             println!("Gateway:     {gateway}");
             println!();
-            println!("Note: Charter signing requires gateway integration.");
-            println!("This feature is pending gateway API implementation.");
-            println!();
-            println!("The signing process will:");
-            println!("  1. Fetch the charter from the gateway");
-            println!("  2. Create a cryptographic signature");
-            println!("  3. Submit the FounderSignature to the gateway");
+
+            // Create signature over charter ID
+            let message = format!("charter-sign:{charter_id}:{}", did.to_string());
+            let signature = keypair.sign(message.as_bytes());
+            let signature_hex = hex::encode(signature.to_bytes());
+
+            // Get auth token
+            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, keypair).await?;
+
+            // Build request
+            let request = serde_json::json!({
+                "signature": signature_hex,
+                "role": role,
+            });
+
+            let client = reqwest::Client::new();
+            let url = format!("{gateway}/v1/charter/{charter_id}/sign");
+
+            match client
+                .post(&url)
+                .header("Authorization", format!("Bearer {token}"))
+                .json(&request)
+                .send()
+                .await
+            {
+                Ok(resp) => {
+                    let status = resp.status();
+                    if status.is_success() {
+                        let body: serde_json::Value = resp.json().await.unwrap_or_default();
+                        println!("Charter signed successfully!");
+                        println!();
+                        if let Some(total) = body.get("total_founders") {
+                            println!("Total founders: {total}");
+                        }
+                        if let Some(ready) = body.get("ready_for_activation") {
+                            if ready.as_bool().unwrap_or(false) {
+                                println!("Charter is ready for activation!");
+                                println!("Run: icnctl charter ratify {charter_id} --coop-id {coop_id}");
+                            } else if let Some(needed) = body.get("founders_needed") {
+                                println!("Founders needed for activation: {needed}");
+                            }
+                        }
+                    } else {
+                        let body = resp.text().await.unwrap_or_default();
+                        print_http_error("signing charter", status, &body);
+                    }
+                }
+                Err(e) => {
+                    print_gateway_error(&gateway, &e);
+                }
+            }
         }
 
         CharterCommands::Ratify {
             charter_id,
+            coop_id,
             gateway,
         } => {
-            println!("Ratify Charter");
-            println!("==============\n");
+            println!("Activate Charter");
+            println!("================\n");
 
-            println!("Charter ID: {charter_id}");
-            println!("Gateway:    {gateway}");
+            let keystore_path = get_keystore_path(data_dir);
+            if !keystore_path.exists() {
+                bail!("No identity found. Run 'icnctl id init' first.");
+            }
+
+            let passphrase = read_passphrase("Enter passphrase: ")?;
+            let mut keystore = AgeKeyStore::open(&keystore_path)?;
+            keystore.unlock(&passphrase)?;
+            let keypair = keystore.get_keypair()?;
+            let did = keypair.did();
+
+            println!("Your DID:    {did}");
+            println!("Charter ID:  {charter_id}");
+            println!("Gateway:     {gateway}");
             println!();
-            println!("Note: Charter ratification requires gateway integration.");
-            println!("This feature is pending gateway API implementation.");
-            println!();
-            println!("Ratification requirements:");
-            println!("  1. Sufficient founder signatures");
-            println!("  2. Governance quorum met");
-            println!("  3. No blocking objections");
+
+            // Get auth token
+            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, keypair).await?;
+
+            let client = reqwest::Client::new();
+            let url = format!("{gateway}/v1/charter/{charter_id}/activate");
+
+            match client
+                .post(&url)
+                .header("Authorization", format!("Bearer {token}"))
+                .send()
+                .await
+            {
+                Ok(resp) => {
+                    let status = resp.status();
+                    if status.is_success() {
+                        let body: serde_json::Value = resp.json().await.unwrap_or_default();
+                        println!("Charter activated successfully!");
+                        println!();
+                        if let Some(s) = body.get("status") {
+                            println!("Status: {s}");
+                        }
+                    } else {
+                        let body = resp.text().await.unwrap_or_default();
+                        print_http_error("activating charter", status, &body);
+                    }
+                }
+                Err(e) => {
+                    print_gateway_error(&gateway, &e);
+                }
+            }
         }
     }
 
@@ -8089,13 +8189,23 @@ async fn handle_amendment_command(
             description,
             new_value,
             old_value,
+            coop_id,
             gateway,
         } => {
             println!("Add Change to Amendment");
             println!("=======================\n");
 
-            // Note: This requires a PATCH or update endpoint that may need to be added
-            // For now, we'll show the planned change
+            let keystore_path = get_keystore_path(data_dir);
+            if !keystore_path.exists() {
+                bail!("No identity found. Run 'icnctl id init' first.");
+            }
+
+            let passphrase = read_passphrase("Enter passphrase: ")?;
+            let mut keystore = AgeKeyStore::open(&keystore_path)?;
+            keystore.unlock(&passphrase)?;
+            let keypair = keystore.get_keypair()?;
+            let did = keypair.did();
+
             println!("Amendment ID:  {amendment_id}");
             println!("Target:        {target}");
             println!("Change Type:   {change_type}");
@@ -8104,14 +8214,47 @@ async fn handle_amendment_command(
             if let Some(ref ov) = old_value {
                 println!("Old Value:     {ov}");
             }
-            println!("Gateway:       {gateway}");
             println!();
-            println!("Note: Adding changes to draft amendments requires");
-            println!("re-creating the amendment with the changes included,");
-            println!("or using the update endpoint (not yet implemented).");
-            println!();
-            println!("For now, include changes when proposing:");
-            println!("  icnctl amendment propose --title '...' --description '...'");
+
+            let request = serde_json::json!({
+                "target": target,
+                "change_type": change_type,
+                "description": description,
+                "new_value": new_value,
+                "old_value": old_value,
+            });
+
+            let client = reqwest::Client::new();
+            let url = format!("{gateway}/v1/constitutional/amendments/{amendment_id}/changes");
+            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, keypair).await?;
+
+            match client
+                .post(&url)
+                .header("Authorization", format!("Bearer {token}"))
+                .json(&request)
+                .send()
+                .await
+            {
+                Ok(resp) => {
+                    let status = resp.status();
+                    if status.is_success() {
+                        let body: serde_json::Value = resp.json().await.unwrap_or_default();
+                        println!("Change added successfully!");
+                        println!();
+                        if let Some(changes) = body.get("changes") {
+                            if let Some(arr) = changes.as_array() {
+                                println!("Total changes: {}", arr.len());
+                            }
+                        }
+                    } else {
+                        let body = resp.text().await.unwrap_or_default();
+                        print_http_error("adding change", status, &body);
+                    }
+                }
+                Err(e) => {
+                    print_gateway_error(&gateway, &e);
+                }
+            }
         }
     }
 

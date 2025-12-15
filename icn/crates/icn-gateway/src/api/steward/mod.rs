@@ -519,19 +519,57 @@ pub async fn slash_bond(
     body: web::Json<BondOperationRequest>,
     commons_manager: web::Data<Arc<CommonsManager>>,
 ) -> Result<HttpResponse> {
-    let _claims = get_claims(&http_req)
+    let claims = get_claims(&http_req)
         .ok_or_else(|| GatewayError::AuthenticationFailed("Authentication required".to_string()))?;
 
-    // TODO: Verify caller has governance authority to slash bonds
+    let caller_did: Did = claims
+        .sub
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
 
     let steward_id = path.into_inner();
 
-    // Verify steward exists
-    let _steward = commons_manager
+    // Verify steward exists and get their jurisdiction
+    let steward = commons_manager
         .get_steward(&steward_id)
         .await
         .map_err(|e| GatewayError::InternalError(e.to_string()))?
         .ok_or_else(|| GatewayError::NotFound("Steward not found".to_string()))?;
+
+    // Authorization: Caller must have HoldOffice capability in steward's jurisdiction
+    let jurisdiction_id = steward
+        .jurisdiction
+        .as_ref()
+        .map(|j| icn_identity::JurisdictionId(j.clone()))
+        .ok_or_else(|| {
+            GatewayError::InternalError("Steward has no jurisdiction".to_string())
+        })?;
+
+    // Get caller's holder record
+    let caller_holder = commons_manager
+        .get_holder_by_did(&caller_did)
+        .await
+        .map_err(|e| GatewayError::InternalError(e.to_string()))?
+        .ok_or_else(|| {
+            GatewayError::AuthorizationFailed("Caller is not a commons holder".to_string())
+        })?;
+
+    // Check if caller has HoldOffice capability in the jurisdiction
+    let holder_id_hex = hex::encode(caller_holder.holder_id);
+    let has_authority = commons_manager
+        .member_has_capability(
+            &holder_id_hex,
+            &jurisdiction_id,
+            icn_identity::MembershipCapability::HoldOffice,
+        )
+        .await
+        .unwrap_or(false);
+
+    if !has_authority {
+        return Err(GatewayError::AuthorizationFailed(
+            "Caller does not have governance authority (HoldOffice capability required)".to_string(),
+        ));
+    }
 
     let slashed = commons_manager
         .slash_steward_bond(&steward_id, body.amount)

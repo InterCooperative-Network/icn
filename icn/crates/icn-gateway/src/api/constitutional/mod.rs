@@ -7,6 +7,7 @@
 //! - POST /v1/constitutional/amendments - Create amendment
 //! - GET /v1/constitutional/amendments - List amendments
 //! - GET /v1/constitutional/amendments/{id} - Get amendment
+//! - POST /v1/constitutional/amendments/{id}/changes - Add change to draft
 //! - POST /v1/constitutional/amendments/{id}/submit - Submit for review
 //! - POST /v1/constitutional/amendments/{id}/vote - Open voting
 //! - POST /v1/constitutional/amendments/{id}/ratify - Add ratification
@@ -775,6 +776,54 @@ pub async fn ratify_amendment(
     Ok(HttpResponse::Ok().json(amendment_to_response(&amendment)))
 }
 
+/// POST /constitutional/amendments/{id}/changes - Add a change to a draft amendment
+#[post("/amendments/{id}/changes")]
+pub async fn add_amendment_change(
+    http_req: HttpRequest,
+    commons_mgr: web::Data<Arc<CommonsManager>>,
+    id: web::Path<String>,
+    req: web::Json<AmendmentChangeRequest>,
+) -> Result<HttpResponse> {
+    require_scope(&http_req, "constitutional:write")?;
+
+    let claims = get_claims(&http_req)
+        .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
+    let caller: Did = claims
+        .sub
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
+
+    let id_hex = id.into_inner();
+
+    // Verify caller is proposer (get amendment first)
+    let existing = commons_mgr
+        .store()
+        .get_amendment(&id_hex)?
+        .ok_or_else(|| GatewayError::NotFound("Amendment not found".to_string()))?;
+
+    if existing.proposer != caller {
+        return Err(GatewayError::AuthorizationFailed(
+            "Only the proposer can add changes to an amendment".to_string(),
+        ));
+    }
+
+    // Parse change fields
+    let change = AmendmentChange {
+        target: parse_change_target(&req.target)?,
+        change_type: parse_change_type(&req.change_type)?,
+        description: req.description.clone(),
+        old_value: req.old_value.clone(),
+        new_value: req.new_value.clone(),
+    };
+
+    // Add change
+    let amendment = commons_mgr
+        .add_amendment_change(&id_hex, change)
+        .await?;
+
+    Ok(HttpResponse::Ok().json(amendment_to_response(&amendment)))
+}
+
 /// POST /constitutional/amendments/{id}/withdraw - Withdraw amendment
 #[post("/amendments/{id}/withdraw")]
 pub async fn withdraw_amendment(
@@ -1177,6 +1226,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         .service(submit_amendment)
         .service(open_amendment_voting)
         .service(ratify_amendment)
+        .service(add_amendment_change)
         .service(withdraw_amendment)
         .service(file_appeal)
         .service(list_appeals)
