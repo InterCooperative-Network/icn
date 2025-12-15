@@ -28,7 +28,14 @@
 //! - POST /v1/constitutional/appeals/{id}/review - Begin review
 //! - POST /v1/constitutional/appeals/{id}/resolve - Resolve appeal
 //! - POST /v1/constitutional/appeals/{id}/withdraw - Withdraw appeal
+//!
+//! # Appeal UI Endpoints
+//! - GET /v1/constitutional/appeals/{id}/timeline - Appeal event timeline
+//! - GET /v1/constitutional/appeals/{id}/status - Detailed status with next steps
+//! - POST /v1/constitutional/appeals/{id}/assign-reviewer - Assign reviewer (admin)
+//! - GET /v1/constitutional/appeals/dashboard - Appeals dashboard data
 
+pub mod appeals_ui;
 pub mod voting;
 
 use actix_web::{get, post, web, HttpRequest, HttpResponse};
@@ -1247,6 +1254,9 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
 
     // UI-friendly voting endpoints
     voting::configure(cfg);
+
+    // UI-friendly appeals management endpoints
+    appeals_ui::configure(cfg);
 }
 
 #[cfg(test)]
