@@ -6571,15 +6571,50 @@ async fn handle_commons_command(
 
             println!("DID: {target_did}");
             println!();
-            println!("Note: PersonhoodAnchor lookup requires gateway integration.");
-            println!("This feature is pending gateway API implementation.");
-            println!();
-            println!("Expected fields when available:");
-            println!("  - Anchor ID");
-            println!("  - Status (Active/Suspended/Revoked)");
-            println!("  - POP Level (Weak/Strong/Verified)");
-            println!("  - Attestations");
-            println!("  - Key rotation history");
+
+            // Try to fetch from gateway (requires default gateway URL)
+            let gateway = std::env::var("ICN_GATEWAY")
+                .unwrap_or_else(|_| "http://localhost:8080".to_string());
+            let client = reqwest::Client::new();
+            let url = format!("{gateway}/v1/commons/anchor/by-did/{target_did}");
+
+            match client.get(&url).send().await {
+                Ok(resp) => {
+                    if resp.status().is_success() {
+                        let data: serde_json::Value = resp.json().await?;
+                        println!(
+                            "Anchor ID:    {}",
+                            data["anchor_id"].as_str().unwrap_or("unknown")
+                        );
+                        println!(
+                            "Status:       {}",
+                            data["status"].as_str().unwrap_or("unknown")
+                        );
+                        println!(
+                            "POP Level:    {}",
+                            data["pop_level"].as_str().unwrap_or("none")
+                        );
+                        println!(
+                            "Attestations: {}",
+                            data["attestation_count"].as_u64().unwrap_or(0)
+                        );
+                        println!("Created:      {}", data["created_at"].as_u64().unwrap_or(0));
+                        println!("Updated:      {}", data["updated_at"].as_u64().unwrap_or(0));
+                    } else if resp.status() == reqwest::StatusCode::NOT_FOUND {
+                        println!("No PersonhoodAnchor found for this DID.");
+                        println!("\nTo create an anchor, complete the enrollment process:");
+                        println!("  icnctl steward start-enrollment <identity_name> <coop_id>");
+                    } else {
+                        let status = resp.status();
+                        let body = resp.text().await.unwrap_or_default();
+                        println!("Error: {status} - {body}");
+                    }
+                }
+                Err(e) => {
+                    println!("Could not connect to gateway: {e}");
+                    println!("Set ICN_GATEWAY environment variable or ensure gateway is running.");
+                }
+            }
         }
 
         CommonsCommands::Affiliations { did } => {
@@ -6769,23 +6804,65 @@ async fn handle_charter_command(
             println!("  3. Ratify the charter: icnctl charter ratify <charter_id>");
         }
 
-        CharterCommands::Show { charter_id, gateway } => {
+        CharterCommands::Show {
+            charter_id,
+            gateway,
+        } => {
             println!("Charter Details");
             println!("===============\n");
 
-            println!("Charter ID: {charter_id}");
-            println!("Gateway:    {gateway}");
-            println!();
-            println!("Note: Charter lookup requires gateway integration.");
-            println!("This feature is pending gateway API implementation.");
-            println!();
-            println!("Expected fields when available:");
-            println!("  - Name and type");
-            println!("  - Preamble/mission");
-            println!("  - Governance configuration");
-            println!("  - Founder signatures");
-            println!("  - Ratification status");
-            println!("  - Amendment history");
+            let client = reqwest::Client::new();
+            let url = format!("{gateway}/v1/charter/{charter_id}");
+
+            match client.get(&url).send().await {
+                Ok(resp) => {
+                    if resp.status().is_success() {
+                        let data: serde_json::Value = resp.json().await?;
+                        println!(
+                            "Charter ID:   {}",
+                            data["charter_id"].as_str().unwrap_or("unknown")
+                        );
+                        println!(
+                            "Name:         {}",
+                            data["name"].as_str().unwrap_or("unknown")
+                        );
+                        println!(
+                            "Domain:       {}",
+                            data["domain_id"].as_str().unwrap_or("unknown")
+                        );
+                        println!(
+                            "Type:         {}",
+                            data["org_type"].as_str().unwrap_or("unknown")
+                        );
+                        println!(
+                            "Status:       {}",
+                            data["status"].as_str().unwrap_or("unknown")
+                        );
+                        if let Some(desc) = data["description"].as_str() {
+                            println!("Description:  {desc}");
+                        }
+                        println!("Created:      {}", data["created_at"].as_u64().unwrap_or(0));
+
+                        if let Some(founders) = data["founders"].as_array() {
+                            println!("\nFounders ({}):", founders.len());
+                            for f in founders {
+                                let did = f["did"].as_str().unwrap_or("unknown");
+                                let role = f["role"].as_str().unwrap_or("founder");
+                                println!("  - {did} ({role})");
+                            }
+                        }
+                    } else if resp.status() == reqwest::StatusCode::NOT_FOUND {
+                        println!("Charter not found: {charter_id}");
+                    } else {
+                        let status = resp.status();
+                        let body = resp.text().await.unwrap_or_default();
+                        println!("Error: {status} - {body}");
+                    }
+                }
+                Err(e) => {
+                    println!("Could not connect to gateway: {e}");
+                }
+            }
         }
 
         CharterCommands::List {
@@ -6796,19 +6873,57 @@ async fn handle_charter_command(
             println!("List Charters");
             println!("=============\n");
 
-            println!("Gateway: {gateway}");
-            if let Some(t) = org_type {
-                println!("Filter by type: {t}");
+            let client = reqwest::Client::new();
+            let mut url = format!("{gateway}/v1/charter");
+            let mut params = Vec::new();
+            if let Some(ref t) = org_type {
+                params.push(format!("org_type={t}"));
             }
-            if let Some(s) = status {
-                println!("Filter by status: {s}");
+            if let Some(ref s) = status {
+                params.push(format!("status={s}"));
             }
-            println!();
-            println!("Note: Charter listing requires gateway integration.");
-            println!("This feature is pending gateway API implementation.");
+            if !params.is_empty() {
+                url = format!("{}?{}", url, params.join("&"));
+            }
+
+            match client.get(&url).send().await {
+                Ok(resp) => {
+                    let resp_status = resp.status();
+                    if resp_status.is_success() {
+                        let charters: Vec<serde_json::Value> = resp.json().await?;
+                        if charters.is_empty() {
+                            println!("No charters found.");
+                        } else {
+                            println!(
+                                "{:<12} {:<20} {:<15} {:<10}",
+                                "TYPE", "NAME", "DOMAIN", "STATUS"
+                            );
+                            println!("{}", "-".repeat(60));
+                            for c in charters {
+                                println!(
+                                    "{:<12} {:<20} {:<15} {:<10}",
+                                    c["org_type"].as_str().unwrap_or("-"),
+                                    c["name"].as_str().unwrap_or("-"),
+                                    c["domain_id"].as_str().unwrap_or("-"),
+                                    c["status"].as_str().unwrap_or("-"),
+                                );
+                            }
+                        }
+                    } else {
+                        let body = resp.text().await.unwrap_or_default();
+                        println!("Error: {resp_status} - {body}");
+                    }
+                }
+                Err(e) => {
+                    println!("Could not connect to gateway: {e}");
+                }
+            }
         }
 
-        CharterCommands::Sign { charter_id, gateway } => {
+        CharterCommands::Sign {
+            charter_id,
+            gateway,
+        } => {
             println!("Sign Charter");
             println!("============\n");
 
@@ -6836,7 +6951,10 @@ async fn handle_charter_command(
             println!("  3. Submit the FounderSignature to the gateway");
         }
 
-        CharterCommands::Ratify { charter_id, gateway } => {
+        CharterCommands::Ratify {
+            charter_id,
+            gateway,
+        } => {
             println!("Ratify Charter");
             println!("==============\n");
 

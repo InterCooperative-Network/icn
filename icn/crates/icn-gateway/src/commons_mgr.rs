@@ -1,0 +1,756 @@
+//! Commons Manager for Gateway API
+//!
+//! Provides Commons Evolution operations for the gateway API:
+//! - PersonhoodAnchor management (Layer 0)
+//! - CommonsHolderRecord management (Layer 1)
+//! - Charter management (Layer 2)
+//! - Affiliation/membership management
+
+use anyhow::{bail, Result};
+use icn_governance::{Charter, CharterStatus, OrgType, StewardRecord};
+use icn_identity::{
+    Affiliation, Anchor, AnchorStatus, CommonsHolderRecord, Did, EnrollmentPathway, HolderStatus,
+    JurisdictionId, MembershipCapability, MembershipStatus, POPAttestation, POPLevel, POPMethod,
+    PersonhoodAnchor,
+};
+use sha2::{Digest, Sha256};
+use std::collections::HashMap;
+use std::sync::RwLock;
+
+/// Commons Manager for gateway API
+pub struct CommonsManager {
+    // Layer 0: PersonhoodAnchors (by anchor_id hex)
+    anchors: RwLock<HashMap<String, PersonhoodAnchor>>,
+    // Index: DID -> anchor_id
+    anchors_by_did: RwLock<HashMap<String, String>>,
+
+    // Layer 1: CommonsHolderRecords (by holder_id hex)
+    holders: RwLock<HashMap<String, CommonsHolderRecord>>,
+    // Index: DID -> holder_id
+    holders_by_did: RwLock<HashMap<String, String>>,
+    // Index: anchor_id -> holder_id
+    holders_by_anchor: RwLock<HashMap<String, String>>,
+
+    // Layer 2: Charters (by charter_id hex)
+    charters: RwLock<HashMap<String, Charter>>,
+    // Index: domain_id -> charter_id
+    charters_by_domain: RwLock<HashMap<String, String>>,
+
+    // Steward records (by steward_id hex)
+    stewards: RwLock<HashMap<String, StewardRecord>>,
+    // Index: DID -> steward_id
+    stewards_by_did: RwLock<HashMap<String, String>>,
+}
+
+impl CommonsManager {
+    /// Create a new commons manager with in-memory storage
+    pub fn new() -> Self {
+        CommonsManager {
+            anchors: RwLock::new(HashMap::new()),
+            anchors_by_did: RwLock::new(HashMap::new()),
+            holders: RwLock::new(HashMap::new()),
+            holders_by_did: RwLock::new(HashMap::new()),
+            holders_by_anchor: RwLock::new(HashMap::new()),
+            charters: RwLock::new(HashMap::new()),
+            charters_by_domain: RwLock::new(HashMap::new()),
+            stewards: RwLock::new(HashMap::new()),
+            stewards_by_did: RwLock::new(HashMap::new()),
+        }
+    }
+
+    // ========== PersonhoodAnchor Operations (Layer 0) ==========
+
+    /// Create a new PersonhoodAnchor from enrollment completion
+    ///
+    /// This creates a full PersonhoodAnchor with an underlying SDIS Anchor
+    /// and an initial POP attestation.
+    pub async fn create_anchor_from_enrollment(
+        &self,
+        did: &Did,
+        steward_did: Option<&Did>,
+    ) -> Result<PersonhoodAnchor> {
+        // Generate pseudo-VUI from DID (in real SDIS, this comes from ceremony)
+        let mut hasher = Sha256::new();
+        hasher.update(b"gateway-enrollment-vui:");
+        hasher.update(did.as_str().as_bytes());
+        let vui_result = hasher.finalize();
+        let mut vui = [0u8; 32];
+        vui.copy_from_slice(&vui_result);
+
+        // Generate genesis random
+        let mut genesis = [0u8; 32];
+        use rand::RngCore;
+        rand::thread_rng().fill_bytes(&mut genesis);
+
+        // Create the underlying SDIS Anchor
+        let pathway = if steward_did.is_some() {
+            EnrollmentPathway::WebOfTrust {
+                vouchers: vec![steward_did.unwrap().clone()],
+                vouched_at: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs(),
+            }
+        } else {
+            EnrollmentPathway::Genesis {
+                reason: "Gateway enrollment".to_string(),
+            }
+        };
+
+        let sdis_anchor = Anchor::from_vui(&vui, pathway, &genesis);
+        let anchor_id_bytes = sdis_anchor.id;
+
+        // Create POP attestation
+        let (pop_method, pop_level, issuer) = if let Some(steward) = steward_did {
+            (
+                POPMethod::Sponsored {
+                    sponsor_did: steward.clone(),
+                },
+                POPLevel::Strong,
+                steward.clone(),
+            )
+        } else {
+            (
+                POPMethod::Genesis {
+                    reason: "Gateway enrollment".to_string(),
+                },
+                POPLevel::Weak,
+                did.clone(),
+            )
+        };
+
+        let attestation = POPAttestation::new(
+            &anchor_id_bytes,
+            issuer,
+            pop_method,
+            pop_level,
+            vec![], // Signature placeholder
+            None,   // No expiry
+        );
+
+        // Derive a current key from the DID (hash of DID as placeholder)
+        let mut key_hasher = Sha256::new();
+        key_hasher.update(b"gateway-current-key:");
+        key_hasher.update(did.as_str().as_bytes());
+        let key_result = key_hasher.finalize();
+        let mut current_key = [0u8; 32];
+        current_key.copy_from_slice(&key_result);
+
+        // Create PersonhoodAnchor
+        let anchor = PersonhoodAnchor::new(sdis_anchor, attestation, current_key);
+
+        // Store anchor
+        let anchor_id = hex::encode(anchor.id());
+        let did_str = did.to_string();
+
+        {
+            let mut anchors = self
+                .anchors
+                .write()
+                .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+
+            if anchors.contains_key(&anchor_id) {
+                bail!("Anchor already exists: {anchor_id}");
+            }
+
+            anchors.insert(anchor_id.clone(), anchor.clone());
+        }
+
+        {
+            let mut by_did = self
+                .anchors_by_did
+                .write()
+                .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+            by_did.insert(did_str, anchor_id);
+        }
+
+        Ok(anchor)
+    }
+
+    /// Get a PersonhoodAnchor by ID
+    pub async fn get_anchor(&self, anchor_id: &str) -> Result<Option<PersonhoodAnchor>> {
+        let anchors = self
+            .anchors
+            .read()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        Ok(anchors.get(anchor_id).cloned())
+    }
+
+    /// Get a PersonhoodAnchor by DID
+    pub async fn get_anchor_by_did(&self, did: &Did) -> Result<Option<PersonhoodAnchor>> {
+        let did_str = did.to_string();
+
+        let anchor_id = {
+            let by_did = self
+                .anchors_by_did
+                .read()
+                .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+            by_did.get(&did_str).cloned()
+        };
+
+        if let Some(id) = anchor_id {
+            self.get_anchor(&id).await
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Update anchor status
+    pub async fn update_anchor_status(&self, anchor_id: &str, status: AnchorStatus) -> Result<()> {
+        let mut anchors = self
+            .anchors
+            .write()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+
+        if let Some(anchor) = anchors.get_mut(anchor_id) {
+            anchor.status = status;
+            anchor.updated_at = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
+            Ok(())
+        } else {
+            bail!("Anchor not found: {anchor_id}")
+        }
+    }
+
+    /// Add an attestation to an anchor
+    pub async fn add_attestation(
+        &self,
+        anchor_id: &str,
+        attestation: POPAttestation,
+    ) -> Result<()> {
+        let mut anchors = self
+            .anchors
+            .write()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+
+        if let Some(anchor) = anchors.get_mut(anchor_id) {
+            anchor.add_attestation(attestation);
+            Ok(())
+        } else {
+            bail!("Anchor not found: {anchor_id}")
+        }
+    }
+
+    // ========== CommonsHolderRecord Operations (Layer 1) ==========
+
+    /// Create a CommonsHolderRecord from an anchor
+    pub async fn create_holder_from_anchor(
+        &self,
+        anchor_id: &str,
+        did: &Did,
+    ) -> Result<CommonsHolderRecord> {
+        // Verify anchor exists and get its POP level
+        let anchor = self
+            .get_anchor(anchor_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Anchor not found: {anchor_id}"))?;
+
+        // Convert anchor_id hex string to bytes
+        let anchor_bytes: [u8; 32] = hex::decode(anchor_id)?
+            .try_into()
+            .map_err(|_| anyhow::anyhow!("Invalid anchor_id length"))?;
+
+        // Get the POP level from the anchor (default to Weak if no attestations)
+        let pop_level = anchor.pop_level().unwrap_or(POPLevel::Weak);
+
+        // Create holder with baseline Commons Rights
+        let holder = CommonsHolderRecord::new(anchor_bytes, did.clone(), pop_level);
+
+        let holder_id = hex::encode(holder.id());
+        let did_str = did.to_string();
+
+        // Store holder
+        {
+            let mut holders = self
+                .holders
+                .write()
+                .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+
+            if holders.contains_key(&holder_id) {
+                bail!("Holder already exists: {holder_id}");
+            }
+
+            holders.insert(holder_id.clone(), holder.clone());
+        }
+
+        // Update indexes
+        {
+            let mut by_did = self
+                .holders_by_did
+                .write()
+                .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+            by_did.insert(did_str, holder_id.clone());
+        }
+
+        {
+            let mut by_anchor = self
+                .holders_by_anchor
+                .write()
+                .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+            by_anchor.insert(anchor_id.to_string(), holder_id);
+        }
+
+        Ok(holder)
+    }
+
+    /// Get a CommonsHolderRecord by ID
+    pub async fn get_holder(&self, holder_id: &str) -> Result<Option<CommonsHolderRecord>> {
+        let holders = self
+            .holders
+            .read()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        Ok(holders.get(holder_id).cloned())
+    }
+
+    /// Get a CommonsHolderRecord by DID
+    pub async fn get_holder_by_did(&self, did: &Did) -> Result<Option<CommonsHolderRecord>> {
+        let did_str = did.to_string();
+
+        let holder_id = {
+            let by_did = self
+                .holders_by_did
+                .read()
+                .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+            by_did.get(&did_str).cloned()
+        };
+
+        if let Some(id) = holder_id {
+            self.get_holder(&id).await
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Update holder status
+    pub async fn update_holder_status(&self, holder_id: &str, status: HolderStatus) -> Result<()> {
+        let mut holders = self
+            .holders
+            .write()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+
+        if let Some(holder) = holders.get_mut(holder_id) {
+            holder.status = status;
+            holder.updated_at = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
+            Ok(())
+        } else {
+            bail!("Holder not found: {holder_id}")
+        }
+    }
+
+    // ========== Affiliation Operations ==========
+
+    /// Add an affiliation (join jurisdiction)
+    pub async fn join_jurisdiction(
+        &self,
+        holder_id: &str,
+        jurisdiction: JurisdictionId,
+        initial_capabilities: Vec<MembershipCapability>,
+    ) -> Result<Affiliation> {
+        let mut holders = self
+            .holders
+            .write()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+
+        let holder = holders
+            .get_mut(holder_id)
+            .ok_or_else(|| anyhow::anyhow!("Holder not found: {holder_id}"))?;
+
+        // Check if already affiliated
+        if holder
+            .affiliations
+            .iter()
+            .any(|a| a.jurisdiction_id == jurisdiction)
+        {
+            bail!(
+                "Already affiliated with jurisdiction: {}",
+                jurisdiction.as_str()
+            );
+        }
+
+        // Create affiliation (starts as Candidate by default)
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        let affiliation = Affiliation {
+            jurisdiction_id: jurisdiction.clone(),
+            membership_status: MembershipStatus::Candidate,
+            capabilities: initial_capabilities,
+            roles: Vec::new(),
+            joined_at: now,
+            expires_at: None,
+        };
+
+        holder.affiliations.push(affiliation.clone());
+        holder.updated_at = now;
+
+        Ok(affiliation)
+    }
+
+    /// Leave a jurisdiction
+    pub async fn leave_jurisdiction(
+        &self,
+        holder_id: &str,
+        jurisdiction: &JurisdictionId,
+    ) -> Result<()> {
+        let mut holders = self
+            .holders
+            .write()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+
+        let holder = holders
+            .get_mut(holder_id)
+            .ok_or_else(|| anyhow::anyhow!("Holder not found: {holder_id}"))?;
+
+        // Find and update affiliation status to Exited
+        if let Some(affiliation) = holder
+            .affiliations
+            .iter_mut()
+            .find(|a| &a.jurisdiction_id == jurisdiction)
+        {
+            affiliation.membership_status = MembershipStatus::Exited;
+            holder.updated_at = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
+            Ok(())
+        } else {
+            bail!(
+                "Not affiliated with jurisdiction: {}",
+                jurisdiction.as_str()
+            )
+        }
+    }
+
+    /// Update affiliation status (e.g., Candidate -> Member)
+    pub async fn update_affiliation_status(
+        &self,
+        holder_id: &str,
+        jurisdiction: &JurisdictionId,
+        status: MembershipStatus,
+    ) -> Result<()> {
+        let mut holders = self
+            .holders
+            .write()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+
+        let holder = holders
+            .get_mut(holder_id)
+            .ok_or_else(|| anyhow::anyhow!("Holder not found: {holder_id}"))?;
+
+        if let Some(affiliation) = holder
+            .affiliations
+            .iter_mut()
+            .find(|a| &a.jurisdiction_id == jurisdiction)
+        {
+            affiliation.membership_status = status;
+            holder.updated_at = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
+            Ok(())
+        } else {
+            bail!(
+                "Not affiliated with jurisdiction: {}",
+                jurisdiction.as_str()
+            )
+        }
+    }
+
+    /// List affiliations for a holder
+    pub async fn list_affiliations(&self, holder_id: &str) -> Result<Vec<Affiliation>> {
+        let holders = self
+            .holders
+            .read()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+
+        let holder = holders
+            .get(holder_id)
+            .ok_or_else(|| anyhow::anyhow!("Holder not found: {holder_id}"))?;
+
+        Ok(holder.affiliations.clone())
+    }
+
+    // ========== Charter Operations (Layer 2) ==========
+
+    /// Store a charter
+    pub async fn store_charter(&self, charter: Charter) -> Result<()> {
+        let charter_id = charter.charter_id.to_hex();
+        let domain_id = charter.domain_id.clone();
+
+        {
+            let mut charters = self
+                .charters
+                .write()
+                .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+
+            if charters.contains_key(&charter_id) {
+                bail!("Charter already exists: {charter_id}");
+            }
+
+            charters.insert(charter_id.clone(), charter);
+        }
+
+        {
+            let mut by_domain = self
+                .charters_by_domain
+                .write()
+                .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+            by_domain.insert(domain_id, charter_id);
+        }
+
+        Ok(())
+    }
+
+    /// Get a charter by ID
+    pub async fn get_charter(&self, charter_id: &str) -> Result<Option<Charter>> {
+        let charters = self
+            .charters
+            .read()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        Ok(charters.get(charter_id).cloned())
+    }
+
+    /// Get a charter by domain ID
+    pub async fn get_charter_by_domain(&self, domain_id: &str) -> Result<Option<Charter>> {
+        let charter_id = {
+            let by_domain = self
+                .charters_by_domain
+                .read()
+                .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+            by_domain.get(domain_id).cloned()
+        };
+
+        if let Some(id) = charter_id {
+            self.get_charter(&id).await
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// List all charters with optional filters
+    pub async fn list_charters(
+        &self,
+        org_type: Option<OrgType>,
+        status: Option<CharterStatus>,
+    ) -> Result<Vec<Charter>> {
+        let charters = self
+            .charters
+            .read()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+
+        let mut results: Vec<Charter> = charters
+            .values()
+            .filter(|c| {
+                let type_match = org_type.as_ref().is_none_or(|t| c.org_type == *t);
+                let status_match = status.as_ref().is_none_or(|s| c.status == *s);
+                type_match && status_match
+            })
+            .cloned()
+            .collect();
+
+        // Sort by creation time, newest first
+        results.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+
+        Ok(results)
+    }
+
+    /// Update charter status
+    pub async fn update_charter_status(
+        &self,
+        charter_id: &str,
+        status: CharterStatus,
+    ) -> Result<()> {
+        let mut charters = self
+            .charters
+            .write()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+
+        if let Some(charter) = charters.get_mut(charter_id) {
+            charter.status = status;
+            // Note: Charter doesn't have an updated_at field
+            // Status changes are tracked via amendments in production
+            Ok(())
+        } else {
+            bail!("Charter not found: {charter_id}")
+        }
+    }
+
+    // ========== Steward Operations ==========
+
+    /// Store a steward record
+    pub async fn store_steward(&self, steward: StewardRecord) -> Result<()> {
+        let steward_id = steward.steward_id.to_hex();
+        let did_str = steward.steward_did.to_string();
+
+        {
+            let mut stewards = self
+                .stewards
+                .write()
+                .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+
+            if stewards.contains_key(&steward_id) {
+                bail!("Steward already exists: {steward_id}");
+            }
+
+            stewards.insert(steward_id.clone(), steward);
+        }
+
+        {
+            let mut by_did = self
+                .stewards_by_did
+                .write()
+                .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+            by_did.insert(did_str, steward_id);
+        }
+
+        Ok(())
+    }
+
+    /// Get a steward by DID
+    pub async fn get_steward_by_did(&self, did: &Did) -> Result<Option<StewardRecord>> {
+        let did_str = did.to_string();
+
+        let steward_id = {
+            let by_did = self
+                .stewards_by_did
+                .read()
+                .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+            by_did.get(&did_str).cloned()
+        };
+
+        if let Some(id) = steward_id {
+            let stewards = self
+                .stewards
+                .read()
+                .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+            Ok(stewards.get(&id).cloned())
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Check if a DID belongs to an active steward
+    pub async fn is_active_steward(&self, did: &Did) -> Result<bool> {
+        if let Some(steward) = self.get_steward_by_did(did).await? {
+            Ok(steward.is_active() && steward.can_attest())
+        } else {
+            Ok(false)
+        }
+    }
+}
+
+impl Default for CommonsManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_did() -> Did {
+        Did::from_anchor_id(&[42u8; 32])
+    }
+
+    fn steward_did() -> Did {
+        Did::from_anchor_id(&[99u8; 32])
+    }
+
+    #[tokio::test]
+    async fn test_create_anchor_with_steward() {
+        let mgr = CommonsManager::new();
+        let did = test_did();
+        let steward = steward_did();
+
+        let anchor = mgr
+            .create_anchor_from_enrollment(&did, Some(&steward))
+            .await
+            .unwrap();
+
+        assert!(anchor.is_active());
+        assert_eq!(anchor.pop_attestations.len(), 1);
+        assert_eq!(anchor.pop_level(), Some(POPLevel::Strong));
+    }
+
+    #[tokio::test]
+    async fn test_create_holder_from_anchor() {
+        let mgr = CommonsManager::new();
+        let did = test_did();
+
+        let anchor = mgr.create_anchor_from_enrollment(&did, None).await.unwrap();
+        let anchor_id = hex::encode(anchor.id());
+
+        let holder = mgr
+            .create_holder_from_anchor(&anchor_id, &did)
+            .await
+            .unwrap();
+
+        assert!(holder.is_active());
+        assert!(holder.affiliations.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_join_and_leave_jurisdiction() {
+        let mgr = CommonsManager::new();
+        let did = test_did();
+
+        let anchor = mgr.create_anchor_from_enrollment(&did, None).await.unwrap();
+        let anchor_id = hex::encode(anchor.id());
+
+        let holder = mgr
+            .create_holder_from_anchor(&anchor_id, &did)
+            .await
+            .unwrap();
+        let holder_id = hex::encode(holder.id());
+
+        let jurisdiction = JurisdictionId::new("coop:test-coop");
+
+        // Join
+        let affiliation = mgr
+            .join_jurisdiction(&holder_id, jurisdiction.clone(), vec![])
+            .await
+            .unwrap();
+        assert_eq!(affiliation.membership_status, MembershipStatus::Candidate);
+
+        // Verify affiliation exists
+        let affiliations = mgr.list_affiliations(&holder_id).await.unwrap();
+        assert_eq!(affiliations.len(), 1);
+
+        // Leave
+        mgr.leave_jurisdiction(&holder_id, &jurisdiction)
+            .await
+            .unwrap();
+
+        // Verify status is Exited
+        let affiliations = mgr.list_affiliations(&holder_id).await.unwrap();
+        assert_eq!(affiliations[0].membership_status, MembershipStatus::Exited);
+    }
+
+    #[tokio::test]
+    async fn test_get_by_did() {
+        let mgr = CommonsManager::new();
+        let did = test_did();
+
+        let anchor = mgr.create_anchor_from_enrollment(&did, None).await.unwrap();
+        let anchor_id = hex::encode(anchor.id());
+
+        mgr.create_holder_from_anchor(&anchor_id, &did)
+            .await
+            .unwrap();
+
+        // Lookup by DID
+        let found_anchor = mgr.get_anchor_by_did(&did).await.unwrap();
+        assert!(found_anchor.is_some());
+
+        let found_holder = mgr.get_holder_by_did(&did).await.unwrap();
+        assert!(found_holder.is_some());
+    }
+}

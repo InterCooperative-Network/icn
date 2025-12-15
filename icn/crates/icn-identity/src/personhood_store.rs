@@ -54,7 +54,10 @@ impl PersonhoodStore for InMemoryPersonhoodStore {
     }
 
     fn put(&self, key: &[u8], value: &[u8]) -> Result<()> {
-        self.data.write().unwrap().insert(key.to_vec(), value.to_vec());
+        self.data
+            .write()
+            .unwrap()
+            .insert(key.to_vec(), value.to_vec());
         Ok(())
     }
 
@@ -453,11 +456,12 @@ impl<S: PersonhoodStore> PersonhoodAnchorStore<S> {
         let mut reinstated = Vec::new();
 
         for anchor in suspended {
-            if let AnchorStatus::Suspended { until: Some(until), .. } = anchor.status {
+            if let AnchorStatus::Suspended {
+                until: Some(until), ..
+            } = anchor.status
+            {
                 if now >= until {
-                    if let Some(updated) =
-                        self.update_status(anchor.id(), AnchorStatus::Active)?
-                    {
+                    if let Some(updated) = self.update_status(anchor.id(), AnchorStatus::Active)? {
                         info!(
                             "Auto-reinstated PersonhoodAnchor {}",
                             hex::encode(anchor.id())
@@ -608,13 +612,18 @@ mod tests {
         let attestation = POPAttestation::new(
             &anchor_id,
             issuer,
-            POPMethod::InPerson { location_hash: None },
+            POPMethod::InPerson {
+                location_hash: None,
+            },
             POPLevel::Strong,
             vec![1, 2, 3],
             None,
         );
 
-        let updated = store.add_attestation(&anchor_id, attestation).unwrap().unwrap();
+        let updated = store
+            .add_attestation(&anchor_id, attestation)
+            .unwrap()
+            .unwrap();
         assert_eq!(updated.pop_attestations.len(), 2); // Genesis + new one
         assert!(updated.meets_pop_level(POPLevel::Strong));
     }
@@ -656,7 +665,9 @@ mod tests {
         let attestation = POPAttestation::new(
             anchor2.id(),
             issuer,
-            POPMethod::InPerson { location_hash: None },
+            POPMethod::InPerson {
+                location_hash: None,
+            },
             POPLevel::Strong,
             vec![],
             None,

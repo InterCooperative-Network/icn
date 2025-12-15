@@ -41,6 +41,12 @@ pub mod store;
 pub mod tally;
 pub mod vote;
 
+pub use charter::{
+    AmendmentRef, ArbitratorSelection, Charter, CharterId, CharterStatus, ContributionRouting,
+    DisputePolicy, EconomicPolicy, FeePeriod, FounderSignature, MembershipFee, MembershipPolicy,
+    OrgType,
+};
+pub use charter_store::{CharterStore, CharterStoreBackend, InMemoryCharterStore};
 pub use config::{EmergencyThresholds, GovernanceConfig, GovernanceParams};
 pub use domain::{GovernanceDomain, GovernanceDomainId};
 pub use handle::GovernanceOps;
@@ -56,20 +62,14 @@ pub use sdis::{
     AttestationType, InstitutionalAuthority, JurisdictionTier, RevocationTarget, SdisProposal,
     SdisVotingRequirements, StewardPenalty, StewardStats, ThresholdOp, ThresholdType,
 };
-pub use store::{GovernanceStore, InMemoryGovernanceStore};
-pub use tally::VoteTally;
-pub use vote::{Vote, VoteChoice};
-pub use charter::{
-    AmendmentRef, ArbitratorSelection, Charter, CharterId, CharterStatus, ContributionRouting,
-    DisputePolicy, EconomicPolicy, FeePeriod, FounderSignature, MembershipFee, MembershipPolicy,
-    OrgType,
-};
-pub use charter_store::{CharterStore, CharterStoreBackend, InMemoryCharterStore};
 pub use steward::{
     AttestationType as StewardAttestationType, ContactMethod, DisputeOutcome, StewardAttestation,
     StewardContact, StewardId, StewardRecord, StewardStatus,
 };
 pub use steward_store::{InMemoryStewardStore, StewardStore, StewardStoreBackend};
+pub use store::{GovernanceStore, InMemoryGovernanceStore};
+pub use tally::VoteTally;
+pub use vote::{Vote, VoteChoice};
 
 /// Unix timestamp in seconds
 pub type Timestamp = u64;

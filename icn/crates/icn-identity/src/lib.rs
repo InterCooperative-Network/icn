@@ -34,6 +34,11 @@ pub use batch_verify::{
     verify_signatures_batched, BatchVerifier, BatchVerifyResult, SignatureToVerify,
 };
 pub use bundle::{verify_binding_info, BindingInfo, IdentityBundle};
+pub use commons::{
+    Affiliation, CommonsHolderRecord, CommonsRight, CommonsRights, HolderStatus, JurisdictionId,
+    JurisdictionType, MembershipCapability, MembershipStatus,
+};
+pub use commons_store::CommonsHolderStore;
 pub use keybundle::KeyBundle;
 pub use keystore::{AgeKeyStore, KeyRotation, KeyStore, RotationReason};
 pub use multi_device::{
@@ -46,11 +51,6 @@ pub use personhood::{
     UniquenessProofType,
 };
 pub use personhood_store::{InMemoryPersonhoodStore, PersonhoodAnchorStore, PersonhoodStore};
-pub use commons::{
-    Affiliation, CommonsHolderRecord, CommonsRight, CommonsRights, HolderStatus,
-    JurisdictionId, JurisdictionType, MembershipCapability, MembershipStatus,
-};
-pub use commons_store::CommonsHolderStore;
 pub use recovery::{
     RecoveryAttestation, RecoveryEvent, RecoveryMessage, RecoveryStatus, IDENTITY_RECOVERY_TOPIC,
 };

@@ -121,6 +121,8 @@ pub struct DeviceInfo {
 #[derive(Debug, Serialize)]
 pub struct CompleteEnrollmentResponse {
     pub did: String,
+    pub anchor_id: Option<String>,
+    pub holder_id: Option<String>,
     pub recovery_codes: Vec<String>,
     pub auth_token: String,
 }
@@ -343,6 +345,7 @@ pub async fn complete_enrollment(
     store: web::Data<Arc<EnrollmentStore>>,
     auth: web::Data<Arc<AuthManager>>,
     trust_mgr: web::Data<Arc<TrustManager>>,
+    commons_mgr: web::Data<Arc<crate::commons_mgr::CommonsManager>>,
     req: web::Json<CompleteEnrollmentRequest>,
 ) -> Result<HttpResponse> {
     let mut enrollments = store.enrollments.write().await;
@@ -404,18 +407,48 @@ pub async fn complete_enrollment(
     let recovery_codes: Vec<String> = generate_recovery_codes(5);
 
     // If there's a vouching steward, create an initial trust edge from steward to new member
-    if let Some(ref steward_did_str) = session.steward_did {
+    let steward_did_opt: Option<Did> = if let Some(ref steward_did_str) = session.steward_did {
         if let Ok(steward_did) = steward_did_str.parse::<Did>() {
             // Create initial trust edge: steward vouched for this member
             let edge = icn_trust::TrustEdge::new(
-                steward_did,
+                steward_did.clone(),
                 ephemeral_did.clone(),
                 0.5, // Initial trust from vouch
             )
             .with_label("enrollment-vouch");
             let _ = trust_mgr.add_edge(edge);
+            Some(steward_did)
+        } else {
+            None
         }
-    }
+    } else {
+        None
+    };
+
+    // Create PersonhoodAnchor and CommonsHolderRecord for the new identity
+    let (anchor_id, holder_id) = match commons_mgr
+        .create_anchor_from_enrollment(&ephemeral_did, steward_did_opt.as_ref())
+        .await
+    {
+        Ok(anchor) => {
+            let anchor_id_hex = hex::encode(anchor.id());
+            // Create holder from anchor
+            match commons_mgr
+                .create_holder_from_anchor(&anchor_id_hex, &ephemeral_did)
+                .await
+            {
+                Ok(holder) => (Some(anchor_id_hex), Some(hex::encode(holder.id()))),
+                Err(e) => {
+                    tracing::warn!("Failed to create holder for {}: {}", did, e);
+                    (Some(anchor_id_hex), None)
+                }
+            }
+        }
+        Err(e) => {
+            tracing::warn!("Failed to create anchor for {}: {}", did, e);
+            (None, None)
+        }
+    };
 
     // Issue auth token for the new identity
     let auth_token = auth.issue_token(
@@ -431,6 +464,8 @@ pub async fn complete_enrollment(
 
     Ok(HttpResponse::Ok().json(CompleteEnrollmentResponse {
         did,
+        anchor_id,
+        holder_id,
         recovery_codes,
         auth_token,
     }))

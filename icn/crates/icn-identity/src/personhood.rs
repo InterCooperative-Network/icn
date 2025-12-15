@@ -349,11 +349,7 @@ impl PersonhoodAnchor {
     }
 
     /// Create a new PersonhoodAnchor with initial POP attestation
-    pub fn new(
-        anchor: Anchor,
-        initial_attestation: POPAttestation,
-        current_key: [u8; 32],
-    ) -> Self {
+    pub fn new(anchor: Anchor, initial_attestation: POPAttestation, current_key: [u8; 32]) -> Self {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -379,11 +375,8 @@ impl PersonhoodAnchor {
             .as_secs();
 
         // Create a genesis attestation
-        let attestation = POPAttestation::genesis(
-            &anchor.id,
-            Did::from_anchor_id(&anchor.id),
-            reason,
-        );
+        let attestation =
+            POPAttestation::genesis(&anchor.id, Did::from_anchor_id(&anchor.id), reason);
 
         Self {
             anchor,
@@ -550,7 +543,7 @@ impl POPAttestation {
         hasher.update(b"icn-pop-attestation-v1");
         hasher.update(anchor_id);
         hasher.update(issuer_did.as_str().as_bytes());
-        hasher.update(&now.to_le_bytes());
+        hasher.update(now.to_le_bytes());
         let result = hasher.finalize();
 
         let mut attestation_id = [0u8; 32];
@@ -617,13 +610,21 @@ impl POPLevel {
     }
 
     /// Parse from string
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "weak" => Some(POPLevel::Weak),
             "strong" => Some(POPLevel::Strong),
             "verified" => Some(POPLevel::Verified),
             _ => None,
         }
+    }
+}
+
+impl std::str::FromStr for POPLevel {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        POPLevel::parse(s).ok_or(())
     }
 }
 
@@ -637,8 +638,8 @@ impl std::fmt::Display for AnchorStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             AnchorStatus::Active => write!(f, "active"),
-            AnchorStatus::Suspended { reason, .. } => write!(f, "suspended: {}", reason),
-            AnchorStatus::Revoked { reason, .. } => write!(f, "revoked: {}", reason),
+            AnchorStatus::Suspended { reason, .. } => write!(f, "suspended: {reason}"),
+            AnchorStatus::Revoked { reason, .. } => write!(f, "revoked: {reason}"),
         }
     }
 }
@@ -713,7 +714,9 @@ mod tests {
         let attestation = POPAttestation::new(
             &anchor_id,
             issuer.clone(),
-            POPMethod::InPerson { location_hash: None },
+            POPMethod::InPerson {
+                location_hash: None,
+            },
             POPLevel::Strong,
             vec![1, 2, 3],
             None,
@@ -734,7 +737,9 @@ mod tests {
         let mut attestation = POPAttestation::new(
             &anchor_id,
             issuer,
-            POPMethod::InPerson { location_hash: None },
+            POPMethod::InPerson {
+                location_hash: None,
+            },
             POPLevel::Strong,
             vec![1, 2, 3],
             Some(1), // Expired at timestamp 1
@@ -749,10 +754,10 @@ mod tests {
 
     #[test]
     fn test_pop_level_parsing() {
-        assert_eq!(POPLevel::from_str("weak"), Some(POPLevel::Weak));
-        assert_eq!(POPLevel::from_str("STRONG"), Some(POPLevel::Strong));
-        assert_eq!(POPLevel::from_str("Verified"), Some(POPLevel::Verified));
-        assert_eq!(POPLevel::from_str("invalid"), None);
+        assert_eq!(POPLevel::parse("weak"), Some(POPLevel::Weak));
+        assert_eq!(POPLevel::parse("STRONG"), Some(POPLevel::Strong));
+        assert_eq!(POPLevel::parse("Verified"), Some(POPLevel::Verified));
+        assert_eq!(POPLevel::parse("invalid"), None);
     }
 
     #[test]
@@ -771,7 +776,9 @@ mod tests {
         let attestation = POPAttestation::new(
             pa.id(),
             issuer,
-            POPMethod::InPerson { location_hash: None },
+            POPMethod::InPerson {
+                location_hash: None,
+            },
             POPLevel::Strong,
             vec![1, 2, 3],
             None,
@@ -797,7 +804,9 @@ mod tests {
         let attestation = POPAttestation::new(
             pa.id(),
             issuer,
-            POPMethod::InPerson { location_hash: None },
+            POPMethod::InPerson {
+                location_hash: None,
+            },
             POPLevel::Strong,
             vec![],
             None,

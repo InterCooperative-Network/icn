@@ -1,6 +1,8 @@
 //! API endpoint modules
 
 pub mod auth;
+pub mod charter;
+pub mod commons;
 pub mod compute;
 pub mod coops;
 pub mod federation;

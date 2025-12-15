@@ -681,10 +681,12 @@ mod tests {
 
     #[test]
     fn test_jurisdiction() {
-        let steward = create_test_steward()
-            .with_jurisdiction("federation:pacific-nw");
+        let steward = create_test_steward().with_jurisdiction("federation:pacific-nw");
 
-        assert_eq!(steward.jurisdiction, Some("federation:pacific-nw".to_string()));
+        assert_eq!(
+            steward.jurisdiction,
+            Some("federation:pacific-nw".to_string())
+        );
     }
 
     #[test]

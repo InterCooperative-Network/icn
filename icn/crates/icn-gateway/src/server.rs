@@ -11,6 +11,7 @@ use tracing::info;
 
 use crate::api;
 use crate::auth::AuthManager;
+use crate::commons_mgr::CommonsManager;
 use crate::compute_mgr::ComputeManager;
 use crate::coop::CoopManager;
 use crate::error::Result;
@@ -120,6 +121,7 @@ impl GatewayServer {
             Arc::new(ComputeManager::new())
         };
         let federation_manager = Arc::new(FederationManager::new());
+        let commons_manager = Arc::new(CommonsManager::new());
 
         // Create SDIS state for identity verification
         let sdis_state = Arc::new(crate::api::sdis::SdisState::new());
@@ -227,6 +229,7 @@ impl GatewayServer {
                 .app_data(web::Data::new(trust_manager.clone()))
                 .app_data(web::Data::new(compute_manager.clone()))
                 .app_data(web::Data::new(federation_manager.clone()))
+                .app_data(web::Data::new(commons_manager.clone()))
                 .app_data(web::Data::new(ledger_manager.clone()))
                 .app_data(web::Data::new(sdis_state.clone()))
                 .app_data(web::Data::new(enrollment_store.clone()))
@@ -386,6 +389,24 @@ impl GatewayServer {
                                 .service(api::notifications::register_device)
                                 .service(api::notifications::unregister_device)
                                 .wrap(auth_for_notifications),
+                        )
+                        // Commons Evolution endpoints (auth + rate limiting)
+                        .service(
+                            web::scope("/commons")
+                                .configure(api::commons::configure)
+                                .wrap(middleware::from_fn(
+                                    crate::rate_limit::rate_limit_middleware,
+                                ))
+                                .wrap(auth.clone()),
+                        )
+                        // Charter management endpoints (auth + rate limiting)
+                        .service(
+                            web::scope("/charter")
+                                .configure(api::charter::configure)
+                                .wrap(middleware::from_fn(
+                                    crate::rate_limit::rate_limit_middleware,
+                                ))
+                                .wrap(auth.clone()),
                         ),
                 )
                 // Static files and root route

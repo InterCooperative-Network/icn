@@ -434,11 +434,11 @@ impl MembershipPolicy {
     /// Create a policy for federations
     pub fn federation_default() -> Self {
         Self {
-            min_founders: 2,                             // Federations need fewer founders
-            min_sponsors: 0,                             // Members are jurisdictions, not individuals
-            probation_duration_secs: 90 * 24 * 60 * 60,  // 90 days probation
-            open_enrollment: false,                      // Federations are invite-only
-            required_pop_level: "Strong".to_string(),    // Higher requirements for federation founders
+            min_founders: 2,                            // Federations need fewer founders
+            min_sponsors: 0, // Members are jurisdictions, not individuals
+            probation_duration_secs: 90 * 24 * 60 * 60, // 90 days probation
+            open_enrollment: false, // Federations are invite-only
+            required_pop_level: "Strong".to_string(), // Higher requirements for federation founders
             training_requirements: Vec::new(),
             max_members: 0,
             jurisdiction_members: Some(Vec::new()),
@@ -704,7 +704,10 @@ mod tests {
 
     #[test]
     fn test_federation_charter() {
-        let members = vec!["coop:food-portland".to_string(), "coop:housing-seattle".to_string()];
+        let members = vec![
+            "coop:food-portland".to_string(),
+            "coop:housing-seattle".to_string(),
+        ];
         let charter = Charter::federation(
             "pacific-nw".to_string(),
             "Pacific Northwest Federation".to_string(),
@@ -771,7 +774,10 @@ mod tests {
         assert!(matches!(charter.status, CharterStatus::Suspended { .. }));
 
         // Dissolve
-        charter.dissolve("Members voted to dissolve".to_string(), "proposal-123".to_string());
+        charter.dissolve(
+            "Members voted to dissolve".to_string(),
+            "proposal-123".to_string(),
+        );
         assert!(matches!(charter.status, CharterStatus::Dissolved { .. }));
     }
 

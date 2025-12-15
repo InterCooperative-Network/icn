@@ -359,10 +359,7 @@ pub enum HolderStatus {
     },
 
     /// Voluntarily exited the commons
-    Exited {
-        reason: String,
-        exit_timestamp: u64,
-    },
+    Exited { reason: String, exit_timestamp: u64 },
 
     /// Revoked by network governance (serious violations)
     Revoked {
@@ -771,7 +768,9 @@ mod tests {
 
         assert!(holder.is_revoked());
         if let HolderStatus::Revoked {
-            reason, evidence: e, ..
+            reason,
+            evidence: e,
+            ..
         } = &holder.status
         {
             assert_eq!(reason, "Sybil attack detected");

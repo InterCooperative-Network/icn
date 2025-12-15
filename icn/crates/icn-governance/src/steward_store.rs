@@ -261,8 +261,7 @@ impl<B: StewardStoreBackend> StewardStore<B> {
         // Get the old record to update indexes
         if let Some(old_record) = self.get(&record.steward_id).await? {
             // Remove old indexes if status changed
-            if std::mem::discriminant(&old_record.status)
-                != std::mem::discriminant(&record.status)
+            if std::mem::discriminant(&old_record.status) != std::mem::discriminant(&record.status)
             {
                 self.remove_status_index(&old_record).await?;
             }
@@ -528,10 +527,7 @@ mod tests {
 
         let retrieved = store.get(&record.steward_id).await.unwrap();
         assert!(retrieved.is_some());
-        assert_eq!(
-            retrieved.unwrap().steward_id.0,
-            record.steward_id.0
-        );
+        assert_eq!(retrieved.unwrap().steward_id.0, record.steward_id.0);
     }
 
     #[tokio::test]
@@ -578,7 +574,10 @@ mod tests {
         record2.jurisdiction = Some("federation:pacific-nw".to_string());
         store.store(&record2).await.unwrap();
 
-        let records = store.list_by_jurisdiction("federation:pacific-nw").await.unwrap();
+        let records = store
+            .list_by_jurisdiction("federation:pacific-nw")
+            .await
+            .unwrap();
         assert_eq!(records.len(), 2);
     }
 
@@ -607,7 +606,10 @@ mod tests {
         store.store(&record).await.unwrap();
 
         // Suspend
-        assert!(store.suspend(&steward_id, "Under review".to_string()).await.unwrap());
+        assert!(store
+            .suspend(&steward_id, "Under review".to_string())
+            .await
+            .unwrap());
 
         let retrieved = store.get(&steward_id).await.unwrap().unwrap();
         assert!(retrieved.is_suspended());
@@ -644,12 +646,10 @@ mod tests {
         store.store(&record).await.unwrap();
 
         let evidence = vec![[1u8; 32], [2u8; 32]];
-        assert!(
-            store
-                .revoke(&steward_id, "Fraud".to_string(), evidence)
-                .await
-                .unwrap()
-        );
+        assert!(store
+            .revoke(&steward_id, "Fraud".to_string(), evidence)
+            .await
+            .unwrap());
 
         let retrieved = store.get(&steward_id).await.unwrap().unwrap();
         assert!(matches!(retrieved.status, StewardStatus::Revoked { .. }));

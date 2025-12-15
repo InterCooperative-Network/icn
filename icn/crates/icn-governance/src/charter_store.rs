@@ -51,7 +51,10 @@ impl CharterStoreBackend for InMemoryCharterStore {
     }
 
     fn put(&self, key: &[u8], value: &[u8]) -> Result<()> {
-        self.data.write().unwrap().insert(key.to_vec(), value.to_vec());
+        self.data
+            .write()
+            .unwrap()
+            .insert(key.to_vec(), value.to_vec());
         Ok(())
     }
 
@@ -391,7 +394,10 @@ impl<S: CharterStoreBackend> CharterStore<S> {
             // Store updated charter (will create new status index)
             self.store(&charter)?;
 
-            info!("Updated Charter {} status to {}", charter_id, charter.status);
+            info!(
+                "Updated Charter {} status to {}",
+                charter_id, charter.status
+            );
 
             return Ok(Some(charter));
         }
@@ -459,7 +465,7 @@ mod tests {
     use crate::config::GovernanceParams;
     use crate::membership::MembershipConfig;
     use crate::profile::GovernanceProfileId;
-    use crate::{GovernanceConfig, MembershipPolicy, DisputePolicy, FounderSignature};
+    use crate::{DisputePolicy, FounderSignature, GovernanceConfig, MembershipPolicy};
     use icn_identity::Did;
 
     fn test_governance_config() -> GovernanceConfig {
