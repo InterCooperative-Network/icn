@@ -139,6 +139,14 @@ enum Commands {
     #[command(subcommand)]
     Steward(StewardCommands),
 
+    /// Commons identity operations (Commons Evolution)
+    #[command(subcommand)]
+    Commons(CommonsCommands),
+
+    /// Charter operations (organizational founding documents)
+    #[command(subcommand)]
+    Charter(CharterCommands),
+
     /// Generate shell completions
     Completions {
         /// Shell type
@@ -1156,6 +1164,134 @@ enum StewardCommands {
     Topics,
 }
 
+#[derive(Subcommand, Debug)]
+enum CommonsCommands {
+    /// Show commons holder status for current identity
+    Status,
+
+    /// Begin enrollment as a Commons Holder
+    Enroll {
+        /// Gateway URL for enrollment
+        #[arg(short, long, default_value = "http://localhost:8080")]
+        gateway: String,
+
+        /// Cooperative/jurisdiction to enroll with
+        #[arg(short, long)]
+        coop_id: String,
+    },
+
+    /// Show PersonhoodAnchor details
+    Anchor {
+        /// DID to look up (defaults to current identity)
+        #[arg(short, long)]
+        did: Option<String>,
+    },
+
+    /// List affiliations for a commons holder
+    Affiliations {
+        /// DID to look up (defaults to current identity)
+        #[arg(short, long)]
+        did: Option<String>,
+    },
+
+    /// Request to join a jurisdiction
+    Join {
+        /// Jurisdiction ID (e.g., coop:mycoop, federation:pacific-nw)
+        #[arg(short, long)]
+        jurisdiction: String,
+
+        /// Gateway URL
+        #[arg(short, long, default_value = "http://localhost:8080")]
+        gateway: String,
+    },
+
+    /// Leave a jurisdiction
+    Leave {
+        /// Jurisdiction ID to leave
+        #[arg(short, long)]
+        jurisdiction: String,
+
+        /// Gateway URL
+        #[arg(short, long, default_value = "http://localhost:8080")]
+        gateway: String,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum CharterCommands {
+    /// Create a new organizational charter
+    Create {
+        /// Organization name
+        #[arg(short, long)]
+        name: String,
+
+        /// Organization type: cooperative, community, federation, or network
+        #[arg(short = 't', long, default_value = "cooperative")]
+        org_type: String,
+
+        /// Governance domain ID
+        #[arg(short, long)]
+        domain: String,
+
+        /// Mission statement
+        #[arg(short, long)]
+        mission: Option<String>,
+
+        /// Initial member DIDs (comma-separated)
+        #[arg(long)]
+        founders: Option<String>,
+
+        /// Output charter to file (JSON)
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+    },
+
+    /// Show charter details
+    Show {
+        /// Charter ID (hex)
+        charter_id: String,
+
+        /// Gateway URL
+        #[arg(short, long, default_value = "http://localhost:8080")]
+        gateway: String,
+    },
+
+    /// List charters
+    List {
+        /// Filter by organization type
+        #[arg(short = 't', long)]
+        org_type: Option<String>,
+
+        /// Filter by status (draft, ratified, suspended, dissolved)
+        #[arg(short, long)]
+        status: Option<String>,
+
+        /// Gateway URL
+        #[arg(short, long, default_value = "http://localhost:8080")]
+        gateway: String,
+    },
+
+    /// Sign a charter as a founder
+    Sign {
+        /// Charter ID (hex)
+        charter_id: String,
+
+        /// Gateway URL
+        #[arg(short, long, default_value = "http://localhost:8080")]
+        gateway: String,
+    },
+
+    /// Ratify a charter (requires sufficient founder signatures)
+    Ratify {
+        /// Charter ID (hex)
+        charter_id: String,
+
+        /// Gateway URL
+        #[arg(short, long, default_value = "http://localhost:8080")]
+        gateway: String,
+    },
+}
+
 fn get_data_dir(data_dir: Option<PathBuf>) -> Result<PathBuf> {
     if let Some(dir) = data_dir {
         Ok(dir)
@@ -1340,6 +1476,14 @@ async fn main() -> Result<()> {
 
         Commands::Steward(steward_cmd) => {
             handle_steward_command(steward_cmd, &data_dir, &args.endpoint).await?
+        }
+
+        Commands::Commons(commons_cmd) => {
+            handle_commons_command(commons_cmd, &data_dir, &args.endpoint).await?
+        }
+
+        Commands::Charter(charter_cmd) => {
+            handle_charter_command(charter_cmd, &data_dir, &args.endpoint).await?
         }
 
         Commands::Completions { shell } => {
@@ -6337,4 +6481,388 @@ fn print_default_steward_config() {
     println!("max_concurrent_enrollments: 100");
     println!("max_concurrent_recoveries:  50");
     println!("token_validity_secs:       604800 (7 days)");
+}
+
+// ========== Commons Commands (Commons Evolution) ==========
+
+async fn handle_commons_command(
+    cmd: CommonsCommands,
+    data_dir: &Path,
+    _endpoint: &str,
+) -> Result<()> {
+    match cmd {
+        CommonsCommands::Status => {
+            println!("Commons Holder Status");
+            println!("=====================\n");
+
+            let keystore_path = get_keystore_path(data_dir);
+            if !keystore_path.exists() {
+                println!("Status: NOT ENROLLED");
+                println!("\nYou are not yet a Commons Holder.");
+                println!("Run 'icnctl commons enroll' to begin the enrollment process.");
+                return Ok(());
+            }
+
+            // Get current identity
+            let passphrase = read_passphrase("Enter passphrase: ")?;
+            let mut keystore = AgeKeyStore::open(&keystore_path)?;
+            keystore.unlock(&passphrase)?;
+            let keypair = keystore.get_keypair()?;
+            let did = keypair.did();
+
+            println!("DID:        {did}");
+            println!("Status:     IDENTITY EXISTS");
+            println!("\nNote: Full Commons Holder status requires PersonhoodAnchor");
+            println!("verification through the SDIS enrollment process.");
+            println!("\nTo check your enrollment status:");
+            println!("  icnctl steward enrollment-status <ceremony_id>");
+        }
+
+        CommonsCommands::Enroll { gateway, coop_id } => {
+            println!("Commons Holder Enrollment");
+            println!("=========================\n");
+
+            let keystore_path = get_keystore_path(data_dir);
+            if !keystore_path.exists() {
+                bail!("No identity found. Run 'icnctl id init' first.");
+            }
+
+            // Get current identity
+            let passphrase = read_passphrase("Enter passphrase: ")?;
+            let mut keystore = AgeKeyStore::open(&keystore_path)?;
+            keystore.unlock(&passphrase)?;
+            let keypair = keystore.get_keypair()?;
+            let did = keypair.did();
+
+            println!("Your DID:   {did}");
+            println!("Gateway:    {gateway}");
+            println!("Coop ID:    {coop_id}");
+            println!();
+            println!("Enrollment Steps:");
+            println!("  1. Visit {gateway}/enroll/{coop_id}");
+            println!("  2. Present your DID QR code to a steward");
+            println!("  3. Complete proof-of-personhood verification");
+            println!("  4. Receive your PersonhoodAnchor attestation");
+            println!();
+            println!("Note: The enrollment process requires in-person or video");
+            println!("verification with a network steward.");
+            println!();
+            println!("Alternative: Use 'icnctl steward start-enrollment' for direct API access.");
+        }
+
+        CommonsCommands::Anchor { did } => {
+            println!("PersonhoodAnchor Details");
+            println!("========================\n");
+
+            let target_did = if let Some(d) = did {
+                d
+            } else {
+                // Get current identity
+                let keystore_path = get_keystore_path(data_dir);
+                if !keystore_path.exists() {
+                    bail!("No identity found. Run 'icnctl id init' first or provide --did.");
+                }
+
+                let passphrase = read_passphrase("Enter passphrase: ")?;
+                let mut keystore = AgeKeyStore::open(&keystore_path)?;
+                keystore.unlock(&passphrase)?;
+                keystore.get_keypair()?.did().to_string()
+            };
+
+            println!("DID: {target_did}");
+            println!();
+            println!("Note: PersonhoodAnchor lookup requires gateway integration.");
+            println!("This feature is pending gateway API implementation.");
+            println!();
+            println!("Expected fields when available:");
+            println!("  - Anchor ID");
+            println!("  - Status (Active/Suspended/Revoked)");
+            println!("  - POP Level (Weak/Strong/Verified)");
+            println!("  - Attestations");
+            println!("  - Key rotation history");
+        }
+
+        CommonsCommands::Affiliations { did } => {
+            println!("Commons Holder Affiliations");
+            println!("===========================\n");
+
+            let target_did = if let Some(d) = did {
+                d
+            } else {
+                // Get current identity
+                let keystore_path = get_keystore_path(data_dir);
+                if !keystore_path.exists() {
+                    bail!("No identity found. Run 'icnctl id init' first or provide --did.");
+                }
+
+                let passphrase = read_passphrase("Enter passphrase: ")?;
+                let mut keystore = AgeKeyStore::open(&keystore_path)?;
+                keystore.unlock(&passphrase)?;
+                keystore.get_keypair()?.did().to_string()
+            };
+
+            println!("DID: {target_did}");
+            println!();
+            println!("Note: Affiliation lookup requires gateway integration.");
+            println!("This feature is pending gateway API implementation.");
+            println!();
+            println!("Expected fields when available:");
+            println!("  - Jurisdiction ID");
+            println!("  - Membership status");
+            println!("  - Role/capabilities");
+            println!("  - Join date");
+        }
+
+        CommonsCommands::Join {
+            jurisdiction,
+            gateway,
+        } => {
+            println!("Join Jurisdiction");
+            println!("=================\n");
+
+            let keystore_path = get_keystore_path(data_dir);
+            if !keystore_path.exists() {
+                bail!("No identity found. Run 'icnctl id init' first.");
+            }
+
+            let passphrase = read_passphrase("Enter passphrase: ")?;
+            let mut keystore = AgeKeyStore::open(&keystore_path)?;
+            keystore.unlock(&passphrase)?;
+            let did = keystore.get_keypair()?.did().to_string();
+
+            println!("Your DID:     {did}");
+            println!("Jurisdiction: {jurisdiction}");
+            println!("Gateway:      {gateway}");
+            println!();
+            println!("Note: Join request requires gateway integration.");
+            println!("This feature is pending gateway API implementation.");
+            println!();
+            println!("The join process typically requires:");
+            println!("  1. Active PersonhoodAnchor");
+            println!("  2. Charter signature (for some jurisdictions)");
+            println!("  3. Membership fee payment (if applicable)");
+        }
+
+        CommonsCommands::Leave {
+            jurisdiction,
+            gateway,
+        } => {
+            println!("Leave Jurisdiction");
+            println!("==================\n");
+
+            let keystore_path = get_keystore_path(data_dir);
+            if !keystore_path.exists() {
+                bail!("No identity found. Run 'icnctl id init' first.");
+            }
+
+            let passphrase = read_passphrase("Enter passphrase: ")?;
+            let mut keystore = AgeKeyStore::open(&keystore_path)?;
+            keystore.unlock(&passphrase)?;
+            let did = keystore.get_keypair()?.did().to_string();
+
+            println!("Your DID:     {did}");
+            println!("Jurisdiction: {jurisdiction}");
+            println!("Gateway:      {gateway}");
+            println!();
+            println!("Note: Leave request requires gateway integration.");
+            println!("This feature is pending gateway API implementation.");
+            println!();
+            println!("Important: Leaving a jurisdiction:");
+            println!("  - Does NOT revoke your PersonhoodAnchor");
+            println!("  - May affect pending transactions");
+            println!("  - May require notice period");
+        }
+    }
+
+    Ok(())
+}
+
+// ========== Charter Commands (Organizational Founding Documents) ==========
+
+async fn handle_charter_command(
+    cmd: CharterCommands,
+    data_dir: &Path,
+    _endpoint: &str,
+) -> Result<()> {
+    match cmd {
+        CharterCommands::Create {
+            name,
+            org_type,
+            domain,
+            mission,
+            founders,
+            output,
+        } => {
+            use icn_governance::{Charter, GovernanceConfig, OrgType};
+
+            println!("Create Organizational Charter");
+            println!("=============================\n");
+
+            // Parse organization type
+            let org = match org_type.to_lowercase().as_str() {
+                "cooperative" | "coop" => OrgType::Cooperative,
+                "community" => OrgType::Community,
+                "federation" => OrgType::Federation,
+                "network" => OrgType::Federation, // Networks use federation structure
+                other => bail!("Unknown organization type: {other}. Use: cooperative, community, federation, or network"),
+            };
+
+            // Create governance config based on org type
+            let config = GovernanceConfig::cooperative_default();
+
+            // Create the charter based on org type
+            let mut charter = match org {
+                OrgType::Cooperative => Charter::cooperative(
+                    domain.clone(),
+                    name.clone(),
+                    config,
+                    "credits".to_string(), // Default currency
+                ),
+                OrgType::Community => Charter::community(domain.clone(), name.clone(), config),
+                OrgType::Federation => Charter::federation(
+                    domain.clone(),
+                    name.clone(),
+                    config,
+                    Vec::new(), // Empty initial member jurisdictions
+                ),
+            };
+
+            // Set description if provided
+            if let Some(m) = mission {
+                charter.description = Some(m);
+            }
+
+            // Add founders if provided
+            if let Some(founder_list) = founders {
+                let founder_dids: Vec<&str> = founder_list.split(',').map(|s| s.trim()).collect();
+                println!("Founders: {}", founder_dids.len());
+                for f in &founder_dids {
+                    println!("  - {f}");
+                }
+            }
+
+            println!();
+            println!("Charter Created:");
+            println!("  ID:       {}", charter.charter_id);
+            println!("  Name:     {}", charter.name);
+            println!("  Type:     {}", charter.org_type);
+            println!("  Domain:   {}", charter.domain_id);
+            println!("  Status:   {}", charter.status);
+            println!("  Created:  {}", charter.created_at);
+
+            // Output to file if requested
+            if let Some(path) = output {
+                let json = serde_json::to_string_pretty(&charter)?;
+                std::fs::write(&path, &json)?;
+                println!();
+                println!("Charter saved to: {}", path.display());
+            } else {
+                println!();
+                println!("Charter JSON:");
+                println!("{}", serde_json::to_string_pretty(&charter)?);
+            }
+
+            println!();
+            println!("Next steps:");
+            println!("  1. Share the charter with founders");
+            println!("  2. Collect founder signatures: icnctl charter sign <charter_id>");
+            println!("  3. Ratify the charter: icnctl charter ratify <charter_id>");
+        }
+
+        CharterCommands::Show { charter_id, gateway } => {
+            println!("Charter Details");
+            println!("===============\n");
+
+            println!("Charter ID: {charter_id}");
+            println!("Gateway:    {gateway}");
+            println!();
+            println!("Note: Charter lookup requires gateway integration.");
+            println!("This feature is pending gateway API implementation.");
+            println!();
+            println!("Expected fields when available:");
+            println!("  - Name and type");
+            println!("  - Preamble/mission");
+            println!("  - Governance configuration");
+            println!("  - Founder signatures");
+            println!("  - Ratification status");
+            println!("  - Amendment history");
+        }
+
+        CharterCommands::List {
+            org_type,
+            status,
+            gateway,
+        } => {
+            println!("List Charters");
+            println!("=============\n");
+
+            println!("Gateway: {gateway}");
+            if let Some(t) = org_type {
+                println!("Filter by type: {t}");
+            }
+            if let Some(s) = status {
+                println!("Filter by status: {s}");
+            }
+            println!();
+            println!("Note: Charter listing requires gateway integration.");
+            println!("This feature is pending gateway API implementation.");
+        }
+
+        CharterCommands::Sign { charter_id, gateway } => {
+            println!("Sign Charter");
+            println!("============\n");
+
+            let keystore_path = get_keystore_path(data_dir);
+            if !keystore_path.exists() {
+                bail!("No identity found. Run 'icnctl id init' first.");
+            }
+
+            let passphrase = read_passphrase("Enter passphrase: ")?;
+            let mut keystore = AgeKeyStore::open(&keystore_path)?;
+            keystore.unlock(&passphrase)?;
+            let keypair = keystore.get_keypair()?;
+            let did = keypair.did();
+
+            println!("Your DID:    {did}");
+            println!("Charter ID:  {charter_id}");
+            println!("Gateway:     {gateway}");
+            println!();
+            println!("Note: Charter signing requires gateway integration.");
+            println!("This feature is pending gateway API implementation.");
+            println!();
+            println!("The signing process will:");
+            println!("  1. Fetch the charter from the gateway");
+            println!("  2. Create a cryptographic signature");
+            println!("  3. Submit the FounderSignature to the gateway");
+        }
+
+        CharterCommands::Ratify { charter_id, gateway } => {
+            println!("Ratify Charter");
+            println!("==============\n");
+
+            println!("Charter ID: {charter_id}");
+            println!("Gateway:    {gateway}");
+            println!();
+            println!("Note: Charter ratification requires gateway integration.");
+            println!("This feature is pending gateway API implementation.");
+            println!();
+            println!("Ratification requirements:");
+            println!("  1. Sufficient founder signatures");
+            println!("  2. Governance quorum met");
+            println!("  3. No blocking objections");
+        }
+    }
+
+    Ok(())
+}
+
+/// Generate a QR code representation (ASCII art placeholder)
+#[allow(dead_code)]
+fn print_qr_placeholder(data: &str) {
+    println!("┌─────────────────────┐");
+    println!("│  [QR CODE WOULD BE  │");
+    println!("│   DISPLAYED HERE]   │");
+    println!("│                     │");
+    println!("│  Data: {:.12}...│", data);
+    println!("└─────────────────────┘");
 }
