@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Constitutional Governance (v0.6.0) (2025-12-14)
+
+**Amendment System** ([icn/crates/icn-governance/src/amendment.rs](icn/crates/icn-governance/src/amendment.rs)):
+- `Amendment` - Full amendment record with lifecycle (Draft → Submitted → UnderReview → Voting → Ratified/Rejected/Withdrawn/Expired)
+- `AmendmentType` - Charter, Constitutional, Policy, Economic, Governance amendment types
+- `AmendmentScope` - Jurisdiction, Federation, or Network scope determines ratification requirements
+- `RatificationRequirements` - Configurable quorum, approval threshold, voting period, review period, and min jurisdictions/federations
+- `Ratification` - Individual ratification votes with ratifier type (CommonsHolder, Jurisdiction, Federation)
+- `AmendmentChange` - Structured changes targeting GovernanceRules, MembershipPolicy, EconomicPolicy, etc.
+- 17 unit tests covering amendment lifecycle and ratification
+
+**Appeal System** ([icn/crates/icn-governance/src/appeal.rs](icn/crates/icn-governance/src/appeal.rs)):
+- `Appeal` - Full appeal record with lifecycle (Filed → UnderReview → Hearing → Resolved/Dismissed/Withdrawn)
+- `AppealType` - Revocation, Suspension, GovernanceDecision, DisputeResolution, MembershipDenial, StewardAction appeals
+- `AppealScope` - Jurisdiction, Federation, or Network scope determines appeal body
+- `AppealGrounds` - ProceduralError, NewEvidence, ExceededAuthority, RightsViolation, FactualError, Bias, DisproportionatePenalty
+- `AppealOutcome` - Upheld, Denied, PartiallyUpheld, Remanded with remedy specification
+- `AppealRemedy` - Reverse, Reinstate, Modify, Compensation, Custom, None
+- `AppealEvidence` - Evidence attachment with type (Document, Transaction, Communication, WitnessStatement, ExpertOpinion, Technical)
+- `AppealDeadlines` - Configurable filing window, review period, hearing period, max duration
+- 18 unit tests covering appeal lifecycle and outcomes
+
+**Gateway Constitutional API** ([icn/crates/icn-gateway/src/api/constitutional/mod.rs](icn/crates/icn-gateway/src/api/constitutional/mod.rs)):
+Amendment Endpoints:
+- `POST /v1/constitutional/amendments` - Create amendment
+- `GET /v1/constitutional/amendments` - List amendments with filters (status, scope, type)
+- `GET /v1/constitutional/amendments/{id}` - Get amendment by ID
+- `POST /v1/constitutional/amendments/{id}/submit` - Submit for review
+- `POST /v1/constitutional/amendments/{id}/vote` - Open voting period
+- `POST /v1/constitutional/amendments/{id}/ratify` - Add ratification vote
+- `POST /v1/constitutional/amendments/{id}/withdraw` - Withdraw amendment
+
+Appeal Endpoints:
+- `POST /v1/constitutional/appeals` - File appeal
+- `GET /v1/constitutional/appeals` - List appeals with filters (status, scope, appellant)
+- `GET /v1/constitutional/appeals/{id}` - Get appeal by ID
+- `POST /v1/constitutional/appeals/{id}/evidence` - Add evidence
+- `POST /v1/constitutional/appeals/{id}/respond` - Add response
+- `POST /v1/constitutional/appeals/{id}/review` - Begin review
+- `POST /v1/constitutional/appeals/{id}/resolve` - Resolve appeal with outcome
+- `POST /v1/constitutional/appeals/{id}/withdraw` - Withdraw appeal
+
+**CommonsManager Extensions** ([icn/crates/icn-gateway/src/commons_mgr.rs](icn/crates/icn-gateway/src/commons_mgr.rs)):
+- Amendment storage and CRUD operations
+- Amendment lifecycle management (submit, open voting, ratify, withdraw)
+- Appeal storage and CRUD operations
+- Appeal lifecycle management (add evidence, add response, begin review, resolve, withdraw)
+
 ### Added - Membership & Rights (v0.5.0) (2025-12-14)
 
 **RevocationRecord & Registry** ([icn/crates/icn-identity/src/revocation.rs](icn/crates/icn-identity/src/revocation.rs), [revocation_store.rs](icn/crates/icn-identity/src/revocation_store.rs)):

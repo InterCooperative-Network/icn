@@ -34,6 +34,18 @@
 - Ban/revoke with appeal process and due process support
 - Rights enforcement through revocation checks before actions
 
+**v0.6.0 Constitutional Governance - COMPLETE**:
+- Amendment types (Charter, Constitutional, Policy, Economic, Governance)
+- Amendment lifecycle: Draft → Submitted → UnderReview → Voting → Ratified/Rejected
+- Multi-level ratification: jurisdiction, federation, and network scopes
+- Ratification requirements with quorum, approval threshold, and jurisdiction/federation minimums
+- Appeal types (Revocation, Suspension, GovernanceDecision, DisputeResolution, MembershipDenial, StewardAction)
+- Appeal lifecycle: Filed → UnderReview → Hearing → Resolved/Dismissed/Withdrawn
+- Appeal outcomes: Upheld, Denied, PartiallyUpheld, Remanded with remedies
+- Gateway REST API (`/v1/constitutional/*`) with 15 endpoints
+- Evidence and response management for appeals
+- 140 governance tests + 195 gateway tests passing
+
 ---
 
 ## Abstract
@@ -783,7 +795,7 @@ contract CommonsGovernance {
 | **v0.3.0** | Commons Foundation | **COMPLETE** | PersonhoodAnchor, CommonsHolderRecord, Charter structs; Gateway APIs; SDIS integration; CLI commands |
 | **v0.4.0** | Stewardship | **COMPLETE** | StewardRecord, POP attestation workflow, steward governance, reputation tracking, bond/term management |
 | **v0.5.0** | Membership & Rights | **COMPLETE** | RevocationRecord/Registry, 15 membership API endpoints, full lifecycle management, capability/role system |
-| **v0.6.0** | Constitutional Governance | Planned | Amendment process, multi-level ratification, appeal mechanisms |
+| **v0.6.0** | Constitutional Governance | **COMPLETE** | Amendment types/lifecycle, multi-level ratification, appeal mechanisms, 15 API endpoints |
 | **v1.0.0** | Production Commons | Planned | Full steward network, multiple POP pathways, complete economic layer |
 
 ---

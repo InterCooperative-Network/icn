@@ -4,6 +4,7 @@ pub mod auth;
 pub mod charter;
 pub mod commons;
 pub mod compute;
+pub mod constitutional;
 pub mod coops;
 pub mod federation;
 pub mod governance;

@@ -24,6 +24,8 @@
 //! );
 //! ```
 
+pub mod amendment;
+pub mod appeal;
 pub mod charter;
 pub mod charter_store;
 pub mod config;
@@ -41,6 +43,15 @@ pub mod store;
 pub mod tally;
 pub mod vote;
 
+pub use amendment::{
+    Amendment, AmendmentChange, AmendmentId, AmendmentScope, AmendmentStatus, AmendmentType,
+    ChangeTarget, ChangeType, Ratification, RatificationRequirements, RatificationResult,
+    RatifierType,
+};
+pub use appeal::{
+    Appeal, AppealDeadlines, AppealEvidence, AppealGrounds, AppealId, AppealOutcome, AppealRemedy,
+    AppealResponse, AppealScope, AppealStatus, AppealType, EvidenceType, ResponseType,
+};
 pub use charter::{
     AmendmentRef, ArbitratorSelection, Charter, CharterId, CharterStatus, ContributionRouting,
     DisputePolicy, EconomicPolicy, FeePeriod, FounderSignature, MembershipFee, MembershipPolicy,

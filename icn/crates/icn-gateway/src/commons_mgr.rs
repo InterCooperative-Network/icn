@@ -7,7 +7,10 @@
 //! - Affiliation/membership management
 
 use anyhow::{bail, Result};
-use icn_governance::{Charter, CharterStatus, OrgType, StewardRecord};
+use icn_governance::{
+    Amendment, AmendmentId, AmendmentStatus, Appeal, AppealEvidence, AppealId, AppealOutcome,
+    AppealResponse, Charter, CharterStatus, OrgType, Ratification, StewardRecord,
+};
 use icn_identity::{
     Affiliation, Anchor, AnchorStatus, CommonsHolderRecord, CommonsRevocationReason, Did,
     EnrollmentPathway, HolderStatus, JurisdictionId, MembershipCapability, MembershipStatus,
@@ -44,6 +47,12 @@ pub struct CommonsManager {
 
     // Revocation registry
     revocations: RevocationRegistry,
+
+    // Amendments (by amendment_id hex)
+    amendments: RwLock<HashMap<String, Amendment>>,
+
+    // Appeals (by appeal_id hex)
+    appeals: RwLock<HashMap<String, Appeal>>,
 }
 
 impl CommonsManager {
@@ -60,6 +69,8 @@ impl CommonsManager {
             stewards: RwLock::new(HashMap::new()),
             stewards_by_did: RwLock::new(HashMap::new()),
             revocations: RevocationRegistry::new(),
+            amendments: RwLock::new(HashMap::new()),
+            appeals: RwLock::new(HashMap::new()),
         }
     }
 
@@ -1434,6 +1445,274 @@ impl CommonsManager {
         }
 
         results
+    }
+
+    // ========== Amendment Operations (v0.6.0 Constitutional Governance) ==========
+
+    /// Store an amendment
+    pub async fn store_amendment(&self, amendment: Amendment) -> Result<()> {
+        let id = amendment.id.to_hex();
+        self.amendments.write().unwrap().insert(id, amendment);
+        Ok(())
+    }
+
+    /// Get an amendment by ID
+    pub async fn get_amendment(&self, id: &AmendmentId) -> Result<Option<Amendment>> {
+        let id_hex = id.to_hex();
+        Ok(self.amendments.read().unwrap().get(&id_hex).cloned())
+    }
+
+    /// List amendments with optional filters
+    pub async fn list_amendments(
+        &self,
+        status: Option<&str>,
+        scope: Option<&str>,
+        amendment_type: Option<&str>,
+    ) -> Result<Vec<Amendment>> {
+        let amendments = self.amendments.read().unwrap();
+        let mut results: Vec<Amendment> = amendments.values().cloned().collect();
+
+        // Filter by status
+        if let Some(s) = status {
+            let s_lower = s.to_lowercase();
+            results.retain(|a| format!("{:?}", a.status).to_lowercase().contains(&s_lower));
+        }
+
+        // Filter by scope
+        if let Some(s) = scope {
+            let s_lower = s.to_lowercase();
+            results.retain(|a| format!("{}", a.scope).to_lowercase().contains(&s_lower));
+        }
+
+        // Filter by type
+        if let Some(t) = amendment_type {
+            let t_lower = t.to_lowercase();
+            results.retain(|a| format!("{}", a.amendment_type).to_lowercase().contains(&t_lower));
+        }
+
+        // Sort by created_at descending
+        results.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+
+        Ok(results)
+    }
+
+    /// Submit an amendment for review
+    pub async fn submit_amendment(
+        &self,
+        id: &AmendmentId,
+        caller: &Did,
+    ) -> Result<Amendment> {
+        let id_hex = id.to_hex();
+        let mut amendments = self.amendments.write().unwrap();
+        let amendment = amendments
+            .get_mut(&id_hex)
+            .ok_or_else(|| anyhow::anyhow!("Amendment not found"))?;
+
+        // Only proposer can submit
+        if amendment.proposer != *caller {
+            bail!("Only proposer can submit amendment");
+        }
+
+        amendment.submit().map_err(|e| anyhow::anyhow!(e))?;
+        Ok(amendment.clone())
+    }
+
+    /// Open voting on an amendment (skipping review for simple cases)
+    pub async fn open_amendment_voting(
+        &self,
+        id: &AmendmentId,
+        _caller: &Did,
+    ) -> Result<Amendment> {
+        let id_hex = id.to_hex();
+        let mut amendments = self.amendments.write().unwrap();
+        let amendment = amendments
+            .get_mut(&id_hex)
+            .ok_or_else(|| anyhow::anyhow!("Amendment not found"))?;
+
+        // If still in submitted state, begin review first (auto-skip if review_period is 0)
+        if matches!(amendment.status, AmendmentStatus::Submitted { .. }) {
+            amendment.begin_review().map_err(|e| anyhow::anyhow!(e))?;
+        }
+
+        amendment.open_voting().map_err(|e| anyhow::anyhow!(e))?;
+        Ok(amendment.clone())
+    }
+
+    /// Add a ratification to an amendment
+    pub async fn add_amendment_ratification(
+        &self,
+        id: &AmendmentId,
+        ratification: Ratification,
+    ) -> Result<Amendment> {
+        let id_hex = id.to_hex();
+        let mut amendments = self.amendments.write().unwrap();
+        let amendment = amendments
+            .get_mut(&id_hex)
+            .ok_or_else(|| anyhow::anyhow!("Amendment not found"))?;
+
+        amendment
+            .add_ratification(ratification)
+            .map_err(|e| anyhow::anyhow!(e))?;
+
+        // Check if ratification requirements are now met
+        let result = amendment.check_ratification();
+        if matches!(result, icn_governance::RatificationResult::Approved { .. }) {
+            let _ = amendment.ratify();
+        }
+
+        Ok(amendment.clone())
+    }
+
+    /// Withdraw an amendment
+    pub async fn withdraw_amendment(
+        &self,
+        id: &AmendmentId,
+        caller: &Did,
+        reason: String,
+    ) -> Result<Amendment> {
+        let id_hex = id.to_hex();
+        let mut amendments = self.amendments.write().unwrap();
+        let amendment = amendments
+            .get_mut(&id_hex)
+            .ok_or_else(|| anyhow::anyhow!("Amendment not found"))?;
+
+        // Only proposer can withdraw
+        if amendment.proposer != *caller {
+            bail!("Only proposer can withdraw amendment");
+        }
+
+        amendment.withdraw(reason).map_err(|e| anyhow::anyhow!(e))?;
+        Ok(amendment.clone())
+    }
+
+    // ========== Appeal Operations (v0.6.0 Constitutional Governance) ==========
+
+    /// Store an appeal
+    pub async fn store_appeal(&self, appeal: Appeal) -> Result<()> {
+        let id = appeal.id.to_hex();
+        self.appeals.write().unwrap().insert(id, appeal);
+        Ok(())
+    }
+
+    /// Get an appeal by ID
+    pub async fn get_appeal(&self, id: &AppealId) -> Result<Option<Appeal>> {
+        let id_hex = id.to_hex();
+        Ok(self.appeals.read().unwrap().get(&id_hex).cloned())
+    }
+
+    /// List appeals with optional filters
+    pub async fn list_appeals(
+        &self,
+        status: Option<&str>,
+        scope: Option<&str>,
+        appellant: Option<&str>,
+    ) -> Result<Vec<Appeal>> {
+        let appeals = self.appeals.read().unwrap();
+        let mut results: Vec<Appeal> = appeals.values().cloned().collect();
+
+        // Filter by status
+        if let Some(s) = status {
+            let s_lower = s.to_lowercase();
+            results.retain(|a| format!("{:?}", a.status).to_lowercase().contains(&s_lower));
+        }
+
+        // Filter by scope
+        if let Some(s) = scope {
+            let s_lower = s.to_lowercase();
+            results.retain(|a| format!("{}", a.scope).to_lowercase().contains(&s_lower));
+        }
+
+        // Filter by appellant
+        if let Some(a) = appellant {
+            results.retain(|appeal| appeal.appellant.to_string() == a);
+        }
+
+        // Sort by created_at descending
+        results.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+
+        Ok(results)
+    }
+
+    /// Add evidence to an appeal
+    pub async fn add_appeal_evidence(
+        &self,
+        id: &AppealId,
+        evidence: AppealEvidence,
+    ) -> Result<Appeal> {
+        let id_hex = id.to_hex();
+        let mut appeals = self.appeals.write().unwrap();
+        let appeal = appeals
+            .get_mut(&id_hex)
+            .ok_or_else(|| anyhow::anyhow!("Appeal not found"))?;
+
+        appeal.add_evidence(evidence).map_err(|e| anyhow::anyhow!(e))?;
+        Ok(appeal.clone())
+    }
+
+    /// Add response to an appeal
+    pub async fn add_appeal_response(
+        &self,
+        id: &AppealId,
+        response: AppealResponse,
+    ) -> Result<Appeal> {
+        let id_hex = id.to_hex();
+        let mut appeals = self.appeals.write().unwrap();
+        let appeal = appeals
+            .get_mut(&id_hex)
+            .ok_or_else(|| anyhow::anyhow!("Appeal not found"))?;
+
+        appeal.add_response(response).map_err(|e| anyhow::anyhow!(e))?;
+        Ok(appeal.clone())
+    }
+
+    /// Begin review of an appeal
+    pub async fn begin_appeal_review(&self, id: &AppealId) -> Result<Appeal> {
+        let id_hex = id.to_hex();
+        let mut appeals = self.appeals.write().unwrap();
+        let appeal = appeals
+            .get_mut(&id_hex)
+            .ok_or_else(|| anyhow::anyhow!("Appeal not found"))?;
+
+        appeal.begin_review().map_err(|e| anyhow::anyhow!(e))?;
+        Ok(appeal.clone())
+    }
+
+    /// Resolve a constitutional appeal with outcome
+    pub async fn resolve_constitutional_appeal(
+        &self,
+        id: &AppealId,
+        outcome: AppealOutcome,
+    ) -> Result<Appeal> {
+        let id_hex = id.to_hex();
+        let mut appeals = self.appeals.write().unwrap();
+        let appeal = appeals
+            .get_mut(&id_hex)
+            .ok_or_else(|| anyhow::anyhow!("Appeal not found"))?;
+
+        appeal.resolve(outcome).map_err(|e| anyhow::anyhow!(e))?;
+        Ok(appeal.clone())
+    }
+
+    /// Withdraw an appeal
+    pub async fn withdraw_appeal(
+        &self,
+        id: &AppealId,
+        caller: &Did,
+        reason: Option<String>,
+    ) -> Result<Appeal> {
+        let id_hex = id.to_hex();
+        let mut appeals = self.appeals.write().unwrap();
+        let appeal = appeals
+            .get_mut(&id_hex)
+            .ok_or_else(|| anyhow::anyhow!("Appeal not found"))?;
+
+        // Only appellant can withdraw
+        if appeal.appellant != *caller {
+            bail!("Only appellant can withdraw appeal");
+        }
+
+        appeal.withdraw(reason).map_err(|e| anyhow::anyhow!(e))?;
+        Ok(appeal.clone())
     }
 }
 

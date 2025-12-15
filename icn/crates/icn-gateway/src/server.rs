@@ -425,6 +425,15 @@ impl GatewayServer {
                                     crate::rate_limit::rate_limit_middleware,
                                 ))
                                 .wrap(auth.clone()),
+                        )
+                        // Constitutional governance endpoints (auth + rate limiting)
+                        .service(
+                            web::scope("/constitutional")
+                                .configure(api::constitutional::configure)
+                                .wrap(middleware::from_fn(
+                                    crate::rate_limit::rate_limit_middleware,
+                                ))
+                                .wrap(auth.clone()),
                         ),
                 )
                 // Static files and root route
