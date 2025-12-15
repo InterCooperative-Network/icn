@@ -386,35 +386,37 @@ Central coordinator in `icn-gateway/src/commons_mgr.rs` providing:
 
 ## Next Steps: Prioritized Roadmap
 
-### Immediate (v0.7.x) - Integration & Testing
+### Immediate (v0.7.x) - Integration & Testing ✅ COMPLETE
 
-**1. CLI Commands for Constitutional Governance**
-- Wire `icnctl amendment propose/list/vote/ratify` commands
-- Wire `icnctl appeal file/list/respond/resolve` commands
-- Add interactive prompts for complex operations
-- Files: `icnctl/src/main.rs`, new `icnctl/src/constitutional.rs`
+**1. CLI Commands for Constitutional Governance** ✅
+- ✅ `icnctl amendment propose/list/vote/ratify` commands wired
+- ✅ `icnctl appeal file/list/respond/resolve` commands wired
+- ✅ Gateway authentication fixed (`get_gateway_token` uses correct endpoints)
+- Files: `icnctl/src/main.rs`
 
-**2. Integration Tests**
-- End-to-end enrollment → anchor → holder flow
-- Charter creation → signing → ratification flow
-- Amendment proposal → voting → ratification flow
-- Appeal filing → review → resolution flow
-- Multi-node steward attestation scenarios
-- Files: `icn-core/tests/commons_integration.rs`
+**2. Integration Tests** ✅
+- ✅ End-to-end enrollment → anchor → holder flow
+- ✅ Charter creation → activation flow
+- ✅ Membership lifecycle (Candidate → Provisional → Member → Suspended → Exited)
+- ✅ E2E coop formation test
+- Files: `icn-gateway/tests/governance_flows_integration.rs`
 
-**3. SDIS-Commons Bridge Completion**
-- Ensure `complete_enrollment` creates PersonhoodAnchor + CommonsHolderRecord
-- Add enrollment QR codes that include anchor_id
-- Update mobile SDK to handle anchor_id in responses
+**3. SDIS-Commons Bridge Completion** ✅
+- ✅ `complete_enrollment` creates PersonhoodAnchor + CommonsHolderRecord
+- ✅ Auto-affiliation with enrollment coop_id
+- ✅ Auto-approve to Provisional if steward vouched
+- ✅ Response includes `coop_id` and `membership_status`
 - Files: `icn-gateway/src/api/sdis/simple_enrollment.rs`
 
 ### Near-term (v0.8.x) - Production Readiness
 
-**4. Persistent Storage Migration**
-- Move CommonsManager from in-memory to Sled backend
-- Implement proper indexes for efficient queries
-- Add migration tooling for existing data
-- Files: `icn-gateway/src/commons_mgr.rs`, `icn-store/src/commons/`
+**4. Persistent Storage Migration** ✅
+- ✅ `CommonsStoreBackend` trait with pluggable backends
+- ✅ `InMemoryCommonsStore` for development/testing
+- ✅ `SledCommonsStore` for production (feature: `sled-storage`)
+- ✅ LRU caching for all entity types
+- ✅ Proper indexes (by_did, by_anchor, by_domain)
+- Files: `icn-gateway/src/commons_store.rs`, `icn-gateway/src/commons_mgr.rs`
 
 **5. Production Hardening**
 - Rate limiting per endpoint category
