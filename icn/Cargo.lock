@@ -2700,6 +2700,8 @@ dependencies = [
  "serde_bytes",
  "serde_json",
  "sha2",
+ "sled",
+ "tempfile",
  "thiserror 1.0.69",
  "tokio",
  "tracing",

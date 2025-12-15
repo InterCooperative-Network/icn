@@ -47,6 +47,33 @@ impl CommonsManager<InMemoryCommonsStore> {
     }
 }
 
+#[cfg(feature = "sled-storage")]
+use crate::commons_store::SledCommonsStore;
+
+#[cfg(feature = "sled-storage")]
+impl CommonsManager<SledCommonsStore> {
+    /// Create a new commons manager with persistent Sled storage
+    ///
+    /// Data will persist across gateway restarts at the given path.
+    pub fn with_sled_path(path: impl AsRef<std::path::Path>) -> Result<Self> {
+        let backend = Arc::new(SledCommonsStore::open(path)?);
+        Ok(Self::with_store(backend))
+    }
+
+    /// Create a new commons manager with a temporary Sled database
+    ///
+    /// Useful for testing persistent storage behavior without leaving files.
+    pub fn with_sled_temporary() -> Result<Self> {
+        let backend = Arc::new(SledCommonsStore::temporary()?);
+        Ok(Self::with_store(backend))
+    }
+
+    /// Flush all pending writes to disk
+    pub fn flush(&self) -> Result<()> {
+        self.store.backend().flush()
+    }
+}
+
 impl<S: CommonsStoreBackend> CommonsManager<S> {
     /// Create a new commons manager with a custom store backend
     pub fn with_store(backend: Arc<S>) -> Self {

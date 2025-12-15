@@ -130,6 +130,73 @@ impl CommonsStoreBackend for InMemoryCommonsStore {
 }
 
 // ============================================================================
+// Sled Implementation (Feature-gated)
+// ============================================================================
+
+/// Sled-based persistent store implementation
+///
+/// Enable with the `sled-storage` feature flag.
+#[cfg(feature = "sled-storage")]
+pub struct SledCommonsStore {
+    db: sled::Db,
+}
+
+#[cfg(feature = "sled-storage")]
+impl SledCommonsStore {
+    /// Open a persistent Sled database at the given path
+    pub fn open(path: impl AsRef<std::path::Path>) -> Result<Self> {
+        let db = sled::open(path).context("Failed to open Sled database")?;
+        Ok(SledCommonsStore { db })
+    }
+
+    /// Create a temporary Sled database (deleted on drop)
+    pub fn temporary() -> Result<Self> {
+        let db = sled::Config::new()
+            .temporary(true)
+            .open()
+            .context("Failed to create temporary Sled database")?;
+        Ok(SledCommonsStore { db })
+    }
+
+    /// Flush all pending writes to disk
+    pub fn flush(&self) -> Result<()> {
+        self.db.flush().context("Failed to flush Sled database")?;
+        Ok(())
+    }
+
+    /// Get approximate database size in bytes
+    pub fn size_on_disk(&self) -> Result<u64> {
+        Ok(self.db.size_on_disk().unwrap_or(0))
+    }
+}
+
+#[cfg(feature = "sled-storage")]
+impl CommonsStoreBackend for SledCommonsStore {
+    fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
+        Ok(self.db.get(key)?.map(|v| v.to_vec()))
+    }
+
+    fn put(&self, key: &[u8], value: &[u8]) -> Result<()> {
+        self.db.insert(key, value)?;
+        Ok(())
+    }
+
+    fn delete(&self, key: &[u8]) -> Result<()> {
+        self.db.remove(key)?;
+        Ok(())
+    }
+
+    fn scan(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
+        let mut results = Vec::new();
+        for item in self.db.scan_prefix(prefix) {
+            let (k, v) = item?;
+            results.push((k.to_vec(), v.to_vec()));
+        }
+        Ok(results)
+    }
+}
+
+// ============================================================================
 // Commons Store (High-Level Interface)
 // ============================================================================
 
@@ -883,5 +950,188 @@ mod tests {
         // Now should be gone
         let gone = store.get_charter(&id).unwrap();
         assert!(gone.is_none());
+    }
+
+    // ========================================================================
+    // Sled Backend Tests (feature-gated)
+    // ========================================================================
+
+    #[cfg(feature = "sled-storage")]
+    mod sled_tests {
+        use super::*;
+        use crate::commons_store::SledCommonsStore;
+
+        fn create_sled_store() -> CommonsStore<SledCommonsStore> {
+            let backend = Arc::new(SledCommonsStore::temporary().unwrap());
+            CommonsStore::new(backend)
+        }
+
+        #[test]
+        fn test_sled_backend_basic() {
+            let backend = SledCommonsStore::temporary().unwrap();
+
+            // Put and get
+            backend.put(b"key1", b"value1").unwrap();
+            let value = backend.get(b"key1").unwrap();
+            assert_eq!(value, Some(b"value1".to_vec()));
+
+            // Delete
+            backend.delete(b"key1").unwrap();
+            let value = backend.get(b"key1").unwrap();
+            assert!(value.is_none());
+
+            // Scan
+            backend.put(b"prefix/a", b"1").unwrap();
+            backend.put(b"prefix/b", b"2").unwrap();
+            backend.put(b"other/c", b"3").unwrap();
+
+            let results = backend.scan(b"prefix/").unwrap();
+            assert_eq!(results.len(), 2);
+        }
+
+        #[test]
+        fn test_sled_holder_operations() {
+            use icn_identity::{CommonsHolderRecord, CommonsRights, HolderStatus, POPLevel};
+
+            let store = create_sled_store();
+            let keypair = KeyPair::generate().unwrap();
+            let did = keypair.did().clone();
+
+            let holder = CommonsHolderRecord {
+                holder_id: [1u8; 32],
+                anchor_id: [2u8; 32],
+                holder_did: did.clone(),
+                status: HolderStatus::Active,
+                personhood_level: POPLevel::Strong,
+                affiliations: Vec::new(),
+                baseline_rights: CommonsRights::default(),
+                created_at: 12345,
+                last_review_at: None,
+                updated_at: 12345,
+            };
+
+            // Store
+            store.put_holder(&holder).unwrap();
+
+            // Get by ID
+            let id = hex::encode(holder.id());
+            let retrieved = store.get_holder(&id).unwrap().unwrap();
+            assert_eq!(retrieved.id(), holder.id());
+
+            // Get by DID
+            let by_did = store.get_holder_by_did(&did.to_string()).unwrap().unwrap();
+            assert_eq!(by_did.id(), holder.id());
+
+            // Get by anchor
+            let anchor_id = hex::encode(holder.anchor_id);
+            let by_anchor = store.get_holder_by_anchor(&anchor_id).unwrap().unwrap();
+            assert_eq!(by_anchor.id(), holder.id());
+
+            // List
+            let holders = store.list_holders().unwrap();
+            assert_eq!(holders.len(), 1);
+
+            // Delete
+            let deleted = store.delete_holder(&id).unwrap();
+            assert!(deleted);
+            assert!(store.get_holder(&id).unwrap().is_none());
+        }
+
+        #[test]
+        fn test_sled_charter_operations() {
+            use icn_governance::{DisputePolicy, GovernanceConfig, MembershipPolicy, OrgType};
+
+            let store = create_sled_store();
+
+            let charter = Charter::new(
+                OrgType::Cooperative,
+                "sled-test-coop".to_string(),
+                "Sled Test Cooperative".to_string(),
+                GovernanceConfig::cooperative_default(),
+                MembershipPolicy::default(),
+                DisputePolicy::default(),
+            );
+
+            let id = charter.charter_id.to_hex();
+            let domain = &charter.domain_id;
+
+            // Store
+            store.put_charter(&charter).unwrap();
+
+            // Get by ID
+            let retrieved = store.get_charter(&id).unwrap().unwrap();
+            assert_eq!(retrieved.name, "Sled Test Cooperative");
+
+            // Get by domain
+            let by_domain = store.get_charter_by_domain(domain).unwrap().unwrap();
+            assert_eq!(by_domain.charter_id.to_hex(), id);
+
+            // List
+            let charters = store.list_charters().unwrap();
+            assert_eq!(charters.len(), 1);
+        }
+
+        #[test]
+        fn test_sled_persistence() {
+            use icn_governance::{DisputePolicy, GovernanceConfig, MembershipPolicy, OrgType};
+            use std::path::PathBuf;
+            use tempfile::tempdir;
+
+            // Create a temporary directory for the database
+            let temp_dir = tempdir().unwrap();
+            let db_path: PathBuf = temp_dir.path().join("commons_test.db");
+
+            let charter_id: String;
+            let charter_name = "Persistent Coop";
+
+            // First: Create database and store data
+            {
+                let backend = Arc::new(SledCommonsStore::open(&db_path).unwrap());
+                let store = CommonsStore::new(backend.clone());
+
+                let charter = Charter::new(
+                    OrgType::Cooperative,
+                    "persistent-coop".to_string(),
+                    charter_name.to_string(),
+                    GovernanceConfig::cooperative_default(),
+                    MembershipPolicy::default(),
+                    DisputePolicy::default(),
+                );
+                charter_id = charter.charter_id.to_hex();
+
+                store.put_charter(&charter).unwrap();
+
+                // Explicitly flush
+                backend.flush().unwrap();
+            } // Store and backend dropped here
+
+            // Second: Reopen database and verify data persisted
+            {
+                let backend = Arc::new(SledCommonsStore::open(&db_path).unwrap());
+                let store = CommonsStore::new(backend);
+
+                let retrieved = store.get_charter(&charter_id).unwrap();
+                assert!(retrieved.is_some(), "Charter should persist across restarts");
+                assert_eq!(retrieved.unwrap().name, charter_name);
+            }
+        }
+
+        #[test]
+        fn test_sled_size_on_disk() {
+            let backend = SledCommonsStore::temporary().unwrap();
+
+            // Add some data
+            for i in 0..100 {
+                let key = format!("key_{}", i);
+                let value = format!("value_{}", i);
+                backend.put(key.as_bytes(), value.as_bytes()).unwrap();
+            }
+
+            backend.flush().unwrap();
+
+            // Should report some size
+            let size = backend.size_on_disk().unwrap();
+            assert!(size > 0, "Database should have non-zero size after writes");
+        }
     }
 }
