@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tracing::{debug, error, info, warn};
 
+use crate::email_client::{EmailClient, EmailResult, EmailTemplates, SmtpConfig};
 use crate::fcm_client::{create_notification_message, FcmClient, FcmConfig, FcmResult};
 use crate::notification_queue::{
     calculate_backoff, DeliveryStatus, NotificationChannel, NotificationPriority,
@@ -24,6 +25,10 @@ pub struct ProcessorConfig {
     pub fcm_config: Option<FcmConfig>,
     /// SMTP configuration for email
     pub smtp_config: Option<SmtpConfig>,
+    /// Base URL for email links (e.g., "https://mycoop.org")
+    pub email_base_url: String,
+    /// Cooperative name for email branding
+    pub email_coop_name: String,
     /// Maximum concurrent deliveries per channel
     pub max_concurrent: usize,
     /// Whether to enable push notifications
@@ -39,31 +44,14 @@ impl Default for ProcessorConfig {
         Self {
             fcm_config: None,
             smtp_config: None,
+            email_base_url: "https://localhost".to_string(),
+            email_coop_name: "ICN Cooperative".to_string(),
             max_concurrent: 10,
             enable_push: true,
             enable_email: true,
             enable_in_app: true,
         }
     }
-}
-
-/// SMTP configuration for email delivery
-#[derive(Debug, Clone)]
-pub struct SmtpConfig {
-    /// SMTP server host
-    pub host: String,
-    /// SMTP server port
-    pub port: u16,
-    /// Username for authentication
-    pub username: String,
-    /// Password for authentication
-    pub password: String,
-    /// Sender email address
-    pub from_address: String,
-    /// Sender name
-    pub from_name: String,
-    /// Use TLS
-    pub use_tls: bool,
 }
 
 /// In-app notification storage
@@ -101,6 +89,10 @@ pub struct NotificationProcessor {
     notification_service: Arc<NotificationService>,
     /// FCM client for push notifications (optional)
     fcm_client: Option<Arc<FcmClient>>,
+    /// Email client for email notifications (optional)
+    email_client: Option<Arc<EmailClient>>,
+    /// Email templates
+    email_templates: EmailTemplates,
     /// In-app notification storage (recipient -> notifications)
     in_app_store: Arc<DashMap<String, Vec<InAppNotification>>>,
     /// Processor configuration
@@ -120,10 +112,24 @@ impl NotificationProcessor {
             Arc::new(FcmClient::new(fcm_config.clone()))
         });
 
+        // Create email client if SMTP config is provided
+        let email_client = config.smtp_config.as_ref().map(|smtp_config| {
+            info!("Email client initialized for SMTP: {}", smtp_config.host);
+            Arc::new(EmailClient::new(smtp_config.clone()))
+        });
+
+        // Create email templates
+        let email_templates = EmailTemplates::new(
+            config.email_base_url.clone(),
+            config.email_coop_name.clone(),
+        );
+
         Self {
             queue,
             notification_service,
             fcm_client,
+            email_client,
+            email_templates,
             in_app_store: Arc::new(DashMap::new()),
             config,
         }
@@ -349,28 +355,108 @@ impl NotificationProcessor {
     async fn deliver_email(&self, notification: &QueuedNotification) {
         let id = &notification.id;
 
-        // Check if SMTP is configured
-        if self.config.smtp_config.is_none() {
-            debug!(notification_id = %id, "SMTP not configured, skipping email");
-            // Mark as delivered since email is optional
-            self.queue.mark_delivered(id, NotificationChannel::Email);
-            return;
-        }
+        // Check if email client is available
+        let email_client = match &self.email_client {
+            Some(client) => client,
+            None => {
+                debug!(notification_id = %id, "Email client not configured, skipping email");
+                // Mark as delivered since email is optional
+                self.queue.mark_delivered(id, NotificationChannel::Email);
+                return;
+            }
+        };
 
-        // In a real implementation, we'd:
-        // 1. Look up the user's email address from their profile
-        // 2. Render the email template
-        // 3. Send via SMTP
+        // Get recipient email from notification data
+        // In a full implementation, we'd look this up from user profile
+        let recipient_email = notification
+            .data
+            .as_ref()
+            .and_then(|d| d.get("recipient_email"))
+            .and_then(|v| v.as_str());
 
-        // For now, log and mark as delivered
-        info!(
-            notification_id = %id,
-            recipient = %notification.recipient,
-            title = %notification.title,
-            "Would send email notification (SMTP not implemented)"
+        let recipient_email = match recipient_email {
+            Some(email) => email,
+            None => {
+                debug!(
+                    notification_id = %id,
+                    recipient = %notification.recipient,
+                    "No email address available for recipient, skipping email"
+                );
+                // Mark as delivered since we can't send without an email
+                self.queue.mark_delivered(id, NotificationChannel::Email);
+                return;
+            }
+        };
+
+        // Generate email from template
+        let email_message = self.email_templates.generate_email(
+            recipient_email,
+            notification.notification_type.clone(),
+            &notification.title,
+            &notification.body,
+            notification.data.as_ref(),
         );
 
-        self.queue.mark_delivered(id, NotificationChannel::Email);
+        // Send the email
+        match email_client.send(email_message).await {
+            EmailResult::Success { message_id } => {
+                info!(
+                    notification_id = %id,
+                    recipient_email = %recipient_email,
+                    message_id = %message_id,
+                    "Email notification sent"
+                );
+                self.queue.mark_delivered(id, NotificationChannel::Email);
+            }
+            EmailResult::InvalidRecipient { error } => {
+                warn!(
+                    notification_id = %id,
+                    recipient_email = %recipient_email,
+                    error = %error,
+                    "Invalid email recipient"
+                );
+                // Mark as delivered - nothing more we can do
+                self.queue.mark_delivered(id, NotificationChannel::Email);
+            }
+            EmailResult::TemporaryFailure { error } => {
+                warn!(
+                    notification_id = %id,
+                    recipient_email = %recipient_email,
+                    error = %error,
+                    "Temporary email failure, will retry"
+                );
+                let retries = notification
+                    .status
+                    .get(&NotificationChannel::Email)
+                    .map(|s| match s.value() {
+                        DeliveryStatus::Failed { retries, .. } => *retries,
+                        _ => 0,
+                    })
+                    .unwrap_or(0);
+
+                self.queue.mark_failed(id, NotificationChannel::Email, &error, retries + 1);
+
+                if retries < 5 {
+                    let backoff = calculate_backoff(retries);
+                    debug!(
+                        notification_id = %id,
+                        retry = retries + 1,
+                        backoff_ms = backoff.as_millis(),
+                        "Scheduling email retry"
+                    );
+                }
+            }
+            EmailResult::PermanentFailure { error } => {
+                error!(
+                    notification_id = %id,
+                    recipient_email = %recipient_email,
+                    error = %error,
+                    "Permanent email failure"
+                );
+                // Mark as failed with max retries so it gets abandoned
+                self.queue.mark_failed(id, NotificationChannel::Email, &error, 999);
+            }
+        }
     }
 
     /// Deliver to in-app notification center
