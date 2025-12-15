@@ -485,7 +485,7 @@ mod tests {
         Charter::new(
             org_type,
             name.to_string(),
-            format!("{} Organization", name),
+            format!("{name} Organization"),
             test_governance_config(),
             MembershipPolicy::default(),
             DisputePolicy::default(),

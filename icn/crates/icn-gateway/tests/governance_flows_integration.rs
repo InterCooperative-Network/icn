@@ -56,7 +56,7 @@ async fn test_enrollment_creates_affiliated_holder() {
     let holder_id = hex::encode(holder.id());
 
     // Auto-affiliate with coop (simulating what simple_enrollment does)
-    let jurisdiction = JurisdictionId::new(format!("coop:{}", coop_id));
+    let jurisdiction = JurisdictionId::new(format!("coop:{coop_id}"));
     let initial_capabilities = vec![
         MembershipCapability::Transact,
         MembershipCapability::Vote,

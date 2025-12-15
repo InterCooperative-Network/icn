@@ -849,7 +849,7 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
         })?;
 
         // Create revocation record
-        let target_id = format!("{}:{}", holder_id, jurisdiction_id);
+        let target_id = format!("{holder_id}:{jurisdiction_id}");
         let record = RevocationRecord::new(
             RevocationType::Membership,
             target_id,
@@ -893,7 +893,7 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
         })?;
 
         // Create immediate revocation
-        let target_id = format!("{}:{}", holder_id, jurisdiction_id);
+        let target_id = format!("{holder_id}:{jurisdiction_id}");
         let record = RevocationRecord::immediate(
             RevocationType::Membership,
             target_id,
@@ -922,7 +922,7 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
         holder_id: &str,
         jurisdiction_id: &JurisdictionId,
     ) -> bool {
-        let target_id = format!("{}:{}", holder_id, jurisdiction_id);
+        let target_id = format!("{holder_id}:{jurisdiction_id}");
         self.revocations
             .is_revoked_in_jurisdiction(&target_id, jurisdiction_id)
     }

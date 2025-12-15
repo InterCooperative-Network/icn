@@ -74,9 +74,9 @@ impl RevocationRecord {
         hasher.update(b"revocation:");
         hasher.update(target_id.as_bytes());
         hasher.update(b":");
-        hasher.update(&now.to_le_bytes());
+        hasher.update(now.to_le_bytes());
         hasher.update(b":");
-        hasher.update(&nonce);
+        hasher.update(nonce);
         let result = hasher.finalize();
         let mut revocation_id = [0u8; 32];
         revocation_id.copy_from_slice(&result);
@@ -235,10 +235,10 @@ impl fmt::Display for RevocationScope {
         match self {
             RevocationScope::Global => write!(f, "Global"),
             RevocationScope::Federation { federation_id } => {
-                write!(f, "Federation({})", federation_id)
+                write!(f, "Federation({federation_id})")
             }
             RevocationScope::Jurisdiction { jurisdiction_id } => {
-                write!(f, "Jurisdiction({})", jurisdiction_id)
+                write!(f, "Jurisdiction({jurisdiction_id})")
             }
         }
     }

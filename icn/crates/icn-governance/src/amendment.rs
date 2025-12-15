@@ -378,7 +378,7 @@ impl Amendment {
             .as_secs();
 
         // Generate ID from content
-        let content = format!("{}:{}:{}:{}", amendment_type, scope, title, now);
+        let content = format!("{amendment_type}:{scope}:{title}:{now}");
         let id = AmendmentId::from_content(content.as_bytes());
 
         // Default requirements based on scope
@@ -557,8 +557,7 @@ impl Amendment {
                     approvals,
                     rejections,
                     reason: format!(
-                        "Need {} jurisdiction approvals, have {}",
-                        min, jurisdiction_approvals
+                        "Need {min} jurisdiction approvals, have {jurisdiction_approvals}"
                     ),
                 };
             }
@@ -571,8 +570,7 @@ impl Amendment {
                     approvals,
                     rejections,
                     reason: format!(
-                        "Need {} federation approvals, have {}",
-                        min, federation_approvals
+                        "Need {min} federation approvals, have {federation_approvals}"
                     ),
                 };
             }

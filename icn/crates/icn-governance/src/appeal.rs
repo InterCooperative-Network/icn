@@ -469,7 +469,7 @@ impl Appeal {
             .as_secs();
 
         // Generate ID from content
-        let content = format!("{}:{}:{}:{}", appeal_type, scope, appellant, now);
+        let content = format!("{appeal_type}:{scope}:{appellant}:{now}");
         let id = AppealId::from_content(content.as_bytes());
 
         Self {
