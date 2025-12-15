@@ -38,7 +38,8 @@ pub trait PersonhoodStore: Send + Sync {
 /// In-memory store implementation for testing
 #[derive(Default)]
 pub struct InMemoryPersonhoodStore {
-    data: RwLock<std::collections::BTreeMap<Vec<u8>, Vec<u8>>>,
+    /// Internal data storage (pub(crate) for testing)
+    pub(crate) data: RwLock<std::collections::BTreeMap<Vec<u8>, Vec<u8>>>,
 }
 
 impl InMemoryPersonhoodStore {

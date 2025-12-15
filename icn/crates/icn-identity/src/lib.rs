@@ -13,6 +13,7 @@ pub mod anchor;
 pub mod batch_verify;
 pub mod bundle;
 pub mod commons;
+pub mod commons_store;
 pub mod keybundle;
 pub mod keystore;
 pub mod multi_device;
@@ -49,6 +50,7 @@ pub use commons::{
     Affiliation, CommonsHolderRecord, CommonsRight, CommonsRights, HolderStatus,
     JurisdictionId, JurisdictionType, MembershipCapability, MembershipStatus,
 };
+pub use commons_store::CommonsHolderStore;
 pub use recovery::{
     RecoveryAttestation, RecoveryEvent, RecoveryMessage, RecoveryStatus, IDENTITY_RECOVERY_TOPIC,
 };
