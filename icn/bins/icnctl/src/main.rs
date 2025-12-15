@@ -7735,12 +7735,11 @@ async fn handle_amendment_command(
                     } else {
                         let status = resp.status();
                         let body = resp.text().await.unwrap_or_default();
-                        println!("Error creating amendment: {status}");
-                        println!("{body}");
+                        print_http_error("creating amendment", status, &body);
                     }
                 }
                 Err(e) => {
-                    println!("Could not connect to gateway: {e}");
+                    print_gateway_error(&gateway, &e);
                 }
             }
         }
@@ -7797,11 +7796,11 @@ async fn handle_amendment_command(
                     } else {
                         let status = resp.status();
                         let body = resp.text().await.unwrap_or_default();
-                        println!("Error: {status} - {body}");
+                        print_http_error("listing amendments", status, &body);
                     }
                 }
                 Err(e) => {
-                    println!("Could not connect to gateway: {e}");
+                    print_gateway_error(&gateway, &e);
                 }
             }
         }
@@ -7852,11 +7851,11 @@ async fn handle_amendment_command(
                     } else {
                         let status = resp.status();
                         let body = resp.text().await.unwrap_or_default();
-                        println!("Error: {status} - {body}");
+                        print_http_error("fetching amendment", status, &body);
                     }
                 }
                 Err(e) => {
-                    println!("Could not connect to gateway: {e}");
+                    print_gateway_error(&gateway, &e);
                 }
             }
         }
@@ -7900,12 +7899,11 @@ async fn handle_amendment_command(
                     } else {
                         let status = resp.status();
                         let body = resp.text().await.unwrap_or_default();
-                        println!("Error submitting amendment: {status}");
-                        println!("{body}");
+                        print_http_error("submitting amendment", status, &body);
                     }
                 }
                 Err(e) => {
-                    println!("Could not connect to gateway: {e}");
+                    print_gateway_error(&gateway, &e);
                 }
             }
         }
@@ -7950,12 +7948,11 @@ async fn handle_amendment_command(
                     } else {
                         let status = resp.status();
                         let body = resp.text().await.unwrap_or_default();
-                        println!("Error opening voting: {status}");
-                        println!("{body}");
+                        print_http_error("opening voting", status, &body);
                     }
                 }
                 Err(e) => {
-                    println!("Could not connect to gateway: {e}");
+                    print_gateway_error(&gateway, &e);
                 }
             }
         }
@@ -8025,12 +8022,11 @@ async fn handle_amendment_command(
                     } else {
                         let status = resp.status();
                         let body = resp.text().await.unwrap_or_default();
-                        println!("Error recording vote: {status}");
-                        println!("{body}");
+                        print_http_error("recording vote", status, &body);
                     }
                 }
                 Err(e) => {
-                    println!("Could not connect to gateway: {e}");
+                    print_gateway_error(&gateway, &e);
                 }
             }
         }
@@ -8077,12 +8073,11 @@ async fn handle_amendment_command(
                     } else {
                         let status = resp.status();
                         let body = resp.text().await.unwrap_or_default();
-                        println!("Error withdrawing amendment: {status}");
-                        println!("{body}");
+                        print_http_error("withdrawing amendment", status, &body);
                     }
                 }
                 Err(e) => {
-                    println!("Could not connect to gateway: {e}");
+                    print_gateway_error(&gateway, &e);
                 }
             }
         }
@@ -8231,12 +8226,11 @@ async fn handle_appeal_command(
                     } else {
                         let status = resp.status();
                         let body = resp.text().await.unwrap_or_default();
-                        println!("Error filing appeal: {status}");
-                        println!("{body}");
+                        print_http_error("filing appeal", status, &body);
                     }
                 }
                 Err(e) => {
-                    println!("Could not connect to gateway: {e}");
+                    print_gateway_error(&gateway, &e);
                 }
             }
         }
@@ -8299,11 +8293,11 @@ async fn handle_appeal_command(
                     } else {
                         let status = resp.status();
                         let body = resp.text().await.unwrap_or_default();
-                        println!("Error: {status} - {body}");
+                        print_http_error("listing appeals", status, &body);
                     }
                 }
                 Err(e) => {
-                    println!("Could not connect to gateway: {e}");
+                    print_gateway_error(&gateway, &e);
                 }
             }
         }
@@ -8631,6 +8625,40 @@ async fn get_gateway_token(
         .context("Missing token in response")?;
 
     Ok(token.to_string())
+}
+
+/// Print a gateway connection error with actionable hints
+fn print_gateway_error(gateway: &str, error: &impl std::fmt::Display) {
+    println!("Error: Could not connect to gateway at {gateway}");
+    println!();
+    println!("  Cause: {error}");
+    println!();
+    println!("Troubleshooting:");
+    println!("  • Check that the gateway server is running");
+    println!("  • Verify the gateway URL is correct: {gateway}");
+    println!("  • If using a non-default port, specify with --gateway");
+}
+
+/// Print an HTTP error response with context
+fn print_http_error(action: &str, status: reqwest::StatusCode, body: &str) {
+    println!("Error {action}: HTTP {status}");
+    if !body.is_empty() {
+        // Try to extract a message from JSON response
+        if let Ok(json) = serde_json::from_str::<serde_json::Value>(body) {
+            if let Some(msg) = json.get("message").or_else(|| json.get("error")) {
+                if let Some(s) = msg.as_str() {
+                    println!("  Message: {s}");
+                    return;
+                }
+            }
+        }
+        // Truncate long error bodies
+        if body.len() > 200 {
+            println!("  Details: {}...", &body[..200]);
+        } else {
+            println!("  Details: {body}");
+        }
+    }
 }
 
 /// Generate a QR code representation (ASCII art placeholder)
