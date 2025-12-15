@@ -377,6 +377,244 @@ pub async fn update_charter_status(
 }
 
 // ============================================================================
+// Enhanced Viewing Endpoints
+// ============================================================================
+
+/// Detailed founder response
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FounderDetailResponse {
+    pub did: String,
+    pub role: Option<String>,
+    pub timestamp: u64,
+    /// Human-readable timestamp
+    pub signed_at: String,
+    /// Truncated DID for display
+    pub display_name: String,
+    /// Has valid signature
+    pub has_signature: bool,
+}
+
+/// Founders list response
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FoundersResponse {
+    pub charter_id: String,
+    pub total_founders: usize,
+    pub minimum_required: usize,
+    pub ready_for_activation: bool,
+    pub founders_needed: usize,
+    pub founders: Vec<FounderDetailResponse>,
+}
+
+/// Timeline event
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TimelineEvent {
+    /// Event type
+    pub event_type: String,
+    /// Human-readable description
+    pub description: String,
+    /// Timestamp (Unix)
+    pub timestamp: u64,
+    /// Human-readable timestamp
+    pub date_time: String,
+    /// Related actor (DID)
+    pub actor: Option<String>,
+    /// Additional metadata
+    pub metadata: Option<serde_json::Value>,
+}
+
+/// Timeline response
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TimelineResponse {
+    pub charter_id: String,
+    pub charter_name: String,
+    pub events: Vec<TimelineEvent>,
+}
+
+fn format_timestamp(timestamp: u64) -> String {
+    // Simple ISO-like format
+    use std::time::{Duration, UNIX_EPOCH};
+    let datetime = UNIX_EPOCH + Duration::from_secs(timestamp);
+    let duration_since_epoch = datetime
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default();
+    let secs = duration_since_epoch.as_secs();
+
+    // Convert to date/time components (simplified)
+    let days = secs / 86400;
+    let years = 1970 + (days / 365); // Approximate
+    let days_in_year = days % 365;
+    let months = days_in_year / 30 + 1;
+    let day = days_in_year % 30 + 1;
+    let hours = (secs % 86400) / 3600;
+    let mins = (secs % 3600) / 60;
+
+    format!("{:04}-{:02}-{:02} {:02}:{:02} UTC", years, months, day, hours, mins)
+}
+
+fn truncate_did(did: &str) -> String {
+    if did.len() > 24 {
+        format!("{}...{}", &did[..16], &did[did.len() - 6..])
+    } else {
+        did.to_string()
+    }
+}
+
+/// GET /v1/charter/{id}/summary - Get charter summary
+#[get("/{charter_id}/summary")]
+pub async fn get_charter_summary(
+    path: web::Path<String>,
+    commons_manager: web::Data<Arc<CommonsManager>>,
+) -> Result<HttpResponse> {
+    let charter_id = path.into_inner();
+
+    let charter = commons_manager
+        .get_charter(&charter_id)
+        .await?
+        .ok_or_else(|| GatewayError::NotFound("Charter not found".to_string()))?;
+
+    Ok(HttpResponse::Ok().json(charter_to_summary(&charter)))
+}
+
+/// GET /v1/charter/{id}/founders - Get detailed founder information
+#[get("/{charter_id}/founders")]
+pub async fn get_charter_founders(
+    path: web::Path<String>,
+    commons_manager: web::Data<Arc<CommonsManager>>,
+) -> Result<HttpResponse> {
+    let charter_id = path.into_inner();
+
+    let charter = commons_manager
+        .get_charter(&charter_id)
+        .await?
+        .ok_or_else(|| GatewayError::NotFound("Charter not found".to_string()))?;
+
+    let min_founders = 3;
+    let total = charter.founders.len();
+
+    let founders: Vec<FounderDetailResponse> = charter
+        .founders
+        .iter()
+        .map(|f| FounderDetailResponse {
+            did: f.did.to_string(),
+            role: f.role.clone(),
+            timestamp: f.timestamp,
+            signed_at: format_timestamp(f.timestamp),
+            display_name: truncate_did(&f.did.to_string()),
+            has_signature: !f.signature.is_empty(),
+        })
+        .collect();
+
+    Ok(HttpResponse::Ok().json(FoundersResponse {
+        charter_id: charter.charter_id.to_hex(),
+        total_founders: total,
+        minimum_required: min_founders,
+        ready_for_activation: total >= min_founders,
+        founders_needed: if total >= min_founders { 0 } else { min_founders - total },
+        founders,
+    }))
+}
+
+/// GET /v1/charter/{id}/timeline - Get charter timeline
+#[get("/{charter_id}/timeline")]
+pub async fn get_charter_timeline(
+    path: web::Path<String>,
+    commons_manager: web::Data<Arc<CommonsManager>>,
+) -> Result<HttpResponse> {
+    let charter_id = path.into_inner();
+
+    let charter = commons_manager
+        .get_charter(&charter_id)
+        .await?
+        .ok_or_else(|| GatewayError::NotFound("Charter not found".to_string()))?;
+
+    let mut events: Vec<TimelineEvent> = Vec::new();
+
+    // 1. Creation event
+    events.push(TimelineEvent {
+        event_type: "charter_created".to_string(),
+        description: format!("Charter '{}' was created", charter.name),
+        timestamp: charter.created_at,
+        date_time: format_timestamp(charter.created_at),
+        actor: charter.founders.first().map(|f| f.did.to_string()),
+        metadata: Some(serde_json::json!({
+            "org_type": format_org_type(&charter.org_type),
+            "domain_id": charter.domain_id,
+        })),
+    });
+
+    // 2. Founder signature events
+    for founder in &charter.founders {
+        events.push(TimelineEvent {
+            event_type: "founder_signed".to_string(),
+            description: format!(
+                "{} signed as {}",
+                truncate_did(&founder.did.to_string()),
+                founder.role.as_deref().unwrap_or("founder")
+            ),
+            timestamp: founder.timestamp,
+            date_time: format_timestamp(founder.timestamp),
+            actor: Some(founder.did.to_string()),
+            metadata: founder.role.as_ref().map(|r| serde_json::json!({"role": r})),
+        });
+    }
+
+    // 3. Status change event (if activated)
+    if matches!(charter.status, CharterStatus::Active) {
+        // Find the latest founder signature as approximate activation time
+        let activation_time = charter
+            .founders
+            .iter()
+            .map(|f| f.timestamp)
+            .max()
+            .unwrap_or(charter.created_at);
+
+        events.push(TimelineEvent {
+            event_type: "charter_activated".to_string(),
+            description: "Charter was activated".to_string(),
+            timestamp: activation_time,
+            date_time: format_timestamp(activation_time),
+            actor: None,
+            metadata: None,
+        });
+    }
+
+    // 4. Amendment events
+    for (i, amendment_ref) in charter.amendments.iter().enumerate() {
+        events.push(TimelineEvent {
+            event_type: "amendment_added".to_string(),
+            description: format!("Amendment #{} was ratified", i + 1),
+            timestamp: amendment_ref.ratified_at,
+            date_time: format_timestamp(amendment_ref.ratified_at),
+            actor: None,
+            metadata: Some(serde_json::json!({
+                "amendment_id": hex::encode(amendment_ref.amendment_id),
+            })),
+        });
+    }
+
+    // 5. Suspension event (if suspended)
+    if let CharterStatus::Suspended { reason } = &charter.status {
+        events.push(TimelineEvent {
+            event_type: "charter_suspended".to_string(),
+            description: format!("Charter was suspended: {}", reason),
+            timestamp: charter.created_at, // Would need actual suspension timestamp
+            date_time: format_timestamp(charter.created_at),
+            actor: None,
+            metadata: Some(serde_json::json!({"reason": reason})),
+        });
+    }
+
+    // Sort by timestamp
+    events.sort_by_key(|e| e.timestamp);
+
+    Ok(HttpResponse::Ok().json(TimelineResponse {
+        charter_id: charter.charter_id.to_hex(),
+        charter_name: charter.name.clone(),
+        events,
+    }))
+}
+
+// ============================================================================
 // Route Configuration
 // ============================================================================
 
@@ -388,5 +626,8 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         .service(list_charters)
         .service(sign_charter)
         .service(activate_charter)
-        .service(update_charter_status);
+        .service(update_charter_status)
+        .service(get_charter_summary)
+        .service(get_charter_founders)
+        .service(get_charter_timeline);
 }
