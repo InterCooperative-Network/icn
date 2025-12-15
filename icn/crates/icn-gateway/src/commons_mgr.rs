@@ -19,6 +19,7 @@ use icn_identity::{
 };
 use sha2::{Digest, Sha256};
 use std::sync::Arc;
+use tracing::{info, warn};
 
 use crate::commons_store::{CommonsStore, CommonsStoreBackend, InMemoryCommonsStore};
 
@@ -185,6 +186,16 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
         // Record metrics
         icn_obs::metrics::commons::anchor_created_inc();
 
+        // Audit log
+        info!(
+            target: "commons_audit",
+            action = "anchor_created",
+            anchor_id = %anchor_id,
+            did = %did_str,
+            steward_vouched = steward_did.is_some(),
+            "PersonhoodAnchor created"
+        );
+
         Ok(anchor)
     }
 
@@ -225,6 +236,15 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
             _ => {}
         }
 
+        // Audit log
+        info!(
+            target: "commons_audit",
+            action = "anchor_status_updated",
+            anchor_id = %anchor_id,
+            new_status = ?status,
+            "PersonhoodAnchor status updated"
+        );
+
         Ok(())
     }
 
@@ -245,6 +265,15 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
 
         // Record verification metric
         icn_obs::metrics::commons::anchor_verified_inc(&method_name);
+
+        // Audit log
+        info!(
+            target: "commons_audit",
+            action = "attestation_added",
+            anchor_id = %anchor_id,
+            method = %method_name,
+            "POP attestation added to anchor"
+        );
 
         Ok(())
     }
@@ -286,6 +315,18 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
         // Record metrics
         icn_obs::metrics::commons::holder_created_inc();
 
+        // Audit log
+        let did_str = did.to_string();
+        info!(
+            target: "commons_audit",
+            action = "holder_created",
+            holder_id = %holder_id,
+            anchor_id = %anchor_id,
+            did = %did_str,
+            pop_level = ?pop_level,
+            "CommonsHolderRecord created"
+        );
+
         Ok(holder)
     }
 
@@ -317,6 +358,15 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
 
         // Record status change metric
         icn_obs::metrics::commons::holder_status_changed_inc(&format!("{:?}", status));
+
+        // Audit log
+        info!(
+            target: "commons_audit",
+            action = "holder_status_updated",
+            holder_id = %holder_id,
+            new_status = ?status,
+            "CommonsHolderRecord status updated"
+        );
 
         Ok(())
     }
@@ -370,6 +420,16 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
         // Record membership join metric
         icn_obs::metrics::commons::membership_joined_inc(jurisdiction.as_str());
 
+        // Audit log
+        info!(
+            target: "commons_audit",
+            action = "membership_joined",
+            holder_id = %holder_id,
+            jurisdiction = %jurisdiction.as_str(),
+            capabilities_count = affiliation.capabilities.len(),
+            "Holder joined jurisdiction"
+        );
+
         Ok(affiliation)
     }
 
@@ -399,6 +459,15 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
 
             // Record exit metric
             icn_obs::metrics::commons::membership_exited_inc(jurisdiction.as_str());
+
+            // Audit log
+            info!(
+                target: "commons_audit",
+                action = "membership_exited",
+                holder_id = %holder_id,
+                jurisdiction = %jurisdiction.as_str(),
+                "Holder left jurisdiction"
+            );
 
             Ok(())
         } else {
@@ -445,6 +514,16 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
                 _ => {}
             }
 
+            // Audit log
+            info!(
+                target: "commons_audit",
+                action = "membership_status_updated",
+                holder_id = %holder_id,
+                jurisdiction = %jurisdiction_str,
+                new_status = ?status,
+                "Membership status updated"
+            );
+
             Ok(())
         } else {
             bail!(
@@ -481,6 +560,17 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
 
         // Record charter creation metric
         icn_obs::metrics::commons::charter_created_inc(&org_type);
+
+        // Audit log
+        info!(
+            target: "commons_audit",
+            action = "charter_created",
+            charter_id = %charter_id,
+            org_type = %org_type,
+            domain_id = %charter.domain_id,
+            founders_count = charter.founders.len(),
+            "Charter created"
+        );
 
         Ok(())
     }
@@ -548,6 +638,15 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
             _ => {}
         }
 
+        // Audit log
+        info!(
+            target: "commons_audit",
+            action = "charter_status_updated",
+            charter_id = %charter_id,
+            new_status = ?status,
+            "Charter status updated"
+        );
+
         Ok(())
     }
 
@@ -607,8 +706,8 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
         );
 
         // Set optional fields
-        if let Some(j) = jurisdiction {
-            steward.jurisdiction = Some(j);
+        if let Some(ref j) = jurisdiction {
+            steward.jurisdiction = Some(j.clone());
         }
         for spec in specializations {
             steward.add_specialization(spec);
@@ -616,6 +715,18 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
 
         // Store
         self.store_steward(steward.clone()).await?;
+
+        // Audit log
+        info!(
+            target: "commons_audit",
+            action = "steward_registered",
+            steward_id = %steward.steward_id.to_hex(),
+            steward_did = %steward_did.to_string(),
+            holder_did = %holder_did.to_string(),
+            jurisdiction = ?jurisdiction,
+            bond_amount = bond_amount,
+            "Steward registered"
+        );
 
         Ok(steward)
     }
@@ -697,8 +808,18 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
             .get_steward(steward_id)?
             .ok_or_else(|| anyhow::anyhow!("Steward not found: {steward_id}"))?;
 
-        steward.suspend(reason);
+        steward.suspend(reason.clone());
         self.store.put_steward(&steward)?;
+
+        // Audit log
+        warn!(
+            target: "commons_audit",
+            action = "steward_suspended",
+            steward_id = %steward_id,
+            reason = %reason,
+            "Steward suspended"
+        );
+
         Ok(())
     }
 
@@ -711,6 +832,17 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
 
         let result = steward.reinstate();
         self.store.put_steward(&steward)?;
+
+        // Audit log
+        if result {
+            info!(
+                target: "commons_audit",
+                action = "steward_reinstated",
+                steward_id = %steward_id,
+                "Steward reinstated"
+            );
+        }
+
         Ok(result)
     }
 
@@ -723,6 +855,15 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
 
         steward.retire();
         self.store.put_steward(&steward)?;
+
+        // Audit log
+        info!(
+            target: "commons_audit",
+            action = "steward_retired",
+            steward_id = %steward_id,
+            "Steward retired"
+        );
+
         Ok(())
     }
 
@@ -738,8 +879,19 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
             .get_steward(steward_id)?
             .ok_or_else(|| anyhow::anyhow!("Steward not found: {steward_id}"))?;
 
-        steward.revoke(reason, evidence);
+        steward.revoke(reason.clone(), evidence.clone());
         self.store.put_steward(&steward)?;
+
+        // Audit log
+        warn!(
+            target: "commons_audit",
+            action = "steward_revoked",
+            steward_id = %steward_id,
+            reason = %reason,
+            evidence_count = evidence.len(),
+            "Steward revoked for cause"
+        );
+
         Ok(())
     }
 
@@ -1069,6 +1221,15 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
         // Record approval metric
         icn_obs::metrics::commons::membership_approved_inc(jurisdiction_id.as_str());
 
+        // Audit log
+        info!(
+            target: "commons_audit",
+            action = "membership_approved",
+            holder_id = %holder_id,
+            jurisdiction = %jurisdiction_id.as_str(),
+            "Membership application approved"
+        );
+
         Ok(())
     }
 
@@ -1101,6 +1262,15 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
         // Record promotion metric
         icn_obs::metrics::commons::membership_promoted_inc(jurisdiction_id.as_str());
 
+        // Audit log
+        info!(
+            target: "commons_audit",
+            action = "membership_promoted",
+            holder_id = %holder_id,
+            jurisdiction = %jurisdiction_id.as_str(),
+            "Member promoted to full membership"
+        );
+
         Ok(())
     }
 
@@ -1122,6 +1292,15 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
         affiliation.suspend();
 
         self.store.put_holder(&holder)?;
+
+        // Audit log
+        warn!(
+            target: "commons_audit",
+            action = "member_suspended",
+            holder_id = %holder_id,
+            jurisdiction = %jurisdiction_id.as_str(),
+            "Member suspended"
+        );
 
         Ok(())
     }
@@ -1149,6 +1328,15 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
         affiliation.membership_status = MembershipStatus::Member;
 
         self.store.put_holder(&holder)?;
+
+        // Audit log
+        info!(
+            target: "commons_audit",
+            action = "member_reinstated",
+            holder_id = %holder_id,
+            jurisdiction = %jurisdiction_id.as_str(),
+            "Member reinstated"
+        );
 
         Ok(())
     }
@@ -1298,7 +1486,22 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
 
     /// Store an amendment
     pub async fn store_amendment(&self, amendment: Amendment) -> Result<()> {
+        let amendment_id = amendment.id.to_hex();
+        let proposer = amendment.proposer.to_string();
+
         self.store.put_amendment(&amendment)?;
+
+        // Audit log
+        info!(
+            target: "commons_audit",
+            action = "amendment_created",
+            amendment_id = %amendment_id,
+            proposer = %proposer,
+            scope = %format!("{}", amendment.scope),
+            amendment_type = %format!("{}", amendment.amendment_type),
+            "Amendment created"
+        );
+
         Ok(())
     }
 
@@ -1360,6 +1563,16 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
 
         amendment.submit().map_err(|e| anyhow::anyhow!(e))?;
         self.store.put_amendment(&amendment)?;
+
+        // Audit log
+        info!(
+            target: "commons_audit",
+            action = "amendment_submitted",
+            amendment_id = %id_hex,
+            caller = %caller.to_string(),
+            "Amendment submitted for review"
+        );
+
         Ok(amendment)
     }
 
@@ -1382,6 +1595,15 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
 
         amendment.open_voting().map_err(|e| anyhow::anyhow!(e))?;
         self.store.put_amendment(&amendment)?;
+
+        // Audit log
+        info!(
+            target: "commons_audit",
+            action = "amendment_voting_opened",
+            amendment_id = %id_hex,
+            "Amendment voting period opened"
+        );
+
         Ok(amendment)
     }
 
@@ -1397,17 +1619,31 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
             .get_amendment(&id_hex)?
             .ok_or_else(|| anyhow::anyhow!("Amendment not found"))?;
 
+        let ratifier = ratification.authority_did.to_string();
         amendment
             .add_ratification(ratification)
             .map_err(|e| anyhow::anyhow!(e))?;
 
         // Check if ratification requirements are now met
         let result = amendment.check_ratification();
-        if matches!(result, icn_governance::RatificationResult::Approved { .. }) {
+        let was_ratified = matches!(result, icn_governance::RatificationResult::Approved { .. });
+        if was_ratified {
             let _ = amendment.ratify();
         }
 
         self.store.put_amendment(&amendment)?;
+
+        // Audit log
+        info!(
+            target: "commons_audit",
+            action = "amendment_ratification_added",
+            amendment_id = %id_hex,
+            ratifier = %ratifier,
+            total_ratifications = amendment.ratifications.len(),
+            amendment_ratified = was_ratified,
+            "Amendment ratification added"
+        );
+
         Ok(amendment)
     }
 
@@ -1429,8 +1665,21 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
             bail!("Only proposer can withdraw amendment");
         }
 
-        amendment.withdraw(reason).map_err(|e| anyhow::anyhow!(e))?;
+        amendment
+            .withdraw(reason.clone())
+            .map_err(|e| anyhow::anyhow!(e))?;
         self.store.put_amendment(&amendment)?;
+
+        // Audit log
+        info!(
+            target: "commons_audit",
+            action = "amendment_withdrawn",
+            amendment_id = %id_hex,
+            caller = %caller.to_string(),
+            reason = %reason,
+            "Amendment withdrawn"
+        );
+
         Ok(amendment)
     }
 
@@ -1438,7 +1687,21 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
 
     /// Store an appeal
     pub async fn store_appeal(&self, appeal: Appeal) -> Result<()> {
+        let appeal_id = appeal.id.to_hex();
+        let appellant = appeal.appellant.to_string();
+
         self.store.put_appeal(&appeal)?;
+
+        // Audit log
+        info!(
+            target: "commons_audit",
+            action = "appeal_created",
+            appeal_id = %appeal_id,
+            appellant = %appellant,
+            scope = %format!("{}", appeal.scope),
+            "Appeal created"
+        );
+
         Ok(())
     }
 
@@ -1528,6 +1791,15 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
 
         appeal.begin_review().map_err(|e| anyhow::anyhow!(e))?;
         self.store.put_appeal(&appeal)?;
+
+        // Audit log
+        info!(
+            target: "commons_audit",
+            action = "appeal_review_started",
+            appeal_id = %id_hex,
+            "Appeal review started"
+        );
+
         Ok(appeal)
     }
 
@@ -1543,8 +1815,19 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
             .get_appeal(&id_hex)?
             .ok_or_else(|| anyhow::anyhow!("Appeal not found"))?;
 
+        let outcome_str = format!("{:?}", outcome);
         appeal.resolve(outcome).map_err(|e| anyhow::anyhow!(e))?;
         self.store.put_appeal(&appeal)?;
+
+        // Audit log
+        info!(
+            target: "commons_audit",
+            action = "appeal_resolved",
+            appeal_id = %id_hex,
+            outcome = %outcome_str,
+            "Constitutional appeal resolved"
+        );
+
         Ok(appeal)
     }
 
@@ -1566,8 +1849,21 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
             bail!("Only appellant can withdraw appeal");
         }
 
-        appeal.withdraw(reason).map_err(|e| anyhow::anyhow!(e))?;
+        appeal
+            .withdraw(reason.clone())
+            .map_err(|e| anyhow::anyhow!(e))?;
         self.store.put_appeal(&appeal)?;
+
+        // Audit log
+        info!(
+            target: "commons_audit",
+            action = "appeal_withdrawn",
+            appeal_id = %id_hex,
+            caller = %caller.to_string(),
+            reason = ?reason,
+            "Appeal withdrawn"
+        );
+
         Ok(appeal)
     }
 }
