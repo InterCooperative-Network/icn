@@ -1,15 +1,15 @@
 # Commons Evolution Implementation Summary
 
 **Document ID**: ICN-DEV-COMMONS-SUMMARY
-**Version**: 0.6.0
-**Date**: 2025-12-14
+**Version**: 0.8.0
+**Date**: 2025-12-15
 **Author**: ICN Development Team
 
 ---
 
 ## Overview
 
-The Commons Evolution transforms ICN from a "cooperative coordination tool" into a "global commons infrastructure." This document summarizes the implementation completed over versions 0.3.0 through 0.6.0.
+The Commons Evolution transforms ICN from a "cooperative coordination tool" into a "global commons infrastructure." This document summarizes the implementation completed over versions 0.3.0 through 0.8.0.
 
 **Core Insight**: Commons Holder is the root identity; membership is scoped capability grants under that identity.
 
@@ -23,7 +23,9 @@ The Commons Evolution transforms ICN from a "cooperative coordination tool" into
 | v0.4.0 | Stewardship | 1 | ~1,200 |
 | v0.5.0 | Membership & Rights | 1 | ~2,400 |
 | v0.6.0 | Constitutional Governance | 1 | ~3,800 |
-| **Total** | | **10** | **~9,900** |
+| v0.7.x | Integration & Testing | 1 | ~500 |
+| v0.8.x | Production Hardening | 4 | ~1,200 |
+| **Total** | | **15** | **~11,600** |
 
 ---
 
@@ -408,7 +410,7 @@ Central coordinator in `icn-gateway/src/commons_mgr.rs` providing:
 - ✅ Response includes `coop_id` and `membership_status`
 - Files: `icn-gateway/src/api/sdis/simple_enrollment.rs`
 
-### Near-term (v0.8.x) - Production Readiness
+### Near-term (v0.8.x) - Production Readiness ✅ COMPLETE
 
 **4. Persistent Storage Migration** ✅
 - ✅ `CommonsStoreBackend` trait with pluggable backends
@@ -418,12 +420,20 @@ Central coordinator in `icn-gateway/src/commons_mgr.rs` providing:
 - ✅ Proper indexes (by_did, by_anchor, by_domain)
 - Files: `icn-gateway/src/commons_store.rs`, `icn-gateway/src/commons_mgr.rs`
 
-**5. Production Hardening**
-- Rate limiting per endpoint category
-- Request validation and sanitization
-- Audit logging for governance actions
-- Metrics for Commons operations
-- Files: `icn-gateway/src/api/`, `icn-obs/src/metrics/commons.rs`
+**5. Production Hardening** ✅
+- ✅ **Per-category rate limiting**: Different limits for Read/Write/Governance/Compute endpoints
+  - Read: 200 burst, 20 req/sec (high limits for queries)
+  - Write: 60 burst, 6 req/sec (moderate for mutations)
+  - Governance: 30 burst, 3 req/sec (lower for voting/proposals)
+  - Compute: 10 burst, 1 req/sec (strictest for resource-intensive operations)
+- ✅ **Audit logging for governance actions**: Structured tracing with target `commons_audit`
+  - Covers: anchor/holder creation, membership lifecycle, charter operations, steward operations, amendments, appeals
+  - Uses `warn!` for adverse actions (suspensions, revocations), `info!` for normal operations
+- ✅ **Metrics for Commons operations**: 50+ metrics in `icn-obs/src/metrics.rs`
+  - Counters: anchors created, holders created, memberships joined/exited/approved/promoted/suspended/banned
+  - Counters: charters created/activated/suspended/dissolved, amendments, appeals
+  - Histograms: operation durations, store operation latency
+- Files: `icn-gateway/src/rate_limit.rs`, `icn-gateway/src/commons_mgr.rs`, `icn-obs/src/metrics.rs`
 
 **6. Multiple POP Pathways**
 - InPerson verification flow (steward + applicant co-located)
@@ -518,19 +528,19 @@ v1.0.0: Full Commons Release
 
 For the pilot community (Track C), the minimum required functionality:
 
-1. **Working Today**:
+1. **Working Today** ✅:
    - Enrollment via SDIS (steward-sponsored)
    - CommonsHolderRecord with baseline rights
    - Charter creation for pilot cooperative
    - Membership lifecycle management
+   - CLI commands for daily operations (`icnctl amendment`, `icnctl appeal`)
+   - Persistent storage via Sled (data survives restarts)
+   - Basic monitoring/observability (50+ Commons metrics)
+   - Audit logging for governance compliance
+   - Per-category rate limiting for API protection
 
-2. **Needed for Pilot**:
-   - CLI commands for daily operations
-   - Persistent storage (data survives restarts)
-   - Basic monitoring/observability
-
-3. **Can Wait Until Post-Pilot**:
-   - Multiple POP pathways
+2. **Can Wait Until Post-Pilot**:
+   - Multiple POP pathways (InPerson, VideoCall, Ceremony)
    - Federation support
    - Economic layer integration
    - Advanced appeal mechanisms
@@ -540,9 +550,21 @@ For the pilot community (Track C), the minimum required functionality:
 ## Commit History
 
 ```
+# v0.8.x - Production Hardening
+6ac5f30 feat(gateway): add per-category rate limiting for endpoint protection
+b407042 feat(gateway): add comprehensive audit logging for governance actions
+0ea62b6 feat(obs): add Commons Evolution metrics for monitoring
+9d1c3a5 feat(gateway): add Sled persistent storage backend for CommonsManager
+
+# v0.7.x - Integration & Testing
+b313562 feat(gateway): complete Commons Evolution integration (CLI, storage, enrollment)
+
+# v0.6.x - Constitutional Governance
 69c5674 feat(governance): implement Constitutional Governance (v0.6.0)
 8d4e57a feat(gateway): implement Membership & Rights (v0.5.0)
 b990ef9 feat(gateway): implement Steward Layer (v0.4.0)
+
+# v0.3.x-0.5.x - Foundation
 6c0931f docs: update COMMONS_EVOLUTION RFC with implementation status
 00d8e95 feat(gateway): implement Commons Evolution API endpoints
 90d250a feat(cli): add commons and charter commands to icnctl
