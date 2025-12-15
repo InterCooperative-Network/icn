@@ -158,7 +158,17 @@ pub async fn create_payment(
     })))
 }
 
-/// GET /ledger/:coop_id/history?did=...&offset=0&limit=100 - Get transaction history
+/// GET /ledger/:coop_id/history?did=...&cursor=...&limit=100 - Get transaction history
+///
+/// Supports both cursor-based and offset-based pagination:
+/// - Cursor-based (preferred): Use `cursor` parameter for efficient large dataset navigation
+/// - Offset-based (legacy): Use `offset` parameter for backward compatibility
+///
+/// Query parameters:
+/// - `did`: Filter transactions involving this DID
+/// - `cursor`: Cursor for next page (from previous response)
+/// - `limit`: Maximum number of transactions to return (default: 20, max: 100)
+/// - `offset`: Offset for legacy pagination (ignored if cursor provided)
 #[get("/{coop_id}/history")]
 pub async fn get_history(
     req: HttpRequest,
@@ -166,6 +176,9 @@ pub async fn get_history(
     coop_id: web::Path<String>,
     query: web::Query<std::collections::HashMap<String, String>>,
 ) -> Result<HttpResponse> {
+    use crate::models::{PaginationInfo, TransactionHistoryResponse};
+    use crate::pagination::{Cursor, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE};
+
     // Check authorization
     require_scope(&req, "ledger:read")?;
     require_coop_access(&req, &coop_id)?; // CRITICAL: Prevent cross-coop privacy leaks
@@ -181,36 +194,57 @@ pub async fn get_history(
     };
 
     // Parse pagination parameters
-    let offset: usize = query
-        .get("offset")
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(0);
-
+    let cursor = query.get("cursor").cloned();
     let limit: usize = query
         .get("limit")
         .and_then(|s| s.parse().ok())
-        .unwrap_or(validation::DEFAULT_HISTORY_LIMIT);
+        .unwrap_or(DEFAULT_PAGE_SIZE)
+        .min(MAX_PAGE_SIZE)
+        .max(1);
+
+    // Decode cursor if provided
+    let decoded_cursor = cursor.as_ref().and_then(|c| Cursor::decode(c));
+
+    // Determine starting offset for cursor-based pagination
+    // For now, we fall back to loading all data and filtering in memory
+    // TODO: Update icn-ledger to support native cursor-based queries
+    let offset: usize = if decoded_cursor.is_some() {
+        // When using cursor, we need to load enough data to find the cursor position
+        0
+    } else {
+        query
+            .get("offset")
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0)
+    };
 
     // Validate pagination parameters
     // SECURITY: Validate offset to prevent integer overflow in pagination arithmetic
     let offset = validation::validate_history_offset(offset)?;
-    let limit = validation::validate_history_limit(limit)?;
+    let validated_limit = validation::validate_history_limit(limit)?;
 
-    let entries = ledger_mgr.get_history(&coop_id, filter_did.as_ref(), offset, limit)?;
+    // Request one extra to determine if there are more items
+    let fetch_limit = if decoded_cursor.is_some() {
+        validation::MAX_HISTORY_LIMIT // Need more for cursor-based
+    } else {
+        validated_limit + 1
+    };
+
+    let entries = ledger_mgr.get_history(&coop_id, filter_did.as_ref(), offset, fetch_limit)?;
 
     // Track history query
     gateway::history_queries_inc();
 
     // Convert to response format
-    let history: Vec<TransactionHistoryEntry> = entries
+    let mut history: Vec<TransactionHistoryEntry> = entries
         .into_iter()
         .map(|entry| {
             let accounts: Vec<AccountDeltaResponse> = entry
                 .accounts
-                .into_iter()
+                .iter()
                 .map(|delta| AccountDeltaResponse {
                     account_id: delta.account_id.to_string(),
-                    currency: delta.currency,
+                    currency: delta.currency.clone(),
                     debit: delta.debit,
                     credit: delta.credit,
                 })
@@ -225,7 +259,77 @@ pub async fn get_history(
         })
         .collect();
 
-    Ok(HttpResponse::Ok().json(history))
+    // Apply cursor-based pagination if cursor provided
+    let (page_transactions, pagination) = if let Some(ref cur) = decoded_cursor {
+        // Find the position after the cursor
+        let start_idx = history
+            .iter()
+            .position(|tx| {
+                tx.timestamp < cur.ts || (tx.timestamp == cur.ts && tx.id <= cur.id)
+            })
+            .unwrap_or(history.len());
+
+        // Get page items
+        let page: Vec<TransactionHistoryEntry> =
+            history.iter().skip(start_idx).take(limit).cloned().collect();
+
+        let has_more = start_idx + limit < history.len();
+
+        // Build next cursor from last item
+        let next_cursor = if has_more {
+            page.last().map(|tx| Cursor::from_seconds(tx.timestamp, &tx.id).encode())
+        } else {
+            None
+        };
+
+        // Build prev cursor
+        let prev_cursor = if start_idx > 0 {
+            history.get(start_idx.saturating_sub(1)).map(|tx| {
+                Cursor::from_seconds(tx.timestamp, &tx.id).encode()
+            })
+        } else {
+            None
+        };
+
+        let count = page.len();
+        (
+            page,
+            PaginationInfo::cursor_based(next_cursor, prev_cursor, count, has_more, limit),
+        )
+    } else {
+        // Offset-based pagination (legacy mode)
+        let has_more = history.len() > validated_limit;
+        if has_more {
+            history.pop(); // Remove the extra item we fetched
+        }
+
+        // Generate cursor for next page if there are more items
+        let next_cursor = if has_more {
+            history.last().map(|tx| Cursor::from_seconds(tx.timestamp, &tx.id).encode())
+        } else {
+            None
+        };
+
+        let count = history.len();
+        let pagination = PaginationInfo {
+            total: None, // Total not efficiently available
+            next_cursor,
+            prev_cursor: None,
+            count,
+            has_more,
+            offset: Some(offset),
+            limit: validated_limit,
+        };
+
+        (history, pagination)
+    };
+
+    let response = TransactionHistoryResponse {
+        transactions: page_transactions,
+        pagination,
+    };
+
+    Ok(HttpResponse::Ok().json(response))
 }
 
 #[cfg(test)]
@@ -302,6 +406,8 @@ mod tests {
 
     #[actix_web::test]
     async fn test_get_history() {
+        use crate::models::TransactionHistoryResponse;
+
         let ledger_mgr = Arc::new(LedgerManager::new());
         let alice = IdentityBundle::generate().unwrap();
         let bob = IdentityBundle::generate().unwrap();
@@ -338,33 +444,46 @@ mod tests {
             .to_request();
         req.extensions_mut().insert(claims.clone());
 
-        let resp: Vec<TransactionHistoryEntry> = test::call_and_read_body_json(&app, req).await;
-        assert_eq!(resp.len(), 1);
-        assert_eq!(resp[0].accounts.len(), 2); // Alice and Bob
+        let resp: TransactionHistoryResponse = test::call_and_read_body_json(&app, req).await;
+        assert_eq!(resp.transactions.len(), 1);
+        assert_eq!(resp.transactions[0].accounts.len(), 2); // Alice and Bob
+        assert_eq!(resp.pagination.count, 1);
+        assert!(!resp.pagination.has_more);
 
         // Get history filtered by Alice with authorization
         let uri = format!("/ledger/test-coop/history?did={}", alice.did());
         let req = test::TestRequest::get().uri(&uri).to_request();
         req.extensions_mut().insert(claims.clone());
 
-        let resp: Vec<TransactionHistoryEntry> = test::call_and_read_body_json(&app, req).await;
-        assert_eq!(resp.len(), 1);
+        let resp: TransactionHistoryResponse = test::call_and_read_body_json(&app, req).await;
+        assert_eq!(resp.transactions.len(), 1);
 
         // Test pagination parameters
         let uri = "/ledger/test-coop/history?offset=0&limit=10";
         let req = test::TestRequest::get().uri(uri).to_request();
         req.extensions_mut().insert(claims.clone());
 
-        let resp: Vec<TransactionHistoryEntry> = test::call_and_read_body_json(&app, req).await;
-        assert_eq!(resp.len(), 1);
+        let resp: TransactionHistoryResponse = test::call_and_read_body_json(&app, req).await;
+        assert_eq!(resp.transactions.len(), 1);
+        assert_eq!(resp.pagination.limit, 10);
 
         // Test offset beyond available entries
         let uri = "/ledger/test-coop/history?offset=100&limit=10";
         let req = test::TestRequest::get().uri(uri).to_request();
-        req.extensions_mut().insert(claims);
+        req.extensions_mut().insert(claims.clone());
 
-        let resp: Vec<TransactionHistoryEntry> = test::call_and_read_body_json(&app, req).await;
-        assert_eq!(resp.len(), 0);
+        let resp: TransactionHistoryResponse = test::call_and_read_body_json(&app, req).await;
+        assert_eq!(resp.transactions.len(), 0);
+
+        // Test cursor-based pagination (get next_cursor from first request)
+        let req = test::TestRequest::get()
+            .uri("/ledger/test-coop/history")
+            .to_request();
+        req.extensions_mut().insert(claims.clone());
+
+        let resp: TransactionHistoryResponse = test::call_and_read_body_json(&app, req).await;
+        // With only 1 item, there should be no next_cursor
+        assert!(resp.pagination.next_cursor.is_none());
     }
 
     #[actix_web::test]

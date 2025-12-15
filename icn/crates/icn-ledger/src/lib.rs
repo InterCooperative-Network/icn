@@ -46,6 +46,7 @@ pub mod balance;
 pub mod credit_policy;
 pub mod dispute;
 pub mod entry;
+pub mod events;
 pub mod fork_resolution;
 pub mod freeze;
 pub mod hash;
@@ -68,4 +69,11 @@ pub use sync::{deserialize_sync_message, ledger_topic, serialize_sync_message, L
 pub use types::{
     AccountBalances, AccountDelta, ContentHash, CreditLimit, Currency, Dispute, DisputeOutcome,
     DisputeStatus, JournalEntry, QuarantineReason, QuarantinedEntry, Resolution, Signature,
+};
+
+// Event types for real-time notifications
+pub use events::{
+    create_shared_emitter, BalanceChanged, BatchBalanceChanged, ForkDetected, ForkResolved,
+    LedgerEvent, LedgerEventEmitter, MemberFrozen, MemberUnfrozen, RollbackPerformed,
+    SharedEventEmitter, TransactionCreated, TransactionConfirmed, Transfer,
 };

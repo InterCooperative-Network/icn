@@ -121,6 +121,85 @@ pub struct AccountDeltaResponse {
     pub credit: Option<i64>,
 }
 
+/// Paginated transaction history response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransactionHistoryResponse {
+    /// The transactions on this page
+    pub transactions: Vec<TransactionHistoryEntry>,
+
+    /// Pagination metadata
+    pub pagination: PaginationInfo,
+}
+
+/// Generic pagination metadata for list responses
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PaginationInfo {
+    /// Total number of items (if known/available)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total: Option<usize>,
+
+    /// Cursor for the next page (None if no more items)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub next_cursor: Option<String>,
+
+    /// Cursor for the previous page (None if at beginning)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prev_cursor: Option<String>,
+
+    /// Number of items in current page
+    pub count: usize,
+
+    /// Whether there are more items after this page
+    pub has_more: bool,
+
+    /// Current offset (for backward compatibility)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub offset: Option<usize>,
+
+    /// Limit used for this query
+    pub limit: usize,
+}
+
+impl PaginationInfo {
+    /// Create pagination info for cursor-based response
+    pub fn cursor_based(
+        next_cursor: Option<String>,
+        prev_cursor: Option<String>,
+        count: usize,
+        has_more: bool,
+        limit: usize,
+    ) -> Self {
+        Self {
+            total: None,
+            next_cursor,
+            prev_cursor,
+            count,
+            has_more,
+            offset: None,
+            limit,
+        }
+    }
+
+    /// Create pagination info for offset-based response
+    pub fn offset_based(
+        total: Option<usize>,
+        offset: usize,
+        limit: usize,
+        count: usize,
+    ) -> Self {
+        let has_more = total.map(|t| offset + count < t).unwrap_or(count >= limit);
+        Self {
+            total,
+            next_cursor: None,
+            prev_cursor: None,
+            count,
+            has_more,
+            offset: Some(offset),
+            limit,
+        }
+    }
+}
+
 // === Governance Operations ===
 
 /// Create a new governance domain

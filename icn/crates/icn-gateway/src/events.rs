@@ -117,6 +117,79 @@ pub enum GatewayEvent {
         amount: i64,
         currency: String,
     },
+
+    // === Ledger Events (real-time balance tracking) ===
+
+    /// An account balance changed
+    BalanceChanged {
+        coop_id: String,
+        account: String,
+        currency: String,
+        old_balance: i64,
+        new_balance: i64,
+        change: i64,
+        entry_hash: String,
+    },
+
+    /// Multiple balance changes in a batch (from one transaction)
+    BatchBalanceChanged {
+        coop_id: String,
+        entry_hash: String,
+        changes: Vec<BalanceChangeDetail>,
+    },
+
+    /// A member was frozen
+    LedgerMemberFrozen {
+        coop_id: String,
+        member: String,
+        reason: String,
+        frozen_by: Option<String>,
+        proposal_id: Option<String>,
+        duration_seconds: Option<u64>,
+    },
+
+    /// A member was unfrozen
+    LedgerMemberUnfrozen {
+        coop_id: String,
+        member: String,
+        reason: String,
+        unfrozen_by: Option<String>,
+        proposal_id: Option<String>,
+    },
+
+    /// A fork was detected in the ledger
+    LedgerForkDetected {
+        coop_id: String,
+        parent_hash: String,
+        conflicting_entries: Vec<String>,
+    },
+
+    /// A fork was resolved in the ledger
+    LedgerForkResolved {
+        coop_id: String,
+        parent_hash: String,
+        kept_entry: String,
+        quarantined_entries: Vec<String>,
+        resolution_strategy: String,
+    },
+
+    /// A ledger rollback was performed
+    LedgerRollback {
+        coop_id: String,
+        target_hash: String,
+        archived_count: usize,
+        reason: String,
+    },
+}
+
+/// Detail of a single balance change (used in BatchBalanceChanged)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BalanceChangeDetail {
+    pub account: String,
+    pub currency: String,
+    pub old_balance: i64,
+    pub new_balance: i64,
+    pub change: i64,
 }
 
 /// Event with sequence number for backfill support

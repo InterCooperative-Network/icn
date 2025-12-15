@@ -1,6 +1,7 @@
 //! Ledger implementation with storage
 
 use crate::balance::compute_all_balances;
+use crate::events::{BalanceChanged, SharedEventEmitter, Transfer};
 use crate::fork_resolution::{
     Fork, ForkDetector, ForkResolution, ForkResolutionStrategy, ForkResolver,
 };
@@ -100,6 +101,13 @@ pub struct Ledger {
     /// Journal version counter for snapshot isolation (M7 fix)
     /// Incremented on each entry append to detect concurrent modifications
     journal_version: u64,
+
+    /// Optional event emitter for real-time notifications
+    /// When set, ledger operations emit events for WebSocket/notification systems
+    event_emitter: Option<SharedEventEmitter>,
+
+    /// Domain ID for this ledger (used in event payloads)
+    domain_id: Option<String>,
 }
 
 impl Ledger {
@@ -125,6 +133,8 @@ impl Ledger {
             trust_graph: None,
             min_trust_for_entry: DEFAULT_MIN_TRUST_FOR_ENTRY,
             journal_version,
+            event_emitter: None, // Set via set_event_emitter()
+            domain_id: None,     // Set via set_domain_id()
         };
 
         // Load cached balances from storage
@@ -194,6 +204,36 @@ impl Ledger {
         detector: Arc<tokio::sync::RwLock<icn_security::MisbehaviorDetector>>,
     ) {
         self.misbehavior_detector = Some(detector);
+    }
+
+    /// Set the event emitter for real-time notifications
+    ///
+    /// When set, the ledger will emit events for:
+    /// - Transaction creation
+    /// - Balance changes
+    /// - Member freeze/unfreeze
+    /// - Fork detection/resolution
+    /// - Rollback operations
+    pub fn set_event_emitter(&mut self, emitter: SharedEventEmitter) {
+        self.event_emitter = Some(emitter);
+    }
+
+    /// Get a reference to the event emitter (if set)
+    pub fn event_emitter(&self) -> Option<&SharedEventEmitter> {
+        self.event_emitter.as_ref()
+    }
+
+    /// Set the domain ID for this ledger
+    ///
+    /// The domain ID is included in event payloads to identify
+    /// which cooperative/domain the events belong to.
+    pub fn set_domain_id(&mut self, domain_id: String) {
+        self.domain_id = Some(domain_id);
+    }
+
+    /// Get the domain ID (if set)
+    pub fn domain_id(&self) -> Option<&str> {
+        self.domain_id.as_deref()
     }
 
     /// Append a journal entry to the ledger
@@ -282,13 +322,39 @@ impl Ledger {
         );
 
         // Update cached balances and cleared volume index
+        // Also collect balance changes for event emission
+        let mut balance_changes: Vec<BalanceChanged> = Vec::new();
+        let mut transfers: Vec<Transfer> = Vec::new();
+
         for delta in &entry.accounts {
+            // Capture old balance before update
+            let old_balance = self
+                .cached_balances
+                .get(&delta.account_id)
+                .map(|b| b.get(&delta.currency))
+                .unwrap_or(0);
+
             let account_balances = self
                 .cached_balances
                 .entry(delta.account_id.clone())
                 .or_insert_with(|| AccountBalances::new(delta.account_id.clone()));
 
             account_balances.apply_delta(delta);
+
+            // Capture new balance after update
+            let new_balance = account_balances.get(&delta.currency);
+
+            // Record balance change for event emission
+            balance_changes.push(BalanceChanged {
+                account: delta.account_id.to_string(),
+                currency: delta.currency.clone(),
+                old_balance,
+                new_balance,
+                change: new_balance - old_balance,
+                entry_hash: hash.to_hex(),
+                timestamp: entry.timestamp,
+                domain_id: self.domain_id.clone(),
+            });
 
             // Update cleared volume index (track total credits received)
             if let Some(credit) = delta.credit {
@@ -297,9 +363,65 @@ impl Ledger {
             }
         }
 
+        // Build transfers list from deltas (pair debits with credits)
+        // Group by currency and match debits to credits
+        let mut debits_by_currency: HashMap<String, Vec<(&icn_identity::Did, i64)>> = HashMap::new();
+        let mut credits_by_currency: HashMap<String, Vec<(&icn_identity::Did, i64)>> = HashMap::new();
+
+        for delta in &entry.accounts {
+            if let Some(debit) = delta.debit {
+                debits_by_currency
+                    .entry(delta.currency.clone())
+                    .or_default()
+                    .push((&delta.account_id, debit));
+            }
+            if let Some(credit) = delta.credit {
+                credits_by_currency
+                    .entry(delta.currency.clone())
+                    .or_default()
+                    .push((&delta.account_id, credit));
+            }
+        }
+
+        // Match debits to credits by currency
+        for (currency, debits) in &debits_by_currency {
+            if let Some(credits) = credits_by_currency.get(currency) {
+                for (from_did, amount) in debits {
+                    for (to_did, credit_amount) in credits {
+                        if amount == credit_amount {
+                            transfers.push(Transfer {
+                                from: from_did.to_string(),
+                                to: to_did.to_string(),
+                                amount: *amount,
+                                currency: currency.clone(),
+                            });
+                            break; // Match found
+                        }
+                    }
+                }
+            }
+        }
+
         // Persist updated balances and cleared volume index
         self.save_cached_balances()?;
         self.save_cleared_volume_index()?;
+
+        // Emit events if emitter is configured
+        if let Some(ref emitter) = self.event_emitter {
+            // Emit TransactionCreated event
+            emitter.emit_transaction_created(
+                hash.clone(),
+                &entry.author,
+                transfers,
+                entry.timestamp,
+                self.domain_id.clone(),
+            );
+
+            // Emit batch balance change event
+            if !balance_changes.is_empty() {
+                emitter.emit_batch_balance_changed(&hash, balance_changes, entry.timestamp);
+            }
+        }
 
         // Increment and persist journal version for snapshot isolation (M7 fix)
         self.journal_version += 1;
@@ -325,6 +447,19 @@ impl Ledger {
                     new_entry = %hash.to_hex(),
                     "Potential fork detected - multiple entries share parent"
                 );
+
+                // Emit fork detected event
+                if let Some(ref emitter) = self.event_emitter {
+                    // Get all children of this parent for the event
+                    let forks = self.fork_detector.detect_forks();
+                    if let Some((_, children)) = forks.iter().find(|(p, _)| p == parent) {
+                        let now = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .map(|d| d.as_secs())
+                            .unwrap_or(0);
+                        emitter.emit_fork_detected(parent, children.clone(), now);
+                    }
+                }
             }
         }
 
@@ -1052,7 +1187,17 @@ impl Ledger {
             duration = ?duration_seconds,
             "Freezing member account"
         );
-        self.freeze_manager.freeze(did, reason, duration_seconds);
+        self.freeze_manager
+            .freeze(did.clone(), reason.clone(), duration_seconds);
+
+        // Emit freeze event
+        if let Some(ref emitter) = self.event_emitter {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+            emitter.emit_member_frozen(&did, reason, None, None, duration_seconds, now);
+        }
     }
 
     /// Freeze a member with full metadata (for governance integration)
@@ -1071,12 +1216,28 @@ impl Ledger {
             "Freezing member account via governance"
         );
         self.freeze_manager.freeze_with_metadata(
-            did,
-            reason,
+            did.clone(),
+            reason.clone(),
             duration_seconds,
-            proposal_id,
-            frozen_by,
+            proposal_id.clone(),
+            frozen_by.clone(),
         );
+
+        // Emit freeze event
+        if let Some(ref emitter) = self.event_emitter {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+            emitter.emit_member_frozen(
+                &did,
+                reason,
+                frozen_by.as_ref(),
+                proposal_id,
+                duration_seconds,
+                now,
+            );
+        }
     }
 
     /// Unfreeze a member account
@@ -1089,7 +1250,20 @@ impl Ledger {
             reason = %reason,
             "Unfreezing member account"
         );
-        self.freeze_manager.unfreeze(did, reason)
+        let result = self.freeze_manager.unfreeze(did, reason.clone());
+
+        // Emit unfreeze event if member was unfrozen
+        if result.is_some() {
+            if let Some(ref emitter) = self.event_emitter {
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0);
+                emitter.emit_member_unfrozen(did, reason, None, None, now);
+            }
+        }
+
+        result
     }
 
     /// Unfreeze a member with full metadata (for governance integration)
@@ -1106,8 +1280,25 @@ impl Ledger {
             proposal = ?proposal_id,
             "Unfreezing member account via governance"
         );
-        self.freeze_manager
-            .unfreeze_with_metadata(did, reason, proposal_id, unfrozen_by)
+        let result = self.freeze_manager.unfreeze_with_metadata(
+            did,
+            reason.clone(),
+            proposal_id.clone(),
+            unfrozen_by.clone(),
+        );
+
+        // Emit unfreeze event if member was unfrozen
+        if result.is_some() {
+            if let Some(ref emitter) = self.event_emitter {
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0);
+                emitter.emit_member_unfrozen(did, reason, unfrozen_by.as_ref(), proposal_id, now);
+            }
+        }
+
+        result
     }
 
     /// Check if a member is currently frozen
@@ -1440,6 +1631,16 @@ impl Ledger {
 
         // Emit metrics
         icn_obs::metrics::ledger::rollback_performed_inc();
+
+        // Emit rollback event
+        if let Some(ref emitter) = self.event_emitter {
+            emitter.emit_rollback_performed(
+                target_hash,
+                archived_count,
+                reason,
+                archive_timestamp,
+            );
+        }
 
         Ok(archived_hashes)
     }
