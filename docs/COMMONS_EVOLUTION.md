@@ -1,10 +1,20 @@
 # RFC: ICN Commons Evolution
 
 **Document ID**: ICN-RFC-COMMONS-01
-**Status**: DRAFT
+**Status**: IMPLEMENTED (v0.3.0 Foundation)
 **Author**: Matthew Faherty
 **Created**: 2025-12-14
+**Updated**: 2025-12-14
 **Target Version**: v0.3.0+
+
+### Implementation Status (2025-12-14)
+
+**v0.3.0 Foundation - COMPLETE**:
+- PersonhoodAnchor, CommonsHolderRecord, Charter structs
+- Gateway REST APIs (`/v1/commons/*`, `/v1/charter/*`)
+- SDIS enrollment creates PersonhoodAnchor + CommonsHolderRecord
+- CLI commands (`icnctl commons anchor`, `icnctl charter show/list`)
+- Integration tests for full enrollment → anchor → holder flow
 
 ---
 
@@ -750,13 +760,13 @@ contract CommonsGovernance {
 
 ## Implementation Roadmap
 
-| Version | Milestone | Key Deliverables |
-|---------|-----------|------------------|
-| **v0.3.0** | Commons Foundation | PersonhoodAnchor, CommonsHolderRecord, Charter structs; `network:commons` domain; `icnctl commons enroll` |
-| **v0.4.0** | Stewardship | StewardRecord, POP attestation workflow, steward governance |
-| **v0.5.0** | Membership & Rights | Full MembershipRecord with capabilities, rights enforcement hooks, revocation registry |
-| **v0.6.0** | Constitutional Governance | Amendment process, multi-level ratification, appeal mechanisms |
-| **v1.0.0** | Production Commons | Full steward network, multiple POP pathways, complete economic layer |
+| Version | Milestone | Status | Key Deliverables |
+|---------|-----------|--------|------------------|
+| **v0.3.0** | Commons Foundation | **COMPLETE** | PersonhoodAnchor, CommonsHolderRecord, Charter structs; Gateway APIs; SDIS integration; CLI commands |
+| **v0.4.0** | Stewardship | Planned | StewardRecord, POP attestation workflow, steward governance |
+| **v0.5.0** | Membership & Rights | Planned | Full MembershipRecord with capabilities, rights enforcement hooks, revocation registry |
+| **v0.6.0** | Constitutional Governance | Planned | Amendment process, multi-level ratification, appeal mechanisms |
+| **v1.0.0** | Production Commons | Planned | Full steward network, multiple POP pathways, complete economic layer |
 
 ---
 
