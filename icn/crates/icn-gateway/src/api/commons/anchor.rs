@@ -179,11 +179,17 @@ pub async fn add_attestation(
         .parse::<Did>()
         .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
 
-    // Check if caller is an active steward
-    let is_steward = commons_manager.is_active_steward(&steward_did).await?;
-    if !is_steward {
+    // Check if caller is an active steward and get their record
+    let steward = commons_manager
+        .get_steward_by_did(&steward_did)
+        .await?
+        .ok_or_else(|| {
+            GatewayError::AuthorizationFailed("Only registered stewards can add attestations".to_string())
+        })?;
+
+    if !steward.can_attest() {
         return Err(GatewayError::AuthorizationFailed(
-            "Only stewards can add attestations".to_string(),
+            "Steward is not authorized to issue attestations (suspended, expired term, or low reputation)".to_string(),
         ));
     }
 
@@ -244,9 +250,16 @@ pub async fn add_attestation(
         expiry,
     );
 
+    // Add attestation to anchor
     commons_manager
         .add_attestation(&anchor_id, attestation.clone())
         .await?;
+
+    // Record attestation on steward's record (for reputation tracking)
+    let steward_id = steward.steward_id.to_hex();
+    let _ = commons_manager
+        .record_steward_attestation(&steward_id)
+        .await;
 
     Ok(HttpResponse::Created().json(attestation_to_response(&attestation)))
 }

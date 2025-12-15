@@ -1101,6 +1101,66 @@ enum StewardCommands {
     /// Show steward configuration
     Config,
 
+    /// Get steward info by ID or DID
+    Info {
+        /// Steward ID or DID
+        steward: String,
+        /// Gateway URL (defaults to ICN_GATEWAY env or http://localhost:8080)
+        #[arg(long, short)]
+        gateway: Option<String>,
+    },
+
+    /// List registered stewards
+    List {
+        /// Show only active stewards
+        #[arg(long)]
+        active: bool,
+        /// Filter by jurisdiction
+        #[arg(long)]
+        jurisdiction: Option<String>,
+        /// Gateway URL
+        #[arg(long, short)]
+        gateway: Option<String>,
+    },
+
+    /// List stewards who can issue attestations
+    Attesters {
+        /// Gateway URL
+        #[arg(long, short)]
+        gateway: Option<String>,
+    },
+
+    /// Register as a steward (requires Strong POP level)
+    Register {
+        /// Term duration in days (30-730)
+        #[arg(long, default_value = "365")]
+        term_days: u64,
+        /// Bond amount in credits
+        #[arg(long, default_value = "1000")]
+        bond: u64,
+        /// Governance proposal ID that approved this registration
+        #[arg(long)]
+        governance_approval: String,
+        /// Optional jurisdiction scope
+        #[arg(long)]
+        jurisdiction: Option<String>,
+        /// Specializations (comma-separated, e.g., "identity,mediation")
+        #[arg(long)]
+        specializations: Option<String>,
+        /// Gateway URL
+        #[arg(long, short)]
+        gateway: Option<String>,
+    },
+
+    /// Retire from stewardship (self-service)
+    Retire {
+        /// Steward ID (defaults to current user's steward record)
+        steward_id: Option<String>,
+        /// Gateway URL
+        #[arg(long, short)]
+        gateway: Option<String>,
+    },
+
     /// Check if a VUI is already registered
     CheckVui {
         /// VUI hash (hex, 32 bytes)
@@ -6307,6 +6367,308 @@ async fn handle_steward_command(
                 println!("No [steward] section in config.toml");
                 println!("\nDefault configuration:");
                 print_default_steward_config();
+            }
+        }
+
+        StewardCommands::Info { steward, gateway } => {
+            println!("Steward Info");
+            println!("============\n");
+
+            let gateway = gateway
+                .or_else(|| std::env::var("ICN_GATEWAY").ok())
+                .unwrap_or_else(|| "http://localhost:8080".to_string());
+            let client = reqwest::Client::new();
+
+            // Try as DID first, then as steward_id
+            let url = if steward.starts_with("did:") {
+                format!("{gateway}/v1/steward/by-did/{steward}")
+            } else {
+                format!("{gateway}/v1/steward/{steward}")
+            };
+
+            match client.get(&url).send().await {
+                Ok(resp) => {
+                    let status = resp.status();
+                    if status.is_success() {
+                        let data: serde_json::Value = resp.json().await?;
+                        println!(
+                            "Steward ID:     {}",
+                            data["steward_id"].as_str().unwrap_or("unknown")
+                        );
+                        println!(
+                            "Steward DID:    {}",
+                            data["steward_did"].as_str().unwrap_or("unknown")
+                        );
+                        println!(
+                            "Holder DID:     {}",
+                            data["holder_did"].as_str().unwrap_or("unknown")
+                        );
+                        println!(
+                            "Status:         {}",
+                            data["status"].as_str().unwrap_or("unknown")
+                        );
+                        println!(
+                            "Can Attest:     {}",
+                            if data["can_attest"].as_bool().unwrap_or(false) {
+                                "Yes"
+                            } else {
+                                "No"
+                            }
+                        );
+                        println!(
+                            "Reputation:     {:.2}",
+                            data["reputation_score"].as_f64().unwrap_or(0.0)
+                        );
+                        println!(
+                            "Effectiveness:  {:.2}",
+                            data["effectiveness_score"].as_f64().unwrap_or(0.0)
+                        );
+                        println!(
+                            "Attestations:   {} issued, {} disputed",
+                            data["attestations_issued"].as_u64().unwrap_or(0),
+                            data["attestations_disputed"].as_u64().unwrap_or(0)
+                        );
+                        println!(
+                            "Disputes:       {} against, {} won",
+                            data["disputes_against"].as_u64().unwrap_or(0),
+                            data["disputes_won"].as_u64().unwrap_or(0)
+                        );
+                        println!(
+                            "Bond:           {} credits",
+                            data["bond_amount"].as_u64().unwrap_or(0)
+                        );
+                        if let Some(jurisdiction) = data["jurisdiction"].as_str() {
+                            println!("Jurisdiction:   {jurisdiction}");
+                        }
+                        if let Some(specs) = data["specializations"].as_array() {
+                            if !specs.is_empty() {
+                                let spec_strs: Vec<&str> =
+                                    specs.iter().filter_map(|s| s.as_str()).collect();
+                                println!("Specializations: {}", spec_strs.join(", "));
+                            }
+                        }
+                        println!(
+                            "Term Expired:   {}",
+                            if data["is_term_expired"].as_bool().unwrap_or(false) {
+                                "Yes"
+                            } else {
+                                "No"
+                            }
+                        );
+                    } else if status == reqwest::StatusCode::NOT_FOUND {
+                        println!("Steward not found: {steward}");
+                    } else {
+                        let text = resp.text().await.unwrap_or_default();
+                        println!("Error: {status} - {text}");
+                    }
+                }
+                Err(e) => {
+                    println!("Could not reach gateway at {gateway}: {e}");
+                }
+            }
+        }
+
+        StewardCommands::List {
+            active,
+            jurisdiction,
+            gateway,
+        } => {
+            println!("Registered Stewards");
+            println!("===================\n");
+
+            let gateway = gateway
+                .or_else(|| std::env::var("ICN_GATEWAY").ok())
+                .unwrap_or_else(|| "http://localhost:8080".to_string());
+            let client = reqwest::Client::new();
+
+            let mut url = format!("{gateway}/v1/steward");
+            let mut params = vec![];
+            if active {
+                params.push("active=true".to_string());
+            }
+            if let Some(j) = jurisdiction {
+                params.push(format!("jurisdiction={j}"));
+            }
+            if !params.is_empty() {
+                url = format!("{}?{}", url, params.join("&"));
+            }
+
+            match client.get(&url).send().await {
+                Ok(resp) => {
+                    let status = resp.status();
+                    if status.is_success() {
+                        let stewards: Vec<serde_json::Value> = resp.json().await?;
+                        if stewards.is_empty() {
+                            println!("No stewards found.");
+                        } else {
+                            println!(
+                                "{:<64} {:<10} {:<8} {:<12}",
+                                "STEWARD_ID", "STATUS", "CAN_ATT", "REPUTATION"
+                            );
+                            println!("{}", "-".repeat(100));
+                            for s in stewards {
+                                println!(
+                                    "{:<64} {:<10} {:<8} {:<12.2}",
+                                    s["steward_id"].as_str().unwrap_or("-"),
+                                    s["status"].as_str().unwrap_or("-"),
+                                    if s["can_attest"].as_bool().unwrap_or(false) {
+                                        "Yes"
+                                    } else {
+                                        "No"
+                                    },
+                                    s["reputation_score"].as_f64().unwrap_or(0.0)
+                                );
+                            }
+                        }
+                    } else {
+                        let text = resp.text().await.unwrap_or_default();
+                        println!("Error: {status} - {text}");
+                    }
+                }
+                Err(e) => {
+                    println!("Could not reach gateway at {gateway}: {e}");
+                }
+            }
+        }
+
+        StewardCommands::Attesters { gateway } => {
+            println!("Active Attesters");
+            println!("================\n");
+
+            let gateway = gateway
+                .or_else(|| std::env::var("ICN_GATEWAY").ok())
+                .unwrap_or_else(|| "http://localhost:8080".to_string());
+            let client = reqwest::Client::new();
+
+            let url = format!("{gateway}/v1/steward/attesters");
+
+            match client.get(&url).send().await {
+                Ok(resp) => {
+                    let status = resp.status();
+                    if status.is_success() {
+                        let attesters: Vec<serde_json::Value> = resp.json().await?;
+                        if attesters.is_empty() {
+                            println!("No attesters available.");
+                        } else {
+                            println!(
+                                "{:<64} {:<8} {:<12} {:<12}",
+                                "STEWARD_ID", "ATTESTED", "REPUTATION", "JURISDICTION"
+                            );
+                            println!("{}", "-".repeat(100));
+                            for s in attesters {
+                                println!(
+                                    "{:<64} {:<8} {:<12.2} {:<12}",
+                                    s["steward_id"].as_str().unwrap_or("-"),
+                                    s["attestations_issued"].as_u64().unwrap_or(0),
+                                    s["reputation_score"].as_f64().unwrap_or(0.0),
+                                    s["jurisdiction"].as_str().unwrap_or("global")
+                                );
+                            }
+                        }
+                    } else {
+                        let text = resp.text().await.unwrap_or_default();
+                        println!("Error: {status} - {text}");
+                    }
+                }
+                Err(e) => {
+                    println!("Could not reach gateway at {gateway}: {e}");
+                }
+            }
+        }
+
+        StewardCommands::Register {
+            term_days,
+            bond,
+            governance_approval,
+            jurisdiction,
+            specializations,
+            gateway,
+        } => {
+            println!("Register as Steward");
+            println!("===================\n");
+
+            let gateway = gateway
+                .or_else(|| std::env::var("ICN_GATEWAY").ok())
+                .unwrap_or_else(|| "http://localhost:8080".to_string());
+            let client = reqwest::Client::new();
+
+            // Get auth token from keystore
+            let keystore_path = data_dir.join("keystore.age");
+            if !keystore_path.exists() {
+                bail!("No keystore found. Run 'icnctl id init' first.");
+            }
+
+            // Build request body
+            let specs: Vec<String> = specializations
+                .map(|s| s.split(',').map(|x| x.trim().to_string()).collect())
+                .unwrap_or_default();
+
+            let body = serde_json::json!({
+                "term_duration_days": term_days,
+                "bond_amount": bond,
+                "governance_approval": governance_approval,
+                "jurisdiction": jurisdiction,
+                "specializations": specs,
+            });
+
+            let url = format!("{gateway}/v1/steward");
+
+            // Note: In production, this would need auth token
+            match client.post(&url).json(&body).send().await {
+                Ok(resp) => {
+                    let status = resp.status();
+                    if status.is_success() {
+                        let data: serde_json::Value = resp.json().await?;
+                        println!("Successfully registered as steward!");
+                        println!(
+                            "  Steward ID: {}",
+                            data["steward_id"].as_str().unwrap_or("unknown")
+                        );
+                        println!("  Term: {} days", term_days);
+                        println!("  Bond: {} credits", bond);
+                    } else {
+                        let text = resp.text().await.unwrap_or_default();
+                        println!("Registration failed: {status} - {text}");
+                    }
+                }
+                Err(e) => {
+                    println!("Could not reach gateway at {gateway}: {e}");
+                }
+            }
+        }
+
+        StewardCommands::Retire { steward_id, gateway } => {
+            println!("Retire from Stewardship");
+            println!("=======================\n");
+
+            let gateway = gateway
+                .or_else(|| std::env::var("ICN_GATEWAY").ok())
+                .unwrap_or_else(|| "http://localhost:8080".to_string());
+            let client = reqwest::Client::new();
+
+            let id = steward_id.unwrap_or_else(|| "me".to_string());
+            if id == "me" {
+                println!("Note: Retiring your own stewardship (use --steward-id for specific ID)");
+            }
+
+            let url = format!("{gateway}/v1/steward/{id}/retire");
+
+            // Note: In production, this would need auth token
+            match client.post(&url).send().await {
+                Ok(resp) => {
+                    let status = resp.status();
+                    if status.is_success() {
+                        println!("Successfully retired from stewardship.");
+                    } else if status == reqwest::StatusCode::NOT_FOUND {
+                        println!("Steward not found: {id}");
+                    } else {
+                        let text = resp.text().await.unwrap_or_default();
+                        println!("Retirement failed: {status} - {text}");
+                    }
+                }
+                Err(e) => {
+                    println!("Could not reach gateway at {gateway}: {e}");
+                }
             }
         }
 

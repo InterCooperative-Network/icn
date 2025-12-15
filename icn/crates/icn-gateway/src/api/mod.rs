@@ -14,5 +14,6 @@ pub mod ledger;
 pub mod members;
 pub mod notifications;
 pub mod sdis;
+pub mod steward;
 pub mod trust;
 pub mod websocket;

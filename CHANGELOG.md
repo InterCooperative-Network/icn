@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Steward Layer (v0.4.0) (2025-12-14)
+
+**Gateway Steward API** ([icn/crates/icn-gateway/src/api/steward/mod.rs](icn/crates/icn-gateway/src/api/steward/mod.rs)):
+- `POST /v1/steward` - Register as steward (requires Strong POP level)
+- `GET /v1/steward/{id}` - Get steward by ID
+- `GET /v1/steward/by-did/{did}` - Get steward by DID
+- `GET /v1/steward` - List stewards with optional filters (active, jurisdiction)
+- `GET /v1/steward/attesters` - List stewards eligible to issue attestations
+- `PUT /v1/steward/{id}/status` - Update status (suspend/reinstate/revoke)
+- `POST /v1/steward/{id}/retire` - Self-service retirement
+- `POST /v1/steward/{id}/extend-term` - Extend steward term
+- `POST /v1/steward/{id}/bond/add` - Add to steward bond
+- `POST /v1/steward/{id}/bond/slash` - Slash steward bond (governance)
+- `POST /v1/steward/{id}/attestation|dispute|dispute-won` - Reputation tracking
+
+**CommonsManager Steward Operations** ([icn/crates/icn-gateway/src/commons_mgr.rs](icn/crates/icn-gateway/src/commons_mgr.rs)):
+- Full steward lifecycle: register, suspend, reinstate, retire, revoke
+- Reputation tracking: attestations issued, disputes, disputes won
+- Term and bond management with governance controls
+- Steward listing with filters and sorting by reputation
+
+**POP Attestation Integration** ([icn/crates/icn-gateway/src/api/commons/anchor.rs](icn/crates/icn-gateway/src/api/commons/anchor.rs)):
+- Attestation endpoint validates caller is registered steward
+- Checks `can_attest()` (active status, valid term, good reputation)
+- Records attestation on steward's record for reputation tracking
+
+**CLI Commands** ([icn/bins/icnctl/src/main.rs](icn/bins/icnctl/src/main.rs)):
+- `icnctl steward info <id|did>` - Get steward information
+- `icnctl steward list [--active] [--jurisdiction <j>]` - List stewards
+- `icnctl steward attesters` - List stewards who can issue attestations
+- `icnctl steward register` - Register as steward
+- `icnctl steward retire` - Self-service retirement
+
+**Integration Tests** ([icn/crates/icn-gateway/tests/steward_integration.rs](icn/crates/icn-gateway/tests/steward_integration.rs)):
+- 14 comprehensive tests covering registration, lifecycle, attestations, disputes, bonds, term management
+
 ### Tested - End-to-End Pilot UI Validation (2025-12-14)
 
 **Deployment Verification**:

@@ -584,6 +584,73 @@ impl CommonsManager {
 
     // ========== Steward Operations ==========
 
+    /// Register a new steward from a Commons Holder
+    ///
+    /// Requirements:
+    /// - Must be an active Commons Holder
+    /// - Must have at least Strong POP level
+    /// - Must have governance approval (proposal ID)
+    pub async fn register_steward(
+        &self,
+        holder_did: &Did,
+        steward_did: &Did,
+        term_duration_days: u64,
+        bond_amount: u64,
+        governance_approval: String,
+        jurisdiction: Option<String>,
+        specializations: Vec<String>,
+    ) -> Result<StewardRecord> {
+        // Verify holder exists and is active
+        let holder = self
+            .get_holder_by_did(holder_did)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Holder not found for DID: {holder_did}"))?;
+
+        if !holder.is_active() {
+            bail!("Holder is not active");
+        }
+
+        // Require at least Strong POP level to become a steward
+        if holder.personhood_level == POPLevel::Weak {
+            bail!("Steward requires at least Strong POP level");
+        }
+
+        // Check not already a steward
+        if self.get_steward_by_did(steward_did).await?.is_some() {
+            bail!("Already registered as steward");
+        }
+
+        // Calculate term
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let term_end = now + (term_duration_days * 24 * 60 * 60);
+
+        // Create steward record
+        let mut steward = StewardRecord::new(
+            steward_did.clone(),
+            holder_did.clone(),
+            now,
+            term_end,
+            bond_amount,
+            governance_approval,
+        );
+
+        // Set optional fields
+        if let Some(j) = jurisdiction {
+            steward.jurisdiction = Some(j);
+        }
+        for spec in specializations {
+            steward.add_specialization(spec);
+        }
+
+        // Store
+        self.store_steward(steward.clone()).await?;
+
+        Ok(steward)
+    }
+
     /// Store a steward record
     pub async fn store_steward(&self, steward: StewardRecord) -> Result<()> {
         let steward_id = steward.steward_id.to_hex();
@@ -613,6 +680,15 @@ impl CommonsManager {
         Ok(())
     }
 
+    /// Get a steward by ID
+    pub async fn get_steward(&self, steward_id: &str) -> Result<Option<StewardRecord>> {
+        let stewards = self
+            .stewards
+            .read()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        Ok(stewards.get(steward_id).cloned())
+    }
+
     /// Get a steward by DID
     pub async fn get_steward_by_did(&self, did: &Did) -> Result<Option<StewardRecord>> {
         let did_str = did.to_string();
@@ -626,14 +702,58 @@ impl CommonsManager {
         };
 
         if let Some(id) = steward_id {
-            let stewards = self
-                .stewards
-                .read()
-                .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-            Ok(stewards.get(&id).cloned())
+            self.get_steward(&id).await
         } else {
             Ok(None)
         }
+    }
+
+    /// List all stewards with optional filters
+    pub async fn list_stewards(
+        &self,
+        active_only: bool,
+        jurisdiction: Option<&str>,
+    ) -> Result<Vec<StewardRecord>> {
+        let stewards = self
+            .stewards
+            .read()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+
+        let mut results: Vec<StewardRecord> = stewards
+            .values()
+            .filter(|s| {
+                let active_match = !active_only || s.is_active();
+                let jurisdiction_match = jurisdiction.is_none()
+                    || s.jurisdiction.as_deref() == jurisdiction;
+                active_match && jurisdiction_match
+            })
+            .cloned()
+            .collect();
+
+        // Sort by reputation score, highest first
+        results.sort_by(|a, b| {
+            b.reputation_score
+                .partial_cmp(&a.reputation_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        Ok(results)
+    }
+
+    /// List stewards who can issue attestations
+    pub async fn list_attesters(&self) -> Result<Vec<StewardRecord>> {
+        let stewards = self
+            .stewards
+            .read()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+
+        let attesters: Vec<StewardRecord> = stewards
+            .values()
+            .filter(|s| s.can_attest())
+            .cloned()
+            .collect();
+
+        Ok(attesters)
     }
 
     /// Check if a DID belongs to an active steward
@@ -642,6 +762,159 @@ impl CommonsManager {
             Ok(steward.is_active() && steward.can_attest())
         } else {
             Ok(false)
+        }
+    }
+
+    /// Suspend a steward
+    pub async fn suspend_steward(&self, steward_id: &str, reason: String) -> Result<()> {
+        let mut stewards = self
+            .stewards
+            .write()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+
+        if let Some(steward) = stewards.get_mut(steward_id) {
+            steward.suspend(reason);
+            Ok(())
+        } else {
+            bail!("Steward not found: {steward_id}")
+        }
+    }
+
+    /// Reinstate a suspended steward
+    pub async fn reinstate_steward(&self, steward_id: &str) -> Result<bool> {
+        let mut stewards = self
+            .stewards
+            .write()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+
+        if let Some(steward) = stewards.get_mut(steward_id) {
+            Ok(steward.reinstate())
+        } else {
+            bail!("Steward not found: {steward_id}")
+        }
+    }
+
+    /// Retire a steward
+    pub async fn retire_steward(&self, steward_id: &str) -> Result<()> {
+        let mut stewards = self
+            .stewards
+            .write()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+
+        if let Some(steward) = stewards.get_mut(steward_id) {
+            steward.retire();
+            Ok(())
+        } else {
+            bail!("Steward not found: {steward_id}")
+        }
+    }
+
+    /// Revoke a steward for cause
+    pub async fn revoke_steward(
+        &self,
+        steward_id: &str,
+        reason: String,
+        evidence: Vec<[u8; 32]>,
+    ) -> Result<()> {
+        let mut stewards = self
+            .stewards
+            .write()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+
+        if let Some(steward) = stewards.get_mut(steward_id) {
+            steward.revoke(reason, evidence);
+            Ok(())
+        } else {
+            bail!("Steward not found: {steward_id}")
+        }
+    }
+
+    /// Record an attestation issued by a steward
+    pub async fn record_steward_attestation(&self, steward_id: &str) -> Result<()> {
+        let mut stewards = self
+            .stewards
+            .write()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+
+        if let Some(steward) = stewards.get_mut(steward_id) {
+            steward.record_attestation();
+            Ok(())
+        } else {
+            bail!("Steward not found: {steward_id}")
+        }
+    }
+
+    /// Record a dispute against a steward's attestation
+    pub async fn record_steward_dispute(&self, steward_id: &str) -> Result<()> {
+        let mut stewards = self
+            .stewards
+            .write()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+
+        if let Some(steward) = stewards.get_mut(steward_id) {
+            steward.record_dispute();
+            Ok(())
+        } else {
+            bail!("Steward not found: {steward_id}")
+        }
+    }
+
+    /// Record a dispute won by a steward
+    pub async fn record_steward_dispute_won(&self, steward_id: &str) -> Result<()> {
+        let mut stewards = self
+            .stewards
+            .write()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+
+        if let Some(steward) = stewards.get_mut(steward_id) {
+            steward.record_dispute_won();
+            Ok(())
+        } else {
+            bail!("Steward not found: {steward_id}")
+        }
+    }
+
+    /// Extend a steward's term
+    pub async fn extend_steward_term(&self, steward_id: &str, new_term_end: u64) -> Result<()> {
+        let mut stewards = self
+            .stewards
+            .write()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+
+        if let Some(steward) = stewards.get_mut(steward_id) {
+            steward.extend_term(new_term_end);
+            Ok(())
+        } else {
+            bail!("Steward not found: {steward_id}")
+        }
+    }
+
+    /// Add to a steward's bond
+    pub async fn add_steward_bond(&self, steward_id: &str, amount: u64) -> Result<()> {
+        let mut stewards = self
+            .stewards
+            .write()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+
+        if let Some(steward) = stewards.get_mut(steward_id) {
+            steward.add_bond(amount);
+            Ok(())
+        } else {
+            bail!("Steward not found: {steward_id}")
+        }
+    }
+
+    /// Slash a steward's bond
+    pub async fn slash_steward_bond(&self, steward_id: &str, amount: u64) -> Result<u64> {
+        let mut stewards = self
+            .stewards
+            .write()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+
+        if let Some(steward) = stewards.get_mut(steward_id) {
+            Ok(steward.slash_bond(amount))
+        } else {
+            bail!("Steward not found: {steward_id}")
         }
     }
 }

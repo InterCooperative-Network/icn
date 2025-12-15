@@ -16,6 +16,15 @@
 - CLI commands (`icnctl commons anchor`, `icnctl charter show/list`)
 - Integration tests for full enrollment → anchor → holder flow
 
+**v0.4.0 Stewardship - COMPLETE**:
+- StewardRecord management in CommonsManager with full lifecycle
+- Gateway REST API (`/v1/steward/*`) with 13 endpoints
+- POP attestation workflow integrated with steward validation
+- Reputation tracking (attestations issued, disputes, disputes won)
+- Term and bond management (extend term, add/slash bond)
+- CLI commands (`icnctl steward info/list/attesters/register/retire`)
+- 14 steward integration tests
+
 ---
 
 ## Abstract
@@ -763,7 +772,7 @@ contract CommonsGovernance {
 | Version | Milestone | Status | Key Deliverables |
 |---------|-----------|--------|------------------|
 | **v0.3.0** | Commons Foundation | **COMPLETE** | PersonhoodAnchor, CommonsHolderRecord, Charter structs; Gateway APIs; SDIS integration; CLI commands |
-| **v0.4.0** | Stewardship | Planned | StewardRecord, POP attestation workflow, steward governance |
+| **v0.4.0** | Stewardship | **COMPLETE** | StewardRecord, POP attestation workflow, steward governance, reputation tracking, bond/term management |
 | **v0.5.0** | Membership & Rights | Planned | Full MembershipRecord with capabilities, rights enforcement hooks, revocation registry |
 | **v0.6.0** | Constitutional Governance | Planned | Amendment process, multi-level ratification, appeal mechanisms |
 | **v1.0.0** | Production Commons | Planned | Full steward network, multiple POP pathways, complete economic layer |
