@@ -28,6 +28,9 @@ pub mod ledger_mgr;
 pub mod middleware;
 pub mod models;
 pub mod notification_listener;
+pub mod notification_processor;
+pub mod notification_queue;
+pub mod notification_triggers;
 pub mod notifications;
 pub mod pagination;
 pub mod rate_limit;
@@ -51,6 +54,10 @@ pub use pagination::{
     DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE,
 };
 pub use identity_mgr::{DeviceInfo, IdentityManager, RegisterDeviceRequest};
+pub use notification_queue::{
+    DeliveryStatus, NotificationChannel, NotificationPriority, NotificationQueue,
+    NotificationStatsSnapshot, NotificationType, QueuedNotification,
+};
 pub use rate_limit::{
     category_rate_limit_middleware, CategoryRateLimiter, EndpointCategory, RateLimitConfig,
     RateLimiter,

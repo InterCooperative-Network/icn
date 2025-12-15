@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
 use icn_identity::Did;
-use icn_ledger::{entry::JournalEntryBuilder, Ledger};
+use icn_ledger::{entry::JournalEntryBuilder, Ledger, SharedEventEmitter};
 use icn_store::{SledStore, Store};
 
 use crate::coop::CoopId;
@@ -16,6 +16,8 @@ use crate::events::{EventBroadcaster, GatewayEvent};
 pub struct LedgerManager {
     ledgers: Arc<RwLock<HashMap<CoopId, Arc<RwLock<Ledger>>>>>,
     event_broadcaster: Option<Arc<EventBroadcaster>>,
+    /// Shared event emitter for ledger events (used by notification triggers)
+    ledger_emitter: SharedEventEmitter,
     data_dir: Option<PathBuf>,
 }
 
@@ -31,6 +33,7 @@ impl LedgerManager {
         Self {
             ledgers: Arc::new(RwLock::new(HashMap::new())),
             event_broadcaster: None,
+            ledger_emitter: icn_ledger::create_shared_emitter(),
             data_dir: None,
         }
     }
@@ -40,8 +43,16 @@ impl LedgerManager {
         Self {
             ledgers: Arc::new(RwLock::new(HashMap::new())),
             event_broadcaster: None,
+            ledger_emitter: icn_ledger::create_shared_emitter(),
             data_dir: Some(data_dir),
         }
+    }
+
+    /// Get the shared event emitter for ledger events
+    ///
+    /// Use this to subscribe to ledger events for notifications, logging, etc.
+    pub fn get_event_emitter(&self) -> SharedEventEmitter {
+        self.ledger_emitter.clone()
     }
 
     /// Set the event broadcaster for real-time updates
@@ -88,7 +99,11 @@ impl LedgerManager {
             Arc::new(SledStore::temporary().map_err(GatewayError::SubstrateError)?)
         };
 
-        let ledger = Ledger::new(store).map_err(GatewayError::SubstrateError)?;
+        let mut ledger = Ledger::new(store).map_err(GatewayError::SubstrateError)?;
+
+        // Set event emitter for ledger events (notifications, real-time updates)
+        ledger.set_event_emitter(self.ledger_emitter.clone());
+        ledger.set_domain_id(coop_id.clone());
 
         let ledger_arc = Arc::new(RwLock::new(ledger));
         ledgers.insert(coop_id.clone(), ledger_arc.clone());

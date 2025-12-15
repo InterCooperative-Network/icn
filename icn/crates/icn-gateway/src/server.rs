@@ -20,6 +20,9 @@ use crate::federation_mgr::FederationManager;
 use crate::governance_mgr::GovernanceManager;
 use crate::identity_mgr::IdentityManager;
 use crate::ledger_mgr::LedgerManager;
+use crate::notification_processor::{NotificationProcessor, ProcessorConfig};
+use crate::notification_queue::NotificationQueue;
+use crate::notification_triggers::{GovernanceNotificationTrigger, LedgerNotificationTrigger};
 use crate::notifications::NotificationService;
 use crate::rate_limit::{IpRateLimiter, RateLimitConfig, RateLimiter};
 use crate::security::{configure_cors, SecurityConfig, SecurityHeaders};
@@ -164,6 +167,33 @@ impl GatewayServer {
         let notification_service = Arc::new(NotificationService::new(None));
         info!("Notification service initialized");
 
+        // Create notification queue and processor
+        let (notification_queue, notification_receiver) = NotificationQueue::new();
+        let notification_queue = Arc::new(notification_queue);
+        let notification_processor = Arc::new(NotificationProcessor::new(
+            notification_queue.clone(),
+            notification_service.clone(),
+            ProcessorConfig::default(),
+        ));
+        info!("Notification queue and processor initialized");
+
+        // Start notification processor
+        let _processor_handle = notification_processor.clone().start(notification_receiver);
+        info!("Notification processor started");
+
+        // Start ledger notification trigger (connects ledger events to notifications)
+        let ledger_emitter = ledger_manager.get_event_emitter();
+        let ledger_trigger = LedgerNotificationTrigger::new(
+            ledger_emitter,
+            notification_queue.clone(),
+            "default-coop".to_string(), // Default coop ID for ledger events
+        );
+        let _ledger_trigger_handle = ledger_trigger.start();
+        info!("Ledger notification trigger started");
+
+        // Create governance notification trigger (for proposal/amendment/appeal notifications)
+        let governance_trigger = Arc::new(GovernanceNotificationTrigger::new(notification_queue.clone()));
+
         // Create shutdown channel
         let (shutdown_tx, _shutdown_rx) = tokio::sync::broadcast::channel::<()>(1);
 
@@ -244,6 +274,9 @@ impl GatewayServer {
                 .app_data(web::Data::new(enrollment_store.clone()))
                 .app_data(web::Data::new(event_broadcaster.clone()))
                 .app_data(web::Data::new(notification_service.clone()))
+                .app_data(web::Data::new(notification_queue.clone()))
+                .app_data(web::Data::new(notification_processor.clone()))
+                .app_data(web::Data::new(governance_trigger.clone()))
                 .app_data(web::Data::new(rate_limiter.clone()))
                 .app_data(web::Data::new(ip_rate_limiter.clone()))
                 // JSON payload size limit (256KB - we're not handling file uploads)
