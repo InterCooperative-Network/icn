@@ -18,6 +18,7 @@ use crate::error::Result;
 use crate::events::EventBroadcaster;
 use crate::federation_mgr::FederationManager;
 use crate::governance_mgr::GovernanceManager;
+use crate::identity_mgr::IdentityManager;
 use crate::ledger_mgr::LedgerManager;
 use crate::notifications::NotificationService;
 use crate::rate_limit::{IpRateLimiter, RateLimitConfig, RateLimiter};
@@ -129,10 +130,17 @@ impl GatewayServer {
             Arc::new(crate::api::sdis::simple_enrollment::EnrollmentStore::new());
 
         // Create ledger manager with persistent storage if data_dir is set
-        let ledger_manager = if let Some(data_dir) = self.data_dir {
-            Arc::new(LedgerManager::new_with_storage(data_dir))
+        let ledger_manager = if let Some(ref data_dir) = self.data_dir {
+            Arc::new(LedgerManager::new_with_storage(data_dir.clone()))
         } else {
             Arc::new(LedgerManager::new())
+        };
+
+        // Create identity manager for multi-device support
+        let identity_manager = if let Some(ref data_dir) = self.data_dir {
+            Arc::new(IdentityManager::new_with_storage(data_dir.clone()))
+        } else {
+            Arc::new(IdentityManager::new())
         };
 
         // Use provided event broadcaster or create a new one
@@ -231,6 +239,7 @@ impl GatewayServer {
                 .app_data(web::Data::new(federation_manager.clone()))
                 .app_data(web::Data::new(commons_manager.clone()))
                 .app_data(web::Data::new(ledger_manager.clone()))
+                .app_data(web::Data::new(identity_manager.clone()))
                 .app_data(web::Data::new(sdis_state.clone()))
                 .app_data(web::Data::new(enrollment_store.clone()))
                 .app_data(web::Data::new(event_broadcaster.clone()))
@@ -378,6 +387,20 @@ impl GatewayServer {
                                 .service(api::trust::create_trust_attestation)
                                 .service(api::trust::revoke_trust_attestation)
                                 .service(api::trust::get_trust_network)
+                                .wrap(middleware::from_fn(
+                                    crate::rate_limit::rate_limit_middleware,
+                                ))
+                                .wrap(auth.clone()),
+                        )
+                        // Protected device management endpoints (auth + rate limiting)
+                        // These enable multi-device support for mobile apps
+                        // Routes: /v1/devices/{did}, /v1/devices/{did}/{device_id}
+                        .service(
+                            web::scope("/devices")
+                                .service(api::devices::register_device)
+                                .service(api::devices::list_devices)
+                                .service(api::devices::get_device)
+                                .service(api::devices::revoke_device)
                                 .wrap(middleware::from_fn(
                                     crate::rate_limit::rate_limit_middleware,
                                 ))

@@ -182,6 +182,23 @@ export {
   useAppealAdmin,
 } from './constitutional-hooks';
 
+// Device Management Types
+export type {
+  DeviceCapability,
+  DeviceInfo,
+  RegisterDeviceRequest,
+  RegisterDeviceResponse,
+  ListDevicesResponse,
+  DeviceAPI,
+} from './device-hooks';
+
+// Device Management React Hooks
+export {
+  createDeviceAPI,
+  useDevices,
+  useDeviceSigning,
+} from './device-hooks';
+
 // Re-export core SDK types for convenience
 export {
   ICNClient,

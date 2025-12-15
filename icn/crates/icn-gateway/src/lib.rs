@@ -21,6 +21,7 @@ pub mod error;
 pub mod events;
 pub mod federation_mgr;
 pub mod governance_mgr;
+pub mod identity_mgr;
 pub mod invite;
 pub mod ledger_events;
 pub mod ledger_mgr;
@@ -49,6 +50,7 @@ pub use pagination::{
     Cursor, Cursored, Direction, PaginatedList, PaginationRequest, PaginationResponse,
     DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE,
 };
+pub use identity_mgr::{DeviceInfo, IdentityManager, RegisterDeviceRequest};
 pub use rate_limit::{
     category_rate_limit_middleware, CategoryRateLimiter, EndpointCategory, RateLimitConfig,
     RateLimiter,
