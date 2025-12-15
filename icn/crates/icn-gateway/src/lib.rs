@@ -13,6 +13,7 @@
 pub mod api;
 pub mod auth;
 pub mod commons_mgr;
+pub mod commons_store;
 pub mod compute_events;
 pub mod compute_mgr;
 pub mod coop;

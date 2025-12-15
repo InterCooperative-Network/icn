@@ -18,60 +18,47 @@ use icn_identity::{
     RevocationScope, RevocationType,
 };
 use sha2::{Digest, Sha256};
-use std::collections::HashMap;
-use std::sync::RwLock;
+use std::sync::Arc;
+
+use crate::commons_store::{CommonsStore, CommonsStoreBackend, InMemoryCommonsStore};
 
 /// Commons Manager for gateway API
-pub struct CommonsManager {
-    // Layer 0: PersonhoodAnchors (by anchor_id hex)
-    anchors: RwLock<HashMap<String, PersonhoodAnchor>>,
-    // Index: DID -> anchor_id
-    anchors_by_did: RwLock<HashMap<String, String>>,
+///
+/// Uses CommonsStore for persistent/in-memory storage of:
+/// - PersonhoodAnchors (Layer 0)
+/// - CommonsHolderRecords (Layer 1)
+/// - Charters (Layer 2)
+/// - StewardRecords, Amendments, Appeals
+///
+/// RevocationRegistry is kept separate for now.
+pub struct CommonsManager<S: CommonsStoreBackend = InMemoryCommonsStore> {
+    /// Storage backend
+    store: CommonsStore<S>,
 
-    // Layer 1: CommonsHolderRecords (by holder_id hex)
-    holders: RwLock<HashMap<String, CommonsHolderRecord>>,
-    // Index: DID -> holder_id
-    holders_by_did: RwLock<HashMap<String, String>>,
-    // Index: anchor_id -> holder_id
-    holders_by_anchor: RwLock<HashMap<String, String>>,
-
-    // Layer 2: Charters (by charter_id hex)
-    charters: RwLock<HashMap<String, Charter>>,
-    // Index: domain_id -> charter_id
-    charters_by_domain: RwLock<HashMap<String, String>>,
-
-    // Steward records (by steward_id hex)
-    stewards: RwLock<HashMap<String, StewardRecord>>,
-    // Index: DID -> steward_id
-    stewards_by_did: RwLock<HashMap<String, String>>,
-
-    // Revocation registry
+    /// Revocation registry (kept separate from main store)
     revocations: RevocationRegistry,
-
-    // Amendments (by amendment_id hex)
-    amendments: RwLock<HashMap<String, Amendment>>,
-
-    // Appeals (by appeal_id hex)
-    appeals: RwLock<HashMap<String, Appeal>>,
 }
 
-impl CommonsManager {
+impl CommonsManager<InMemoryCommonsStore> {
     /// Create a new commons manager with in-memory storage
     pub fn new() -> Self {
+        let backend = Arc::new(InMemoryCommonsStore::new());
+        Self::with_store(backend)
+    }
+}
+
+impl<S: CommonsStoreBackend> CommonsManager<S> {
+    /// Create a new commons manager with a custom store backend
+    pub fn with_store(backend: Arc<S>) -> Self {
         CommonsManager {
-            anchors: RwLock::new(HashMap::new()),
-            anchors_by_did: RwLock::new(HashMap::new()),
-            holders: RwLock::new(HashMap::new()),
-            holders_by_did: RwLock::new(HashMap::new()),
-            holders_by_anchor: RwLock::new(HashMap::new()),
-            charters: RwLock::new(HashMap::new()),
-            charters_by_domain: RwLock::new(HashMap::new()),
-            stewards: RwLock::new(HashMap::new()),
-            stewards_by_did: RwLock::new(HashMap::new()),
+            store: CommonsStore::new(backend),
             revocations: RevocationRegistry::new(),
-            amendments: RwLock::new(HashMap::new()),
-            appeals: RwLock::new(HashMap::new()),
         }
+    }
+
+    /// Get a reference to the underlying store
+    pub fn store(&self) -> &CommonsStore<S> {
+        &self.store
     }
 
     // ========== PersonhoodAnchor Operations (Layer 0) ==========
@@ -155,79 +142,48 @@ impl CommonsManager {
         // Create PersonhoodAnchor
         let anchor = PersonhoodAnchor::new(sdis_anchor, attestation, current_key);
 
-        // Store anchor
+        // Check if anchor already exists
         let anchor_id = hex::encode(anchor.id());
+        if self.store.get_anchor(&anchor_id)?.is_some() {
+            bail!("Anchor already exists: {anchor_id}");
+        }
+
+        // Store anchor
+        self.store.put_anchor(&anchor)?;
+
+        // Also index by the enrollment DID (which may differ from anchor's internal DID)
         let did_str = did.to_string();
-
-        {
-            let mut anchors = self
-                .anchors
-                .write()
-                .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-
-            if anchors.contains_key(&anchor_id) {
-                bail!("Anchor already exists: {anchor_id}");
-            }
-
-            anchors.insert(anchor_id.clone(), anchor.clone());
-        }
-
-        {
-            let mut by_did = self
-                .anchors_by_did
-                .write()
-                .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-            by_did.insert(did_str, anchor_id);
-        }
+        self.store.put_anchor_did_index(&did_str, &anchor_id)?;
 
         Ok(anchor)
     }
 
     /// Get a PersonhoodAnchor by ID
     pub async fn get_anchor(&self, anchor_id: &str) -> Result<Option<PersonhoodAnchor>> {
-        let anchors = self
-            .anchors
-            .read()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-        Ok(anchors.get(anchor_id).cloned())
+        self.store.get_anchor(anchor_id)
     }
 
     /// Get a PersonhoodAnchor by DID
     pub async fn get_anchor_by_did(&self, did: &Did) -> Result<Option<PersonhoodAnchor>> {
         let did_str = did.to_string();
-
-        let anchor_id = {
-            let by_did = self
-                .anchors_by_did
-                .read()
-                .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-            by_did.get(&did_str).cloned()
-        };
-
-        if let Some(id) = anchor_id {
-            self.get_anchor(&id).await
-        } else {
-            Ok(None)
-        }
+        self.store.get_anchor_by_did(&did_str)
     }
 
     /// Update anchor status
     pub async fn update_anchor_status(&self, anchor_id: &str, status: AnchorStatus) -> Result<()> {
-        let mut anchors = self
-            .anchors
-            .write()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        let mut anchor = self
+            .store
+            .get_anchor(anchor_id)?
+            .ok_or_else(|| anyhow::anyhow!("Anchor not found: {anchor_id}"))?;
 
-        if let Some(anchor) = anchors.get_mut(anchor_id) {
-            anchor.status = status;
-            anchor.updated_at = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
-            Ok(())
-        } else {
-            bail!("Anchor not found: {anchor_id}")
-        }
+        anchor.status = status;
+        anchor.updated_at = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        self.store.put_anchor(&anchor)?;
+        Ok(())
     }
 
     /// Add an attestation to an anchor
@@ -236,17 +192,14 @@ impl CommonsManager {
         anchor_id: &str,
         attestation: POPAttestation,
     ) -> Result<()> {
-        let mut anchors = self
-            .anchors
-            .write()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        let mut anchor = self
+            .store
+            .get_anchor(anchor_id)?
+            .ok_or_else(|| anyhow::anyhow!("Anchor not found: {anchor_id}"))?;
 
-        if let Some(anchor) = anchors.get_mut(anchor_id) {
-            anchor.add_attestation(attestation);
-            Ok(())
-        } else {
-            bail!("Anchor not found: {anchor_id}")
-        }
+        anchor.add_attestation(attestation);
+        self.store.put_anchor(&anchor)?;
+        Ok(())
     }
 
     // ========== CommonsHolderRecord Operations (Layer 1) ==========
@@ -274,88 +227,44 @@ impl CommonsManager {
         // Create holder with baseline Commons Rights
         let holder = CommonsHolderRecord::new(anchor_bytes, did.clone(), pop_level);
 
+        // Check if holder already exists
         let holder_id = hex::encode(holder.id());
-        let did_str = did.to_string();
-
-        // Store holder
-        {
-            let mut holders = self
-                .holders
-                .write()
-                .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-
-            if holders.contains_key(&holder_id) {
-                bail!("Holder already exists: {holder_id}");
-            }
-
-            holders.insert(holder_id.clone(), holder.clone());
+        if self.store.get_holder(&holder_id)?.is_some() {
+            bail!("Holder already exists: {holder_id}");
         }
 
-        // Update indexes
-        {
-            let mut by_did = self
-                .holders_by_did
-                .write()
-                .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-            by_did.insert(did_str, holder_id.clone());
-        }
-
-        {
-            let mut by_anchor = self
-                .holders_by_anchor
-                .write()
-                .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-            by_anchor.insert(anchor_id.to_string(), holder_id);
-        }
+        // Store holder (this also updates DID and anchor indexes)
+        self.store.put_holder(&holder)?;
 
         Ok(holder)
     }
 
     /// Get a CommonsHolderRecord by ID
     pub async fn get_holder(&self, holder_id: &str) -> Result<Option<CommonsHolderRecord>> {
-        let holders = self
-            .holders
-            .read()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-        Ok(holders.get(holder_id).cloned())
+        self.store.get_holder(holder_id)
     }
 
     /// Get a CommonsHolderRecord by DID
     pub async fn get_holder_by_did(&self, did: &Did) -> Result<Option<CommonsHolderRecord>> {
         let did_str = did.to_string();
-
-        let holder_id = {
-            let by_did = self
-                .holders_by_did
-                .read()
-                .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-            by_did.get(&did_str).cloned()
-        };
-
-        if let Some(id) = holder_id {
-            self.get_holder(&id).await
-        } else {
-            Ok(None)
-        }
+        self.store.get_holder_by_did(&did_str)
     }
 
     /// Update holder status
     pub async fn update_holder_status(&self, holder_id: &str, status: HolderStatus) -> Result<()> {
-        let mut holders = self
-            .holders
-            .write()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        let mut holder = self
+            .store
+            .get_holder(holder_id)?
+            .ok_or_else(|| anyhow::anyhow!("Holder not found: {holder_id}"))?;
 
-        if let Some(holder) = holders.get_mut(holder_id) {
-            holder.status = status;
-            holder.updated_at = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
-            Ok(())
-        } else {
-            bail!("Holder not found: {holder_id}")
-        }
+        holder.status = status;
+        holder.updated_at = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        self.store.put_holder(&holder)?;
+        Ok(())
     }
 
     // ========== Affiliation Operations ==========
@@ -367,13 +276,9 @@ impl CommonsManager {
         jurisdiction: JurisdictionId,
         initial_capabilities: Vec<MembershipCapability>,
     ) -> Result<Affiliation> {
-        let mut holders = self
-            .holders
-            .write()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-
-        let holder = holders
-            .get_mut(holder_id)
+        let mut holder = self
+            .store
+            .get_holder(holder_id)?
             .ok_or_else(|| anyhow::anyhow!("Holder not found: {holder_id}"))?;
 
         // Check if already affiliated
@@ -406,6 +311,7 @@ impl CommonsManager {
         holder.affiliations.push(affiliation.clone());
         holder.updated_at = now;
 
+        self.store.put_holder(&holder)?;
         Ok(affiliation)
     }
 
@@ -415,13 +321,9 @@ impl CommonsManager {
         holder_id: &str,
         jurisdiction: &JurisdictionId,
     ) -> Result<()> {
-        let mut holders = self
-            .holders
-            .write()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-
-        let holder = holders
-            .get_mut(holder_id)
+        let mut holder = self
+            .store
+            .get_holder(holder_id)?
             .ok_or_else(|| anyhow::anyhow!("Holder not found: {holder_id}"))?;
 
         // Find and update affiliation status to Exited
@@ -435,6 +337,7 @@ impl CommonsManager {
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
                 .as_secs();
+            self.store.put_holder(&holder)?;
             Ok(())
         } else {
             bail!(
@@ -451,13 +354,9 @@ impl CommonsManager {
         jurisdiction: &JurisdictionId,
         status: MembershipStatus,
     ) -> Result<()> {
-        let mut holders = self
-            .holders
-            .write()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-
-        let holder = holders
-            .get_mut(holder_id)
+        let mut holder = self
+            .store
+            .get_holder(holder_id)?
             .ok_or_else(|| anyhow::anyhow!("Holder not found: {holder_id}"))?;
 
         if let Some(affiliation) = holder
@@ -470,6 +369,7 @@ impl CommonsManager {
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
                 .as_secs();
+            self.store.put_holder(&holder)?;
             Ok(())
         } else {
             bail!(
@@ -481,13 +381,9 @@ impl CommonsManager {
 
     /// List affiliations for a holder
     pub async fn list_affiliations(&self, holder_id: &str) -> Result<Vec<Affiliation>> {
-        let holders = self
-            .holders
-            .read()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-
-        let holder = holders
-            .get(holder_id)
+        let holder = self
+            .store
+            .get_holder(holder_id)?
             .ok_or_else(|| anyhow::anyhow!("Holder not found: {holder_id}"))?;
 
         Ok(holder.affiliations.clone())
@@ -498,56 +394,25 @@ impl CommonsManager {
     /// Store a charter
     pub async fn store_charter(&self, charter: Charter) -> Result<()> {
         let charter_id = charter.charter_id.to_hex();
-        let domain_id = charter.domain_id.clone();
 
-        {
-            let mut charters = self
-                .charters
-                .write()
-                .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-
-            if charters.contains_key(&charter_id) {
-                bail!("Charter already exists: {charter_id}");
-            }
-
-            charters.insert(charter_id.clone(), charter);
+        // Check if charter already exists
+        if self.store.get_charter(&charter_id)?.is_some() {
+            bail!("Charter already exists: {charter_id}");
         }
 
-        {
-            let mut by_domain = self
-                .charters_by_domain
-                .write()
-                .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-            by_domain.insert(domain_id, charter_id);
-        }
-
+        // Store charter (this also updates the domain index)
+        self.store.put_charter(&charter)?;
         Ok(())
     }
 
     /// Get a charter by ID
     pub async fn get_charter(&self, charter_id: &str) -> Result<Option<Charter>> {
-        let charters = self
-            .charters
-            .read()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-        Ok(charters.get(charter_id).cloned())
+        self.store.get_charter(charter_id)
     }
 
     /// Get a charter by domain ID
     pub async fn get_charter_by_domain(&self, domain_id: &str) -> Result<Option<Charter>> {
-        let charter_id = {
-            let by_domain = self
-                .charters_by_domain
-                .read()
-                .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-            by_domain.get(domain_id).cloned()
-        };
-
-        if let Some(id) = charter_id {
-            self.get_charter(&id).await
-        } else {
-            Ok(None)
-        }
+        self.store.get_charter_by_domain(domain_id)
     }
 
     /// List all charters with optional filters
@@ -556,19 +421,15 @@ impl CommonsManager {
         org_type: Option<OrgType>,
         status: Option<CharterStatus>,
     ) -> Result<Vec<Charter>> {
-        let charters = self
-            .charters
-            .read()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        let all_charters = self.store.list_charters()?;
 
-        let mut results: Vec<Charter> = charters
-            .values()
+        let mut results: Vec<Charter> = all_charters
+            .into_iter()
             .filter(|c| {
                 let type_match = org_type.as_ref().is_none_or(|t| c.org_type == *t);
                 let status_match = status.as_ref().is_none_or(|s| c.status == *s);
                 type_match && status_match
             })
-            .cloned()
             .collect();
 
         // Sort by creation time, newest first
@@ -583,19 +444,16 @@ impl CommonsManager {
         charter_id: &str,
         status: CharterStatus,
     ) -> Result<()> {
-        let mut charters = self
-            .charters
-            .write()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        let mut charter = self
+            .store
+            .get_charter(charter_id)?
+            .ok_or_else(|| anyhow::anyhow!("Charter not found: {charter_id}"))?;
 
-        if let Some(charter) = charters.get_mut(charter_id) {
-            charter.status = status;
-            // Note: Charter doesn't have an updated_at field
-            // Status changes are tracked via amendments in production
-            Ok(())
-        } else {
-            bail!("Charter not found: {charter_id}")
-        }
+        charter.status = status;
+        // Note: Charter doesn't have an updated_at field
+        // Status changes are tracked via amendments in production
+        self.store.put_charter(&charter)?;
+        Ok(())
     }
 
     // ========== Steward Operations ==========
@@ -670,58 +528,26 @@ impl CommonsManager {
     /// Store a steward record
     pub async fn store_steward(&self, steward: StewardRecord) -> Result<()> {
         let steward_id = steward.steward_id.to_hex();
-        let did_str = steward.steward_did.to_string();
 
-        {
-            let mut stewards = self
-                .stewards
-                .write()
-                .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-
-            if stewards.contains_key(&steward_id) {
-                bail!("Steward already exists: {steward_id}");
-            }
-
-            stewards.insert(steward_id.clone(), steward);
+        // Check if steward already exists
+        if self.store.get_steward(&steward_id)?.is_some() {
+            bail!("Steward already exists: {steward_id}");
         }
 
-        {
-            let mut by_did = self
-                .stewards_by_did
-                .write()
-                .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-            by_did.insert(did_str, steward_id);
-        }
-
+        // Store steward (this also updates the DID index)
+        self.store.put_steward(&steward)?;
         Ok(())
     }
 
     /// Get a steward by ID
     pub async fn get_steward(&self, steward_id: &str) -> Result<Option<StewardRecord>> {
-        let stewards = self
-            .stewards
-            .read()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-        Ok(stewards.get(steward_id).cloned())
+        self.store.get_steward(steward_id)
     }
 
     /// Get a steward by DID
     pub async fn get_steward_by_did(&self, did: &Did) -> Result<Option<StewardRecord>> {
         let did_str = did.to_string();
-
-        let steward_id = {
-            let by_did = self
-                .stewards_by_did
-                .read()
-                .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-            by_did.get(&did_str).cloned()
-        };
-
-        if let Some(id) = steward_id {
-            self.get_steward(&id).await
-        } else {
-            Ok(None)
-        }
+        self.store.get_steward_by_did(&did_str)
     }
 
     /// List all stewards with optional filters
@@ -730,20 +556,16 @@ impl CommonsManager {
         active_only: bool,
         jurisdiction: Option<&str>,
     ) -> Result<Vec<StewardRecord>> {
-        let stewards = self
-            .stewards
-            .read()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        let all_stewards = self.store.list_stewards()?;
 
-        let mut results: Vec<StewardRecord> = stewards
-            .values()
+        let mut results: Vec<StewardRecord> = all_stewards
+            .into_iter()
             .filter(|s| {
                 let active_match = !active_only || s.is_active();
-                let jurisdiction_match = jurisdiction.is_none()
-                    || s.jurisdiction.as_deref() == jurisdiction;
+                let jurisdiction_match =
+                    jurisdiction.is_none() || s.jurisdiction.as_deref() == jurisdiction;
                 active_match && jurisdiction_match
             })
-            .cloned()
             .collect();
 
         // Sort by reputation score, highest first
@@ -758,17 +580,9 @@ impl CommonsManager {
 
     /// List stewards who can issue attestations
     pub async fn list_attesters(&self) -> Result<Vec<StewardRecord>> {
-        let stewards = self
-            .stewards
-            .read()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-
-        let attesters: Vec<StewardRecord> = stewards
-            .values()
-            .filter(|s| s.can_attest())
-            .cloned()
-            .collect();
-
+        let all_stewards = self.store.list_stewards()?;
+        let attesters: Vec<StewardRecord> =
+            all_stewards.into_iter().filter(|s| s.can_attest()).collect();
         Ok(attesters)
     }
 
@@ -783,46 +597,38 @@ impl CommonsManager {
 
     /// Suspend a steward
     pub async fn suspend_steward(&self, steward_id: &str, reason: String) -> Result<()> {
-        let mut stewards = self
-            .stewards
-            .write()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        let mut steward = self
+            .store
+            .get_steward(steward_id)?
+            .ok_or_else(|| anyhow::anyhow!("Steward not found: {steward_id}"))?;
 
-        if let Some(steward) = stewards.get_mut(steward_id) {
-            steward.suspend(reason);
-            Ok(())
-        } else {
-            bail!("Steward not found: {steward_id}")
-        }
+        steward.suspend(reason);
+        self.store.put_steward(&steward)?;
+        Ok(())
     }
 
     /// Reinstate a suspended steward
     pub async fn reinstate_steward(&self, steward_id: &str) -> Result<bool> {
-        let mut stewards = self
-            .stewards
-            .write()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        let mut steward = self
+            .store
+            .get_steward(steward_id)?
+            .ok_or_else(|| anyhow::anyhow!("Steward not found: {steward_id}"))?;
 
-        if let Some(steward) = stewards.get_mut(steward_id) {
-            Ok(steward.reinstate())
-        } else {
-            bail!("Steward not found: {steward_id}")
-        }
+        let result = steward.reinstate();
+        self.store.put_steward(&steward)?;
+        Ok(result)
     }
 
     /// Retire a steward
     pub async fn retire_steward(&self, steward_id: &str) -> Result<()> {
-        let mut stewards = self
-            .stewards
-            .write()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        let mut steward = self
+            .store
+            .get_steward(steward_id)?
+            .ok_or_else(|| anyhow::anyhow!("Steward not found: {steward_id}"))?;
 
-        if let Some(steward) = stewards.get_mut(steward_id) {
-            steward.retire();
-            Ok(())
-        } else {
-            bail!("Steward not found: {steward_id}")
-        }
+        steward.retire();
+        self.store.put_steward(&steward)?;
+        Ok(())
     }
 
     /// Revoke a steward for cause
@@ -832,106 +638,86 @@ impl CommonsManager {
         reason: String,
         evidence: Vec<[u8; 32]>,
     ) -> Result<()> {
-        let mut stewards = self
-            .stewards
-            .write()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        let mut steward = self
+            .store
+            .get_steward(steward_id)?
+            .ok_or_else(|| anyhow::anyhow!("Steward not found: {steward_id}"))?;
 
-        if let Some(steward) = stewards.get_mut(steward_id) {
-            steward.revoke(reason, evidence);
-            Ok(())
-        } else {
-            bail!("Steward not found: {steward_id}")
-        }
+        steward.revoke(reason, evidence);
+        self.store.put_steward(&steward)?;
+        Ok(())
     }
 
     /// Record an attestation issued by a steward
     pub async fn record_steward_attestation(&self, steward_id: &str) -> Result<()> {
-        let mut stewards = self
-            .stewards
-            .write()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        let mut steward = self
+            .store
+            .get_steward(steward_id)?
+            .ok_or_else(|| anyhow::anyhow!("Steward not found: {steward_id}"))?;
 
-        if let Some(steward) = stewards.get_mut(steward_id) {
-            steward.record_attestation();
-            Ok(())
-        } else {
-            bail!("Steward not found: {steward_id}")
-        }
+        steward.record_attestation();
+        self.store.put_steward(&steward)?;
+        Ok(())
     }
 
     /// Record a dispute against a steward's attestation
     pub async fn record_steward_dispute(&self, steward_id: &str) -> Result<()> {
-        let mut stewards = self
-            .stewards
-            .write()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        let mut steward = self
+            .store
+            .get_steward(steward_id)?
+            .ok_or_else(|| anyhow::anyhow!("Steward not found: {steward_id}"))?;
 
-        if let Some(steward) = stewards.get_mut(steward_id) {
-            steward.record_dispute();
-            Ok(())
-        } else {
-            bail!("Steward not found: {steward_id}")
-        }
+        steward.record_dispute();
+        self.store.put_steward(&steward)?;
+        Ok(())
     }
 
     /// Record a dispute won by a steward
     pub async fn record_steward_dispute_won(&self, steward_id: &str) -> Result<()> {
-        let mut stewards = self
-            .stewards
-            .write()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        let mut steward = self
+            .store
+            .get_steward(steward_id)?
+            .ok_or_else(|| anyhow::anyhow!("Steward not found: {steward_id}"))?;
 
-        if let Some(steward) = stewards.get_mut(steward_id) {
-            steward.record_dispute_won();
-            Ok(())
-        } else {
-            bail!("Steward not found: {steward_id}")
-        }
+        steward.record_dispute_won();
+        self.store.put_steward(&steward)?;
+        Ok(())
     }
 
     /// Extend a steward's term
     pub async fn extend_steward_term(&self, steward_id: &str, new_term_end: u64) -> Result<()> {
-        let mut stewards = self
-            .stewards
-            .write()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        let mut steward = self
+            .store
+            .get_steward(steward_id)?
+            .ok_or_else(|| anyhow::anyhow!("Steward not found: {steward_id}"))?;
 
-        if let Some(steward) = stewards.get_mut(steward_id) {
-            steward.extend_term(new_term_end);
-            Ok(())
-        } else {
-            bail!("Steward not found: {steward_id}")
-        }
+        steward.extend_term(new_term_end);
+        self.store.put_steward(&steward)?;
+        Ok(())
     }
 
     /// Add to a steward's bond
     pub async fn add_steward_bond(&self, steward_id: &str, amount: u64) -> Result<()> {
-        let mut stewards = self
-            .stewards
-            .write()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        let mut steward = self
+            .store
+            .get_steward(steward_id)?
+            .ok_or_else(|| anyhow::anyhow!("Steward not found: {steward_id}"))?;
 
-        if let Some(steward) = stewards.get_mut(steward_id) {
-            steward.add_bond(amount);
-            Ok(())
-        } else {
-            bail!("Steward not found: {steward_id}")
-        }
+        steward.add_bond(amount);
+        self.store.put_steward(&steward)?;
+        Ok(())
     }
 
     /// Slash a steward's bond
     pub async fn slash_steward_bond(&self, steward_id: &str, amount: u64) -> Result<u64> {
-        let mut stewards = self
-            .stewards
-            .write()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        let mut steward = self
+            .store
+            .get_steward(steward_id)?
+            .ok_or_else(|| anyhow::anyhow!("Steward not found: {steward_id}"))?;
 
-        if let Some(steward) = stewards.get_mut(steward_id) {
-            Ok(steward.slash_bond(amount))
-        } else {
-            bail!("Steward not found: {steward_id}")
-        }
+        let result = steward.slash_bond(amount);
+        self.store.put_steward(&steward)?;
+        Ok(result)
     }
 
     // ========== Revocation Operations ==========
@@ -1054,12 +840,8 @@ impl CommonsManager {
         // Update affiliation status (but allow appeal)
         affiliation.suspend();
 
-        // Update holder
-        let mut holders = self
-            .holders
-            .write()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-        holders.insert(holder_id.to_string(), holder);
+        // Update holder via store
+        self.store.put_holder(&holder)?;
 
         Ok(record)
     }
@@ -1101,12 +883,8 @@ impl CommonsManager {
         // Ban the member
         affiliation.ban();
 
-        // Update holder
-        let mut holders = self
-            .holders
-            .write()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-        holders.insert(holder_id.to_string(), holder);
+        // Update holder via store
+        self.store.put_holder(&holder)?;
 
         Ok(record)
     }
@@ -1161,12 +939,8 @@ impl CommonsManager {
         // Add to holder
         holder.add_affiliation(affiliation.clone());
 
-        // Update storage
-        let mut holders = self
-            .holders
-            .write()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-        holders.insert(holder_id.to_string(), holder);
+        // Update storage via store
+        self.store.put_holder(&holder)?;
 
         Ok(affiliation)
     }
@@ -1187,16 +961,15 @@ impl CommonsManager {
         })?;
 
         if affiliation.membership_status != MembershipStatus::Candidate {
-            bail!("Can only approve candidates, current status: {}", affiliation.membership_status);
+            bail!(
+                "Can only approve candidates, current status: {}",
+                affiliation.membership_status
+            );
         }
 
         affiliation.approve();
 
-        let mut holders = self
-            .holders
-            .write()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-        holders.insert(holder_id.to_string(), holder);
+        self.store.put_holder(&holder)?;
 
         Ok(())
     }
@@ -1225,11 +998,7 @@ impl CommonsManager {
 
         affiliation.promote();
 
-        let mut holders = self
-            .holders
-            .write()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-        holders.insert(holder_id.to_string(), holder);
+        self.store.put_holder(&holder)?;
 
         Ok(())
     }
@@ -1251,11 +1020,7 @@ impl CommonsManager {
 
         affiliation.suspend();
 
-        let mut holders = self
-            .holders
-            .write()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-        holders.insert(holder_id.to_string(), holder);
+        self.store.put_holder(&holder)?;
 
         Ok(())
     }
@@ -1282,11 +1047,7 @@ impl CommonsManager {
         // Reinstate to Member status
         affiliation.membership_status = MembershipStatus::Member;
 
-        let mut holders = self
-            .holders
-            .write()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-        holders.insert(holder_id.to_string(), holder);
+        self.store.put_holder(&holder)?;
 
         Ok(())
     }
@@ -1313,11 +1074,7 @@ impl CommonsManager {
 
         affiliation.add_capability(capability);
 
-        let mut holders = self
-            .holders
-            .write()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-        holders.insert(holder_id.to_string(), holder);
+        self.store.put_holder(&holder)?;
 
         Ok(())
     }
@@ -1340,11 +1097,7 @@ impl CommonsManager {
 
         affiliation.remove_capability(capability);
 
-        let mut holders = self
-            .holders
-            .write()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-        holders.insert(holder_id.to_string(), holder);
+        self.store.put_holder(&holder)?;
 
         Ok(())
     }
@@ -1369,11 +1122,7 @@ impl CommonsManager {
             affiliation.roles.push(role);
         }
 
-        let mut holders = self
-            .holders
-            .write()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-        holders.insert(holder_id.to_string(), holder);
+        self.store.put_holder(&holder)?;
 
         Ok(())
     }
@@ -1396,11 +1145,7 @@ impl CommonsManager {
 
         affiliation.roles.retain(|r| r != role);
 
-        let mut holders = self
-            .holders
-            .write()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-        holders.insert(holder_id.to_string(), holder);
+        self.store.put_holder(&holder)?;
 
         Ok(())
     }
@@ -1430,16 +1175,17 @@ impl CommonsManager {
         jurisdiction_id: &JurisdictionId,
         status: Option<MembershipStatus>,
     ) -> Vec<(String, Affiliation)> {
-        let holders = match self.holders.read() {
+        let holders = match self.store.list_holders() {
             Ok(h) => h,
             Err(_) => return Vec::new(),
         };
 
         let mut results = Vec::new();
-        for (holder_id, holder) in holders.iter() {
+        for holder in holders {
+            let holder_id = hex::encode(holder.id());
             if let Some(affiliation) = holder.get_affiliation(jurisdiction_id) {
                 if status.is_none() || Some(affiliation.membership_status) == status {
-                    results.push((holder_id.clone(), affiliation.clone()));
+                    results.push((holder_id, affiliation.clone()));
                 }
             }
         }
@@ -1451,15 +1197,14 @@ impl CommonsManager {
 
     /// Store an amendment
     pub async fn store_amendment(&self, amendment: Amendment) -> Result<()> {
-        let id = amendment.id.to_hex();
-        self.amendments.write().unwrap().insert(id, amendment);
+        self.store.put_amendment(&amendment)?;
         Ok(())
     }
 
     /// Get an amendment by ID
     pub async fn get_amendment(&self, id: &AmendmentId) -> Result<Option<Amendment>> {
         let id_hex = id.to_hex();
-        Ok(self.amendments.read().unwrap().get(&id_hex).cloned())
+        self.store.get_amendment(&id_hex)
     }
 
     /// List amendments with optional filters
@@ -1469,8 +1214,7 @@ impl CommonsManager {
         scope: Option<&str>,
         amendment_type: Option<&str>,
     ) -> Result<Vec<Amendment>> {
-        let amendments = self.amendments.read().unwrap();
-        let mut results: Vec<Amendment> = amendments.values().cloned().collect();
+        let mut results = self.store.list_amendments()?;
 
         // Filter by status
         if let Some(s) = status {
@@ -1503,9 +1247,9 @@ impl CommonsManager {
         caller: &Did,
     ) -> Result<Amendment> {
         let id_hex = id.to_hex();
-        let mut amendments = self.amendments.write().unwrap();
-        let amendment = amendments
-            .get_mut(&id_hex)
+        let mut amendment = self
+            .store
+            .get_amendment(&id_hex)?
             .ok_or_else(|| anyhow::anyhow!("Amendment not found"))?;
 
         // Only proposer can submit
@@ -1514,7 +1258,8 @@ impl CommonsManager {
         }
 
         amendment.submit().map_err(|e| anyhow::anyhow!(e))?;
-        Ok(amendment.clone())
+        self.store.put_amendment(&amendment)?;
+        Ok(amendment)
     }
 
     /// Open voting on an amendment (skipping review for simple cases)
@@ -1524,9 +1269,9 @@ impl CommonsManager {
         _caller: &Did,
     ) -> Result<Amendment> {
         let id_hex = id.to_hex();
-        let mut amendments = self.amendments.write().unwrap();
-        let amendment = amendments
-            .get_mut(&id_hex)
+        let mut amendment = self
+            .store
+            .get_amendment(&id_hex)?
             .ok_or_else(|| anyhow::anyhow!("Amendment not found"))?;
 
         // If still in submitted state, begin review first (auto-skip if review_period is 0)
@@ -1535,7 +1280,8 @@ impl CommonsManager {
         }
 
         amendment.open_voting().map_err(|e| anyhow::anyhow!(e))?;
-        Ok(amendment.clone())
+        self.store.put_amendment(&amendment)?;
+        Ok(amendment)
     }
 
     /// Add a ratification to an amendment
@@ -1545,9 +1291,9 @@ impl CommonsManager {
         ratification: Ratification,
     ) -> Result<Amendment> {
         let id_hex = id.to_hex();
-        let mut amendments = self.amendments.write().unwrap();
-        let amendment = amendments
-            .get_mut(&id_hex)
+        let mut amendment = self
+            .store
+            .get_amendment(&id_hex)?
             .ok_or_else(|| anyhow::anyhow!("Amendment not found"))?;
 
         amendment
@@ -1560,7 +1306,8 @@ impl CommonsManager {
             let _ = amendment.ratify();
         }
 
-        Ok(amendment.clone())
+        self.store.put_amendment(&amendment)?;
+        Ok(amendment)
     }
 
     /// Withdraw an amendment
@@ -1571,9 +1318,9 @@ impl CommonsManager {
         reason: String,
     ) -> Result<Amendment> {
         let id_hex = id.to_hex();
-        let mut amendments = self.amendments.write().unwrap();
-        let amendment = amendments
-            .get_mut(&id_hex)
+        let mut amendment = self
+            .store
+            .get_amendment(&id_hex)?
             .ok_or_else(|| anyhow::anyhow!("Amendment not found"))?;
 
         // Only proposer can withdraw
@@ -1582,22 +1329,22 @@ impl CommonsManager {
         }
 
         amendment.withdraw(reason).map_err(|e| anyhow::anyhow!(e))?;
-        Ok(amendment.clone())
+        self.store.put_amendment(&amendment)?;
+        Ok(amendment)
     }
 
     // ========== Appeal Operations (v0.6.0 Constitutional Governance) ==========
 
     /// Store an appeal
     pub async fn store_appeal(&self, appeal: Appeal) -> Result<()> {
-        let id = appeal.id.to_hex();
-        self.appeals.write().unwrap().insert(id, appeal);
+        self.store.put_appeal(&appeal)?;
         Ok(())
     }
 
     /// Get an appeal by ID
     pub async fn get_appeal(&self, id: &AppealId) -> Result<Option<Appeal>> {
         let id_hex = id.to_hex();
-        Ok(self.appeals.read().unwrap().get(&id_hex).cloned())
+        self.store.get_appeal(&id_hex)
     }
 
     /// List appeals with optional filters
@@ -1607,8 +1354,7 @@ impl CommonsManager {
         scope: Option<&str>,
         appellant: Option<&str>,
     ) -> Result<Vec<Appeal>> {
-        let appeals = self.appeals.read().unwrap();
-        let mut results: Vec<Appeal> = appeals.values().cloned().collect();
+        let mut results = self.store.list_appeals()?;
 
         // Filter by status
         if let Some(s) = status {
@@ -1640,13 +1386,16 @@ impl CommonsManager {
         evidence: AppealEvidence,
     ) -> Result<Appeal> {
         let id_hex = id.to_hex();
-        let mut appeals = self.appeals.write().unwrap();
-        let appeal = appeals
-            .get_mut(&id_hex)
+        let mut appeal = self
+            .store
+            .get_appeal(&id_hex)?
             .ok_or_else(|| anyhow::anyhow!("Appeal not found"))?;
 
-        appeal.add_evidence(evidence).map_err(|e| anyhow::anyhow!(e))?;
-        Ok(appeal.clone())
+        appeal
+            .add_evidence(evidence)
+            .map_err(|e| anyhow::anyhow!(e))?;
+        self.store.put_appeal(&appeal)?;
+        Ok(appeal)
     }
 
     /// Add response to an appeal
@@ -1656,25 +1405,29 @@ impl CommonsManager {
         response: AppealResponse,
     ) -> Result<Appeal> {
         let id_hex = id.to_hex();
-        let mut appeals = self.appeals.write().unwrap();
-        let appeal = appeals
-            .get_mut(&id_hex)
+        let mut appeal = self
+            .store
+            .get_appeal(&id_hex)?
             .ok_or_else(|| anyhow::anyhow!("Appeal not found"))?;
 
-        appeal.add_response(response).map_err(|e| anyhow::anyhow!(e))?;
-        Ok(appeal.clone())
+        appeal
+            .add_response(response)
+            .map_err(|e| anyhow::anyhow!(e))?;
+        self.store.put_appeal(&appeal)?;
+        Ok(appeal)
     }
 
     /// Begin review of an appeal
     pub async fn begin_appeal_review(&self, id: &AppealId) -> Result<Appeal> {
         let id_hex = id.to_hex();
-        let mut appeals = self.appeals.write().unwrap();
-        let appeal = appeals
-            .get_mut(&id_hex)
+        let mut appeal = self
+            .store
+            .get_appeal(&id_hex)?
             .ok_or_else(|| anyhow::anyhow!("Appeal not found"))?;
 
         appeal.begin_review().map_err(|e| anyhow::anyhow!(e))?;
-        Ok(appeal.clone())
+        self.store.put_appeal(&appeal)?;
+        Ok(appeal)
     }
 
     /// Resolve a constitutional appeal with outcome
@@ -1684,13 +1437,14 @@ impl CommonsManager {
         outcome: AppealOutcome,
     ) -> Result<Appeal> {
         let id_hex = id.to_hex();
-        let mut appeals = self.appeals.write().unwrap();
-        let appeal = appeals
-            .get_mut(&id_hex)
+        let mut appeal = self
+            .store
+            .get_appeal(&id_hex)?
             .ok_or_else(|| anyhow::anyhow!("Appeal not found"))?;
 
         appeal.resolve(outcome).map_err(|e| anyhow::anyhow!(e))?;
-        Ok(appeal.clone())
+        self.store.put_appeal(&appeal)?;
+        Ok(appeal)
     }
 
     /// Withdraw an appeal
@@ -1701,9 +1455,9 @@ impl CommonsManager {
         reason: Option<String>,
     ) -> Result<Appeal> {
         let id_hex = id.to_hex();
-        let mut appeals = self.appeals.write().unwrap();
-        let appeal = appeals
-            .get_mut(&id_hex)
+        let mut appeal = self
+            .store
+            .get_appeal(&id_hex)?
             .ok_or_else(|| anyhow::anyhow!("Appeal not found"))?;
 
         // Only appellant can withdraw
@@ -1712,11 +1466,12 @@ impl CommonsManager {
         }
 
         appeal.withdraw(reason).map_err(|e| anyhow::anyhow!(e))?;
-        Ok(appeal.clone())
+        self.store.put_appeal(&appeal)?;
+        Ok(appeal)
     }
 }
 
-impl Default for CommonsManager {
+impl Default for CommonsManager<InMemoryCommonsStore> {
     fn default() -> Self {
         Self::new()
     }

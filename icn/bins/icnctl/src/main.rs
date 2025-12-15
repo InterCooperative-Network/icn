@@ -147,6 +147,14 @@ enum Commands {
     #[command(subcommand)]
     Charter(CharterCommands),
 
+    /// Amendment operations (constitutional governance)
+    #[command(subcommand)]
+    Amendment(AmendmentCommands),
+
+    /// Appeal operations (due process for governance decisions)
+    #[command(subcommand)]
+    Appeal(AppealCommands),
+
     /// Generate shell completions
     Completions {
         /// Shell type
@@ -1352,6 +1360,316 @@ enum CharterCommands {
     },
 }
 
+#[derive(Subcommand, Debug)]
+enum AmendmentCommands {
+    /// Propose a new amendment
+    Propose {
+        /// Amendment title
+        #[arg(long)]
+        title: String,
+
+        /// Amendment description
+        #[arg(long)]
+        description: String,
+
+        /// Amendment type: charter, constitutional, policy, economic, governance
+        #[arg(short = 't', long, default_value = "policy")]
+        amendment_type: String,
+
+        /// Scope type: jurisdiction, federation, network
+        #[arg(short = 's', long, default_value = "jurisdiction")]
+        scope: String,
+
+        /// Scope ID (jurisdiction or federation ID)
+        #[arg(long)]
+        scope_id: Option<String>,
+
+        /// Charter ID (required for charter amendments)
+        #[arg(long)]
+        charter_id: Option<String>,
+
+        /// Cooperative ID for authentication
+        #[arg(short, long, env = "ICN_COOP_ID")]
+        coop_id: String,
+
+        /// Gateway URL
+        #[arg(long, default_value = "http://localhost:8080")]
+        gateway: String,
+    },
+
+    /// List amendments
+    List {
+        /// Filter by status: draft, submitted, under_review, voting, ratified, rejected
+        #[arg(short, long)]
+        status: Option<String>,
+
+        /// Filter by scope: jurisdiction, federation, network
+        #[arg(long)]
+        scope: Option<String>,
+
+        /// Filter by amendment type
+        #[arg(short = 't', long)]
+        amendment_type: Option<String>,
+
+        /// Gateway URL
+        #[arg(short, long, default_value = "http://localhost:8080")]
+        gateway: String,
+    },
+
+    /// Show amendment details
+    Show {
+        /// Amendment ID
+        amendment_id: String,
+
+        /// Gateway URL
+        #[arg(short, long, default_value = "http://localhost:8080")]
+        gateway: String,
+    },
+
+    /// Submit an amendment for review
+    Submit {
+        /// Amendment ID
+        amendment_id: String,
+
+        /// Cooperative ID for authentication
+        #[arg(short, long, env = "ICN_COOP_ID")]
+        coop_id: String,
+
+        /// Gateway URL
+        #[arg(long, default_value = "http://localhost:8080")]
+        gateway: String,
+    },
+
+    /// Open voting on an amendment (after review period)
+    OpenVoting {
+        /// Amendment ID
+        amendment_id: String,
+
+        /// Cooperative ID for authentication
+        #[arg(short, long, env = "ICN_COOP_ID")]
+        coop_id: String,
+
+        /// Gateway URL
+        #[arg(long, default_value = "http://localhost:8080")]
+        gateway: String,
+    },
+
+    /// Vote on an amendment (as a ratifier)
+    Vote {
+        /// Amendment ID
+        amendment_id: String,
+
+        /// Approve the amendment
+        #[arg(long, group = "vote_choice")]
+        approve: bool,
+
+        /// Reject the amendment
+        #[arg(long, group = "vote_choice")]
+        reject: bool,
+
+        /// Optional comment with your vote
+        #[arg(long)]
+        comment: Option<String>,
+
+        /// Cooperative ID for authentication
+        #[arg(short, long, env = "ICN_COOP_ID")]
+        coop_id: String,
+
+        /// Gateway URL
+        #[arg(long, default_value = "http://localhost:8080")]
+        gateway: String,
+    },
+
+    /// Withdraw an amendment (proposer only)
+    Withdraw {
+        /// Amendment ID
+        amendment_id: String,
+
+        /// Reason for withdrawal
+        #[arg(short, long)]
+        reason: Option<String>,
+
+        /// Cooperative ID for authentication
+        #[arg(long, env = "ICN_COOP_ID")]
+        coop_id: String,
+
+        /// Gateway URL
+        #[arg(long, default_value = "http://localhost:8080")]
+        gateway: String,
+    },
+
+    /// Add a change to a draft amendment
+    AddChange {
+        /// Amendment ID
+        amendment_id: String,
+
+        /// Target of the change: governance, membership, economic, rights, charter, custom
+        #[arg(short, long)]
+        target: String,
+
+        /// Change type: add, modify, remove, replace
+        #[arg(short = 'k', long, default_value = "modify")]
+        change_type: String,
+
+        /// Description of the change
+        #[arg(short, long)]
+        description: String,
+
+        /// New value (JSON or text)
+        #[arg(short, long)]
+        new_value: String,
+
+        /// Old value (for modify/replace)
+        #[arg(short, long)]
+        old_value: Option<String>,
+
+        /// Gateway URL
+        #[arg(short, long, default_value = "http://localhost:8080")]
+        gateway: String,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum AppealCommands {
+    /// File a new appeal
+    File {
+        /// Appeal type: revocation, suspension, governance, dispute, membership, steward
+        #[arg(short = 't', long)]
+        appeal_type: String,
+
+        /// Target ID (revocation ID, proposal ID, etc.)
+        #[arg(long)]
+        target_id: String,
+
+        /// Scope: jurisdiction, federation, network
+        #[arg(short = 's', long, default_value = "jurisdiction")]
+        scope: String,
+
+        /// Scope ID (jurisdiction or federation ID)
+        #[arg(long)]
+        scope_id: Option<String>,
+
+        /// Statement explaining the appeal
+        #[arg(long)]
+        statement: String,
+
+        /// Grounds for appeal (comma-separated): procedural, factual, proportionality, new_evidence, rights_violation
+        #[arg(long)]
+        grounds: String,
+
+        /// Requested remedy: reverse, reinstate, modify, compensation
+        #[arg(long, default_value = "reverse")]
+        remedy: String,
+
+        /// Cooperative ID for authentication
+        #[arg(short, long, env = "ICN_COOP_ID")]
+        coop_id: String,
+
+        /// Gateway URL
+        #[arg(long, default_value = "http://localhost:8080")]
+        gateway: String,
+    },
+
+    /// List appeals
+    List {
+        /// Filter by status: filed, under_review, hearing, resolved, dismissed, withdrawn
+        #[arg(short = 's', long)]
+        status: Option<String>,
+
+        /// Filter by appeal type
+        #[arg(short = 't', long)]
+        appeal_type: Option<String>,
+
+        /// Filter by appellant DID
+        #[arg(long)]
+        appellant: Option<String>,
+
+        /// Gateway URL
+        #[arg(short, long, default_value = "http://localhost:8080")]
+        gateway: String,
+    },
+
+    /// Show appeal details
+    Show {
+        /// Appeal ID
+        appeal_id: String,
+
+        /// Gateway URL
+        #[arg(short, long, default_value = "http://localhost:8080")]
+        gateway: String,
+    },
+
+    /// Add evidence to an appeal
+    AddEvidence {
+        /// Appeal ID
+        appeal_id: String,
+
+        /// Evidence type: document, testimony, record, communication, other
+        #[arg(short = 't', long, default_value = "document")]
+        evidence_type: String,
+
+        /// Description of the evidence
+        #[arg(long)]
+        description: String,
+
+        /// Content hash (for off-chain evidence)
+        #[arg(long)]
+        content_hash: Option<String>,
+
+        /// URI to evidence location
+        #[arg(long)]
+        uri: Option<String>,
+
+        /// Cooperative ID for authentication
+        #[arg(short, long, env = "ICN_COOP_ID")]
+        coop_id: String,
+
+        /// Gateway URL
+        #[arg(long, default_value = "http://localhost:8080")]
+        gateway: String,
+    },
+
+    /// Respond to an appeal (as respondent)
+    Respond {
+        /// Appeal ID
+        appeal_id: String,
+
+        /// Response type: answer, objection, motion, evidence
+        #[arg(short = 't', long, default_value = "answer")]
+        response_type: String,
+
+        /// Response content
+        #[arg(long)]
+        content: String,
+
+        /// Cooperative ID for authentication
+        #[arg(short, long, env = "ICN_COOP_ID")]
+        coop_id: String,
+
+        /// Gateway URL
+        #[arg(long, default_value = "http://localhost:8080")]
+        gateway: String,
+    },
+
+    /// Withdraw an appeal
+    Withdraw {
+        /// Appeal ID
+        appeal_id: String,
+
+        /// Reason for withdrawal
+        #[arg(short, long)]
+        reason: Option<String>,
+
+        /// Cooperative ID for authentication
+        #[arg(long, env = "ICN_COOP_ID")]
+        coop_id: String,
+
+        /// Gateway URL
+        #[arg(long, default_value = "http://localhost:8080")]
+        gateway: String,
+    },
+}
+
 fn get_data_dir(data_dir: Option<PathBuf>) -> Result<PathBuf> {
     if let Some(dir) = data_dir {
         Ok(dir)
@@ -1544,6 +1862,14 @@ async fn main() -> Result<()> {
 
         Commands::Charter(charter_cmd) => {
             handle_charter_command(charter_cmd, &data_dir, &args.endpoint).await?
+        }
+
+        Commands::Amendment(amendment_cmd) => {
+            handle_amendment_command(amendment_cmd, &data_dir, &args.endpoint).await?
+        }
+
+        Commands::Appeal(appeal_cmd) => {
+            handle_appeal_command(appeal_cmd, &data_dir, &args.endpoint).await?
         }
 
         Commands::Completions { shell } => {
@@ -7334,6 +7660,977 @@ async fn handle_charter_command(
     }
 
     Ok(())
+}
+
+async fn handle_amendment_command(
+    cmd: AmendmentCommands,
+    data_dir: &Path,
+    _endpoint: &str,
+) -> Result<()> {
+    match cmd {
+        AmendmentCommands::Propose {
+            title,
+            description,
+            amendment_type,
+            scope,
+            scope_id,
+            charter_id,
+            coop_id,
+            gateway,
+        } => {
+            println!("Propose Amendment");
+            println!("=================\n");
+
+            // Get identity for signing
+            let keystore_path = get_keystore_path(data_dir);
+            if !keystore_path.exists() {
+                bail!("No identity found. Run 'icnctl id init' first.");
+            }
+
+            let passphrase = read_passphrase("Enter passphrase: ")?;
+            let mut keystore = AgeKeyStore::open(&keystore_path)?;
+            keystore.unlock(&passphrase)?;
+            let keypair = keystore.get_keypair()?;
+            let did = keypair.did();
+
+            // Build request
+            let request = serde_json::json!({
+                "amendment_type": amendment_type,
+                "scope_type": scope,
+                "scope_id": scope_id,
+                "title": title,
+                "description": description,
+                "charter_id": charter_id,
+                "changes": []  // Changes added separately via add-change
+            });
+
+            let client = reqwest::Client::new();
+            let url = format!("{gateway}/v1/constitutional/amendments");
+
+            // Get auth token
+            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, keypair).await?;
+
+            match client
+                .post(&url)
+                .header("Authorization", format!("Bearer {token}"))
+                .json(&request)
+                .send()
+                .await
+            {
+                Ok(resp) => {
+                    if resp.status().is_success() {
+                        let data: serde_json::Value = resp.json().await?;
+                        let id = data["id"].as_str().unwrap_or("unknown");
+                        println!("Amendment created successfully!");
+                        println!();
+                        println!("  ID:          {id}");
+                        println!("  Title:       {title}");
+                        println!("  Type:        {amendment_type}");
+                        println!("  Scope:       {scope}");
+                        println!("  Status:      Draft");
+                        println!();
+                        println!("Next steps:");
+                        println!("  1. Add changes:  icnctl amendment add-change {id} ...");
+                        println!("  2. Submit:       icnctl amendment submit {id}");
+                    } else {
+                        let status = resp.status();
+                        let body = resp.text().await.unwrap_or_default();
+                        println!("Error creating amendment: {status}");
+                        println!("{body}");
+                    }
+                }
+                Err(e) => {
+                    println!("Could not connect to gateway: {e}");
+                }
+            }
+        }
+
+        AmendmentCommands::List {
+            status,
+            scope,
+            amendment_type,
+            gateway,
+        } => {
+            println!("Amendments");
+            println!("==========\n");
+
+            let client = reqwest::Client::new();
+            let mut url = format!("{gateway}/v1/constitutional/amendments");
+            let mut params = Vec::new();
+            if let Some(ref s) = status {
+                params.push(format!("status={s}"));
+            }
+            if let Some(ref s) = scope {
+                params.push(format!("scope={s}"));
+            }
+            if let Some(ref t) = amendment_type {
+                params.push(format!("amendment_type={t}"));
+            }
+            if !params.is_empty() {
+                url = format!("{}?{}", url, params.join("&"));
+            }
+
+            match client.get(&url).send().await {
+                Ok(resp) => {
+                    if resp.status().is_success() {
+                        let amendments: Vec<serde_json::Value> = resp.json().await?;
+                        if amendments.is_empty() {
+                            println!("No amendments found.");
+                        } else {
+                            println!(
+                                "{:<12} {:<30} {:<12} {:<10}",
+                                "ID", "TITLE", "TYPE", "STATUS"
+                            );
+                            println!("{}", "-".repeat(70));
+                            for a in amendments {
+                                let id = a["id"].as_str().unwrap_or("-");
+                                let short_id = if id.len() > 10 { &id[..10] } else { id };
+                                println!(
+                                    "{:<12} {:<30} {:<12} {:<10}",
+                                    short_id,
+                                    truncate_str(a["title"].as_str().unwrap_or("-"), 28),
+                                    a["amendment_type"].as_str().unwrap_or("-"),
+                                    a["status"].as_str().unwrap_or("-"),
+                                );
+                            }
+                        }
+                    } else {
+                        let status = resp.status();
+                        let body = resp.text().await.unwrap_or_default();
+                        println!("Error: {status} - {body}");
+                    }
+                }
+                Err(e) => {
+                    println!("Could not connect to gateway: {e}");
+                }
+            }
+        }
+
+        AmendmentCommands::Show {
+            amendment_id,
+            gateway,
+        } => {
+            println!("Amendment Details");
+            println!("=================\n");
+
+            let client = reqwest::Client::new();
+            let url = format!("{gateway}/v1/constitutional/amendments/{amendment_id}");
+
+            match client.get(&url).send().await {
+                Ok(resp) => {
+                    if resp.status().is_success() {
+                        let a: serde_json::Value = resp.json().await?;
+                        println!("ID:           {}", a["id"].as_str().unwrap_or("-"));
+                        println!("Title:        {}", a["title"].as_str().unwrap_or("-"));
+                        println!("Type:         {}", a["amendment_type"].as_str().unwrap_or("-"));
+                        println!("Scope:        {}", a["scope"].as_str().unwrap_or("-"));
+                        println!("Status:       {}", a["status"].as_str().unwrap_or("-"));
+                        println!("Proposer:     {}", a["proposer"].as_str().unwrap_or("-"));
+                        println!(
+                            "Description:  {}",
+                            a["description"].as_str().unwrap_or("-")
+                        );
+
+                        if let Some(changes) = a["changes"].as_array() {
+                            println!("\nChanges ({}):", changes.len());
+                            for (i, c) in changes.iter().enumerate() {
+                                println!(
+                                    "  {}. [{}] {} - {}",
+                                    i + 1,
+                                    c["change_type"].as_str().unwrap_or("-"),
+                                    c["target"].as_str().unwrap_or("-"),
+                                    c["description"].as_str().unwrap_or("-")
+                                );
+                            }
+                        }
+
+                        let ratifications = a["ratifications_count"].as_u64().unwrap_or(0);
+                        let approvals = a["approvals_count"].as_u64().unwrap_or(0);
+                        println!("\nRatifications: {ratifications} ({approvals} approved)");
+                    } else if resp.status() == reqwest::StatusCode::NOT_FOUND {
+                        println!("Amendment not found: {amendment_id}");
+                    } else {
+                        let status = resp.status();
+                        let body = resp.text().await.unwrap_or_default();
+                        println!("Error: {status} - {body}");
+                    }
+                }
+                Err(e) => {
+                    println!("Could not connect to gateway: {e}");
+                }
+            }
+        }
+
+        AmendmentCommands::Submit {
+            amendment_id,
+            coop_id,
+            gateway,
+        } => {
+            println!("Submit Amendment for Review");
+            println!("===========================\n");
+
+            let keystore_path = get_keystore_path(data_dir);
+            if !keystore_path.exists() {
+                bail!("No identity found. Run 'icnctl id init' first.");
+            }
+
+            let passphrase = read_passphrase("Enter passphrase: ")?;
+            let mut keystore = AgeKeyStore::open(&keystore_path)?;
+            keystore.unlock(&passphrase)?;
+            let keypair = keystore.get_keypair()?;
+            let did = keypair.did();
+
+            let client = reqwest::Client::new();
+            let url = format!("{gateway}/v1/constitutional/amendments/{amendment_id}/submit");
+            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, keypair).await?;
+
+            match client
+                .post(&url)
+                .header("Authorization", format!("Bearer {token}"))
+                .send()
+                .await
+            {
+                Ok(resp) => {
+                    if resp.status().is_success() {
+                        println!("Amendment submitted for review!");
+                        println!("Amendment ID: {amendment_id}");
+                        println!();
+                        println!("The amendment is now under review.");
+                        println!("After the review period, use 'icnctl amendment open-voting {amendment_id}'");
+                    } else {
+                        let status = resp.status();
+                        let body = resp.text().await.unwrap_or_default();
+                        println!("Error submitting amendment: {status}");
+                        println!("{body}");
+                    }
+                }
+                Err(e) => {
+                    println!("Could not connect to gateway: {e}");
+                }
+            }
+        }
+
+        AmendmentCommands::OpenVoting {
+            amendment_id,
+            coop_id,
+            gateway,
+        } => {
+            println!("Open Voting on Amendment");
+            println!("========================\n");
+
+            let keystore_path = get_keystore_path(data_dir);
+            if !keystore_path.exists() {
+                bail!("No identity found. Run 'icnctl id init' first.");
+            }
+
+            let passphrase = read_passphrase("Enter passphrase: ")?;
+            let mut keystore = AgeKeyStore::open(&keystore_path)?;
+            keystore.unlock(&passphrase)?;
+            let keypair = keystore.get_keypair()?;
+            let did = keypair.did();
+
+            let client = reqwest::Client::new();
+            let url = format!("{gateway}/v1/constitutional/amendments/{amendment_id}/vote");
+            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, &keypair).await?;
+
+            match client
+                .post(&url)
+                .header("Authorization", format!("Bearer {token}"))
+                .send()
+                .await
+            {
+                Ok(resp) => {
+                    if resp.status().is_success() {
+                        println!("Voting is now open!");
+                        println!("Amendment ID: {amendment_id}");
+                        println!();
+                        println!("Members can now vote using:");
+                        println!("  icnctl amendment vote {amendment_id} --approve");
+                        println!("  icnctl amendment vote {amendment_id} --reject");
+                    } else {
+                        let status = resp.status();
+                        let body = resp.text().await.unwrap_or_default();
+                        println!("Error opening voting: {status}");
+                        println!("{body}");
+                    }
+                }
+                Err(e) => {
+                    println!("Could not connect to gateway: {e}");
+                }
+            }
+        }
+
+        AmendmentCommands::Vote {
+            amendment_id,
+            approve,
+            reject,
+            comment,
+            coop_id,
+            gateway,
+        } => {
+            println!("Vote on Amendment");
+            println!("=================\n");
+
+            let approved = if approve {
+                true
+            } else if reject {
+                false
+            } else {
+                bail!("Must specify --approve or --reject");
+            };
+
+            let keystore_path = get_keystore_path(data_dir);
+            if !keystore_path.exists() {
+                bail!("No identity found. Run 'icnctl id init' first.");
+            }
+
+            let passphrase = read_passphrase("Enter passphrase: ")?;
+            let mut keystore = AgeKeyStore::open(&keystore_path)?;
+            keystore.unlock(&passphrase)?;
+            let keypair = keystore.get_keypair()?;
+            let did = keypair.did();
+
+            // Sign the vote
+            let vote_data = format!("{}:{}:{}", amendment_id, approved, did);
+            let signature = keypair.sign(vote_data.as_bytes());
+
+            let request = serde_json::json!({
+                "ratifier_id": did.to_string(),
+                "ratifier_type": "member",
+                "approved": approved,
+                "comment": comment,
+                "signature": hex::encode(signature.to_bytes())
+            });
+
+            let client = reqwest::Client::new();
+            let url = format!("{gateway}/v1/constitutional/amendments/{amendment_id}/ratify");
+            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, &keypair).await?;
+
+            match client
+                .post(&url)
+                .header("Authorization", format!("Bearer {token}"))
+                .json(&request)
+                .send()
+                .await
+            {
+                Ok(resp) => {
+                    if resp.status().is_success() {
+                        println!("Vote recorded!");
+                        println!();
+                        println!("  Amendment:  {amendment_id}");
+                        println!("  Your vote:  {}", if approved { "APPROVE" } else { "REJECT" });
+                        if let Some(c) = comment {
+                            println!("  Comment:    {c}");
+                        }
+                    } else {
+                        let status = resp.status();
+                        let body = resp.text().await.unwrap_or_default();
+                        println!("Error recording vote: {status}");
+                        println!("{body}");
+                    }
+                }
+                Err(e) => {
+                    println!("Could not connect to gateway: {e}");
+                }
+            }
+        }
+
+        AmendmentCommands::Withdraw {
+            amendment_id,
+            reason,
+            coop_id,
+            gateway,
+        } => {
+            println!("Withdraw Amendment");
+            println!("==================\n");
+
+            let keystore_path = get_keystore_path(data_dir);
+            if !keystore_path.exists() {
+                bail!("No identity found. Run 'icnctl id init' first.");
+            }
+
+            let passphrase = read_passphrase("Enter passphrase: ")?;
+            let mut keystore = AgeKeyStore::open(&keystore_path)?;
+            keystore.unlock(&passphrase)?;
+            let keypair = keystore.get_keypair()?;
+            let did = keypair.did();
+
+            let request = serde_json::json!({
+                "reason": reason.unwrap_or_else(|| "Withdrawn by proposer".to_string())
+            });
+
+            let client = reqwest::Client::new();
+            let url = format!("{gateway}/v1/constitutional/amendments/{amendment_id}/withdraw");
+            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, &keypair).await?;
+
+            match client
+                .post(&url)
+                .header("Authorization", format!("Bearer {token}"))
+                .json(&request)
+                .send()
+                .await
+            {
+                Ok(resp) => {
+                    if resp.status().is_success() {
+                        println!("Amendment withdrawn.");
+                        println!("Amendment ID: {amendment_id}");
+                    } else {
+                        let status = resp.status();
+                        let body = resp.text().await.unwrap_or_default();
+                        println!("Error withdrawing amendment: {status}");
+                        println!("{body}");
+                    }
+                }
+                Err(e) => {
+                    println!("Could not connect to gateway: {e}");
+                }
+            }
+        }
+
+        AmendmentCommands::AddChange {
+            amendment_id,
+            target,
+            change_type,
+            description,
+            new_value,
+            old_value,
+            gateway,
+        } => {
+            println!("Add Change to Amendment");
+            println!("=======================\n");
+
+            // Note: This requires a PATCH or update endpoint that may need to be added
+            // For now, we'll show the planned change
+            println!("Amendment ID:  {amendment_id}");
+            println!("Target:        {target}");
+            println!("Change Type:   {change_type}");
+            println!("Description:   {description}");
+            println!("New Value:     {new_value}");
+            if let Some(ref ov) = old_value {
+                println!("Old Value:     {ov}");
+            }
+            println!("Gateway:       {gateway}");
+            println!();
+            println!("Note: Adding changes to draft amendments requires");
+            println!("re-creating the amendment with the changes included,");
+            println!("or using the update endpoint (not yet implemented).");
+            println!();
+            println!("For now, include changes when proposing:");
+            println!("  icnctl amendment propose --title '...' --description '...'");
+        }
+    }
+
+    Ok(())
+}
+
+async fn handle_appeal_command(
+    cmd: AppealCommands,
+    data_dir: &Path,
+    _endpoint: &str,
+) -> Result<()> {
+    match cmd {
+        AppealCommands::File {
+            appeal_type,
+            target_id,
+            scope,
+            scope_id,
+            statement,
+            grounds,
+            remedy,
+            coop_id,
+            gateway,
+        } => {
+            println!("File Appeal");
+            println!("===========\n");
+
+            let keystore_path = get_keystore_path(data_dir);
+            if !keystore_path.exists() {
+                bail!("No identity found. Run 'icnctl id init' first.");
+            }
+
+            let passphrase = read_passphrase("Enter passphrase: ")?;
+            let mut keystore = AgeKeyStore::open(&keystore_path)?;
+            keystore.unlock(&passphrase)?;
+            let keypair = keystore.get_keypair()?;
+            let did = keypair.did();
+
+            // Parse grounds
+            let grounds_list: Vec<serde_json::Value> = grounds
+                .split(',')
+                .map(|g| {
+                    serde_json::json!({
+                        "ground_type": g.trim(),
+                        "description": format!("Appeal on {} grounds", g.trim())
+                    })
+                })
+                .collect();
+
+            // Build appeal type request based on type
+            let appeal_type_req = match appeal_type.to_lowercase().as_str() {
+                "revocation" => serde_json::json!({
+                    "category": "revocation",
+                    "revocation_id": target_id
+                }),
+                "suspension" => serde_json::json!({
+                    "category": "suspension",
+                    "target_id": target_id
+                }),
+                "governance" => serde_json::json!({
+                    "category": "governance_decision",
+                    "proposal_id": target_id
+                }),
+                "dispute" => serde_json::json!({
+                    "category": "dispute_resolution",
+                    "dispute_id": target_id
+                }),
+                "membership" => serde_json::json!({
+                    "category": "membership_denial",
+                    "details": target_id
+                }),
+                "steward" => serde_json::json!({
+                    "category": "steward_action",
+                    "steward_did": target_id
+                }),
+                _ => bail!("Unknown appeal type: {appeal_type}. Use: revocation, suspension, governance, dispute, membership, steward"),
+            };
+
+            let request = serde_json::json!({
+                "appeal_type": appeal_type_req,
+                "scope_type": scope,
+                "scope_id": scope_id,
+                "grounds": grounds_list,
+                "statement": statement,
+                "requested_remedy": remedy
+            });
+
+            let client = reqwest::Client::new();
+            let url = format!("{gateway}/v1/constitutional/appeals");
+            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, &keypair).await?;
+
+            match client
+                .post(&url)
+                .header("Authorization", format!("Bearer {token}"))
+                .json(&request)
+                .send()
+                .await
+            {
+                Ok(resp) => {
+                    if resp.status().is_success() {
+                        let data: serde_json::Value = resp.json().await?;
+                        let id = data["id"].as_str().unwrap_or("unknown");
+                        println!("Appeal filed successfully!");
+                        println!();
+                        println!("  Appeal ID:  {id}");
+                        println!("  Type:       {appeal_type}");
+                        println!("  Target:     {target_id}");
+                        println!("  Status:     Filed");
+                        println!();
+                        println!("Next steps:");
+                        println!("  - Add evidence: icnctl appeal add-evidence {id} ...");
+                        println!("  - Check status: icnctl appeal show {id}");
+                    } else {
+                        let status = resp.status();
+                        let body = resp.text().await.unwrap_or_default();
+                        println!("Error filing appeal: {status}");
+                        println!("{body}");
+                    }
+                }
+                Err(e) => {
+                    println!("Could not connect to gateway: {e}");
+                }
+            }
+        }
+
+        AppealCommands::List {
+            status,
+            appeal_type,
+            appellant,
+            gateway,
+        } => {
+            println!("Appeals");
+            println!("=======\n");
+
+            let client = reqwest::Client::new();
+            let mut url = format!("{gateway}/v1/constitutional/appeals");
+            let mut params = Vec::new();
+            if let Some(ref s) = status {
+                params.push(format!("status={s}"));
+            }
+            if let Some(ref t) = appeal_type {
+                params.push(format!("appeal_type={t}"));
+            }
+            if let Some(ref a) = appellant {
+                params.push(format!("appellant={a}"));
+            }
+            if !params.is_empty() {
+                url = format!("{}?{}", url, params.join("&"));
+            }
+
+            match client.get(&url).send().await {
+                Ok(resp) => {
+                    if resp.status().is_success() {
+                        let appeals: Vec<serde_json::Value> = resp.json().await?;
+                        if appeals.is_empty() {
+                            println!("No appeals found.");
+                        } else {
+                            println!(
+                                "{:<12} {:<15} {:<12} {:<10}",
+                                "ID", "TYPE", "STATUS", "APPELLANT"
+                            );
+                            println!("{}", "-".repeat(55));
+                            for a in appeals {
+                                let id = a["id"].as_str().unwrap_or("-");
+                                let short_id = if id.len() > 10 { &id[..10] } else { id };
+                                let appellant_did = a["appellant"].as_str().unwrap_or("-");
+                                let short_appellant = if appellant_did.len() > 10 {
+                                    &appellant_did[..10]
+                                } else {
+                                    appellant_did
+                                };
+                                println!(
+                                    "{:<12} {:<15} {:<12} {:<10}",
+                                    short_id,
+                                    a["appeal_type"].as_str().unwrap_or("-"),
+                                    a["status"].as_str().unwrap_or("-"),
+                                    short_appellant,
+                                );
+                            }
+                        }
+                    } else {
+                        let status = resp.status();
+                        let body = resp.text().await.unwrap_or_default();
+                        println!("Error: {status} - {body}");
+                    }
+                }
+                Err(e) => {
+                    println!("Could not connect to gateway: {e}");
+                }
+            }
+        }
+
+        AppealCommands::Show { appeal_id, gateway } => {
+            println!("Appeal Details");
+            println!("==============\n");
+
+            let client = reqwest::Client::new();
+            let url = format!("{gateway}/v1/constitutional/appeals/{appeal_id}");
+
+            match client.get(&url).send().await {
+                Ok(resp) => {
+                    if resp.status().is_success() {
+                        let a: serde_json::Value = resp.json().await?;
+                        println!("ID:          {}", a["id"].as_str().unwrap_or("-"));
+                        println!("Type:        {}", a["appeal_type"].as_str().unwrap_or("-"));
+                        println!("Scope:       {}", a["scope"].as_str().unwrap_or("-"));
+                        println!("Status:      {}", a["status"].as_str().unwrap_or("-"));
+                        println!("Appellant:   {}", a["appellant"].as_str().unwrap_or("-"));
+                        if let Some(respondent) = a["respondent"].as_str() {
+                            println!("Respondent:  {respondent}");
+                        }
+                        println!("Statement:   {}", a["statement"].as_str().unwrap_or("-"));
+                        println!("Remedy:      {}", a["requested_remedy"].as_str().unwrap_or("-"));
+
+                        if let Some(grounds) = a["grounds"].as_array() {
+                            println!("\nGrounds ({}):", grounds.len());
+                            for (i, g) in grounds.iter().enumerate() {
+                                println!(
+                                    "  {}. {} - {}",
+                                    i + 1,
+                                    g["ground_type"].as_str().unwrap_or("-"),
+                                    g["description"].as_str().unwrap_or("-")
+                                );
+                            }
+                        }
+
+                        if let Some(evidence) = a["evidence"].as_array() {
+                            if !evidence.is_empty() {
+                                println!("\nEvidence ({}):", evidence.len());
+                                for (i, e) in evidence.iter().enumerate() {
+                                    println!(
+                                        "  {}. [{}] {}",
+                                        i + 1,
+                                        e["evidence_type"].as_str().unwrap_or("-"),
+                                        e["description"].as_str().unwrap_or("-")
+                                    );
+                                }
+                            }
+                        }
+
+                        if let Some(responses) = a["responses"].as_array() {
+                            if !responses.is_empty() {
+                                println!("\nResponses ({}):", responses.len());
+                                for (i, r) in responses.iter().enumerate() {
+                                    println!(
+                                        "  {}. [{}] {}",
+                                        i + 1,
+                                        r["response_type"].as_str().unwrap_or("-"),
+                                        truncate_str(r["content"].as_str().unwrap_or("-"), 50)
+                                    );
+                                }
+                            }
+                        }
+
+                        if let Some(outcome) = a["outcome"].as_object() {
+                            println!("\nOutcome:");
+                            println!("  Result: {}", outcome.get("result").and_then(|v| v.as_str()).unwrap_or("-"));
+                            if let Some(reason) = outcome.get("reason").and_then(|v| v.as_str()) {
+                                println!("  Reason: {reason}");
+                            }
+                        }
+                    } else if resp.status() == reqwest::StatusCode::NOT_FOUND {
+                        println!("Appeal not found: {appeal_id}");
+                    } else {
+                        let status = resp.status();
+                        let body = resp.text().await.unwrap_or_default();
+                        println!("Error: {status} - {body}");
+                    }
+                }
+                Err(e) => {
+                    println!("Could not connect to gateway: {e}");
+                }
+            }
+        }
+
+        AppealCommands::AddEvidence {
+            appeal_id,
+            evidence_type,
+            description,
+            content_hash,
+            uri,
+            coop_id,
+            gateway,
+        } => {
+            println!("Add Evidence to Appeal");
+            println!("======================\n");
+
+            let keystore_path = get_keystore_path(data_dir);
+            if !keystore_path.exists() {
+                bail!("No identity found. Run 'icnctl id init' first.");
+            }
+
+            let passphrase = read_passphrase("Enter passphrase: ")?;
+            let mut keystore = AgeKeyStore::open(&keystore_path)?;
+            keystore.unlock(&passphrase)?;
+            let keypair = keystore.get_keypair()?;
+            let did = keypair.did();
+
+            let request = serde_json::json!({
+                "evidence_type": evidence_type,
+                "description": description,
+                "content_hash": content_hash,
+                "uri": uri
+            });
+
+            let client = reqwest::Client::new();
+            let url = format!("{gateway}/v1/constitutional/appeals/{appeal_id}/evidence");
+            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, &keypair).await?;
+
+            match client
+                .post(&url)
+                .header("Authorization", format!("Bearer {token}"))
+                .json(&request)
+                .send()
+                .await
+            {
+                Ok(resp) => {
+                    if resp.status().is_success() {
+                        println!("Evidence added successfully!");
+                        println!();
+                        println!("  Appeal ID:  {appeal_id}");
+                        println!("  Type:       {evidence_type}");
+                        println!("  Description: {description}");
+                    } else {
+                        let status = resp.status();
+                        let body = resp.text().await.unwrap_or_default();
+                        println!("Error adding evidence: {status}");
+                        println!("{body}");
+                    }
+                }
+                Err(e) => {
+                    println!("Could not connect to gateway: {e}");
+                }
+            }
+        }
+
+        AppealCommands::Respond {
+            appeal_id,
+            response_type,
+            content,
+            coop_id,
+            gateway,
+        } => {
+            println!("Respond to Appeal");
+            println!("=================\n");
+
+            let keystore_path = get_keystore_path(data_dir);
+            if !keystore_path.exists() {
+                bail!("No identity found. Run 'icnctl id init' first.");
+            }
+
+            let passphrase = read_passphrase("Enter passphrase: ")?;
+            let mut keystore = AgeKeyStore::open(&keystore_path)?;
+            keystore.unlock(&passphrase)?;
+            let keypair = keystore.get_keypair()?;
+            let did = keypair.did();
+
+            let request = serde_json::json!({
+                "response_type": response_type,
+                "content": content
+            });
+
+            let client = reqwest::Client::new();
+            let url = format!("{gateway}/v1/constitutional/appeals/{appeal_id}/respond");
+            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, &keypair).await?;
+
+            match client
+                .post(&url)
+                .header("Authorization", format!("Bearer {token}"))
+                .json(&request)
+                .send()
+                .await
+            {
+                Ok(resp) => {
+                    if resp.status().is_success() {
+                        println!("Response submitted!");
+                        println!();
+                        println!("  Appeal ID:     {appeal_id}");
+                        println!("  Response type: {response_type}");
+                    } else {
+                        let status = resp.status();
+                        let body = resp.text().await.unwrap_or_default();
+                        println!("Error submitting response: {status}");
+                        println!("{body}");
+                    }
+                }
+                Err(e) => {
+                    println!("Could not connect to gateway: {e}");
+                }
+            }
+        }
+
+        AppealCommands::Withdraw {
+            appeal_id,
+            reason,
+            coop_id,
+            gateway,
+        } => {
+            println!("Withdraw Appeal");
+            println!("===============\n");
+
+            let keystore_path = get_keystore_path(data_dir);
+            if !keystore_path.exists() {
+                bail!("No identity found. Run 'icnctl id init' first.");
+            }
+
+            let passphrase = read_passphrase("Enter passphrase: ")?;
+            let mut keystore = AgeKeyStore::open(&keystore_path)?;
+            keystore.unlock(&passphrase)?;
+            let keypair = keystore.get_keypair()?;
+            let did = keypair.did();
+
+            let request = serde_json::json!({
+                "reason": reason.unwrap_or_else(|| "Withdrawn by appellant".to_string())
+            });
+
+            let client = reqwest::Client::new();
+            let url = format!("{gateway}/v1/constitutional/appeals/{appeal_id}/withdraw");
+            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, &keypair).await?;
+
+            match client
+                .post(&url)
+                .header("Authorization", format!("Bearer {token}"))
+                .json(&request)
+                .send()
+                .await
+            {
+                Ok(resp) => {
+                    if resp.status().is_success() {
+                        println!("Appeal withdrawn.");
+                        println!("Appeal ID: {appeal_id}");
+                    } else {
+                        let status = resp.status();
+                        let body = resp.text().await.unwrap_or_default();
+                        println!("Error withdrawing appeal: {status}");
+                        println!("{body}");
+                    }
+                }
+                Err(e) => {
+                    println!("Could not connect to gateway: {e}");
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Truncate a string to max length, adding "..." if truncated
+fn truncate_str(s: &str, max_len: usize) -> String {
+    if s.len() <= max_len {
+        s.to_string()
+    } else {
+        format!("{}...", &s[..max_len.saturating_sub(3)])
+    }
+}
+
+/// Get a gateway auth token using challenge-response
+async fn get_gateway_token(
+    gateway: &str,
+    did: &str,
+    coop_id: &str,
+    keypair: &icn_identity::KeyPair,
+) -> Result<String> {
+    let client = reqwest::Client::new();
+
+    // Request challenge
+    let challenge_url = format!("{gateway}/v1/auth/challenge");
+    let challenge_req = serde_json::json!({ "did": did });
+
+    let resp = client
+        .post(&challenge_url)
+        .json(&challenge_req)
+        .send()
+        .await
+        .context("Failed to request auth challenge")?;
+
+    if !resp.status().is_success() {
+        bail!("Failed to get auth challenge: {}", resp.status());
+    }
+
+    let challenge_data: serde_json::Value = resp.json().await?;
+    let nonce = challenge_data["nonce"]
+        .as_str()
+        .context("Missing nonce in response")?;
+
+    // Sign the nonce
+    let signature = keypair.sign(nonce.as_bytes());
+
+    // Submit signed challenge to verify endpoint
+    let verify_url = format!("{gateway}/v1/auth/verify");
+    let verify_req = serde_json::json!({
+        "did": did,
+        "signature": hex::encode(signature.to_bytes()),
+        "coop_id": coop_id,
+        "scopes": ["gov:read", "gov:write"]
+    });
+
+    let resp = client
+        .post(&verify_url)
+        .json(&verify_req)
+        .send()
+        .await
+        .context("Failed to verify signature")?;
+
+    if !resp.status().is_success() {
+        bail!("Failed to get auth token: {}", resp.status());
+    }
+
+    let token_data: serde_json::Value = resp.json().await?;
+    let token = token_data["token"]
+        .as_str()
+        .context("Missing token in response")?;
+
+    Ok(token.to_string())
 }
 
 /// Generate a QR code representation (ASCII art placeholder)

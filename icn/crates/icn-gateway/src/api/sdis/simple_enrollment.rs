@@ -8,6 +8,7 @@
 
 use actix_web::{post, web, HttpRequest, HttpResponse};
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+use icn_identity::commons::{JurisdictionId, MembershipCapability};
 use icn_identity::Did;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -123,6 +124,8 @@ pub struct CompleteEnrollmentResponse {
     pub did: String,
     pub anchor_id: Option<String>,
     pub holder_id: Option<String>,
+    pub coop_id: String,
+    pub membership_status: Option<String>,
     pub recovery_codes: Vec<String>,
     pub auth_token: String,
 }
@@ -450,10 +453,53 @@ pub async fn complete_enrollment(
         }
     };
 
+    // Auto-affiliate the new holder with their enrollment coop
+    let membership_status = if let Some(ref holder_id_hex) = holder_id {
+        let jurisdiction = JurisdictionId::new(format!("coop:{}", session.coop_id));
+        let initial_capabilities = vec![
+            MembershipCapability::Transact,
+            MembershipCapability::Vote,
+        ];
+
+        match commons_mgr
+            .join_jurisdiction(holder_id_hex, jurisdiction.clone(), initial_capabilities)
+            .await
+        {
+            Ok(_affiliation) => {
+                // If steward vouched, auto-approve (skip candidate → provisional)
+                if steward_did_opt.is_some() {
+                    if let Err(e) = commons_mgr
+                        .approve_membership(holder_id_hex, &jurisdiction)
+                        .await
+                    {
+                        tracing::warn!("Failed to auto-approve membership: {}", e);
+                    }
+                    Some("provisional".to_string())
+                } else {
+                    Some("candidate".to_string())
+                }
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "Failed to auto-affiliate {} with coop {}: {}",
+                    holder_id_hex,
+                    session.coop_id,
+                    e
+                );
+                None
+            }
+        }
+    } else {
+        None
+    };
+
+    // Capture coop_id before dropping session
+    let coop_id = session.coop_id.clone();
+
     // Issue auth token for the new identity
     let auth_token = auth.issue_token(
         &ephemeral_did,
-        &session.coop_id,
+        &coop_id,
         vec!["ledger:read".to_string(), "ledger:write".to_string()],
     )?;
 
@@ -466,6 +512,8 @@ pub async fn complete_enrollment(
         did,
         anchor_id,
         holder_id,
+        coop_id,
+        membership_status,
         recovery_codes,
         auth_token,
     }))

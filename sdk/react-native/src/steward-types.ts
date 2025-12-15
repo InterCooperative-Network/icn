@@ -168,6 +168,10 @@ export interface CompleteEnrollmentRequest {
  */
 export interface CompleteEnrollmentResponse {
   did: string;
+  anchor_id: string | null;
+  holder_id: string | null;
+  coop_id: string;
+  membership_status: string | null;
   recovery_codes: string[];
   auth_token: string;
 }
