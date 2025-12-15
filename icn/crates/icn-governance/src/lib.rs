@@ -25,6 +25,7 @@
 //! ```
 
 pub mod charter;
+pub mod charter_store;
 pub mod config;
 pub mod domain;
 pub mod handle;
@@ -34,6 +35,8 @@ pub mod profile;
 pub mod proposal;
 pub mod resolver;
 pub mod sdis;
+pub mod steward;
+pub mod steward_store;
 pub mod store;
 pub mod tally;
 pub mod vote;
@@ -61,6 +64,12 @@ pub use charter::{
     DisputePolicy, EconomicPolicy, FeePeriod, FounderSignature, MembershipFee, MembershipPolicy,
     OrgType,
 };
+pub use charter_store::{CharterStore, CharterStoreBackend, InMemoryCharterStore};
+pub use steward::{
+    AttestationType as StewardAttestationType, ContactMethod, DisputeOutcome, StewardAttestation,
+    StewardContact, StewardId, StewardRecord, StewardStatus,
+};
+pub use steward_store::{InMemoryStewardStore, StewardStore, StewardStoreBackend};
 
 /// Unix timestamp in seconds
 pub type Timestamp = u64;
