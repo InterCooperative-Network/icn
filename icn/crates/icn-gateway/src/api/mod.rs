@@ -7,6 +7,7 @@ pub mod compute;
 pub mod constitutional;
 pub mod coops;
 pub mod devices;
+pub mod escrow;
 pub mod federation;
 pub mod governance;
 pub mod governance_dashboard;
