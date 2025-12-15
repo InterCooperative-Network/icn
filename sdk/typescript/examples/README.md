@@ -16,7 +16,46 @@ npx ts-node examples/websocket-filters.ts
 
 ## Examples
 
-### 1. Batch Operations (`batch-operations.ts`)
+### 1. Commons Evolution (`commons-evolution.ts`)
+
+Comprehensive example of Commons Evolution governance features:
+
+- **Charter Management**: Create, sign, and activate cooperative charters
+- **Membership Lifecycle**: Apply, approve, promote, and manage capabilities
+- **Constitutional Amendments**: Draft, modify, submit, and ratify amendments
+- **Appeals Process**: File appeals, add evidence, and resolve disputes
+
+**Use cases**:
+- Founding a new cooperative with multiple co-founders
+- Managing member onboarding and progression
+- Democratic governance rule changes
+- Fair dispute resolution processes
+
+```typescript
+// Create a cooperative charter
+const charter = await client.createCharter({
+  domain_id: 'coop:green-valley',
+  name: 'Green Valley Food Cooperative',
+  org_type: 'cooperative',
+});
+
+// Sign as a founder
+const signed = await client.signCharter(charter.charter_id, signature, 'founding_member');
+console.log(`${signed.total_founders} founders signed, ${signed.founders_needed} more needed`);
+
+// Apply for membership
+const member = await client.applyForMembership('coop:green-valley', ['vote', 'transact']);
+
+// File an appeal
+const appeal = await client.fileAppeal({
+  appeal_type: { category: 'membership_denial' },
+  grounds: [{ ground_type: 'procedural_error', description: 'Not given proper review' }],
+  statement: 'Request fair review of my application',
+  requested_remedy: 'reinstate',
+});
+```
+
+### 2. Batch Operations (`batch-operations.ts`)
 
 Learn how to efficiently process multiple operations:
 

@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - SDK Commons Evolution Integration (2025-12-15)
+
+**TypeScript SDK** ([sdk/typescript/src/](sdk/typescript/src/)):
+- 38 new client methods for Commons Evolution features
+- Charter: `createCharter`, `getCharter`, `getCharterByDomain`, `listCharters`, `signCharter`, `activateCharter`, `updateCharterStatus`
+- Membership: `applyForMembership`, `getMembershipStatus`, `listJurisdictionMembers`, `approveMembership`, `promoteMember`, `suspendMember`, `reinstateMember`, `exitMembership`, `grantCapability`, `revokeCapability`, `checkCapability`, `addMemberRole`, `removeMemberRole`
+- Amendments: `createAmendment`, `getAmendment`, `listAmendments`, `addAmendmentChange`, `submitAmendment`, `openAmendmentVoting`, `ratifyAmendment`, `withdrawAmendment`
+- Appeals: `fileAppeal`, `getAppeal`, `listAppeals`, `addAppealEvidence`, `addAppealResponse`, `beginAppealReview`, `resolveAppeal`, `withdrawAppeal`
+- Full TypeScript types for all Commons Evolution entities
+- New example: `examples/commons-evolution.ts`
+
+**React Native SDK** ([sdk/react-native/src/](sdk/react-native/src/)):
+- 18 new React hooks for mobile app integration
+- Membership hooks: `useMembership`, `useJurisdictionMembers`, `useMembershipAdmin`, `useCapabilities`, `useRoles`
+- Charter hooks: `useCharter`, `useCharters`, `useCreateCharter`, `useCharterSignature`, `useCharterStatus`
+- Amendment hooks: `useAmendment`, `useAmendments`, `useAmendmentActions`
+- Appeal hooks: `useAppeal`, `useAppeals`, `useAppealActions`, `useAppealAdmin`
+- All hooks include loading states, error handling, and refresh callbacks
+- Mobile client extends base TypeScript SDK
+
 ### Added - Wire Up Remaining Features (2025-12-15)
 
 **Charter Signing Flow** ([icn/crates/icn-gateway/src/commons_mgr.rs](icn/crates/icn-gateway/src/commons_mgr.rs)):
