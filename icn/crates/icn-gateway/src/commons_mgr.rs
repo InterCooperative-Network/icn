@@ -357,7 +357,7 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
         self.store.put_holder(&holder)?;
 
         // Record status change metric
-        icn_obs::metrics::commons::holder_status_changed_inc(&format!("{:?}", status));
+        icn_obs::metrics::commons::holder_status_changed_inc(&format!("{status:?}"));
 
         // Audit log
         info!(
@@ -495,7 +495,7 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
             .iter_mut()
             .find(|a| &a.jurisdiction_id == jurisdiction)
         {
-            affiliation.membership_status = status.clone();
+            affiliation.membership_status = status;
             holder.updated_at = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
@@ -1815,7 +1815,7 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
             .get_appeal(&id_hex)?
             .ok_or_else(|| anyhow::anyhow!("Appeal not found"))?;
 
-        let outcome_str = format!("{:?}", outcome);
+        let outcome_str = format!("{outcome:?}");
         appeal.resolve(outcome).map_err(|e| anyhow::anyhow!(e))?;
         self.store.put_appeal(&appeal)?;
 
