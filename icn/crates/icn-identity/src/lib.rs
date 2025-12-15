@@ -20,6 +20,8 @@ pub mod multi_device;
 pub mod personhood;
 pub mod personhood_store;
 pub mod recovery;
+pub mod revocation;
+pub mod revocation_store;
 pub mod sync;
 pub mod vui;
 
@@ -54,6 +56,11 @@ pub use personhood_store::{InMemoryPersonhoodStore, PersonhoodAnchorStore, Perso
 pub use recovery::{
     RecoveryAttestation, RecoveryEvent, RecoveryMessage, RecoveryStatus, IDENTITY_RECOVERY_TOPIC,
 };
+pub use revocation::{
+    AppealStatus, CommonsRevocationReason, RevocationCheck, RevocationRecord, RevocationScope,
+    RevocationType,
+};
+pub use revocation_store::RevocationRegistry;
 pub use sync::{DidDocumentCache, IdentityUpdateMessage, IDENTITY_UPDATES_TOPIC};
 pub use vui::Vui;
 

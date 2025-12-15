@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Membership & Rights (v0.5.0) (2025-12-14)
+
+**RevocationRecord & Registry** ([icn/crates/icn-identity/src/revocation.rs](icn/crates/icn-identity/src/revocation.rs), [revocation_store.rs](icn/crates/icn-identity/src/revocation_store.rs)):
+- `RevocationRecord` - Tracks revocations with evidence, appeal deadlines, and effective dates
+- `CommonsRevocationReason` - Enum for Sybil attack, identity fraud, policy violation, governance decision, key compromise, voluntary exit, abandoned, other
+- `RevocationScope` - Global, Federation, or Jurisdiction-level revocations
+- `AppealStatus` - None, Pending, Denied, Upheld lifecycle
+- `RevocationRegistry` - In-memory store with indexes by target ID, target type, and appeal status
+- 10 unit tests covering all revocation operations
+
+**Gateway Membership API** ([icn/crates/icn-gateway/src/api/membership/mod.rs](icn/crates/icn-gateway/src/api/membership/mod.rs)):
+- `POST /v1/membership/apply` - Apply for membership in jurisdiction
+- `GET /v1/membership/status/{jurisdiction}` - Get membership status
+- `POST /v1/membership/approve` - Approve pending application
+- `POST /v1/membership/promote` - Promote provisional to full member
+- `POST /v1/membership/suspend` - Suspend member (reversible)
+- `POST /v1/membership/reinstate` - Reinstate suspended member
+- `POST /v1/membership/ban` - Ban member immediately (no appeal)
+- `POST /v1/membership/revoke` - Revoke with appeal window
+- `POST /v1/membership/capability/grant` - Grant capability to member
+- `POST /v1/membership/capability/revoke` - Revoke capability
+- `GET /v1/membership/capability/check` - Check if member has capability
+- `POST /v1/membership/role/add` - Add role to member
+- `POST /v1/membership/role/remove` - Remove role from member
+- `GET /v1/membership/list/{jurisdiction}` - List members with optional status filter
+- `POST /v1/membership/exit` - Voluntary exit from jurisdiction
+
+**CommonsManager Membership Operations** ([icn/crates/icn-gateway/src/commons_mgr.rs](icn/crates/icn-gateway/src/commons_mgr.rs)):
+- Full membership lifecycle: apply, approve, promote, suspend, reinstate, exit
+- Capability management: grant, revoke, check per-jurisdiction capabilities
+- Role management: add/remove roles with authority validation
+- Ban/revoke with revocation registry integration
+- Appeal process: file appeal, resolve appeal (uphold/deny)
+- Rights enforcement: revocation checks before allowing actions
+
+**Membership Capabilities** ([icn/crates/icn-identity/src/commons.rs](icn/crates/icn-identity/src/commons.rs)):
+- Vote, Propose, Transact, HoldOffice, AccessPrivate, Sponsor capabilities
+- Per-jurisdiction capability grants with expiration support
+- Capability checks integrated into membership operations
+
 ### Added - Steward Layer (v0.4.0) (2025-12-14)
 
 **Gateway Steward API** ([icn/crates/icn-gateway/src/api/steward/mod.rs](icn/crates/icn-gateway/src/api/steward/mod.rs)):

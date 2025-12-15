@@ -12,6 +12,7 @@ pub mod identity;
 pub mod invites;
 pub mod ledger;
 pub mod members;
+pub mod membership;
 pub mod notifications;
 pub mod sdis;
 pub mod steward;

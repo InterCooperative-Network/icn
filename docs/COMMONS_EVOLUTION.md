@@ -25,6 +25,15 @@
 - CLI commands (`icnctl steward info/list/attesters/register/retire`)
 - 14 steward integration tests
 
+**v0.5.0 Membership & Rights - COMPLETE**:
+- RevocationRecord and RevocationRegistry for tracking revocations with appeals
+- Membership management API (`/v1/membership/*`) with 15 endpoints
+- Full membership lifecycle: apply, approve, promote, suspend, reinstate, exit
+- Capability management: grant, revoke, check capabilities per jurisdiction
+- Role management: add/remove roles for members
+- Ban/revoke with appeal process and due process support
+- Rights enforcement through revocation checks before actions
+
 ---
 
 ## Abstract
@@ -773,7 +782,7 @@ contract CommonsGovernance {
 |---------|-----------|--------|------------------|
 | **v0.3.0** | Commons Foundation | **COMPLETE** | PersonhoodAnchor, CommonsHolderRecord, Charter structs; Gateway APIs; SDIS integration; CLI commands |
 | **v0.4.0** | Stewardship | **COMPLETE** | StewardRecord, POP attestation workflow, steward governance, reputation tracking, bond/term management |
-| **v0.5.0** | Membership & Rights | Planned | Full MembershipRecord with capabilities, rights enforcement hooks, revocation registry |
+| **v0.5.0** | Membership & Rights | **COMPLETE** | RevocationRecord/Registry, 15 membership API endpoints, full lifecycle management, capability/role system |
 | **v0.6.0** | Constitutional Governance | Planned | Amendment process, multi-level ratification, appeal mechanisms |
 | **v1.0.0** | Production Commons | Planned | Full steward network, multiple POP pathways, complete economic layer |
 

@@ -9,9 +9,10 @@
 use anyhow::{bail, Result};
 use icn_governance::{Charter, CharterStatus, OrgType, StewardRecord};
 use icn_identity::{
-    Affiliation, Anchor, AnchorStatus, CommonsHolderRecord, Did, EnrollmentPathway, HolderStatus,
-    JurisdictionId, MembershipCapability, MembershipStatus, POPAttestation, POPLevel, POPMethod,
-    PersonhoodAnchor,
+    Affiliation, Anchor, AnchorStatus, CommonsHolderRecord, CommonsRevocationReason, Did,
+    EnrollmentPathway, HolderStatus, JurisdictionId, MembershipCapability, MembershipStatus,
+    POPAttestation, POPLevel, POPMethod, PersonhoodAnchor, RevocationRecord, RevocationRegistry,
+    RevocationScope, RevocationType,
 };
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
@@ -40,6 +41,9 @@ pub struct CommonsManager {
     stewards: RwLock<HashMap<String, StewardRecord>>,
     // Index: DID -> steward_id
     stewards_by_did: RwLock<HashMap<String, String>>,
+
+    // Revocation registry
+    revocations: RevocationRegistry,
 }
 
 impl CommonsManager {
@@ -55,6 +59,7 @@ impl CommonsManager {
             charters_by_domain: RwLock::new(HashMap::new()),
             stewards: RwLock::new(HashMap::new()),
             stewards_by_did: RwLock::new(HashMap::new()),
+            revocations: RevocationRegistry::new(),
         }
     }
 
@@ -916,6 +921,519 @@ impl CommonsManager {
         } else {
             bail!("Steward not found: {steward_id}")
         }
+    }
+
+    // ========== Revocation Operations ==========
+
+    /// Add a revocation record
+    pub async fn add_revocation(&self, record: RevocationRecord) -> Result<()> {
+        self.revocations
+            .add(record)
+            .map_err(|e| anyhow::anyhow!("Failed to add revocation: {e}"))
+    }
+
+    /// Check if a target is revoked
+    pub async fn check_revocation(&self, target_id: &str) -> icn_identity::RevocationCheck {
+        self.revocations.check(target_id)
+    }
+
+    /// Check if a target is revoked at a specific scope
+    pub async fn check_revocation_at_scope(
+        &self,
+        target_id: &str,
+        scope: &RevocationScope,
+    ) -> icn_identity::RevocationCheck {
+        self.revocations.check_at_scope(target_id, scope)
+    }
+
+    /// Get a revocation record by ID
+    pub async fn get_revocation(&self, revocation_id: &str) -> Option<RevocationRecord> {
+        self.revocations.get(revocation_id)
+    }
+
+    /// List all revocations for a target
+    pub async fn list_revocations_for_target(&self, target_id: &str) -> Vec<RevocationRecord> {
+        self.revocations.list_for_target(target_id)
+    }
+
+    /// List all revocations by type
+    pub async fn list_revocations_by_type(
+        &self,
+        target_type: RevocationType,
+    ) -> Vec<RevocationRecord> {
+        self.revocations.list_by_type(target_type)
+    }
+
+    /// List all pending appeals
+    pub async fn list_pending_appeals(&self) -> Vec<RevocationRecord> {
+        self.revocations.list_pending_appeals()
+    }
+
+    /// File an appeal for a revocation
+    pub async fn file_appeal(&self, revocation_id: &str, reason: String) -> Result<()> {
+        let mut record = self
+            .revocations
+            .get(revocation_id)
+            .ok_or_else(|| anyhow::anyhow!("Revocation not found"))?;
+
+        if !record.file_appeal(reason) {
+            bail!("Cannot file appeal - appeal window closed or already appealed");
+        }
+
+        self.revocations
+            .update(record)
+            .map_err(|e| anyhow::anyhow!("Failed to update revocation: {e}"))
+    }
+
+    /// Resolve an appeal
+    pub async fn resolve_appeal(
+        &self,
+        revocation_id: &str,
+        upheld: bool,
+        resolution_notes: String,
+    ) -> Result<()> {
+        let mut record = self
+            .revocations
+            .get(revocation_id)
+            .ok_or_else(|| anyhow::anyhow!("Revocation not found"))?;
+
+        record.resolve_appeal(upheld, resolution_notes);
+
+        self.revocations
+            .update(record)
+            .map_err(|e| anyhow::anyhow!("Failed to update revocation: {e}"))
+    }
+
+    /// Revoke a membership with proper due process
+    pub async fn revoke_membership(
+        &self,
+        holder_id: &str,
+        jurisdiction_id: &JurisdictionId,
+        authority: Did,
+        reason: CommonsRevocationReason,
+        appeal_window_days: u64,
+    ) -> Result<RevocationRecord> {
+        // Verify holder exists
+        let mut holder = self
+            .get_holder(holder_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Holder not found"))?;
+
+        // Verify has affiliation with jurisdiction
+        let affiliation = holder.get_affiliation_mut(jurisdiction_id).ok_or_else(|| {
+            anyhow::anyhow!("Holder not affiliated with jurisdiction: {jurisdiction_id}")
+        })?;
+
+        // Create revocation record
+        let target_id = format!("{}:{}", holder_id, jurisdiction_id);
+        let record = RevocationRecord::new(
+            RevocationType::Membership,
+            target_id,
+            RevocationScope::Jurisdiction {
+                jurisdiction_id: jurisdiction_id.clone(),
+            },
+            authority,
+            reason,
+            appeal_window_days,
+        );
+
+        // Add to registry
+        self.add_revocation(record.clone()).await?;
+
+        // Update affiliation status (but allow appeal)
+        affiliation.suspend();
+
+        // Update holder
+        let mut holders = self
+            .holders
+            .write()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        holders.insert(holder_id.to_string(), holder);
+
+        Ok(record)
+    }
+
+    /// Ban a member immediately (severe violations)
+    pub async fn ban_member(
+        &self,
+        holder_id: &str,
+        jurisdiction_id: &JurisdictionId,
+        authority: Did,
+        reason: CommonsRevocationReason,
+    ) -> Result<RevocationRecord> {
+        // Verify holder exists
+        let mut holder = self
+            .get_holder(holder_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Holder not found"))?;
+
+        // Verify has affiliation
+        let affiliation = holder.get_affiliation_mut(jurisdiction_id).ok_or_else(|| {
+            anyhow::anyhow!("Holder not affiliated with jurisdiction: {jurisdiction_id}")
+        })?;
+
+        // Create immediate revocation
+        let target_id = format!("{}:{}", holder_id, jurisdiction_id);
+        let record = RevocationRecord::immediate(
+            RevocationType::Membership,
+            target_id,
+            RevocationScope::Jurisdiction {
+                jurisdiction_id: jurisdiction_id.clone(),
+            },
+            authority,
+            reason,
+        );
+
+        // Add to registry
+        self.add_revocation(record.clone()).await?;
+
+        // Ban the member
+        affiliation.ban();
+
+        // Update holder
+        let mut holders = self
+            .holders
+            .write()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        holders.insert(holder_id.to_string(), holder);
+
+        Ok(record)
+    }
+
+    /// Check if a member is revoked in a jurisdiction
+    pub async fn is_member_revoked(
+        &self,
+        holder_id: &str,
+        jurisdiction_id: &JurisdictionId,
+    ) -> bool {
+        let target_id = format!("{}:{}", holder_id, jurisdiction_id);
+        self.revocations
+            .is_revoked_in_jurisdiction(&target_id, jurisdiction_id)
+    }
+
+    // ========== Membership Management Operations ==========
+
+    /// Apply for membership in a jurisdiction
+    pub async fn apply_for_membership(
+        &self,
+        holder_id: &str,
+        jurisdiction_id: JurisdictionId,
+        capabilities_requested: Vec<MembershipCapability>,
+    ) -> Result<Affiliation> {
+        // Verify holder exists and is active
+        let mut holder = self
+            .get_holder(holder_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Holder not found"))?;
+
+        if !holder.is_active() {
+            bail!("Holder is not active");
+        }
+
+        // Check not already affiliated
+        if holder.is_affiliated(&jurisdiction_id) {
+            bail!("Already affiliated with jurisdiction: {jurisdiction_id}");
+        }
+
+        // Check not revoked from this jurisdiction
+        if self.is_member_revoked(holder_id, &jurisdiction_id).await {
+            bail!("Previously banned from jurisdiction: {jurisdiction_id}");
+        }
+
+        // Create affiliation as candidate
+        let mut affiliation = Affiliation::new(jurisdiction_id.clone());
+        // Store requested capabilities for review
+        for cap in capabilities_requested {
+            affiliation.add_capability(cap);
+        }
+
+        // Add to holder
+        holder.add_affiliation(affiliation.clone());
+
+        // Update storage
+        let mut holders = self
+            .holders
+            .write()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        holders.insert(holder_id.to_string(), holder);
+
+        Ok(affiliation)
+    }
+
+    /// Approve a membership application (moves from Candidate to Provisional)
+    pub async fn approve_membership(
+        &self,
+        holder_id: &str,
+        jurisdiction_id: &JurisdictionId,
+    ) -> Result<()> {
+        let mut holder = self
+            .get_holder(holder_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Holder not found"))?;
+
+        let affiliation = holder.get_affiliation_mut(jurisdiction_id).ok_or_else(|| {
+            anyhow::anyhow!("Holder not affiliated with jurisdiction: {jurisdiction_id}")
+        })?;
+
+        if affiliation.membership_status != MembershipStatus::Candidate {
+            bail!("Can only approve candidates, current status: {}", affiliation.membership_status);
+        }
+
+        affiliation.approve();
+
+        let mut holders = self
+            .holders
+            .write()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        holders.insert(holder_id.to_string(), holder);
+
+        Ok(())
+    }
+
+    /// Promote a member from Provisional to full Member
+    pub async fn promote_member(
+        &self,
+        holder_id: &str,
+        jurisdiction_id: &JurisdictionId,
+    ) -> Result<()> {
+        let mut holder = self
+            .get_holder(holder_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Holder not found"))?;
+
+        let affiliation = holder.get_affiliation_mut(jurisdiction_id).ok_or_else(|| {
+            anyhow::anyhow!("Holder not affiliated with jurisdiction: {jurisdiction_id}")
+        })?;
+
+        if affiliation.membership_status != MembershipStatus::Provisional {
+            bail!(
+                "Can only promote provisional members, current status: {}",
+                affiliation.membership_status
+            );
+        }
+
+        affiliation.promote();
+
+        let mut holders = self
+            .holders
+            .write()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        holders.insert(holder_id.to_string(), holder);
+
+        Ok(())
+    }
+
+    /// Suspend a member
+    pub async fn suspend_member(
+        &self,
+        holder_id: &str,
+        jurisdiction_id: &JurisdictionId,
+    ) -> Result<()> {
+        let mut holder = self
+            .get_holder(holder_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Holder not found"))?;
+
+        let affiliation = holder.get_affiliation_mut(jurisdiction_id).ok_or_else(|| {
+            anyhow::anyhow!("Holder not affiliated with jurisdiction: {jurisdiction_id}")
+        })?;
+
+        affiliation.suspend();
+
+        let mut holders = self
+            .holders
+            .write()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        holders.insert(holder_id.to_string(), holder);
+
+        Ok(())
+    }
+
+    /// Reinstate a suspended member
+    pub async fn reinstate_member(
+        &self,
+        holder_id: &str,
+        jurisdiction_id: &JurisdictionId,
+    ) -> Result<()> {
+        let mut holder = self
+            .get_holder(holder_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Holder not found"))?;
+
+        let affiliation = holder.get_affiliation_mut(jurisdiction_id).ok_or_else(|| {
+            anyhow::anyhow!("Holder not affiliated with jurisdiction: {jurisdiction_id}")
+        })?;
+
+        if affiliation.membership_status != MembershipStatus::Suspended {
+            bail!("Member is not suspended");
+        }
+
+        // Reinstate to Member status
+        affiliation.membership_status = MembershipStatus::Member;
+
+        let mut holders = self
+            .holders
+            .write()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        holders.insert(holder_id.to_string(), holder);
+
+        Ok(())
+    }
+
+    /// Grant a capability to a member
+    pub async fn grant_capability(
+        &self,
+        holder_id: &str,
+        jurisdiction_id: &JurisdictionId,
+        capability: MembershipCapability,
+    ) -> Result<()> {
+        let mut holder = self
+            .get_holder(holder_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Holder not found"))?;
+
+        let affiliation = holder.get_affiliation_mut(jurisdiction_id).ok_or_else(|| {
+            anyhow::anyhow!("Holder not affiliated with jurisdiction: {jurisdiction_id}")
+        })?;
+
+        if !affiliation.is_active() {
+            bail!("Member is not active");
+        }
+
+        affiliation.add_capability(capability);
+
+        let mut holders = self
+            .holders
+            .write()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        holders.insert(holder_id.to_string(), holder);
+
+        Ok(())
+    }
+
+    /// Revoke a capability from a member
+    pub async fn revoke_capability(
+        &self,
+        holder_id: &str,
+        jurisdiction_id: &JurisdictionId,
+        capability: MembershipCapability,
+    ) -> Result<()> {
+        let mut holder = self
+            .get_holder(holder_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Holder not found"))?;
+
+        let affiliation = holder.get_affiliation_mut(jurisdiction_id).ok_or_else(|| {
+            anyhow::anyhow!("Holder not affiliated with jurisdiction: {jurisdiction_id}")
+        })?;
+
+        affiliation.remove_capability(capability);
+
+        let mut holders = self
+            .holders
+            .write()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        holders.insert(holder_id.to_string(), holder);
+
+        Ok(())
+    }
+
+    /// Add a role to a member
+    pub async fn add_member_role(
+        &self,
+        holder_id: &str,
+        jurisdiction_id: &JurisdictionId,
+        role: String,
+    ) -> Result<()> {
+        let mut holder = self
+            .get_holder(holder_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Holder not found"))?;
+
+        let affiliation = holder.get_affiliation_mut(jurisdiction_id).ok_or_else(|| {
+            anyhow::anyhow!("Holder not affiliated with jurisdiction: {jurisdiction_id}")
+        })?;
+
+        if !affiliation.roles.contains(&role) {
+            affiliation.roles.push(role);
+        }
+
+        let mut holders = self
+            .holders
+            .write()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        holders.insert(holder_id.to_string(), holder);
+
+        Ok(())
+    }
+
+    /// Remove a role from a member
+    pub async fn remove_member_role(
+        &self,
+        holder_id: &str,
+        jurisdiction_id: &JurisdictionId,
+        role: &str,
+    ) -> Result<()> {
+        let mut holder = self
+            .get_holder(holder_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Holder not found"))?;
+
+        let affiliation = holder.get_affiliation_mut(jurisdiction_id).ok_or_else(|| {
+            anyhow::anyhow!("Holder not affiliated with jurisdiction: {jurisdiction_id}")
+        })?;
+
+        affiliation.roles.retain(|r| r != role);
+
+        let mut holders = self
+            .holders
+            .write()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        holders.insert(holder_id.to_string(), holder);
+
+        Ok(())
+    }
+
+    /// Check if a member has a specific capability
+    pub async fn member_has_capability(
+        &self,
+        holder_id: &str,
+        jurisdiction_id: &JurisdictionId,
+        capability: MembershipCapability,
+    ) -> Result<bool> {
+        let holder = self
+            .get_holder(holder_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Holder not found"))?;
+
+        let affiliation = holder.get_affiliation(jurisdiction_id).ok_or_else(|| {
+            anyhow::anyhow!("Holder not affiliated with jurisdiction: {jurisdiction_id}")
+        })?;
+
+        Ok(affiliation.is_active() && affiliation.has_capability(capability))
+    }
+
+    /// List members of a jurisdiction by status
+    pub async fn list_members_by_status(
+        &self,
+        jurisdiction_id: &JurisdictionId,
+        status: Option<MembershipStatus>,
+    ) -> Vec<(String, Affiliation)> {
+        let holders = match self.holders.read() {
+            Ok(h) => h,
+            Err(_) => return Vec::new(),
+        };
+
+        let mut results = Vec::new();
+        for (holder_id, holder) in holders.iter() {
+            if let Some(affiliation) = holder.get_affiliation(jurisdiction_id) {
+                if status.is_none() || Some(affiliation.membership_status) == status {
+                    results.push((holder_id.clone(), affiliation.clone()));
+                }
+            }
+        }
+
+        results
     }
 }
 

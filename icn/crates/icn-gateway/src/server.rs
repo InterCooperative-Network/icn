@@ -416,6 +416,15 @@ impl GatewayServer {
                                     crate::rate_limit::rate_limit_middleware,
                                 ))
                                 .wrap(auth.clone()),
+                        )
+                        // Membership management endpoints (auth + rate limiting)
+                        .service(
+                            web::scope("/membership")
+                                .configure(api::membership::configure)
+                                .wrap(middleware::from_fn(
+                                    crate::rate_limit::rate_limit_middleware,
+                                ))
+                                .wrap(auth.clone()),
                         ),
                 )
                 // Static files and root route
