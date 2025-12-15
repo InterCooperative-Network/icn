@@ -1255,6 +1255,199 @@ pub fn init_descriptions() {
         "icn_contribution_bandwidth_transfer_bytes",
         "Size of bandwidth transfers in bytes"
     );
+
+    // Commons Evolution metrics
+    // PersonhoodAnchor metrics (Layer 0)
+    describe_counter!(
+        "icn_commons_anchors_created_total",
+        "Total number of PersonhoodAnchors created"
+    );
+    describe_counter!(
+        "icn_commons_anchors_verified_total",
+        "Total number of PersonhoodAnchors verified with POP attestation"
+    );
+    describe_counter!(
+        "icn_commons_anchors_suspended_total",
+        "Total number of PersonhoodAnchors suspended"
+    );
+    describe_counter!(
+        "icn_commons_anchors_revoked_total",
+        "Total number of PersonhoodAnchors revoked"
+    );
+    describe_gauge!(
+        "icn_commons_anchors_active",
+        "Current number of active PersonhoodAnchors"
+    );
+
+    // CommonsHolderRecord metrics (Layer 1)
+    describe_counter!(
+        "icn_commons_holders_created_total",
+        "Total number of CommonsHolderRecords created"
+    );
+    describe_counter!(
+        "icn_commons_holders_status_changes_total",
+        "Total number of holder status changes by new status"
+    );
+    describe_gauge!(
+        "icn_commons_holders_active",
+        "Current number of active CommonsHolders"
+    );
+    describe_gauge!(
+        "icn_commons_holders_by_pop_level",
+        "Number of holders by POP level"
+    );
+
+    // Charter metrics (Layer 2)
+    describe_counter!(
+        "icn_commons_charters_created_total",
+        "Total number of Charters created"
+    );
+    describe_counter!(
+        "icn_commons_charters_activated_total",
+        "Total number of Charters activated"
+    );
+    describe_counter!(
+        "icn_commons_charters_suspended_total",
+        "Total number of Charters suspended"
+    );
+    describe_counter!(
+        "icn_commons_charters_dissolved_total",
+        "Total number of Charters dissolved"
+    );
+    describe_gauge!(
+        "icn_commons_charters_active",
+        "Current number of active Charters"
+    );
+    describe_gauge!(
+        "icn_commons_charters_by_org_type",
+        "Number of charters by organization type"
+    );
+
+    // Steward metrics
+    describe_counter!(
+        "icn_commons_stewards_registered_total",
+        "Total number of Stewards registered"
+    );
+    describe_counter!(
+        "icn_commons_stewards_vouches_total",
+        "Total number of vouches issued by Stewards"
+    );
+    describe_counter!(
+        "icn_commons_stewards_rejections_total",
+        "Total number of enrollment rejections by Stewards"
+    );
+    describe_counter!(
+        "icn_commons_stewards_retired_total",
+        "Total number of Stewards retired"
+    );
+    describe_gauge!(
+        "icn_commons_stewards_active",
+        "Current number of active Stewards"
+    );
+
+    // Amendment metrics
+    describe_counter!(
+        "icn_commons_amendments_proposed_total",
+        "Total number of Amendments proposed"
+    );
+    describe_counter!(
+        "icn_commons_amendments_submitted_total",
+        "Total number of Amendments submitted for review"
+    );
+    describe_counter!(
+        "icn_commons_amendments_ratified_total",
+        "Total number of Amendments ratified"
+    );
+    describe_counter!(
+        "icn_commons_amendments_rejected_total",
+        "Total number of Amendments rejected"
+    );
+    describe_counter!(
+        "icn_commons_amendments_withdrawn_total",
+        "Total number of Amendments withdrawn"
+    );
+    describe_counter!(
+        "icn_commons_amendments_votes_total",
+        "Total number of votes cast on Amendments"
+    );
+    describe_gauge!(
+        "icn_commons_amendments_pending",
+        "Current number of pending Amendments"
+    );
+
+    // Appeal metrics
+    describe_counter!(
+        "icn_commons_appeals_filed_total",
+        "Total number of Appeals filed"
+    );
+    describe_counter!(
+        "icn_commons_appeals_resolved_total",
+        "Total number of Appeals resolved by outcome"
+    );
+    describe_counter!(
+        "icn_commons_appeals_withdrawn_total",
+        "Total number of Appeals withdrawn"
+    );
+    describe_gauge!(
+        "icn_commons_appeals_pending",
+        "Current number of pending Appeals"
+    );
+    describe_histogram!(
+        "icn_commons_appeals_resolution_duration_seconds",
+        "Duration to resolve Appeals in seconds"
+    );
+
+    // Membership metrics
+    describe_counter!(
+        "icn_commons_memberships_joined_total",
+        "Total number of membership applications (joined as Candidate)"
+    );
+    describe_counter!(
+        "icn_commons_memberships_approved_total",
+        "Total number of memberships approved (Candidate → Provisional)"
+    );
+    describe_counter!(
+        "icn_commons_memberships_promoted_total",
+        "Total number of memberships promoted (Provisional → Member)"
+    );
+    describe_counter!(
+        "icn_commons_memberships_suspended_total",
+        "Total number of memberships suspended"
+    );
+    describe_counter!(
+        "icn_commons_memberships_exited_total",
+        "Total number of memberships exited voluntarily"
+    );
+    describe_counter!(
+        "icn_commons_memberships_banned_total",
+        "Total number of memberships banned"
+    );
+    describe_gauge!(
+        "icn_commons_memberships_by_status",
+        "Number of memberships by status"
+    );
+
+    // Enrollment metrics
+    describe_counter!(
+        "icn_commons_enrollments_started_total",
+        "Total number of enrollments started"
+    );
+    describe_counter!(
+        "icn_commons_enrollments_completed_total",
+        "Total number of enrollments completed successfully"
+    );
+    describe_counter!(
+        "icn_commons_enrollments_failed_total",
+        "Total number of enrollments failed by reason"
+    );
+    describe_counter!(
+        "icn_commons_enrollments_expired_total",
+        "Total number of enrollments expired"
+    );
+    describe_histogram!(
+        "icn_commons_enrollments_duration_seconds",
+        "Duration of successful enrollments in seconds"
+    );
 }
 
 /// Network metrics
@@ -3078,5 +3271,359 @@ pub mod supervisor {
             "actor" => actor.to_string()
         )
         .increment(1);
+    }
+}
+
+/// Commons Evolution metrics (PersonhoodAnchor, CommonsHolder, Charter, etc.)
+pub mod commons {
+    use metrics::{counter, gauge, histogram};
+
+    // ============================================================
+    // PersonhoodAnchor Metrics (Layer 0)
+    // ============================================================
+
+    /// Record anchor creation
+    pub fn anchor_created_inc() {
+        counter!("icn_commons_anchors_created_total").increment(1);
+    }
+
+    /// Record anchor verification (POP attestation added)
+    pub fn anchor_verified_inc(method: &str) {
+        counter!(
+            "icn_commons_anchors_verified_total",
+            "method" => method.to_string()
+        )
+        .increment(1);
+    }
+
+    /// Record anchor suspension
+    pub fn anchor_suspended_inc(reason: &str) {
+        counter!(
+            "icn_commons_anchors_suspended_total",
+            "reason" => reason.to_string()
+        )
+        .increment(1);
+    }
+
+    /// Record anchor revocation
+    pub fn anchor_revoked_inc(reason: &str) {
+        counter!(
+            "icn_commons_anchors_revoked_total",
+            "reason" => reason.to_string()
+        )
+        .increment(1);
+    }
+
+    /// Set current active anchor count
+    pub fn anchors_active_set(count: u64) {
+        gauge!("icn_commons_anchors_active").set(count as f64);
+    }
+
+    // ============================================================
+    // CommonsHolderRecord Metrics (Layer 1)
+    // ============================================================
+
+    /// Record holder creation
+    pub fn holder_created_inc() {
+        counter!("icn_commons_holders_created_total").increment(1);
+    }
+
+    /// Record holder status change
+    pub fn holder_status_changed_inc(new_status: &str) {
+        counter!(
+            "icn_commons_holders_status_changes_total",
+            "status" => new_status.to_string()
+        )
+        .increment(1);
+    }
+
+    /// Set current active holder count
+    pub fn holders_active_set(count: u64) {
+        gauge!("icn_commons_holders_active").set(count as f64);
+    }
+
+    /// Set holder count by POP level
+    pub fn holders_by_pop_level_set(level: &str, count: u64) {
+        gauge!(
+            "icn_commons_holders_by_pop_level",
+            "level" => level.to_string()
+        )
+        .set(count as f64);
+    }
+
+    // ============================================================
+    // Charter Metrics (Layer 2)
+    // ============================================================
+
+    /// Record charter creation
+    pub fn charter_created_inc(org_type: &str) {
+        counter!(
+            "icn_commons_charters_created_total",
+            "org_type" => org_type.to_string()
+        )
+        .increment(1);
+    }
+
+    /// Record charter activation
+    pub fn charter_activated_inc() {
+        counter!("icn_commons_charters_activated_total").increment(1);
+    }
+
+    /// Record charter suspension
+    pub fn charter_suspended_inc() {
+        counter!("icn_commons_charters_suspended_total").increment(1);
+    }
+
+    /// Record charter dissolution
+    pub fn charter_dissolved_inc() {
+        counter!("icn_commons_charters_dissolved_total").increment(1);
+    }
+
+    /// Set current active charter count
+    pub fn charters_active_set(count: u64) {
+        gauge!("icn_commons_charters_active").set(count as f64);
+    }
+
+    /// Set charter count by organization type
+    pub fn charters_by_org_type_set(org_type: &str, count: u64) {
+        gauge!(
+            "icn_commons_charters_by_org_type",
+            "org_type" => org_type.to_string()
+        )
+        .set(count as f64);
+    }
+
+    // ============================================================
+    // Steward Metrics
+    // ============================================================
+
+    /// Record steward registration
+    pub fn steward_registered_inc() {
+        counter!("icn_commons_stewards_registered_total").increment(1);
+    }
+
+    /// Record steward vouch
+    pub fn steward_vouch_inc(steward_did: &str) {
+        counter!(
+            "icn_commons_stewards_vouches_total",
+            "steward" => steward_did.to_string()
+        )
+        .increment(1);
+    }
+
+    /// Record steward rejection of enrollment
+    pub fn steward_rejection_inc(steward_did: &str, reason: &str) {
+        counter!(
+            "icn_commons_stewards_rejections_total",
+            "steward" => steward_did.to_string(),
+            "reason" => reason.to_string()
+        )
+        .increment(1);
+    }
+
+    /// Record steward retirement
+    pub fn steward_retired_inc() {
+        counter!("icn_commons_stewards_retired_total").increment(1);
+    }
+
+    /// Set current active steward count
+    pub fn stewards_active_set(count: u64) {
+        gauge!("icn_commons_stewards_active").set(count as f64);
+    }
+
+    // ============================================================
+    // Amendment Metrics
+    // ============================================================
+
+    /// Record amendment proposal
+    pub fn amendment_proposed_inc(amendment_type: &str) {
+        counter!(
+            "icn_commons_amendments_proposed_total",
+            "type" => amendment_type.to_string()
+        )
+        .increment(1);
+    }
+
+    /// Record amendment submission for review
+    pub fn amendment_submitted_inc() {
+        counter!("icn_commons_amendments_submitted_total").increment(1);
+    }
+
+    /// Record amendment ratification
+    pub fn amendment_ratified_inc() {
+        counter!("icn_commons_amendments_ratified_total").increment(1);
+    }
+
+    /// Record amendment rejection
+    pub fn amendment_rejected_inc(reason: &str) {
+        counter!(
+            "icn_commons_amendments_rejected_total",
+            "reason" => reason.to_string()
+        )
+        .increment(1);
+    }
+
+    /// Record amendment withdrawal
+    pub fn amendment_withdrawn_inc() {
+        counter!("icn_commons_amendments_withdrawn_total").increment(1);
+    }
+
+    /// Record vote cast on amendment
+    pub fn amendment_vote_inc(vote: &str) {
+        counter!(
+            "icn_commons_amendments_votes_total",
+            "vote" => vote.to_string()
+        )
+        .increment(1);
+    }
+
+    /// Set pending amendment count
+    pub fn amendments_pending_set(count: u64) {
+        gauge!("icn_commons_amendments_pending").set(count as f64);
+    }
+
+    // ============================================================
+    // Appeal Metrics
+    // ============================================================
+
+    /// Record appeal filing
+    pub fn appeal_filed_inc(appeal_type: &str) {
+        counter!(
+            "icn_commons_appeals_filed_total",
+            "type" => appeal_type.to_string()
+        )
+        .increment(1);
+    }
+
+    /// Record appeal resolution
+    pub fn appeal_resolved_inc(outcome: &str) {
+        counter!(
+            "icn_commons_appeals_resolved_total",
+            "outcome" => outcome.to_string()
+        )
+        .increment(1);
+    }
+
+    /// Record appeal withdrawal
+    pub fn appeal_withdrawn_inc() {
+        counter!("icn_commons_appeals_withdrawn_total").increment(1);
+    }
+
+    /// Set pending appeal count
+    pub fn appeals_pending_set(count: u64) {
+        gauge!("icn_commons_appeals_pending").set(count as f64);
+    }
+
+    /// Record appeal resolution duration
+    pub fn appeal_resolution_duration_observe(duration_secs: f64) {
+        histogram!("icn_commons_appeals_resolution_duration_seconds").record(duration_secs);
+    }
+
+    // ============================================================
+    // Membership Metrics
+    // ============================================================
+
+    /// Record membership application (joined as Candidate)
+    pub fn membership_joined_inc(jurisdiction: &str) {
+        counter!(
+            "icn_commons_memberships_joined_total",
+            "jurisdiction" => jurisdiction.to_string()
+        )
+        .increment(1);
+    }
+
+    /// Record membership approval (Candidate → Provisional)
+    pub fn membership_approved_inc(jurisdiction: &str) {
+        counter!(
+            "icn_commons_memberships_approved_total",
+            "jurisdiction" => jurisdiction.to_string()
+        )
+        .increment(1);
+    }
+
+    /// Record membership promotion (Provisional → Member)
+    pub fn membership_promoted_inc(jurisdiction: &str) {
+        counter!(
+            "icn_commons_memberships_promoted_total",
+            "jurisdiction" => jurisdiction.to_string()
+        )
+        .increment(1);
+    }
+
+    /// Record membership suspension
+    pub fn membership_suspended_inc(jurisdiction: &str) {
+        counter!(
+            "icn_commons_memberships_suspended_total",
+            "jurisdiction" => jurisdiction.to_string()
+        )
+        .increment(1);
+    }
+
+    /// Record voluntary membership exit
+    pub fn membership_exited_inc(jurisdiction: &str) {
+        counter!(
+            "icn_commons_memberships_exited_total",
+            "jurisdiction" => jurisdiction.to_string()
+        )
+        .increment(1);
+    }
+
+    /// Record membership ban
+    pub fn membership_banned_inc(jurisdiction: &str) {
+        counter!(
+            "icn_commons_memberships_banned_total",
+            "jurisdiction" => jurisdiction.to_string()
+        )
+        .increment(1);
+    }
+
+    /// Set membership count by status
+    pub fn memberships_by_status_set(status: &str, count: u64) {
+        gauge!(
+            "icn_commons_memberships_by_status",
+            "status" => status.to_string()
+        )
+        .set(count as f64);
+    }
+
+    // ============================================================
+    // Enrollment Metrics
+    // ============================================================
+
+    /// Record enrollment start
+    pub fn enrollment_started_inc(coop_id: &str) {
+        counter!(
+            "icn_commons_enrollments_started_total",
+            "coop" => coop_id.to_string()
+        )
+        .increment(1);
+    }
+
+    /// Record enrollment completion
+    pub fn enrollment_completed_inc(coop_id: &str) {
+        counter!(
+            "icn_commons_enrollments_completed_total",
+            "coop" => coop_id.to_string()
+        )
+        .increment(1);
+    }
+
+    /// Record enrollment failure
+    pub fn enrollment_failed_inc(reason: &str) {
+        counter!(
+            "icn_commons_enrollments_failed_total",
+            "reason" => reason.to_string()
+        )
+        .increment(1);
+    }
+
+    /// Record enrollment expiration
+    pub fn enrollment_expired_inc() {
+        counter!("icn_commons_enrollments_expired_total").increment(1);
+    }
+
+    /// Record enrollment duration
+    pub fn enrollment_duration_observe(duration_secs: f64) {
+        histogram!("icn_commons_enrollments_duration_seconds").record(duration_secs);
     }
 }

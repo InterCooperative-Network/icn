@@ -182,6 +182,9 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
         let did_str = did.to_string();
         self.store.put_anchor_did_index(&did_str, &anchor_id)?;
 
+        // Record metrics
+        icn_obs::metrics::commons::anchor_created_inc();
+
         Ok(anchor)
     }
 
@@ -203,13 +206,25 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
             .get_anchor(anchor_id)?
             .ok_or_else(|| anyhow::anyhow!("Anchor not found: {anchor_id}"))?;
 
-        anchor.status = status;
+        anchor.status = status.clone();
         anchor.updated_at = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_secs();
 
         self.store.put_anchor(&anchor)?;
+
+        // Record status change metrics
+        match &status {
+            AnchorStatus::Suspended { .. } => {
+                icn_obs::metrics::commons::anchor_suspended_inc("status_update");
+            }
+            AnchorStatus::Revoked { .. } => {
+                icn_obs::metrics::commons::anchor_revoked_inc("status_update");
+            }
+            _ => {}
+        }
+
         Ok(())
     }
 
@@ -224,8 +239,13 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
             .get_anchor(anchor_id)?
             .ok_or_else(|| anyhow::anyhow!("Anchor not found: {anchor_id}"))?;
 
+        let method_name = format!("{:?}", attestation.method);
         anchor.add_attestation(attestation);
         self.store.put_anchor(&anchor)?;
+
+        // Record verification metric
+        icn_obs::metrics::commons::anchor_verified_inc(&method_name);
+
         Ok(())
     }
 
@@ -263,6 +283,9 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
         // Store holder (this also updates DID and anchor indexes)
         self.store.put_holder(&holder)?;
 
+        // Record metrics
+        icn_obs::metrics::commons::holder_created_inc();
+
         Ok(holder)
     }
 
@@ -284,13 +307,17 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
             .get_holder(holder_id)?
             .ok_or_else(|| anyhow::anyhow!("Holder not found: {holder_id}"))?;
 
-        holder.status = status;
+        holder.status = status.clone();
         holder.updated_at = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_secs();
 
         self.store.put_holder(&holder)?;
+
+        // Record status change metric
+        icn_obs::metrics::commons::holder_status_changed_inc(&format!("{:?}", status));
+
         Ok(())
     }
 
@@ -339,6 +366,10 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
         holder.updated_at = now;
 
         self.store.put_holder(&holder)?;
+
+        // Record membership join metric
+        icn_obs::metrics::commons::membership_joined_inc(jurisdiction.as_str());
+
         Ok(affiliation)
     }
 
@@ -365,6 +396,10 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
                 .unwrap()
                 .as_secs();
             self.store.put_holder(&holder)?;
+
+            // Record exit metric
+            icn_obs::metrics::commons::membership_exited_inc(jurisdiction.as_str());
+
             Ok(())
         } else {
             bail!(
@@ -391,12 +426,25 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
             .iter_mut()
             .find(|a| &a.jurisdiction_id == jurisdiction)
         {
-            affiliation.membership_status = status;
+            affiliation.membership_status = status.clone();
             holder.updated_at = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
                 .as_secs();
             self.store.put_holder(&holder)?;
+
+            // Record status-specific metrics
+            let jurisdiction_str = jurisdiction.as_str();
+            match status {
+                MembershipStatus::Suspended => {
+                    icn_obs::metrics::commons::membership_suspended_inc(jurisdiction_str);
+                }
+                MembershipStatus::Banned => {
+                    icn_obs::metrics::commons::membership_banned_inc(jurisdiction_str);
+                }
+                _ => {}
+            }
+
             Ok(())
         } else {
             bail!(
@@ -421,6 +469,7 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
     /// Store a charter
     pub async fn store_charter(&self, charter: Charter) -> Result<()> {
         let charter_id = charter.charter_id.to_hex();
+        let org_type = format!("{:?}", charter.org_type);
 
         // Check if charter already exists
         if self.store.get_charter(&charter_id)?.is_some() {
@@ -429,6 +478,10 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
 
         // Store charter (this also updates the domain index)
         self.store.put_charter(&charter)?;
+
+        // Record charter creation metric
+        icn_obs::metrics::commons::charter_created_inc(&org_type);
+
         Ok(())
     }
 
@@ -476,10 +529,25 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
             .get_charter(charter_id)?
             .ok_or_else(|| anyhow::anyhow!("Charter not found: {charter_id}"))?;
 
-        charter.status = status;
+        charter.status = status.clone();
         // Note: Charter doesn't have an updated_at field
         // Status changes are tracked via amendments in production
         self.store.put_charter(&charter)?;
+
+        // Record status-specific metrics
+        match &status {
+            CharterStatus::Active => {
+                icn_obs::metrics::commons::charter_activated_inc();
+            }
+            CharterStatus::Suspended { .. } => {
+                icn_obs::metrics::commons::charter_suspended_inc();
+            }
+            CharterStatus::Dissolved { .. } => {
+                icn_obs::metrics::commons::charter_dissolved_inc();
+            }
+            _ => {}
+        }
+
         Ok(())
     }
 
@@ -998,6 +1066,9 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
 
         self.store.put_holder(&holder)?;
 
+        // Record approval metric
+        icn_obs::metrics::commons::membership_approved_inc(jurisdiction_id.as_str());
+
         Ok(())
     }
 
@@ -1026,6 +1097,9 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
         affiliation.promote();
 
         self.store.put_holder(&holder)?;
+
+        // Record promotion metric
+        icn_obs::metrics::commons::membership_promoted_inc(jurisdiction_id.as_str());
 
         Ok(())
     }
