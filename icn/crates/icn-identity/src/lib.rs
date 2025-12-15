@@ -15,6 +15,7 @@ pub mod bundle;
 pub mod keybundle;
 pub mod keystore;
 pub mod multi_device;
+pub mod personhood;
 pub mod recovery;
 pub mod sync;
 pub mod vui;
@@ -35,6 +36,11 @@ pub use keystore::{AgeKeyStore, KeyRotation, KeyStore, RotationReason};
 pub use multi_device::{
     Capability, DidDocument, KeyType, RecoveryConfig, RecoveryMethod, RecoveryProof,
     RevocationReason, RotationEvent, RotationEventType, VerificationMethod,
+};
+pub use personhood::{
+    AnchorStatus, BiometricType, KeyRotationReason, KeyRotationRecord, POPAttestation, POPLevel,
+    POPMethod, PersonhoodAnchor, RecoverySignature, UniquenessAttestation, UniquenessProof,
+    UniquenessProofType,
 };
 pub use recovery::{
     RecoveryAttestation, RecoveryEvent, RecoveryMessage, RecoveryStatus, IDENTITY_RECOVERY_TOPIC,
