@@ -142,6 +142,46 @@ export {
   useEnrollmentDetail,
 } from './steward-hooks';
 
+// Membership Types
+export * from './membership-types';
+
+// Membership React Hooks
+export {
+  useMembership,
+  useJurisdictionMembers,
+  useMembershipAdmin,
+  useCapabilities,
+  useRoles,
+} from './membership-hooks';
+
+// Charter Types
+export * from './charter-types';
+
+// Charter React Hooks
+export {
+  useCharter,
+  useCharters,
+  useCreateCharter,
+  useCharterSignature,
+  useCharterStatus,
+} from './charter-hooks';
+
+// Constitutional Governance Types (Amendments & Appeals)
+export * from './constitutional-types';
+
+// Constitutional Governance React Hooks
+export {
+  // Amendment hooks
+  useAmendment,
+  useAmendments,
+  useAmendmentActions,
+  // Appeal hooks
+  useAppeal,
+  useAppeals,
+  useAppealActions,
+  useAppealAdmin,
+} from './constitutional-hooks';
+
 // Re-export core SDK types for convenience
 export {
   ICNClient,

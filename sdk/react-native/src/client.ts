@@ -1221,6 +1221,1066 @@ export class ICNMobileClient extends ICNClient {
     }
   }
 
+  // ===========================================================================
+  // Constitutional Governance Methods (Amendments & Appeals)
+  // ===========================================================================
+
+  /**
+   * Create a new amendment
+   *
+   * @param request - Amendment creation request
+   * @returns Created amendment
+   */
+  async createAmendment(
+    request: import('./constitutional-types').CreateAmendmentRequest
+  ): Promise<import('./constitutional-types').Amendment> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/constitutional/amendments`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to create amendment: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Get amendment by ID
+   *
+   * @param amendmentId - Amendment ID (hex)
+   * @returns Amendment details
+   */
+  async getAmendment(amendmentId: string): Promise<import('./constitutional-types').Amendment> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/constitutional/amendments/${amendmentId}`, {
+      method: 'GET',
+      headers: {
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to get amendment: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * List amendments with optional filters
+   *
+   * @param status - Optional status filter
+   * @param scope - Optional scope filter
+   * @param type - Optional type filter
+   * @returns Amendment list
+   */
+  async listAmendments(
+    status?: string,
+    scope?: string,
+    type?: string
+  ): Promise<import('./constitutional-types').AmendmentListResponse> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const params = new URLSearchParams();
+    if (status) params.set('status', status);
+    if (scope) params.set('scope', scope);
+    if (type) params.set('type', type);
+
+    const url = `${baseUrl}/v1/constitutional/amendments${params.toString() ? `?${params}` : ''}`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to list amendments: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Add a change to a draft amendment
+   *
+   * @param amendmentId - Amendment ID (hex)
+   * @param change - Change to add
+   * @returns Updated amendment
+   */
+  async addAmendmentChange(
+    amendmentId: string,
+    change: import('./constitutional-types').AddChangeRequest
+  ): Promise<import('./constitutional-types').Amendment> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/constitutional/amendments/${amendmentId}/changes`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+      body: JSON.stringify(change),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to add change: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Submit amendment for review
+   *
+   * @param amendmentId - Amendment ID (hex)
+   * @returns Updated amendment
+   */
+  async submitAmendment(amendmentId: string): Promise<import('./constitutional-types').Amendment> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/constitutional/amendments/${amendmentId}/submit`, {
+      method: 'POST',
+      headers: {
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to submit amendment: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Open voting on an amendment
+   *
+   * @param amendmentId - Amendment ID (hex)
+   * @returns Updated amendment
+   */
+  async openAmendmentVoting(amendmentId: string): Promise<import('./constitutional-types').Amendment> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/constitutional/amendments/${amendmentId}/vote`, {
+      method: 'POST',
+      headers: {
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to open voting: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Ratify an amendment
+   *
+   * @param amendmentId - Amendment ID (hex)
+   * @param request - Ratification request
+   * @returns Updated amendment
+   */
+  async ratifyAmendment(
+    amendmentId: string,
+    request: import('./constitutional-types').RatifyRequest
+  ): Promise<import('./constitutional-types').Amendment> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/constitutional/amendments/${amendmentId}/ratify`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to ratify amendment: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Withdraw an amendment
+   *
+   * @param amendmentId - Amendment ID (hex)
+   * @param reason - Reason for withdrawal
+   * @returns Updated amendment
+   */
+  async withdrawAmendment(
+    amendmentId: string,
+    reason?: string
+  ): Promise<import('./constitutional-types').Amendment> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/constitutional/amendments/${amendmentId}/withdraw`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+      body: JSON.stringify({ reason }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to withdraw amendment: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * File an appeal
+   *
+   * @param request - Appeal filing request
+   * @returns Filed appeal
+   */
+  async fileAppeal(
+    request: import('./constitutional-types').FileAppealRequest
+  ): Promise<import('./constitutional-types').Appeal> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/constitutional/appeals`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to file appeal: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Get appeal by ID
+   *
+   * @param appealId - Appeal ID (hex)
+   * @returns Appeal details
+   */
+  async getAppeal(appealId: string): Promise<import('./constitutional-types').Appeal> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/constitutional/appeals/${appealId}`, {
+      method: 'GET',
+      headers: {
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to get appeal: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * List appeals with optional filters
+   *
+   * @param status - Optional status filter
+   * @param scope - Optional scope filter
+   * @param appellant - Optional appellant filter
+   * @returns Appeal list
+   */
+  async listAppeals(
+    status?: string,
+    scope?: string,
+    appellant?: string
+  ): Promise<import('./constitutional-types').AppealListResponse> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const params = new URLSearchParams();
+    if (status) params.set('status', status);
+    if (scope) params.set('scope', scope);
+    if (appellant) params.set('appellant', appellant);
+
+    const url = `${baseUrl}/v1/constitutional/appeals${params.toString() ? `?${params}` : ''}`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to list appeals: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Add evidence to an appeal
+   *
+   * @param appealId - Appeal ID (hex)
+   * @param evidence - Evidence to add
+   * @returns Updated appeal
+   */
+  async addAppealEvidence(
+    appealId: string,
+    evidence: import('./constitutional-types').AddEvidenceRequest
+  ): Promise<import('./constitutional-types').Appeal> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/constitutional/appeals/${appealId}/evidence`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+      body: JSON.stringify(evidence),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to add evidence: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Add response to an appeal
+   *
+   * @param appealId - Appeal ID (hex)
+   * @param appealResponse - Response to add
+   * @returns Updated appeal
+   */
+  async addAppealResponse(
+    appealId: string,
+    appealResponse: import('./constitutional-types').AddResponseRequest
+  ): Promise<import('./constitutional-types').Appeal> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/constitutional/appeals/${appealId}/respond`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+      body: JSON.stringify(appealResponse),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to add response: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Begin review of an appeal (admin)
+   *
+   * @param appealId - Appeal ID (hex)
+   * @returns Updated appeal
+   */
+  async beginAppealReview(appealId: string): Promise<import('./constitutional-types').Appeal> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/constitutional/appeals/${appealId}/review`, {
+      method: 'POST',
+      headers: {
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to begin review: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Resolve an appeal (admin)
+   *
+   * @param appealId - Appeal ID (hex)
+   * @param resolution - Resolution request
+   * @returns Updated appeal
+   */
+  async resolveAppeal(
+    appealId: string,
+    resolution: import('./constitutional-types').ResolveAppealRequest
+  ): Promise<import('./constitutional-types').Appeal> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/constitutional/appeals/${appealId}/resolve`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+      body: JSON.stringify(resolution),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to resolve appeal: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Withdraw an appeal
+   *
+   * @param appealId - Appeal ID (hex)
+   * @param reason - Reason for withdrawal
+   * @returns Updated appeal
+   */
+  async withdrawAppeal(
+    appealId: string,
+    reason?: string
+  ): Promise<import('./constitutional-types').Appeal> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/constitutional/appeals/${appealId}/withdraw`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+      body: JSON.stringify({ reason }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to withdraw appeal: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  // ===========================================================================
+  // Charter Methods
+  // ===========================================================================
+
+  /**
+   * Create a new charter
+   *
+   * @param request - Charter creation request
+   * @returns Created charter
+   */
+  async createCharter(
+    request: import('./charter-types').CreateCharterRequest
+  ): Promise<import('./charter-types').Charter> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/charter`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to create charter: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Get charter by ID
+   *
+   * @param charterId - Charter ID (hex)
+   * @returns Charter details
+   */
+  async getCharter(charterId: string): Promise<import('./charter-types').Charter> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/charter/${charterId}`, {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to get charter: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Get charter by domain ID
+   *
+   * @param domainId - Domain ID (e.g., "coop:my-coop")
+   * @returns Charter details
+   */
+  async getCharterByDomain(domainId: string): Promise<import('./charter-types').Charter> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/charter/by-domain/${domainId}`, {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to get charter: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * List charters with optional filters
+   *
+   * @param orgType - Optional org type filter
+   * @param status - Optional status filter
+   * @returns List of charter summaries
+   */
+  async listCharters(
+    orgType?: string,
+    status?: string
+  ): Promise<import('./charter-types').CharterSummary[]> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const params = new URLSearchParams();
+    if (orgType) params.set('org_type', orgType);
+    if (status) params.set('status', status);
+
+    const url = `${baseUrl}/v1/charter${params.toString() ? `?${params}` : ''}`;
+    const response = await fetch(url, {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to list charters: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Sign a charter as a founder
+   *
+   * @param charterId - Charter ID (hex)
+   * @param signature - Signature hex
+   * @param role - Optional role
+   * @returns Sign response with founder count
+   */
+  async signCharter(
+    charterId: string,
+    signature: string,
+    role?: string
+  ): Promise<import('./charter-types').CharterSignResponse> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/charter/${charterId}/sign`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+      body: JSON.stringify({ signature, role }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to sign charter: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Activate a charter (requires minimum founders)
+   *
+   * @param charterId - Charter ID (hex)
+   * @returns Action response
+   */
+  async activateCharter(
+    charterId: string
+  ): Promise<import('./charter-types').CharterActionResponse> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/charter/${charterId}/activate`, {
+      method: 'POST',
+      headers: {
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to activate charter: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Update charter status
+   *
+   * @param charterId - Charter ID (hex)
+   * @param status - New status
+   * @param reason - Optional reason (required for suspend)
+   * @returns Action response
+   */
+  async updateCharterStatus(
+    charterId: string,
+    status: string,
+    reason?: string
+  ): Promise<import('./charter-types').CharterActionResponse> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/charter/${charterId}/status`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+      body: JSON.stringify({ status, reason }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to update charter status: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  // ===========================================================================
+  // Membership Methods
+  // ===========================================================================
+
+  /**
+   * Apply for membership in a jurisdiction
+   *
+   * @param jurisdictionId - The jurisdiction to join
+   * @param capabilitiesRequested - Optional capabilities to request
+   * @returns Membership response with initial status
+   */
+  async applyForMembership(
+    jurisdictionId: string,
+    capabilitiesRequested?: string[]
+  ): Promise<import('./membership-types').MemberResponse> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/membership/apply`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+      body: JSON.stringify({
+        jurisdiction_id: jurisdictionId,
+        capabilities_requested: capabilitiesRequested || [],
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to apply for membership: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Get membership status in a jurisdiction
+   *
+   * @param jurisdictionId - The jurisdiction to check
+   * @returns Member response with current status
+   */
+  async getMembershipStatus(
+    jurisdictionId: string
+  ): Promise<import('./membership-types').MemberResponse> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/membership/status/${jurisdictionId}`, {
+      method: 'GET',
+      headers: {
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to get membership status: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * List members of a jurisdiction
+   *
+   * @param jurisdictionId - The jurisdiction to list members from
+   * @param status - Optional filter by membership status
+   * @returns List of members
+   */
+  async listJurisdictionMembers(
+    jurisdictionId: string,
+    status?: string
+  ): Promise<import('./membership-types').MemberListResponse> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const params = new URLSearchParams();
+    if (status) params.set('status', status);
+
+    const url = `${baseUrl}/v1/membership/list/${jurisdictionId}${params.toString() ? `?${params}` : ''}`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to list members: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Approve a membership application (admin)
+   *
+   * @param holderId - The holder ID to approve
+   * @param jurisdictionId - The jurisdiction
+   * @returns Action response
+   */
+  async approveMembership(
+    holderId: string,
+    jurisdictionId: string
+  ): Promise<import('./membership-types').MembershipActionResponse> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/membership/approve`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+      body: JSON.stringify({
+        holder_id: holderId,
+        jurisdiction_id: jurisdictionId,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to approve membership: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Promote a provisional member to full member (admin)
+   *
+   * @param holderId - The holder ID to promote
+   * @param jurisdictionId - The jurisdiction
+   * @returns Action response
+   */
+  async promoteMember(
+    holderId: string,
+    jurisdictionId: string
+  ): Promise<import('./membership-types').MembershipActionResponse> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/membership/promote`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+      body: JSON.stringify({
+        holder_id: holderId,
+        jurisdiction_id: jurisdictionId,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to promote member: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Suspend a member (admin)
+   *
+   * @param holderId - The holder ID to suspend
+   * @param jurisdictionId - The jurisdiction
+   * @returns Action response
+   */
+  async suspendMember(
+    holderId: string,
+    jurisdictionId: string
+  ): Promise<import('./membership-types').MembershipActionResponse> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/membership/suspend`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+      body: JSON.stringify({
+        holder_id: holderId,
+        jurisdiction_id: jurisdictionId,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to suspend member: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Reinstate a suspended member (admin)
+   *
+   * @param holderId - The holder ID to reinstate
+   * @param jurisdictionId - The jurisdiction
+   * @returns Action response
+   */
+  async reinstateMember(
+    holderId: string,
+    jurisdictionId: string
+  ): Promise<import('./membership-types').MembershipActionResponse> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/membership/reinstate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+      body: JSON.stringify({
+        holder_id: holderId,
+        jurisdiction_id: jurisdictionId,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to reinstate member: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Voluntarily exit a jurisdiction
+   *
+   * @param holderId - Your holder ID
+   * @param jurisdictionId - The jurisdiction to leave
+   * @returns Action response
+   */
+  async exitMembership(
+    holderId: string,
+    jurisdictionId: string
+  ): Promise<import('./membership-types').MembershipActionResponse> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/membership/exit`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+      body: JSON.stringify({
+        holder_id: holderId,
+        jurisdiction_id: jurisdictionId,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to exit membership: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Grant a capability to a member (admin)
+   *
+   * @param holderId - The holder ID
+   * @param jurisdictionId - The jurisdiction
+   * @param capability - The capability to grant
+   * @returns Action response
+   */
+  async grantCapability(
+    holderId: string,
+    jurisdictionId: string,
+    capability: string
+  ): Promise<import('./membership-types').MembershipActionResponse> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/membership/capability/grant`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+      body: JSON.stringify({
+        holder_id: holderId,
+        jurisdiction_id: jurisdictionId,
+        capability,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to grant capability: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Revoke a capability from a member (admin)
+   *
+   * @param holderId - The holder ID
+   * @param jurisdictionId - The jurisdiction
+   * @param capability - The capability to revoke
+   * @returns Action response
+   */
+  async revokeCapability(
+    holderId: string,
+    jurisdictionId: string,
+    capability: string
+  ): Promise<import('./membership-types').MembershipActionResponse> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/membership/capability/revoke`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+      body: JSON.stringify({
+        holder_id: holderId,
+        jurisdiction_id: jurisdictionId,
+        capability,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to revoke capability: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Check if a member has a capability
+   *
+   * @param holderId - The holder ID
+   * @param jurisdictionId - The jurisdiction
+   * @param capability - The capability to check
+   * @returns Capability check response
+   */
+  async checkCapability(
+    holderId: string,
+    jurisdictionId: string,
+    capability: string
+  ): Promise<import('./membership-types').CapabilityCheckResponse> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const params = new URLSearchParams({
+      holder_id: holderId,
+      jurisdiction_id: jurisdictionId,
+      capability,
+    });
+
+    const response = await fetch(`${baseUrl}/v1/membership/capability/check?${params}`, {
+      method: 'GET',
+      headers: {
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to check capability: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Add a role to a member (admin)
+   *
+   * @param holderId - The holder ID
+   * @param jurisdictionId - The jurisdiction
+   * @param role - The role to add
+   * @returns Action response
+   */
+  async addMemberRole(
+    holderId: string,
+    jurisdictionId: string,
+    role: string
+  ): Promise<import('./membership-types').MembershipActionResponse> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/membership/role/add`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+      body: JSON.stringify({
+        holder_id: holderId,
+        jurisdiction_id: jurisdictionId,
+        role,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to add role: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Remove a role from a member (admin)
+   *
+   * @param holderId - The holder ID
+   * @param jurisdictionId - The jurisdiction
+   * @param role - The role to remove
+   * @returns Action response
+   */
+  async removeMemberRole(
+    holderId: string,
+    jurisdictionId: string,
+    role: string
+  ): Promise<import('./membership-types').MembershipActionResponse> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/membership/role/remove`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+      body: JSON.stringify({
+        holder_id: holderId,
+        jurisdiction_id: jurisdictionId,
+        role,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to remove role: ${error}`);
+    }
+
+    return response.json();
+  }
+
   private getWebSocketUrl(coopId: string): string {
     // Get base URL from the parent class (we need to access private field)
     const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
