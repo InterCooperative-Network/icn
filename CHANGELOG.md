@@ -7,6 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Production Hardening (v0.8.x) (2025-12-15)
+
+**Per-Category Rate Limiting** ([icn/crates/icn-gateway/src/rate_limit.rs](icn/crates/icn-gateway/src/rate_limit.rs)):
+- `EndpointCategory` - Read, Write, Governance, Compute categories with different rate limits
+- `CategoryRateLimiter` - Per-(DID, category) token bucket rate limiting
+- `category_rate_limit_middleware` - Actix-web middleware for differentiated rate limits
+- Smart path/method classification for endpoint categorization
+- Read: 200 burst, 20 req/sec (queries, listing)
+- Write: 60 burst, 6 req/sec (state mutations)
+- Governance: 30 burst, 3 req/sec (voting, proposals, amendments)
+- Compute: 10 burst, 1 req/sec (task submission)
+- 6 new tests for category rate limiting
+
+**Audit Logging for Governance Actions** ([icn/crates/icn-gateway/src/commons_mgr.rs](icn/crates/icn-gateway/src/commons_mgr.rs)):
+- Structured tracing with target `commons_audit` for all governance operations
+- Covers: anchor/holder creation, membership lifecycle, charter operations, steward operations, amendments, appeals
+- Uses `warn!` for adverse actions (suspensions, revocations), `info!` for normal operations
+- 25+ audit log points across governance operations
+
+**Commons Evolution Metrics** ([icn/crates/icn-obs/src/metrics.rs](icn/crates/icn-obs/src/metrics.rs)):
+- 50+ new metrics for Commons operations
+- Counters: anchors created, holders created, memberships joined/exited/approved/promoted/suspended/banned
+- Counters: charters created/activated/suspended/dissolved, amendments, appeals
+- Histograms: operation durations, store operation latency
+- Helper module `icn_obs::metrics::commons` for easy metric recording
+
+**Persistent Storage** ([icn/crates/icn-gateway/src/commons_store.rs](icn/crates/icn-gateway/src/commons_store.rs)):
+- `CommonsStoreBackend` trait - Pluggable storage abstraction
+- `InMemoryCommonsStore` - In-memory storage for development/testing
+- `SledCommonsStore` - Sled persistent storage (feature: `sled-storage`)
+- `CommonsStore<S>` - High-level interface with LRU caching
+- Proper indexes: by_did, by_anchor, by_domain
+- `CommonsManager::with_sled_path()`, `with_sled_temporary()` constructors
+
+### Added - Integration & Testing (v0.7.x) (2025-12-14)
+
+**CLI Authentication Fix** ([icn/bins/icnctl/src/main.rs](icn/bins/icnctl/src/main.rs)):
+- Fixed `get_gateway_token()` to use correct `/v1/auth/challenge` and `/v1/auth/verify` endpoints
+- Fixed response field from `challenge` to `nonce`
+- Fixed request body structure with proper scopes array
+- `icnctl amendment` and `icnctl appeal` commands now work with gateway
+
+**SDIS-Commons Auto-Affiliation** ([icn/crates/icn-gateway/src/api/sdis/simple_enrollment.rs](icn/crates/icn-gateway/src/api/sdis/simple_enrollment.rs)):
+- `CompleteEnrollmentResponse` now includes `coop_id` and `membership_status`
+- Auto-create PersonhoodAnchor and CommonsHolderRecord on enrollment completion
+- Auto-affiliate with enrollment coop_id
+- Auto-approve to Provisional if steward vouched
+- Grant initial capabilities (Transact, Vote)
+
+**Integration Tests** ([icn/crates/icn-gateway/tests/governance_flows_integration.rs](icn/crates/icn-gateway/tests/governance_flows_integration.rs)):
+- `test_enrollment_creates_affiliated_holder` - Enrollment with auto-affiliation
+- `test_charter_creation_to_activation` - Charter lifecycle (Draft → Active)
+- `test_membership_lifecycle` - Full status progression (Candidate → Provisional → Member → Suspended → Exited)
+- `test_e2e_coop_formation` - End-to-end coop formation with founders and new member
+
 ### Added - Constitutional Governance (v0.6.0) (2025-12-14)
 
 **Amendment System** ([icn/crates/icn-governance/src/amendment.rs](icn/crates/icn-governance/src/amendment.rs)):
