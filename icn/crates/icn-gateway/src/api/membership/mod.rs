@@ -15,6 +15,7 @@ use std::sync::Arc;
 use crate::commons_mgr::CommonsManager;
 use crate::error::{GatewayError, Result};
 use crate::middleware::get_claims;
+use crate::pagination::{paginate_items, Cursored, PaginatedList, PaginationRequest};
 use icn_identity::{
     CommonsRevocationReason, Did, JurisdictionId, MembershipCapability, MembershipStatus,
 };
@@ -81,7 +82,7 @@ fn default_appeal_days() -> u64 {
 }
 
 /// Member response
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemberResponse {
     pub holder_id: String,
     pub holder_did: String,
@@ -93,11 +94,15 @@ pub struct MemberResponse {
     pub expires_at: Option<u64>,
 }
 
-/// Membership list response
-#[derive(Debug, Serialize, Deserialize)]
-pub struct MemberListResponse {
-    pub members: Vec<MemberResponse>,
-    pub total: usize,
+impl Cursored for MemberResponse {
+    fn cursor_timestamp(&self) -> u64 {
+        // Convert seconds to milliseconds for cursor
+        self.joined_at * 1000
+    }
+
+    fn cursor_id(&self) -> &str {
+        &self.holder_id
+    }
 }
 
 fn parse_capability(s: &str) -> Option<MembershipCapability> {
@@ -577,6 +582,17 @@ pub async fn remove_role(
 // ============================================================================
 
 /// GET /v1/membership/list/{jurisdiction} - List members of a jurisdiction
+///
+/// Supports cursor-based pagination for efficient navigation of large member lists.
+///
+/// Query parameters:
+/// - `status`: Filter by membership status (candidate, provisional, member, suspended, exited, banned)
+/// - `cursor`: Pagination cursor from previous response
+/// - `limit`: Number of items per page (default: 20, max: 100)
+///
+/// Response includes:
+/// - `items`: Array of member objects
+/// - `pagination`: Object with `next_cursor`, `prev_cursor`, `count`, `has_more`
 #[get("/list/{jurisdiction}")]
 pub async fn list_members(
     http_req: HttpRequest,
@@ -606,7 +622,8 @@ pub async fn list_members(
         .list_members_by_status(&jurisdiction_id, status_filter)
         .await;
 
-    let member_responses: Vec<MemberResponse> = members
+    // Convert to MemberResponse and sort by joined_at descending (newest first)
+    let mut member_responses: Vec<MemberResponse> = members
         .into_iter()
         .map(|(holder_id, affiliation)| MemberResponse {
             holder_id,
@@ -624,17 +641,37 @@ pub async fn list_members(
         })
         .collect();
 
-    let total = member_responses.len();
+    // Sort by joined_at descending (newest first) for cursor pagination
+    member_responses.sort_by(|a, b| b.joined_at.cmp(&a.joined_at));
 
-    Ok(HttpResponse::Ok().json(MemberListResponse {
-        members: member_responses,
-        total,
-    }))
+    // Apply cursor pagination
+    let pagination_request = PaginationRequest {
+        cursor: query.cursor.clone(),
+        limit: query.limit,
+        direction: crate::pagination::Direction::Forward,
+    }
+    .validate();
+
+    let paginated: PaginatedList<MemberResponse> =
+        paginate_items(member_responses, &pagination_request);
+
+    Ok(HttpResponse::Ok().json(paginated))
 }
 
+/// Query parameters for listing members (with cursor pagination)
 #[derive(Debug, Deserialize)]
 pub struct ListMembersQuery {
+    /// Filter by membership status
     pub status: Option<String>,
+    /// Cursor for pagination
+    pub cursor: Option<String>,
+    /// Number of items per page (default: 20, max: 100)
+    #[serde(default = "default_limit")]
+    pub limit: usize,
+}
+
+fn default_limit() -> usize {
+    crate::pagination::DEFAULT_PAGE_SIZE
 }
 
 /// POST /v1/membership/exit - Voluntarily exit membership

@@ -45,6 +45,7 @@ use std::sync::Arc;
 use crate::commons_mgr::CommonsManager;
 use crate::error::{GatewayError, Result};
 use crate::middleware::{get_claims, require_scope};
+use crate::pagination::{paginate_items, Cursored, PaginatedList, PaginationRequest};
 use icn_governance::{
     Amendment, AmendmentChange, AmendmentId, AmendmentScope, AmendmentType, Appeal, AppealEvidence,
     AppealGrounds, AppealId, AppealOutcome, AppealRemedy, AppealResponse, AppealScope, AppealType,
@@ -144,7 +145,7 @@ pub struct ResolveAppealRequest {
 }
 
 /// Amendment response
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct AmendmentResponse {
     pub id: String,
     pub amendment_type: String,
@@ -161,7 +162,18 @@ pub struct AmendmentResponse {
     pub updated_at: u64,
 }
 
-#[derive(Debug, Serialize)]
+impl Cursored for AmendmentResponse {
+    fn cursor_timestamp(&self) -> u64 {
+        // Use updated_at in milliseconds for cursor
+        self.updated_at * 1000
+    }
+
+    fn cursor_id(&self) -> &str {
+        &self.id
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct AmendmentChangeResponse {
     pub target: String,
     pub change_type: String,
@@ -171,7 +183,7 @@ pub struct AmendmentChangeResponse {
 }
 
 /// Appeal response
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct AppealResponse2 {
     pub id: String,
     pub appeal_type: String,
@@ -186,6 +198,17 @@ pub struct AppealResponse2 {
     pub responses_count: usize,
     pub created_at: u64,
     pub updated_at: u64,
+}
+
+impl Cursored for AppealResponse2 {
+    fn cursor_timestamp(&self) -> u64 {
+        // Use updated_at in milliseconds for cursor
+        self.updated_at * 1000
+    }
+
+    fn cursor_id(&self) -> &str {
+        &self.id
+    }
 }
 
 // ============================================================================
@@ -599,33 +622,69 @@ pub async fn create_amendment(
     Ok(HttpResponse::Created().json(amendment_to_response(&amendment)))
 }
 
+/// Query parameters for listing amendments (with cursor pagination)
+#[derive(Debug, Deserialize)]
+pub struct ListAmendmentsQuery {
+    /// Filter by status
+    pub status: Option<String>,
+    /// Filter by scope
+    pub scope: Option<String>,
+    /// Filter by type
+    #[serde(rename = "type")]
+    pub amendment_type: Option<String>,
+    /// Cursor for pagination
+    pub cursor: Option<String>,
+    /// Number of items per page (default: 20, max: 100)
+    #[serde(default = "default_page_limit")]
+    pub limit: usize,
+}
+
+fn default_page_limit() -> usize {
+    crate::pagination::DEFAULT_PAGE_SIZE
+}
+
 /// GET /constitutional/amendments - List amendments
+///
+/// Supports cursor-based pagination for efficient navigation.
+///
+/// Query parameters:
+/// - `status`: Filter by amendment status
+/// - `scope`: Filter by scope
+/// - `type`: Filter by amendment type
+/// - `cursor`: Pagination cursor from previous response
+/// - `limit`: Number of items per page (default: 20, max: 100)
 #[get("/amendments")]
 pub async fn list_amendments(
     http_req: HttpRequest,
     commons_mgr: web::Data<Arc<CommonsManager>>,
-    query: web::Query<std::collections::HashMap<String, String>>,
+    query: web::Query<ListAmendmentsQuery>,
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "constitutional:read")?;
 
-    let status_filter = query.get("status");
-    let scope_filter = query.get("scope");
-    let type_filter = query.get("type");
-
     let amendments = commons_mgr
         .list_amendments(
-            status_filter.map(|s| s.as_str()),
-            scope_filter.map(|s| s.as_str()),
-            type_filter.map(|s| s.as_str()),
+            query.status.as_deref(),
+            query.scope.as_deref(),
+            query.amendment_type.as_deref(),
         )
         .await?;
 
-    let responses: Vec<AmendmentResponse> = amendments.iter().map(amendment_to_response).collect();
+    // Convert to responses and sort by updated_at descending (most recent first)
+    let mut responses: Vec<AmendmentResponse> =
+        amendments.iter().map(amendment_to_response).collect();
+    responses.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
 
-    Ok(HttpResponse::Ok().json(serde_json::json!({
-        "amendments": responses,
-        "count": responses.len()
-    })))
+    // Apply cursor pagination
+    let pagination_request = PaginationRequest {
+        cursor: query.cursor.clone(),
+        limit: query.limit,
+        direction: crate::pagination::Direction::Forward,
+    }
+    .validate();
+
+    let paginated: PaginatedList<AmendmentResponse> = paginate_items(responses, &pagination_request);
+
+    Ok(HttpResponse::Ok().json(paginated))
 }
 
 /// GET /constitutional/amendments/{id} - Get amendment by ID
@@ -930,33 +989,63 @@ pub async fn file_appeal(
     Ok(HttpResponse::Created().json(appeal_to_response(&appeal)))
 }
 
+/// Query parameters for listing appeals (with cursor pagination)
+#[derive(Debug, Deserialize)]
+pub struct ListAppealsQuery {
+    /// Filter by status
+    pub status: Option<String>,
+    /// Filter by scope
+    pub scope: Option<String>,
+    /// Filter by appellant
+    pub appellant: Option<String>,
+    /// Cursor for pagination
+    pub cursor: Option<String>,
+    /// Number of items per page (default: 20, max: 100)
+    #[serde(default = "default_page_limit")]
+    pub limit: usize,
+}
+
 /// GET /constitutional/appeals - List appeals
+///
+/// Supports cursor-based pagination for efficient navigation.
+///
+/// Query parameters:
+/// - `status`: Filter by appeal status
+/// - `scope`: Filter by scope
+/// - `appellant`: Filter by appellant DID
+/// - `cursor`: Pagination cursor from previous response
+/// - `limit`: Number of items per page (default: 20, max: 100)
 #[get("/appeals")]
 pub async fn list_appeals(
     http_req: HttpRequest,
     commons_mgr: web::Data<Arc<CommonsManager>>,
-    query: web::Query<std::collections::HashMap<String, String>>,
+    query: web::Query<ListAppealsQuery>,
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "constitutional:read")?;
 
-    let status_filter = query.get("status");
-    let scope_filter = query.get("scope");
-    let appellant_filter = query.get("appellant");
-
     let appeals = commons_mgr
         .list_appeals(
-            status_filter.map(|s| s.as_str()),
-            scope_filter.map(|s| s.as_str()),
-            appellant_filter.map(|s| s.as_str()),
+            query.status.as_deref(),
+            query.scope.as_deref(),
+            query.appellant.as_deref(),
         )
         .await?;
 
-    let responses: Vec<AppealResponse2> = appeals.iter().map(appeal_to_response).collect();
+    // Convert to responses and sort by updated_at descending (most recent first)
+    let mut responses: Vec<AppealResponse2> = appeals.iter().map(appeal_to_response).collect();
+    responses.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
 
-    Ok(HttpResponse::Ok().json(serde_json::json!({
-        "appeals": responses,
-        "count": responses.len()
-    })))
+    // Apply cursor pagination
+    let pagination_request = PaginationRequest {
+        cursor: query.cursor.clone(),
+        limit: query.limit,
+        direction: crate::pagination::Direction::Forward,
+    }
+    .validate();
+
+    let paginated: PaginatedList<AppealResponse2> = paginate_items(responses, &pagination_request);
+
+    Ok(HttpResponse::Ok().json(paginated))
 }
 
 /// GET /constitutional/appeals/{id} - Get appeal by ID
