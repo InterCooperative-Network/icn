@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Infrastructure Improvements (2025-12-16)
+
+**Persistent Enrollment Session Storage** ([icn/crates/icn-gateway/src/api/sdis/simple_enrollment.rs](icn/crates/icn-gateway/src/api/sdis/simple_enrollment.rs)):
+- Enrollment sessions now persist across gateway restarts
+- Added enrollment session storage to CommonsStore with LRU cache
+- Added `with_persistence()` constructor for write-through caching
+- All mutation handlers (start, verify, vouch, reject) persist changes
+- Loaded sessions from persistent storage on startup
+
+**SDK Governance Dashboard Methods** ([sdk/react-native/src/client.ts](sdk/react-native/src/client.ts)):
+- Added `getGovernanceDashboard()` to base client
+- Added `getGovernanceParticipation()` to base client
+- Non-React apps can now access governance statistics
+
 ### Added - Gap Closure Improvements (2025-12-15)
 
 **SMTP Email Delivery** ([icn/crates/icn-gateway/src/email_client.rs](icn/crates/icn-gateway/src/email_client.rs)):
