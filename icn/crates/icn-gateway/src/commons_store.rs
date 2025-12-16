@@ -1189,8 +1189,8 @@ mod tests {
     // ========================================================================
     // Sled Backend Tests (feature-gated)
     // ========================================================================
-
-    #[cfg_attr(not(feature = "sled-storage"), allow(unexpected_cfgs))]
+    // TODO: Re-enable when sled-storage feature is added to Cargo.toml
+    /*
     #[cfg(feature = "sled-storage")]
     mod sled_tests {
         use super::*;
@@ -1373,4 +1373,5 @@ mod tests {
             assert!(size > 0, "Database should have non-zero size after writes");
         }
     }
+    */
 }
