@@ -36,7 +36,6 @@ pub enum Direction {
     Backward,
 }
 
-
 /// Cursor containing position information
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Cursor {

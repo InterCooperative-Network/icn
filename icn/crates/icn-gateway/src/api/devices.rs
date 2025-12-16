@@ -261,7 +261,7 @@ pub async fn get_device(
 mod tests {
     use super::*;
     use actix_web::{test, App};
-    
+
     use icn_identity::KeyPair;
 
     fn test_keypair() -> KeyPair {

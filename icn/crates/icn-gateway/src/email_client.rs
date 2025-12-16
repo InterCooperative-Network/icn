@@ -585,9 +585,7 @@ impl EmailTemplates {
             if footer.is_empty() {
                 String::new()
             } else {
-                format!(
-                    "<p style=\"color: #6b7280; font-size: 14px;\">{footer}</p>"
-                )
+                format!("<p style=\"color: #6b7280; font-size: 14px;\">{footer}</p>")
             },
             self.coop_name
         )

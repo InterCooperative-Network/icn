@@ -49,7 +49,6 @@ pub enum NotificationPriority {
     Low,
 }
 
-
 /// Notification delivery status
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

@@ -139,9 +139,7 @@ fn format_timestamp(timestamp: u64) -> String {
     let hours = (secs % 86400) / 3600;
     let mins = (secs % 3600) / 60;
 
-    format!(
-        "{years:04}-{months:02}-{day:02} {hours:02}:{mins:02} UTC"
-    )
+    format!("{years:04}-{months:02}-{day:02} {hours:02}:{mins:02} UTC")
 }
 
 fn ratification_to_vote(r: &Ratification) -> VoteResponse {
