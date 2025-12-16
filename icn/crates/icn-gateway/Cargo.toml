@@ -7,11 +7,11 @@ repository.workspace = true
 
 [features]
 default = []
-sled-storage = ["sled"]
+
 
 [dependencies]
 # Optional persistent storage
-sled = { workspace = true, optional = true }
+sled = { workspace = true }
 # Web framework
 actix = "0.13"
 actix-web = "4"

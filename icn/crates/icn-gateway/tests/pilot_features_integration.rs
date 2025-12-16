@@ -12,7 +12,8 @@ use icn_gateway::api::{
 
 #[tokio::test]
 async fn test_recurring_payment_lifecycle() {
-    let store = RecurringPaymentStore::new();
+    let db = sled::Config::new().temporary(true).open().unwrap();
+    let store = RecurringPaymentStore::new(db);
 
     // Create payment
     let payment = RecurringPayment {
@@ -33,10 +34,10 @@ async fn test_recurring_payment_lifecycle() {
         updated_at: 500,
     };
 
-    store.insert(payment.clone()).await;
+    store.insert(payment.clone()).unwrap();
 
     // Retrieve
-    let retrieved = store.get("test-1").await;
+    let retrieved = store.get("test-1").unwrap();
     assert!(retrieved.is_some());
     let retrieved = retrieved.unwrap();
     assert_eq!(retrieved.owner, "did:icn:alice");
@@ -47,18 +48,18 @@ async fn test_recurring_payment_lifecycle() {
     let mut updated = retrieved.clone();
     updated.status = RecurringStatus::Paused;
     updated.amount = 150;
-    store.update("test-1", updated).await;
+    store.update("test-1", updated).unwrap();
 
-    let retrieved = store.get("test-1").await.unwrap();
+    let retrieved = store.get("test-1").unwrap().unwrap();
     assert_eq!(retrieved.status, RecurringStatus::Paused);
     assert_eq!(retrieved.amount, 150);
 
     // List
-    let all = store.list().await;
+    let all = store.list().unwrap();
     assert_eq!(all.len(), 1);
 
     // Get due payments (none since status is paused)
-    let due = store.get_due_payments().await;
+    let due = store.get_due_payments(2000).unwrap();
     assert_eq!(due.len(), 0);
 }
 

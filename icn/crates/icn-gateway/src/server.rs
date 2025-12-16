@@ -200,9 +200,39 @@ impl GatewayServer {
             notification_queue.clone(),
         ));
 
+        // Initialize Sled DB for persistent stores
+        let db = if let Some(ref data_dir) = self.data_dir {
+            let db_path = data_dir.join("gateway_store");
+            match sled::open(&db_path) {
+                Ok(db) => {
+                    info!("Opened gateway storage at {:?}", db_path);
+                    db
+                }
+                Err(e) => {
+                    return Err(crate::error::GatewayError::InternalError(format!(
+                        "Failed to open gateway storage: {}",
+                        e
+                    )));
+                }
+            }
+        } else {
+            info!("Using temporary in-memory storage for gateway");
+            match sled::Config::new().temporary(true).open() {
+                Ok(db) => db,
+                Err(e) => {
+                     return Err(crate::error::GatewayError::InternalError(format!(
+                        "Failed to open temporary storage: {}",
+                        e
+                    )));
+                }
+            }
+        };
+
         // Create recurring payment store
         let recurring_payment_store =
-            Arc::new(crate::api::recurring_payments::RecurringPaymentStore::new());
+            Arc::new(crate::api::recurring_payments::RecurringPaymentStore::new(
+                db.clone(),
+            ));
         info!("Recurring payment store initialized");
 
         // Create escrow store
