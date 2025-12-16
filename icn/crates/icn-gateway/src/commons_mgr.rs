@@ -114,9 +114,9 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
         rand::thread_rng().fill_bytes(&mut genesis);
 
         // Create the underlying SDIS Anchor
-        let pathway = if steward_did.is_some() {
+        let pathway = if let Some(did) = steward_did {
             EnrollmentPathway::WebOfTrust {
-                vouchers: vec![steward_did.unwrap().clone()],
+                vouchers: vec![did.clone()],
                 vouched_at: std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap()
