@@ -266,8 +266,8 @@ pub async fn start_enrollment(
     }))
 }
 
-/// POST /verify/level1
-#[post("/verify/level1")]
+/// POST /enrollment/verify/level1
+#[post("/enrollment/verify/level1")]
 pub async fn verify_level1(
     store: web::Data<Arc<EnrollmentStore>>,
     req: web::Json<VerifyLevel1Request>,
@@ -344,8 +344,8 @@ pub async fn verify_level1(
 /// Minimum trust score required for stewards to vouch for enrollees
 const STEWARD_MIN_TRUST_SCORE: f64 = 0.4;
 
-/// POST /verify/level2
-#[post("/verify/level2")]
+/// POST /enrollment/verify/level2
+#[post("/enrollment/verify/level2")]
 pub async fn verify_level2(
     http_req: HttpRequest,
     store: web::Data<Arc<EnrollmentStore>>,

@@ -78,7 +78,7 @@ export function LoginScreen({ navigation, route }: Props) {
       setEnrollmentStatus('Verifying with cooperative...');
 
       // Call the enrollment verification endpoint (Level 1)
-      const response = await fetch(`${gateway}/v1/sdis/verify/level1`, {
+      const response = await fetch(`${gateway}/v1/sdis/enrollment/verify/level1`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
