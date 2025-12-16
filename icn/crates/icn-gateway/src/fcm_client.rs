@@ -3,6 +3,7 @@
 //! Implements push notification delivery via FCM HTTP v1 API.
 //! Supports both Android and iOS devices through Firebase.
 
+use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -391,13 +392,16 @@ impl FcmClient {
     }
 
     /// Sign a JWT using RS256
-    fn sign_jwt(&self, _claims: &JwtClaims) -> Result<String, String> {
-        // Note: In a production system, use a proper JWT library like jsonwebtoken
-        // This is a simplified implementation that shows the structure
+    fn sign_jwt(&self, claims: &JwtClaims) -> Result<String, String> {
+        // Parse the private key (PKCS#8 PEM format from Google service account)
+        let encoding_key = EncodingKey::from_rsa_pem(self.config.private_key.as_bytes())
+            .map_err(|e| format!("Failed to parse private key: {e}"))?;
 
-        // For now, return an error indicating JWT signing is not implemented
-        // This would require the jsonwebtoken crate
-        Err("JWT signing requires the jsonwebtoken crate - configure FCM with an access token directly for now".to_string())
+        // Create JWT header with RS256 algorithm
+        let header = Header::new(Algorithm::RS256);
+
+        // Encode the JWT
+        encode(&header, claims, &encoding_key).map_err(|e| format!("Failed to sign JWT: {e}"))
     }
 
     /// Create FCM client with a pre-existing access token (for testing/development)

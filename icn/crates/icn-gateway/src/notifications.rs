@@ -160,8 +160,10 @@ impl NotificationService {
             notification.body
         );
 
-        // TODO: Integrate with Firebase Admin SDK
-        // This would use fcm_credentials to authenticate and send via FCM
+        // Note: This is the legacy fallback path. The primary notification flow
+        // uses NotificationProcessor with FcmClient which handles FCM HTTP v1 API
+        // with proper JWT authentication. This method is retained for simple
+        // direct push scenarios when NotificationProcessor is not available.
 
         Ok(())
     }

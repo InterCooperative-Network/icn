@@ -25,10 +25,11 @@ pub fn start_notification_listener(
         // events are broadcast. In production, EventBroadcaster could have a
         // global listener mechanism.
 
-        // TODO: This is a placeholder. In production, EventBroadcaster should
-        // support a global event listener that receives all events regardless of coop.
-        // For now, notifications will need to be triggered explicitly when events
-        // are broadcast in the API handlers.
+        // Note: EventBroadcaster currently uses per-coop channels for WebSocket subscriptions.
+        // For notifications, we use explicit triggers from API handlers via handle_event_for_notifications().
+        // This is the recommended pattern for pilot as it gives fine-grained control over
+        // which events generate notifications. A global event listener could be added later
+        // for centralized notification processing if needed.
 
         info!("Notification listener ready (manual trigger mode)");
 
