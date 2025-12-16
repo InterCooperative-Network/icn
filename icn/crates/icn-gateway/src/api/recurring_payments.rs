@@ -8,8 +8,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use tracing::{debug, info, warn};
 
 use crate::error::{GatewayError, Result};
+use crate::ledger_mgr::LedgerManager;
 use crate::middleware::{get_claims, require_scope};
 
 /// Payment frequency
@@ -37,6 +39,8 @@ pub enum RecurringStatus {
 pub struct RecurringPayment {
     /// Unique ID
     pub id: String,
+    /// Cooperative ID (ledger namespace)
+    pub coop_id: String,
     /// Owner/creator DID
     pub owner: String,
     /// From account
@@ -133,6 +137,8 @@ impl RecurringPaymentStore {
 /// Request to create recurring payment
 #[derive(Debug, Deserialize)]
 pub struct CreateRecurringPaymentRequest {
+    /// Cooperative ID (ledger namespace)
+    pub coop_id: String,
     pub from_account: String,
     pub to_account: String,
     pub amount: i64,
@@ -176,6 +182,7 @@ pub async fn create_recurring_payment(
 
     let payment = RecurringPayment {
         id: uuid::Uuid::new_v4().to_string(),
+        coop_id: req.coop_id.clone(),
         owner: owner.to_string(),
         from_account: req.from_account.clone(),
         to_account: req.to_account.clone(),
@@ -361,4 +368,154 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         .service(get_recurring_payment)
         .service(update_recurring_payment)
         .service(cancel_recurring_payment);
+}
+
+// ============================================================================
+// Scheduler Functions
+// ============================================================================
+
+/// Calculate next execution time based on frequency
+fn calculate_next_execution(current: u64, frequency: PaymentFrequency) -> u64 {
+    match frequency {
+        PaymentFrequency::Daily => current + 86400,         // 24 hours
+        PaymentFrequency::Weekly => current + 604800,       // 7 days
+        PaymentFrequency::Monthly => current + 2592000,     // 30 days (approximate)
+        PaymentFrequency::Yearly => current + 31536000,     // 365 days
+    }
+}
+
+/// Execute all due recurring payments
+///
+/// This function should be called periodically by a scheduler (e.g., every minute).
+/// It executes all payments that are due and updates their next execution time.
+pub async fn execute_due_payments(
+    store: &RecurringPaymentStore,
+    ledger_mgr: &Arc<LedgerManager>,
+) -> Vec<(String, std::result::Result<String, String>)> {
+    let due_payments = store.get_due_payments().await;
+    let mut results = Vec::new();
+
+    debug!(count = due_payments.len(), "Checking due recurring payments");
+
+    for mut payment in due_payments {
+        let payment_id = payment.id.clone();
+
+        // Parse DIDs
+        let from_did: Did = match payment.from_account.parse() {
+            Ok(did) => did,
+            Err(e) => {
+                warn!(
+                    payment_id = %payment_id,
+                    error = %e,
+                    "Invalid from_account DID in recurring payment"
+                );
+                results.push((payment_id, Err(format!("Invalid from_account: {e}"))));
+                continue;
+            }
+        };
+
+        let to_did: Did = match payment.to_account.parse() {
+            Ok(did) => did,
+            Err(e) => {
+                warn!(
+                    payment_id = %payment_id,
+                    error = %e,
+                    "Invalid to_account DID in recurring payment"
+                );
+                results.push((payment_id, Err(format!("Invalid to_account: {e}"))));
+                continue;
+            }
+        };
+
+        // Execute payment via ledger
+        match ledger_mgr.create_payment(
+            &payment.coop_id,
+            &from_did,
+            &to_did,
+            payment.amount,
+            payment.currency.clone(),
+        ) {
+            Ok(tx_hash) => {
+                info!(
+                    payment_id = %payment_id,
+                    tx_hash = %tx_hash,
+                    amount = payment.amount,
+                    execution_count = payment.execution_count + 1,
+                    "Recurring payment executed"
+                );
+
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs();
+
+                // Update payment state
+                payment.execution_count += 1;
+                payment.last_execution = Some(now);
+                payment.next_execution = calculate_next_execution(now, payment.frequency);
+                payment.updated_at = now;
+
+                // Check if payment has reached end date
+                if let Some(end_date) = payment.end_date {
+                    if payment.next_execution > end_date {
+                        payment.status = RecurringStatus::Completed;
+                        info!(
+                            payment_id = %payment_id,
+                            "Recurring payment completed (reached end date)"
+                        );
+                    }
+                }
+
+                store.update(&payment_id, payment).await;
+                results.push((payment_id, Ok(tx_hash)));
+            }
+            Err(e) => {
+                warn!(
+                    payment_id = %payment_id,
+                    error = %e,
+                    "Failed to execute recurring payment"
+                );
+                results.push((payment_id, Err(format!("Ledger error: {e}"))));
+            }
+        }
+    }
+
+    results
+}
+
+/// Start the recurring payments scheduler
+///
+/// Spawns a background task that checks for and executes due payments
+/// at the specified interval.
+pub fn start_scheduler(
+    store: RecurringPaymentStore,
+    ledger_mgr: Arc<LedgerManager>,
+    check_interval_secs: u64,
+) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+        info!(
+            interval_secs = check_interval_secs,
+            "Starting recurring payments scheduler"
+        );
+
+        let mut interval = tokio::time::interval(
+            std::time::Duration::from_secs(check_interval_secs)
+        );
+
+        loop {
+            interval.tick().await;
+
+            let results = execute_due_payments(&store, &ledger_mgr).await;
+
+            if !results.is_empty() {
+                let succeeded = results.iter().filter(|(_, r)| r.is_ok()).count();
+                let failed = results.iter().filter(|(_, r)| r.is_err()).count();
+                info!(
+                    succeeded = succeeded,
+                    failed = failed,
+                    "Recurring payments scheduler tick completed"
+                );
+            }
+        }
+    })
 }

@@ -27,6 +27,8 @@ export type RecurringStatus = 'active' | 'paused' | 'cancelled' | 'completed';
 export interface RecurringPayment {
   /** Unique ID */
   id: string;
+  /** Cooperative ID (ledger namespace) */
+  coop_id: string;
   /** Owner/creator DID */
   owner: string;
   /** From account */
@@ -59,6 +61,8 @@ export interface RecurringPayment {
  * Create recurring payment request
  */
 export interface CreateRecurringPaymentRequest {
+  /** Cooperative ID (ledger namespace) */
+  coop_id: string;
   /** From account DID */
   from_account: string;
   /** To account DID */

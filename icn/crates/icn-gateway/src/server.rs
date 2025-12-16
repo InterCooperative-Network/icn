@@ -209,6 +209,14 @@ impl GatewayServer {
         let budget_store = Arc::new(crate::api::budgets::BudgetStore::new());
         info!("Budget store initialized");
 
+        // Start recurring payments scheduler (check every 60 seconds)
+        let _recurring_payments_handle = crate::api::recurring_payments::start_scheduler(
+            (*recurring_payment_store).clone(),
+            ledger_manager.clone(),
+            60, // Check every minute
+        );
+        info!("Recurring payments scheduler started");
+
         // Create shutdown channel
         let (shutdown_tx, _shutdown_rx) = tokio::sync::broadcast::channel::<()>(1);
 
