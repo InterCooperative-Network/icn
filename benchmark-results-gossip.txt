@@ -1,0 +1,113 @@
+   Compiling icn-gossip v0.1.0 (/home/matt/projects/icn/icn/crates/icn-gossip)
+    Finished `bench` profile [optimized] target(s) in 1.49s
+     Running benches/gossip_bench.rs (target/release/deps/gossip_bench-bab25c8a70468d80)
+Gnuplot not found, using plotters backend
+Benchmarking vector_clock/10
+Benchmarking vector_clock/10: Warming up for 3.0000 s
+Benchmarking vector_clock/10: Collecting 100 samples in estimated 5.0012 s (16M iterations)
+Benchmarking vector_clock/10: Analyzing
+vector_clock/10         time:   [311.56 ns 315.11 ns 319.44 ns]
+Found 7 outliers among 100 measurements (7.00%)
+  3 (3.00%) high mild
+  4 (4.00%) high severe
+Benchmarking vector_clock/50
+Benchmarking vector_clock/50: Warming up for 3.0000 s
+Benchmarking vector_clock/50: Collecting 100 samples in estimated 5.0103 s (2.3M iterations)
+Benchmarking vector_clock/50: Analyzing
+vector_clock/50         time:   [2.1620 µs 2.1861 µs 2.2120 µs]
+Found 6 outliers among 100 measurements (6.00%)
+  3 (3.00%) high mild
+  3 (3.00%) high severe
+Benchmarking vector_clock/100
+Benchmarking vector_clock/100: Warming up for 3.0000 s
+Benchmarking vector_clock/100: Collecting 100 samples in estimated 5.0106 s (1.2M iterations)
+Benchmarking vector_clock/100: Analyzing
+vector_clock/100        time:   [4.3438 µs 4.3769 µs 4.4144 µs]
+Found 7 outliers among 100 measurements (7.00%)
+  6 (6.00%) high mild
+  1 (1.00%) high severe
+Benchmarking vector_clock/500
+Benchmarking vector_clock/500: Warming up for 3.0000 s
+Benchmarking vector_clock/500: Collecting 100 samples in estimated 5.0369 s (424k iterations)
+Benchmarking vector_clock/500: Analyzing
+vector_clock/500        time:   [11.744 µs 11.860 µs 11.991 µs]
+Found 4 outliers among 100 measurements (4.00%)
+  3 (3.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking content_hash/100
+Benchmarking content_hash/100: Warming up for 3.0000 s
+Benchmarking content_hash/100: Collecting 100 samples in estimated 5.0001 s (39M iterations)
+Benchmarking content_hash/100: Analyzing
+content_hash/100        time:   [123.89 ns 124.47 ns 125.06 ns]
+Found 3 outliers among 100 measurements (3.00%)
+  2 (2.00%) high mild
+  1 (1.00%) high severe
+Benchmarking content_hash/1000
+Benchmarking content_hash/1000: Warming up for 3.0000 s
+Benchmarking content_hash/1000: Collecting 100 samples in estimated 5.0016 s (6.1M iterations)
+Benchmarking content_hash/1000: Analyzing
+content_hash/1000       time:   [797.66 ns 803.91 ns 810.79 ns]
+Found 7 outliers among 100 measurements (7.00%)
+  6 (6.00%) high mild
+  1 (1.00%) high severe
+Benchmarking content_hash/10000
+Benchmarking content_hash/10000: Warming up for 3.0000 s
+Benchmarking content_hash/10000: Collecting 100 samples in estimated 5.0082 s (1.8M iterations)
+Benchmarking content_hash/10000: Analyzing
+content_hash/10000      time:   [2.8263 µs 2.8604 µs 2.8965 µs]
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high mild
+Benchmarking content_hash/100000
+Benchmarking content_hash/100000: Warming up for 3.0000 s
+Benchmarking content_hash/100000: Collecting 100 samples in estimated 5.0690 s (343k iterations)
+Benchmarking content_hash/100000: Analyzing
+content_hash/100000     time:   [13.847 µs 14.005 µs 14.174 µs]
+Found 2 outliers among 100 measurements (2.00%)
+  2 (2.00%) high mild
+
+Benchmarking gossip_entry/serialize
+Benchmarking gossip_entry/serialize: Warming up for 3.0000 s
+Benchmarking gossip_entry/serialize: Collecting 100 samples in estimated 5.0017 s (9.9M iterations)
+Benchmarking gossip_entry/serialize: Analyzing
+gossip_entry/serialize  time:   [503.81 ns 510.37 ns 518.20 ns]
+Found 10 outliers among 100 measurements (10.00%)
+  5 (5.00%) high mild
+  5 (5.00%) high severe
+Benchmarking gossip_entry/deserialize
+Benchmarking gossip_entry/deserialize: Warming up for 3.0000 s
+Benchmarking gossip_entry/deserialize: Collecting 100 samples in estimated 5.0008 s (5.3M iterations)
+Benchmarking gossip_entry/deserialize: Analyzing
+gossip_entry/deserialize
+                        time:   [931.78 ns 942.97 ns 956.88 ns]
+Found 9 outliers among 100 measurements (9.00%)
+  4 (4.00%) high mild
+  5 (5.00%) high severe
+
+Benchmarking gossip_compression/1024
+Benchmarking gossip_compression/1024: Warming up for 3.0000 s
+Benchmarking gossip_compression/1024: Collecting 100 samples in estimated 5.0301 s (571k iterations)
+Benchmarking gossip_compression/1024: Analyzing
+gossip_compression/1024 time:   [8.7980 µs 8.8727 µs 8.9574 µs]
+Found 4 outliers among 100 measurements (4.00%)
+  3 (3.00%) high mild
+  1 (1.00%) high severe
+Benchmarking gossip_compression/10240
+Benchmarking gossip_compression/10240: Warming up for 3.0000 s
+Benchmarking gossip_compression/10240: Collecting 100 samples in estimated 5.0018 s (500k iterations)
+Benchmarking gossip_compression/10240: Analyzing
+gossip_compression/10240
+                        time:   [9.7620 µs 9.8679 µs 9.9865 µs]
+Found 10 outliers among 100 measurements (10.00%)
+  5 (5.00%) high mild
+  5 (5.00%) high severe
+Benchmarking gossip_compression/102400
+Benchmarking gossip_compression/102400: Warming up for 3.0000 s
+Benchmarking gossip_compression/102400: Collecting 100 samples in estimated 5.0545 s (263k iterations)
+Benchmarking gossip_compression/102400: Analyzing
+gossip_compression/102400
+                        time:   [19.394 µs 19.722 µs 20.092 µs]
+Found 5 outliers among 100 measurements (5.00%)
+  3 (3.00%) high mild
+  2 (2.00%) high severe
+

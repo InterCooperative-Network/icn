@@ -2762,7 +2762,10 @@ name = "icn-gossip"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "bincode",
+ "blake3",
  "bytes",
+ "criterion",
  "futures",
  "hex",
  "icn-identity",
@@ -2837,6 +2840,8 @@ dependencies = [
  "anyhow",
  "bincode",
  "bytes",
+ "criterion",
+ "ed25519-dalek",
  "hex",
  "icn-gossip",
  "icn-identity",
@@ -2844,6 +2849,7 @@ dependencies = [
  "icn-security",
  "icn-store",
  "icn-trust",
+ "rand 0.8.5",
  "serde",
  "serde_json",
  "sha2",
@@ -3061,6 +3067,7 @@ name = "icn-trust"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "criterion",
  "ed25519-dalek",
  "icn-identity",
  "icn-obs",
@@ -3070,6 +3077,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "tempfile",
  "thiserror 1.0.69",
  "tracing",
 ]

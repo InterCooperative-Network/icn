@@ -1,8 +1,75 @@
 # Contributing to ICN
 
-## Branch Workflow
+Thank you for your interest in contributing to ICN! This document provides guidelines and workflows for contributors.
 
-### Branch Naming Convention
+---
+
+## Getting Started
+
+### 1. Development Environment Setup
+
+**Automated Setup (Recommended):**
+```bash
+./scripts/dev-setup.sh
+```
+
+This script will:
+- Install all required Rust development tools (`cargo-watch`, `cargo-audit`, `cargo-tarpaulin`, `cargo-outdated`)
+- Install Node.js tools for commit message validation (optional)
+- Set up pre-commit hooks (format checking, linting)
+- Set up commit-msg validation (conventional commits)
+- Create `.envrc` for direnv users (optional)
+
+**Manual Setup:**
+```bash
+# Install Rust (if not already installed)
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# Install development tools
+cargo install cargo-watch cargo-audit cargo-tarpaulin cargo-outdated
+
+# Install Node.js tools (optional, for commit message validation)
+npm install -g @commitlint/cli @commitlint/config-conventional
+```
+
+### 2. Build and Test
+
+```bash
+# Clone the repository
+git clone https://github.com/InterCooperative-Network/icn.git
+cd icn
+
+# Build the project
+cd icn
+cargo build
+
+# Run tests
+cargo test --workspace
+
+# Run clippy (linter)
+cargo clippy --workspace --all-targets
+
+# Check formatting
+cargo fmt --all -- --check
+```
+
+### 3. Verify Everything Works
+
+```bash
+# Run the full CI pipeline locally
+cargo fmt --all --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+cargo audit  # Check for security vulnerabilities
+
+# Optional: Run benchmarks
+cargo bench --workspace
+
+# Optional: Generate coverage report
+cargo tarpaulin --workspace --timeout 300
+```
+
+---
 
 Use descriptive branch names with prefixes:
 

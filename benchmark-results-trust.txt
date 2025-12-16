@@ -1,0 +1,91 @@
+    Finished `bench` profile [optimized] target(s) in 0.17s
+     Running benches/trust_bench.rs (target/release/deps/trust_bench-a5da12eb13cca263)
+Gnuplot not found, using plotters backend
+Benchmarking trust_graph/compute/10
+Benchmarking trust_graph/compute/10: Warming up for 3.0000 s
+Benchmarking trust_graph/compute/10: Collecting 100 samples in estimated 5.0002 s (115M iterations)
+Benchmarking trust_graph/compute/10: Analyzing
+trust_graph/compute/10  time:   [43.635 ns 44.035 ns 44.436 ns]
+                        change: [-3.7586% -2.7251% -1.6569%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 5 outliers among 100 measurements (5.00%)
+  4 (4.00%) high mild
+  1 (1.00%) high severe
+Benchmarking trust_graph/compute/50
+Benchmarking trust_graph/compute/50: Warming up for 3.0000 s
+Benchmarking trust_graph/compute/50: Collecting 100 samples in estimated 5.0001 s (114M iterations)
+Benchmarking trust_graph/compute/50: Analyzing
+trust_graph/compute/50  time:   [43.456 ns 43.724 ns 44.015 ns]
+                        change: [-1.9714% -0.9450% +0.1360%] (p = 0.07 > 0.05)
+                        No change in performance detected.
+Found 3 outliers among 100 measurements (3.00%)
+  2 (2.00%) high mild
+  1 (1.00%) high severe
+Benchmarking trust_graph/compute/100
+Benchmarking trust_graph/compute/100: Warming up for 3.0000 s
+Benchmarking trust_graph/compute/100: Collecting 100 samples in estimated 5.0001 s (114M iterations)
+Benchmarking trust_graph/compute/100: Analyzing
+trust_graph/compute/100 time:   [44.289 ns 44.684 ns 45.091 ns]
+                        change: [+0.5845% +1.7133% +2.8526%] (p = 0.00 < 0.05)
+                        Change within noise threshold.
+Found 3 outliers among 100 measurements (3.00%)
+  3 (3.00%) high mild
+
+Benchmarking trust_operations/add_edge
+Benchmarking trust_operations/add_edge: Warming up for 3.0000 s
+Benchmarking trust_operations/add_edge: Collecting 100 samples in estimated 5.2557 s (1600 iterations)
+Benchmarking trust_operations/add_edge: Analyzing
+trust_operations/add_edge
+                        time:   [98.042 µs 99.591 µs 101.19 µs]
+                        change: [-11.046% -8.8289% -6.6843%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 2 outliers among 100 measurements (2.00%)
+  2 (2.00%) high mild
+Benchmarking trust_operations/remove_edge
+Benchmarking trust_operations/remove_edge: Warming up for 3.0000 s
+Benchmarking trust_operations/remove_edge: Collecting 100 samples in estimated 5.2175 s (1900 iterations)
+Benchmarking trust_operations/remove_edge: Analyzing
+trust_operations/remove_edge
+                        time:   [102.41 µs 104.24 µs 106.16 µs]
+                        change: [-0.9849% +1.6337% +4.1780%] (p = 0.21 > 0.05)
+                        No change in performance detected.
+Found 2 outliers among 100 measurements (2.00%)
+  2 (2.00%) high mild
+Benchmarking trust_operations/compute_trust_score
+Benchmarking trust_operations/compute_trust_score: Warming up for 3.0000 s
+Benchmarking trust_operations/compute_trust_score: Collecting 100 samples in estimated 5.0000 s (110M iterations)
+Benchmarking trust_operations/compute_trust_score: Analyzing
+trust_operations/compute_trust_score
+                        time:   [45.924 ns 46.756 ns 47.619 ns]
+                        change: [+2.3771% +4.0244% +5.5825%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 2 outliers among 100 measurements (2.00%)
+  2 (2.00%) high mild
+
+Benchmarking transitive_trust/2
+Benchmarking transitive_trust/2: Warming up for 3.0000 s
+Benchmarking transitive_trust/2: Collecting 100 samples in estimated 5.0000 s (109M iterations)
+Benchmarking transitive_trust/2: Analyzing
+transitive_trust/2      time:   [43.974 ns 44.444 ns 45.032 ns]
+                        change: [-0.7909% +0.4102% +1.8964%] (p = 0.56 > 0.05)
+                        No change in performance detected.
+Found 6 outliers among 100 measurements (6.00%)
+  4 (4.00%) high mild
+  2 (2.00%) high severe
+Benchmarking transitive_trust/3
+Benchmarking transitive_trust/3: Warming up for 3.0000 s
+Benchmarking transitive_trust/3: Collecting 100 samples in estimated 5.0001 s (107M iterations)
+Benchmarking transitive_trust/3: Analyzing
+transitive_trust/3      time:   [44.653 ns 45.103 ns 45.562 ns]
+Found 9 outliers among 100 measurements (9.00%)
+  4 (4.00%) high mild
+  5 (5.00%) high severe
+Benchmarking transitive_trust/4
+Benchmarking transitive_trust/4: Warming up for 3.0000 s
+Benchmarking transitive_trust/4: Collecting 100 samples in estimated 5.0002 s (113M iterations)
+Benchmarking transitive_trust/4: Analyzing
+transitive_trust/4      time:   [43.877 ns 44.322 ns 44.769 ns]
+Found 9 outliers among 100 measurements (9.00%)
+  5 (5.00%) high mild
+  4 (4.00%) high severe
+

@@ -1,0 +1,59 @@
+# Codecov Configuration
+# https://docs.codecov.io/docs/codecov-yaml
+
+coverage:
+  status:
+    project:
+      default:
+        target: 70%  # Target overall coverage
+        threshold: 5%  # Allow 5% drop without failing
+        informational: false  # Fail CI if coverage drops
+    patch:
+      default:
+        target: 80%  # New code should be well-tested
+        threshold: 10%  # More lenient for patches
+        informational: false
+
+  range: 50..90  # Red at 50%, green at 90%
+
+comment:
+  layout: "header, diff, flags, files"
+  behavior: default
+  require_changes: false  # Always comment
+  require_base: false  # Comment even without base coverage
+  require_head: true  # Only comment if head coverage exists
+
+ignore:
+  - "icn/bins/**"  # Binaries don't need full coverage
+  - "icn/**/benches/**"  # Benchmarks
+  - "icn/**/tests/**"  # Test code itself
+  - "icn/**/examples/**"  # Example code
+  - "web/**"  # Web UI (has own test suite)
+  - "sdk/**"  # SDKs (have own test suites)
+  - "docs/**"  # Documentation
+  - "scripts/**"  # Scripts
+  - "deploy/**"  # Deployment configs
+  - "monitoring/**"  # Monitoring configs
+
+flags:
+  icn-core:
+    paths:
+      - icn/crates/icn-core/
+  icn-gossip:
+    paths:
+      - icn/crates/icn-gossip/
+  icn-ledger:
+    paths:
+      - icn/crates/icn-ledger/
+  icn-trust:
+    paths:
+      - icn/crates/icn-trust/
+  icn-gateway:
+    paths:
+      - icn/crates/icn-gateway/
+
+# Don't require CI to pass to merge coverage data
+codecov:
+  require_ci_to_pass: false
+  notify:
+    wait_for_ci: false
