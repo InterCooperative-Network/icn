@@ -435,9 +435,13 @@ pub async fn complete_enrollment(
     {
         Ok(anchor) => {
             let anchor_id_hex = hex::encode(anchor.id());
-            // Create holder from anchor
+            // Create holder from anchor with display name from enrollment
             match commons_mgr
-                .create_holder_from_anchor(&anchor_id_hex, &ephemeral_did)
+                .create_holder_from_anchor_with_name(
+                    &anchor_id_hex,
+                    &ephemeral_did,
+                    Some(session.identity_name.clone()),
+                )
                 .await
             {
                 Ok(holder) => (Some(anchor_id_hex), Some(hex::encode(holder.id()))),

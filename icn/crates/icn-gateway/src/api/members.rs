@@ -4,6 +4,7 @@ use actix_web::{get, web, HttpRequest, HttpResponse};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+use crate::commons_mgr::CommonsManager;
 use crate::coop::{CoopManager, MemberRole};
 use crate::error::{GatewayError, Result};
 use crate::ledger_mgr::LedgerManager;
@@ -42,6 +43,7 @@ pub async fn get_member_profile(
     coop_manager: web::Data<Arc<CoopManager>>,
     ledger_manager: web::Data<Arc<LedgerManager>>,
     trust_manager: web::Data<Arc<TrustManager>>,
+    commons_manager: web::Data<Arc<CommonsManager>>,
 ) -> Result<HttpResponse> {
     let (coop_id, did) = path.into_inner();
 
@@ -87,9 +89,17 @@ pub async fn get_member_profile(
         None
     };
 
+    // Look up display name from CommonsHolderRecord
+    let display_name = commons_manager
+        .get_holder_by_did(&did_obj)
+        .await
+        .ok()
+        .flatten()
+        .and_then(|holder| holder.display_name);
+
     let profile = MemberProfile {
         did: did.clone(),
-        name: None, // TODO: Integrate with identity system for display names
+        name: display_name,
         role: member.role.clone(),
         joined_at: member.joined_at,
         balance,
@@ -107,10 +117,15 @@ mod tests {
     use actix_web::{test, App};
     use std::time::{SystemTime, UNIX_EPOCH};
 
+    fn create_test_commons_manager() -> Arc<CommonsManager> {
+        Arc::new(CommonsManager::new())
+    }
+
     #[actix_web::test]
     async fn test_get_member_profile() {
         let coop_manager = Arc::new(CoopManager::new());
         let ledger_manager = Arc::new(LedgerManager::new());
+        let commons_manager = create_test_commons_manager();
 
         // Create test coop with a real generated DID
         let coop_id = "test-coop";
@@ -138,6 +153,7 @@ mod tests {
                 .app_data(web::Data::new(coop_manager))
                 .app_data(web::Data::new(ledger_manager))
                 .app_data(web::Data::new(trust_manager))
+                .app_data(web::Data::new(commons_manager))
                 .service(get_member_profile),
         )
         .await;
@@ -159,12 +175,14 @@ mod tests {
         let coop_manager = Arc::new(CoopManager::new());
         let ledger_manager = Arc::new(LedgerManager::new());
         let trust_manager = Arc::new(TrustManager::new());
+        let commons_manager = create_test_commons_manager();
 
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(coop_manager))
                 .app_data(web::Data::new(ledger_manager))
                 .app_data(web::Data::new(trust_manager))
+                .app_data(web::Data::new(commons_manager))
                 .service(get_member_profile),
         )
         .await;

@@ -123,6 +123,10 @@ pub struct CommonsHolderRecord {
     /// Link to underlying PersonhoodAnchor (Layer 0)
     pub anchor_id: [u8; 32],
 
+    /// Display name provided during enrollment (human-readable identifier)
+    #[serde(default)]
+    pub display_name: Option<String>,
+
     /// Holder status in the commons
     pub status: HolderStatus,
 
@@ -160,6 +164,7 @@ impl CommonsHolderRecord {
             holder_id,
             holder_did,
             anchor_id,
+            display_name: None,
             status: HolderStatus::Active,
             personhood_level,
             affiliations: Vec::new(),
@@ -168,6 +173,21 @@ impl CommonsHolderRecord {
             last_review_at: None,
             updated_at: now,
         }
+    }
+
+    /// Create with a display name
+    pub fn with_display_name(mut self, name: impl Into<String>) -> Self {
+        self.display_name = Some(name.into());
+        self
+    }
+
+    /// Set the display name
+    pub fn set_display_name(&mut self, name: impl Into<String>) {
+        self.display_name = Some(name.into());
+        self.updated_at = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
     }
 
     /// Get the holder ID

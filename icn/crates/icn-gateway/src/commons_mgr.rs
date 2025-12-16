@@ -286,6 +286,17 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
         anchor_id: &str,
         did: &Did,
     ) -> Result<CommonsHolderRecord> {
+        self.create_holder_from_anchor_with_name(anchor_id, did, None)
+            .await
+    }
+
+    /// Create a CommonsHolderRecord from an anchor with an optional display name
+    pub async fn create_holder_from_anchor_with_name(
+        &self,
+        anchor_id: &str,
+        did: &Did,
+        display_name: Option<String>,
+    ) -> Result<CommonsHolderRecord> {
         // Verify anchor exists and get its POP level
         let anchor = self
             .get_anchor(anchor_id)
@@ -301,7 +312,12 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
         let pop_level = anchor.pop_level().unwrap_or(POPLevel::Weak);
 
         // Create holder with baseline Commons Rights
-        let holder = CommonsHolderRecord::new(anchor_bytes, did.clone(), pop_level);
+        let mut holder = CommonsHolderRecord::new(anchor_bytes, did.clone(), pop_level);
+
+        // Set display name if provided
+        if let Some(name) = display_name {
+            holder.display_name = Some(name);
+        }
 
         // Check if holder already exists
         let holder_id = hex::encode(holder.id());
