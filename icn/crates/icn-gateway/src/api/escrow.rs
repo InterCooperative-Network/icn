@@ -8,8 +8,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use tracing::{info, warn};
 
 use crate::error::{GatewayError, Result};
+use crate::ledger_mgr::LedgerManager;
 use crate::middleware::{get_claims, require_scope};
 
 /// Escrow status
@@ -40,6 +42,8 @@ pub enum EscrowCondition {
 pub struct Escrow {
     /// Unique ID
     pub id: String,
+    /// Cooperative ID (ledger namespace)
+    pub coop_id: String,
     /// Creator/initiator DID
     pub creator: String,
     /// From account
@@ -111,6 +115,8 @@ impl EscrowStore {
 /// Request to create escrow
 #[derive(Debug, Deserialize)]
 pub struct CreateEscrowRequest {
+    /// Cooperative ID (ledger namespace)
+    pub coop_id: String,
     pub from_account: String,
     pub to_account: String,
     pub amount: i64,
@@ -149,6 +155,7 @@ pub async fn create_escrow(
 
     let escrow = Escrow {
         id: uuid::Uuid::new_v4().to_string(),
+        coop_id: req.coop_id.clone(),
         creator: creator.to_string(),
         from_account: req.from_account.clone(),
         to_account: req.to_account.clone(),
@@ -243,6 +250,7 @@ pub async fn get_escrow(
 pub async fn release_escrow(
     http_req: HttpRequest,
     store: web::Data<EscrowStore>,
+    ledger_mgr: web::Data<Arc<LedgerManager>>,
     id: web::Path<String>,
     req: web::Json<ApproveEscrowRequest>,
 ) -> Result<HttpResponse> {
@@ -280,6 +288,44 @@ pub async fn release_escrow(
     let conditions_met = check_conditions(&escrow, &approver_did, req.proof.as_deref());
 
     if conditions_met {
+        // Execute actual payment transaction via ledger
+        let from_did: Did = escrow
+            .from_account
+            .parse()
+            .map_err(|e| GatewayError::BadRequest(format!("Invalid from_account DID: {e}")))?;
+        let to_did: Did = escrow
+            .to_account
+            .parse()
+            .map_err(|e| GatewayError::BadRequest(format!("Invalid to_account DID: {e}")))?;
+
+        let tx_hash = match ledger_mgr.create_payment(
+            &escrow.coop_id,
+            &from_did,
+            &to_did,
+            escrow.amount,
+            escrow.currency.clone(),
+        ) {
+            Ok(hash) => {
+                info!(
+                    escrow_id = %escrow_id,
+                    tx_hash = %hash,
+                    amount = escrow.amount,
+                    "Escrow funds released via ledger transaction"
+                );
+                Some(hash)
+            }
+            Err(e) => {
+                warn!(
+                    escrow_id = %escrow_id,
+                    error = %e,
+                    "Failed to execute escrow release transaction"
+                );
+                return Err(GatewayError::InternalError(format!(
+                    "Failed to execute release transaction: {e}"
+                )));
+            }
+        };
+
         escrow.status = EscrowStatus::Released;
         escrow.updated_at = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -288,11 +334,10 @@ pub async fn release_escrow(
 
         store.update(&escrow_id, escrow.clone()).await;
 
-        // TODO: Execute actual payment transaction via ledger
-
         Ok(HttpResponse::Ok().json(serde_json::json!({
             "escrow": escrow,
             "released": true,
+            "transaction_hash": tx_hash,
             "message": "Funds released to beneficiary"
         })))
     } else {
@@ -317,6 +362,7 @@ pub async fn release_escrow(
 pub async fn refund_escrow(
     http_req: HttpRequest,
     store: web::Data<EscrowStore>,
+    ledger_mgr: web::Data<Arc<LedgerManager>>,
     id: web::Path<String>,
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "payments:write")?;
@@ -346,6 +392,46 @@ pub async fn refund_escrow(
         )));
     }
 
+    // Execute refund transaction via ledger
+    // Refund is a payment from the escrow holding account back to the original sender
+    let to_did: Did = escrow
+        .to_account
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid to_account DID: {e}")))?;
+    let from_did: Did = escrow
+        .from_account
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid from_account DID: {e}")))?;
+
+    // Refund: reverse the original payment direction (to -> from)
+    let tx_hash = match ledger_mgr.create_payment(
+        &escrow.coop_id,
+        &to_did,    // Refund from beneficiary's reserved funds
+        &from_did,  // Back to original sender
+        escrow.amount,
+        escrow.currency.clone(),
+    ) {
+        Ok(hash) => {
+            info!(
+                escrow_id = %escrow_id,
+                tx_hash = %hash,
+                amount = escrow.amount,
+                "Escrow funds refunded via ledger transaction"
+            );
+            Some(hash)
+        }
+        Err(e) => {
+            warn!(
+                escrow_id = %escrow_id,
+                error = %e,
+                "Failed to execute escrow refund transaction"
+            );
+            return Err(GatewayError::InternalError(format!(
+                "Failed to execute refund transaction: {e}"
+            )));
+        }
+    };
+
     escrow.status = EscrowStatus::Refunded;
     escrow.updated_at = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -354,10 +440,9 @@ pub async fn refund_escrow(
 
     store.update(&escrow_id, escrow.clone()).await;
 
-    // TODO: Execute refund transaction via ledger
-
     Ok(HttpResponse::Ok().json(serde_json::json!({
         "escrow": escrow,
+        "transaction_hash": tx_hash,
         "message": "Funds refunded to sender"
     })))
 }

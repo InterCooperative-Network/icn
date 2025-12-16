@@ -100,6 +100,8 @@ export type EscrowCondition =
 export interface Escrow {
   /** Unique ID */
   id: string;
+  /** Cooperative ID (ledger namespace) */
+  coop_id: string;
   /** Creator/initiator DID */
   creator: string;
   /** From account */
@@ -130,6 +132,8 @@ export interface Escrow {
  * Create escrow request
  */
 export interface CreateEscrowRequest {
+  /** Cooperative ID (ledger namespace) */
+  coop_id: string;
   /** From account DID */
   from_account: string;
   /** To account DID */
