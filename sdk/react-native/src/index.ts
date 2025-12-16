@@ -221,6 +221,63 @@ export {
   useDeviceSigning,
 } from './device-hooks';
 
+// Notification Types
+export type {
+  InAppNotification,
+  NotificationListResponse,
+  NotificationCountResponse,
+  ListNotificationsOptions,
+} from './notification-hooks';
+
+// Notification React Hooks
+export {
+  createNotificationAPI,
+  useNotifications,
+  useUnreadCount,
+} from './notification-hooks';
+
+// Governance Dashboard Types
+export type {
+  AmendmentsBreakdown,
+  AppealsBreakdown,
+  ActivityEvent,
+  GovernanceDashboard,
+  ParticipationStats,
+} from './governance-dashboard-hooks';
+
+// Governance Dashboard React Hooks
+export {
+  createGovernanceDashboardAPI,
+  useGovernanceDashboard,
+  useGovernanceParticipation,
+  useGovernanceOverview,
+} from './governance-dashboard-hooks';
+
+// Economic Feature Types
+export type {
+  PaymentFrequency,
+  RecurringStatus,
+  RecurringPayment,
+  CreateRecurringPaymentRequest,
+  EscrowStatus,
+  EscrowCondition,
+  Escrow,
+  CreateEscrowRequest,
+  BudgetPeriod,
+  BudgetStatus,
+  Budget,
+  CreateBudgetRequest,
+} from './economic-hooks';
+
+// Economic Feature React Hooks
+export {
+  createEconomicAPI,
+  useRecurringPayments,
+  useEscrow,
+  useBudgets,
+  useBudget,
+} from './economic-hooks';
+
 // Re-export core SDK types for convenience
 export {
   ICNClient,
