@@ -1,5 +1,6 @@
 use icn_gateway::api::recurring_payments::{
-    execute_due_payments, PaymentFrequency, RecurringPayment, RecurringPaymentStore, RecurringStatus,
+    execute_due_payments, PaymentFrequency, RecurringPayment, RecurringPaymentStore,
+    RecurringStatus,
 };
 use icn_gateway::ledger_mgr::LedgerManager;
 use icn_identity::IdentityBundle;
@@ -26,7 +27,7 @@ async fn test_scheduler_execution_flow() {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_secs();
-    
+
     let payment = RecurringPayment {
         id: "daily-pay".to_string(),
         coop_id: coop_id.clone(),
@@ -48,12 +49,12 @@ async fn test_scheduler_execution_flow() {
 
     // Execute due payments
     let results = execute_due_payments(&store, &ledger_mgr).await;
-    
+
     // Verify execution results
     assert_eq!(results.len(), 1);
     let (id, res) = &results[0];
     assert_eq!(id, "daily-pay");
-    assert!(res.is_ok(), "Payment execution failed: {:?}", res);
+    assert!(res.is_ok(), "Payment execution failed: {res:?}");
 
     // Verify store update
     let updated = store.get("daily-pay").unwrap().unwrap();
@@ -66,11 +67,13 @@ async fn test_scheduler_execution_flow() {
 
     // Verify ledger transaction
     // Note: get_balance requires currency string
-    let alice_balance = ledger_mgr.get_balance(&coop_id, alice.did(), "USD").unwrap();
+    let alice_balance = ledger_mgr
+        .get_balance(&coop_id, alice.did(), "USD")
+        .unwrap();
     let bob_balance = ledger_mgr.get_balance(&coop_id, bob.did(), "USD").unwrap();
 
-    // Since it's a credit-based ledger initiated from 0? 
-    // Wait, create_payment just appends entries. 
+    // Since it's a credit-based ledger initiated from 0?
+    // Wait, create_payment just appends entries.
     // If Alice starts at 0, she goes to -50. Bob goes to +50.
     assert_eq!(alice_balance, -50);
     assert_eq!(bob_balance, 50);

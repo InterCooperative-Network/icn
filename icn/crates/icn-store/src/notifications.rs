@@ -1,5 +1,4 @@
 use anyhow::Result;
-use icn_identity::Did;
 use serde::{Deserialize, Serialize};
 use sled::Db;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -81,11 +80,12 @@ impl NotificationStore {
         };
 
         // Store by token (primary key)
-        let key = format!("device:{}", device_token);
-        self.db.insert(key.as_bytes(), serde_json::to_vec(&device)?)?;
+        let key = format!("device:{device_token}");
+        self.db
+            .insert(key.as_bytes(), serde_json::to_vec(&device)?)?;
 
         // Update DID index (idx_device_owner:{did}:{token})
-        let idx_key = format!("idx_device_owner:{}:{}", did, device_token);
+        let idx_key = format!("idx_device_owner:{did}:{device_token}");
         self.db.insert(idx_key.as_bytes(), &[])?;
 
         Ok(())
@@ -93,7 +93,7 @@ impl NotificationStore {
 
     /// Unregister a device
     pub fn unregister_device(&self, device_token: &str) -> Result<()> {
-        let key = format!("device:{}", device_token);
+        let key = format!("device:{device_token}");
         if let Some(data) = self.db.remove(key.as_bytes())? {
             // Remove index if device existed
             if let Ok(device) = serde_json::from_slice::<RegisteredDevice>(&data) {
@@ -106,7 +106,7 @@ impl NotificationStore {
 
     /// Get all device tokens for a DID
     pub fn get_device_tokens(&self, did: &str) -> Result<Vec<String>> {
-        let prefix = format!("idx_device_owner:{}:", did);
+        let prefix = format!("idx_device_owner:{did}:");
         let mut tokens = Vec::new();
 
         for item in self.db.scan_prefix(prefix.as_bytes()) {
@@ -126,7 +126,8 @@ impl NotificationStore {
     pub fn add_notification(&self, notification: InAppNotification) -> Result<()> {
         // Store by ID (notif:{id})
         let key = format!("notif:{}", notification.id);
-        self.db.insert(key.as_bytes(), serde_json::to_vec(&notification)?)?;
+        self.db
+            .insert(key.as_bytes(), serde_json::to_vec(&notification)?)?;
 
         // Index by recipient (idx_notif_recipient:{recipient}:{created_at}:{id})
         // Using created_at in key enables chronological sorting
@@ -148,7 +149,7 @@ impl NotificationStore {
         offset: Option<usize>,
     ) -> Result<(Vec<InAppNotification>, usize)> {
         // First get all matching keys
-        let prefix = format!("idx_notif_recipient:{}:", recipient);
+        let prefix = format!("idx_notif_recipient:{recipient}:");
         let mut notifications = Vec::new();
 
         // Scan in reverse to get newest first
@@ -159,7 +160,7 @@ impl NotificationStore {
             // Format: idx_notif_recipient:{recipient}:{created_at}:{id}
             let parts: Vec<&str> = key_str.split(':').collect();
             if let Some(id) = parts.last() {
-                if let Some(data) = self.db.get(format!("notif:{}", id).as_bytes())? {
+                if let Some(data) = self.db.get(format!("notif:{id}").as_bytes())? {
                     if let Ok(notif) = serde_json::from_slice::<InAppNotification>(&data) {
                         if !unread_only || !notif.read {
                             notifications.push(notif);
@@ -173,18 +174,14 @@ impl NotificationStore {
         let limit = limit.unwrap_or(50);
         let offset = offset.unwrap_or(0);
 
-        let paged = notifications
-            .into_iter()
-            .skip(offset)
-            .take(limit)
-            .collect();
+        let paged = notifications.into_iter().skip(offset).take(limit).collect();
 
         Ok((paged, total))
     }
 
     /// Get unread count
     pub fn get_unread_count(&self, recipient: &str) -> Result<usize> {
-        let prefix = format!("idx_notif_recipient:{}:", recipient);
+        let prefix = format!("idx_notif_recipient:{recipient}:");
         let mut count = 0;
 
         for item in self.db.scan_prefix(prefix.as_bytes()) {
@@ -192,7 +189,7 @@ impl NotificationStore {
             let key_str = std::str::from_utf8(&key)?;
             let parts: Vec<&str> = key_str.split(':').collect();
             if let Some(id) = parts.last() {
-                if let Some(data) = self.db.get(format!("notif:{}", id).as_bytes())? {
+                if let Some(data) = self.db.get(format!("notif:{id}").as_bytes())? {
                     if let Ok(notif) = serde_json::from_slice::<InAppNotification>(&data) {
                         if !notif.read {
                             count += 1;
@@ -206,10 +203,10 @@ impl NotificationStore {
 
     /// Mark notification as read
     pub fn mark_read(&self, recipient: &str, notification_id: &str) -> Result<bool> {
-        let key = format!("notif:{}", notification_id);
+        let key = format!("notif:{notification_id}");
         if let Some(data) = self.db.get(key.as_bytes())? {
             let mut notif: InAppNotification = serde_json::from_slice(&data)?;
-            
+
             // Verify recipient matches
             if notif.recipient != recipient {
                 return Ok(false);
@@ -218,7 +215,8 @@ impl NotificationStore {
             if !notif.read {
                 notif.read = true;
                 notif.read_at = Some(SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs());
-                self.db.insert(key.as_bytes(), serde_json::to_vec(&notif)?)?;
+                self.db
+                    .insert(key.as_bytes(), serde_json::to_vec(&notif)?)?;
             }
             Ok(true)
         } else {
@@ -228,7 +226,7 @@ impl NotificationStore {
 
     /// Mark all as read
     pub fn mark_all_read(&self, recipient: &str) -> Result<usize> {
-        let prefix = format!("idx_notif_recipient:{}:", recipient);
+        let prefix = format!("idx_notif_recipient:{recipient}:");
         let mut count = 0;
 
         for item in self.db.scan_prefix(prefix.as_bytes()) {
@@ -236,13 +234,15 @@ impl NotificationStore {
             let key_str = std::str::from_utf8(&key)?;
             let parts: Vec<&str> = key_str.split(':').collect();
             if let Some(id) = parts.last() {
-                let notif_key = format!("notif:{}", id);
+                let notif_key = format!("notif:{id}");
                 if let Some(data) = self.db.get(notif_key.as_bytes())? {
                     if let Ok(mut notif) = serde_json::from_slice::<InAppNotification>(&data) {
                         if !notif.read {
                             notif.read = true;
-                            notif.read_at = Some(SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs());
-                            self.db.insert(notif_key.as_bytes(), serde_json::to_vec(&notif)?)?;
+                            notif.read_at =
+                                Some(SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs());
+                            self.db
+                                .insert(notif_key.as_bytes(), serde_json::to_vec(&notif)?)?;
                             count += 1;
                         }
                     }
@@ -254,10 +254,10 @@ impl NotificationStore {
 
     /// Delete notification
     pub fn delete_notification(&self, recipient: &str, notification_id: &str) -> Result<bool> {
-        let key = format!("notif:{}", notification_id);
+        let key = format!("notif:{notification_id}");
         if let Some(data) = self.db.get(key.as_bytes())? {
             let notif: InAppNotification = serde_json::from_slice(&data)?;
-            
+
             if notif.recipient != recipient {
                 return Ok(false);
             }
@@ -285,13 +285,14 @@ impl NotificationStore {
         // key: log:{notification_id}:{timestamp}
         // This allows multiple log entries per notification, ordered by time
         let key = format!("log:{}:{}", entry.notification_id, entry.timestamp);
-        self.db.insert(key.as_bytes(), serde_json::to_vec(&entry)?)?;
+        self.db
+            .insert(key.as_bytes(), serde_json::to_vec(&entry)?)?;
         Ok(())
     }
 
     /// Get delivery logs for a notification
     pub fn get_delivery_logs(&self, notification_id: &str) -> Result<Vec<DeliveryLogEntry>> {
-        let prefix = format!("log:{}:", notification_id);
+        let prefix = format!("log:{notification_id}:");
         let mut logs = Vec::new();
 
         for item in self.db.scan_prefix(prefix.as_bytes()) {

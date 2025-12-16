@@ -1,7 +1,7 @@
 use icn_gateway::error::GatewayError;
 use icn_gateway::ledger_mgr::LedgerManager;
-use icn_store::budgets::{Budget, BudgetPeriod, BudgetStatus, BudgetStore};
 use icn_identity::IdentityBundle;
+use icn_store::budgets::{Budget, BudgetPeriod, BudgetStatus, BudgetStore};
 use std::sync::Arc;
 use std::time::SystemTime;
 
@@ -48,13 +48,7 @@ fn test_budget_enforcement() {
     budget_store.insert(budget.clone()).unwrap();
 
     // 2. Make Payment (50) -> Success
-    let res = ledger_mgr.create_payment(
-        &coop_id,
-        alice.did(),
-        bob.did(),
-        50,
-        currency.clone(),
-    );
+    let res = ledger_mgr.create_payment(&coop_id, alice.did(), bob.did(), 50, currency.clone());
     assert!(res.is_ok());
 
     // Verify spent updated
@@ -62,18 +56,13 @@ fn test_budget_enforcement() {
     assert_eq!(updated_budget.spent, 50);
 
     // 3. Make Payment (60) -> Fail (Total 110 > 100)
-    let res_fail = ledger_mgr.create_payment(
-        &coop_id,
-        alice.did(),
-        bob.did(),
-        60,
-        currency.clone(),
-    );
-    
+    let res_fail =
+        ledger_mgr.create_payment(&coop_id, alice.did(), bob.did(), 60, currency.clone());
+
     assert!(res_fail.is_err());
     match res_fail {
         Err(GatewayError::BudgetExceeded(_)) => (),
-        _ => panic!("Expected BudgetExceeded error, got {:?}", res_fail),
+        _ => panic!("Expected BudgetExceeded error, got {res_fail:?}"),
     }
 
     // Verify spent NOT updated (or at least not for the failed tx)
@@ -81,31 +70,21 @@ fn test_budget_enforcement() {
     assert_eq!(updated_budget_2.spent, 50);
 
     // 4. Make Payment (50) -> Success (Total 100 == 100)
-    let res_success = ledger_mgr.create_payment(
-        &coop_id,
-        alice.did(),
-        bob.did(),
-        50,
-        currency.clone(),
-    );
+    let res_success =
+        ledger_mgr.create_payment(&coop_id, alice.did(), bob.did(), 50, currency.clone());
     assert!(res_success.is_ok());
 
     // Verify spent updated
     let updated_budget_3 = budget_store.get("budget-1").unwrap().unwrap();
     assert_eq!(updated_budget_3.spent, 100);
     assert!(updated_budget_3.is_exceeded());
-    
+
     // Status should update to Exceeded?
     // The implementation of record_spending updates status if exceeded.
     assert_eq!(updated_budget_3.status, BudgetStatus::Exceeded);
 
     // 5. Make Payment (1) -> Fail (Status is Exceeded or Limit hit)
-    let res_fail_2 = ledger_mgr.create_payment(
-        &coop_id,
-        alice.did(),
-        bob.did(),
-        1,
-        currency.clone(),
-    );
+    let res_fail_2 =
+        ledger_mgr.create_payment(&coop_id, alice.did(), bob.did(), 1, currency.clone());
     assert!(res_fail_2.is_err());
 }

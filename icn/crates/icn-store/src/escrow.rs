@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use sled::Db;
 use std::collections::HashSet;
@@ -84,7 +84,7 @@ impl EscrowStore {
 
     /// Get an escrow by ID
     pub fn get(&self, id: &str) -> Result<Option<Escrow>> {
-        let key = format!("escrow:{}", id);
+        let key = format!("escrow:{id}");
         if let Some(value) = self.db.get(key.as_bytes())? {
             let escrow = serde_json::from_slice(&value)?;
             Ok(Some(escrow))
@@ -119,7 +119,7 @@ impl EscrowStore {
     pub fn delete(&self, id: &str) -> Result<()> {
         if let Some(escrow) = self.get(id)? {
             self.remove_indices(&escrow)?;
-            let key = format!("escrow:{}", id);
+            let key = format!("escrow:{id}");
             self.db.remove(key.as_bytes())?;
         }
         Ok(())
@@ -132,11 +132,11 @@ impl EscrowStore {
 
         // 1. Scan creator index
         // Prefix includes the trailing colon to strictly match the DID segment
-        let creator_prefix = format!("idx_escrow_creator:{}:", did);
+        let creator_prefix = format!("idx_escrow_creator:{did}:");
         for item in self.db.scan_prefix(creator_prefix.as_bytes()) {
             let (key, _) = item?;
             let key_str = std::str::from_utf8(&key)?;
-            
+
             if let Some(id) = key_str.strip_prefix(&creator_prefix) {
                 if seen_ids.insert(id.to_string()) {
                     if let Some(escrow) = self.get(id)? {
@@ -147,11 +147,11 @@ impl EscrowStore {
         }
 
         // 2. Scan beneficiary index
-        let beneficiary_prefix = format!("idx_escrow_beneficiary:{}:", did);
+        let beneficiary_prefix = format!("idx_escrow_beneficiary:{did}:");
         for item in self.db.scan_prefix(beneficiary_prefix.as_bytes()) {
             let (key, _) = item?;
             let key_str = std::str::from_utf8(&key)?;
-            
+
             if let Some(id) = key_str.strip_prefix(&beneficiary_prefix) {
                 if seen_ids.insert(id.to_string()) {
                     if let Some(escrow) = self.get(id)? {

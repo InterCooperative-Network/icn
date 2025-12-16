@@ -1,10 +1,10 @@
 //! ICN Store - Persistent key-value storage abstraction
 
-pub mod quotas;
 pub mod budgets;
-pub mod notifications;
-pub mod recurring_payments;
 pub mod escrow;
+pub mod notifications;
+pub mod quotas;
+pub mod recurring_payments;
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};

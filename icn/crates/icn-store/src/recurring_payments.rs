@@ -1,7 +1,6 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use sled::Db;
-use std::time::SystemTime;
 
 /// Payment frequency
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -83,7 +82,7 @@ impl RecurringPaymentStore {
 
     /// Get a recurring payment by ID
     pub fn get(&self, id: &str) -> Result<Option<RecurringPayment>> {
-        let key = format!("payment:{}", id);
+        let key = format!("payment:{id}");
         if let Some(value) = self.db.get(key.as_bytes())? {
             let payment = serde_json::from_slice(&value)?;
             Ok(Some(payment))
@@ -121,7 +120,7 @@ impl RecurringPaymentStore {
         // Get old payment to remove indices
         if let Some(payment) = self.get(id)? {
             self.remove_indices(&payment)?;
-            let key = format!("payment:{}", id);
+            let key = format!("payment:{id}");
             self.db.remove(key.as_bytes())?;
         }
         Ok(())
@@ -129,7 +128,7 @@ impl RecurringPaymentStore {
 
     /// List payments by owner
     pub fn list_by_owner(&self, owner: &str) -> Result<Vec<RecurringPayment>> {
-        let prefix = format!("idx_owner:{}", owner);
+        let prefix = format!("idx_owner:{owner}");
         let mut payments = Vec::new();
 
         for item in self.db.scan_prefix(prefix.as_bytes()) {
@@ -154,7 +153,7 @@ impl RecurringPaymentStore {
         // Since we need to check status == Active and next_execution <= now
         // An index on next_execution would help start the scan, but we still need to filter by status.
         // For iteration 1, we filter in memory from list().
-        
+
         let payments = self.list()?;
         Ok(payments
             .into_iter()
@@ -266,7 +265,7 @@ mod tests {
 
     impl Default for RecurringPayment {
         fn default() -> Self {
-             Self {
+            Self {
                 id: "".to_string(),
                 coop_id: "".to_string(),
                 owner: "".to_string(),

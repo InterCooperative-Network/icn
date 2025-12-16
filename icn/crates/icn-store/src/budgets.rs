@@ -113,7 +113,7 @@ impl BudgetStore {
 
     /// Get a budget by ID
     pub fn get(&self, id: &str) -> Result<Option<Budget>> {
-        let key = format!("budget:{}", id);
+        let key = format!("budget:{id}");
         if let Some(value) = self.db.get(key.as_bytes())? {
             let budget = serde_json::from_slice(&value)?;
             Ok(Some(budget))
@@ -149,7 +149,7 @@ impl BudgetStore {
     pub fn delete(&self, id: &str) -> Result<()> {
         if let Some(budget) = self.get(id)? {
             self.remove_indices(&budget)?;
-            let key = format!("budget:{}", id);
+            let key = format!("budget:{id}");
             self.db.remove(key.as_bytes())?;
         }
         Ok(())
@@ -158,14 +158,14 @@ impl BudgetStore {
     /// List budgets by owner
     pub fn list_by_owner(&self, did: &str) -> Result<Vec<Budget>> {
         let mut budgets = Vec::new();
-        let prefix = format!("idx_budget_owner:{}:", did);
-        
+        let prefix = format!("idx_budget_owner:{did}:");
+
         for item in self.db.scan_prefix(prefix.as_bytes()) {
             let (key, _) = item?;
             let key_str = std::str::from_utf8(&key)?;
-            
+
             if let Some(id) = key_str.strip_prefix(&prefix) {
-                 if let Some(budget) = self.get(id)? {
+                if let Some(budget) = self.get(id)? {
                     budgets.push(budget);
                 }
             }
@@ -173,7 +173,7 @@ impl BudgetStore {
 
         Ok(budgets)
     }
-    
+
     // --- Index Management ---
 
     fn update_indices(&self, budget: &Budget) -> Result<()> {
@@ -232,7 +232,7 @@ impl BudgetStore {
                     budget.notified_thresholds.push(threshold);
                     notified_budgets.push(budget.id.clone());
                 }
-                
+
                 // Update in store
                 self.insert(budget)?;
             }

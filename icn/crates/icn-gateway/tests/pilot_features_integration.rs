@@ -148,7 +148,7 @@ async fn test_budget_tracking() {
 
     // Record spending
     let notified = store.record_spending("alice-spending", 850).unwrap();
-    
+
     assert_eq!(notified.len(), 1); // 85% triggers 80% threshold
 
     let retrieved = store.get("budget-1").unwrap().unwrap();
