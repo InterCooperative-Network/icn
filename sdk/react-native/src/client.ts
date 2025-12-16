@@ -2386,6 +2386,66 @@ export class ICNMobileClient extends ICNClient {
   }
 
   // ============================================================================
+  // Governance Dashboard APIs
+  // ============================================================================
+
+  /**
+   * Get governance dashboard for a domain
+   *
+   * @param domainId - The governance domain ID
+   * @returns Dashboard with amendments/appeals stats and recent activity
+   */
+  async getGovernanceDashboard(
+    domainId: string
+  ): Promise<import('./governance-dashboard-hooks').GovernanceDashboard> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(
+      `${baseUrl}/v1/governance/${encodeURIComponent(domainId)}/dashboard`,
+      {
+        method: 'GET',
+        headers: {
+          ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to get governance dashboard: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Get participation stats for a domain
+   *
+   * @param domainId - The governance domain ID
+   * @returns Participation statistics (voters, rates, averages)
+   */
+  async getGovernanceParticipation(
+    domainId: string
+  ): Promise<import('./governance-dashboard-hooks').ParticipationStats> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(
+      `${baseUrl}/v1/governance/${encodeURIComponent(domainId)}/participation`,
+      {
+        method: 'GET',
+        headers: {
+          ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to get participation stats: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  // ============================================================================
   // Economic APIs (Recurring Payments, Escrow, Budgets)
   // ============================================================================
 
