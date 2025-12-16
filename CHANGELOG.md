@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added - Infrastructure Improvements (2025-12-16)
 
+**FCM JWT Signing for Push Notifications** ([icn/crates/icn-gateway/src/fcm_client.rs](icn/crates/icn-gateway/src/fcm_client.rs)):
+- Implemented proper RS256 JWT signing using `jsonwebtoken` crate
+- FCM client now authenticates via Google OAuth2 with service account credentials
+- Production-ready push notification delivery to Android and iOS devices
+
 **Persistent Enrollment Session Storage** ([icn/crates/icn-gateway/src/api/sdis/simple_enrollment.rs](icn/crates/icn-gateway/src/api/sdis/simple_enrollment.rs)):
 - Enrollment sessions now persist across gateway restarts
 - Added enrollment session storage to CommonsStore with LRU cache
