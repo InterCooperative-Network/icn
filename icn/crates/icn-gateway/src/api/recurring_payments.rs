@@ -71,6 +71,12 @@ pub struct RecurringPaymentStore {
     payments: Arc<RwLock<HashMap<String, RecurringPayment>>>,
 }
 
+impl Default for RecurringPaymentStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RecurringPaymentStore {
     pub fn new() -> Self {
         Self {
@@ -79,7 +85,10 @@ impl RecurringPaymentStore {
     }
 
     pub async fn insert(&self, payment: RecurringPayment) {
-        self.payments.write().await.insert(payment.id.clone(), payment);
+        self.payments
+            .write()
+            .await
+            .insert(payment.id.clone(), payment);
     }
 
     pub async fn get(&self, id: &str) -> Option<RecurringPayment> {
@@ -115,9 +124,7 @@ impl RecurringPaymentStore {
             .read()
             .await
             .values()
-            .filter(|p| {
-                p.status == RecurringStatus::Active && p.next_execution <= now
-            })
+            .filter(|p| p.status == RecurringStatus::Active && p.next_execution <= now)
             .cloned()
             .collect()
     }
@@ -216,8 +223,7 @@ pub async fn list_recurring_payments(
             "completed" => RecurringStatus::Completed,
             _ => {
                 return Err(GatewayError::BadRequest(format!(
-                    "Invalid status: {}",
-                    status_str
+                    "Invalid status: {status_str}"
                 )))
             }
         };
@@ -247,7 +253,7 @@ pub async fn get_recurring_payment(
     let payment = store
         .get(&payment_id)
         .await
-        .ok_or_else(|| GatewayError::NotFound(format!("Payment not found: {}", payment_id)))?;
+        .ok_or_else(|| GatewayError::NotFound(format!("Payment not found: {payment_id}")))?;
 
     // Verify ownership
     if payment.owner != owner_did {
@@ -277,7 +283,7 @@ pub async fn update_recurring_payment(
     let mut payment = store
         .get(&payment_id)
         .await
-        .ok_or_else(|| GatewayError::NotFound(format!("Payment not found: {}", payment_id)))?;
+        .ok_or_else(|| GatewayError::NotFound(format!("Payment not found: {payment_id}")))?;
 
     // Verify ownership
     if payment.owner != owner_did {
@@ -327,7 +333,7 @@ pub async fn cancel_recurring_payment(
     let mut payment = store
         .get(&payment_id)
         .await
-        .ok_or_else(|| GatewayError::NotFound(format!("Payment not found: {}", payment_id)))?;
+        .ok_or_else(|| GatewayError::NotFound(format!("Payment not found: {payment_id}")))?;
 
     // Verify ownership
     if payment.owner != owner_did {

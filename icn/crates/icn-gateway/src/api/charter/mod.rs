@@ -434,9 +434,7 @@ fn format_timestamp(timestamp: u64) -> String {
     // Simple ISO-like format
     use std::time::{Duration, UNIX_EPOCH};
     let datetime = UNIX_EPOCH + Duration::from_secs(timestamp);
-    let duration_since_epoch = datetime
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default();
+    let duration_since_epoch = datetime.duration_since(UNIX_EPOCH).unwrap_or_default();
     let secs = duration_since_epoch.as_secs();
 
     // Convert to date/time components (simplified)
@@ -448,7 +446,9 @@ fn format_timestamp(timestamp: u64) -> String {
     let hours = (secs % 86400) / 3600;
     let mins = (secs % 3600) / 60;
 
-    format!("{:04}-{:02}-{:02} {:02}:{:02} UTC", years, months, day, hours, mins)
+    format!(
+        "{years:04}-{months:02}-{day:02} {hours:02}:{mins:02} UTC"
+    )
 }
 
 fn truncate_did(did: &str) -> String {
@@ -509,7 +509,7 @@ pub async fn get_charter_founders(
         total_founders: total,
         minimum_required: min_founders,
         ready_for_activation: total >= min_founders,
-        founders_needed: if total >= min_founders { 0 } else { min_founders - total },
+        founders_needed: min_founders.saturating_sub(total),
         founders,
     }))
 }
@@ -554,7 +554,10 @@ pub async fn get_charter_timeline(
             timestamp: founder.timestamp,
             date_time: format_timestamp(founder.timestamp),
             actor: Some(founder.did.to_string()),
-            metadata: founder.role.as_ref().map(|r| serde_json::json!({"role": r})),
+            metadata: founder
+                .role
+                .as_ref()
+                .map(|r| serde_json::json!({"role": r})),
         });
     }
 
@@ -596,7 +599,7 @@ pub async fn get_charter_timeline(
     if let CharterStatus::Suspended { reason } = &charter.status {
         events.push(TimelineEvent {
             event_type: "charter_suspended".to_string(),
-            description: format!("Charter was suspended: {}", reason),
+            description: format!("Charter was suspended: {reason}"),
             timestamp: charter.created_at, // Would need actual suspension timestamp
             date_time: format_timestamp(charter.created_at),
             actor: None,

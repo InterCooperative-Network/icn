@@ -134,16 +134,20 @@ impl RevocationRegistry {
 
     /// Check if a scope applies to another scope
     /// Global applies everywhere, Federation applies within federation, etc.
-    fn scope_applies(&self, revocation_scope: &RevocationScope, check_scope: &RevocationScope) -> bool {
+    fn scope_applies(
+        &self,
+        revocation_scope: &RevocationScope,
+        check_scope: &RevocationScope,
+    ) -> bool {
         match revocation_scope {
             RevocationScope::Global => true, // Global applies everywhere
             RevocationScope::Federation { federation_id } => {
                 // Federation scope applies to the federation and its jurisdictions
                 match check_scope {
                     RevocationScope::Global => false,
-                    RevocationScope::Federation { federation_id: check_fed } => {
-                        federation_id == check_fed
-                    }
+                    RevocationScope::Federation {
+                        federation_id: check_fed,
+                    } => federation_id == check_fed,
                     RevocationScope::Jurisdiction { jurisdiction_id } => {
                         // Check if jurisdiction is within this federation
                         // For now, simple check - in practice would need federation membership lookup
@@ -154,9 +158,9 @@ impl RevocationRegistry {
             RevocationScope::Jurisdiction { jurisdiction_id } => {
                 // Jurisdiction scope only applies within that jurisdiction
                 match check_scope {
-                    RevocationScope::Jurisdiction { jurisdiction_id: check_jur } => {
-                        jurisdiction_id == check_jur
-                    }
+                    RevocationScope::Jurisdiction {
+                        jurisdiction_id: check_jur,
+                    } => jurisdiction_id == check_jur,
                     _ => false,
                 }
             }
@@ -230,7 +234,11 @@ impl RevocationRegistry {
             Err(_) => return Vec::new(),
         };
 
-        records.values().filter(|r| r.is_effective()).cloned().collect()
+        records
+            .values()
+            .filter(|r| r.is_effective())
+            .cloned()
+            .collect()
     }
 
     /// Update a revocation record (for appeals)
@@ -581,9 +589,8 @@ mod tests {
             .unwrap();
 
         assert!(registry.is_revoked_in_jurisdiction("member-jur", &coop_id));
-        assert!(!registry.is_revoked_in_jurisdiction(
-            "member-jur",
-            &JurisdictionId::coop("other-coop")
-        ));
+        assert!(
+            !registry.is_revoked_in_jurisdiction("member-jur", &JurisdictionId::coop("other-coop"))
+        );
     }
 }

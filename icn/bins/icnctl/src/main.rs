@@ -6979,7 +6979,10 @@ async fn handle_steward_command(
             }
         }
 
-        StewardCommands::Retire { steward_id, gateway } => {
+        StewardCommands::Retire {
+            steward_id,
+            gateway,
+        } => {
             println!("Retire from Stewardship");
             println!("=======================\n");
 
@@ -7651,7 +7654,7 @@ async fn handle_charter_command(
             println!();
 
             // Create signature over charter ID
-            let message = format!("charter-sign:{charter_id}:{}", did.to_string());
+            let message = format!("charter-sign:{charter_id}:{did}");
             let signature = keypair.sign(message.as_bytes());
             let signature_hex = hex::encode(signature.to_bytes());
 
@@ -7686,7 +7689,9 @@ async fn handle_charter_command(
                         if let Some(ready) = body.get("ready_for_activation") {
                             if ready.as_bool().unwrap_or(false) {
                                 println!("Charter is ready for activation!");
-                                println!("Run: icnctl charter ratify {charter_id} --coop-id {coop_id}");
+                                println!(
+                                    "Run: icnctl charter ratify {charter_id} --coop-id {coop_id}"
+                                );
                             } else if let Some(needed) = body.get("founders_needed") {
                                 println!("Founders needed for activation: {needed}");
                             }
@@ -7921,14 +7926,14 @@ async fn handle_amendment_command(
                         let a: serde_json::Value = resp.json().await?;
                         println!("ID:           {}", a["id"].as_str().unwrap_or("-"));
                         println!("Title:        {}", a["title"].as_str().unwrap_or("-"));
-                        println!("Type:         {}", a["amendment_type"].as_str().unwrap_or("-"));
+                        println!(
+                            "Type:         {}",
+                            a["amendment_type"].as_str().unwrap_or("-")
+                        );
                         println!("Scope:        {}", a["scope"].as_str().unwrap_or("-"));
                         println!("Status:       {}", a["status"].as_str().unwrap_or("-"));
                         println!("Proposer:     {}", a["proposer"].as_str().unwrap_or("-"));
-                        println!(
-                            "Description:  {}",
-                            a["description"].as_str().unwrap_or("-")
-                        );
+                        println!("Description:  {}", a["description"].as_str().unwrap_or("-"));
 
                         if let Some(changes) = a["changes"].as_array() {
                             println!("\nChanges ({}):", changes.len());
@@ -8115,7 +8120,10 @@ async fn handle_amendment_command(
                         println!("Vote recorded!");
                         println!();
                         println!("  Amendment:  {amendment_id}");
-                        println!("  Your vote:  {}", if approved { "APPROVE" } else { "REJECT" });
+                        println!(
+                            "  Your vote:  {}",
+                            if approved { "APPROVE" } else { "REJECT" }
+                        );
                         if let Some(c) = comment {
                             println!("  Comment:    {c}");
                         }
@@ -8465,7 +8473,10 @@ async fn handle_appeal_command(
                             println!("Respondent:  {respondent}");
                         }
                         println!("Statement:   {}", a["statement"].as_str().unwrap_or("-"));
-                        println!("Remedy:      {}", a["requested_remedy"].as_str().unwrap_or("-"));
+                        println!(
+                            "Remedy:      {}",
+                            a["requested_remedy"].as_str().unwrap_or("-")
+                        );
 
                         if let Some(grounds) = a["grounds"].as_array() {
                             println!("\nGrounds ({}):", grounds.len());
@@ -8509,7 +8520,13 @@ async fn handle_appeal_command(
 
                         if let Some(outcome) = a["outcome"].as_object() {
                             println!("\nOutcome:");
-                            println!("  Result: {}", outcome.get("result").and_then(|v| v.as_str()).unwrap_or("-"));
+                            println!(
+                                "  Result: {}",
+                                outcome
+                                    .get("result")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("-")
+                            );
                             if let Some(reason) = outcome.get("reason").and_then(|v| v.as_str()) {
                                 println!("  Reason: {reason}");
                             }

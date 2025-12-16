@@ -602,22 +602,34 @@ mod tests {
 
         // Compute has lowest limits (10)
         for _ in 0..10 {
-            assert!(limiter.check_rate_limit(did, EndpointCategory::Compute).is_ok());
+            assert!(limiter
+                .check_rate_limit(did, EndpointCategory::Compute)
+                .is_ok());
         }
         // 11th compute request should fail
-        assert!(limiter.check_rate_limit(did, EndpointCategory::Compute).is_err());
+        assert!(limiter
+            .check_rate_limit(did, EndpointCategory::Compute)
+            .is_err());
 
         // But governance still has tokens (30)
         for _ in 0..30 {
-            assert!(limiter.check_rate_limit(did, EndpointCategory::Governance).is_ok());
+            assert!(limiter
+                .check_rate_limit(did, EndpointCategory::Governance)
+                .is_ok());
         }
-        assert!(limiter.check_rate_limit(did, EndpointCategory::Governance).is_err());
+        assert!(limiter
+            .check_rate_limit(did, EndpointCategory::Governance)
+            .is_err());
 
         // And read has even more tokens (200)
         for _ in 0..200 {
-            assert!(limiter.check_rate_limit(did, EndpointCategory::Read).is_ok());
+            assert!(limiter
+                .check_rate_limit(did, EndpointCategory::Read)
+                .is_ok());
         }
-        assert!(limiter.check_rate_limit(did, EndpointCategory::Read).is_err());
+        assert!(limiter
+            .check_rate_limit(did, EndpointCategory::Read)
+            .is_err());
     }
 
     #[test]
@@ -628,15 +640,23 @@ mod tests {
 
         // Exhaust compute bucket for alice
         for _ in 0..10 {
-            assert!(limiter.check_rate_limit(did1, EndpointCategory::Compute).is_ok());
+            assert!(limiter
+                .check_rate_limit(did1, EndpointCategory::Compute)
+                .is_ok());
         }
-        assert!(limiter.check_rate_limit(did1, EndpointCategory::Compute).is_err());
+        assert!(limiter
+            .check_rate_limit(did1, EndpointCategory::Compute)
+            .is_err());
 
         // Bob should still have full compute quota
         for _ in 0..10 {
-            assert!(limiter.check_rate_limit(did2, EndpointCategory::Compute).is_ok());
+            assert!(limiter
+                .check_rate_limit(did2, EndpointCategory::Compute)
+                .is_ok());
         }
-        assert!(limiter.check_rate_limit(did2, EndpointCategory::Compute).is_err());
+        assert!(limiter
+            .check_rate_limit(did2, EndpointCategory::Compute)
+            .is_err());
     }
 
     #[test]

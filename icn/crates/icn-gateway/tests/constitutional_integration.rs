@@ -95,7 +95,11 @@ async fn test_amendment_full_lifecycle() {
     commons_mgr.store_amendment(amendment).await.unwrap();
 
     // Verify it's in Draft status
-    let stored = commons_mgr.get_amendment(&amendment_id).await.unwrap().unwrap();
+    let stored = commons_mgr
+        .get_amendment(&amendment_id)
+        .await
+        .unwrap()
+        .unwrap();
     assert!(matches!(
         stored.status,
         icn_governance::amendment::AmendmentStatus::Draft
@@ -122,7 +126,11 @@ async fn test_amendment_full_lifecycle() {
     ));
 
     // Verify the store has the voting status
-    let stored_voting = commons_mgr.get_amendment(&amendment_id).await.unwrap().unwrap();
+    let stored_voting = commons_mgr
+        .get_amendment(&amendment_id)
+        .await
+        .unwrap()
+        .unwrap();
     assert!(
         stored_voting.status.is_active(),
         "Expected active status in store, got {:?}",
@@ -150,7 +158,11 @@ async fn test_amendment_full_lifecycle() {
         .unwrap();
 
     // Verify the amendment was auto-ratified (1/1 = 100% > 67% threshold)
-    let ratified = commons_mgr.get_amendment(&amendment_id).await.unwrap().unwrap();
+    let ratified = commons_mgr
+        .get_amendment(&amendment_id)
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(ratified.ratifications.len(), 1);
     assert!(matches!(
         ratified.status,
@@ -340,7 +352,11 @@ async fn test_appeal_withdrawal() {
 
     // Withdraw the appeal
     let withdrawn = commons_mgr
-        .withdraw_appeal(&appeal_id, &appellant_did, Some("Resolved privately".to_string()))
+        .withdraw_appeal(
+            &appeal_id,
+            &appellant_did,
+            Some("Resolved privately".to_string()),
+        )
         .await
         .unwrap();
 

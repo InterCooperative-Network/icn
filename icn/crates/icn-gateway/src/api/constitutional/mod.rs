@@ -46,10 +46,9 @@ use crate::commons_mgr::CommonsManager;
 use crate::error::{GatewayError, Result};
 use crate::middleware::{get_claims, require_scope};
 use icn_governance::{
-    Amendment, AmendmentChange, AmendmentId, AmendmentScope, AmendmentType, Appeal,
-    AppealEvidence, AppealGrounds, AppealId, AppealOutcome, AppealRemedy, AppealResponse,
-    AppealScope, AppealType, ChangeTarget, ChangeType, EvidenceType, Ratification, RatifierType,
-    ResponseType,
+    Amendment, AmendmentChange, AmendmentId, AmendmentScope, AmendmentType, Appeal, AppealEvidence,
+    AppealGrounds, AppealId, AppealOutcome, AppealRemedy, AppealResponse, AppealScope, AppealType,
+    ChangeTarget, ChangeType, EvidenceType, Ratification, RatifierType, ResponseType,
 };
 use icn_identity::Did;
 
@@ -311,10 +310,7 @@ fn parse_appeal_type(req: &AppealTypeRequest) -> Result<AppealType> {
             id.copy_from_slice(&id_bytes);
             Ok(AppealType::Revocation {
                 revocation_id: id,
-                revocation_type: req
-                    .details
-                    .clone()
-                    .unwrap_or_else(|| "Unknown".to_string()),
+                revocation_type: req.details.clone().unwrap_or_else(|| "Unknown".to_string()),
             })
         }
         "suspension" => Ok(AppealType::Suspension {
@@ -322,30 +318,21 @@ fn parse_appeal_type(req: &AppealTypeRequest) -> Result<AppealType> {
                 .target_id
                 .clone()
                 .unwrap_or_else(|| "Unknown".to_string()),
-            suspension_type: req
-                .details
-                .clone()
-                .unwrap_or_else(|| "Unknown".to_string()),
+            suspension_type: req.details.clone().unwrap_or_else(|| "Unknown".to_string()),
         }),
         "governance_decision" | "governancedecision" => Ok(AppealType::GovernanceDecision {
             proposal_id: req
                 .proposal_id
                 .clone()
                 .unwrap_or_else(|| "Unknown".to_string()),
-            decision: req
-                .details
-                .clone()
-                .unwrap_or_else(|| "Unknown".to_string()),
+            decision: req.details.clone().unwrap_or_else(|| "Unknown".to_string()),
         }),
         "dispute_resolution" | "disputeresolution" => Ok(AppealType::DisputeResolution {
             dispute_id: req
                 .dispute_id
                 .clone()
                 .unwrap_or_else(|| "Unknown".to_string()),
-            resolution: req
-                .details
-                .clone()
-                .unwrap_or_else(|| "Unknown".to_string()),
+            resolution: req.details.clone().unwrap_or_else(|| "Unknown".to_string()),
         }),
         "membership_denial" | "membershipdenial" => Ok(AppealType::MembershipDenial {
             jurisdiction_id: req
@@ -367,10 +354,7 @@ fn parse_appeal_type(req: &AppealTypeRequest) -> Result<AppealType> {
                 .map_err(|e| GatewayError::BadRequest(format!("Invalid steward DID: {e}")))?;
             Ok(AppealType::StewardAction {
                 steward_did: did,
-                action: req
-                    .details
-                    .clone()
-                    .unwrap_or_else(|| "Unknown".to_string()),
+                action: req.details.clone().unwrap_or_else(|| "Unknown".to_string()),
             })
         }
         other => Ok(AppealType::Other {
@@ -832,9 +816,7 @@ pub async fn add_amendment_change(
     };
 
     // Add change
-    let amendment = commons_mgr
-        .add_amendment_change(&id_hex, change)
-        .await?;
+    let amendment = commons_mgr.add_amendment_change(&id_hex, change).await?;
 
     Ok(HttpResponse::Ok().json(amendment_to_response(&amendment)))
 }
@@ -1220,7 +1202,10 @@ pub async fn withdraw_appeal(
     let mut appeal_id = [0u8; 32];
     appeal_id.copy_from_slice(&id_bytes);
 
-    let reason = body.get("reason").and_then(|v| v.as_str()).map(String::from);
+    let reason = body
+        .get("reason")
+        .and_then(|v| v.as_str())
+        .map(String::from);
 
     let appeal = commons_mgr
         .withdraw_appeal(&AppealId::new(appeal_id), &caller, reason)

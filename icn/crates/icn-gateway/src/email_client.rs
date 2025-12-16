@@ -52,7 +52,11 @@ impl SmtpConfig {
     }
 
     /// Create configuration for common providers
-    pub fn sendgrid(api_key: impl Into<String>, from_address: impl Into<String>, from_name: impl Into<String>) -> Self {
+    pub fn sendgrid(
+        api_key: impl Into<String>,
+        from_address: impl Into<String>,
+        from_name: impl Into<String>,
+    ) -> Self {
         Self::new(
             "smtp.sendgrid.net",
             587,
@@ -69,7 +73,7 @@ impl SmtpConfig {
             587,
             "api",
             api_key,
-            format!("notifications@{}", domain),
+            format!("notifications@{domain}"),
             from_name,
         )
     }
@@ -94,7 +98,11 @@ pub struct EmailMessage {
 
 impl EmailMessage {
     /// Create a new email message
-    pub fn new(to: impl Into<String>, subject: impl Into<String>, text_body: impl Into<String>) -> Self {
+    pub fn new(
+        to: impl Into<String>,
+        subject: impl Into<String>,
+        text_body: impl Into<String>,
+    ) -> Self {
         Self {
             to: to.into(),
             subject: subject.into(),
@@ -279,7 +287,13 @@ impl EmailTemplates {
     <p style="color: #666; font-size: 12px;">{}</p>
 </body>
 </html>"#,
-            title, body, amount, currency, truncate_did(from), self.base_url, self.coop_name
+            title,
+            body,
+            amount,
+            currency,
+            truncate_did(from),
+            self.base_url,
+            self.coop_name
         );
 
         (subject, text, html)
@@ -309,7 +323,11 @@ impl EmailTemplates {
             "{}\n\nAmount: {} {}\nTo: {}\n\nView your account at: {}/account",
             body, amount, currency, to, self.base_url
         );
-        let html = self.simple_notification_html(title, body, &format!("Amount: {} {} | To: {}", amount, currency, truncate_did(to)));
+        let html = self.simple_notification_html(
+            title,
+            body,
+            &format!("Amount: {} {} | To: {}", amount, currency, truncate_did(to)),
+        );
 
         (subject, text, html)
     }
@@ -355,8 +373,12 @@ impl EmailTemplates {
         _data: Option<&serde_json::Value>,
     ) -> (String, String, String) {
         let subject = format!("[{}] {}", self.coop_name, title);
-        let text = format!("{}\n\nDon't forget to cast your vote!", body);
-        let html = self.simple_notification_html(title, body, "This proposal is closing soon. Cast your vote now!");
+        let text = format!("{body}\n\nDon't forget to cast your vote!");
+        let html = self.simple_notification_html(
+            title,
+            body,
+            "This proposal is closing soon. Cast your vote now!",
+        );
 
         (subject, text, html)
     }
@@ -368,8 +390,12 @@ impl EmailTemplates {
         _data: Option<&serde_json::Value>,
     ) -> (String, String, String) {
         let subject = format!("[{}] {}", self.coop_name, title);
-        let text = format!("{}\n\nThank you for participating!", body);
-        let html = self.simple_notification_html(title, body, "Thank you for participating in cooperative governance.");
+        let text = format!("{body}\n\nThank you for participating!");
+        let html = self.simple_notification_html(
+            title,
+            body,
+            "Thank you for participating in cooperative governance.",
+        );
 
         (subject, text, html)
     }
@@ -419,7 +445,10 @@ impl EmailTemplates {
         let html = self.simple_notification_html(
             title,
             body,
-            &format!("View amendment: {}/governance/amendments/{}", self.base_url, amendment_id),
+            &format!(
+                "View amendment: {}/governance/amendments/{}",
+                self.base_url, amendment_id
+            ),
         );
 
         (subject, text, html)
@@ -446,7 +475,11 @@ impl EmailTemplates {
     ) -> (String, String, String) {
         let subject = format!("[{}] {}", self.coop_name, title);
         let text = body.to_string();
-        let html = self.simple_notification_html(title, body, "Your appeal has been filed and is under review.");
+        let html = self.simple_notification_html(
+            title,
+            body,
+            "Your appeal has been filed and is under review.",
+        );
 
         (subject, text, html)
     }
@@ -480,8 +513,12 @@ impl EmailTemplates {
             .unwrap_or("credits");
 
         let subject = format!("[{}] {}", self.coop_name, title);
-        let text = format!("{}\n\nNew balance: {} {}", body, new_balance, currency);
-        let html = self.simple_notification_html(title, body, &format!("Current balance: {} {}", new_balance, currency));
+        let text = format!("{body}\n\nNew balance: {new_balance} {currency}");
+        let html = self.simple_notification_html(
+            title,
+            body,
+            &format!("Current balance: {new_balance} {currency}"),
+        );
 
         (subject, text, html)
     }
@@ -493,7 +530,9 @@ impl EmailTemplates {
         _data: Option<&serde_json::Value>,
     ) -> (String, String, String) {
         let subject = format!("[{}] SECURITY ALERT: {}", self.coop_name, title);
-        let text = format!("SECURITY ALERT\n\n{}\n\nIf this was not you, please contact support immediately.", body);
+        let text = format!(
+            "SECURITY ALERT\n\n{body}\n\nIf this was not you, please contact support immediately."
+        );
         let html = format!(
             r#"<!DOCTYPE html>
 <html>
@@ -546,7 +585,9 @@ impl EmailTemplates {
             if footer.is_empty() {
                 String::new()
             } else {
-                format!("<p style=\"color: #6b7280; font-size: 14px;\">{}</p>", footer)
+                format!(
+                    "<p style=\"color: #6b7280; font-size: 14px;\">{footer}</p>"
+                )
             },
             self.coop_name
         )

@@ -75,5 +75,5 @@ pub use types::{
 pub use events::{
     create_shared_emitter, BalanceChanged, BatchBalanceChanged, ForkDetected, ForkResolved,
     LedgerEvent, LedgerEventEmitter, MemberFrozen, MemberUnfrozen, RollbackPerformed,
-    SharedEventEmitter, TransactionCreated, TransactionConfirmed, Transfer,
+    SharedEventEmitter, TransactionConfirmed, TransactionCreated, Transfer,
 };

@@ -9,9 +9,7 @@
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use icn_gateway::CommonsManager;
-use icn_governance::{
-    Charter, DisputePolicy, GovernanceConfig, MembershipPolicy, OrgType,
-};
+use icn_governance::{Charter, DisputePolicy, GovernanceConfig, MembershipPolicy, OrgType};
 use icn_identity::KeyPair;
 use tokio::runtime::Runtime;
 

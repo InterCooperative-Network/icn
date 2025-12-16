@@ -119,7 +119,6 @@ pub enum GatewayEvent {
     },
 
     // === Ledger Events (real-time balance tracking) ===
-
     /// An account balance changed
     BalanceChanged {
         coop_id: String,

@@ -837,8 +837,10 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
     /// List stewards who can issue attestations
     pub async fn list_attesters(&self) -> Result<Vec<StewardRecord>> {
         let all_stewards = self.store.list_stewards()?;
-        let attesters: Vec<StewardRecord> =
-            all_stewards.into_iter().filter(|s| s.can_attest()).collect();
+        let attesters: Vec<StewardRecord> = all_stewards
+            .into_iter()
+            .filter(|s| s.can_attest())
+            .collect();
         Ok(attesters)
     }
 
@@ -1629,7 +1631,11 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
         // Filter by type
         if let Some(t) = amendment_type {
             let t_lower = t.to_lowercase();
-            results.retain(|a| format!("{}", a.amendment_type).to_lowercase().contains(&t_lower));
+            results.retain(|a| {
+                format!("{}", a.amendment_type)
+                    .to_lowercase()
+                    .contains(&t_lower)
+            });
         }
 
         // Sort by created_at descending
@@ -1639,11 +1645,7 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
     }
 
     /// Submit an amendment for review
-    pub async fn submit_amendment(
-        &self,
-        id: &AmendmentId,
-        caller: &Did,
-    ) -> Result<Amendment> {
+    pub async fn submit_amendment(&self, id: &AmendmentId, caller: &Did) -> Result<Amendment> {
         let id_hex = id.to_hex();
         let mut amendment = self
             .store

@@ -167,7 +167,11 @@ pub async fn apply_for_membership(
         holder_did: applicant_did.to_string(),
         jurisdiction_id: jurisdiction_id.to_string(),
         status: format!("{}", affiliation.membership_status),
-        capabilities: affiliation.capabilities.iter().map(format_capability).collect(),
+        capabilities: affiliation
+            .capabilities
+            .iter()
+            .map(format_capability)
+            .collect(),
         roles: affiliation.roles.clone(),
         joined_at: affiliation.joined_at,
         expires_at: affiliation.expires_at,
@@ -195,16 +199,20 @@ pub async fn get_membership_status(
         .ok_or_else(|| GatewayError::NotFound("Commons holder not found".to_string()))?;
 
     let jurisdiction_id = JurisdictionId::new(path.into_inner());
-    let affiliation = holder.get_affiliation(&jurisdiction_id).ok_or_else(|| {
-        GatewayError::NotFound(format!("Not a member of {jurisdiction_id}"))
-    })?;
+    let affiliation = holder
+        .get_affiliation(&jurisdiction_id)
+        .ok_or_else(|| GatewayError::NotFound(format!("Not a member of {jurisdiction_id}")))?;
 
     Ok(HttpResponse::Ok().json(MemberResponse {
         holder_id: hex::encode(holder.id()),
         holder_did: user_did.to_string(),
         jurisdiction_id: jurisdiction_id.to_string(),
         status: format!("{}", affiliation.membership_status),
-        capabilities: affiliation.capabilities.iter().map(format_capability).collect(),
+        capabilities: affiliation
+            .capabilities
+            .iter()
+            .map(format_capability)
+            .collect(),
         roles: affiliation.roles.clone(),
         joined_at: affiliation.joined_at,
         expires_at: affiliation.expires_at,
@@ -581,15 +589,18 @@ pub async fn list_members(
 
     let jurisdiction_id = JurisdictionId::new(path.into_inner());
 
-    let status_filter = query.status.as_ref().and_then(|s| match s.to_lowercase().as_str() {
-        "candidate" => Some(MembershipStatus::Candidate),
-        "provisional" => Some(MembershipStatus::Provisional),
-        "member" => Some(MembershipStatus::Member),
-        "suspended" => Some(MembershipStatus::Suspended),
-        "exited" => Some(MembershipStatus::Exited),
-        "banned" => Some(MembershipStatus::Banned),
-        _ => None,
-    });
+    let status_filter = query
+        .status
+        .as_ref()
+        .and_then(|s| match s.to_lowercase().as_str() {
+            "candidate" => Some(MembershipStatus::Candidate),
+            "provisional" => Some(MembershipStatus::Provisional),
+            "member" => Some(MembershipStatus::Member),
+            "suspended" => Some(MembershipStatus::Suspended),
+            "exited" => Some(MembershipStatus::Exited),
+            "banned" => Some(MembershipStatus::Banned),
+            _ => None,
+        });
 
     let members = commons_manager
         .list_members_by_status(&jurisdiction_id, status_filter)
@@ -602,7 +613,11 @@ pub async fn list_members(
             holder_did: String::new(), // Would need to look up
             jurisdiction_id: jurisdiction_id.to_string(),
             status: format!("{}", affiliation.membership_status),
-            capabilities: affiliation.capabilities.iter().map(format_capability).collect(),
+            capabilities: affiliation
+                .capabilities
+                .iter()
+                .map(format_capability)
+                .collect(),
             roles: affiliation.roles,
             joined_at: affiliation.joined_at,
             expires_at: affiliation.expires_at,

@@ -196,7 +196,7 @@ impl RatificationRequirements {
     pub fn jurisdiction_default() -> Self {
         Self {
             quorum_percent: 50,
-            approval_percent: 67, // 2/3 majority
+            approval_percent: 67,                  // 2/3 majority
             voting_period_secs: 14 * 24 * 60 * 60, // 14 days
             review_period_secs: 7 * 24 * 60 * 60,  // 7 days
             min_jurisdictions: None,
@@ -210,9 +210,9 @@ impl RatificationRequirements {
         Self {
             quorum_percent: 60,
             approval_percent: 67,
-            voting_period_secs: 21 * 24 * 60 * 60,  // 21 days
-            review_period_secs: 14 * 24 * 60 * 60,  // 14 days
-            min_jurisdictions: Some(3),             // At least 3 jurisdictions must ratify
+            voting_period_secs: 21 * 24 * 60 * 60, // 21 days
+            review_period_secs: 14 * 24 * 60 * 60, // 14 days
+            min_jurisdictions: Some(3),            // At least 3 jurisdictions must ratify
             min_federations: None,
             effective_delay_secs: 14 * 24 * 60 * 60, // 14 day grace period
         }
@@ -222,11 +222,11 @@ impl RatificationRequirements {
     pub fn network_default() -> Self {
         Self {
             quorum_percent: 75,
-            approval_percent: 80, // Super-majority
-            voting_period_secs: 30 * 24 * 60 * 60, // 30 days
-            review_period_secs: 21 * 24 * 60 * 60, // 21 days review
-            min_jurisdictions: Some(10),           // At least 10 jurisdictions
-            min_federations: Some(3),              // At least 3 federations
+            approval_percent: 80,                    // Super-majority
+            voting_period_secs: 30 * 24 * 60 * 60,   // 30 days
+            review_period_secs: 21 * 24 * 60 * 60,   // 21 days review
+            min_jurisdictions: Some(10),             // At least 10 jurisdictions
+            min_federations: Some(3),                // At least 3 federations
             effective_delay_secs: 30 * 24 * 60 * 60, // 30 day grace period
         }
     }
@@ -235,7 +235,7 @@ impl RatificationRequirements {
     pub fn critical() -> Self {
         Self {
             quorum_percent: 80,
-            approval_percent: 90, // Near-unanimous
+            approval_percent: 90,                  // Near-unanimous
             voting_period_secs: 45 * 24 * 60 * 60, // 45 days
             review_period_secs: 30 * 24 * 60 * 60, // 30 days
             min_jurisdictions: Some(20),
@@ -569,9 +569,7 @@ impl Amendment {
                 return RatificationResult::Pending {
                     approvals,
                     rejections,
-                    reason: format!(
-                        "Need {min} federation approvals, have {federation_approvals}"
-                    ),
+                    reason: format!("Need {min} federation approvals, have {federation_approvals}"),
                 };
             }
         }
@@ -606,7 +604,10 @@ impl Amendment {
 
     /// Finalize the amendment as ratified
     pub fn ratify(&mut self) -> Result<(), &'static str> {
-        if !matches!(self.check_ratification(), RatificationResult::Approved { .. }) {
+        if !matches!(
+            self.check_ratification(),
+            RatificationResult::Approved { .. }
+        ) {
             return Err("Ratification requirements not met");
         }
 
@@ -835,7 +836,10 @@ mod tests {
 
         // Now can submit
         assert!(amendment.submit().is_ok());
-        assert!(matches!(amendment.status, AmendmentStatus::Submitted { .. }));
+        assert!(matches!(
+            amendment.status,
+            AmendmentStatus::Submitted { .. }
+        ));
     }
 
     #[test]
@@ -862,7 +866,10 @@ mod tests {
 
         // Submit
         amendment.submit().unwrap();
-        assert!(matches!(amendment.status, AmendmentStatus::Submitted { .. }));
+        assert!(matches!(
+            amendment.status,
+            AmendmentStatus::Submitted { .. }
+        ));
 
         // Open voting (skip review since period is 0)
         amendment.open_voting().unwrap();

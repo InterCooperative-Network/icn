@@ -23,9 +23,8 @@ pub struct IdentityManager {
 impl IdentityManager {
     /// Create a new identity manager with temporary storage (for testing)
     pub fn new() -> Self {
-        let store = Arc::new(
-            icn_store::SledStore::temporary().expect("Failed to create temp store"),
-        );
+        let store =
+            Arc::new(icn_store::SledStore::temporary().expect("Failed to create temp store"));
 
         Self {
             store,
@@ -68,8 +67,9 @@ impl IdentityManager {
         // Check storage
         let key = format!("{DID_DOCUMENT_PREFIX}{}", did.as_str());
         if let Some(data) = self.store.get(key.as_bytes())? {
-            let doc: DidDocument = serde_json::from_slice(&data)
-                .map_err(|e| GatewayError::InternalError(format!("Failed to parse DID doc: {e}")))?;
+            let doc: DidDocument = serde_json::from_slice(&data).map_err(|e| {
+                GatewayError::InternalError(format!("Failed to parse DID doc: {e}"))
+            })?;
 
             // Update cache
             let mut cache = self.cache.write().await;
@@ -104,8 +104,9 @@ impl IdentityManager {
         // Check storage
         let key = format!("{DID_DOCUMENT_PREFIX}{}", did.as_str());
         if let Some(data) = self.store.get(key.as_bytes())? {
-            let doc: DidDocument = serde_json::from_slice(&data)
-                .map_err(|e| GatewayError::InternalError(format!("Failed to parse DID doc: {e}")))?;
+            let doc: DidDocument = serde_json::from_slice(&data).map_err(|e| {
+                GatewayError::InternalError(format!("Failed to parse DID doc: {e}"))
+            })?;
 
             // Update cache
             let mut cache = self.cache.write().await;
@@ -120,8 +121,9 @@ impl IdentityManager {
     /// Store a DID document
     async fn store_document(&self, doc: &DidDocument) -> Result<()> {
         let key = format!("{DID_DOCUMENT_PREFIX}{}", doc.id.as_str());
-        let data = serde_json::to_vec(doc)
-            .map_err(|e| GatewayError::InternalError(format!("Failed to serialize DID doc: {e}")))?;
+        let data = serde_json::to_vec(doc).map_err(|e| {
+            GatewayError::InternalError(format!("Failed to serialize DID doc: {e}"))
+        })?;
 
         self.store.put(key.as_bytes(), &data)?;
 
@@ -182,9 +184,9 @@ impl IdentityManager {
             .map_err(|_| GatewayError::BadRequest("Invalid signature format".to_string()))?;
 
         use ed25519_dalek::Verifier;
-        verifying_key
-            .verify(&message, &sig)
-            .map_err(|_| GatewayError::AuthorizationFailed("Signature verification failed".to_string()))?;
+        verifying_key.verify(&message, &sig).map_err(|_| {
+            GatewayError::AuthorizationFailed("Signature verification failed".to_string())
+        })?;
 
         // Parse capabilities
         let capabilities = parse_capabilities(&request.capabilities)?;
@@ -195,8 +197,9 @@ impl IdentityManager {
 
         // If encryption key provided, add both
         if let Some(ref enc_key) = request.encryption_public_key {
-            let x25519_key = hex::decode(enc_key)
-                .map_err(|e| GatewayError::BadRequest(format!("Invalid encryption key hex: {e}")))?;
+            let x25519_key = hex::decode(enc_key).map_err(|e| {
+                GatewayError::BadRequest(format!("Invalid encryption key hex: {e}"))
+            })?;
 
             doc.add_device_with_encryption_key(
                 request.device_id.clone(),
@@ -257,7 +260,7 @@ impl IdentityManager {
                 capabilities: vm
                     .capabilities
                     .iter()
-                    .map(|c| format!("{:?}", c).to_lowercase())
+                    .map(|c| format!("{c:?}").to_lowercase())
                     .collect(),
                 added_at: vm.added_at,
                 revoked: vm.revoked_at.is_some(),
@@ -309,9 +312,9 @@ impl IdentityManager {
             .map_err(|_| GatewayError::BadRequest("Invalid signature format".to_string()))?;
 
         use ed25519_dalek::Verifier;
-        verifying_key
-            .verify(&message, &sig)
-            .map_err(|_| GatewayError::AuthorizationFailed("Signature verification failed".to_string()))?;
+        verifying_key.verify(&message, &sig).map_err(|_| {
+            GatewayError::AuthorizationFailed("Signature verification failed".to_string())
+        })?;
 
         // Prevent self-revocation if it's the last device with management capabilities
         let devices_with_revoke_cap: Vec<_> = doc
@@ -470,9 +473,7 @@ fn parse_capabilities(caps: &[String]) -> Result<Vec<Capability>> {
             "rotate_key" | "rotatekey" => Ok(Capability::RotateKey),
             "recover" => Ok(Capability::Recover),
             "encrypt" => Ok(Capability::Encrypt),
-            _ => Err(GatewayError::BadRequest(format!(
-                "Unknown capability: {c}"
-            ))),
+            _ => Err(GatewayError::BadRequest(format!("Unknown capability: {c}"))),
         })
         .collect()
 }

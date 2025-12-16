@@ -5,7 +5,9 @@
 use icn_gateway::api::{
     budgets::{Budget, BudgetPeriod, BudgetStatus, BudgetStore},
     escrow::{Escrow, EscrowCondition, EscrowStatus, EscrowStore},
-    recurring_payments::{PaymentFrequency, RecurringPayment, RecurringStatus, RecurringPaymentStore},
+    recurring_payments::{
+        PaymentFrequency, RecurringPayment, RecurringPaymentStore, RecurringStatus,
+    },
 };
 
 #[tokio::test]
@@ -72,11 +74,9 @@ async fn test_escrow_conditions() {
         amount: 500,
         currency: "USD".to_string(),
         status: EscrowStatus::Pending,
-        conditions: vec![
-            EscrowCondition::RequiresApproval {
-                did: "did:icn:charlie".to_string(),
-            },
-        ],
+        conditions: vec![EscrowCondition::RequiresApproval {
+            did: "did:icn:charlie".to_string(),
+        }],
         approvals: Vec::new(),
         expires_at: Some(9999),
         description: "Payment for services".to_string(),
@@ -242,7 +242,7 @@ async fn test_recurring_payment_frequencies() {
 
     for freq in frequencies {
         let payment = RecurringPayment {
-            id: format!("test-{:?}", freq),
+            id: format!("test-{freq:?}"),
             owner: "did:icn:test".to_string(),
             from_account: "test".to_string(),
             to_account: "dest".to_string(),

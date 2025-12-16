@@ -137,11 +137,8 @@ pub async fn list_notifications(
     let offset = query.offset.unwrap_or(0);
     let limit = query.limit.unwrap_or(50).min(100);
 
-    let notifications: Vec<InAppNotification> = notifications
-        .into_iter()
-        .skip(offset)
-        .take(limit)
-        .collect();
+    let notifications: Vec<InAppNotification> =
+        notifications.into_iter().skip(offset).take(limit).collect();
 
     Ok(HttpResponse::Ok().json(ListNotificationsResponse {
         notifications,
@@ -205,7 +202,7 @@ pub async fn mark_all_read(
 
     Ok(HttpResponse::Ok().json(MarkReadResponse {
         success: true,
-        message: format!("Marked {} notifications as read", count),
+        message: format!("Marked {count} notifications as read"),
     }))
 }
 
@@ -349,32 +346,35 @@ mod tests {
 
         // Add some test notifications directly to the in-app store
         let store = processor.in_app_store();
-        store.insert(recipient.to_string(), vec![
-            InAppNotification {
-                id: "notif1".to_string(),
-                recipient: recipient.to_string(),
-                coop_id: "coop1".to_string(),
-                title: "Test 1".to_string(),
-                body: "Body 1".to_string(),
-                data: None,
-                notification_type: "System".to_string(),
-                created_at: 1000,
-                read: false,
-                read_at: None,
-            },
-            InAppNotification {
-                id: "notif2".to_string(),
-                recipient: recipient.to_string(),
-                coop_id: "coop1".to_string(),
-                title: "Test 2".to_string(),
-                body: "Body 2".to_string(),
-                data: None,
-                notification_type: "PaymentReceived".to_string(),
-                created_at: 2000,
-                read: true,
-                read_at: Some(2500),
-            },
-        ]);
+        store.insert(
+            recipient.to_string(),
+            vec![
+                InAppNotification {
+                    id: "notif1".to_string(),
+                    recipient: recipient.to_string(),
+                    coop_id: "coop1".to_string(),
+                    title: "Test 1".to_string(),
+                    body: "Body 1".to_string(),
+                    data: None,
+                    notification_type: "System".to_string(),
+                    created_at: 1000,
+                    read: false,
+                    read_at: None,
+                },
+                InAppNotification {
+                    id: "notif2".to_string(),
+                    recipient: recipient.to_string(),
+                    coop_id: "coop1".to_string(),
+                    title: "Test 2".to_string(),
+                    body: "Body 2".to_string(),
+                    data: None,
+                    notification_type: "PaymentReceived".to_string(),
+                    created_at: 2000,
+                    read: true,
+                    read_at: Some(2500),
+                },
+            ],
+        );
 
         // Test the count
         let all = processor.get_in_app_notifications(recipient, false);
@@ -391,32 +391,35 @@ mod tests {
 
         // Add unread notifications
         let store = processor.in_app_store();
-        store.insert(recipient.to_string(), vec![
-            InAppNotification {
-                id: "n1".to_string(),
-                recipient: recipient.to_string(),
-                coop_id: "coop1".to_string(),
-                title: "Notification 1".to_string(),
-                body: "Body".to_string(),
-                data: None,
-                notification_type: "System".to_string(),
-                created_at: 1000,
-                read: false,
-                read_at: None,
-            },
-            InAppNotification {
-                id: "n2".to_string(),
-                recipient: recipient.to_string(),
-                coop_id: "coop1".to_string(),
-                title: "Notification 2".to_string(),
-                body: "Body".to_string(),
-                data: None,
-                notification_type: "System".to_string(),
-                created_at: 2000,
-                read: false,
-                read_at: None,
-            },
-        ]);
+        store.insert(
+            recipient.to_string(),
+            vec![
+                InAppNotification {
+                    id: "n1".to_string(),
+                    recipient: recipient.to_string(),
+                    coop_id: "coop1".to_string(),
+                    title: "Notification 1".to_string(),
+                    body: "Body".to_string(),
+                    data: None,
+                    notification_type: "System".to_string(),
+                    created_at: 1000,
+                    read: false,
+                    read_at: None,
+                },
+                InAppNotification {
+                    id: "n2".to_string(),
+                    recipient: recipient.to_string(),
+                    coop_id: "coop1".to_string(),
+                    title: "Notification 2".to_string(),
+                    body: "Body".to_string(),
+                    data: None,
+                    notification_type: "System".to_string(),
+                    created_at: 2000,
+                    read: false,
+                    read_at: None,
+                },
+            ],
+        );
 
         // Mark one as read
         assert!(processor.mark_read(recipient, "n1"));
@@ -435,8 +438,9 @@ mod tests {
 
         // Add a notification
         let store = processor.in_app_store();
-        store.insert(recipient.to_string(), vec![
-            InAppNotification {
+        store.insert(
+            recipient.to_string(),
+            vec![InAppNotification {
                 id: "to-delete".to_string(),
                 recipient: recipient.to_string(),
                 coop_id: "coop1".to_string(),
@@ -447,14 +451,20 @@ mod tests {
                 created_at: 1000,
                 read: false,
                 read_at: None,
-            },
-        ]);
+            }],
+        );
 
-        assert_eq!(processor.get_in_app_notifications(recipient, false).len(), 1);
+        assert_eq!(
+            processor.get_in_app_notifications(recipient, false).len(),
+            1
+        );
 
         // Delete it
         assert!(processor.delete_notification(recipient, "to-delete"));
-        assert_eq!(processor.get_in_app_notifications(recipient, false).len(), 0);
+        assert_eq!(
+            processor.get_in_app_notifications(recipient, false).len(),
+            0
+        );
 
         // Try to delete non-existent
         assert!(!processor.delete_notification(recipient, "nonexistent"));
@@ -467,51 +477,55 @@ mod tests {
 
         // Add notifications of different types
         let store = processor.in_app_store();
-        store.insert(recipient.to_string(), vec![
-            InAppNotification {
-                id: "payment1".to_string(),
-                recipient: recipient.to_string(),
-                coop_id: "coop1".to_string(),
-                title: "Payment 1".to_string(),
-                body: "Body".to_string(),
-                data: None,
-                notification_type: "PaymentReceived".to_string(),
-                created_at: 1000,
-                read: false,
-                read_at: None,
-            },
-            InAppNotification {
-                id: "system1".to_string(),
-                recipient: recipient.to_string(),
-                coop_id: "coop1".to_string(),
-                title: "System 1".to_string(),
-                body: "Body".to_string(),
-                data: None,
-                notification_type: "System".to_string(),
-                created_at: 2000,
-                read: false,
-                read_at: None,
-            },
-            InAppNotification {
-                id: "payment2".to_string(),
-                recipient: recipient.to_string(),
-                coop_id: "coop1".to_string(),
-                title: "Payment 2".to_string(),
-                body: "Body".to_string(),
-                data: None,
-                notification_type: "PaymentReceived".to_string(),
-                created_at: 3000,
-                read: false,
-                read_at: None,
-            },
-        ]);
+        store.insert(
+            recipient.to_string(),
+            vec![
+                InAppNotification {
+                    id: "payment1".to_string(),
+                    recipient: recipient.to_string(),
+                    coop_id: "coop1".to_string(),
+                    title: "Payment 1".to_string(),
+                    body: "Body".to_string(),
+                    data: None,
+                    notification_type: "PaymentReceived".to_string(),
+                    created_at: 1000,
+                    read: false,
+                    read_at: None,
+                },
+                InAppNotification {
+                    id: "system1".to_string(),
+                    recipient: recipient.to_string(),
+                    coop_id: "coop1".to_string(),
+                    title: "System 1".to_string(),
+                    body: "Body".to_string(),
+                    data: None,
+                    notification_type: "System".to_string(),
+                    created_at: 2000,
+                    read: false,
+                    read_at: None,
+                },
+                InAppNotification {
+                    id: "payment2".to_string(),
+                    recipient: recipient.to_string(),
+                    coop_id: "coop1".to_string(),
+                    title: "Payment 2".to_string(),
+                    body: "Body".to_string(),
+                    data: None,
+                    notification_type: "PaymentReceived".to_string(),
+                    created_at: 3000,
+                    read: false,
+                    read_at: None,
+                },
+            ],
+        );
 
         // Get all
         let all = processor.get_in_app_notifications(recipient, false);
         assert_eq!(all.len(), 3);
 
         // Filter in code (simulating what the API does)
-        let payment_only: Vec<_> = all.into_iter()
+        let payment_only: Vec<_> = all
+            .into_iter()
             .filter(|n| n.notification_type == "PaymentReceived")
             .collect();
         assert_eq!(payment_only.len(), 2);

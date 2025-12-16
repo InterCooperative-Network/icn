@@ -329,7 +329,7 @@ fn build_timeline(appeal: &Appeal) -> Vec<AppealTimelineEvent> {
     {
         timeline.push(AppealTimelineEvent {
             event_type: "resolved".to_string(),
-            description: format!("Appeal resolved: {:?}", outcome),
+            description: format!("Appeal resolved: {outcome:?}"),
             timestamp: *resolved_at,
             actor: None,
         });
@@ -344,7 +344,7 @@ fn build_timeline(appeal: &Appeal) -> Vec<AppealTimelineEvent> {
     {
         timeline.push(AppealTimelineEvent {
             event_type: "dismissed".to_string(),
-            description: format!("Appeal dismissed: {}", reason),
+            description: format!("Appeal dismissed: {reason}"),
             timestamp: *dismissed_at,
             actor: None,
         });
@@ -358,7 +358,7 @@ fn build_timeline(appeal: &Appeal) -> Vec<AppealTimelineEvent> {
     } = &appeal.status
     {
         let desc = if let Some(r) = reason {
-            format!("Appeal withdrawn: {}", r)
+            format!("Appeal withdrawn: {r}")
         } else {
             "Appeal withdrawn".to_string()
         };
@@ -400,10 +400,12 @@ fn build_status_detail(appeal: &Appeal, _caller: Option<&Did>) -> AppealStatusDe
                 "You may submit additional evidence".to_string(),
             ],
         ),
-        AppealStatus::Hearing { hearing_ends_at, .. } => {
+        AppealStatus::Hearing {
+            hearing_ends_at, ..
+        } => {
             let time_left = (*hearing_ends_at as i64) - (now as i64);
             let desc = if time_left > 0 {
-                format!("Hearing period active ({} seconds remaining)", time_left)
+                format!("Hearing period active ({time_left} seconds remaining)")
             } else {
                 "Hearing period ended, awaiting decision".to_string()
             };
@@ -418,12 +420,12 @@ fn build_status_detail(appeal: &Appeal, _caller: Option<&Did>) -> AppealStatusDe
         }
         AppealStatus::Resolved { outcome, .. } => (
             "resolved".to_string(),
-            format!("Appeal resolved: {:?}", outcome),
+            format!("Appeal resolved: {outcome:?}"),
             vec!["No further action required".to_string()],
         ),
         AppealStatus::Dismissed { reason, .. } => (
             "dismissed".to_string(),
-            format!("Appeal dismissed: {}", reason),
+            format!("Appeal dismissed: {reason}"),
             vec!["Appeal closed - cannot resubmit".to_string()],
         ),
         AppealStatus::Withdrawn { .. } => (
@@ -436,7 +438,10 @@ fn build_status_detail(appeal: &Appeal, _caller: Option<&Did>) -> AppealStatusDe
     // Build deadlines
     let mut deadlines = Vec::new();
 
-    if let AppealStatus::Hearing { hearing_ends_at, .. } = &appeal.status {
+    if let AppealStatus::Hearing {
+        hearing_ends_at, ..
+    } = &appeal.status
+    {
         let time_remaining = (*hearing_ends_at as i64) - (now as i64);
         deadlines.push(AppealDeadline {
             deadline_type: "hearing_end".to_string(),

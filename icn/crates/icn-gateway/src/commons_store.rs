@@ -309,7 +309,10 @@ impl<S: CommonsStoreBackend> CommonsStore<S> {
         self.store.put(&did_key, id.as_bytes())?;
 
         // Update cache
-        self.anchor_cache.write().unwrap().put(id.clone(), anchor.clone());
+        self.anchor_cache
+            .write()
+            .unwrap()
+            .put(id.clone(), anchor.clone());
 
         debug!("Stored anchor: {}", id);
         Ok(())
@@ -326,7 +329,10 @@ impl<S: CommonsStoreBackend> CommonsStore<S> {
         let key = Self::make_key(ANCHOR_PREFIX, id);
         if let Some(value) = self.store.get(&key)? {
             let anchor: PersonhoodAnchor = Self::deserialize(&value)?;
-            self.anchor_cache.write().unwrap().put(id.to_string(), anchor.clone());
+            self.anchor_cache
+                .write()
+                .unwrap()
+                .put(id.to_string(), anchor.clone());
             return Ok(Some(anchor));
         }
 
@@ -415,7 +421,10 @@ impl<S: CommonsStoreBackend> CommonsStore<S> {
         self.store.put(&anchor_key, id.as_bytes())?;
 
         // Update cache
-        self.holder_cache.write().unwrap().put(id.clone(), holder.clone());
+        self.holder_cache
+            .write()
+            .unwrap()
+            .put(id.clone(), holder.clone());
 
         debug!("Stored holder: {}", id);
         Ok(())
@@ -432,7 +441,10 @@ impl<S: CommonsStoreBackend> CommonsStore<S> {
         let key = Self::make_key(HOLDER_PREFIX, id);
         if let Some(value) = self.store.get(&key)? {
             let holder: CommonsHolderRecord = Self::deserialize(&value)?;
-            self.holder_cache.write().unwrap().put(id.to_string(), holder.clone());
+            self.holder_cache
+                .write()
+                .unwrap()
+                .put(id.to_string(), holder.clone());
             return Ok(Some(holder));
         }
 
@@ -523,7 +535,10 @@ impl<S: CommonsStoreBackend> CommonsStore<S> {
         self.store.put(&domain_key, id.as_bytes())?;
 
         // Update cache
-        self.charter_cache.write().unwrap().put(id.clone(), charter.clone());
+        self.charter_cache
+            .write()
+            .unwrap()
+            .put(id.clone(), charter.clone());
 
         debug!("Stored charter: {}", id);
         Ok(())
@@ -540,7 +555,10 @@ impl<S: CommonsStoreBackend> CommonsStore<S> {
         let key = Self::make_key(CHARTER_PREFIX, id);
         if let Some(value) = self.store.get(&key)? {
             let charter: Charter = Self::deserialize(&value)?;
-            self.charter_cache.write().unwrap().put(id.to_string(), charter.clone());
+            self.charter_cache
+                .write()
+                .unwrap()
+                .put(id.to_string(), charter.clone());
             return Ok(Some(charter));
         }
 
@@ -593,7 +611,10 @@ impl<S: CommonsStoreBackend> CommonsStore<S> {
         self.store.put(&did_key, id.as_bytes())?;
 
         // Update cache
-        self.steward_cache.write().unwrap().put(id.clone(), steward.clone());
+        self.steward_cache
+            .write()
+            .unwrap()
+            .put(id.clone(), steward.clone());
 
         debug!("Stored steward: {}", id);
         Ok(())
@@ -610,7 +631,10 @@ impl<S: CommonsStoreBackend> CommonsStore<S> {
         let key = Self::make_key(STEWARD_PREFIX, id);
         if let Some(value) = self.store.get(&key)? {
             let steward: StewardRecord = Self::deserialize(&value)?;
-            self.steward_cache.write().unwrap().put(id.to_string(), steward.clone());
+            self.steward_cache
+                .write()
+                .unwrap()
+                .put(id.to_string(), steward.clone());
             return Ok(Some(steward));
         }
 
@@ -656,7 +680,10 @@ impl<S: CommonsStoreBackend> CommonsStore<S> {
         let value = Self::serialize(amendment)?;
         self.store.put(&key, &value)?;
 
-        self.amendment_cache.write().unwrap().put(id.clone(), amendment.clone());
+        self.amendment_cache
+            .write()
+            .unwrap()
+            .put(id.clone(), amendment.clone());
 
         debug!("Stored amendment: {}", id);
         Ok(())
@@ -671,7 +698,10 @@ impl<S: CommonsStoreBackend> CommonsStore<S> {
         let key = Self::make_key(AMENDMENT_PREFIX, id);
         if let Some(value) = self.store.get(&key)? {
             let amendment: Amendment = Self::deserialize(&value)?;
-            self.amendment_cache.write().unwrap().put(id.to_string(), amendment.clone());
+            self.amendment_cache
+                .write()
+                .unwrap()
+                .put(id.to_string(), amendment.clone());
             return Ok(Some(amendment));
         }
 
@@ -704,7 +734,10 @@ impl<S: CommonsStoreBackend> CommonsStore<S> {
         let value = Self::serialize(appeal)?;
         self.store.put(&key, &value)?;
 
-        self.appeal_cache.write().unwrap().put(id.clone(), appeal.clone());
+        self.appeal_cache
+            .write()
+            .unwrap()
+            .put(id.clone(), appeal.clone());
 
         debug!("Stored appeal: {}", id);
         Ok(())
@@ -719,7 +752,10 @@ impl<S: CommonsStoreBackend> CommonsStore<S> {
         let key = Self::make_key(APPEAL_PREFIX, id);
         if let Some(value) = self.store.get(&key)? {
             let appeal: Appeal = Self::deserialize(&value)?;
-            self.appeal_cache.write().unwrap().put(id.to_string(), appeal.clone());
+            self.appeal_cache
+                .write()
+                .unwrap()
+                .put(id.to_string(), appeal.clone());
             return Ok(Some(appeal));
         }
 
@@ -1111,7 +1147,10 @@ mod tests {
                 let store = CommonsStore::new(backend);
 
                 let retrieved = store.get_charter(&charter_id).unwrap();
-                assert!(retrieved.is_some(), "Charter should persist across restarts");
+                assert!(
+                    retrieved.is_some(),
+                    "Charter should persist across restarts"
+                );
                 assert_eq!(retrieved.unwrap().name, charter_name);
             }
         }
@@ -1122,8 +1161,8 @@ mod tests {
 
             // Add some data
             for i in 0..100 {
-                let key = format!("key_{}", i);
-                let value = format!("value_{}", i);
+                let key = format!("key_{i}");
+                let value = format!("value_{i}");
                 backend.put(key.as_bytes(), value.as_bytes()).unwrap();
             }
 

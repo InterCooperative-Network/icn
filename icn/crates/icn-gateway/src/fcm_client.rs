@@ -33,8 +33,8 @@ pub struct FcmConfig {
 impl FcmConfig {
     /// Create config from service account JSON
     pub fn from_service_account_json(json: &str) -> Result<Self, String> {
-        let account: ServiceAccountJson = serde_json::from_str(json)
-            .map_err(|e| format!("Invalid service account JSON: {e}"))?;
+        let account: ServiceAccountJson =
+            serde_json::from_str(json).map_err(|e| format!("Invalid service account JSON: {e}"))?;
 
         Ok(Self {
             project_id: account.project_id,
@@ -259,7 +259,7 @@ impl FcmClient {
         let response = match self
             .http_client
             .post(&endpoint)
-            .header("Authorization", format!("Bearer {}", token))
+            .header("Authorization", format!("Bearer {token}"))
             .json(&message)
             .send()
             .await
@@ -548,6 +548,9 @@ mod tests {
 
         let config = FcmConfig::from_service_account_json(json).unwrap();
         assert_eq!(config.project_id, "my-project");
-        assert_eq!(config.service_account_email, "test@test.iam.gserviceaccount.com");
+        assert_eq!(
+            config.service_account_email,
+            "test@test.iam.gserviceaccount.com"
+        );
     }
 }

@@ -83,9 +83,13 @@ pub async fn register_device(
     let did_str = path.into_inner();
 
     // Get authenticated user's DID from token
-    let claims = req.extensions().get::<TokenClaims>().cloned().ok_or_else(|| {
-        GatewayError::AuthenticationFailed("Missing authentication token".to_string())
-    })?;
+    let claims = req
+        .extensions()
+        .get::<TokenClaims>()
+        .cloned()
+        .ok_or_else(|| {
+            GatewayError::AuthenticationFailed("Missing authentication token".to_string())
+        })?;
 
     // Verify the DID in path matches the authenticated user
     if claims.sub != did_str {
@@ -135,9 +139,13 @@ pub async fn list_devices(
     let did_str = path.into_inner();
 
     // Get authenticated user's DID from token
-    let claims = req.extensions().get::<TokenClaims>().cloned().ok_or_else(|| {
-        GatewayError::AuthenticationFailed("Missing authentication token".to_string())
-    })?;
+    let claims = req
+        .extensions()
+        .get::<TokenClaims>()
+        .cloned()
+        .ok_or_else(|| {
+            GatewayError::AuthenticationFailed("Missing authentication token".to_string())
+        })?;
 
     // Verify the DID in path matches the authenticated user
     if claims.sub != did_str {
@@ -172,9 +180,13 @@ pub async fn revoke_device(
     let (did_str, device_id) = path.into_inner();
 
     // Get authenticated user's DID from token
-    let claims = req.extensions().get::<TokenClaims>().cloned().ok_or_else(|| {
-        GatewayError::AuthenticationFailed("Missing authentication token".to_string())
-    })?;
+    let claims = req
+        .extensions()
+        .get::<TokenClaims>()
+        .cloned()
+        .ok_or_else(|| {
+            GatewayError::AuthenticationFailed("Missing authentication token".to_string())
+        })?;
 
     // Verify the DID in path matches the authenticated user
     if claims.sub != did_str {
@@ -215,9 +227,13 @@ pub async fn get_device(
     let (did_str, device_id) = path.into_inner();
 
     // Get authenticated user's DID from token
-    let claims = req.extensions().get::<TokenClaims>().cloned().ok_or_else(|| {
-        GatewayError::AuthenticationFailed("Missing authentication token".to_string())
-    })?;
+    let claims = req
+        .extensions()
+        .get::<TokenClaims>()
+        .cloned()
+        .ok_or_else(|| {
+            GatewayError::AuthenticationFailed("Missing authentication token".to_string())
+        })?;
 
     // Verify the DID in path matches the authenticated user
     if claims.sub != did_str {
@@ -245,7 +261,7 @@ pub async fn get_device(
 mod tests {
     use super::*;
     use actix_web::{test, App};
-    use actix_web_httpauth::middleware::HttpAuthentication;
+    
     use icn_identity::KeyPair;
 
     fn test_keypair() -> KeyPair {

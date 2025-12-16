@@ -254,10 +254,7 @@ impl LedgerEventEmitter {
     /// Returns the number of subscribers that received the event.
     /// If no subscribers, returns 0 (events are dropped).
     pub fn emit(&self, event: LedgerEvent) -> usize {
-        match self.sender.send(event) {
-            Ok(count) => count,
-            Err(_) => 0, // No subscribers
-        }
+        self.sender.send(event).unwrap_or_default()
     }
 
     /// Subscribe to ledger events

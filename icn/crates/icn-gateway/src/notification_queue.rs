@@ -38,20 +38,17 @@ pub enum NotificationChannel {
 /// Priority levels for notifications
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum NotificationPriority {
     /// Urgent - deliver immediately
     High,
     /// Normal delivery
+    #[default]
     Normal,
     /// Low priority - can be batched
     Low,
 }
 
-impl Default for NotificationPriority {
-    fn default() -> Self {
-        NotificationPriority::Normal
-    }
-}
 
 /// Notification delivery status
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -320,7 +317,8 @@ impl NotificationQueue {
         body: &str,
         notification_type: NotificationType,
     ) -> Result<String, String> {
-        let notification = QueuedNotification::new(recipient, coop_id, title, body, notification_type);
+        let notification =
+            QueuedNotification::new(recipient, coop_id, title, body, notification_type);
         self.queue(notification).await
     }
 
@@ -434,7 +432,12 @@ pub fn payment_received_notification(
         recipient,
         coop_id,
         "Payment Received",
-        format!("You received {} {} from {}", amount, currency, truncate_did(from)),
+        format!(
+            "You received {} {} from {}",
+            amount,
+            currency,
+            truncate_did(from)
+        ),
         NotificationType::PaymentReceived,
     )
     .with_data(serde_json::json!({

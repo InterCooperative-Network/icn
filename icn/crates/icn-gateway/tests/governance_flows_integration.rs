@@ -57,10 +57,7 @@ async fn test_enrollment_creates_affiliated_holder() {
 
     // Auto-affiliate with coop (simulating what simple_enrollment does)
     let jurisdiction = JurisdictionId::new(format!("coop:{coop_id}"));
-    let initial_capabilities = vec![
-        MembershipCapability::Transact,
-        MembershipCapability::Vote,
-    ];
+    let initial_capabilities = vec![MembershipCapability::Transact, MembershipCapability::Vote];
 
     let affiliation = commons_mgr
         .join_jurisdiction(&holder_id, jurisdiction.clone(), initial_capabilities)
@@ -489,12 +486,11 @@ async fn test_charter_duplicate_signature_rejected() {
         role: Some("founder".to_string()),
     };
 
-    let result = commons_mgr.add_charter_signature(&charter_id, dup_sig).await;
+    let result = commons_mgr
+        .add_charter_signature(&charter_id, dup_sig)
+        .await;
     assert!(result.is_err());
-    assert!(result
-        .unwrap_err()
-        .to_string()
-        .contains("already signed"));
+    assert!(result.unwrap_err().to_string().contains("already signed"));
 }
 
 /// Test amendment add-change flow
@@ -525,10 +521,7 @@ async fn test_amendment_add_change_flow() {
     commons_mgr.store_amendment(amendment).await.unwrap();
 
     // Verify initial state - no changes yet
-    let amendment_bytes: [u8; 32] = hex::decode(&amendment_id)
-        .unwrap()
-        .try_into()
-        .unwrap();
+    let amendment_bytes: [u8; 32] = hex::decode(&amendment_id).unwrap().try_into().unwrap();
     let stored = commons_mgr
         .get_amendment(&icn_governance::AmendmentId::new(amendment_bytes))
         .await
@@ -549,7 +542,10 @@ async fn test_amendment_add_change_flow() {
         .await
         .unwrap();
     assert_eq!(updated.changes.len(), 1);
-    assert_eq!(updated.changes[0].description, "Increase quorum requirement");
+    assert_eq!(
+        updated.changes[0].description,
+        "Increase quorum requirement"
+    );
 
     // Add second change
     let change2 = AmendmentChange {
@@ -623,10 +619,7 @@ async fn test_amendment_add_change_fails_after_submit() {
 
     // Store and submit
     commons_mgr.store_amendment(amendment).await.unwrap();
-    let amendment_bytes: [u8; 32] = hex::decode(&amendment_id)
-        .unwrap()
-        .try_into()
-        .unwrap();
+    let amendment_bytes: [u8; 32] = hex::decode(&amendment_id).unwrap().try_into().unwrap();
     commons_mgr
         .submit_amendment(
             &icn_governance::AmendmentId::new(amendment_bytes),

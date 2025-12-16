@@ -316,10 +316,10 @@ pub struct AppealDeadlines {
 impl Default for AppealDeadlines {
     fn default() -> Self {
         Self {
-            filing_window_secs: 30 * 24 * 60 * 60,   // 30 days to file
-            review_period_secs: 14 * 24 * 60 * 60,  // 14 days review
-            hearing_period_secs: 7 * 24 * 60 * 60,  // 7 days hearing
-            max_duration_secs: 90 * 24 * 60 * 60,   // 90 days max
+            filing_window_secs: 30 * 24 * 60 * 60, // 30 days to file
+            review_period_secs: 14 * 24 * 60 * 60, // 14 days review
+            hearing_period_secs: 7 * 24 * 60 * 60, // 7 days hearing
+            max_duration_secs: 90 * 24 * 60 * 60,  // 90 days max
         }
     }
 }
@@ -772,10 +772,7 @@ mod tests {
             "Statement of appeal".to_string(),
         );
 
-        assert!(matches!(
-            appeal.appeal_type,
-            AppealType::Revocation { .. }
-        ));
+        assert!(matches!(appeal.appeal_type, AppealType::Revocation { .. }));
         assert!(matches!(appeal.requested_remedy, AppealRemedy::Reverse));
     }
 
@@ -792,10 +789,7 @@ mod tests {
             "I was wrongly suspended".to_string(),
         );
 
-        assert!(matches!(
-            appeal.appeal_type,
-            AppealType::Suspension { .. }
-        ));
+        assert!(matches!(appeal.appeal_type, AppealType::Suspension { .. }));
         assert!(matches!(appeal.requested_remedy, AppealRemedy::Reinstate));
     }
 
@@ -912,9 +906,7 @@ mod tests {
             },
         );
 
-        appeal
-            .withdraw(Some("Issue resolved".to_string()))
-            .unwrap();
+        appeal.withdraw(Some("Issue resolved".to_string())).unwrap();
         assert!(matches!(appeal.status, AppealStatus::Withdrawn { .. }));
     }
 

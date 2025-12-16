@@ -192,10 +192,13 @@ impl GatewayServer {
         info!("Ledger notification trigger started");
 
         // Create governance notification trigger (for proposal/amendment/appeal notifications)
-        let governance_trigger = Arc::new(GovernanceNotificationTrigger::new(notification_queue.clone()));
+        let governance_trigger = Arc::new(GovernanceNotificationTrigger::new(
+            notification_queue.clone(),
+        ));
 
         // Create recurring payment store
-        let recurring_payment_store = Arc::new(crate::api::recurring_payments::RecurringPaymentStore::new());
+        let recurring_payment_store =
+            Arc::new(crate::api::recurring_payments::RecurringPaymentStore::new());
         info!("Recurring payment store initialized");
 
         // Create escrow store

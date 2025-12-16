@@ -108,7 +108,10 @@ impl NotificationProcessor {
     ) -> Self {
         // Create FCM client if config is provided
         let fcm_client = config.fcm_config.as_ref().map(|fcm_config| {
-            info!("FCM client initialized for project: {}", fcm_config.project_id);
+            info!(
+                "FCM client initialized for project: {}",
+                fcm_config.project_id
+            );
             Arc::new(FcmClient::new(fcm_config.clone()))
         });
 
@@ -218,7 +221,7 @@ impl NotificationProcessor {
                 self.queue.mark_failed(
                     id,
                     NotificationChannel::Push,
-                    &format!("Invalid DID: {}", e),
+                    &format!("Invalid DID: {e}"),
                     0,
                 );
                 return;
@@ -309,7 +312,8 @@ impl NotificationProcessor {
                     })
                     .unwrap_or(0);
 
-                self.queue.mark_failed(id, NotificationChannel::Push, &error, retries + 1);
+                self.queue
+                    .mark_failed(id, NotificationChannel::Push, &error, retries + 1);
 
                 if retries < 5 {
                     let backoff = calculate_backoff(retries);
@@ -329,7 +333,11 @@ impl NotificationProcessor {
                 data: notification.data.clone(),
             };
 
-            match self.notification_service.send_to_did(&did, fcm_notification).await {
+            match self
+                .notification_service
+                .send_to_did(&did, fcm_notification)
+                .await
+            {
                 Ok(sent) => {
                     debug!(notification_id = %id, devices = sent, "Push notification sent (legacy)");
                     self.queue.mark_delivered(id, NotificationChannel::Push);
@@ -345,7 +353,8 @@ impl NotificationProcessor {
                         })
                         .unwrap_or(0);
 
-                    self.queue.mark_failed(id, NotificationChannel::Push, &e, retries + 1);
+                    self.queue
+                        .mark_failed(id, NotificationChannel::Push, &e, retries + 1);
                 }
             }
         }
@@ -391,7 +400,7 @@ impl NotificationProcessor {
         // Generate email from template
         let email_message = self.email_templates.generate_email(
             recipient_email,
-            notification.notification_type.clone(),
+            notification.notification_type,
             &notification.title,
             &notification.body,
             notification.data.as_ref(),
@@ -434,7 +443,8 @@ impl NotificationProcessor {
                     })
                     .unwrap_or(0);
 
-                self.queue.mark_failed(id, NotificationChannel::Email, &error, retries + 1);
+                self.queue
+                    .mark_failed(id, NotificationChannel::Email, &error, retries + 1);
 
                 if retries < 5 {
                     let backoff = calculate_backoff(retries);
@@ -454,7 +464,8 @@ impl NotificationProcessor {
                     "Permanent email failure"
                 );
                 // Mark as failed with max retries so it gets abandoned
-                self.queue.mark_failed(id, NotificationChannel::Email, &error, 999);
+                self.queue
+                    .mark_failed(id, NotificationChannel::Email, &error, 999);
             }
         }
     }
@@ -499,7 +510,11 @@ impl NotificationProcessor {
     }
 
     /// Get in-app notifications for a user
-    pub fn get_in_app_notifications(&self, recipient: &str, unread_only: bool) -> Vec<InAppNotification> {
+    pub fn get_in_app_notifications(
+        &self,
+        recipient: &str,
+        unread_only: bool,
+    ) -> Vec<InAppNotification> {
         self.in_app_store
             .get(recipient)
             .map(|notifications| {
@@ -595,7 +610,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_in_app_storage() {
-        let (queue, receiver) = NotificationQueue::new();
+        let (queue, _receiver) = NotificationQueue::new();
         let queue = Arc::new(queue);
         let notification_service = Arc::new(NotificationService::new(None));
         let processor = NotificationProcessor::new(

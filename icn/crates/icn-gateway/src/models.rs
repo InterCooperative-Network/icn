@@ -181,12 +181,7 @@ impl PaginationInfo {
     }
 
     /// Create pagination info for offset-based response
-    pub fn offset_based(
-        total: Option<usize>,
-        offset: usize,
-        limit: usize,
-        count: usize,
-    ) -> Self {
+    pub fn offset_based(total: Option<usize>, offset: usize, limit: usize, count: usize) -> Self {
         let has_more = total.map(|t| offset + count < t).unwrap_or(count >= limit);
         Self {
             total,

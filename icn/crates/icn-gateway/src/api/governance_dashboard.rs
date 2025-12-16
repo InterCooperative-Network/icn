@@ -168,7 +168,7 @@ fn build_dashboard(
 
     for amendment in amendments.iter().take(5) {
         let timestamp = match &amendment.status {
-            AmendmentStatus::Draft { .. } => amendment.created_at,
+            AmendmentStatus::Draft => amendment.created_at,
             AmendmentStatus::Submitted { submitted_at, .. } => *submitted_at,
             AmendmentStatus::Voting {
                 voting_started_at, ..

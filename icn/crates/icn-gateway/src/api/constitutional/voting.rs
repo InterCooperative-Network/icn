@@ -128,9 +128,7 @@ pub struct MyVoteResponse {
 fn format_timestamp(timestamp: u64) -> String {
     use std::time::{Duration, UNIX_EPOCH};
     let datetime = UNIX_EPOCH + Duration::from_secs(timestamp);
-    let duration_since_epoch = datetime
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default();
+    let duration_since_epoch = datetime.duration_since(UNIX_EPOCH).unwrap_or_default();
     let secs = duration_since_epoch.as_secs();
 
     let days = secs / 86400;
@@ -141,7 +139,9 @@ fn format_timestamp(timestamp: u64) -> String {
     let hours = (secs % 86400) / 3600;
     let mins = (secs % 3600) / 60;
 
-    format!("{:04}-{:02}-{:02} {:02}:{:02} UTC", years, months, day, hours, mins)
+    format!(
+        "{years:04}-{months:02}-{day:02} {hours:02}:{mins:02} UTC"
+    )
 }
 
 fn ratification_to_vote(r: &Ratification) -> VoteResponse {
@@ -340,7 +340,10 @@ pub async fn get_results(
     let mut abstain_count = 0;
 
     for r in &amendment.ratifications {
-        if r.comment.as_ref().map_or(false, |c| c.starts_with("[ABSTAIN]")) {
+        if r.comment
+            .as_ref()
+            .is_some_and(|c| c.starts_with("[ABSTAIN]"))
+        {
             abstain_count += 1;
         } else if r.approved {
             approve_count += 1;
@@ -366,7 +369,11 @@ pub async fn get_results(
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
                 .as_secs();
-            let remaining = if *voting_ends_at > now { voting_ends_at - now } else { 0 };
+            let remaining = if *voting_ends_at > now {
+                voting_ends_at - now
+            } else {
+                0
+            };
             (Some(*voting_ends_at), Some(remaining))
         }
         _ => (None, None),

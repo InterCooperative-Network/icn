@@ -199,8 +199,7 @@ pub async fn get_history(
         .get("limit")
         .and_then(|s| s.parse().ok())
         .unwrap_or(DEFAULT_PAGE_SIZE)
-        .min(MAX_PAGE_SIZE)
-        .max(1);
+        .clamp(1, MAX_PAGE_SIZE);
 
     // Decode cursor if provided
     let decoded_cursor = cursor.as_ref().and_then(|c| Cursor::decode(c));
@@ -264,29 +263,32 @@ pub async fn get_history(
         // Find the position after the cursor
         let start_idx = history
             .iter()
-            .position(|tx| {
-                tx.timestamp < cur.ts || (tx.timestamp == cur.ts && tx.id <= cur.id)
-            })
+            .position(|tx| tx.timestamp < cur.ts || (tx.timestamp == cur.ts && tx.id <= cur.id))
             .unwrap_or(history.len());
 
         // Get page items
-        let page: Vec<TransactionHistoryEntry> =
-            history.iter().skip(start_idx).take(limit).cloned().collect();
+        let page: Vec<TransactionHistoryEntry> = history
+            .iter()
+            .skip(start_idx)
+            .take(limit)
+            .cloned()
+            .collect();
 
         let has_more = start_idx + limit < history.len();
 
         // Build next cursor from last item
         let next_cursor = if has_more {
-            page.last().map(|tx| Cursor::from_seconds(tx.timestamp, &tx.id).encode())
+            page.last()
+                .map(|tx| Cursor::from_seconds(tx.timestamp, &tx.id).encode())
         } else {
             None
         };
 
         // Build prev cursor
         let prev_cursor = if start_idx > 0 {
-            history.get(start_idx.saturating_sub(1)).map(|tx| {
-                Cursor::from_seconds(tx.timestamp, &tx.id).encode()
-            })
+            history
+                .get(start_idx.saturating_sub(1))
+                .map(|tx| Cursor::from_seconds(tx.timestamp, &tx.id).encode())
         } else {
             None
         };
@@ -305,7 +307,9 @@ pub async fn get_history(
 
         // Generate cursor for next page if there are more items
         let next_cursor = if has_more {
-            history.last().map(|tx| Cursor::from_seconds(tx.timestamp, &tx.id).encode())
+            history
+                .last()
+                .map(|tx| Cursor::from_seconds(tx.timestamp, &tx.id).encode())
         } else {
             None
         };

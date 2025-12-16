@@ -27,18 +27,15 @@ pub const DEFAULT_PAGE_SIZE: usize = 20;
 /// Direction of pagination
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum Direction {
     /// Forward pagination (newer items first by default)
+    #[default]
     Forward,
     /// Backward pagination (older items first)
     Backward,
 }
 
-impl Default for Direction {
-    fn default() -> Self {
-        Direction::Forward
-    }
-}
 
 /// Cursor containing position information
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -112,7 +109,7 @@ impl PaginationRequest {
     pub fn validate(self) -> Self {
         Self {
             cursor: self.cursor,
-            limit: self.limit.min(MAX_PAGE_SIZE).max(1),
+            limit: self.limit.clamp(1, MAX_PAGE_SIZE),
             direction: self.direction,
         }
     }
@@ -237,7 +234,8 @@ pub fn paginate_items<T: Cursored + Clone>(
                 // We want to find items with timestamp strictly less than cursor
                 // OR same timestamp but ID strictly less (for tie-breaking)
                 item.cursor_timestamp() < cursor.ts
-                    || (item.cursor_timestamp() == cursor.ts && item.cursor_id() < cursor.id.as_str())
+                    || (item.cursor_timestamp() == cursor.ts
+                        && item.cursor_id() < cursor.id.as_str())
             })
             .unwrap_or(items.len())
     } else {
@@ -259,7 +257,9 @@ pub fn paginate_items<T: Cursored + Clone>(
 
     // Build prev cursor if we're not at the start
     let prev_cursor = if start_idx > 0 {
-        items.get(start_idx.saturating_sub(1)).map(|item| item.to_cursor())
+        items
+            .get(start_idx.saturating_sub(1))
+            .map(|item| item.to_cursor())
     } else {
         None
     };

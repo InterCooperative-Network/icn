@@ -254,7 +254,10 @@ pub enum CommonsRevocationReason {
     /// Policy violation
     PolicyViolation { policy_ref: String, details: String },
     /// Governance decision
-    GovernanceDecision { proposal_id: String, vote_outcome: String },
+    GovernanceDecision {
+        proposal_id: String,
+        vote_outcome: String,
+    },
     /// Key compromise (not punitive)
     KeyCompromise,
     /// Voluntary exit

@@ -456,10 +456,7 @@ pub async fn complete_enrollment(
     // Auto-affiliate the new holder with their enrollment coop
     let membership_status = if let Some(ref holder_id_hex) = holder_id {
         let jurisdiction = JurisdictionId::new(format!("coop:{}", session.coop_id));
-        let initial_capabilities = vec![
-            MembershipCapability::Transact,
-            MembershipCapability::Vote,
-        ];
+        let initial_capabilities = vec![MembershipCapability::Transact, MembershipCapability::Vote];
 
         match commons_mgr
             .join_jurisdiction(holder_id_hex, jurisdiction.clone(), initial_capabilities)

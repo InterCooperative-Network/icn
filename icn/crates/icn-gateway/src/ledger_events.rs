@@ -77,7 +77,9 @@ impl LedgerEventBridge {
                         amount: transfer.amount,
                         currency: transfer.currency,
                     };
-                    self.gateway_broadcaster.broadcast(&coop_id, gateway_event).await;
+                    self.gateway_broadcaster
+                        .broadcast(&coop_id, gateway_event)
+                        .await;
                 }
                 debug!(
                     entry_hash = %tx.entry_hash,
@@ -106,7 +108,9 @@ impl LedgerEventBridge {
                     change: bc.change,
                     entry_hash: bc.entry_hash,
                 };
-                self.gateway_broadcaster.broadcast(&coop_id, gateway_event).await;
+                self.gateway_broadcaster
+                    .broadcast(&coop_id, gateway_event)
+                    .await;
                 debug!("Forwarded BalanceChanged event");
             }
 
@@ -135,7 +139,9 @@ impl LedgerEventBridge {
                     entry_hash: batch.entry_hash,
                     changes,
                 };
-                self.gateway_broadcaster.broadcast(&coop_id, gateway_event).await;
+                self.gateway_broadcaster
+                    .broadcast(&coop_id, gateway_event)
+                    .await;
                 debug!("Forwarded BatchBalanceChanged event");
             }
 
@@ -150,7 +156,9 @@ impl LedgerEventBridge {
                     proposal_id: mf.proposal_id,
                     duration_seconds: mf.duration_seconds,
                 };
-                self.gateway_broadcaster.broadcast(&coop_id, gateway_event).await;
+                self.gateway_broadcaster
+                    .broadcast(&coop_id, gateway_event)
+                    .await;
                 debug!("Forwarded MemberFrozen event");
             }
 
@@ -163,7 +171,9 @@ impl LedgerEventBridge {
                     unfrozen_by: mu.unfrozen_by,
                     proposal_id: mu.proposal_id,
                 };
-                self.gateway_broadcaster.broadcast(&coop_id, gateway_event).await;
+                self.gateway_broadcaster
+                    .broadcast(&coop_id, gateway_event)
+                    .await;
                 debug!("Forwarded MemberUnfrozen event");
             }
 
@@ -174,7 +184,9 @@ impl LedgerEventBridge {
                     parent_hash: fd.parent_hash,
                     conflicting_entries: fd.conflicting_entries,
                 };
-                self.gateway_broadcaster.broadcast(&coop_id, gateway_event).await;
+                self.gateway_broadcaster
+                    .broadcast(&coop_id, gateway_event)
+                    .await;
                 warn!("Forwarded ForkDetected event");
             }
 
@@ -187,7 +199,9 @@ impl LedgerEventBridge {
                     quarantined_entries: fr.quarantined_entries,
                     resolution_strategy: fr.resolution_strategy,
                 };
-                self.gateway_broadcaster.broadcast(&coop_id, gateway_event).await;
+                self.gateway_broadcaster
+                    .broadcast(&coop_id, gateway_event)
+                    .await;
                 info!("Forwarded ForkResolved event");
             }
 
@@ -199,7 +213,9 @@ impl LedgerEventBridge {
                     archived_count: rp.archived_count,
                     reason: rp.reason,
                 };
-                self.gateway_broadcaster.broadcast(&coop_id, gateway_event).await;
+                self.gateway_broadcaster
+                    .broadcast(&coop_id, gateway_event)
+                    .await;
                 warn!("Forwarded RollbackPerformed event");
             }
         }
@@ -257,9 +273,7 @@ mod tests {
         if let Ok(sequenced) = rx.try_recv() {
             match sequenced.event {
                 GatewayEvent::PaymentCreated {
-                    coop_id: c,
-                    amount,
-                    ..
+                    coop_id: c, amount, ..
                 } => {
                     assert_eq!(c, "test-coop");
                     assert_eq!(amount, 10);

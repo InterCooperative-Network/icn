@@ -52,7 +52,7 @@ async fn test_steward_registration() {
         .register_steward(
             &member_did,
             &member_did,
-            365, // 1 year term
+            365,  // 1 year term
             1000, // bond amount
             "governance-proposal-123".to_string(),
             Some("coop:test-coop".to_string()),
@@ -66,7 +66,9 @@ async fn test_steward_registration() {
     assert_eq!(steward.bond_amount, 1000);
     assert_eq!(steward.jurisdiction, Some("coop:test-coop".to_string()));
     assert!(steward.specializations.contains(&"enrollment".to_string()));
-    assert!(steward.specializations.contains(&"dispute-resolution".to_string()));
+    assert!(steward
+        .specializations
+        .contains(&"dispute-resolution".to_string()));
 }
 
 /// Test that weak POP level cannot become steward
@@ -141,7 +143,10 @@ async fn test_steward_lookup() {
     // Lookup by DID
     let found = commons_mgr.get_steward_by_did(&member_did).await.unwrap();
     assert!(found.is_some());
-    assert_eq!(found.unwrap().steward_did.to_string(), member_did.to_string());
+    assert_eq!(
+        found.unwrap().steward_did.to_string(),
+        member_did.to_string()
+    );
 }
 
 /// Test steward suspension and reinstatement
@@ -293,9 +298,18 @@ async fn test_attestation_tracking() {
     assert_eq!(steward.attestations_issued, 0);
 
     // Record some attestations
-    commons_mgr.record_steward_attestation(&steward_id).await.unwrap();
-    commons_mgr.record_steward_attestation(&steward_id).await.unwrap();
-    commons_mgr.record_steward_attestation(&steward_id).await.unwrap();
+    commons_mgr
+        .record_steward_attestation(&steward_id)
+        .await
+        .unwrap();
+    commons_mgr
+        .record_steward_attestation(&steward_id)
+        .await
+        .unwrap();
+    commons_mgr
+        .record_steward_attestation(&steward_id)
+        .await
+        .unwrap();
 
     let updated = commons_mgr.get_steward(&steward_id).await.unwrap().unwrap();
     assert_eq!(updated.attestations_issued, 3);
@@ -330,11 +344,20 @@ async fn test_dispute_tracking() {
     assert_eq!(steward.disputes_won, 0);
 
     // Record disputes
-    commons_mgr.record_steward_dispute(&steward_id).await.unwrap();
-    commons_mgr.record_steward_dispute(&steward_id).await.unwrap();
+    commons_mgr
+        .record_steward_dispute(&steward_id)
+        .await
+        .unwrap();
+    commons_mgr
+        .record_steward_dispute(&steward_id)
+        .await
+        .unwrap();
 
     // Record a dispute win
-    commons_mgr.record_steward_dispute_won(&steward_id).await.unwrap();
+    commons_mgr
+        .record_steward_dispute_won(&steward_id)
+        .await
+        .unwrap();
 
     let updated = commons_mgr.get_steward(&steward_id).await.unwrap().unwrap();
     assert_eq!(updated.attestations_disputed, 2);
@@ -369,20 +392,29 @@ async fn test_bond_management() {
     assert_eq!(steward.bond_amount, 1000);
 
     // Add bond
-    commons_mgr.add_steward_bond(&steward_id, 500).await.unwrap();
+    commons_mgr
+        .add_steward_bond(&steward_id, 500)
+        .await
+        .unwrap();
 
     let updated = commons_mgr.get_steward(&steward_id).await.unwrap().unwrap();
     assert_eq!(updated.bond_amount, 1500);
 
     // Slash bond - returns the amount slashed, not remaining
-    let slashed = commons_mgr.slash_steward_bond(&steward_id, 300).await.unwrap();
+    let slashed = commons_mgr
+        .slash_steward_bond(&steward_id, 300)
+        .await
+        .unwrap();
     assert_eq!(slashed, 300);
 
     let updated = commons_mgr.get_steward(&steward_id).await.unwrap().unwrap();
     assert_eq!(updated.bond_amount, 1200);
 
     // Slash more than available - only slashes what's available
-    let slashed = commons_mgr.slash_steward_bond(&steward_id, 2000).await.unwrap();
+    let slashed = commons_mgr
+        .slash_steward_bond(&steward_id, 2000)
+        .await
+        .unwrap();
     assert_eq!(slashed, 1200); // Only 1200 was available
 
     let updated = commons_mgr.get_steward(&steward_id).await.unwrap().unwrap();
@@ -541,7 +573,10 @@ async fn test_list_attesters() {
     // Only one attester now
     let attesters = commons_mgr.list_attesters().await.unwrap();
     assert_eq!(attesters.len(), 1);
-    assert_eq!(attesters[0].steward_id.to_hex(), steward2.steward_id.to_hex());
+    assert_eq!(
+        attesters[0].steward_id.to_hex(),
+        steward2.steward_id.to_hex()
+    );
 }
 
 /// Test duplicate steward registration prevention
@@ -583,7 +618,10 @@ async fn test_duplicate_steward_prevention() {
         .await;
 
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Already registered"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("Already registered"));
 }
 
 /// Test steward without holder fails

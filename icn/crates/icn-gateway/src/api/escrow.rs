@@ -72,6 +72,12 @@ pub struct EscrowStore {
     escrows: Arc<RwLock<HashMap<String, Escrow>>>,
 }
 
+impl Default for EscrowStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EscrowStore {
     pub fn new() -> Self {
         Self {
@@ -178,9 +184,7 @@ pub async fn list_escrows(
     let mut escrows = store.list().await;
 
     // Filter to user's escrows (as creator or beneficiary)
-    escrows.retain(|e| {
-        e.creator == user_did || e.to_account.contains(&user_did)
-    });
+    escrows.retain(|e| e.creator == user_did || e.to_account.contains(&user_did));
 
     // Filter by status if provided
     if let Some(status_str) = query.get("status") {
@@ -192,8 +196,7 @@ pub async fn list_escrows(
             "expired" => EscrowStatus::Expired,
             _ => {
                 return Err(GatewayError::BadRequest(format!(
-                    "Invalid status: {}",
-                    status_str
+                    "Invalid status: {status_str}"
                 )))
             }
         };
@@ -223,7 +226,7 @@ pub async fn get_escrow(
     let escrow = store
         .get(&escrow_id)
         .await
-        .ok_or_else(|| GatewayError::NotFound(format!("Escrow not found: {}", escrow_id)))?;
+        .ok_or_else(|| GatewayError::NotFound(format!("Escrow not found: {escrow_id}")))?;
 
     // Verify user is involved
     if escrow.creator != user_did && !escrow.to_account.contains(&user_did) {
@@ -253,7 +256,7 @@ pub async fn release_escrow(
     let mut escrow = store
         .get(&escrow_id)
         .await
-        .ok_or_else(|| GatewayError::NotFound(format!("Escrow not found: {}", escrow_id)))?;
+        .ok_or_else(|| GatewayError::NotFound(format!("Escrow not found: {escrow_id}")))?;
 
     // Check status
     if escrow.status != EscrowStatus::Pending && escrow.status != EscrowStatus::Locked {
@@ -326,7 +329,7 @@ pub async fn refund_escrow(
     let mut escrow = store
         .get(&escrow_id)
         .await
-        .ok_or_else(|| GatewayError::NotFound(format!("Escrow not found: {}", escrow_id)))?;
+        .ok_or_else(|| GatewayError::NotFound(format!("Escrow not found: {escrow_id}")))?;
 
     // Only creator can refund
     if escrow.creator != user_did {

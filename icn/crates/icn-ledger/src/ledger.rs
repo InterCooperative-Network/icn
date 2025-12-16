@@ -365,8 +365,10 @@ impl Ledger {
 
         // Build transfers list from deltas (pair debits with credits)
         // Group by currency and match debits to credits
-        let mut debits_by_currency: HashMap<String, Vec<(&icn_identity::Did, i64)>> = HashMap::new();
-        let mut credits_by_currency: HashMap<String, Vec<(&icn_identity::Did, i64)>> = HashMap::new();
+        let mut debits_by_currency: HashMap<String, Vec<(&icn_identity::Did, i64)>> =
+            HashMap::new();
+        let mut credits_by_currency: HashMap<String, Vec<(&icn_identity::Did, i64)>> =
+            HashMap::new();
 
         for delta in &entry.accounts {
             if let Some(debit) = delta.debit {
@@ -1634,12 +1636,7 @@ impl Ledger {
 
         // Emit rollback event
         if let Some(ref emitter) = self.event_emitter {
-            emitter.emit_rollback_performed(
-                target_hash,
-                archived_count,
-                reason,
-                archive_timestamp,
-            );
+            emitter.emit_rollback_performed(target_hash, archived_count, reason, archive_timestamp);
         }
 
         Ok(archived_hashes)

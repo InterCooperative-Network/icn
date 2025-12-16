@@ -240,7 +240,11 @@ impl GovernanceNotificationTrigger {
             recipient,
             coop_id,
             "Appeal Filed",
-            format!("Appeal regarding {} filed by {}", subject, truncate_did(appellant)),
+            format!(
+                "Appeal regarding {} filed by {}",
+                subject,
+                truncate_did(appellant)
+            ),
             NotificationType::AppealFiled,
         )
         .with_data(serde_json::json!({
@@ -264,7 +268,7 @@ impl GovernanceNotificationTrigger {
             appellant,
             coop_id,
             "Appeal Decision",
-            format!("Your appeal has been {}", decision),
+            format!("Your appeal has been {decision}"),
             NotificationType::AppealDecision,
         )
         .with_data(serde_json::json!({
@@ -285,8 +289,8 @@ impl GovernanceNotificationTrigger {
         reason: Option<&str>,
     ) -> Result<String, String> {
         let body = match reason {
-            Some(r) => format!("Your membership status is now: {}. Reason: {}", status, r),
-            None => format!("Your membership status is now: {}", status),
+            Some(r) => format!("Your membership status is now: {status}. Reason: {r}"),
+            None => format!("Your membership status is now: {status}"),
         };
 
         let notif = QueuedNotification::new(
@@ -325,11 +329,8 @@ mod tests {
         let (queue, mut receiver) = NotificationQueue::new();
         let queue = Arc::new(queue);
 
-        let trigger = LedgerNotificationTrigger::new(
-            emitter.clone(),
-            queue.clone(),
-            "test-coop".to_string(),
-        );
+        let trigger =
+            LedgerNotificationTrigger::new(emitter.clone(), queue.clone(), "test-coop".to_string());
         let _handle = trigger.start();
 
         // Give trigger time to start

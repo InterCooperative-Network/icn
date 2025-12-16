@@ -541,9 +541,7 @@ pub async fn slash_bond(
         .jurisdiction
         .as_ref()
         .map(|j| icn_identity::JurisdictionId(j.clone()))
-        .ok_or_else(|| {
-            GatewayError::InternalError("Steward has no jurisdiction".to_string())
-        })?;
+        .ok_or_else(|| GatewayError::InternalError("Steward has no jurisdiction".to_string()))?;
 
     // Get caller's holder record
     let caller_holder = commons_manager
@@ -567,7 +565,8 @@ pub async fn slash_bond(
 
     if !has_authority {
         return Err(GatewayError::AuthorizationFailed(
-            "Caller does not have governance authority (HoldOffice capability required)".to_string(),
+            "Caller does not have governance authority (HoldOffice capability required)"
+                .to_string(),
         ));
     }
 

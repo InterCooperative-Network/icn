@@ -104,6 +104,12 @@ pub struct BudgetStore {
     budgets: Arc<RwLock<HashMap<String, Budget>>>,
 }
 
+impl Default for BudgetStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BudgetStore {
     pub fn new() -> Self {
         Self {
@@ -140,7 +146,7 @@ impl BudgetStore {
     /// Check spending against budget
     pub async fn check_spending(&self, account: &str, amount: i64) -> Result<bool> {
         let budgets = self.budgets.read().await;
-        
+
         for budget in budgets.values() {
             if budget.account == account {
                 // Deny if budget is exceeded
@@ -153,7 +159,7 @@ impl BudgetStore {
                 }
             }
         }
-        
+
         Ok(true)
     }
 
@@ -231,7 +237,9 @@ pub async fn create_budget(
     let period_end = calculate_period_end(now, req.period);
 
     let default_thresholds = vec![80, 100];
-    let notification_thresholds = req.notification_thresholds.clone()
+    let notification_thresholds = req
+        .notification_thresholds
+        .clone()
         .unwrap_or(default_thresholds);
 
     let budget = Budget {
@@ -284,8 +292,7 @@ pub async fn list_budgets(
             "expired" => BudgetStatus::Expired,
             _ => {
                 return Err(GatewayError::BadRequest(format!(
-                    "Invalid status: {}",
-                    status_str
+                    "Invalid status: {status_str}"
                 )))
             }
         };
@@ -315,7 +322,7 @@ pub async fn get_budget(
     let budget = store
         .get(&budget_id)
         .await
-        .ok_or_else(|| GatewayError::NotFound(format!("Budget not found: {}", budget_id)))?;
+        .ok_or_else(|| GatewayError::NotFound(format!("Budget not found: {budget_id}")))?;
 
     // Verify ownership
     if budget.owner != owner_did {
@@ -350,7 +357,7 @@ pub async fn update_budget(
     let mut budget = store
         .get(&budget_id)
         .await
-        .ok_or_else(|| GatewayError::NotFound(format!("Budget not found: {}", budget_id)))?;
+        .ok_or_else(|| GatewayError::NotFound(format!("Budget not found: {budget_id}")))?;
 
     // Verify ownership
     if budget.owner != owner_did {
@@ -401,7 +408,7 @@ pub async fn delete_budget(
     let budget = store
         .get(&budget_id)
         .await
-        .ok_or_else(|| GatewayError::NotFound(format!("Budget not found: {}", budget_id)))?;
+        .ok_or_else(|| GatewayError::NotFound(format!("Budget not found: {budget_id}")))?;
 
     // Verify ownership
     if budget.owner != owner_did {
@@ -421,10 +428,10 @@ pub async fn delete_budget(
 /// Calculate period end timestamp
 fn calculate_period_end(start: u64, period: BudgetPeriod) -> u64 {
     match period {
-        BudgetPeriod::Daily => start + 86400,         // 24 hours
-        BudgetPeriod::Weekly => start + 604800,       // 7 days
-        BudgetPeriod::Monthly => start + 2592000,     // 30 days (approximation)
-        BudgetPeriod::Yearly => start + 31536000,     // 365 days
+        BudgetPeriod::Daily => start + 86400,     // 24 hours
+        BudgetPeriod::Weekly => start + 604800,   // 7 days
+        BudgetPeriod::Monthly => start + 2592000, // 30 days (approximation)
+        BudgetPeriod::Yearly => start + 31536000, // 365 days
     }
 }
 

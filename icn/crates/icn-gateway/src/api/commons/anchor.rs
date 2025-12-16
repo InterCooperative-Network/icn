@@ -184,7 +184,9 @@ pub async fn add_attestation(
         .get_steward_by_did(&steward_did)
         .await?
         .ok_or_else(|| {
-            GatewayError::AuthorizationFailed("Only registered stewards can add attestations".to_string())
+            GatewayError::AuthorizationFailed(
+                "Only registered stewards can add attestations".to_string(),
+            )
         })?;
 
     if !steward.can_attest() {
