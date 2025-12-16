@@ -44,7 +44,6 @@ pub mod websocket;
 
 pub use auth::TokenClaims;
 pub use commons_mgr::CommonsManager;
-#[cfg(feature = "sled-storage")]
 pub use commons_store::SledCommonsStore;
 pub use commons_store::{CommonsStore, CommonsStoreBackend, InMemoryCommonsStore};
 pub use compute_events::{create_forwarding_callback, forward_compute_event};

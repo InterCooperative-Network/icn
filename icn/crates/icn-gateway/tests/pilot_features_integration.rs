@@ -65,7 +65,8 @@ async fn test_recurring_payment_lifecycle() {
 
 #[tokio::test]
 async fn test_escrow_conditions() {
-    let store = EscrowStore::new();
+    let db = sled::Config::new().temporary(true).open().unwrap();
+    let store = EscrowStore::new(db);
 
     // Create escrow with approval condition
     let escrow = Escrow {
@@ -87,10 +88,10 @@ async fn test_escrow_conditions() {
         updated_at: 100,
     };
 
-    store.insert(escrow.clone()).await;
+    store.insert(escrow.clone()).unwrap();
 
     // Retrieve
-    let retrieved = store.get("escrow-1").await;
+    let retrieved = store.get("escrow-1").unwrap();
     assert!(retrieved.is_some());
     let retrieved = retrieved.unwrap();
     assert_eq!(retrieved.status, EscrowStatus::Pending);
@@ -101,20 +102,21 @@ async fn test_escrow_conditions() {
     let mut updated = retrieved.clone();
     updated.approvals.push("did:icn:charlie".to_string());
     updated.status = EscrowStatus::Released;
-    store.update("escrow-1", updated).await;
+    store.update("escrow-1", updated).unwrap();
 
-    let retrieved = store.get("escrow-1").await.unwrap();
+    let retrieved = store.get("escrow-1").unwrap().unwrap();
     assert_eq!(retrieved.status, EscrowStatus::Released);
     assert_eq!(retrieved.approvals.len(), 1);
 
     // List
-    let all = store.list().await;
+    let all = store.list().unwrap();
     assert_eq!(all.len(), 1);
 }
 
 #[tokio::test]
 async fn test_budget_tracking() {
-    let store = BudgetStore::new();
+    let db = sled::Config::new().temporary(true).open().unwrap();
+    let store = BudgetStore::new(db);
 
     // Create budget
     let budget = Budget {
@@ -135,20 +137,21 @@ async fn test_budget_tracking() {
         updated_at: 100,
     };
 
-    store.insert(budget.clone()).await;
+    store.insert(budget.clone()).unwrap();
 
     // Check initial status
-    let retrieved = store.get("budget-1").await.unwrap();
+    let retrieved = store.get("budget-1").unwrap().unwrap();
     assert_eq!(retrieved.spent, 0);
     assert_eq!(retrieved.remaining(), 1000);
     assert_eq!(retrieved.percentage_used(), 0.0);
     assert!(!retrieved.is_exceeded());
 
     // Record spending
-    let notified = store.record_spending("alice-spending", 850).await.unwrap();
+    let notified = store.record_spending("alice-spending", 850).unwrap();
+    
     assert_eq!(notified.len(), 1); // 85% triggers 80% threshold
 
-    let retrieved = store.get("budget-1").await.unwrap();
+    let retrieved = store.get("budget-1").unwrap().unwrap();
     assert_eq!(retrieved.spent, 850);
     assert_eq!(retrieved.remaining(), 150);
     assert!(retrieved.percentage_used() > 80.0);
@@ -156,16 +159,16 @@ async fn test_budget_tracking() {
     assert_eq!(retrieved.notified_thresholds.len(), 1);
 
     // Exceed budget
-    store.record_spending("alice-spending", 200).await.unwrap();
+    store.record_spending("alice-spending", 200).unwrap();
 
-    let retrieved = store.get("budget-1").await.unwrap();
+    let retrieved = store.get("budget-1").unwrap().unwrap();
     assert_eq!(retrieved.spent, 1050);
     assert!(retrieved.is_exceeded());
     assert_eq!(retrieved.status, BudgetStatus::Exceeded);
     assert_eq!(retrieved.notified_thresholds.len(), 2); // Both 80% and 100%
 
     // Check spending enforcement
-    let can_spend = store.check_spending("alice-spending", 100).await.unwrap();
+    let can_spend = store.check_spending("alice-spending", 100).unwrap();
     assert!(!can_spend); // Should deny since exceeded
 }
 
@@ -269,7 +272,8 @@ async fn test_recurring_payment_frequencies() {
 
 #[tokio::test]
 async fn test_budget_multiple_accounts() {
-    let store = BudgetStore::new();
+    let db = sled::Config::new().temporary(true).open().unwrap();
+    let store = BudgetStore::new(db);
 
     // Create budgets for different accounts
     let budget1 = Budget {
@@ -308,15 +312,15 @@ async fn test_budget_multiple_accounts() {
         updated_at: 0,
     };
 
-    store.insert(budget1).await;
-    store.insert(budget2).await;
+    store.insert(budget1).unwrap();
+    store.insert(budget2).unwrap();
 
     // Record spending on account-1
-    store.record_spending("account-1", 300).await.unwrap();
+    store.record_spending("account-1", 300).unwrap();
 
     // Verify budgets are independent
-    let b1 = store.get("budget-1").await.unwrap();
-    let b2 = store.get("budget-2").await.unwrap();
+    let b1 = store.get("budget-1").unwrap().unwrap();
+    let b2 = store.get("budget-2").unwrap().unwrap();
 
     assert_eq!(b1.spent, 300);
     assert_eq!(b2.spent, 0);

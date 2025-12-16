@@ -4,113 +4,15 @@
 
 use actix_web::{get, post, web, HttpRequest, HttpResponse};
 use icn_identity::Did;
-use serde::{Deserialize, Serialize};
+pub use icn_store::escrow::{Escrow, EscrowCondition, EscrowStatus, EscrowStore};
+use serde::Deserialize;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::RwLock;
 use tracing::{info, warn};
 
 use crate::error::{GatewayError, Result};
 use crate::ledger_mgr::LedgerManager;
 use crate::middleware::{get_claims, require_scope};
-
-/// Escrow status
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum EscrowStatus {
-    Pending,
-    Locked,
-    Released,
-    Refunded,
-    Expired,
-}
-
-/// Escrow condition type
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum EscrowCondition {
-    /// Requires approval from specific DID
-    RequiresApproval { did: String },
-    /// Releases after timestamp
-    TimeRelease { timestamp: u64 },
-    /// Requires external proof (e.g., delivery confirmation)
-    ProofRequired { proof_type: String },
-}
-
-/// Escrow record
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Escrow {
-    /// Unique ID
-    pub id: String,
-    /// Cooperative ID (ledger namespace)
-    pub coop_id: String,
-    /// Creator/initiator DID
-    pub creator: String,
-    /// From account
-    pub from_account: String,
-    /// To account (beneficiary)
-    pub to_account: String,
-    /// Amount held
-    pub amount: i64,
-    /// Currency
-    pub currency: String,
-    /// Current status
-    pub status: EscrowStatus,
-    /// Release conditions
-    pub conditions: Vec<EscrowCondition>,
-    /// Approvals received
-    pub approvals: Vec<String>,
-    /// Expiration timestamp
-    pub expires_at: Option<u64>,
-    /// Description/purpose
-    pub description: String,
-    /// Created timestamp
-    pub created_at: u64,
-    /// Updated timestamp
-    pub updated_at: u64,
-}
-
-/// In-memory escrow store
-#[derive(Clone)]
-pub struct EscrowStore {
-    escrows: Arc<RwLock<HashMap<String, Escrow>>>,
-}
-
-impl Default for EscrowStore {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl EscrowStore {
-    pub fn new() -> Self {
-        Self {
-            escrows: Arc::new(RwLock::new(HashMap::new())),
-        }
-    }
-
-    pub async fn insert(&self, escrow: Escrow) {
-        self.escrows.write().await.insert(escrow.id.clone(), escrow);
-    }
-
-    pub async fn get(&self, id: &str) -> Option<Escrow> {
-        self.escrows.read().await.get(id).cloned()
-    }
-
-    pub async fn list(&self) -> Vec<Escrow> {
-        self.escrows.read().await.values().cloned().collect()
-    }
-
-    pub async fn update(&self, id: &str, escrow: Escrow) -> bool {
-        let mut escrows = self.escrows.write().await;
-        if escrows.contains_key(id) {
-            escrows.insert(id.to_string(), escrow);
-            true
-        } else {
-            false
-        }
-    }
-}
 
 /// Request to create escrow
 #[derive(Debug, Deserialize)]
@@ -170,7 +72,8 @@ pub async fn create_escrow(
         updated_at: now,
     };
 
-    store.insert(escrow.clone()).await;
+    store.insert(escrow.clone())
+        .map_err(|e| GatewayError::InternalError(format!("Store error: {e}")))?;
 
     Ok(HttpResponse::Created().json(escrow))
 }
@@ -188,10 +91,9 @@ pub async fn list_escrows(
         .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
     let user_did = claims.sub;
 
-    let mut escrows = store.list().await;
-
-    // Filter to user's escrows (as creator or beneficiary)
-    escrows.retain(|e| e.creator == user_did || e.to_account.contains(&user_did));
+    // Use optimized query by user
+    let mut escrows = store.list_by_user(&user_did)
+        .map_err(|e| GatewayError::InternalError(format!("Store error: {e}")))?;
 
     // Filter by status if provided
     if let Some(status_str) = query.get("status") {
@@ -232,7 +134,7 @@ pub async fn get_escrow(
     let escrow_id = id.into_inner();
     let escrow = store
         .get(&escrow_id)
-        .await
+        .map_err(|e| GatewayError::InternalError(format!("Store error: {e}")))?
         .ok_or_else(|| GatewayError::NotFound(format!("Escrow not found: {escrow_id}")))?;
 
     // Verify user is involved
@@ -263,7 +165,7 @@ pub async fn release_escrow(
     let escrow_id = id.into_inner();
     let mut escrow = store
         .get(&escrow_id)
-        .await
+        .map_err(|e| GatewayError::InternalError(format!("Store error: {e}")))?
         .ok_or_else(|| GatewayError::NotFound(format!("Escrow not found: {escrow_id}")))?;
 
     // Check status
@@ -332,7 +234,8 @@ pub async fn release_escrow(
             .unwrap()
             .as_secs();
 
-        store.update(&escrow_id, escrow.clone()).await;
+        store.update(&escrow_id, escrow.clone())
+            .map_err(|e| GatewayError::InternalError(format!("Store error: {e}")))?;
 
         Ok(HttpResponse::Ok().json(serde_json::json!({
             "escrow": escrow,
@@ -347,7 +250,8 @@ pub async fn release_escrow(
             .unwrap()
             .as_secs();
 
-        store.update(&escrow_id, escrow.clone()).await;
+        store.update(&escrow_id, escrow.clone())
+            .map_err(|e| GatewayError::InternalError(format!("Store error: {e}")))?;
 
         Ok(HttpResponse::Ok().json(serde_json::json!({
             "escrow": escrow,
@@ -374,7 +278,7 @@ pub async fn refund_escrow(
     let escrow_id = id.into_inner();
     let mut escrow = store
         .get(&escrow_id)
-        .await
+        .map_err(|e| GatewayError::InternalError(format!("Store error: {e}")))?
         .ok_or_else(|| GatewayError::NotFound(format!("Escrow not found: {escrow_id}")))?;
 
     // Only creator can refund
@@ -438,7 +342,8 @@ pub async fn refund_escrow(
         .unwrap()
         .as_secs();
 
-    store.update(&escrow_id, escrow.clone()).await;
+    store.update(&escrow_id, escrow.clone())
+        .map_err(|e| GatewayError::InternalError(format!("Store error: {e}")))?;
 
     Ok(HttpResponse::Ok().json(serde_json::json!({
         "escrow": escrow,
@@ -494,3 +399,4 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         .service(release_escrow)
         .service(refund_escrow);
 }
+

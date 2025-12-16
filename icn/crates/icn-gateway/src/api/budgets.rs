@@ -4,194 +4,12 @@
 
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
 use icn_identity::Did;
-use serde::{Deserialize, Serialize};
+pub use icn_store::budgets::{Budget, BudgetPeriod, BudgetStatus, BudgetStore};
+use serde::Deserialize;
 use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::sync::RwLock;
 
 use crate::error::{GatewayError, Result};
 use crate::middleware::{get_claims, require_scope};
-
-/// Budget period
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum BudgetPeriod {
-    Daily,
-    Weekly,
-    Monthly,
-    Yearly,
-}
-
-/// Budget status
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum BudgetStatus {
-    Active,
-    Paused,
-    Exceeded,
-    Expired,
-}
-
-/// Budget limit
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Budget {
-    /// Unique ID
-    pub id: String,
-    /// Owner/creator DID
-    pub owner: String,
-    /// Account this budget applies to
-    pub account: String,
-    /// Currency
-    pub currency: String,
-    /// Spending limit
-    pub limit: i64,
-    /// Current spending in this period
-    pub spent: i64,
-    /// Budget period
-    pub period: BudgetPeriod,
-    /// Period start timestamp
-    pub period_start: u64,
-    /// Period end timestamp
-    pub period_end: u64,
-    /// Current status
-    pub status: BudgetStatus,
-    /// Notification thresholds (percentages)
-    pub notification_thresholds: Vec<u8>,
-    /// Thresholds that have been notified
-    pub notified_thresholds: Vec<u8>,
-    /// Description
-    pub description: String,
-    /// Created timestamp
-    pub created_at: u64,
-    /// Updated timestamp
-    pub updated_at: u64,
-}
-
-impl Budget {
-    /// Check if limit is exceeded
-    pub fn is_exceeded(&self) -> bool {
-        self.spent >= self.limit
-    }
-
-    /// Get remaining budget
-    pub fn remaining(&self) -> i64 {
-        self.limit - self.spent
-    }
-
-    /// Get percentage used
-    pub fn percentage_used(&self) -> f64 {
-        if self.limit == 0 {
-            return 100.0;
-        }
-        (self.spent as f64 / self.limit as f64) * 100.0
-    }
-
-    /// Check if threshold should trigger notification
-    pub fn should_notify(&self) -> Option<u8> {
-        let pct = self.percentage_used() as u8;
-        for threshold in &self.notification_thresholds {
-            if pct >= *threshold && !self.notified_thresholds.contains(threshold) {
-                return Some(*threshold);
-            }
-        }
-        None
-    }
-}
-
-/// In-memory budget store
-#[derive(Clone)]
-pub struct BudgetStore {
-    budgets: Arc<RwLock<HashMap<String, Budget>>>,
-}
-
-impl Default for BudgetStore {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl BudgetStore {
-    pub fn new() -> Self {
-        Self {
-            budgets: Arc::new(RwLock::new(HashMap::new())),
-        }
-    }
-
-    pub async fn insert(&self, budget: Budget) {
-        self.budgets.write().await.insert(budget.id.clone(), budget);
-    }
-
-    pub async fn get(&self, id: &str) -> Option<Budget> {
-        self.budgets.read().await.get(id).cloned()
-    }
-
-    pub async fn list(&self) -> Vec<Budget> {
-        self.budgets.read().await.values().cloned().collect()
-    }
-
-    pub async fn update(&self, id: &str, budget: Budget) -> bool {
-        let mut budgets = self.budgets.write().await;
-        if budgets.contains_key(id) {
-            budgets.insert(id.to_string(), budget);
-            true
-        } else {
-            false
-        }
-    }
-
-    pub async fn delete(&self, id: &str) -> bool {
-        self.budgets.write().await.remove(id).is_some()
-    }
-
-    /// Check spending against budget
-    pub async fn check_spending(&self, account: &str, amount: i64) -> Result<bool> {
-        let budgets = self.budgets.read().await;
-
-        for budget in budgets.values() {
-            if budget.account == account {
-                // Deny if budget is exceeded
-                if budget.status == BudgetStatus::Exceeded {
-                    return Ok(false);
-                }
-                // Deny if spending would exceed limit
-                if budget.status == BudgetStatus::Active && budget.spent + amount > budget.limit {
-                    return Ok(false);
-                }
-            }
-        }
-
-        Ok(true)
-    }
-
-    /// Record spending
-    pub async fn record_spending(&self, account: &str, amount: i64) -> Result<Vec<String>> {
-        let mut notified_budgets = Vec::new();
-        let mut budgets = self.budgets.write().await;
-
-        for budget in budgets.values_mut() {
-            if budget.account == account && budget.status == BudgetStatus::Active {
-                budget.spent += amount;
-                budget.updated_at = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs();
-
-                // Check if exceeded
-                if budget.is_exceeded() {
-                    budget.status = BudgetStatus::Exceeded;
-                }
-
-                // Check notification thresholds
-                if let Some(threshold) = budget.should_notify() {
-                    budget.notified_thresholds.push(threshold);
-                    notified_budgets.push(budget.id.clone());
-                }
-            }
-        }
-
-        Ok(notified_budgets)
-    }
-}
 
 /// Request to create budget
 #[derive(Debug, Deserialize)]
@@ -260,7 +78,7 @@ pub async fn create_budget(
         updated_at: now,
     };
 
-    store.insert(budget.clone()).await;
+    store.insert(budget.clone()).map_err(|e| GatewayError::InternalError(e.to_string()))?;
 
     Ok(HttpResponse::Created().json(budget))
 }
@@ -278,10 +96,8 @@ pub async fn list_budgets(
         .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
     let owner_did = claims.sub;
 
-    let mut budgets = store.list().await;
-
-    // Filter by owner
-    budgets.retain(|b| b.owner == owner_did);
+    // Use indexed lookup by owner
+    let mut budgets = store.list_by_owner(&owner_did).map_err(|e| GatewayError::InternalError(e.to_string()))?;
 
     // Filter by status if provided
     if let Some(status_str) = query.get("status") {
@@ -321,7 +137,7 @@ pub async fn get_budget(
     let budget_id = id.into_inner();
     let budget = store
         .get(&budget_id)
-        .await
+        .map_err(|e| GatewayError::InternalError(e.to_string()))?
         .ok_or_else(|| GatewayError::NotFound(format!("Budget not found: {budget_id}")))?;
 
     // Verify ownership
@@ -356,7 +172,7 @@ pub async fn update_budget(
     let budget_id = id.into_inner();
     let mut budget = store
         .get(&budget_id)
-        .await
+        .map_err(|e| GatewayError::InternalError(e.to_string()))?
         .ok_or_else(|| GatewayError::NotFound(format!("Budget not found: {budget_id}")))?;
 
     // Verify ownership
@@ -386,7 +202,7 @@ pub async fn update_budget(
         .unwrap()
         .as_secs();
 
-    store.update(&budget_id, budget.clone()).await;
+    store.update(&budget_id, budget.clone()).map_err(|e| GatewayError::InternalError(e.to_string()))?;
 
     Ok(HttpResponse::Ok().json(budget))
 }
@@ -407,7 +223,7 @@ pub async fn delete_budget(
     let budget_id = id.into_inner();
     let budget = store
         .get(&budget_id)
-        .await
+        .map_err(|e| GatewayError::InternalError(e.to_string()))?
         .ok_or_else(|| GatewayError::NotFound(format!("Budget not found: {budget_id}")))?;
 
     // Verify ownership
@@ -417,7 +233,7 @@ pub async fn delete_budget(
         ));
     }
 
-    store.delete(&budget_id).await;
+    store.delete(&budget_id).map_err(|e| GatewayError::InternalError(e.to_string()))?;
 
     Ok(HttpResponse::Ok().json(serde_json::json!({
         "message": "Budget deleted",

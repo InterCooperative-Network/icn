@@ -48,10 +48,8 @@ impl CommonsManager<InMemoryCommonsStore> {
     }
 }
 
-#[cfg(feature = "sled-storage")]
 use crate::commons_store::SledCommonsStore;
 
-#[cfg(feature = "sled-storage")]
 impl CommonsManager<SledCommonsStore> {
     /// Create a new commons manager with persistent Sled storage
     ///

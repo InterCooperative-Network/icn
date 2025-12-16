@@ -230,22 +230,22 @@ impl GatewayServer {
 
         // Create recurring payment store
         let recurring_payment_store =
-            Arc::new(crate::api::recurring_payments::RecurringPaymentStore::new(
+            crate::api::recurring_payments::RecurringPaymentStore::new(
                 db.clone(),
-            ));
+            );
         info!("Recurring payment store initialized");
 
         // Create escrow store
-        let escrow_store = Arc::new(crate::api::escrow::EscrowStore::new());
+        let escrow_store = crate::api::escrow::EscrowStore::new(db.clone());
         info!("Escrow store initialized");
 
         // Create budget store
-        let budget_store = Arc::new(crate::api::budgets::BudgetStore::new());
+        let budget_store = crate::api::budgets::BudgetStore::new(db.clone());
         info!("Budget store initialized");
 
         // Start recurring payments scheduler (check every 60 seconds)
         let _recurring_payments_handle = crate::api::recurring_payments::start_scheduler(
-            (*recurring_payment_store).clone(),
+            recurring_payment_store.clone(),
             ledger_manager.clone(),
             60, // Check every minute
         );

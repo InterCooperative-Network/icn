@@ -5,7 +5,7 @@ use std::sync::Arc;
 use tracing::info;
 
 use crate::api::budgets::BudgetStore;
-use crate::error::Result;
+use crate::error::{GatewayError, Result};
 use crate::ledger_mgr::LedgerManager;
 use crate::middleware::{get_claims, require_coop_access, require_scope};
 use crate::models::{
@@ -49,7 +49,7 @@ pub async fn get_balance(
 pub async fn create_payment(
     http_req: HttpRequest,
     ledger_mgr: web::Data<Arc<LedgerManager>>,
-    budget_store: web::Data<Arc<BudgetStore>>,
+    budget_store: web::Data<BudgetStore>,
     notification_service: web::Data<Arc<crate::notifications::NotificationService>>,
     event_broadcaster: web::Data<Arc<crate::events::EventBroadcaster>>,
     coop_id: web::Path<String>,
@@ -95,7 +95,7 @@ pub async fn create_payment(
     validation::validate_memo(&req.memo)?;
 
     // Check budget limits before creating payment
-    let can_spend = budget_store.check_spending(&req.from, req.amount).await?;
+    let can_spend = budget_store.check_spending(&req.from, req.amount).map_err(|e| GatewayError::InternalError(e.to_string()))?;
     if !can_spend {
         return Err(crate::error::GatewayError::BadRequest(
             "Payment exceeds budget limit".to_string(),
@@ -105,7 +105,7 @@ pub async fn create_payment(
     let hash = ledger_mgr.create_payment(&coop_id, &from, &to, req.amount, req.currency.clone())?;
 
     // Record spending in budget tracker
-    let notified_budgets = budget_store.record_spending(&req.from, req.amount).await?;
+    let notified_budgets = budget_store.record_spending(&req.from, req.amount).map_err(|e| GatewayError::InternalError(e.to_string()))?;
     if !notified_budgets.is_empty() {
         info!(
             budgets = ?notified_budgets,
@@ -367,7 +367,8 @@ mod tests {
     #[actix_web::test]
     async fn test_create_payment_and_get_balance() {
         let ledger_mgr = Arc::new(LedgerManager::new());
-        let budget_store = Arc::new(BudgetStore::new());
+        let db = sled::Config::new().temporary(true).open().unwrap();
+        let budget_store = BudgetStore::new(db);
         let notification_service = Arc::new(crate::notifications::NotificationService::new(None));
         let event_broadcaster = Arc::new(EventBroadcaster::new());
         let alice = IdentityBundle::generate().unwrap();
@@ -515,7 +516,8 @@ mod tests {
     #[actix_web::test]
     async fn test_authorization_scope_check() {
         let ledger_mgr = Arc::new(LedgerManager::new());
-        let budget_store = Arc::new(BudgetStore::new());
+        let db = sled::Config::new().temporary(true).open().unwrap();
+        let budget_store = BudgetStore::new(db);
         let notification_service = Arc::new(crate::notifications::NotificationService::new(None));
         let event_broadcaster = Arc::new(EventBroadcaster::new());
         let alice = IdentityBundle::generate().unwrap();
@@ -580,7 +582,8 @@ mod tests {
     #[actix_web::test]
     async fn test_create_payment_from_other_account_fails() {
         let ledger_mgr = Arc::new(LedgerManager::new());
-        let budget_store = Arc::new(BudgetStore::new());
+        let db = sled::Config::new().temporary(true).open().unwrap();
+        let budget_store = BudgetStore::new(db);
         let notification_service = Arc::new(crate::notifications::NotificationService::new(None));
         let event_broadcaster = Arc::new(EventBroadcaster::new());
         let alice = IdentityBundle::generate().unwrap();
@@ -627,7 +630,8 @@ mod tests {
     #[actix_web::test]
     async fn test_cross_cooperative_ledger_privacy() {
         let ledger_mgr = Arc::new(LedgerManager::new());
-        let budget_store = Arc::new(BudgetStore::new());
+        let db = sled::Config::new().temporary(true).open().unwrap();
+        let budget_store = BudgetStore::new(db);
         let notification_service = Arc::new(crate::notifications::NotificationService::new(None));
         let event_broadcaster = Arc::new(EventBroadcaster::new());
         let alice = IdentityBundle::generate().unwrap();
@@ -714,7 +718,8 @@ mod tests {
     #[actix_web::test]
     async fn test_self_payment_rejected() {
         let ledger_mgr = Arc::new(LedgerManager::new());
-        let budget_store = Arc::new(BudgetStore::new());
+        let db = sled::Config::new().temporary(true).open().unwrap();
+        let budget_store = BudgetStore::new(db);
         let notification_service = Arc::new(crate::notifications::NotificationService::new(None));
         let event_broadcaster = Arc::new(EventBroadcaster::new());
         let alice = IdentityBundle::generate().unwrap();

@@ -138,12 +138,10 @@ impl CommonsStoreBackend for InMemoryCommonsStore {
 /// Sled-based persistent store implementation
 ///
 /// Enable with the `sled-storage` feature flag.
-#[cfg(feature = "sled-storage")]
 pub struct SledCommonsStore {
     db: sled::Db,
 }
 
-#[cfg(feature = "sled-storage")]
 impl SledCommonsStore {
     /// Open a persistent Sled database at the given path
     pub fn open(path: impl AsRef<std::path::Path>) -> Result<Self> {
@@ -172,7 +170,6 @@ impl SledCommonsStore {
     }
 }
 
-#[cfg(feature = "sled-storage")]
 impl CommonsStoreBackend for SledCommonsStore {
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
         Ok(self.db.get(key)?.map(|v| v.to_vec()))
