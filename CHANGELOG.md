@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed - Economic Feature Gap Fixes (2025-12-15)
+
+**Escrow Ledger Integration** ([icn/crates/icn-gateway/src/api/escrow.rs](icn/crates/icn-gateway/src/api/escrow.rs)):
+- Escrow release and refund now execute actual ledger transactions
+- Added `coop_id` field to Escrow schema (required for ledger namespace)
+- Returns `transaction_hash` in release/refund responses for traceability
+- Added audit logging for all escrow transactions
+
+**Recurring Payments Scheduler** ([icn/crates/icn-gateway/src/api/recurring_payments.rs](icn/crates/icn-gateway/src/api/recurring_payments.rs)):
+- Added background scheduler that executes due payments automatically (60-second interval)
+- Payments now execute via `LedgerManager::create_payment()`
+- Added `coop_id` field to RecurringPayment schema
+- Calculates next execution based on frequency (daily/weekly/monthly/yearly)
+- Auto-completes payments when reaching end date
+- Wired scheduler startup in server.rs
+
+**Budget Enforcement** ([icn/crates/icn-gateway/src/api/ledger.rs](icn/crates/icn-gateway/src/api/ledger.rs)):
+- Payment endpoint now checks budget limits before processing
+- Rejects payments that would exceed budget limits
+- Records spending in budget tracker after successful payments
+- Logs budget threshold notifications when triggered (80%, 100%)
+
 ### Added - Pilot-Ready Platform Sprint Completion (2025-12-15)
 
 **Notification System Hooks** ([sdk/react-native/src/notification-hooks.ts](sdk/react-native/src/notification-hooks.ts)):
