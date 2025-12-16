@@ -2281,6 +2281,393 @@ export class ICNMobileClient extends ICNClient {
     return response.json();
   }
 
+  // ============================================================================
+  // Notification APIs
+  // ============================================================================
+
+  /**
+   * List notifications for the authenticated user
+   *
+   * @param options - Optional filter options (limit, offset, unread_only)
+   * @returns List of notifications with unread count
+   */
+  async listNotifications(options?: {
+    limit?: number;
+    offset?: number;
+    unread_only?: boolean;
+  }): Promise<import('./notification-hooks').NotificationListResponse> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const params = new URLSearchParams();
+    if (options?.limit) params.set('limit', options.limit.toString());
+    if (options?.offset) params.set('offset', options.offset.toString());
+    if (options?.unread_only) params.set('unread_only', 'true');
+
+    const url = `${baseUrl}/v1/notifications${params.toString() ? `?${params}` : ''}`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to list notifications: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Get notification count (total and unread)
+   *
+   * @returns Notification counts
+   */
+  async getNotificationCount(): Promise<import('./notification-hooks').NotificationCountResponse> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/notifications/count`, {
+      method: 'GET',
+      headers: {
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to get notification count: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Mark a notification as read
+   *
+   * @param notificationId - The notification ID
+   * @returns Updated notification
+   */
+  async markNotificationRead(
+    notificationId: string
+  ): Promise<import('./notification-hooks').InAppNotification> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/notifications/${notificationId}/read`, {
+      method: 'POST',
+      headers: {
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to mark notification as read: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Delete a notification
+   *
+   * @param notificationId - The notification ID
+   */
+  async deleteNotification(notificationId: string): Promise<void> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/notifications/${notificationId}`, {
+      method: 'DELETE',
+      headers: {
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to delete notification: ${error}`);
+    }
+  }
+
+  // ============================================================================
+  // Economic APIs (Recurring Payments, Escrow, Budgets)
+  // ============================================================================
+
+  /**
+   * List recurring payments
+   *
+   * @param coopId - The cooperative ID
+   * @param status - Optional filter by status (active, paused, completed, cancelled)
+   * @returns List of recurring payments
+   */
+  async listRecurringPayments(
+    coopId: string,
+    status?: string
+  ): Promise<import('./economic-hooks').RecurringPayment[]> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const params = new URLSearchParams();
+    if (status) params.set('status', status);
+
+    const url = `${baseUrl}/v1/ledger/${coopId}/recurring${params.toString() ? `?${params}` : ''}`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to list recurring payments: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Create a recurring payment
+   *
+   * @param coopId - The cooperative ID
+   * @param request - The recurring payment request
+   * @returns Created recurring payment
+   */
+  async createRecurringPayment(
+    coopId: string,
+    request: import('./economic-hooks').CreateRecurringPaymentRequest
+  ): Promise<import('./economic-hooks').RecurringPayment> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/ledger/${coopId}/recurring`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to create recurring payment: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Update recurring payment status (pause, resume, cancel)
+   *
+   * @param coopId - The cooperative ID
+   * @param paymentId - The recurring payment ID
+   * @param action - Action to perform: pause, resume, or cancel
+   * @returns Updated recurring payment
+   */
+  async updateRecurringPaymentStatus(
+    coopId: string,
+    paymentId: string,
+    action: 'pause' | 'resume' | 'cancel'
+  ): Promise<import('./economic-hooks').RecurringPayment> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/ledger/${coopId}/recurring/${paymentId}/${action}`, {
+      method: 'POST',
+      headers: {
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to ${action} recurring payment: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * List escrow holds
+   *
+   * @param coopId - The cooperative ID
+   * @param status - Optional filter by status (pending, released, refunded, expired)
+   * @returns List of escrow holds
+   */
+  async listEscrows(
+    coopId: string,
+    status?: string
+  ): Promise<import('./economic-hooks').Escrow[]> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const params = new URLSearchParams();
+    if (status) params.set('status', status);
+
+    const url = `${baseUrl}/v1/ledger/${coopId}/escrow${params.toString() ? `?${params}` : ''}`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to list escrows: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Create an escrow hold
+   *
+   * @param coopId - The cooperative ID
+   * @param request - The escrow request
+   * @returns Created escrow
+   */
+  async createEscrow(
+    coopId: string,
+    request: import('./economic-hooks').CreateEscrowRequest
+  ): Promise<import('./economic-hooks').Escrow> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/ledger/${coopId}/escrow`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to create escrow: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Release escrow funds to recipient
+   *
+   * @param coopId - The cooperative ID
+   * @param escrowId - The escrow ID
+   * @returns Release result with transaction hash
+   */
+  async releaseEscrow(
+    coopId: string,
+    escrowId: string
+  ): Promise<{ escrow: import('./economic-hooks').Escrow; transaction_hash: string }> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/ledger/${coopId}/escrow/${escrowId}/release`, {
+      method: 'POST',
+      headers: {
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to release escrow: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Refund escrow funds to creator
+   *
+   * @param coopId - The cooperative ID
+   * @param escrowId - The escrow ID
+   * @returns Refund result with transaction hash
+   */
+  async refundEscrow(
+    coopId: string,
+    escrowId: string
+  ): Promise<{ escrow: import('./economic-hooks').Escrow; transaction_hash: string }> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/ledger/${coopId}/escrow/${escrowId}/refund`, {
+      method: 'POST',
+      headers: {
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to refund escrow: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * List budgets
+   *
+   * @param coopId - The cooperative ID
+   * @returns List of budgets
+   */
+  async listBudgets(coopId: string): Promise<import('./economic-hooks').Budget[]> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/ledger/${coopId}/budgets`, {
+      method: 'GET',
+      headers: {
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to list budgets: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Get a specific budget
+   *
+   * @param coopId - The cooperative ID
+   * @param budgetId - The budget ID
+   * @returns Budget details
+   */
+  async getBudget(coopId: string, budgetId: string): Promise<import('./economic-hooks').Budget> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/ledger/${coopId}/budgets/${budgetId}`, {
+      method: 'GET',
+      headers: {
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to get budget: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Create a budget
+   *
+   * @param coopId - The cooperative ID
+   * @param request - The budget request
+   * @returns Created budget
+   */
+  async createBudget(
+    coopId: string,
+    request: import('./economic-hooks').CreateBudgetRequest
+  ): Promise<import('./economic-hooks').Budget> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/ledger/${coopId}/budgets`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to create budget: ${error}`);
+    }
+
+    return response.json();
+  }
+
   private getWebSocketUrl(coopId: string): string {
     // Get base URL from the parent class (we need to access private field)
     const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;

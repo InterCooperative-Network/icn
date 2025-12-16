@@ -28,6 +28,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Outcome-specific messages (accepted, rejected, no_quorum)
 - Added `proposal_result_notification()` factory
 
+**SDK Client Economic & Notification Methods** ([sdk/react-native/src/client.ts](sdk/react-native/src/client.ts)):
+- Added 15 new client methods for economic features and notifications
+- Recurring payments: `listRecurringPayments`, `createRecurringPayment`, `updateRecurringPaymentStatus`
+- Escrow: `listEscrows`, `createEscrow`, `releaseEscrow`, `refundEscrow`
+- Budgets: `listBudgets`, `getBudget`, `createBudget`
+- Notifications: `listNotifications`, `getNotificationCount`, `markNotificationRead`, `deleteNotification`
+- Base client now supports all pilot features without requiring React hooks
+
 ### Fixed - Economic Feature Gap Fixes (2025-12-15)
 
 **Escrow Ledger Integration** ([icn/crates/icn-gateway/src/api/escrow.rs](icn/crates/icn-gateway/src/api/escrow.rs)):
