@@ -19,15 +19,95 @@ use crate::auth::AuthManager;
 use crate::error::{GatewayError, Result};
 use crate::trust_mgr::TrustManager;
 
-/// Enrollment state store
+/// Enrollment state store with optional persistence
 pub struct EnrollmentStore {
     enrollments: RwLock<std::collections::HashMap<String, EnrollmentSession>>,
+    /// Optional CommonsManager for persistent storage
+    commons_manager: Option<Arc<crate::commons_mgr::CommonsManager>>,
 }
 
 impl EnrollmentStore {
+    /// Create in-memory only store (for testing)
     pub fn new() -> Self {
         Self {
             enrollments: RwLock::new(std::collections::HashMap::new()),
+            commons_manager: None,
+        }
+    }
+
+    /// Create store with persistence to CommonsManager
+    pub fn with_persistence(commons_manager: Arc<crate::commons_mgr::CommonsManager>) -> Self {
+        // Load existing sessions from persistent storage
+        let sessions = commons_manager
+            .store()
+            .list_enrollment_sessions()
+            .unwrap_or_default();
+
+        let mut map = std::collections::HashMap::new();
+        for (id, session) in sessions {
+            map.insert(id, session);
+        }
+
+        tracing::info!(
+            "Loaded {} enrollment sessions from persistent storage",
+            map.len()
+        );
+
+        Self {
+            enrollments: RwLock::new(map),
+            commons_manager: Some(commons_manager),
+        }
+    }
+
+    /// Insert or update a session (with write-through to persistent storage)
+    pub async fn insert(&self, id: String, session: EnrollmentSession) {
+        // Write to persistent storage first if available
+        if let Some(ref mgr) = self.commons_manager {
+            if let Err(e) = mgr.put_enrollment_session(&id, &session).await {
+                tracing::warn!("Failed to persist enrollment session {}: {}", id, e);
+            }
+        }
+
+        // Update in-memory cache
+        self.enrollments.write().await.insert(id, session);
+    }
+
+    /// Get a session
+    pub async fn get(&self, id: &str) -> Option<EnrollmentSession> {
+        self.enrollments.read().await.get(id).cloned()
+    }
+
+    /// Get mutable reference to session map (for complex operations)
+    /// Note: This is primarily for backward compatibility with existing handlers.
+    /// For simple insert/get operations, prefer the dedicated methods.
+    pub async fn get_mut_map(
+        &self,
+    ) -> tokio::sync::RwLockWriteGuard<'_, std::collections::HashMap<String, EnrollmentSession>>
+    {
+        self.enrollments.write().await
+    }
+
+    /// Persist all sessions to storage (for save before shutdown)
+    pub async fn persist_all(&self) {
+        if let Some(ref mgr) = self.commons_manager {
+            let sessions = self.enrollments.read().await;
+            for (id, session) in sessions.iter() {
+                if let Err(e) = mgr.put_enrollment_session(id, session).await {
+                    tracing::warn!("Failed to persist enrollment session {}: {}", id, e);
+                }
+            }
+            tracing::info!("Persisted {} enrollment sessions", sessions.len());
+        }
+    }
+
+    /// Persist a single session by ID (call after in-place modification)
+    pub async fn persist_session(&self, id: &str) {
+        if let Some(ref mgr) = self.commons_manager {
+            if let Some(session) = self.enrollments.read().await.get(id).cloned() {
+                if let Err(e) = mgr.put_enrollment_session(id, &session).await {
+                    tracing::warn!("Failed to persist enrollment session {}: {}", id, e);
+                }
+            }
         }
     }
 }
@@ -39,7 +119,7 @@ impl Default for EnrollmentStore {
 }
 
 /// Enrollment session state
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EnrollmentSession {
     pub enrollment_id: String,
     pub identity_name: String,
@@ -175,11 +255,8 @@ pub async fn start_enrollment(
         rejected_by: None,
     };
 
-    store
-        .enrollments
-        .write()
-        .await
-        .insert(enrollment_id.clone(), session);
+    // Store session with persistence
+    store.insert(enrollment_id.clone(), session).await;
 
     Ok(HttpResponse::Ok().json(StartEnrollmentResponse {
         enrollment_id,
@@ -249,6 +326,13 @@ pub async fn verify_level1(
     // Signature verified - store ephemeral DID and upgrade level
     session.ephemeral_did = Some(req.device_proof.ephemeral_did.clone());
     session.level = 1;
+
+    // Release lock before persisting
+    let enrollment_id = req.enrollment_id.clone();
+    drop(enrollments);
+
+    // Persist the updated session
+    store.persist_session(&enrollment_id).await;
 
     Ok(HttpResponse::Ok().json(serde_json::json!({
         "status": "verified",
@@ -333,6 +417,11 @@ pub async fn verify_level2(
     session.steward_vouch = Some(req.vouch_statement.clone());
     session.steward_did = Some(steward_did.to_string());
     session.vouched_at = Some(now);
+
+    // Release lock and persist
+    let enrollment_id = req.enrollment_id.clone();
+    drop(enrollments);
+    store.persist_session(&enrollment_id).await;
 
     Ok(HttpResponse::Ok().json(serde_json::json!({
         "status": "verified",
@@ -626,6 +715,11 @@ pub async fn steward_vouch(
     session.steward_did = req.steward_did.clone();
     session.vouched_at = Some(now);
 
+    // Release lock and persist
+    let id = enrollment_id.clone();
+    drop(enrollments);
+    store.persist_session(&id).await;
+
     Ok(HttpResponse::Ok().json(serde_json::json!({
         "status": "vouched",
         "enrollment_id": enrollment_id.as_str(),
@@ -715,6 +809,11 @@ pub async fn reject_enrollment(
     session.rejection_reason = Some(req.reason.clone());
     session.rejected_at = Some(now);
     session.rejected_by = req.steward_did.clone();
+
+    // Release lock and persist
+    let id = enrollment_id.clone();
+    drop(enrollments);
+    store.persist_session(&id).await;
 
     Ok(HttpResponse::Ok().json(serde_json::json!({
         "status": "rejected",

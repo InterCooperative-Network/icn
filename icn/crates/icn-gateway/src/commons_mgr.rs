@@ -1978,6 +1978,50 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
 
         Ok(appeal)
     }
+
+    // ========================================================================
+    // Enrollment Session Operations
+    // ========================================================================
+
+    /// Store an enrollment session
+    pub async fn put_enrollment_session(
+        &self,
+        id: &str,
+        session: &crate::api::sdis::simple_enrollment::EnrollmentSession,
+    ) -> Result<()> {
+        self.store.put_enrollment_session(id, session)?;
+        Ok(())
+    }
+
+    /// Get an enrollment session by ID
+    pub async fn get_enrollment_session(
+        &self,
+        id: &str,
+    ) -> Result<Option<crate::api::sdis::simple_enrollment::EnrollmentSession>> {
+        Ok(self.store.get_enrollment_session(id)?)
+    }
+
+    /// Update an enrollment session
+    pub async fn update_enrollment_session(
+        &self,
+        id: &str,
+        session: &crate::api::sdis::simple_enrollment::EnrollmentSession,
+    ) -> Result<()> {
+        self.store.update_enrollment_session(id, session)?;
+        Ok(())
+    }
+
+    /// Delete an enrollment session
+    pub async fn delete_enrollment_session(&self, id: &str) -> Result<bool> {
+        Ok(self.store.delete_enrollment_session(id)?)
+    }
+
+    /// List all enrollment sessions
+    pub async fn list_enrollment_sessions(
+        &self,
+    ) -> Result<Vec<(String, crate::api::sdis::simple_enrollment::EnrollmentSession)>> {
+        Ok(self.store.list_enrollment_sessions()?)
+    }
 }
 
 impl Default for CommonsManager<InMemoryCommonsStore> {

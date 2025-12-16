@@ -194,7 +194,7 @@ impl EnrollmentStore {
 }
 
 /// Enrollment ceremony state
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EnrollmentCeremony {
     pub pathway: EnrollmentPathwayDto,
     pub proof_data: serde_json::Value,

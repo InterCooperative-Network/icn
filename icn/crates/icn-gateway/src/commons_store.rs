@@ -45,6 +45,8 @@ pub const STEWARD_BY_DID_PREFIX: &[u8] = b"commons/stewards/by_did/";
 pub const AMENDMENT_PREFIX: &[u8] = b"commons/amendments/";
 pub const APPEAL_PREFIX: &[u8] = b"commons/appeals/";
 pub const REVOCATION_PREFIX: &[u8] = b"commons/revocations/";
+pub const CEREMONY_PREFIX: &[u8] = b"commons/ceremonies/";
+pub const ENROLLMENT_SESSION_PREFIX: &[u8] = b"commons/enrollment_sessions/";
 
 // ============================================================================
 // Storage Backend Trait
@@ -209,6 +211,8 @@ pub struct CacheConfig {
     pub steward_cache_size: usize,
     pub amendment_cache_size: usize,
     pub appeal_cache_size: usize,
+    pub ceremony_cache_size: usize,
+    pub enrollment_session_cache_size: usize,
 }
 
 impl Default for CacheConfig {
@@ -220,6 +224,8 @@ impl Default for CacheConfig {
             steward_cache_size: 200,
             amendment_cache_size: 500,
             appeal_cache_size: 500,
+            ceremony_cache_size: 500,
+            enrollment_session_cache_size: 500,
         }
     }
 }
@@ -234,6 +240,9 @@ pub struct CommonsStore<S: CommonsStoreBackend> {
     steward_cache: RwLock<LruCache<String, StewardRecord>>,
     amendment_cache: RwLock<LruCache<String, Amendment>>,
     appeal_cache: RwLock<LruCache<String, Appeal>>,
+    ceremony_cache: RwLock<LruCache<String, crate::api::sdis::enrollment::EnrollmentCeremony>>,
+    enrollment_session_cache:
+        RwLock<LruCache<String, crate::api::sdis::simple_enrollment::EnrollmentSession>>,
 }
 
 impl<S: CommonsStoreBackend> CommonsStore<S> {
@@ -263,6 +272,12 @@ impl<S: CommonsStoreBackend> CommonsStore<S> {
             )),
             appeal_cache: RwLock::new(LruCache::new(
                 NonZeroUsize::new(config.appeal_cache_size).unwrap(),
+            )),
+            ceremony_cache: RwLock::new(LruCache::new(
+                NonZeroUsize::new(config.ceremony_cache_size).unwrap(),
+            )),
+            enrollment_session_cache: RwLock::new(LruCache::new(
+                NonZeroUsize::new(config.enrollment_session_cache_size).unwrap(),
             )),
         }
     }
@@ -828,6 +843,184 @@ impl<S: CommonsStoreBackend> CommonsStore<S> {
         self.steward_cache.write().unwrap().clear();
         self.amendment_cache.write().unwrap().clear();
         self.appeal_cache.write().unwrap().clear();
+        self.ceremony_cache.write().unwrap().clear();
+        self.enrollment_session_cache.write().unwrap().clear();
+    }
+
+    // ========================================================================
+    // EnrollmentCeremony Operations
+    // ========================================================================
+
+    /// Store an EnrollmentCeremony
+    pub fn put_ceremony(
+        &self,
+        id: &str,
+        ceremony: &crate::api::sdis::enrollment::EnrollmentCeremony,
+    ) -> Result<()> {
+        let key = Self::make_key(CEREMONY_PREFIX, id);
+        let value = Self::serialize(ceremony)?;
+        self.store.put(&key, &value)?;
+
+        self.ceremony_cache
+            .write()
+            .unwrap()
+            .put(id.to_string(), ceremony.clone());
+
+        debug!("Stored ceremony: {}", id);
+        Ok(())
+    }
+
+    /// Get an EnrollmentCeremony by ID
+    pub fn get_ceremony(
+        &self,
+        id: &str,
+    ) -> Result<Option<crate::api::sdis::enrollment::EnrollmentCeremony>> {
+        if let Some(cached) = self.ceremony_cache.write().unwrap().get(id) {
+            return Ok(Some(cached.clone()));
+        }
+
+        let key = Self::make_key(CEREMONY_PREFIX, id);
+        if let Some(value) = self.store.get(&key)? {
+            let ceremony: crate::api::sdis::enrollment::EnrollmentCeremony =
+                Self::deserialize(&value)?;
+            self.ceremony_cache
+                .write()
+                .unwrap()
+                .put(id.to_string(), ceremony.clone());
+            return Ok(Some(ceremony));
+        }
+
+        Ok(None)
+    }
+
+    /// Update an existing ceremony
+    pub fn update_ceremony(
+        &self,
+        id: &str,
+        ceremony: &crate::api::sdis::enrollment::EnrollmentCeremony,
+    ) -> Result<()> {
+        self.put_ceremony(id, ceremony)
+    }
+
+    /// Delete a ceremony
+    pub fn delete_ceremony(&self, id: &str) -> Result<bool> {
+        let key = Self::make_key(CEREMONY_PREFIX, id);
+        if self.store.exists(&key)? {
+            self.store.delete(&key)?;
+            self.ceremony_cache.write().unwrap().pop(id);
+            debug!("Deleted ceremony: {}", id);
+            return Ok(true);
+        }
+        Ok(false)
+    }
+
+    /// List all ceremonies
+    pub fn list_ceremonies(&self) -> Result<Vec<(String, crate::api::sdis::enrollment::EnrollmentCeremony)>> {
+        let entries = self.store.scan(CEREMONY_PREFIX)?;
+        let mut ceremonies = Vec::new();
+
+        for (key, value) in entries {
+            // Extract ID from key
+            let key_str = String::from_utf8_lossy(&key);
+            if let Some(id) = key_str.strip_prefix("commons/ceremonies/") {
+                if let Ok(ceremony) =
+                    Self::deserialize::<crate::api::sdis::enrollment::EnrollmentCeremony>(&value)
+                {
+                    ceremonies.push((id.to_string(), ceremony));
+                }
+            }
+        }
+
+        Ok(ceremonies)
+    }
+
+    // ========================================================================
+    // EnrollmentSession Operations (Simple Enrollment)
+    // ========================================================================
+
+    /// Store an EnrollmentSession
+    pub fn put_enrollment_session(
+        &self,
+        id: &str,
+        session: &crate::api::sdis::simple_enrollment::EnrollmentSession,
+    ) -> Result<()> {
+        let key = Self::make_key(ENROLLMENT_SESSION_PREFIX, id);
+        let value = Self::serialize(session)?;
+        self.store.put(&key, &value)?;
+
+        self.enrollment_session_cache
+            .write()
+            .unwrap()
+            .put(id.to_string(), session.clone());
+
+        debug!("Stored enrollment session: {}", id);
+        Ok(())
+    }
+
+    /// Get an EnrollmentSession by ID
+    pub fn get_enrollment_session(
+        &self,
+        id: &str,
+    ) -> Result<Option<crate::api::sdis::simple_enrollment::EnrollmentSession>> {
+        if let Some(cached) = self.enrollment_session_cache.write().unwrap().get(id) {
+            return Ok(Some(cached.clone()));
+        }
+
+        let key = Self::make_key(ENROLLMENT_SESSION_PREFIX, id);
+        if let Some(value) = self.store.get(&key)? {
+            let session: crate::api::sdis::simple_enrollment::EnrollmentSession =
+                Self::deserialize(&value)?;
+            self.enrollment_session_cache
+                .write()
+                .unwrap()
+                .put(id.to_string(), session.clone());
+            return Ok(Some(session));
+        }
+
+        Ok(None)
+    }
+
+    /// Update an existing enrollment session
+    pub fn update_enrollment_session(
+        &self,
+        id: &str,
+        session: &crate::api::sdis::simple_enrollment::EnrollmentSession,
+    ) -> Result<()> {
+        self.put_enrollment_session(id, session)
+    }
+
+    /// Delete an enrollment session
+    pub fn delete_enrollment_session(&self, id: &str) -> Result<bool> {
+        let key = Self::make_key(ENROLLMENT_SESSION_PREFIX, id);
+        if self.store.exists(&key)? {
+            self.store.delete(&key)?;
+            self.enrollment_session_cache.write().unwrap().pop(id);
+            debug!("Deleted enrollment session: {}", id);
+            return Ok(true);
+        }
+        Ok(false)
+    }
+
+    /// List all enrollment sessions
+    pub fn list_enrollment_sessions(
+        &self,
+    ) -> Result<Vec<(String, crate::api::sdis::simple_enrollment::EnrollmentSession)>> {
+        let entries = self.store.scan(ENROLLMENT_SESSION_PREFIX)?;
+        let mut sessions = Vec::new();
+
+        for (key, value) in entries {
+            let key_str = String::from_utf8_lossy(&key);
+            if let Some(id) = key_str.strip_prefix("commons/enrollment_sessions/") {
+                if let Ok(session) = Self::deserialize::<
+                    crate::api::sdis::simple_enrollment::EnrollmentSession,
+                >(&value)
+                {
+                    sessions.push((id.to_string(), session));
+                }
+            }
+        }
+
+        Ok(sessions)
     }
 }
 
