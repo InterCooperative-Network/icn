@@ -43,10 +43,10 @@ describe('ICNWalletImpl', () => {
       expect(keyPair.did).toBeDefined();
       expect(keyPair.did).toMatch(/^did:icn:/);
 
-      // Verify stored in storage
-      expect(storage.store.has('@icn/wallet/private_key')).toBe(true);
-      expect(storage.store.has('@icn/wallet/public_key')).toBe(true);
-      expect(storage.store.has('@icn/wallet/did')).toBe(true);
+      // Verify stored in storage (keys use underscores, not slashes - SecureStore requirement)
+      expect(storage.store.has('icn_wallet_private_key')).toBe(true);
+      expect(storage.store.has('icn_wallet_public_key')).toBe(true);
+      expect(storage.store.has('icn_wallet_did')).toBe(true);
     });
 
     it('should generate unique key pairs', async () => {
@@ -84,9 +84,9 @@ describe('ICNWalletImpl', () => {
       const privateKey = 'b'.repeat(64);
       await wallet.importKeyPair(privateKey);
 
-      expect(storage.store.get('@icn/wallet/private_key')).toBe(privateKey);
-      expect(storage.store.has('@icn/wallet/public_key')).toBe(true);
-      expect(storage.store.has('@icn/wallet/did')).toBe(true);
+      expect(storage.store.get('icn_wallet_private_key')).toBe(privateKey);
+      expect(storage.store.has('icn_wallet_public_key')).toBe(true);
+      expect(storage.store.has('icn_wallet_did')).toBe(true);
     });
   });
 
@@ -125,9 +125,9 @@ describe('ICNWalletImpl', () => {
 
       await wallet.deleteKeyPair();
 
-      expect(storage.store.has('@icn/wallet/private_key')).toBe(false);
-      expect(storage.store.has('@icn/wallet/public_key')).toBe(false);
-      expect(storage.store.has('@icn/wallet/did')).toBe(false);
+      expect(storage.store.has('icn_wallet_private_key')).toBe(false);
+      expect(storage.store.has('icn_wallet_public_key')).toBe(false);
+      expect(storage.store.has('icn_wallet_did')).toBe(false);
     });
 
     it('should clear the cache', async () => {
@@ -140,19 +140,28 @@ describe('ICNWalletImpl', () => {
   });
 
   describe('sign', () => {
+    // Helper to convert string to hex
+    const toHex = (str: string): string =>
+      Array.from(new TextEncoder().encode(str))
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('');
+
     it('should sign a message', async () => {
       await wallet.generateKeyPair();
 
-      const signature = await wallet.sign('test message');
+      // sign() expects hex-encoded messages (like challenge nonces from gateway)
+      const messageHex = toHex('test message');
+      const signature = await wallet.sign(messageHex);
 
       expect(signature).toBeDefined();
       expect(typeof signature).toBe('string');
-      // Base64 encoded
-      expect(signature).toMatch(/^[A-Za-z0-9+/]+=*$/);
+      // Ed25519 signature is 64 bytes = 128 hex chars
+      expect(signature).toMatch(/^[a-f0-9]{128}$/);
     });
 
     it('should throw when no key pair exists', async () => {
-      await expect(wallet.sign('test')).rejects.toThrow(
+      const messageHex = toHex('test');
+      await expect(wallet.sign(messageHex)).rejects.toThrow(
         'No private key stored'
       );
     });
@@ -160,8 +169,9 @@ describe('ICNWalletImpl', () => {
     it('should produce consistent signatures for same message', async () => {
       await wallet.generateKeyPair();
 
-      const sig1 = await wallet.sign('same message');
-      const sig2 = await wallet.sign('same message');
+      const messageHex = toHex('same message');
+      const sig1 = await wallet.sign(messageHex);
+      const sig2 = await wallet.sign(messageHex);
 
       expect(sig1).toBe(sig2);
     });
@@ -169,8 +179,10 @@ describe('ICNWalletImpl', () => {
     it('should produce different signatures for different messages', async () => {
       await wallet.generateKeyPair();
 
-      const sig1 = await wallet.sign('message 1');
-      const sig2 = await wallet.sign('message 2');
+      const msg1Hex = toHex('message 1');
+      const msg2Hex = toHex('message 2');
+      const sig1 = await wallet.sign(msg1Hex);
+      const sig2 = await wallet.sign(msg2Hex);
 
       expect(sig1).not.toBe(sig2);
     });
