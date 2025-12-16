@@ -83,6 +83,20 @@ ssh ubuntu@10.8.10.40 "cd ~/actions-runner && sudo ./svc.sh status"
 ssh ubuntu@10.8.10.40 "journalctl -u actions.runner.* -f"
 ```
 
+**Disk Cleanup** (automated):
+- Script: `~/docker-cleanup.sh` runs every 6 hours via cron
+- Removes dangling images, stopped containers
+- Aggressive cleanup when disk > 80% full
+- Logs: `/var/log/docker-cleanup.log`
+
+```bash
+# Manual cleanup
+ssh ubuntu@10.8.10.40 "~/docker-cleanup.sh"
+
+# Check disk usage
+ssh ubuntu@10.8.10.40 "df -h / && sudo docker system df"
+```
+
 ## Pilot Testing Status (2025-12-05)
 
 **5-Node Pilot Network** on K3s with P2P mesh topology.
