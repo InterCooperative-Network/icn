@@ -80,7 +80,8 @@ pub async fn create_recurring_payment(
         updated_at: now,
     };
 
-    store.insert(payment.clone())
+    store
+        .insert(payment.clone())
         .map_err(|e| GatewayError::InternalError(format!("Store error: {e}")))?;
 
     Ok(HttpResponse::Created().json(payment))
@@ -101,7 +102,8 @@ pub async fn list_recurring_payments(
 
     // Use optimized query if possible, otherwise list all and filter (for now, store.list() does scan)
     // Optimally: store.list_by_owner(&owner_did)
-    let mut payments = store.list_by_owner(&owner_did)
+    let mut payments = store
+        .list_by_owner(&owner_did)
         .map_err(|e| GatewayError::InternalError(format!("Store error: {e}")))?;
 
     // Filter by status if provided
@@ -201,7 +203,8 @@ pub async fn update_recurring_payment(
         .unwrap()
         .as_secs();
 
-    store.update(&payment_id, payment.clone())
+    store
+        .update(&payment_id, payment.clone())
         .map_err(|e| GatewayError::InternalError(format!("Store error: {e}")))?;
 
     Ok(HttpResponse::Ok().json(payment))
@@ -240,7 +243,8 @@ pub async fn cancel_recurring_payment(
         .unwrap()
         .as_secs();
 
-    store.update(&payment_id, payment.clone())
+    store
+        .update(&payment_id, payment.clone())
         .map_err(|e| GatewayError::InternalError(format!("Store error: {e}")))?;
 
     Ok(HttpResponse::Ok().json(payment))
@@ -278,9 +282,9 @@ pub async fn execute_due_payments(
     ledger_mgr: &Arc<LedgerManager>,
 ) -> Vec<(String, std::result::Result<String, String>)> {
     let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
 
     let due_payments = match store.get_due_payments(now) {
         Ok(payments) => payments,

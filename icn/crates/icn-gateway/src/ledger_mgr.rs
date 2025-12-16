@@ -138,8 +138,7 @@ impl LedgerManager {
                 .map_err(|e| GatewayError::InternalError(format!("Budget check failed: {e}")))?
             {
                 return Err(GatewayError::BudgetExceeded(format!(
-                    "Budget exceeded for account {}",
-                    from_account
+                    "Budget exceeded for account {from_account}"
                 )));
             }
         }

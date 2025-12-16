@@ -138,7 +138,9 @@ mod tests {
     #[tokio::test]
     async fn test_payment_notification() {
         // Use temporary store for tests
-        let store = Arc::new(crate::notifications::NotificationStore::new(sled::Config::new().temporary(true).open().unwrap()));
+        let store = Arc::new(crate::notifications::NotificationStore::new(
+            sled::Config::new().temporary(true).open().unwrap(),
+        ));
         let notification_service = Arc::new(NotificationService::new(store, None));
         let alice = KeyPair::generate().unwrap().did().clone();
         let bob = KeyPair::generate().unwrap().did().clone();

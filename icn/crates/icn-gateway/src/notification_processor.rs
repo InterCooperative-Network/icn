@@ -5,7 +5,6 @@
 
 use std::sync::Arc;
 
-use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tracing::{debug, error, info, warn};
 
@@ -15,7 +14,9 @@ use crate::notification_queue::{
     calculate_backoff, DeliveryStatus, NotificationChannel, NotificationPriority,
     NotificationQueue, QueuedNotification,
 };
-use crate::notifications::{NotificationService, NotificationStore, InAppNotification, DeliveryLogEntry};
+use crate::notifications::{
+    DeliveryLogEntry, InAppNotification, NotificationService, NotificationStore,
+};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Configuration for the notification processor
@@ -70,7 +71,7 @@ impl ProcessorConfig {
             if let Ok(port) = port_str.parse::<u16>() {
                 let from_name = std::env::var("ICN_SMTP_FROM_NAME")
                     .unwrap_or_else(|_| "ICN Cooperative".to_string());
-                
+
                 config.smtp_config = Some(SmtpConfig::new(
                     host,
                     port,
@@ -209,7 +210,7 @@ impl NotificationProcessor {
         if let Ok(timestamp) = SystemTime::now().duration_since(UNIX_EPOCH) {
             let entry = DeliveryLogEntry {
                 notification_id: notification_id.to_string(),
-                channel: format!("{:?}", channel),
+                channel: format!("{channel:?}"),
                 status: status.to_string(),
                 timestamp: timestamp.as_secs(),
                 details: details.clone(),
@@ -335,7 +336,12 @@ impl NotificationProcessor {
                             token = %token,
                             "Invalid FCM token, marking for removal"
                         );
-                        self.log_delivery(id, NotificationChannel::Push, "failed", Some("Invalid token".to_string()));
+                        self.log_delivery(
+                            id,
+                            NotificationChannel::Push,
+                            "failed",
+                            Some("Invalid token".to_string()),
+                        );
                         invalid_tokens.push(token.clone());
                         // Don't mark as failure - token is just invalid
                     }
@@ -348,7 +354,12 @@ impl NotificationProcessor {
                         );
                         all_success = false;
                         last_error = Some(error.clone());
-                        self.log_delivery(id, NotificationChannel::Push, "failed", Some(format!("Temporary: {}", error)));
+                        self.log_delivery(
+                            id,
+                            NotificationChannel::Push,
+                            "failed",
+                            Some(format!("Temporary: {error}")),
+                        );
                     }
                     FcmResult::PermanentFailure { error } => {
                         error!(
@@ -359,7 +370,12 @@ impl NotificationProcessor {
                         );
                         all_success = false;
                         last_error = Some(error.clone());
-                        self.log_delivery(id, NotificationChannel::Push, "failed", Some(format!("Permanent: {}", error)));
+                        self.log_delivery(
+                            id,
+                            NotificationChannel::Push,
+                            "failed",
+                            Some(format!("Permanent: {error}")),
+                        );
                     }
                 }
             }
@@ -410,7 +426,12 @@ impl NotificationProcessor {
             {
                 Ok(sent) => {
                     debug!(notification_id = %id, devices = sent, "Push notification sent (legacy)");
-                    self.log_delivery(id, NotificationChannel::Push, "delivered", Some(format!("Legacy send to {} devices", sent)));
+                    self.log_delivery(
+                        id,
+                        NotificationChannel::Push,
+                        "delivered",
+                        Some(format!("Legacy send to {sent} devices")),
+                    );
                     self.queue.mark_delivered(id, NotificationChannel::Push);
                 }
                 Err(e) => {
@@ -486,7 +507,12 @@ impl NotificationProcessor {
                     message_id = %message_id,
                     "Email notification sent"
                 );
-                self.log_delivery(id, NotificationChannel::Email, "delivered", Some(format!("Message ID: {}", message_id)));
+                self.log_delivery(
+                    id,
+                    NotificationChannel::Email,
+                    "delivered",
+                    Some(format!("Message ID: {message_id}")),
+                );
                 self.queue.mark_delivered(id, NotificationChannel::Email);
             }
             EmailResult::InvalidRecipient { error } => {
@@ -497,7 +523,12 @@ impl NotificationProcessor {
                     "Invalid email recipient"
                 );
                 // Mark as delivered - nothing more we can do
-                self.log_delivery(id, NotificationChannel::Email, "failed", Some(format!("Invalid recipient: {}", error)));
+                self.log_delivery(
+                    id,
+                    NotificationChannel::Email,
+                    "failed",
+                    Some(format!("Invalid recipient: {error}")),
+                );
                 self.queue.mark_delivered(id, NotificationChannel::Email);
             }
             EmailResult::TemporaryFailure { error } => {
@@ -507,7 +538,12 @@ impl NotificationProcessor {
                     error = %error,
                     "Temporary email failure, will retry"
                 );
-                self.log_delivery(id, NotificationChannel::Email, "failed", Some(format!("Temporary: {}", error)));
+                self.log_delivery(
+                    id,
+                    NotificationChannel::Email,
+                    "failed",
+                    Some(format!("Temporary: {error}")),
+                );
                 let retries = notification
                     .status
                     .get(&NotificationChannel::Email)
@@ -538,7 +574,12 @@ impl NotificationProcessor {
                     "Permanent email failure"
                 );
                 // Mark as failed with max retries so it gets abandoned
-                self.log_delivery(id, NotificationChannel::Email, "failed", Some(format!("Permanent: {}", error)));
+                self.log_delivery(
+                    id,
+                    NotificationChannel::Email,
+                    "failed",
+                    Some(format!("Permanent: {error}")),
+                );
                 self.queue
                     .mark_failed(id, NotificationChannel::Email, &error, 999);
             }
@@ -580,10 +621,16 @@ impl NotificationProcessor {
                     _ => 0,
                 })
                 .unwrap_or(0);
-                
-             self.queue.mark_failed(id, NotificationChannel::InApp, &e.to_string(), retries + 1);
-             self.log_delivery(id, NotificationChannel::InApp, "failed", Some(e.to_string()));
-             return;
+
+            self.queue
+                .mark_failed(id, NotificationChannel::InApp, &e.to_string(), retries + 1);
+            self.log_delivery(
+                id,
+                NotificationChannel::InApp,
+                "failed",
+                Some(e.to_string()),
+            );
+            return;
         }
 
         debug!(
@@ -602,7 +649,10 @@ impl NotificationProcessor {
         recipient: &str,
         unread_only: bool,
     ) -> Vec<InAppNotification> {
-        match self.store.get_notifications(recipient, unread_only, Some(100), None) {
+        match self
+            .store
+            .get_notifications(recipient, unread_only, Some(100), None)
+        {
             Ok((notifications, _)) => notifications,
             Err(e) => {
                 error!("Failed to get notifications: {}", e);
@@ -618,7 +668,9 @@ impl NotificationProcessor {
 
     /// Mark a notification as read
     pub fn mark_read(&self, recipient: &str, notification_id: &str) -> bool {
-        self.store.mark_read(recipient, notification_id).unwrap_or(false)
+        self.store
+            .mark_read(recipient, notification_id)
+            .unwrap_or(false)
     }
 
     /// Mark all notifications as read for a user
@@ -627,13 +679,19 @@ impl NotificationProcessor {
     }
 
     /// Delete a notification
-    pub fn delete_notification(&self, recipient: &str, notification_id: &str) -> Result<bool, anyhow::Error> {
+    pub fn delete_notification(
+        &self,
+        recipient: &str,
+        notification_id: &str,
+    ) -> Result<bool, anyhow::Error> {
         self.store.delete_notification(recipient, notification_id)
     }
 
     /// Get delivery logs for a notification
     pub fn get_delivery_logs(&self, notification_id: &str) -> Vec<DeliveryLogEntry> {
-        self.store.get_delivery_logs(notification_id).unwrap_or_default()
+        self.store
+            .get_delivery_logs(notification_id)
+            .unwrap_or_default()
     }
 }
 

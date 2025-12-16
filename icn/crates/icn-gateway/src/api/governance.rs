@@ -1024,8 +1024,11 @@ mod tests {
         let gov_mgr = Arc::new(GovernanceManager::new());
         let event_broadcaster = Arc::new(EventBroadcaster::new());
         // Use temporary store for tests
-        let store = Arc::new(crate::notifications::NotificationStore::new(sled::Config::new().temporary(true).open().unwrap()));
-        let notification_service = Arc::new(crate::notifications::NotificationService::new(store, None));
+        let store = Arc::new(crate::notifications::NotificationStore::new(
+            sled::Config::new().temporary(true).open().unwrap(),
+        ));
+        let notification_service =
+            Arc::new(crate::notifications::NotificationService::new(store, None));
         let alice = IdentityBundle::generate().unwrap();
         let bob = IdentityBundle::generate().unwrap();
 
@@ -1972,8 +1975,11 @@ mod tests {
             .unwrap();
 
         // Use temporary store for tests
-        let store = Arc::new(crate::notifications::NotificationStore::new(sled::Config::new().temporary(true).open().unwrap()));
-        let notification_service = Arc::new(crate::notifications::NotificationService::new(store, None));
+        let store = Arc::new(crate::notifications::NotificationStore::new(
+            sled::Config::new().temporary(true).open().unwrap(),
+        ));
+        let notification_service =
+            Arc::new(crate::notifications::NotificationService::new(store, None));
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(gov_mgr.clone()))

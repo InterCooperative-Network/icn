@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use crate::error::Result;
 use crate::notification_processor::NotificationProcessor;
-use crate::notifications::{InAppNotification, NotificationService, Platform, DeliveryLogEntry};
+use crate::notifications::{InAppNotification, NotificationService, Platform};
 use icn_identity::Did;
 
 /// Register device request
@@ -218,7 +218,10 @@ pub async fn delete_notification(
     let notification_id = path.into_inner();
     let recipient = did.to_string();
 
-    if processor.delete_notification(&recipient, &notification_id).unwrap_or(false) {
+    if processor
+        .delete_notification(&recipient, &notification_id)
+        .unwrap_or(false)
+    {
         Ok(HttpResponse::Ok().json(MarkReadResponse {
             success: true,
             message: "Notification deleted".to_string(),
@@ -246,13 +249,13 @@ pub async fn get_delivery_status(
     // Verify ownership via store lookups (or just trust the ID check inside store?)
     // In a real system we should verify the notification belongs to the user.
     // For now, we'll retrieve logs directly. If strict ownership is needed, we'd need to fetch the notification first.
-    
+
     let logs = processor.get_delivery_logs(&notification_id);
-    
+
     // Optional: Filter out if notification doesn't belong to requester?
     // Accessing logs for an ID you don't own leaks metadata.
     // Let's do a quick check if possible, or just accept it for now as low risk internal ID.
-    
+
     Ok(HttpResponse::Ok().json(logs))
 }
 
@@ -388,39 +391,39 @@ mod tests {
             notification_service,
             ProcessorConfig::default(),
         ));
-        
+
         let recipient = "did:icn:test123";
 
         // Add some test notifications directly to the in-app store
-        store.add_notification(
-                InAppNotification {
-                    id: "notif1".to_string(),
-                    recipient: recipient.to_string(),
-                    coop_id: "coop1".to_string(),
-                    title: "Test 1".to_string(),
-                    body: "Body 1".to_string(),
-                    data: None,
-                    notification_type: "System".to_string(),
-                    created_at: 1000,
-                    read: false,
-                    read_at: None,
-                }
-        ).unwrap();
-        
-        store.add_notification(
-                InAppNotification {
-                    id: "notif2".to_string(),
-                    recipient: recipient.to_string(),
-                    coop_id: "coop1".to_string(),
-                    title: "Test 2".to_string(),
-                    body: "Body 2".to_string(),
-                    data: None,
-                    notification_type: "PaymentReceived".to_string(),
-                    created_at: 2000,
-                    read: true,
-                    read_at: Some(2500),
-                }
-        ).unwrap();
+        store
+            .add_notification(InAppNotification {
+                id: "notif1".to_string(),
+                recipient: recipient.to_string(),
+                coop_id: "coop1".to_string(),
+                title: "Test 1".to_string(),
+                body: "Body 1".to_string(),
+                data: None,
+                notification_type: "System".to_string(),
+                created_at: 1000,
+                read: false,
+                read_at: None,
+            })
+            .unwrap();
+
+        store
+            .add_notification(InAppNotification {
+                id: "notif2".to_string(),
+                recipient: recipient.to_string(),
+                coop_id: "coop1".to_string(),
+                title: "Test 2".to_string(),
+                body: "Body 2".to_string(),
+                data: None,
+                notification_type: "PaymentReceived".to_string(),
+                created_at: 2000,
+                read: true,
+                read_at: Some(2500),
+            })
+            .unwrap();
 
         // Test the count
         let all = processor.get_in_app_notifications(recipient, false);
@@ -442,39 +445,39 @@ mod tests {
             notification_service,
             ProcessorConfig::default(),
         ));
-        
+
         let recipient = "did:icn:reader";
 
         // Add unread notifications
-        store.add_notification(
-                InAppNotification {
-                    id: "n1".to_string(),
-                    recipient: recipient.to_string(),
-                    coop_id: "coop1".to_string(),
-                    title: "Notification 1".to_string(),
-                    body: "Body".to_string(),
-                    data: None,
-                    notification_type: "System".to_string(),
-                    created_at: 1000,
-                    read: false,
-                    read_at: None,
-                }
-        ).unwrap();
-        
-        store.add_notification(
-                InAppNotification {
-                    id: "n2".to_string(),
-                    recipient: recipient.to_string(),
-                    coop_id: "coop1".to_string(),
-                    title: "Notification 2".to_string(),
-                    body: "Body".to_string(),
-                    data: None,
-                    notification_type: "System".to_string(),
-                    created_at: 2000,
-                    read: false,
-                    read_at: None,
-                }
-        ).unwrap();
+        store
+            .add_notification(InAppNotification {
+                id: "n1".to_string(),
+                recipient: recipient.to_string(),
+                coop_id: "coop1".to_string(),
+                title: "Notification 1".to_string(),
+                body: "Body".to_string(),
+                data: None,
+                notification_type: "System".to_string(),
+                created_at: 1000,
+                read: false,
+                read_at: None,
+            })
+            .unwrap();
+
+        store
+            .add_notification(InAppNotification {
+                id: "n2".to_string(),
+                recipient: recipient.to_string(),
+                coop_id: "coop1".to_string(),
+                title: "Notification 2".to_string(),
+                body: "Body".to_string(),
+                data: None,
+                notification_type: "System".to_string(),
+                created_at: 2000,
+                read: false,
+                read_at: None,
+            })
+            .unwrap();
 
         // Mark one as read
         assert!(processor.mark_read(recipient, "n1"));
@@ -498,12 +501,12 @@ mod tests {
             notification_service,
             ProcessorConfig::default(),
         ));
-        
+
         let recipient = "did:icn:deleter";
 
         // Add a notification
-        store.add_notification(
-            InAppNotification {
+        store
+            .add_notification(InAppNotification {
                 id: "to-delete".to_string(),
                 recipient: recipient.to_string(),
                 coop_id: "coop1".to_string(),
@@ -514,8 +517,8 @@ mod tests {
                 created_at: 1000,
                 read: false,
                 read_at: None,
-            }
-        ).unwrap();
+            })
+            .unwrap();
 
         assert_eq!(
             processor.get_in_app_notifications(recipient, false).len(),
@@ -523,14 +526,18 @@ mod tests {
         );
 
         // Delete it
-        assert!(processor.delete_notification(recipient, "to-delete").unwrap());
+        assert!(processor
+            .delete_notification(recipient, "to-delete")
+            .unwrap());
         assert_eq!(
             processor.get_in_app_notifications(recipient, false).len(),
             0
         );
 
         // Try to delete non-existent
-        assert!(!processor.delete_notification(recipient, "nonexistent").unwrap());
+        assert!(!processor
+            .delete_notification(recipient, "nonexistent")
+            .unwrap());
     }
 
     #[actix_web::test]
@@ -545,54 +552,54 @@ mod tests {
             notification_service,
             ProcessorConfig::default(),
         ));
-        
+
         let recipient = "did:icn:filtered";
 
         // Add notifications of different types
-        store.add_notification(
-                InAppNotification {
-                    id: "payment1".to_string(),
-                    recipient: recipient.to_string(),
-                    coop_id: "coop1".to_string(),
-                    title: "Payment 1".to_string(),
-                    body: "Body".to_string(),
-                    data: None,
-                    notification_type: "PaymentReceived".to_string(),
-                    created_at: 1000,
-                    read: false,
-                    read_at: None,
-                }
-        ).unwrap();
-        
-        store.add_notification(
-                InAppNotification {
-                    id: "system1".to_string(),
-                    recipient: recipient.to_string(),
-                    coop_id: "coop1".to_string(),
-                    title: "System 1".to_string(),
-                    body: "Body".to_string(),
-                    data: None,
-                    notification_type: "System".to_string(),
-                    created_at: 2000,
-                    read: false,
-                    read_at: None,
-                }
-        ).unwrap();
-        
-        store.add_notification(
-                InAppNotification {
-                    id: "payment2".to_string(),
-                    recipient: recipient.to_string(),
-                    coop_id: "coop1".to_string(),
-                    title: "Payment 2".to_string(),
-                    body: "Body".to_string(),
-                    data: None,
-                    notification_type: "PaymentReceived".to_string(),
-                    created_at: 3000,
-                    read: false,
-                    read_at: None,
-                }
-        ).unwrap();
+        store
+            .add_notification(InAppNotification {
+                id: "payment1".to_string(),
+                recipient: recipient.to_string(),
+                coop_id: "coop1".to_string(),
+                title: "Payment 1".to_string(),
+                body: "Body".to_string(),
+                data: None,
+                notification_type: "PaymentReceived".to_string(),
+                created_at: 1000,
+                read: false,
+                read_at: None,
+            })
+            .unwrap();
+
+        store
+            .add_notification(InAppNotification {
+                id: "system1".to_string(),
+                recipient: recipient.to_string(),
+                coop_id: "coop1".to_string(),
+                title: "System 1".to_string(),
+                body: "Body".to_string(),
+                data: None,
+                notification_type: "System".to_string(),
+                created_at: 2000,
+                read: false,
+                read_at: None,
+            })
+            .unwrap();
+
+        store
+            .add_notification(InAppNotification {
+                id: "payment2".to_string(),
+                recipient: recipient.to_string(),
+                coop_id: "coop1".to_string(),
+                title: "Payment 2".to_string(),
+                body: "Body".to_string(),
+                data: None,
+                notification_type: "PaymentReceived".to_string(),
+                created_at: 3000,
+                read: false,
+                read_at: None,
+            })
+            .unwrap();
 
         // Get all
         let all = processor.get_in_app_notifications(recipient, false);

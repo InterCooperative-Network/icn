@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 /// GET /healthz - Kubernetes liveness probe
-/// 
+///
 /// Lightweight check that the service is alive and responsive.
 /// Should only fail if the process is deadlocked or unrecoverable.
 #[get("/healthz")]
@@ -24,9 +24,7 @@ pub async fn liveness() -> HttpResponse {
 /// Checks if the service can accept traffic.
 /// Returns 503 if critical dependencies are unavailable.
 #[get("/readyz")]
-pub async fn readiness(
-    coop_manager: web::Data<Arc<CoopManager>>,
-) -> HttpResponse {
+pub async fn readiness(coop_manager: web::Data<Arc<CoopManager>>) -> HttpResponse {
     // Check critical dependencies
     let mut ready = true;
     let mut checks = HashMap::new();
@@ -34,22 +32,32 @@ pub async fn readiness(
     // Check cooperative manager (critical for most operations)
     match coop_manager.list_all_coop_ids() {
         Ok(_) => {
-            checks.insert("cooperative_manager".to_string(), ComponentHealth {
-                status: "ok".to_string(),
-                details: Some("Available".to_string()),
-            });
+            checks.insert(
+                "cooperative_manager".to_string(),
+                ComponentHealth {
+                    status: "ok".to_string(),
+                    details: Some("Available".to_string()),
+                },
+            );
         }
         Err(e) => {
             ready = false;
-            checks.insert("cooperative_manager".to_string(), ComponentHealth {
-                status: "error".to_string(),
-                details: Some(format!("Unavailable: {}", e)),
-            });
+            checks.insert(
+                "cooperative_manager".to_string(),
+                ComponentHealth {
+                    status: "error".to_string(),
+                    details: Some(format!("Unavailable: {e}")),
+                },
+            );
         }
     }
 
     let response = HealthResponse {
-        status: if ready { "ready".to_string() } else { "not_ready".to_string() },
+        status: if ready {
+            "ready".to_string()
+        } else {
+            "not_ready".to_string()
+        },
         version: env!("CARGO_PKG_VERSION").to_string(),
         checks: Some(checks),
     };
@@ -88,7 +96,7 @@ pub async fn health_detailed(
         },
         Err(e) => ComponentHealth {
             status: "error".to_string(),
-            details: Some(format!("Failed to list cooperatives: {}", e)),
+            details: Some(format!("Failed to list cooperatives: {e}")),
         },
     };
     checks.insert("cooperative_manager".to_string(), coop_health);
@@ -146,7 +154,7 @@ mod tests {
         let resp = test::call_service(&app, req).await;
 
         assert!(resp.status().is_success());
-        
+
         let body: serde_json::Value = test::read_body_json(resp).await;
         assert_eq!(body["status"], "alive");
     }
@@ -163,18 +171,19 @@ mod tests {
     #[actix_web::test]
     async fn test_readiness_endpoint() {
         let coop_manager = Arc::new(CoopManager::new());
-        
+
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(coop_manager))
-                .service(readiness)
-        ).await;
-        
+                .service(readiness),
+        )
+        .await;
+
         let req = test::TestRequest::get().uri("/readyz").to_request();
         let resp = test::call_service(&app, req).await;
 
         assert!(resp.status().is_success());
-        
+
         let body: serde_json::Value = test::read_body_json(resp).await;
         assert_eq!(body["status"], "ready");
     }

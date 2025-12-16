@@ -72,7 +72,8 @@ pub async fn create_escrow(
         updated_at: now,
     };
 
-    store.insert(escrow.clone())
+    store
+        .insert(escrow.clone())
         .map_err(|e| GatewayError::InternalError(format!("Store error: {e}")))?;
 
     Ok(HttpResponse::Created().json(escrow))
@@ -92,7 +93,8 @@ pub async fn list_escrows(
     let user_did = claims.sub;
 
     // Use optimized query by user
-    let mut escrows = store.list_by_user(&user_did)
+    let mut escrows = store
+        .list_by_user(&user_did)
         .map_err(|e| GatewayError::InternalError(format!("Store error: {e}")))?;
 
     // Filter by status if provided
@@ -234,7 +236,8 @@ pub async fn release_escrow(
             .unwrap()
             .as_secs();
 
-        store.update(&escrow_id, escrow.clone())
+        store
+            .update(&escrow_id, escrow.clone())
             .map_err(|e| GatewayError::InternalError(format!("Store error: {e}")))?;
 
         Ok(HttpResponse::Ok().json(serde_json::json!({
@@ -250,7 +253,8 @@ pub async fn release_escrow(
             .unwrap()
             .as_secs();
 
-        store.update(&escrow_id, escrow.clone())
+        store
+            .update(&escrow_id, escrow.clone())
             .map_err(|e| GatewayError::InternalError(format!("Store error: {e}")))?;
 
         Ok(HttpResponse::Ok().json(serde_json::json!({
@@ -301,7 +305,7 @@ pub async fn refund_escrow(
     // Using `create_payment(to -> from)` would be incorrect as `to` never received the funds.
     // In a future "Locked Funds" implementation where `create_escrow` moves funds to a holding account,
     // this would need to move funds from Holding -> From.
-    
+
     let tx_hash = None::<String>;
     info!(escrow_id = %escrow_id, "Escrow cancelled/refunded (no ledger transaction required)");
 
@@ -311,7 +315,8 @@ pub async fn refund_escrow(
         .unwrap()
         .as_secs();
 
-    store.update(&escrow_id, escrow.clone())
+    store
+        .update(&escrow_id, escrow.clone())
         .map_err(|e| GatewayError::InternalError(format!("Store error: {e}")))?;
 
     Ok(HttpResponse::Ok().json(serde_json::json!({
@@ -368,4 +373,3 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         .service(release_escrow)
         .service(refund_escrow);
 }
-

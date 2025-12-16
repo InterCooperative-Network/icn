@@ -116,7 +116,7 @@ where
     fn call(&self, req: ServiceRequest) -> Self::Future {
         let start = Instant::now();
         let method = req.method().to_string();
-        
+
         // Generate unique request ID
         let request_id = uuid::Uuid::new_v4().to_string();
 
@@ -127,9 +127,10 @@ where
         let path = req
             .match_pattern()
             .unwrap_or_else(|| req.path().to_string());
-        
+
         // Extract user_id from claims if authenticated
-        let user_id = req.extensions()
+        let user_id = req
+            .extensions()
             .get::<TokenClaims>()
             .map(|claims| claims.sub.clone());
 
@@ -145,7 +146,7 @@ where
             // Record metrics with normalized path
             gateway::requests_total_inc(&path, &method);
             gateway::request_duration_record(&path, status, duration);
-            
+
             // Structured log with contextual fields
             if let Some(uid) = user_id {
                 tracing::info!(

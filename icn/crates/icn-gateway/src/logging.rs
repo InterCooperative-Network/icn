@@ -27,10 +27,9 @@ use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, Env
 /// ```
 pub fn init() {
     let log_format = env::var("LOG_FORMAT").unwrap_or_else(|_| "pretty".to_string());
-    
+
     // Default to info level if RUST_LOG not set
-    let env_filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("info"));
+    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
 
     if log_format == "json" {
         // JSON formatter for production/log aggregation
@@ -43,7 +42,7 @@ pub fn init() {
                     .with_span_list(true)
                     .with_target(true)
                     .with_thread_ids(true)
-                    .with_thread_names(true)
+                    .with_thread_names(true),
             )
             .init();
     } else {
@@ -55,7 +54,7 @@ pub fn init() {
                     .pretty()
                     .with_target(true)
                     .with_thread_ids(true)
-                    .with_thread_names(true)
+                    .with_thread_names(true),
             )
             .init();
     }

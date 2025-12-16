@@ -43,7 +43,10 @@ impl NotificationService {
 
     /// Register a device for push notifications
     pub fn register_device(&self, did: Did, device_token: String, platform: Platform) {
-        if let Err(e) = self.store.register_device(&did.to_string(), &device_token, platform) {
+        if let Err(e) = self
+            .store
+            .register_device(&did.to_string(), &device_token, platform)
+        {
             tracing::error!("Failed to register device: {}", e);
         }
     }
@@ -270,7 +273,7 @@ mod tests {
         service.register_device(did.clone(), "token123".to_string(), Platform::Android);
         // We don't have device_count anymore in the service interface as it's not efficient on store
         // But checking tokens should work
-        
+
         service.unregister_device("token123");
         assert!(service.get_device_tokens(&did).is_empty());
     }

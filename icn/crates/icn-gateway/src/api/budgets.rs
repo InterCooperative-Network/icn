@@ -78,7 +78,9 @@ pub async fn create_budget(
         updated_at: now,
     };
 
-    store.insert(budget.clone()).map_err(|e| GatewayError::InternalError(e.to_string()))?;
+    store
+        .insert(budget.clone())
+        .map_err(|e| GatewayError::InternalError(e.to_string()))?;
 
     Ok(HttpResponse::Created().json(budget))
 }
@@ -97,7 +99,9 @@ pub async fn list_budgets(
     let owner_did = claims.sub;
 
     // Use indexed lookup by owner
-    let mut budgets = store.list_by_owner(&owner_did).map_err(|e| GatewayError::InternalError(e.to_string()))?;
+    let mut budgets = store
+        .list_by_owner(&owner_did)
+        .map_err(|e| GatewayError::InternalError(e.to_string()))?;
 
     // Filter by status if provided
     if let Some(status_str) = query.get("status") {
@@ -202,7 +206,9 @@ pub async fn update_budget(
         .unwrap()
         .as_secs();
 
-    store.update(&budget_id, budget.clone()).map_err(|e| GatewayError::InternalError(e.to_string()))?;
+    store
+        .update(&budget_id, budget.clone())
+        .map_err(|e| GatewayError::InternalError(e.to_string()))?;
 
     Ok(HttpResponse::Ok().json(budget))
 }
@@ -233,7 +239,9 @@ pub async fn delete_budget(
         ));
     }
 
-    store.delete(&budget_id).map_err(|e| GatewayError::InternalError(e.to_string()))?;
+    store
+        .delete(&budget_id)
+        .map_err(|e| GatewayError::InternalError(e.to_string()))?;
 
     Ok(HttpResponse::Ok().json(serde_json::json!({
         "message": "Budget deleted",

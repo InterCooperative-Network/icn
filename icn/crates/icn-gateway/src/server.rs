@@ -147,8 +147,7 @@ impl GatewayServer {
                 }
                 Err(e) => {
                     return Err(crate::error::GatewayError::InternalError(format!(
-                        "Failed to open gateway storage: {}",
-                        e
+                        "Failed to open gateway storage: {e}"
                     )));
                 }
             }
@@ -157,9 +156,8 @@ impl GatewayServer {
             match sled::Config::new().temporary(true).open() {
                 Ok(db) => db,
                 Err(e) => {
-                     return Err(crate::error::GatewayError::InternalError(format!(
-                        "Failed to open temporary storage: {}",
-                        e
+                    return Err(crate::error::GatewayError::InternalError(format!(
+                        "Failed to open temporary storage: {e}"
                     )));
                 }
             }
@@ -179,7 +177,7 @@ impl GatewayServer {
 
         // Inject budget store for enforcement
         ledger_manager.set_budget_store(budget_store.clone());
-        
+
         let ledger_manager = Arc::new(ledger_manager);
 
         // Create identity manager for multi-device support
@@ -206,14 +204,13 @@ impl GatewayServer {
         // Create IP-based rate limiter for auth endpoints (more aggressive limits)
         let ip_rate_limiter = Arc::new(IpRateLimiter::new_for_auth());
 
-
-
         // Create persistent notification store
         let notification_store = Arc::new(crate::notifications::NotificationStore::new(db.clone()));
         info!("Persistent notification store initialized");
 
         // Create notification service (FCM credentials would be loaded from config in production)
-        let notification_service = Arc::new(NotificationService::new(notification_store.clone(), None));
+        let notification_service =
+            Arc::new(NotificationService::new(notification_store.clone(), None));
         info!("Notification service initialized");
 
         // Create notification queue and processor
@@ -248,15 +245,12 @@ impl GatewayServer {
 
         // Create recurring payment store
         let recurring_payment_store =
-            crate::api::recurring_payments::RecurringPaymentStore::new(
-                db.clone(),
-            );
+            crate::api::recurring_payments::RecurringPaymentStore::new(db.clone());
         info!("Recurring payment store initialized");
 
         // Create escrow store
         let escrow_store = crate::api::escrow::EscrowStore::new(db.clone());
         info!("Escrow store initialized");
-
 
         let _recurring_payments_handle = crate::api::recurring_payments::start_scheduler(
             recurring_payment_store.clone(),
