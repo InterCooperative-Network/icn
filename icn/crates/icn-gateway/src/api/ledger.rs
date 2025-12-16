@@ -369,7 +369,9 @@ mod tests {
         let ledger_mgr = Arc::new(LedgerManager::new());
         let db = sled::Config::new().temporary(true).open().unwrap();
         let budget_store = BudgetStore::new(db);
-        let notification_service = Arc::new(crate::notifications::NotificationService::new(None));
+        // Use temporary store for tests
+        let store = Arc::new(crate::notifications::NotificationStore::new(sled::Config::new().temporary(true).open().unwrap()));
+        let notification_service = Arc::new(crate::notifications::NotificationService::new(store, None));
         let event_broadcaster = Arc::new(EventBroadcaster::new());
         let alice = IdentityBundle::generate().unwrap();
         let bob = IdentityBundle::generate().unwrap();
@@ -518,7 +520,9 @@ mod tests {
         let ledger_mgr = Arc::new(LedgerManager::new());
         let db = sled::Config::new().temporary(true).open().unwrap();
         let budget_store = BudgetStore::new(db);
-        let notification_service = Arc::new(crate::notifications::NotificationService::new(None));
+        // Use temporary store for tests
+        let store = Arc::new(crate::notifications::NotificationStore::new(sled::Config::new().temporary(true).open().unwrap()));
+        let notification_service = Arc::new(crate::notifications::NotificationService::new(store, None));
         let event_broadcaster = Arc::new(EventBroadcaster::new());
         let alice = IdentityBundle::generate().unwrap();
 
@@ -584,7 +588,9 @@ mod tests {
         let ledger_mgr = Arc::new(LedgerManager::new());
         let db = sled::Config::new().temporary(true).open().unwrap();
         let budget_store = BudgetStore::new(db);
-        let notification_service = Arc::new(crate::notifications::NotificationService::new(None));
+        // Use temporary store for tests
+        let store = Arc::new(crate::notifications::NotificationStore::new(sled::Config::new().temporary(true).open().unwrap()));
+        let notification_service = Arc::new(crate::notifications::NotificationService::new(store, None));
         let event_broadcaster = Arc::new(EventBroadcaster::new());
         let alice = IdentityBundle::generate().unwrap();
         let bob = IdentityBundle::generate().unwrap();
@@ -632,7 +638,9 @@ mod tests {
         let ledger_mgr = Arc::new(LedgerManager::new());
         let db = sled::Config::new().temporary(true).open().unwrap();
         let budget_store = BudgetStore::new(db);
-        let notification_service = Arc::new(crate::notifications::NotificationService::new(None));
+        // Use temporary store for tests
+        let store = Arc::new(crate::notifications::NotificationStore::new(sled::Config::new().temporary(true).open().unwrap()));
+        let notification_service = Arc::new(crate::notifications::NotificationService::new(store, None));
         let event_broadcaster = Arc::new(EventBroadcaster::new());
         let alice = IdentityBundle::generate().unwrap();
         let bob = IdentityBundle::generate().unwrap();
@@ -720,7 +728,9 @@ mod tests {
         let ledger_mgr = Arc::new(LedgerManager::new());
         let db = sled::Config::new().temporary(true).open().unwrap();
         let budget_store = BudgetStore::new(db);
-        let notification_service = Arc::new(crate::notifications::NotificationService::new(None));
+        // Use temporary store for tests
+        let store = Arc::new(crate::notifications::NotificationStore::new(sled::Config::new().temporary(true).open().unwrap()));
+        let notification_service = Arc::new(crate::notifications::NotificationService::new(store, None));
         let event_broadcaster = Arc::new(EventBroadcaster::new());
         let alice = IdentityBundle::generate().unwrap();
 

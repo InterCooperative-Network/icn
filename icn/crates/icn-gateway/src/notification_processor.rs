@@ -5,7 +5,6 @@
 
 use std::sync::Arc;
 
-use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tracing::{debug, error, info, warn};
@@ -16,7 +15,7 @@ use crate::notification_queue::{
     calculate_backoff, DeliveryStatus, NotificationChannel, NotificationPriority,
     NotificationQueue, QueuedNotification,
 };
-use crate::notifications::NotificationService;
+use crate::notifications::{NotificationService, NotificationStore, InAppNotification};
 
 /// Configuration for the notification processor
 #[derive(Debug, Clone)]
@@ -54,37 +53,78 @@ impl Default for ProcessorConfig {
     }
 }
 
-/// In-app notification storage
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct InAppNotification {
-    /// Notification ID
-    pub id: String,
-    /// Recipient DID
-    pub recipient: String,
-    /// Cooperative ID
-    pub coop_id: String,
-    /// Title
-    pub title: String,
-    /// Body
-    pub body: String,
-    /// Custom data
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub data: Option<serde_json::Value>,
-    /// Notification type
-    pub notification_type: String,
-    /// Created timestamp
-    pub created_at: u64,
-    /// Whether the notification has been read
-    pub read: bool,
-    /// Read timestamp
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub read_at: Option<u64>,
+impl ProcessorConfig {
+    /// Load configuration from environment variables
+    pub fn from_env() -> Self {
+        let mut config = Self::default();
+
+        // Load SMTP config
+        if let (Ok(host), Ok(port_str), Ok(username), Ok(password), Ok(from_address)) = (
+            std::env::var("ICN_SMTP_HOST"),
+            std::env::var("ICN_SMTP_PORT"),
+            std::env::var("ICN_SMTP_USERNAME"),
+            std::env::var("ICN_SMTP_PASSWORD"),
+            std::env::var("ICN_SMTP_FROM_ADDRESS"),
+        ) {
+            if let Ok(port) = port_str.parse::<u16>() {
+                let from_name = std::env::var("ICN_SMTP_FROM_NAME")
+                    .unwrap_or_else(|_| "ICN Cooperative".to_string());
+                
+                config.smtp_config = Some(SmtpConfig::new(
+                    host,
+                    port,
+                    username,
+                    password,
+                    from_address,
+                    from_name,
+                ));
+                info!("SMTP configuration loaded from environment");
+            } else {
+                warn!("Invalid ICN_SMTP_PORT, SMTP disabled");
+            }
+        }
+
+        // Load email branding
+        if let Ok(url) = std::env::var("ICN_EMAIL_BASE_URL") {
+            config.email_base_url = url;
+        }
+        if let Ok(name) = std::env::var("ICN_EMAIL_COOP_NAME") {
+            config.email_coop_name = name;
+        }
+
+        // Load FCM config
+        if let Ok(json) = std::env::var("ICN_FCM_SERVICE_ACCOUNT_JSON") {
+            match FcmConfig::from_service_account_json(&json) {
+                Ok(fcm_config) => {
+                    config.fcm_config = Some(fcm_config);
+                    info!("FCM configuration loaded from environment JSON");
+                }
+                Err(e) => warn!("Invalid FCM service account JSON: {}", e),
+            }
+        } else if let Ok(path) = std::env::var("ICN_FCM_SERVICE_ACCOUNT_FILE") {
+            // Try loading from file
+            match std::fs::read_to_string(&path) {
+                Ok(json) => match FcmConfig::from_service_account_json(&json) {
+                    Ok(fcm_config) => {
+                        config.fcm_config = Some(fcm_config);
+                        info!("FCM configuration loaded from file: {}", path);
+                    }
+                    Err(e) => warn!("Invalid FCM service account JSON in file {}: {}", path, e),
+                },
+                Err(e) => warn!("Failed to read FCM service account file {}: {}", path, e),
+            }
+        }
+
+        config
+    }
 }
 
 /// Notification processor that delivers queued notifications
 pub struct NotificationProcessor {
     /// Notification queue reference
     queue: Arc<NotificationQueue>,
+    /// Notification store for in-app notifications
+    store: Arc<NotificationStore>,
     /// Notification service for device token management
     notification_service: Arc<NotificationService>,
     /// FCM client for push notifications (optional)
@@ -93,8 +133,6 @@ pub struct NotificationProcessor {
     email_client: Option<Arc<EmailClient>>,
     /// Email templates
     email_templates: EmailTemplates,
-    /// In-app notification storage (recipient -> notifications)
-    in_app_store: Arc<DashMap<String, Vec<InAppNotification>>>,
     /// Processor configuration
     config: ProcessorConfig,
 }
@@ -103,6 +141,7 @@ impl NotificationProcessor {
     /// Create a new notification processor
     pub fn new(
         queue: Arc<NotificationQueue>,
+        store: Arc<NotificationStore>,
         notification_service: Arc<NotificationService>,
         config: ProcessorConfig,
     ) -> Self {
@@ -129,11 +168,11 @@ impl NotificationProcessor {
 
         Self {
             queue,
+            store,
             notification_service,
             fcm_client,
             email_client,
             email_templates,
-            in_app_store: Arc::new(DashMap::new()),
             config,
         }
     }
@@ -488,17 +527,27 @@ impl NotificationProcessor {
             read_at: None,
         };
 
-        // Store in memory (in a real system, this would be persisted)
-        self.in_app_store
-            .entry(notification.recipient.clone())
-            .and_modify(|notifications| {
-                // Keep only last 100 notifications per user
-                if notifications.len() >= 100 {
-                    notifications.remove(0);
-                }
-                notifications.push(in_app.clone());
-            })
-            .or_insert_with(|| vec![in_app]);
+        // Persist
+        if let Err(e) = self.store.add_notification(in_app) {
+            error!(
+                notification_id = %id,
+                error = %e,
+                "Failed to persist in-app notification"
+            );
+            // Don't mark as delivered? Or allow retry?
+            // For now, retry
+            let retries = notification
+                .status
+                .get(&NotificationChannel::InApp)
+                .map(|s| match s.value() {
+                    DeliveryStatus::Failed { retries, .. } => *retries,
+                    _ => 0,
+                })
+                .unwrap_or(0);
+                
+             self.queue.mark_failed(id, NotificationChannel::InApp, &e.to_string(), retries + 1);
+             return;
+        }
 
         debug!(
             notification_id = %id,
@@ -515,81 +564,33 @@ impl NotificationProcessor {
         recipient: &str,
         unread_only: bool,
     ) -> Vec<InAppNotification> {
-        self.in_app_store
-            .get(recipient)
-            .map(|notifications| {
-                notifications
-                    .iter()
-                    .filter(|n| !unread_only || !n.read)
-                    .cloned()
-                    .collect()
-            })
-            .unwrap_or_default()
+        match self.store.get_notifications(recipient, unread_only, Some(100), None) {
+            Ok((notifications, _)) => notifications,
+            Err(e) => {
+                error!("Failed to get notifications: {}", e);
+                Vec::new()
+            }
+        }
     }
 
     /// Get unread notification count for a user
     pub fn get_unread_count(&self, recipient: &str) -> usize {
-        self.in_app_store
-            .get(recipient)
-            .map(|notifications| notifications.iter().filter(|n| !n.read).count())
-            .unwrap_or(0)
+        self.store.get_unread_count(recipient).unwrap_or(0)
     }
 
     /// Mark a notification as read
     pub fn mark_read(&self, recipient: &str, notification_id: &str) -> bool {
-        if let Some(mut notifications) = self.in_app_store.get_mut(recipient) {
-            for notif in notifications.iter_mut() {
-                if notif.id == notification_id {
-                    notif.read = true;
-                    notif.read_at = Some(
-                        std::time::SystemTime::now()
-                            .duration_since(std::time::UNIX_EPOCH)
-                            .unwrap()
-                            .as_secs(),
-                    );
-                    return true;
-                }
-            }
-        }
-        false
+        self.store.mark_read(recipient, notification_id).unwrap_or(false)
     }
 
     /// Mark all notifications as read for a user
     pub fn mark_all_read(&self, recipient: &str) -> usize {
-        if let Some(mut notifications) = self.in_app_store.get_mut(recipient) {
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
-
-            let mut count = 0;
-            for notif in notifications.iter_mut() {
-                if !notif.read {
-                    notif.read = true;
-                    notif.read_at = Some(now);
-                    count += 1;
-                }
-            }
-            count
-        } else {
-            0
-        }
+        self.store.mark_all_read(recipient).unwrap_or(0)
     }
 
     /// Delete a notification
     pub fn delete_notification(&self, recipient: &str, notification_id: &str) -> bool {
-        if let Some(mut notifications) = self.in_app_store.get_mut(recipient) {
-            let len_before = notifications.len();
-            notifications.retain(|n| n.id != notification_id);
-            notifications.len() < len_before
-        } else {
-            false
-        }
-    }
-
-    /// Get reference to in-app store (for API access)
-    pub fn in_app_store(&self) -> Arc<DashMap<String, Vec<InAppNotification>>> {
-        self.in_app_store.clone()
+        self.store.delete_notification(recipient, notification_id).unwrap_or(false)
     }
 }
 
@@ -597,6 +598,13 @@ impl NotificationProcessor {
 mod tests {
     use super::*;
     use crate::notification_queue::NotificationType;
+    use icn_store::notifications::NotificationStore;
+    use sled::Config;
+
+    fn temp_store() -> Arc<NotificationStore> {
+        let db = Config::new().temporary(true).open().unwrap();
+        Arc::new(NotificationStore::new(db))
+    }
 
     fn test_notification() -> QueuedNotification {
         QueuedNotification::new(
@@ -612,9 +620,12 @@ mod tests {
     async fn test_in_app_storage() {
         let (queue, _receiver) = NotificationQueue::new();
         let queue = Arc::new(queue);
-        let notification_service = Arc::new(NotificationService::new(None));
+        let store = temp_store();
+        // Service also needs a store instance
+        let notification_service = Arc::new(NotificationService::new(store.clone(), None));
         let processor = NotificationProcessor::new(
             queue.clone(),
+            store.clone(),
             notification_service,
             ProcessorConfig::default(),
         );
@@ -634,9 +645,11 @@ mod tests {
     async fn test_mark_read() {
         let (queue, _receiver) = NotificationQueue::new();
         let queue = Arc::new(queue);
-        let notification_service = Arc::new(NotificationService::new(None));
+        let store = temp_store();
+        let notification_service = Arc::new(NotificationService::new(store.clone(), None));
         let processor = NotificationProcessor::new(
             queue.clone(),
+            store.clone(),
             notification_service,
             ProcessorConfig::default(),
         );
@@ -661,9 +674,11 @@ mod tests {
     async fn test_unread_count() {
         let (queue, _receiver) = NotificationQueue::new();
         let queue = Arc::new(queue);
-        let notification_service = Arc::new(NotificationService::new(None));
+        let store = temp_store();
+        let notification_service = Arc::new(NotificationService::new(store.clone(), None));
         let processor = NotificationProcessor::new(
             queue.clone(),
+            store.clone(),
             notification_service,
             ProcessorConfig::default(),
         );
@@ -686,9 +701,11 @@ mod tests {
     async fn test_delete_notification() {
         let (queue, _receiver) = NotificationQueue::new();
         let queue = Arc::new(queue);
-        let notification_service = Arc::new(NotificationService::new(None));
+        let store = temp_store();
+        let notification_service = Arc::new(NotificationService::new(store.clone(), None));
         let processor = NotificationProcessor::new(
             queue.clone(),
+            store.clone(),
             notification_service,
             ProcessorConfig::default(),
         );
@@ -704,5 +721,58 @@ mod tests {
                 .len(),
             0
         );
+    }
+
+    #[test]
+    fn test_config_from_env() {
+        // Set environment variables
+        // Use unique var names to avoid conflict with other tests if parallel
+        let host_var = "ICN_TEST_SMTP_HOST";
+        std::env::set_var("ICN_SMTP_HOST", "smtp.test.com");
+        std::env::set_var("ICN_SMTP_PORT", "587");
+        std::env::set_var("ICN_SMTP_USERNAME", "user");
+        std::env::set_var("ICN_SMTP_PASSWORD", "pass");
+        std::env::set_var("ICN_SMTP_FROM_ADDRESS", "test@test.com");
+        std::env::set_var("ICN_EMAIL_BASE_URL", "https://test.coop");
+        std::env::set_var("ICN_EMAIL_COOP_NAME", "Test Coop");
+
+        let config = ProcessorConfig::from_env();
+
+        assert!(config.smtp_config.is_some());
+        let smtp = config.smtp_config.unwrap();
+        assert_eq!(smtp.host, "smtp.test.com");
+        assert_eq!(smtp.port, 587);
+        assert_eq!(smtp.username, "user");
+        assert_eq!(config.email_base_url, "https://test.coop");
+        assert_eq!(config.email_coop_name, "Test Coop");
+
+        // Clean up
+        std::env::remove_var("ICN_SMTP_HOST");
+        std::env::remove_var("ICN_SMTP_PORT");
+        std::env::remove_var("ICN_SMTP_USERNAME");
+        std::env::remove_var("ICN_SMTP_PASSWORD");
+        std::env::remove_var("ICN_SMTP_FROM_ADDRESS");
+        std::env::remove_var("ICN_EMAIL_BASE_URL");
+        std::env::remove_var("ICN_EMAIL_COOP_NAME");
+    }
+
+    #[test]
+    fn test_fcm_config_from_env() {
+        let json = r#"{
+            "project_id": "env-project",
+            "client_email": "env@test.com",
+            "private_key": "-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----"
+        }"#;
+
+        std::env::set_var("ICN_FCM_SERVICE_ACCOUNT_JSON", json);
+
+        let config = ProcessorConfig::from_env();
+
+        assert!(config.fcm_config.is_some());
+        let fcm = config.fcm_config.unwrap();
+        assert_eq!(fcm.project_id, "env-project");
+        assert_eq!(fcm.service_account_email, "env@test.com");
+
+        std::env::remove_var("ICN_FCM_SERVICE_ACCOUNT_JSON");
     }
 }

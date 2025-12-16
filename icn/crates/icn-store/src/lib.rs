@@ -2,6 +2,7 @@
 
 pub mod quotas;
 pub mod budgets;
+pub mod notifications;
 pub mod recurring_payments;
 pub mod escrow;
 

@@ -1023,7 +1023,9 @@ mod tests {
     async fn test_proposal_lifecycle() {
         let gov_mgr = Arc::new(GovernanceManager::new());
         let event_broadcaster = Arc::new(EventBroadcaster::new());
-        let notification_service = Arc::new(crate::notifications::NotificationService::new(None));
+        // Use temporary store for tests
+        let store = Arc::new(crate::notifications::NotificationStore::new(sled::Config::new().temporary(true).open().unwrap()));
+        let notification_service = Arc::new(crate::notifications::NotificationService::new(store, None));
         let alice = IdentityBundle::generate().unwrap();
         let bob = IdentityBundle::generate().unwrap();
 
@@ -1969,7 +1971,9 @@ mod tests {
             .await
             .unwrap();
 
-        let notification_service = Arc::new(crate::notifications::NotificationService::new(None));
+        // Use temporary store for tests
+        let store = Arc::new(crate::notifications::NotificationStore::new(sled::Config::new().temporary(true).open().unwrap()));
+        let notification_service = Arc::new(crate::notifications::NotificationService::new(store, None));
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(gov_mgr.clone()))

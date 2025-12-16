@@ -2,33 +2,11 @@
 //!
 //! Manages FCM device registration and sends push notifications for events.
 
-use dashmap::DashMap;
+pub use icn_store::notifications::{InAppNotification, NotificationStore, Platform, RegisteredDevice};
+
 use icn_identity::Did;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
-
-/// Device platform type
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "lowercase")]
-pub enum Platform {
-    Ios,
-    Android,
-    Web,
-}
-
-/// Registered device for push notifications
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RegisteredDevice {
-    /// Device identifier (DID)
-    pub did: Did,
-    /// FCM device token
-    pub device_token: String,
-    /// Platform type
-    pub platform: Platform,
-    /// Registration timestamp
-    pub registered_at: u64,
-}
 
 /// Notification payload
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -43,11 +21,10 @@ pub struct Notification {
 }
 
 /// Notification service for managing device tokens and sending notifications
+#[derive(Clone)]
 pub struct NotificationService {
-    /// Map of device_token -> RegisteredDevice
-    devices: Arc<DashMap<String, RegisteredDevice>>,
-    /// Map of DID -> Vec<device_token> for quick lookup
-    did_tokens: Arc<DashMap<String, Vec<String>>>,
+    /// Persistent store
+    store: Arc<NotificationStore>,
     /// Optional FCM service account JSON (for Firebase Admin SDK)
     #[allow(dead_code)]
     fcm_credentials: Option<String>,
@@ -55,70 +32,36 @@ pub struct NotificationService {
 
 impl NotificationService {
     /// Create a new notification service
-    pub fn new(fcm_credentials: Option<String>) -> Self {
+    pub fn new(store: Arc<NotificationStore>, fcm_credentials: Option<String>) -> Self {
         Self {
-            devices: Arc::new(DashMap::new()),
-            did_tokens: Arc::new(DashMap::new()),
+            store,
             fcm_credentials,
         }
     }
 
     /// Register a device for push notifications
     pub fn register_device(&self, did: Did, device_token: String, platform: Platform) {
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-
-        let device = RegisteredDevice {
-            did: did.clone(),
-            device_token: device_token.clone(),
-            platform,
-            registered_at: timestamp,
-        };
-
-        // Store device by token
-        self.devices.insert(device_token.clone(), device);
-
-        // Update DID -> tokens mapping
-        let did_str = did.to_string();
-        self.did_tokens
-            .entry(did_str)
-            .and_modify(|tokens| {
-                if !tokens.contains(&device_token) {
-                    tokens.push(device_token.clone());
-                }
-            })
-            .or_insert_with(|| vec![device_token]);
+        if let Err(e) = self.store.register_device(&did.to_string(), &device_token, platform) {
+            tracing::error!("Failed to register device: {}", e);
+        }
     }
 
     /// Unregister a device
     pub fn unregister_device(&self, device_token: &str) {
-        if let Some((_, device)) = self.devices.remove(device_token) {
-            let did_str = device.did.to_string();
-            if let Some(mut tokens) = self.did_tokens.get_mut(&did_str) {
-                tokens.retain(|t| t != device_token);
-            }
+        if let Err(e) = self.store.unregister_device(device_token) {
+            tracing::error!("Failed to unregister device: {}", e);
         }
     }
 
     /// Get all device tokens for a DID
     pub fn get_device_tokens(&self, did: &Did) -> Vec<String> {
-        let did_str = did.to_string();
-        self.did_tokens
-            .get(&did_str)
-            .map(|tokens| tokens.clone())
-            .unwrap_or_default()
-    }
-
-    /// Get device info by token
-    pub fn get_device(&self, device_token: &str) -> Option<RegisteredDevice> {
-        self.devices.get(device_token).map(|d| d.clone())
-    }
-
-    /// Get count of registered devices
-    pub fn device_count(&self) -> usize {
-        self.devices.len()
+        match self.store.get_device_tokens(&did.to_string()) {
+            Ok(tokens) => tokens,
+            Err(e) => {
+                tracing::error!("Failed to get device tokens: {}", e);
+                Vec::new()
+            }
+        }
     }
 
     /// Send notification to specific DID (all their devices)
@@ -277,23 +220,32 @@ fn format_did(did: &Did) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use icn_store::notifications::NotificationStore;
+    use sled::Config;
+
+    fn temp_store() -> Arc<NotificationStore> {
+        let db = Config::new().temporary(true).open().unwrap();
+        Arc::new(NotificationStore::new(db))
+    }
 
     #[test]
     fn test_register_and_get_device() {
-        let service = NotificationService::new(None);
+        let store = temp_store();
+        let service = NotificationService::new(store, None);
         let keypair = icn_identity::KeyPair::generate().unwrap();
         let did = keypair.did().clone();
 
         service.register_device(did.clone(), "token123".to_string(), Platform::Android);
 
-        let device = service.get_device("token123").unwrap();
-        assert_eq!(device.did, did);
-        assert_eq!(device.platform, Platform::Android);
+        let tokens = service.get_device_tokens(&did);
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0], "token123");
     }
 
     #[test]
     fn test_multiple_devices_per_did() {
-        let service = NotificationService::new(None);
+        let store = temp_store();
+        let service = NotificationService::new(store, None);
         let keypair = icn_identity::KeyPair::generate().unwrap();
         let did = keypair.did().clone();
 
@@ -308,15 +260,16 @@ mod tests {
 
     #[test]
     fn test_unregister_device() {
-        let service = NotificationService::new(None);
+        let store = temp_store();
+        let service = NotificationService::new(store, None);
         let keypair = icn_identity::KeyPair::generate().unwrap();
         let did = keypair.did().clone();
 
         service.register_device(did.clone(), "token123".to_string(), Platform::Android);
-        assert_eq!(service.device_count(), 1);
-
+        // We don't have device_count anymore in the service interface as it's not efficient on store
+        // But checking tokens should work
+        
         service.unregister_device("token123");
-        assert_eq!(service.device_count(), 0);
         assert!(service.get_device_tokens(&did).is_empty());
     }
 

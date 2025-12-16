@@ -8,8 +8,8 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use crate::error::Result;
-use crate::notification_processor::{InAppNotification, NotificationProcessor};
-use crate::notifications::{NotificationService, Platform};
+use crate::notification_processor::NotificationProcessor;
+use crate::notifications::{InAppNotification, NotificationService, Platform};
 use icn_identity::Did;
 
 /// Register device request
@@ -247,15 +247,23 @@ mod tests {
     use super::*;
     use crate::notification_processor::ProcessorConfig;
     use crate::notification_queue::NotificationQueue;
-    use crate::notifications::NotificationService;
+    use crate::notifications::{NotificationService, NotificationStore};
     use actix_web::{test, App};
+    use sled::Config;
+
+    fn test_store() -> Arc<NotificationStore> {
+        let db = Config::new().temporary(true).open().unwrap();
+        Arc::new(NotificationStore::new(db))
+    }
 
     fn create_test_processor() -> Arc<NotificationProcessor> {
         let (queue, _receiver) = NotificationQueue::new();
         let queue = Arc::new(queue);
-        let notification_service = Arc::new(NotificationService::new(None));
+        let store = test_store();
+        let notification_service = Arc::new(NotificationService::new(store.clone(), None));
         Arc::new(NotificationProcessor::new(
             queue,
+            store,
             notification_service,
             ProcessorConfig::default(),
         ))
@@ -263,7 +271,8 @@ mod tests {
 
     #[actix_web::test]
     async fn test_register_device() {
-        let notification_service = Arc::new(NotificationService::new(None));
+        let store = test_store();
+        let notification_service = Arc::new(NotificationService::new(store, None));
         let keypair = icn_identity::KeyPair::generate().unwrap();
         let _did = keypair.did().clone();
 
@@ -309,7 +318,8 @@ mod tests {
 
     #[actix_web::test]
     async fn test_unregister_device() {
-        let notification_service = Arc::new(NotificationService::new(None));
+        let store = test_store();
+        let notification_service = Arc::new(NotificationService::new(store, None));
         let keypair = icn_identity::KeyPair::generate().unwrap();
         let did = keypair.did().clone();
 
@@ -341,14 +351,22 @@ mod tests {
 
     #[actix_web::test]
     async fn test_notification_count() {
-        let processor = create_test_processor();
+        // Need to create store separately to access it for population
+        let store = test_store();
+        let (queue, _receiver) = NotificationQueue::new();
+        let queue = Arc::new(queue);
+        let notification_service = Arc::new(NotificationService::new(store.clone(), None));
+        let processor = Arc::new(NotificationProcessor::new(
+            queue,
+            store.clone(),
+            notification_service,
+            ProcessorConfig::default(),
+        ));
+        
         let recipient = "did:icn:test123";
 
         // Add some test notifications directly to the in-app store
-        let store = processor.in_app_store();
-        store.insert(
-            recipient.to_string(),
-            vec![
+        store.add_notification(
                 InAppNotification {
                     id: "notif1".to_string(),
                     recipient: recipient.to_string(),
@@ -360,7 +378,10 @@ mod tests {
                     created_at: 1000,
                     read: false,
                     read_at: None,
-                },
+                }
+        ).unwrap();
+        
+        store.add_notification(
                 InAppNotification {
                     id: "notif2".to_string(),
                     recipient: recipient.to_string(),
@@ -372,9 +393,8 @@ mod tests {
                     created_at: 2000,
                     read: true,
                     read_at: Some(2500),
-                },
-            ],
-        );
+                }
+        ).unwrap();
 
         // Test the count
         let all = processor.get_in_app_notifications(recipient, false);
@@ -386,14 +406,21 @@ mod tests {
 
     #[actix_web::test]
     async fn test_mark_read_operations() {
-        let processor = create_test_processor();
+        let store = test_store();
+        let (queue, _receiver) = NotificationQueue::new();
+        let queue = Arc::new(queue);
+        let notification_service = Arc::new(NotificationService::new(store.clone(), None));
+        let processor = Arc::new(NotificationProcessor::new(
+            queue,
+            store.clone(),
+            notification_service,
+            ProcessorConfig::default(),
+        ));
+        
         let recipient = "did:icn:reader";
 
         // Add unread notifications
-        let store = processor.in_app_store();
-        store.insert(
-            recipient.to_string(),
-            vec![
+        store.add_notification(
                 InAppNotification {
                     id: "n1".to_string(),
                     recipient: recipient.to_string(),
@@ -405,7 +432,10 @@ mod tests {
                     created_at: 1000,
                     read: false,
                     read_at: None,
-                },
+                }
+        ).unwrap();
+        
+        store.add_notification(
                 InAppNotification {
                     id: "n2".to_string(),
                     recipient: recipient.to_string(),
@@ -417,9 +447,8 @@ mod tests {
                     created_at: 2000,
                     read: false,
                     read_at: None,
-                },
-            ],
-        );
+                }
+        ).unwrap();
 
         // Mark one as read
         assert!(processor.mark_read(recipient, "n1"));
@@ -433,14 +462,22 @@ mod tests {
 
     #[actix_web::test]
     async fn test_delete_notification() {
-        let processor = create_test_processor();
+        let store = test_store();
+        let (queue, _receiver) = NotificationQueue::new();
+        let queue = Arc::new(queue);
+        let notification_service = Arc::new(NotificationService::new(store.clone(), None));
+        let processor = Arc::new(NotificationProcessor::new(
+            queue,
+            store.clone(),
+            notification_service,
+            ProcessorConfig::default(),
+        ));
+        
         let recipient = "did:icn:deleter";
 
         // Add a notification
-        let store = processor.in_app_store();
-        store.insert(
-            recipient.to_string(),
-            vec![InAppNotification {
+        store.add_notification(
+            InAppNotification {
                 id: "to-delete".to_string(),
                 recipient: recipient.to_string(),
                 coop_id: "coop1".to_string(),
@@ -451,8 +488,8 @@ mod tests {
                 created_at: 1000,
                 read: false,
                 read_at: None,
-            }],
-        );
+            }
+        ).unwrap();
 
         assert_eq!(
             processor.get_in_app_notifications(recipient, false).len(),
@@ -472,14 +509,21 @@ mod tests {
 
     #[actix_web::test]
     async fn test_list_with_type_filter() {
-        let processor = create_test_processor();
+        let store = test_store();
+        let (queue, _receiver) = NotificationQueue::new();
+        let queue = Arc::new(queue);
+        let notification_service = Arc::new(NotificationService::new(store.clone(), None));
+        let processor = Arc::new(NotificationProcessor::new(
+            queue,
+            store.clone(),
+            notification_service,
+            ProcessorConfig::default(),
+        ));
+        
         let recipient = "did:icn:filtered";
 
         // Add notifications of different types
-        let store = processor.in_app_store();
-        store.insert(
-            recipient.to_string(),
-            vec![
+        store.add_notification(
                 InAppNotification {
                     id: "payment1".to_string(),
                     recipient: recipient.to_string(),
@@ -491,7 +535,10 @@ mod tests {
                     created_at: 1000,
                     read: false,
                     read_at: None,
-                },
+                }
+        ).unwrap();
+        
+        store.add_notification(
                 InAppNotification {
                     id: "system1".to_string(),
                     recipient: recipient.to_string(),
@@ -503,7 +550,10 @@ mod tests {
                     created_at: 2000,
                     read: false,
                     read_at: None,
-                },
+                }
+        ).unwrap();
+        
+        store.add_notification(
                 InAppNotification {
                     id: "payment2".to_string(),
                     recipient: recipient.to_string(),
@@ -515,9 +565,8 @@ mod tests {
                     created_at: 3000,
                     read: false,
                     read_at: None,
-                },
-            ],
-        );
+                }
+        ).unwrap();
 
         // Get all
         let all = processor.get_in_app_notifications(recipient, false);
