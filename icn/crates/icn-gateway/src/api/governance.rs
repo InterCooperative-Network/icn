@@ -748,7 +748,11 @@ pub async fn close_proposal(
         let voter_count = voters.len();
         for voter in &voters {
             if let Err(e) = notification_service.send_to_did(voter, notif.clone()).await {
-                tracing::warn!("Failed to send proposal result notification to {}: {}", voter, e);
+                tracing::warn!(
+                    "Failed to send proposal result notification to {}: {}",
+                    voter,
+                    e
+                );
             }
         }
         tracing::info!(

@@ -167,10 +167,7 @@ impl EmailClient {
 
     /// Build or get cached SMTP transport
     fn build_transport(&self) -> Result<AsyncSmtpTransport<Tokio1Executor>, String> {
-        let creds = Credentials::new(
-            self.config.username.clone(),
-            self.config.password.clone(),
-        );
+        let creds = Credentials::new(self.config.username.clone(), self.config.password.clone());
 
         let tls_parameters = TlsParameters::builder(self.config.host.clone())
             .build()
@@ -207,18 +204,16 @@ impl EmailClient {
         );
 
         // Parse addresses
-        let from_mailbox: Mailbox = match format!(
-            "{} <{}>",
-            self.config.from_name, self.config.from_address
-        ).parse() {
-            Ok(m) => m,
-            Err(e) => {
-                error!(error = %e, "Invalid from address");
-                return EmailResult::PermanentFailure {
-                    error: format!("Invalid from address: {e}"),
-                };
-            }
-        };
+        let from_mailbox: Mailbox =
+            match format!("{} <{}>", self.config.from_name, self.config.from_address).parse() {
+                Ok(m) => m,
+                Err(e) => {
+                    error!(error = %e, "Invalid from address");
+                    return EmailResult::PermanentFailure {
+                        error: format!("Invalid from address: {e}"),
+                    };
+                }
+            };
 
         let to_mailbox: Mailbox = match message.to.parse() {
             Ok(m) => m,

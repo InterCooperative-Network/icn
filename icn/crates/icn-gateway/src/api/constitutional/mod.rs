@@ -682,7 +682,8 @@ pub async fn list_amendments(
     }
     .validate();
 
-    let paginated: PaginatedList<AmendmentResponse> = paginate_items(responses, &pagination_request);
+    let paginated: PaginatedList<AmendmentResponse> =
+        paginate_items(responses, &pagination_request);
 
     Ok(HttpResponse::Ok().json(paginated))
 }

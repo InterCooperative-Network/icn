@@ -915,7 +915,9 @@ impl<S: CommonsStoreBackend> CommonsStore<S> {
     }
 
     /// List all ceremonies
-    pub fn list_ceremonies(&self) -> Result<Vec<(String, crate::api::sdis::enrollment::EnrollmentCeremony)>> {
+    pub fn list_ceremonies(
+        &self,
+    ) -> Result<Vec<(String, crate::api::sdis::enrollment::EnrollmentCeremony)>> {
         let entries = self.store.scan(CEREMONY_PREFIX)?;
         let mut ceremonies = Vec::new();
 
@@ -1004,7 +1006,12 @@ impl<S: CommonsStoreBackend> CommonsStore<S> {
     /// List all enrollment sessions
     pub fn list_enrollment_sessions(
         &self,
-    ) -> Result<Vec<(String, crate::api::sdis::simple_enrollment::EnrollmentSession)>> {
+    ) -> Result<
+        Vec<(
+            String,
+            crate::api::sdis::simple_enrollment::EnrollmentSession,
+        )>,
+    > {
         let entries = self.store.scan(ENROLLMENT_SESSION_PREFIX)?;
         let mut sessions = Vec::new();
 

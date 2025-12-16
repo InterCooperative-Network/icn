@@ -2019,7 +2019,12 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
     /// List all enrollment sessions
     pub async fn list_enrollment_sessions(
         &self,
-    ) -> Result<Vec<(String, crate::api::sdis::simple_enrollment::EnrollmentSession)>> {
+    ) -> Result<
+        Vec<(
+            String,
+            crate::api::sdis::simple_enrollment::EnrollmentSession,
+        )>,
+    > {
         self.store.list_enrollment_sessions()
     }
 }

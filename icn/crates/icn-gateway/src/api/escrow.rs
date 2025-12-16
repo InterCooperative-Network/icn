@@ -406,8 +406,8 @@ pub async fn refund_escrow(
     // Refund: reverse the original payment direction (to -> from)
     let tx_hash = match ledger_mgr.create_payment(
         &escrow.coop_id,
-        &to_did,    // Refund from beneficiary's reserved funds
-        &from_did,  // Back to original sender
+        &to_did,   // Refund from beneficiary's reserved funds
+        &from_did, // Back to original sender
         escrow.amount,
         escrow.currency.clone(),
     ) {

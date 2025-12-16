@@ -377,10 +377,10 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
 /// Calculate next execution time based on frequency
 fn calculate_next_execution(current: u64, frequency: PaymentFrequency) -> u64 {
     match frequency {
-        PaymentFrequency::Daily => current + 86400,         // 24 hours
-        PaymentFrequency::Weekly => current + 604800,       // 7 days
-        PaymentFrequency::Monthly => current + 2592000,     // 30 days (approximate)
-        PaymentFrequency::Yearly => current + 31536000,     // 365 days
+        PaymentFrequency::Daily => current + 86400,   // 24 hours
+        PaymentFrequency::Weekly => current + 604800, // 7 days
+        PaymentFrequency::Monthly => current + 2592000, // 30 days (approximate)
+        PaymentFrequency::Yearly => current + 31536000, // 365 days
     }
 }
 
@@ -395,7 +395,10 @@ pub async fn execute_due_payments(
     let due_payments = store.get_due_payments().await;
     let mut results = Vec::new();
 
-    debug!(count = due_payments.len(), "Checking due recurring payments");
+    debug!(
+        count = due_payments.len(),
+        "Checking due recurring payments"
+    );
 
     for mut payment in due_payments {
         let payment_id = payment.id.clone();
@@ -498,9 +501,8 @@ pub fn start_scheduler(
             "Starting recurring payments scheduler"
         );
 
-        let mut interval = tokio::time::interval(
-            std::time::Duration::from_secs(check_interval_secs)
-        );
+        let mut interval =
+            tokio::time::interval(std::time::Duration::from_secs(check_interval_secs));
 
         loop {
             interval.tick().await;
