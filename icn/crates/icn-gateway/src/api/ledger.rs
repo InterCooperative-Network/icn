@@ -367,6 +367,7 @@ mod tests {
     #[actix_web::test]
     async fn test_create_payment_and_get_balance() {
         let ledger_mgr = Arc::new(LedgerManager::new());
+        let budget_store = Arc::new(BudgetStore::new());
         let notification_service = Arc::new(crate::notifications::NotificationService::new(None));
         let event_broadcaster = Arc::new(EventBroadcaster::new());
         let alice = IdentityBundle::generate().unwrap();
@@ -375,6 +376,7 @@ mod tests {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(ledger_mgr.clone()))
+                .app_data(web::Data::new(budget_store.clone()))
                 .app_data(web::Data::new(notification_service.clone()))
                 .app_data(web::Data::new(event_broadcaster.clone()))
                 .service(
@@ -513,6 +515,7 @@ mod tests {
     #[actix_web::test]
     async fn test_authorization_scope_check() {
         let ledger_mgr = Arc::new(LedgerManager::new());
+        let budget_store = Arc::new(BudgetStore::new());
         let notification_service = Arc::new(crate::notifications::NotificationService::new(None));
         let event_broadcaster = Arc::new(EventBroadcaster::new());
         let alice = IdentityBundle::generate().unwrap();
@@ -520,6 +523,7 @@ mod tests {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(ledger_mgr.clone()))
+                .app_data(web::Data::new(budget_store.clone()))
                 .app_data(web::Data::new(notification_service.clone()))
                 .app_data(web::Data::new(event_broadcaster.clone()))
                 .service(
@@ -576,6 +580,7 @@ mod tests {
     #[actix_web::test]
     async fn test_create_payment_from_other_account_fails() {
         let ledger_mgr = Arc::new(LedgerManager::new());
+        let budget_store = Arc::new(BudgetStore::new());
         let notification_service = Arc::new(crate::notifications::NotificationService::new(None));
         let event_broadcaster = Arc::new(EventBroadcaster::new());
         let alice = IdentityBundle::generate().unwrap();
@@ -585,6 +590,7 @@ mod tests {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(ledger_mgr.clone()))
+                .app_data(web::Data::new(budget_store.clone()))
                 .app_data(web::Data::new(notification_service.clone()))
                 .app_data(web::Data::new(event_broadcaster.clone()))
                 .service(web::scope("/ledger").service(create_payment)),
@@ -621,6 +627,7 @@ mod tests {
     #[actix_web::test]
     async fn test_cross_cooperative_ledger_privacy() {
         let ledger_mgr = Arc::new(LedgerManager::new());
+        let budget_store = Arc::new(BudgetStore::new());
         let notification_service = Arc::new(crate::notifications::NotificationService::new(None));
         let event_broadcaster = Arc::new(EventBroadcaster::new());
         let alice = IdentityBundle::generate().unwrap();
@@ -640,6 +647,7 @@ mod tests {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(ledger_mgr.clone()))
+                .app_data(web::Data::new(budget_store.clone()))
                 .app_data(web::Data::new(notification_service.clone()))
                 .app_data(web::Data::new(event_broadcaster.clone()))
                 .service(
@@ -706,6 +714,7 @@ mod tests {
     #[actix_web::test]
     async fn test_self_payment_rejected() {
         let ledger_mgr = Arc::new(LedgerManager::new());
+        let budget_store = Arc::new(BudgetStore::new());
         let notification_service = Arc::new(crate::notifications::NotificationService::new(None));
         let event_broadcaster = Arc::new(EventBroadcaster::new());
         let alice = IdentityBundle::generate().unwrap();
@@ -713,6 +722,7 @@ mod tests {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(ledger_mgr.clone()))
+                .app_data(web::Data::new(budget_store.clone()))
                 .app_data(web::Data::new(notification_service.clone()))
                 .app_data(web::Data::new(event_broadcaster.clone()))
                 .service(web::scope("/ledger").service(create_payment)),
