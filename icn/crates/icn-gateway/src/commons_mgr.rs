@@ -1998,7 +1998,7 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
         &self,
         id: &str,
     ) -> Result<Option<crate::api::sdis::simple_enrollment::EnrollmentSession>> {
-        Ok(self.store.get_enrollment_session(id)?)
+        self.store.get_enrollment_session(id)
     }
 
     /// Update an enrollment session
@@ -2013,14 +2013,14 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
 
     /// Delete an enrollment session
     pub async fn delete_enrollment_session(&self, id: &str) -> Result<bool> {
-        Ok(self.store.delete_enrollment_session(id)?)
+        self.store.delete_enrollment_session(id)
     }
 
     /// List all enrollment sessions
     pub async fn list_enrollment_sessions(
         &self,
     ) -> Result<Vec<(String, crate::api::sdis::simple_enrollment::EnrollmentSession)>> {
-        Ok(self.store.list_enrollment_sessions()?)
+        self.store.list_enrollment_sessions()
     }
 }
 
