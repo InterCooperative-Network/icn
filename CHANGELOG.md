@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Pilot-Ready Platform Sprint Completion (2025-12-15)
+
+**Notification System Hooks** ([sdk/react-native/src/notification-hooks.ts](sdk/react-native/src/notification-hooks.ts)):
+- `useNotifications()` - Full notification management with mark read, delete, refresh
+- `useUnreadCount()` - Lightweight badge counter with optional polling interval
+- Optimistic updates for instant UI feedback
+- Types: `InAppNotification`, `NotificationListResponse`, `ListNotificationsOptions`
+
+**Governance Dashboard Hooks** ([sdk/react-native/src/governance-dashboard-hooks.ts](sdk/react-native/src/governance-dashboard-hooks.ts)):
+- `useGovernanceDashboard()` - Amendments/appeals stats with activity timeline
+- `useGovernanceParticipation()` - Voter participation metrics
+- `useGovernanceOverview()` - Combined dashboard with parallel data fetching
+- Types: `GovernanceDashboard`, `AmendmentsBreakdown`, `AppealsBreakdown`, `ParticipationStats`
+
+**Economic Feature Hooks** ([sdk/react-native/src/economic-hooks.ts](sdk/react-native/src/economic-hooks.ts)):
+- `useRecurringPayments()` - Create, pause, resume, cancel scheduled payments
+- `useEscrow()` - Create, release, refund escrow holds with conditions
+- `useBudgets()` - List and create spending limits by period
+- `useBudget()` - Single budget detail with refresh
+- Types: `RecurringPayment`, `Escrow`, `Budget`, `EscrowCondition`
+
+**Cursor-Based Pagination** ([icn/crates/icn-gateway/src/api/](icn/crates/icn-gateway/src/api/)):
+- Added cursor pagination to `list_members` endpoint
+- Added cursor pagination to `list_amendments` endpoint
+- Added cursor pagination to `list_appeals` endpoint
+- `Cursored` trait implementations for all response types
+- Supports `cursor`, `limit`, and `direction` parameters
+
 ### Added - SDK Commons Evolution Integration (2025-12-15)
 
 **TypeScript SDK** ([sdk/typescript/src/](sdk/typescript/src/)):
