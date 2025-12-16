@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Gap Closure Improvements (2025-12-15)
+
+**SMTP Email Delivery** ([icn/crates/icn-gateway/src/email_client.rs](icn/crates/icn-gateway/src/email_client.rs)):
+- Replaced mock email client with actual SMTP implementation using `lettre` crate
+- Support for implicit TLS (port 465) and STARTTLS (port 587)
+- Delivery result classification: Success, InvalidRecipient, TemporaryFailure, PermanentFailure
+- Pre-built configurations for SendGrid and Mailgun
+- HTML + plaintext multipart email support
+
+**Member Display Names** ([icn/crates/icn-identity/src/commons.rs](icn/crates/icn-identity/src/commons.rs)):
+- Added `display_name` field to `CommonsHolderRecord`
+- Display name captured from enrollment `identity_name`
+- Member profile API now returns display name
+- Builder method `with_display_name()` and setter `set_display_name()`
+
+**Proposal Result Notifications** ([icn/crates/icn-gateway/src/api/governance.rs](icn/crates/icn-gateway/src/api/governance.rs)):
+- Added `get_voter_dids()` method to GovernanceManager
+- Proposal close now sends notifications to all voters
+- Outcome-specific messages (accepted, rejected, no_quorum)
+- Added `proposal_result_notification()` factory
+
 ### Fixed - Economic Feature Gap Fixes (2025-12-15)
 
 **Escrow Ledger Integration** ([icn/crates/icn-gateway/src/api/escrow.rs](icn/crates/icn-gateway/src/api/escrow.rs)):
