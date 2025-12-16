@@ -116,6 +116,9 @@ where
     fn call(&self, req: ServiceRequest) -> Self::Future {
         let start = Instant::now();
         let method = req.method().to_string();
+        
+        // Generate unique request ID
+        let request_id = uuid::Uuid::new_v4().to_string();
 
         // SECURITY: Use route pattern instead of raw path to prevent cardinality explosion
         // Raw path contains user-controlled values (coop_id, did) which could create millions of unique labels
@@ -124,6 +127,11 @@ where
         let path = req
             .match_pattern()
             .unwrap_or_else(|| req.path().to_string());
+        
+        // Extract user_id from claims if authenticated
+        let user_id = req.extensions()
+            .get::<TokenClaims>()
+            .map(|claims| claims.sub.clone());
 
         let fut = self.service.call(req);
 
@@ -137,6 +145,28 @@ where
             // Record metrics with normalized path
             gateway::requests_total_inc(&path, &method);
             gateway::request_duration_record(&path, status, duration);
+            
+            // Structured log with contextual fields
+            if let Some(uid) = user_id {
+                tracing::info!(
+                    request_id = %request_id,
+                    user_id = %uid,
+                    method = %method,
+                    path = %path,
+                    status = status,
+                    duration_ms = duration * 1000.0,
+                    "Request completed"
+                );
+            } else {
+                tracing::info!(
+                    request_id = %request_id,
+                    method = %method,
+                    path = %path,
+                    status = status,
+                    duration_ms = duration * 1000.0,
+                    "Request completed"
+                );
+            }
 
             Ok(res)
         })

@@ -27,6 +27,7 @@ pub mod identity_mgr;
 pub mod invite;
 pub mod ledger_events;
 pub mod ledger_mgr;
+pub mod logging;
 pub mod middleware;
 pub mod models;
 pub mod notification_listener;
