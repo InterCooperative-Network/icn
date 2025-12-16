@@ -655,6 +655,7 @@ pub async fn close_proposal(
     http_req: HttpRequest,
     gov_mgr: web::Data<Arc<GovernanceManager>>,
     event_broadcaster: web::Data<Arc<EventBroadcaster>>,
+    notification_service: web::Data<Arc<crate::notifications::NotificationService>>,
     id: web::Path<String>,
 ) -> Result<HttpResponse> {
     // Check authorization
@@ -736,6 +737,26 @@ pub async fn close_proposal(
             },
         )
         .await;
+
+    // Send notifications to all voters about the outcome
+    if let Ok(voters) = gov_mgr.get_voter_dids(&proposal_id).await {
+        let notif = crate::notifications::NotificationService::proposal_result_notification(
+            &proposal_id.0,
+            &proposal.title,
+            outcome,
+        );
+        let voter_count = voters.len();
+        for voter in &voters {
+            if let Err(e) = notification_service.send_to_did(voter, notif.clone()).await {
+                tracing::warn!("Failed to send proposal result notification to {}: {}", voter, e);
+            }
+        }
+        tracing::info!(
+            "Sent proposal result notifications to {} voters for proposal {}",
+            voter_count,
+            proposal_id.0
+        );
+    }
 
     Ok(HttpResponse::Ok().json(proposal))
 }
@@ -1944,10 +1965,12 @@ mod tests {
             .await
             .unwrap();
 
+        let notification_service = Arc::new(crate::notifications::NotificationService::new(None));
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(gov_mgr.clone()))
                 .app_data(web::Data::new(event_broadcaster.clone()))
+                .app_data(web::Data::new(notification_service))
                 .service(
                     web::scope("/gov")
                         .service(open_proposal)

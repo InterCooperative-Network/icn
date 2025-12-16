@@ -102,9 +102,9 @@ pub async fn handle_event_for_notifications(
             outcome,
             ..
         } => {
-            // Could notify all voters about the outcome
+            // Note: Voter notifications are sent directly in close_proposal API handler
+            // This event handler is for WebSocket listeners; notifications are handled inline
             info!("Proposal {} closed with outcome: {}", proposal_id, outcome);
-            // TODO: Query voters and send notifications
         }
 
         GatewayEvent::GovernanceVoteCast {

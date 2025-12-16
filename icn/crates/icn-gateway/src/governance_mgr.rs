@@ -258,6 +258,19 @@ impl GovernanceManager {
         Ok(VoteTally::from(proposal_votes))
     }
 
+    /// Get list of voter DIDs for a proposal (for notifications)
+    pub async fn get_voter_dids(&self, proposal_id: &ProposalId) -> Result<Vec<Did>> {
+        let votes = self
+            .votes
+            .read()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        let voter_dids = votes
+            .get(proposal_id)
+            .map(|votes| votes.iter().map(|v| v.voter.clone()).collect())
+            .unwrap_or_default();
+        Ok(voter_dids)
+    }
+
     /// Cast a vote on a proposal
     pub async fn cast_vote(
         &self,

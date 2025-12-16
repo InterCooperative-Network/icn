@@ -237,6 +237,29 @@ impl NotificationService {
             })),
         }
     }
+
+    /// Create notification for proposal result (closed)
+    pub fn proposal_result_notification(
+        proposal_id: &str,
+        title: &str,
+        outcome: &str,
+    ) -> Notification {
+        let body = match outcome {
+            "accepted" => format!("'{title}' was accepted"),
+            "rejected" => format!("'{title}' was rejected"),
+            "no_quorum" => format!("'{title}' did not reach quorum"),
+            _ => format!("'{title}' voting has concluded"),
+        };
+        Notification {
+            title: "Proposal Result".to_string(),
+            body,
+            data: Some(serde_json::json!({
+                "type": "proposal_result",
+                "proposal_id": proposal_id,
+                "outcome": outcome,
+            })),
+        }
+    }
 }
 
 /// Format DID for display (truncated)
