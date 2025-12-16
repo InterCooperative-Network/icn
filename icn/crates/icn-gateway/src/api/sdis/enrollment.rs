@@ -140,7 +140,10 @@ pub struct FinalizeEnrollmentResponse {
 }
 
 // ============================================================================
-// In-Memory Ceremony Storage (TODO: Replace with persistent storage)
+// In-Memory Ceremony Storage
+// NOTE: Persistent storage is available via CommonsStore.put_ceremony()
+// This API is currently disabled; simple_enrollment.rs uses CommonsManager
+// for persistent storage.
 // ============================================================================
 
 use std::collections::HashMap;
