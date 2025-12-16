@@ -2,7 +2,9 @@
 
 use actix_web::{get, post, web, HttpRequest, HttpResponse};
 use std::sync::Arc;
+use tracing::info;
 
+use crate::api::budgets::BudgetStore;
 use crate::error::Result;
 use crate::ledger_mgr::LedgerManager;
 use crate::middleware::{get_claims, require_coop_access, require_scope};
@@ -47,6 +49,7 @@ pub async fn get_balance(
 pub async fn create_payment(
     http_req: HttpRequest,
     ledger_mgr: web::Data<Arc<LedgerManager>>,
+    budget_store: web::Data<Arc<BudgetStore>>,
     notification_service: web::Data<Arc<crate::notifications::NotificationService>>,
     event_broadcaster: web::Data<Arc<crate::events::EventBroadcaster>>,
     coop_id: web::Path<String>,
@@ -91,7 +94,24 @@ pub async fn create_payment(
     validation::validate_currency(&req.currency)?;
     validation::validate_memo(&req.memo)?;
 
+    // Check budget limits before creating payment
+    let can_spend = budget_store.check_spending(&req.from, req.amount).await?;
+    if !can_spend {
+        return Err(crate::error::GatewayError::BadRequest(
+            "Payment exceeds budget limit".to_string(),
+        ));
+    }
+
     let hash = ledger_mgr.create_payment(&coop_id, &from, &to, req.amount, req.currency.clone())?;
+
+    // Record spending in budget tracker
+    let notified_budgets = budget_store.record_spending(&req.from, req.amount).await?;
+    if !notified_budgets.is_empty() {
+        info!(
+            budgets = ?notified_budgets,
+            "Budget threshold notifications triggered"
+        );
+    }
 
     // Track payment creation metrics
     gateway::payments_created_inc();
