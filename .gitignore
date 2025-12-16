@@ -38,6 +38,9 @@ examples/*/Cargo.lock
 *.dll
 *.exe
 
+# Build logs
+build_errors*.log
+
 # Testing
 /coverage/
 
