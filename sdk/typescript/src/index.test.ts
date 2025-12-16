@@ -702,7 +702,7 @@ describe('authentication flow', () => {
   it('should verify signature and get token', async () => {
     const mockResponse = {
       token: 'jwt-token-here',
-      expires_at: '2024-01-02T00:00:00Z',
+      expires_in: 3600, // 1 hour in seconds
     };
 
     const mockFetch = jest.fn().mockResolvedValue({
@@ -723,7 +723,8 @@ describe('authentication flow', () => {
       ['ledger:read', 'ledger:write']
     );
 
-    expect(result).toEqual(mockResponse);
+    expect(result.token).toEqual(mockResponse.token);
+    expect(result.expires_at).toBeGreaterThan(Date.now());
 
     const [url, options] = mockFetch.mock.calls[0];
     expect(url).toBe('http://localhost:8080/v1/auth/verify');
@@ -737,7 +738,7 @@ describe('authentication flow', () => {
 
   it('should authenticate with signature provider', async () => {
     const mockChallenge = { challenge: 'random-challenge', expires_at: '2024-01-01T00:01:00Z' };
-    const mockVerify = { token: 'jwt-token', expires_at: '2024-01-02T00:00:00Z' };
+    const mockVerify = { token: 'jwt-token', expires_in: 3600 };
 
     let callIndex = 0;
     const mockFetch = jest.fn().mockImplementation(async () => {
@@ -757,7 +758,8 @@ describe('authentication flow', () => {
     const signer = { sign: async (msg: string) => `signed-${msg}` };
     const result = await client.authenticate('did:icn:alice', signer, 'my-coop', ['ledger:read']);
 
-    expect(result).toEqual(mockVerify);
+    expect(result.token).toEqual('jwt-token');
+    expect(result.expires_at).toBeGreaterThan(Date.now());
     expect(client.hasToken()).toBe(true);
     expect(mockFetch).toHaveBeenCalledTimes(2);
   });
@@ -1307,7 +1309,7 @@ describe('token expiration', () => {
 describe('auto-refresh authentication', () => {
   it('should store credentials for auto-refresh', async () => {
     const mockChallenge = { challenge: 'test-challenge', expires_at: Date.now() + 60000 };
-    const mockVerify = { token: 'test-token', expires_at: Math.floor(Date.now() / 1000) + 3600 };
+    const mockVerify = { token: 'test-token', expires_in: 3600 };
 
     let callIndex = 0;
     const mockFetch = jest.fn().mockImplementation(async () => {
@@ -1329,7 +1331,7 @@ describe('auto-refresh authentication', () => {
     await client.authenticate('did:icn:alice', signer, 'my-coop', ['ledger:read']);
 
     expect(client.hasToken()).toBe(true);
-    expect(client.getTokenExpiresAt()).toBe(mockVerify.expires_at);
+    expect(client.getTokenExpiresAt()).toBeGreaterThan(Date.now());
   });
 });
 
