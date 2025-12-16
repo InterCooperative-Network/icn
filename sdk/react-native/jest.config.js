@@ -18,6 +18,16 @@ module.exports = {
       statements: 70,
     },
   },
+  // Custom resolver for @noble package subpath exports
+  resolver: '<rootDir>/jest-resolver.js',
+  // Transform @noble packages (they use ESM)
+  transform: {
+    '^.+\\.tsx?$': ['ts-jest', { useESM: false }],
+    '^.+\\.jsx?$': 'babel-jest',
+  },
+  transformIgnorePatterns: [
+    '/node_modules/(?!@noble)',
+  ],
   // Mock React Native modules
   moduleNameMapper: {
     '^react$': '<rootDir>/src/__mocks__/react.ts',

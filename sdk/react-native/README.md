@@ -5,6 +5,7 @@ React Native SDK for the InterCooperative Network - mobile-first mutual credit a
 ## Features
 
 - **Wallet Management** - Secure key storage with iOS Keychain / Android Keystore
+- **Hybrid Post-Quantum Cryptography** - Ed25519 + ML-DSA-65 for quantum-resistant signatures
 - **Authentication** - Persistent login with automatic token refresh
 - **Real-time Events** - WebSocket with auto-reconnect
 - **QR Payments** - Generate and scan payment QR codes
@@ -183,6 +184,90 @@ Import an existing private key (hex format).
 #### `wallet.sign(message)`
 
 Sign a message with the stored private key.
+
+### Hybrid Post-Quantum Wallet
+
+For quantum-resistant signatures, use the `HybridWallet` which combines Ed25519 with ML-DSA-65 (NIST FIPS 204 Dilithium).
+
+#### Size Considerations
+
+| Component | Classical (Ed25519) | Hybrid (+ ML-DSA-65) |
+|-----------|---------------------|----------------------|
+| Signature | 64 bytes | ~3.4 KB |
+| Public Key | 32 bytes | ~2 KB |
+| Secret Key | 32 bytes | ~4 KB |
+
+#### `createHybridWallet(storage)`
+
+Create a quantum-resistant wallet.
+
+```typescript
+import { createHybridWallet } from '@icn/react-native';
+
+const hybridWallet = createHybridWallet(secureStorage);
+
+// Generate hybrid keypair (Ed25519 + ML-DSA-65)
+const keyInfo = await hybridWallet.generateKeyPair();
+console.log('DID:', keyInfo.did);
+console.log('Public key size:', keyInfo.publicKeySize, 'bytes');
+console.log('Is hybrid:', keyInfo.isHybrid);
+```
+
+#### Signing Messages
+
+```typescript
+// Sign with hybrid signatures (both Ed25519 + ML-DSA)
+const signature = await hybridWallet.sign(messageHex);
+
+// Sign with Ed25519 only (for short-lived proofs like QR codes)
+const classicalSig = await hybridWallet.signClassicalOnly(messageHex);
+
+// Sign with JSON output for interoperability
+const sigJson = await hybridWallet.sign(messageHex, { asJson: true });
+```
+
+#### Verification (Static)
+
+```typescript
+import { HybridWallet, HybridCrypto } from '@icn/react-native';
+
+// Verify a hybrid signature
+const isValid = await HybridWallet.verify(message, signature, publicKey);
+
+// Or use HybridCrypto directly
+const isValid = await HybridCrypto.verify(message, signature, publicKey);
+```
+
+#### Migration from Classical Wallet
+
+Existing Ed25519-only wallets can upgrade to hybrid while preserving their DID:
+
+```typescript
+const wallet = createHybridWallet(secureStorage);
+
+// Check if upgrade is available
+if (await wallet.hasClassicalOnlyKeys()) {
+  // Upgrade adds ML-DSA key, keeps Ed25519 key and DID
+  const keyInfo = await wallet.upgradeToHybrid();
+  console.log('Upgraded to hybrid!', keyInfo.did);
+}
+```
+
+#### Low-Level Crypto Utilities
+
+```typescript
+import { HybridCrypto, getHybridCryptoInfo, isHybridCryptoSupported } from '@icn/react-native';
+
+// Check if hybrid crypto is supported
+if (isHybridCryptoSupported()) {
+  // Generate keypair directly
+  const keypair = await HybridCrypto.generateKeyPair();
+
+  // Get size info
+  const info = getHybridCryptoInfo();
+  console.log('Signature size:', info.signatureSize, 'bytes');
+}
+```
 
 ### QR Codes
 

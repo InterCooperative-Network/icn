@@ -51,8 +51,30 @@ export { QueueManager } from './queue-manager';
 // Error utilities
 export { parseError, createError, isNetworkError, isAuthError } from './error-utils';
 
-// Wallet
+// Wallet (Classical Ed25519)
 export { ICNWalletImpl, createWallet } from './wallet';
+
+// Hybrid Post-Quantum Wallet (Ed25519 + ML-DSA-65)
+export {
+  HybridWallet,
+  createHybridWallet,
+  getHybridCryptoInfo,
+} from './hybrid-wallet';
+export type { HybridKeyPairInfo, HybridSignOptions } from './hybrid-wallet';
+
+// Hybrid Cryptography Utilities
+export {
+  HybridCrypto,
+  ML_DSA_SIZES,
+  isHybridCryptoSupported,
+} from './hybrid-crypto';
+export type {
+  HybridKeyPair,
+  HybridPublicKey,
+  HybridSecretKey,
+  HybridSignature,
+  HybridCryptoOptions,
+} from './hybrid-crypto';
 
 // QR Code utilities
 export {

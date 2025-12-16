@@ -6,7 +6,8 @@
  */
 
 import * as ed from '@noble/ed25519';
-import { sha512 } from '@noble/hashes/sha2';
+// Use .js extension for ESM subpath exports
+import { sha512 } from '@noble/hashes/sha2.js';
 import { ICNWallet, KeyPair, SecureStorage } from './types';
 
 // Configure @noble/ed25519 to use synchronous SHA-512 from @noble/hashes
