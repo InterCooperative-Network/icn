@@ -19,6 +19,7 @@ pub struct LedgerManager {
     /// Shared event emitter for ledger events (used by notification triggers)
     ledger_emitter: SharedEventEmitter,
     data_dir: Option<PathBuf>,
+    budget_store: Option<Arc<icn_store::budgets::BudgetStore>>,
 }
 
 impl Default for LedgerManager {
@@ -35,6 +36,7 @@ impl LedgerManager {
             event_broadcaster: None,
             ledger_emitter: icn_ledger::create_shared_emitter(),
             data_dir: None,
+            budget_store: None,
         }
     }
 
@@ -45,6 +47,7 @@ impl LedgerManager {
             event_broadcaster: None,
             ledger_emitter: icn_ledger::create_shared_emitter(),
             data_dir: Some(data_dir),
+            budget_store: None,
         }
     }
 
@@ -111,6 +114,11 @@ impl LedgerManager {
         Ok(ledger_arc)
     }
 
+    /// Set the budget store for spending limits
+    pub fn set_budget_store(&mut self, budget_store: Arc<icn_store::budgets::BudgetStore>) {
+        self.budget_store = Some(budget_store);
+    }
+
     /// Create a payment transaction
     pub fn create_payment(
         &self,
@@ -120,6 +128,22 @@ impl LedgerManager {
         amount: i64,
         currency: String,
     ) -> Result<String> {
+        // Enforce budget limits if store is available
+        if let Some(store) = &self.budget_store {
+            let from_account = from.to_string();
+            // Check if spending is allowed
+            // We only enforce budgets on the 'from' account (sender/payer)
+            if !store
+                .check_spending(&from_account, amount)
+                .map_err(|e| GatewayError::InternalError(format!("Budget check failed: {e}")))?
+            {
+                return Err(GatewayError::BudgetExceeded(format!(
+                    "Budget exceeded for account {}",
+                    from_account
+                )));
+            }
+        }
+
         let ledger_arc = self.get_ledger(coop_id)?;
 
         // Build the journal entry
@@ -139,6 +163,16 @@ impl LedgerManager {
             .map_err(GatewayError::SubstrateError)?;
 
         let hash_str = hash.to_hex();
+
+        // Record spending in budget store
+        if let Some(store) = &self.budget_store {
+            let from_account = from.to_string();
+            // We ignore errors here to not fail the transaction if it's already recorded in ledger
+            // In a production system, we might want a robust retry mechanism or eventual consistency queue
+            if let Err(e) = store.record_spending(&from_account, amount) {
+                tracing::error!("Failed to record spending for {}: {}", from_account, e);
+            }
+        }
 
         // Broadcast event if broadcaster is available
         if let Some(broadcaster) = &self.event_broadcaster {

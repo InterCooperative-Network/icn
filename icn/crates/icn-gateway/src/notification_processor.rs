@@ -15,7 +15,8 @@ use crate::notification_queue::{
     calculate_backoff, DeliveryStatus, NotificationChannel, NotificationPriority,
     NotificationQueue, QueuedNotification,
 };
-use crate::notifications::{NotificationService, NotificationStore, InAppNotification};
+use crate::notifications::{NotificationService, NotificationStore, InAppNotification, DeliveryLogEntry};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Configuration for the notification processor
 #[derive(Debug, Clone)]
@@ -197,6 +198,32 @@ impl NotificationProcessor {
         })
     }
 
+    /// Helper to log delivery status
+    fn log_delivery(
+        &self,
+        notification_id: &str,
+        channel: NotificationChannel,
+        status: &str,
+        details: Option<String>,
+    ) {
+        if let Ok(timestamp) = SystemTime::now().duration_since(UNIX_EPOCH) {
+            let entry = DeliveryLogEntry {
+                notification_id: notification_id.to_string(),
+                channel: format!("{:?}", channel),
+                status: status.to_string(),
+                timestamp: timestamp.as_secs(),
+                details: details.clone(),
+            };
+            if let Err(e) = self.store.add_delivery_log(entry) {
+                error!(
+                    notification_id = %notification_id,
+                    error = %e,
+                    "Failed to persist delivery log"
+                );
+            }
+        }
+    }
+
     /// Process a single notification
     async fn process_notification(&self, notification: QueuedNotification) {
         let id = notification.id.clone();
@@ -308,6 +335,7 @@ impl NotificationProcessor {
                             token = %token,
                             "Invalid FCM token, marking for removal"
                         );
+                        self.log_delivery(id, NotificationChannel::Push, "failed", Some("Invalid token".to_string()));
                         invalid_tokens.push(token.clone());
                         // Don't mark as failure - token is just invalid
                     }
@@ -319,7 +347,8 @@ impl NotificationProcessor {
                             "Temporary FCM failure, will retry"
                         );
                         all_success = false;
-                        last_error = Some(error);
+                        last_error = Some(error.clone());
+                        self.log_delivery(id, NotificationChannel::Push, "failed", Some(format!("Temporary: {}", error)));
                     }
                     FcmResult::PermanentFailure { error } => {
                         error!(
@@ -329,7 +358,8 @@ impl NotificationProcessor {
                             "Permanent FCM failure"
                         );
                         all_success = false;
-                        last_error = Some(error);
+                        last_error = Some(error.clone());
+                        self.log_delivery(id, NotificationChannel::Push, "failed", Some(format!("Permanent: {}", error)));
                     }
                 }
             }
@@ -340,6 +370,7 @@ impl NotificationProcessor {
             }
 
             if all_success {
+                self.log_delivery(id, NotificationChannel::Push, "delivered", None);
                 self.queue.mark_delivered(id, NotificationChannel::Push);
             } else if let Some(error) = last_error {
                 let retries = notification
@@ -379,6 +410,7 @@ impl NotificationProcessor {
             {
                 Ok(sent) => {
                     debug!(notification_id = %id, devices = sent, "Push notification sent (legacy)");
+                    self.log_delivery(id, NotificationChannel::Push, "delivered", Some(format!("Legacy send to {} devices", sent)));
                     self.queue.mark_delivered(id, NotificationChannel::Push);
                 }
                 Err(e) => {
@@ -454,6 +486,7 @@ impl NotificationProcessor {
                     message_id = %message_id,
                     "Email notification sent"
                 );
+                self.log_delivery(id, NotificationChannel::Email, "delivered", Some(format!("Message ID: {}", message_id)));
                 self.queue.mark_delivered(id, NotificationChannel::Email);
             }
             EmailResult::InvalidRecipient { error } => {
@@ -464,6 +497,7 @@ impl NotificationProcessor {
                     "Invalid email recipient"
                 );
                 // Mark as delivered - nothing more we can do
+                self.log_delivery(id, NotificationChannel::Email, "failed", Some(format!("Invalid recipient: {}", error)));
                 self.queue.mark_delivered(id, NotificationChannel::Email);
             }
             EmailResult::TemporaryFailure { error } => {
@@ -473,6 +507,7 @@ impl NotificationProcessor {
                     error = %error,
                     "Temporary email failure, will retry"
                 );
+                self.log_delivery(id, NotificationChannel::Email, "failed", Some(format!("Temporary: {}", error)));
                 let retries = notification
                     .status
                     .get(&NotificationChannel::Email)
@@ -503,6 +538,7 @@ impl NotificationProcessor {
                     "Permanent email failure"
                 );
                 // Mark as failed with max retries so it gets abandoned
+                self.log_delivery(id, NotificationChannel::Email, "failed", Some(format!("Permanent: {}", error)));
                 self.queue
                     .mark_failed(id, NotificationChannel::Email, &error, 999);
             }
@@ -546,6 +582,7 @@ impl NotificationProcessor {
                 .unwrap_or(0);
                 
              self.queue.mark_failed(id, NotificationChannel::InApp, &e.to_string(), retries + 1);
+             self.log_delivery(id, NotificationChannel::InApp, "failed", Some(e.to_string()));
              return;
         }
 
@@ -555,6 +592,7 @@ impl NotificationProcessor {
             "Stored in-app notification"
         );
 
+        self.log_delivery(id, NotificationChannel::InApp, "delivered", None);
         self.queue.mark_delivered(id, NotificationChannel::InApp);
     }
 
@@ -589,8 +627,13 @@ impl NotificationProcessor {
     }
 
     /// Delete a notification
-    pub fn delete_notification(&self, recipient: &str, notification_id: &str) -> bool {
-        self.store.delete_notification(recipient, notification_id).unwrap_or(false)
+    pub fn delete_notification(&self, recipient: &str, notification_id: &str) -> Result<bool, anyhow::Error> {
+        self.store.delete_notification(recipient, notification_id)
+    }
+
+    /// Get delivery logs for a notification
+    pub fn get_delivery_logs(&self, notification_id: &str) -> Vec<DeliveryLogEntry> {
+        self.store.get_delivery_logs(notification_id).unwrap_or_default()
     }
 }
 
@@ -714,7 +757,7 @@ mod tests {
         let id = notif.id.clone();
         processor.deliver_in_app(&notif).await;
 
-        assert!(processor.delete_notification("did:icn:alice", &id));
+        assert!(processor.delete_notification("did:icn:alice", &id).unwrap());
         assert_eq!(
             processor
                 .get_in_app_notifications("did:icn:alice", false)

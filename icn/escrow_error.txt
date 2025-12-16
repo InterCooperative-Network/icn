@@ -1,0 +1,92 @@
+warning: unused import: `icn_identity::Did`
+ --> crates/icn-store/src/notifications.rs:2:5
+  |
+2 | use icn_identity::Did;
+  |     ^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `Context`
+ --> crates/icn-store/src/recurring_payments.rs:1:14
+  |
+1 | use anyhow::{Context, Result};
+  |              ^^^^^^^
+
+warning: unused import: `std::time::SystemTime`
+ --> crates/icn-store/src/recurring_payments.rs:4:5
+  |
+4 | use std::time::SystemTime;
+  |     ^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `Context`
+ --> crates/icn-store/src/escrow.rs:1:14
+  |
+1 | use anyhow::{Context, Result};
+  |              ^^^^^^^
+
+warning: `icn-store` (lib) generated 4 warnings (run `cargo fix --lib -p icn-store` to apply 4 suggestions)
+warning: unused import: `DeliveryLogEntry`
+  --> crates/icn-gateway/src/api/notifications.rs:12:78
+   |
+12 | ...atform, DeliveryLogEntry};
+   |            ^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` on by default
+
+warning: unused imports: `Deserialize` and `Serialize`
+ --> crates/icn-gateway/src/notification_processor.rs:8:13
+  |
+8 | use serde::{Deserialize, Serialize};
+  |             ^^^^^^^^^^^  ^^^^^^^^^
+
+warning: unused variable: `ledger_mgr`
+   --> crates/icn-gateway/src/api/escrow.rs:269:5
+    |
+269 |     ledger_mgr: web::Data<Arc<Ledg...
+    |     ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_ledger_mgr`
+    |
+    = note: `#[warn(unused_variables)]` on by default
+
+warning: unused variable: `recipient`
+   --> crates/icn-gateway/src/api/notifications.rs:244:9
+    |
+244 |     let recipient = did.to_string();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_recipient`
+
+warning: `icn-gateway` (lib) generated 4 warnings (run `cargo fix --lib -p icn-gateway` to apply 2 suggestions)
+   Compiling icn-gateway v0.1.0 (/home/matt/projects/icn/icn/crates/icn-gateway)
+error[E0603]: function `check_conditions` is private
+   --> crates/icn-gateway/tests/escrow_integration.rs:2:57
+    |
+2   |     Escrow, EscrowCondition, EscrowStatus, EscrowStore, check_conditions,
+    |                                                         ^^^^^^^^^^^^^^^^ private function
+    |
+note: the function `check_conditions` is defined here
+   --> /home/matt/projects/icn/icn/crates/icn-gateway/src/api/escrow.rs:325:1
+    |
+325 | fn check_conditions(escrow: &Escrow, approver: &str, _proof: Option<&str>) -> bool {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `ledger_mgr`
+   --> crates/icn-gateway/tests/escrow_integration.rs:105:9
+    |
+105 |     let ledger_mgr = Arc::new(LedgerManager::new());
+    |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_ledger_mgr`
+    |
+    = note: `#[warn(unused_variables)]` on by default
+
+error[E0594]: cannot assign to `escrow.status`, as `escrow` is not declared as mutable
+   --> crates/icn-gateway/tests/escrow_integration.rs:133:5
+    |
+133 |     escrow.status = EscrowStatus::Refunded;
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ cannot assign
+    |
+help: consider changing this to be mutable
+    |
+111 |     let mut escrow = Escrow {
+    |         +++
+
+Some errors have detailed explanations: E0594, E0603.
+For more information about an error, try `rustc --explain E0594`.
+warning: `icn-gateway` (test "escrow_integration") generated 1 warning
+error: could not compile `icn-gateway` (test "escrow_integration") due to 2 previous errors; 1 warning emitted

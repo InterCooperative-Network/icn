@@ -277,6 +277,48 @@ impl NotificationStore {
             Ok(false)
         }
     }
+
+    // --- Delivery Logs ---
+
+    /// Add a delivery log entry
+    pub fn add_delivery_log(&self, entry: DeliveryLogEntry) -> Result<()> {
+        // key: log:{notification_id}:{timestamp}
+        // This allows multiple log entries per notification, ordered by time
+        let key = format!("log:{}:{}", entry.notification_id, entry.timestamp);
+        self.db.insert(key.as_bytes(), serde_json::to_vec(&entry)?)?;
+        Ok(())
+    }
+
+    /// Get delivery logs for a notification
+    pub fn get_delivery_logs(&self, notification_id: &str) -> Result<Vec<DeliveryLogEntry>> {
+        let prefix = format!("log:{}:", notification_id);
+        let mut logs = Vec::new();
+
+        for item in self.db.scan_prefix(prefix.as_bytes()) {
+            let (_, value) = item?;
+            if let Ok(entry) = serde_json::from_slice::<DeliveryLogEntry>(&value) {
+                logs.push(entry);
+            }
+        }
+
+        Ok(logs)
+    }
+}
+
+/// Delivery log entry
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeliveryLogEntry {
+    /// Notification ID
+    pub notification_id: String,
+    /// Channel (push, email, in_app)
+    pub channel: String,
+    /// Status (delivered, failed, abandoned)
+    pub status: String,
+    /// Timestamp
+    pub timestamp: u64,
+    /// Optional details/error message
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub details: Option<String>,
 }
 
 #[cfg(test)]
@@ -347,6 +389,41 @@ mod tests {
         assert!(store.delete_notification(recipient, "1")?);
         let (list, _) = store.get_notifications(recipient, false, None, None)?;
         assert_eq!(list.len(), 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_delivery_logs() -> Result<()> {
+        let db = temp_db();
+        let store = NotificationStore::new(db);
+        let id = "notif-123";
+
+        // Add logs
+        let entry1 = DeliveryLogEntry {
+            notification_id: id.to_string(),
+            channel: "email".to_string(),
+            status: "pending".to_string(),
+            timestamp: 1000,
+            details: None,
+        };
+        store.add_delivery_log(entry1)?;
+
+        let entry2 = DeliveryLogEntry {
+            notification_id: id.to_string(),
+            channel: "email".to_string(),
+            status: "delivered".to_string(),
+            timestamp: 1001,
+            details: Some("Sent via SMTP".to_string()),
+        };
+        store.add_delivery_log(entry2)?;
+
+        // Retrieve logs
+        let logs = store.get_delivery_logs(id)?;
+        assert_eq!(logs.len(), 2);
+        assert_eq!(logs[0].status, "pending");
+        assert_eq!(logs[1].status, "delivered");
+        assert_eq!(logs[1].details, Some("Sent via SMTP".to_string()));
 
         Ok(())
     }

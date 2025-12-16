@@ -202,8 +202,8 @@ pub async fn release_escrow(
 
         let tx_hash = match ledger_mgr.create_payment(
             &escrow.coop_id,
-            &from_did,
-            &to_did,
+            &to_did,   // Recipient (debited/gains credits in this mutual credit system)
+            &from_did, // Payer (credited/loses credits)
             escrow.amount,
             escrow.currency.clone(),
         ) {
@@ -296,45 +296,14 @@ pub async fn refund_escrow(
         )));
     }
 
-    // Execute refund transaction via ledger
-    // Refund is a payment from the escrow holding account back to the original sender
-    let to_did: Did = escrow
-        .to_account
-        .parse()
-        .map_err(|e| GatewayError::BadRequest(format!("Invalid to_account DID: {e}")))?;
-    let from_did: Did = escrow
-        .from_account
-        .parse()
-        .map_err(|e| GatewayError::BadRequest(format!("Invalid from_account DID: {e}")))?;
-
-    // Refund: reverse the original payment direction (to -> from)
-    let tx_hash = match ledger_mgr.create_payment(
-        &escrow.coop_id,
-        &to_did,   // Refund from beneficiary's reserved funds
-        &from_did, // Back to original sender
-        escrow.amount,
-        escrow.currency.clone(),
-    ) {
-        Ok(hash) => {
-            info!(
-                escrow_id = %escrow_id,
-                tx_hash = %hash,
-                amount = escrow.amount,
-                "Escrow funds refunded via ledger transaction"
-            );
-            Some(hash)
-        }
-        Err(e) => {
-            warn!(
-                escrow_id = %escrow_id,
-                error = %e,
-                "Failed to execute escrow refund transaction"
-            );
-            return Err(GatewayError::InternalError(format!(
-                "Failed to execute refund transaction: {e}"
-            )));
-        }
-    };
+    // Explanation: Since `create_escrow` does not currently execute a ledger transaction to "lock" funds
+    // (it just creates a record), a "refund" while in Pending/Locked state implies simply cancelling the hold.
+    // Using `create_payment(to -> from)` would be incorrect as `to` never received the funds.
+    // In a future "Locked Funds" implementation where `create_escrow` moves funds to a holding account,
+    // this would need to move funds from Holding -> From.
+    
+    let tx_hash = None::<String>;
+    info!(escrow_id = %escrow_id, "Escrow cancelled/refunded (no ledger transaction required)");
 
     escrow.status = EscrowStatus::Refunded;
     escrow.updated_at = std::time::SystemTime::now()
@@ -353,7 +322,7 @@ pub async fn refund_escrow(
 }
 
 /// Check if all escrow conditions are met
-fn check_conditions(escrow: &Escrow, approver: &str, _proof: Option<&str>) -> bool {
+pub fn check_conditions(escrow: &Escrow, approver: &str, _proof: Option<&str>) -> bool {
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()

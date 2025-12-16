@@ -2,7 +2,9 @@
 //!
 //! Manages FCM device registration and sends push notifications for events.
 
-pub use icn_store::notifications::{InAppNotification, NotificationStore, Platform, RegisteredDevice};
+pub use icn_store::notifications::{
+    DeliveryLogEntry, InAppNotification, NotificationStore, Platform, RegisteredDevice,
+};
 
 use icn_identity::Did;
 use serde::{Deserialize, Serialize};

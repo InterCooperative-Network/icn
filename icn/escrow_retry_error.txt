@@ -1,0 +1,89 @@
+warning: unused import: `icn_identity::Did`
+ --> crates/icn-store/src/notifications.rs:2:5
+  |
+2 | use icn_identity::Did;
+  |     ^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `Context`
+ --> crates/icn-store/src/recurring_payments.rs:1:14
+  |
+1 | use anyhow::{Context, Result};
+  |              ^^^^^^^
+
+warning: unused import: `std::time::SystemTime`
+ --> crates/icn-store/src/recurring_payments.rs:4:5
+  |
+4 | use std::time::SystemTime;
+  |     ^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `Context`
+ --> crates/icn-store/src/escrow.rs:1:14
+  |
+1 | use anyhow::{Context, Result};
+  |              ^^^^^^^
+
+warning: `icn-store` (lib) generated 4 warnings (run `cargo fix --lib -p icn-store` to apply 4 suggestions)
+warning: unused import: `DeliveryLogEntry`
+  --> crates/icn-gateway/src/api/notifications.rs:12:78
+   |
+12 | ...atform, DeliveryLogEntry};
+   |            ^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` on by default
+
+warning: unused imports: `Deserialize` and `Serialize`
+ --> crates/icn-gateway/src/notification_processor.rs:8:13
+  |
+8 | use serde::{Deserialize, Serialize};
+  |             ^^^^^^^^^^^  ^^^^^^^^^
+
+warning: unused variable: `ledger_mgr`
+   --> crates/icn-gateway/src/api/escrow.rs:269:5
+    |
+269 |     ledger_mgr: web::Data<Arc<Ledg...
+    |     ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_ledger_mgr`
+    |
+    = note: `#[warn(unused_variables)]` on by default
+
+warning: unused variable: `recipient`
+   --> crates/icn-gateway/src/api/notifications.rs:244:9
+    |
+244 |     let recipient = did.to_string();
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_recipient`
+
+warning: `icn-gateway` (lib) generated 4 warnings (run `cargo fix --lib -p icn-gateway` to apply 2 suggestions)
+warning: unused variable: `ledger_mgr`
+  --> crates/icn-gateway/tests/escrow_integration.rs:96:9
+   |
+96 |     let ledger_mgr = Arc::new(Ledge...
+   |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_ledger_mgr`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+warning: `icn-gateway` (test "escrow_integration") generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.38s
+     Running tests/escrow_integration.rs (target/debug/deps/escrow_integration-95c17e4af348c766)
+
+running 2 tests
+test test_escrow_refund ... ok
+test test_escrow_lifecycle ... FAILED
+
+failures:
+
+---- test_escrow_lifecycle stdout ----
+
+thread 'test_escrow_lifecycle' panicked at crates/icn-gateway/tests/escrow_integration.rs:84:5:
+assertion `left == right` failed
+  left: Pending
+ right: Released
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    test_escrow_lifecycle
+
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+error: test failed, to rerun pass `-p icn-gateway --test escrow_integration`

@@ -23,6 +23,9 @@ pub enum GatewayError {
     #[error("Rate limit exceeded for DID: {0}")]
     RateLimitExceeded(String),
 
+    #[error("Budget exceeded: {0}")]
+    BudgetExceeded(String),
+
     #[error("Internal server error: {0}")]
     InternalError(String),
 
@@ -41,6 +44,7 @@ impl ResponseError for GatewayError {
             GatewayError::NotFound(_) => StatusCode::NOT_FOUND,
             GatewayError::BadRequest(_) => StatusCode::BAD_REQUEST,
             GatewayError::RateLimitExceeded(_) => StatusCode::TOO_MANY_REQUESTS,
+            GatewayError::BudgetExceeded(_) => StatusCode::FORBIDDEN,
             GatewayError::InternalError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             GatewayError::SubstrateError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             GatewayError::IoError(_) => StatusCode::INTERNAL_SERVER_ERROR,
@@ -57,6 +61,7 @@ impl ResponseError for GatewayError {
             GatewayError::NotFound(msg) => msg.clone(),
             GatewayError::BadRequest(msg) => msg.clone(),
             GatewayError::RateLimitExceeded(msg) => format!("Rate limit exceeded for DID: {msg}"),
+            GatewayError::BudgetExceeded(msg) => msg.clone(),
 
             // Internal errors - sanitize to prevent information leakage
             // Log the full error for debugging but return generic message to client

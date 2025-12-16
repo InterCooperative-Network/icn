@@ -3,6 +3,7 @@
 use actix_files as fs;
 use actix_web::{middleware, web, App, HttpServer};
 use actix_web_httpauth::middleware::HttpAuthentication;
+use actix_web_prom::PrometheusMetricsBuilder;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -136,38 +137,7 @@ impl GatewayServer {
             ),
         );
 
-        // Create ledger manager with persistent storage if data_dir is set
-        let ledger_manager = if let Some(ref data_dir) = self.data_dir {
-            Arc::new(LedgerManager::new_with_storage(data_dir.clone()))
-        } else {
-            Arc::new(LedgerManager::new())
-        };
-
-        // Create identity manager for multi-device support
-        let identity_manager = if let Some(ref data_dir) = self.data_dir {
-            Arc::new(IdentityManager::new_with_storage(data_dir.clone()))
-        } else {
-            Arc::new(IdentityManager::new())
-        };
-
-        // Use provided event broadcaster or create a new one
-        let event_broadcaster = self.event_broadcaster.unwrap_or_else(|| {
-            info!("Creating new EventBroadcaster (not shared with compute actor)");
-            Arc::new(EventBroadcaster::new())
-        });
-
-        // Create rate limiter with configured or default config
-        let rate_limit_config = self.rate_limit_config.unwrap_or_default();
-        info!(
-            "Rate limiter: capacity={}, refill_rate={}/sec",
-            rate_limit_config.capacity, rate_limit_config.refill_rate
-        );
-        let rate_limiter = Arc::new(RateLimiter::new(rate_limit_config));
-
-        // Create IP-based rate limiter for auth endpoints (more aggressive limits)
-        let ip_rate_limiter = Arc::new(IpRateLimiter::new_for_auth());
-
-        // Initialize Sled DB for persistent stores
+        // Initialize Sled DB for persistent stores (moved up for dependency injection)
         let db = if let Some(ref data_dir) = self.data_dir {
             let db_path = data_dir.join("gateway_store");
             match sled::open(&db_path) {
@@ -194,6 +164,49 @@ impl GatewayServer {
                 }
             }
         };
+
+        // Create budget store
+        let budget_store = crate::api::budgets::BudgetStore::new(db.clone());
+        let budget_store = Arc::new(budget_store);
+        info!("Budget store initialized");
+
+        // Create ledger manager with persistent storage if data_dir is set
+        let mut ledger_manager = if let Some(ref data_dir) = self.data_dir {
+            LedgerManager::new_with_storage(data_dir.clone())
+        } else {
+            LedgerManager::new()
+        };
+
+        // Inject budget store for enforcement
+        ledger_manager.set_budget_store(budget_store.clone());
+        
+        let ledger_manager = Arc::new(ledger_manager);
+
+        // Create identity manager for multi-device support
+        let identity_manager = if let Some(ref data_dir) = self.data_dir {
+            Arc::new(IdentityManager::new_with_storage(data_dir.clone()))
+        } else {
+            Arc::new(IdentityManager::new())
+        };
+
+        // Use provided event broadcaster or create a new one
+        let event_broadcaster = self.event_broadcaster.unwrap_or_else(|| {
+            info!("Creating new EventBroadcaster (not shared with compute actor)");
+            Arc::new(EventBroadcaster::new())
+        });
+
+        // Create rate limiter with configured or default config
+        let rate_limit_config = self.rate_limit_config.unwrap_or_default();
+        info!(
+            "Rate limiter: capacity={}, refill_rate={}/sec",
+            rate_limit_config.capacity, rate_limit_config.refill_rate
+        );
+        let rate_limiter = Arc::new(RateLimiter::new(rate_limit_config));
+
+        // Create IP-based rate limiter for auth endpoints (more aggressive limits)
+        let ip_rate_limiter = Arc::new(IpRateLimiter::new_for_auth());
+
+
 
         // Create persistent notification store
         let notification_store = Arc::new(crate::notifications::NotificationStore::new(db.clone()));
@@ -244,11 +257,7 @@ impl GatewayServer {
         let escrow_store = crate::api::escrow::EscrowStore::new(db.clone());
         info!("Escrow store initialized");
 
-        // Create budget store
-        let budget_store = crate::api::budgets::BudgetStore::new(db.clone());
-        info!("Budget store initialized");
 
-        // Start recurring payments scheduler (check every 60 seconds)
         let _recurring_payments_handle = crate::api::recurring_payments::start_scheduler(
             recurring_payment_store.clone(),
             ledger_manager.clone(),
@@ -312,6 +321,12 @@ impl GatewayServer {
         // Clone security config for the move closure
         let security_config = self.security_config.clone();
 
+        // Initialize Prometheus metrics
+        let prometheus = PrometheusMetricsBuilder::new("api")
+            .endpoint("/metrics")
+            .build()
+            .unwrap();
+
         let server = HttpServer::new(move || {
             // Create JWT authentication middleware
             let auth = HttpAuthentication::bearer(crate::middleware::jwt_auth);
@@ -348,7 +363,14 @@ impl GatewayServer {
                 .app_data(web::JsonConfig::default().limit(262_144))
                 // Middleware (order: last wrapped runs first for REQUEST, first runs last for RESPONSE)
                 // For CORS header removal when behind reverse proxy, SecurityHeaders must run AFTER cors
+                .wrap(
+                    PrometheusMetricsBuilder::new("icn_gateway")
+                        .endpoint("/metrics")
+                        .build()
+                        .unwrap(),
+                )
                 .wrap(crate::middleware::MetricsMiddleware)
+                .wrap(prometheus.clone())
                 .wrap(cors)
                 .wrap(SecurityHeaders::new(security_config.clone()))
                 .wrap(middleware::Logger::default())
