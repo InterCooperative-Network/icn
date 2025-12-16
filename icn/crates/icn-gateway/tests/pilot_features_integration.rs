@@ -17,6 +17,7 @@ async fn test_recurring_payment_lifecycle() {
     // Create payment
     let payment = RecurringPayment {
         id: "test-1".to_string(),
+        coop_id: "test-coop".to_string(),
         owner: "did:icn:alice".to_string(),
         from_account: "alice-checking".to_string(),
         to_account: "bob-savings".to_string(),
@@ -68,6 +69,7 @@ async fn test_escrow_conditions() {
     // Create escrow with approval condition
     let escrow = Escrow {
         id: "escrow-1".to_string(),
+        coop_id: "test-coop".to_string(),
         creator: "did:icn:alice".to_string(),
         from_account: "alice-account".to_string(),
         to_account: "bob-account".to_string(),
@@ -204,6 +206,7 @@ async fn test_escrow_time_release() {
 
     let escrow = Escrow {
         id: "time-escrow".to_string(),
+        coop_id: "test-coop".to_string(),
         creator: "did:icn:alice".to_string(),
         from_account: "alice".to_string(),
         to_account: "bob".to_string(),
@@ -243,6 +246,7 @@ async fn test_recurring_payment_frequencies() {
     for freq in frequencies {
         let payment = RecurringPayment {
             id: format!("test-{freq:?}"),
+            coop_id: "test-coop".to_string(),
             owner: "did:icn:test".to_string(),
             from_account: "test".to_string(),
             to_account: "dest".to_string(),

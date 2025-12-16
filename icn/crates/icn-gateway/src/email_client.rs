@@ -1,10 +1,19 @@
 //! Email Notification Client
 //!
-//! Implements email notification delivery via SMTP.
+//! Implements email notification delivery via SMTP using lettre.
 //! Supports HTML and plain text templates for various notification types.
 
 use std::collections::HashMap;
-use tracing::{debug, info};
+use tracing::{error, info, warn};
+
+use lettre::{
+    message::{header::ContentType, Mailbox, MultiPart, SinglePart},
+    transport::smtp::{
+        authentication::Credentials,
+        client::{Tls, TlsParameters},
+    },
+    AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor,
+};
 
 use crate::notification_queue::NotificationType;
 
@@ -156,13 +165,40 @@ impl EmailClient {
         Self { config }
     }
 
-    /// Send an email
-    ///
-    /// Note: This is a placeholder implementation. In production, integrate with:
-    /// - lettre crate for SMTP
-    /// - reqwest for API-based providers (SendGrid, Mailgun, SES)
+    /// Build or get cached SMTP transport
+    fn build_transport(&self) -> Result<AsyncSmtpTransport<Tokio1Executor>, String> {
+        let creds = Credentials::new(
+            self.config.username.clone(),
+            self.config.password.clone(),
+        );
+
+        let tls_parameters = TlsParameters::builder(self.config.host.clone())
+            .build()
+            .map_err(|e| format!("Failed to build TLS parameters: {e}"))?;
+
+        let builder = if self.config.use_tls {
+            // Implicit TLS (port 465)
+            AsyncSmtpTransport::<Tokio1Executor>::relay(&self.config.host)
+                .map_err(|e| format!("Failed to create SMTP relay: {e}"))?
+                .port(self.config.port)
+                .tls(Tls::Wrapper(tls_parameters))
+        } else if self.config.use_starttls {
+            // STARTTLS (port 587)
+            AsyncSmtpTransport::<Tokio1Executor>::relay(&self.config.host)
+                .map_err(|e| format!("Failed to create SMTP relay: {e}"))?
+                .port(self.config.port)
+                .tls(Tls::Required(tls_parameters))
+        } else {
+            // No TLS (not recommended for production)
+            AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(&self.config.host)
+                .port(self.config.port)
+        };
+
+        Ok(builder.credentials(creds).build())
+    }
+
+    /// Send an email via SMTP
     pub async fn send(&self, message: EmailMessage) -> EmailResult {
-        // Log the email for now (actual SMTP implementation would go here)
         info!(
             to = %message.to,
             subject = %message.subject,
@@ -170,29 +206,123 @@ impl EmailClient {
             "Sending email notification"
         );
 
-        // In a production system, we would:
-        // 1. Connect to SMTP server
-        // 2. Authenticate
-        // 3. Send the message
-        // 4. Handle errors
+        // Parse addresses
+        let from_mailbox: Mailbox = match format!(
+            "{} <{}>",
+            self.config.from_name, self.config.from_address
+        ).parse() {
+            Ok(m) => m,
+            Err(e) => {
+                error!(error = %e, "Invalid from address");
+                return EmailResult::PermanentFailure {
+                    error: format!("Invalid from address: {e}"),
+                };
+            }
+        };
 
-        // For now, return success to allow testing of the flow
-        debug!(
-            to = %message.to,
-            "Email would be sent (SMTP implementation pending)"
-        );
+        let to_mailbox: Mailbox = match message.to.parse() {
+            Ok(m) => m,
+            Err(e) => {
+                warn!(to = %message.to, error = %e, "Invalid recipient address");
+                return EmailResult::InvalidRecipient {
+                    error: format!("Invalid recipient: {e}"),
+                };
+            }
+        };
 
-        EmailResult::Success {
-            message_id: format!("mock-{}", uuid::Uuid::new_v4()),
+        // Build the email message
+        let mut email_builder = Message::builder()
+            .from(from_mailbox)
+            .to(to_mailbox)
+            .subject(&message.subject);
+
+        // Add reply-to if specified
+        if let Some(reply_to) = &message.reply_to {
+            if let Ok(reply_mailbox) = reply_to.parse::<Mailbox>() {
+                email_builder = email_builder.reply_to(reply_mailbox);
+            }
         }
-    }
 
-    /// Send an email using HTTP API (for API-based providers)
-    #[allow(dead_code)]
-    async fn send_via_api(&self, _message: EmailMessage) -> EmailResult {
-        // This would be implemented for providers like SendGrid, Mailgun, etc.
-        EmailResult::PermanentFailure {
-            error: "API-based email sending not implemented".to_string(),
+        // Build body (multipart if HTML is provided)
+        let email = if let Some(html_body) = &message.html_body {
+            email_builder
+                .multipart(
+                    MultiPart::alternative()
+                        .singlepart(
+                            SinglePart::builder()
+                                .header(ContentType::TEXT_PLAIN)
+                                .body(message.text_body.clone()),
+                        )
+                        .singlepart(
+                            SinglePart::builder()
+                                .header(ContentType::TEXT_HTML)
+                                .body(html_body.clone()),
+                        ),
+                )
+                .map_err(|e| format!("Failed to build email: {e}"))
+        } else {
+            email_builder
+                .body(message.text_body.clone())
+                .map_err(|e| format!("Failed to build email: {e}"))
+        };
+
+        let email = match email {
+            Ok(e) => e,
+            Err(e) => {
+                error!(error = %e, "Failed to build email message");
+                return EmailResult::PermanentFailure { error: e };
+            }
+        };
+
+        // Build transport and send
+        let transport = match self.build_transport() {
+            Ok(t) => t,
+            Err(e) => {
+                error!(error = %e, "Failed to create SMTP transport");
+                return EmailResult::TemporaryFailure { error: e };
+            }
+        };
+
+        match transport.send(email).await {
+            Ok(response) => {
+                let message_id = response
+                    .message()
+                    .next()
+                    .map(|m| m.to_string())
+                    .unwrap_or_else(|| format!("smtp-{}", uuid::Uuid::new_v4()));
+
+                info!(
+                    to = %message.to,
+                    message_id = %message_id,
+                    "Email sent successfully"
+                );
+
+                EmailResult::Success { message_id }
+            }
+            Err(e) => {
+                let error_str = e.to_string();
+
+                // Classify the error
+                if error_str.contains("550")
+                    || error_str.contains("551")
+                    || error_str.contains("553")
+                    || error_str.contains("invalid")
+                {
+                    warn!(to = %message.to, error = %error_str, "Invalid recipient");
+                    EmailResult::InvalidRecipient { error: error_str }
+                } else if error_str.contains("421")
+                    || error_str.contains("450")
+                    || error_str.contains("451")
+                    || error_str.contains("connection")
+                    || error_str.contains("timeout")
+                {
+                    warn!(to = %message.to, error = %error_str, "Temporary SMTP failure");
+                    EmailResult::TemporaryFailure { error: error_str }
+                } else {
+                    error!(to = %message.to, error = %error_str, "Permanent SMTP failure");
+                    EmailResult::PermanentFailure { error: error_str }
+                }
+            }
         }
     }
 }
