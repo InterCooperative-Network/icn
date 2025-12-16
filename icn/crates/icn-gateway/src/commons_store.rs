@@ -1190,7 +1190,7 @@ mod tests {
     // Sled Backend Tests (feature-gated)
     // ========================================================================
 
-    #[allow(unexpected_cfgs)]
+    #[cfg_attr(not(feature = "sled-storage"), allow(unexpected_cfgs))]
     #[cfg(feature = "sled-storage")]
     mod sled_tests {
         use super::*;
