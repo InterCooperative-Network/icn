@@ -379,6 +379,8 @@ impl GatewayServer {
                 .service(
                     web::scope("/v1")
                         // Public endpoints (no auth required)
+                        .service(api::health::liveness)
+                        .service(api::health::readiness)
                         .service(api::health::health)
                         .service(api::health::health_detailed)
                         .service(api::auth::challenge)
