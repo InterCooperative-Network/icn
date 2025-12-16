@@ -107,7 +107,7 @@ async fn test_escrow_lifecycle() {
 async fn test_escrow_refund() {
     let db = temp_db();
     let store = EscrowStore::new(db);
-    let ledger_mgr = Arc::new(LedgerManager::new());
+    let _ledger_mgr = Arc::new(LedgerManager::new());
 
     let alice = IdentityBundle::generate().unwrap();
     let bob = IdentityBundle::generate().unwrap();

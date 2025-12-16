@@ -244,7 +244,7 @@ pub async fn get_delivery_status(
     processor: web::Data<Arc<NotificationProcessor>>,
 ) -> Result<HttpResponse> {
     let notification_id = path.into_inner();
-    let recipient = did.to_string();
+    let _recipient = did.to_string();
 
     // Verify ownership via store lookups (or just trust the ID check inside store?)
     // In a real system we should verify the notification belongs to the user.
@@ -278,6 +278,7 @@ mod tests {
     use crate::notification_queue::NotificationQueue;
     use crate::notifications::{NotificationService, NotificationStore};
     use actix_web::{test, App};
+    use icn_store::notifications::DeliveryLogEntry;
     use sled::Config;
 
     fn test_store() -> Arc<NotificationStore> {
@@ -285,6 +286,7 @@ mod tests {
         Arc::new(NotificationStore::new(db))
     }
 
+    #[allow(dead_code)]
     fn create_test_processor() -> Arc<NotificationProcessor> {
         let (queue, _receiver) = NotificationQueue::new();
         let queue = Arc::new(queue);

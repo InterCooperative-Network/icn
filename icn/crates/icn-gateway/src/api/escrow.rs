@@ -270,7 +270,7 @@ pub async fn release_escrow(
 pub async fn refund_escrow(
     http_req: HttpRequest,
     store: web::Data<EscrowStore>,
-    ledger_mgr: web::Data<Arc<LedgerManager>>,
+    _ledger_mgr: web::Data<Arc<LedgerManager>>,
     id: web::Path<String>,
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "payments:write")?;

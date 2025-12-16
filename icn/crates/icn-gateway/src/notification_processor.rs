@@ -828,7 +828,7 @@ mod tests {
     fn test_config_from_env() {
         // Set environment variables
         // Use unique var names to avoid conflict with other tests if parallel
-        let host_var = "ICN_TEST_SMTP_HOST";
+        let _host_var = "ICN_TEST_SMTP_HOST";
         std::env::set_var("ICN_SMTP_HOST", "smtp.test.com");
         std::env::set_var("ICN_SMTP_PORT", "587");
         std::env::set_var("ICN_SMTP_USERNAME", "user");
