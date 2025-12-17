@@ -2785,6 +2785,7 @@ dependencies = [
  "hex",
  "icn-community",
  "icn-compute",
+ "icn-coop",
  "icn-cooperative",
  "icn-crypto-pq",
  "icn-federation",
