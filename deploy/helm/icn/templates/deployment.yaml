@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "icn.fullname" . }}
+  labels:
+    {{- include "icn.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.icn.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "icn.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+      labels:
+        {{- include "icn.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+      - name: icnd
+        image: "{{ .Values.icn.image.repository }}:{{ .Values.icn.image.tag }}"
+        imagePullPolicy: {{ .Values.icn.image.pullPolicy }}
+        ports:
+        - name: p2p
+          containerPort: 3000
+          protocol: UDP
+        - name: gateway
+          containerPort: 8000
+        - name: metrics
+          containerPort: 9090
+        env:
+        - name: RUST_LOG
+          value: {{ .Values.icn.env.RUST_LOG | quote }}
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "icn.fullname" . }}-secret
+              key: jwt-secret
+        volumeMounts:
+        - name: data
+          mountPath: /data/icn
+        resources:
+          {{- toYaml .Values.icn.resources | nindent 10 }}
+        livenessProbe:
+          httpGet:
+            path: /health/liveness
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health/readiness
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+      volumes:
+      - name: data
+        {{- if .Values.icn.persistence.enabled }}
+        persistentVolumeClaim:
+          claimName: {{ include "icn.fullname" . }}-pvc
+        {{- else }}
+        emptyDir: {}
+        {{- end }}
