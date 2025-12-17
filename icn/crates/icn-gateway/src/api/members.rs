@@ -53,7 +53,7 @@ pub async fn get_member_profile(
         .map_err(|e| GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
 
     // Get cooperative
-    let coop = coop_manager.get_coop(&coop_id)?;
+    let coop = coop_manager.get_coop(&coop_id).await?;
 
     // Check if member exists and get role
     let member = coop

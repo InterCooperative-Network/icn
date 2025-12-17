@@ -67,12 +67,12 @@ pub async fn create_coop(
 
     // Note: Global cooperative limit is checked atomically inside create_coop()
     // to prevent TOCTOU race condition
-    coop_mgr.create_coop(req.id.clone(), req.name.clone(), owner, timestamp()?)?;
+    coop_mgr.create_coop(req.id.clone(), req.name.clone(), owner, timestamp()?).await?;
 
     // Track cooperative creation
     gateway::coops_created_inc();
 
-    let coop = coop_mgr.get_coop(&req.id)?;
+    let coop = coop_mgr.get_coop(&req.id).await?;
     Ok(HttpResponse::Created().json(coop))
 }
 
@@ -87,7 +87,7 @@ pub async fn get_coop(
     require_scope(&req, "coop:read")?;
     require_coop_access(&req, &id)?; // CRITICAL: Prevent cross-coop privacy leaks
 
-    let coop = coop_mgr.get_coop(&id)?;
+    let coop = coop_mgr.get_coop(&id).await?;
     Ok(HttpResponse::Ok().json(coop))
 }
 
@@ -334,7 +334,7 @@ pub async fn get_coop_stats(
     let coop_id = id.into_inner();
 
     // Get cooperative info
-    let coop = coop_mgr.get_coop(&coop_id)?;
+    let coop = coop_mgr.get_coop(&coop_id).await?;
 
     // Get transaction statistics from ledger
     let (transaction_count, total_hours_exchanged) = ledger_mgr
