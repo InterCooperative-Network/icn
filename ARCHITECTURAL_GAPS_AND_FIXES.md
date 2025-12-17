@@ -9,14 +9,17 @@
 
 ## Executive Summary
 
-**Overall Assessment:** ICN has **robust foundational infrastructure** (1134+ tests passing), but **10 documented gaps** remain before production deployment. Most are **non-critical** and can be addressed in parallel with pilot deployment.
+**Overall Assessment:** ICN has **robust foundational infrastructure** (1134+ tests passing), with **9 documented gaps** remaining before production deployment. Most are **non-critical** and can be addressed in parallel with pilot deployment.
 
 **Risk Classification:**
 - 🔴 **CRITICAL (Pilot Blockers):** 0 gaps
-- 🟡 **HIGH (Production Hardening):** 4 gaps
+- 🟡 **HIGH (Production Hardening):** 3 gaps (was 4, completed upgrade coordination)
 - 🟢 **MEDIUM (Future Enhancements):** 6 gaps
 
-**Key Finding:** The substrate is **pilot-ready**. Gaps are primarily in **operational tooling**, **scalability testing**, and **advanced features** (not day-1 requirements).
+**Recent Progress (2025-12-17):**
+- ✅ **Upgrade Coordination (Gap 2.1)** - Complete implementation with governance integration, metrics, and test coverage
+
+**Key Finding:** The substrate is **pilot-ready**. Remaining gaps are primarily in **operational tooling**, **scalability testing**, and **advanced features** (not day-1 requirements).
 
 ---
 
@@ -42,56 +45,71 @@ All pilot-blocking issues have been resolved:
 
 ### 2.1 Upgrade Coordination (Gap 12.6)
 
-**Status:** ⏳ Not Started  
-**Risk:** 🟡 HIGH  
-**Impact:** Without this, protocol upgrades require manual coordination  
+**Status:** ✅ COMPLETED (Phase 19.1)  
+**Risk:** 🟢 LOW (Implemented)  
+**Impact:** Protocol upgrades can now be coordinated via governance  
 
-**Current State:**
-- Manual upgrade process documented (Section 10.5)
-- Version negotiation exists but limited
-- No governance-driven upgrade proposals
+**Implementation Complete:**
+- ✅ `UpgradeCoordinator` for version tracking
+- ✅ `PendingUpgrade` with deadline management
+- ✅ Integration with `ProposalPayload::ProtocolUpgrade`
+- ✅ Peer version tracking and adoption statistics
+- ✅ Minimum version enforcement after deadlines
+- ✅ Deprecated peer rejection
+- ✅ Comprehensive metrics in `icn-obs`
+- ✅ Full test coverage
 
-**Missing Components:**
+**Available Components:**
 
 ```rust
-// Needed: Governance-integrated upgrade system
-pub struct UpgradeProposal {
-    new_version: Version,
-    breaking_changes: Vec<String>,
-    migration_code: Option<MigrationCode>,
-    deadline: u64,  // Upgrade deadline
-    required_approval: f64,  // e.g., 0.66 for breaking changes
+// Already implemented in icn-core/src/upgrade.rs
+pub struct UpgradeCoordinator {
+    current_version: Version,
+    pending_upgrades: Arc<RwLock<Vec<PendingUpgrade>>>,
+    peer_versions: Arc<RwLock<HashMap<Did, PeerVersionInfo>>>,
+    min_required_version: Arc<RwLock<Option<Version>>>,
 }
 
-pub enum ProposalPayload {
-    // ... existing variants
-    ProtocolUpgrade {
-        version: Version,
-        migration: MigrationCode,
-        deadline: u64,
-    },
+pub struct PendingUpgrade {
+    pub version: Version,
+    pub deadline: u64,
+    pub breaking_changes: Vec<String>,
+    pub migration_guide: Option<String>,
+    pub min_required_version: Option<Version>,
+    pub approved_at: u64,
+}
+
+pub struct UpgradeAdoptionStats {
+    pub total_peers: usize,
+    pub at_target_version: usize,
+    pub at_compatible_version: usize,
+    pub at_deprecated_version: usize,
+    pub adoption_rate: f64,
+    pub days_until_deadline: Option<i64>,
 }
 ```
 
-**Upgrade Workflow (Missing):**
+**Upgrade Workflow:**
 ```
-1. Core team creates UpgradeProposal
-2. Governance vote (2/3 for breaking, 1/2 for non-breaking)
-3. Adoption period (90 days typical)
-4. Version tracking metrics
-5. Deadline enforcement (deprecate old nodes)
+1. Core team creates ProtocolUpgrade governance proposal
+2. Governance vote (super-majority for breaking changes)
+3. UpgradeCoordinator registers approved upgrade
+4. Track adoption via metrics (icn_upgrade_adoption_rate)
+5. Enforce minimum version at deadline
+6. Reject connections from deprecated peers
 ```
 
-**Workaround (Pilot Phase):**
-- Manual coordination via mailing list/Discord
-- Staged rollout with monitoring
-- Emergency rollback procedure
+**Metrics Available:**
+- `icn_upgrade_total_peers` - Total tracked peers
+- `icn_upgrade_peers_at_target_version` - Peers on target version
+- `icn_upgrade_adoption_rate` - Adoption percentage
+- `icn_upgrade_days_until_deadline` - Time until enforcement
+- `icn_upgrade_deprecated_peers_rejected_total` - Rejected connections
 
-**Remediation Plan:**
-- **Phase 19.1:** Implement `UpgradeProposal` governance type
-- **Phase 19.2:** Add version adoption metrics
-- **Phase 19.3:** Build migration framework
-- **Timeline:** 2-3 weeks (not pilot-blocking)
+**Next Steps:**
+- Integrate into supervisor for periodic deadline checks
+- Add CLI commands in `icnctl` for upgrade status
+- Add gateway API endpoints for upgrade monitoring
 
 ---
 
