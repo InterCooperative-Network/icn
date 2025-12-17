@@ -447,7 +447,7 @@ impl ContributionValidator {
             let mut visited = HashSet::new();
             let mut rec_stack = HashSet::new();
             
-            if self.has_cycle_dfs(
+            if Self::has_cycle_dfs(
                 &attestation.attester,
                 &graph,
                 &mut visited,
@@ -467,7 +467,6 @@ impl ContributionValidator {
     
     /// Helper for DFS cycle detection
     fn has_cycle_dfs(
-        &self,
         node: &str,
         graph: &HashMap<String, Vec<String>>,
         visited: &mut HashSet<String>,
@@ -486,7 +485,7 @@ impl ContributionValidator {
         
         if let Some(neighbors) = graph.get(node) {
             for neighbor in neighbors {
-                if self.has_cycle_dfs(neighbor, graph, visited, rec_stack) {
+                if Self::has_cycle_dfs(neighbor, graph, visited, rec_stack) {
                     return true;
                 }
             }

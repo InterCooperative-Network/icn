@@ -23,7 +23,7 @@ use tracing::info;
 
 /// Test node representing a cooperative in a federation
 struct FederationTestNode {
-    keypair: KeyPair,
+    _keypair: KeyPair,
     did: Did,
     coop_id: String,
     registry: Arc<RwLock<CooperativeRegistry>>,
@@ -99,7 +99,7 @@ impl FederationTestNode {
         info!("Federation node '{}' initialized", coop_id);
 
         Ok(Self {
-            keypair,
+            _keypair: keypair,
             did,
             coop_id: coop_id.to_string(),
             registry,

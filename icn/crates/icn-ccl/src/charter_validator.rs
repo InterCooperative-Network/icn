@@ -15,19 +15,19 @@ pub struct CharterValidator {
     /// Charter rules to enforce
     rules: CharterRuleSet,
     /// Domain ID for this validator
-    domain_id: String,
+    _domain_id: String,
 }
 
 impl CharterValidator {
     /// Create a new charter validator
     pub fn new(domain_id: String, rules: CharterRuleSet) -> Self {
-        Self { domain_id, rules }
+        Self { _domain_id: domain_id, rules }
     }
 
     /// Create a default validator for cooperatives
     pub fn cooperative_default(domain_id: String, min_trust_bp: i64) -> Self {
         Self {
-            domain_id,
+            _domain_id: domain_id,
             rules: CharterRuleSet::cooperative_default(min_trust_bp),
         }
     }
@@ -160,7 +160,7 @@ mod tests {
     #[test]
     fn test_charter_validator_creation() {
         let validator = CharterValidator::cooperative_default("test-coop".to_string(), 500);
-        assert_eq!(validator.domain_id, "test-coop");
+        assert_eq!(validator._domain_id, "test-coop");
         assert!(!validator.rules.transaction_rules.is_empty());
     }
 

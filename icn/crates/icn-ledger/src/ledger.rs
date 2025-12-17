@@ -20,6 +20,9 @@ use std::sync::Arc;
 use std::time::SystemTime;
 use tracing::{debug, error, info, instrument, warn};
 
+/// Type alias for validation hook callback
+pub type ValidationHook = Box<dyn Fn(&JournalEntry) -> Result<()> + Send + Sync>;
+
 /// Key prefix for journal entries in storage
 const JOURNAL_PREFIX: &str = "ledger:journal:";
 
@@ -112,7 +115,7 @@ pub struct Ledger {
     /// Optional validation hook for charter/policy enforcement
     /// Called before accepting entries. Returns Ok(()) if entry is valid,
     /// Err with reason if entry should be rejected.
-    validation_hook: Option<Box<dyn Fn(&JournalEntry) -> Result<()> + Send + Sync>>,
+    validation_hook: Option<ValidationHook>,
 }
 
 impl Ledger {

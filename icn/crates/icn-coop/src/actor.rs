@@ -8,14 +8,14 @@ use tokio::sync::{mpsc, oneshot};
 use tracing::info;
 use std::sync::Arc;
 
-const COOP_TOPIC: &str = "coop:updates";
+const _COOP_TOPIC: &str = "coop:updates";
 
 pub struct CoopActor {
     rx: mpsc::Receiver<CoopMessage>,
     store: CoopStore,
     lifecycle: LifecycleManager,
     membership: MembershipManager,
-    gossip: Option<Arc<GossipActor>>,
+    _gossip: Option<Arc<GossipActor>>,
 }
 
 pub enum CoopMessage {
@@ -73,7 +73,7 @@ impl CoopActor {
             store,
             lifecycle,
             membership,
-            gossip,
+            _gossip: gossip,
         };
         
         tokio::spawn(async move {

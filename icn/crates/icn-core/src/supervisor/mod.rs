@@ -1257,7 +1257,7 @@ impl Supervisor {
                                 Ok(snapshot_msg) => {
                                     let coordinator = snapshot_coordinator_for_notifications.clone();
                                     let sender = entry.author.clone();
-                                    let network = network_handle_for_snapshots.clone();
+                                    let _network = network_handle_for_snapshots.clone();
                                     let gossip = gossip_handle_for_snapshots.clone();
                                     
                                     tokio::spawn(async move {
@@ -1845,7 +1845,7 @@ impl Supervisor {
             ));
             let version_string = format!("{}.{}.{}", 
                 current_version.major, current_version.minor, current_version.patch);
-            let upgrade_handle = crate::upgrade_actor::UpgradeActor::spawn(
+            let _upgrade_handle = crate::upgrade_actor::UpgradeActor::spawn(
                 did.clone(),
                 version_string.clone(),
                 version_tracker.clone(),

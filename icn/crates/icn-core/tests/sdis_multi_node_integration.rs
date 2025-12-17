@@ -78,6 +78,7 @@ impl SdisTestNode {
         
         let steward_handle = icn_steward::StewardActor::spawn(
             did.clone(),
+            keypair.clone(),
             config,
             shutdown_tx,
             send_gossip,

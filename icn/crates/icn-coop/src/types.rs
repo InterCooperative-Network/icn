@@ -85,13 +85,15 @@ impl Cooperative {
 
     pub fn can_transition_to(&self, new_status: &CoopStatus) -> bool {
         use CoopStatus::*;
-        match (&self.status, new_status) {
-            (Forming, Active) => true,
-            (Active, Suspended) | (Active, Dissolving) => true,
-            (Suspended, Active) | (Suspended, Dissolving) => true,
-            (Dissolving, Dissolved) => true,
-            _ => false,
-        }
+        matches!(
+            (&self.status, new_status),
+            (Forming, Active)
+                | (Active, Suspended)
+                | (Active, Dissolving)
+                | (Suspended, Active)
+                | (Suspended, Dissolving)
+                | (Dissolving, Dissolved)
+        )
     }
 }
 

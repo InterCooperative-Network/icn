@@ -5,7 +5,7 @@ use icn_identity::{Did, KeyPair};
 
 fn test_keypair() -> (KeyPair, Did) {
     let keypair = KeyPair::generate().unwrap();
-    let did = Did::from_public_key(&keypair.verifying_key());
+    let did = Did::from_public_key(keypair.verifying_key());
     (keypair, did)
 }
 

@@ -3,9 +3,9 @@
 //! Tests that charter rules are enforced during ledger transactions.
 
 use anyhow::Result;
-use icn_ccl::{CharterRule, CharterRuleSet, CharterValidator};
+use icn_ccl::{CharterRule, CharterValidator};
 use icn_identity::IdentityBundle;
-use icn_ledger::{entry::JournalEntryBuilder, AccountDelta, Ledger, QuarantineReason};
+use icn_ledger::{entry::JournalEntryBuilder, Ledger, QuarantineReason};
 use icn_store::SledStore;
 use std::sync::Arc;
 use tempfile::TempDir;

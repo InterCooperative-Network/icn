@@ -102,7 +102,7 @@ impl UpgradeHandle {
 pub struct UpgradeActor {
     own_did: Did,
     current_version: String,
-    version_tracker: Arc<RwLock<VersionTracker>>,
+    _version_tracker: Arc<RwLock<VersionTracker>>,
     gossip_handle: GossipHandle,
     
     // State
@@ -126,7 +126,7 @@ impl UpgradeActor {
         let mut actor = UpgradeActor {
             own_did: own_did.clone(),
             current_version: current_version.clone(),
-            version_tracker,
+            _version_tracker: version_tracker,
             gossip_handle: gossip_handle.clone(),
             target_version: None,
             activation_time: None,

@@ -28,12 +28,12 @@ pub enum MembershipAction {
 /// Manages cooperative membership
 pub struct MembershipManager {
     /// Minimum trust score required for membership
-    min_trust_score: f32,
+    _min_trust_score: f32,
 }
 
 impl MembershipManager {
     pub fn new(min_trust_score: f32) -> Self {
-        Self { min_trust_score }
+        Self { _min_trust_score: min_trust_score }
     }
 
     /// Add a new member to the cooperative

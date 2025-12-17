@@ -83,7 +83,7 @@ impl CoopStore {
         let prefix = b"member:";
         
         for item in self.db.scan_prefix(prefix) {
-            let (key, value) = item?;
+            let (_key, value) = item?;
             let member: Member = bincode::deserialize(&value)?;
             if member.did == *did {
                 coop_ids.push(member.coop_id.clone());
