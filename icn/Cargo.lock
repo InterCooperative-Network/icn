@@ -956,6 +956,7 @@ dependencies = [
  "iana-time-zone",
  "js-sys",
  "num-traits",
+ "serde",
  "wasm-bindgen",
  "windows-link 0.2.1",
 ]
@@ -2608,6 +2609,22 @@ dependencies = [
  "tokio",
  "urlencoding",
  "zeroize",
+]
+
+[[package]]
+name = "icn-cooperative"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "icn-governance",
+ "icn-identity",
+ "icn-ledger",
+ "icn-store",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
