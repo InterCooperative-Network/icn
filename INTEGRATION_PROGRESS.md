@@ -278,3 +278,119 @@ Much faster than debugging at the end.
 **Confidence:** High ✅  
 **Timeline:** On track for 2-week pilot-ready goal 🚀
 
+
+---
+
+## Update: 2025-12-17 Evening Session
+
+### ✅ Phase 3: Handle Wiring (COMPLETE)
+
+Successfully wired CoopHandle from supervisor through to gateway!
+
+**Changes Made:**
+1. Added `coop_handle` field to `GatewayServer` struct
+2. Added `with_coop_handle()` method (follows compute_handle pattern)
+3. Declared `coop_handle_for_gateway` in supervisor scope
+4. Assigned handle after CoopActor spawn
+5. Passed to gateway via `.with_coop_handle()`
+6. Gateway now receives handle but not yet using it
+
+**Commit:** `92c4966` - feat: wire CoopHandle from supervisor to gateway
+
+### 🔄 Phase 4: Gateway Integration (IN PROGRESS - 30%)
+
+**Current State:**
+- Gateway receives CoopHandle ✅
+- ActorCoopManager adapter exists ✅
+- Gateway still uses old CoopManager ⏳
+
+**Challenge Identified:**
+- CoopManager has **sync** methods (no async/await)
+- ActorCoopManager has **async** methods (returns Futures)
+- API handlers are async functions (can use .await)
+- Need to either:
+  1. Make CoopManager async (breaking change to 16 call sites)
+  2. Update API endpoints to use ActorCoopManager directly
+  3. Create trait both can implement
+  4. Use conditional dispatch
+
+**Decision Point:**
+Best approach is likely **#2** - Update API endpoints directly.
+- Only 16 call sites in coops.rs
+- Handlers already async
+- Clean, no wrappers needed
+- Just add `.await` to calls
+
+### 📊 Updated Progress
+
+**Time Investment:**
+- Session 1 (Morning): 5 hours
+- Session 2 (Evening): 2 hours
+- **Total: 7 hours**
+- **Remaining: 4 hours (est)**
+
+**Phase Completion:**
+- Phase 1: Supervisor ████████████████████ 100%
+- Phase 2: Adapter    ████████████████████ 100%
+- Phase 3: Wiring     ████████████████████ 100%
+- Phase 4: Gateway    ██████░░░░░░░░░░░░░░  30%
+- Phase 5: Gossip     ░░░░░░░░░░░░░░░░░░░░   0%
+- Phase 6: CLI        ░░░░░░░░░░░░░░░░░░░░   0%
+
+**Overall: 64% complete**
+
+### 🎯 Next Session Plan
+
+**Immediate (1-2 hours):**
+1. Update API endpoints to use ActorCoopManager
+2. Change `web::Data<Arc<CoopManager>>` to `web::Data<Arc<ActorCoopManager>>`
+3. Add `.await` to all 16 call sites
+4. Test POST /coops and GET /coops/:id
+
+**Then (1 hour):**
+5. Handle case when no coop_handle (keep old manager)
+6. Test persistence across restart
+7. Fix any type conversion issues
+
+**Finally (1 hour):**
+8. Add gossip sync handler in init_coop
+9. Add icnctl coop commands
+10. Write integration test
+
+### 🐛 Technical Notes
+
+**Type Mapping:**
+- Gateway `MemberRole`: Steward, Facilitator, Participant
+- Actor `MemberRole`: Founder, Officer, BoardMember, Member
+- Conversion in `convert_to_gateway_member()`
+
+**ID Generation:**
+- Gateway wants to provide ID
+- Actor generates its own ID (UUID)
+- **TODO:** Add optional ID parameter to actor
+
+**Member Query:**
+- Gateway `Coop` includes member list
+- Actor `Cooperative` doesn't include members
+- **TODO:** Query members separately or include in response
+
+### 📈 Confidence Assessment
+
+**What's Working:**
+- ✅ CoopActor spawns correctly
+- ✅ Persistent storage working
+- ✅ Handle flows through stack
+- ✅ Type conversions implemented
+- ✅ All tests passing
+
+**What Needs Work:**
+- ⏳ API endpoint integration
+- ⏳ Sync/async mismatch
+- ⏳ Member list population
+- ⏳ ID generation control
+- ⏳ Gossip synchronization
+
+**Overall Confidence: HIGH ✅**
+
+The infrastructure is solid. Remaining work is integration glue, not architectural changes.
+
