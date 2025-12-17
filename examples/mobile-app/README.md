@@ -8,6 +8,7 @@ Example React Native components demonstrating ICN pilot features.
 - `RecurringPaymentSetup.tsx` - Create and manage recurring payments
 - `VotingScreen.tsx` - Amendment voting interface
 - `BudgetManager.tsx` - Budget creation and monitoring
+- `CooperativeManager.tsx` - Create, join, and manage cooperatives
 
 ## Usage
 
@@ -54,3 +55,10 @@ npm install @react-native-firebase/messaging
 - Threshold alerts
 - Period selection
 - Multi-account support
+
+### Cooperatives
+- Create new cooperatives
+- Join existing cooperatives
+- View member lists
+- Manage membership
+- Real-time status updates
