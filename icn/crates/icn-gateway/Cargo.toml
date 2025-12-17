@@ -68,6 +68,8 @@ icn-trust = { path = "../icn-trust" }
 icn-zkp = { path = "../icn-zkp" }
 icn-steward = { path = "../icn-steward" }
 icn-crypto-pq = { path = "../icn-crypto-pq" }
+icn-cooperative = { path = "../icn-cooperative" }
+icn-community = { path = "../icn-community" }
 
 # Caching
 lru = "0.12"

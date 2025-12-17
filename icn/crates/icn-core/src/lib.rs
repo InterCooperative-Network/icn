@@ -13,6 +13,7 @@ pub mod runtime;
 pub mod supervisor;
 pub mod trust_propagation;
 pub mod upgrade;
+pub mod upgrade_actor;
 
 pub use anti_entropy::{spawn_anti_entropy_task, AntiEntropyConfig};
 pub use config::Config;
@@ -33,3 +34,4 @@ pub use upgrade::{
     PendingUpgrade, UpgradeAdoptionStats, UpgradeCoordinator, CURRENT_VERSION,
     proposal_to_pending_upgrade,
 };
+pub use upgrade_actor::{UpgradeActor, UpgradeHandle, UpgradeMessage, UpgradeStatus, UPGRADE_TOPIC};

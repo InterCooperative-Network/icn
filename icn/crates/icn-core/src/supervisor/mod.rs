@@ -1761,6 +1761,27 @@ impl Supervisor {
 
             info!("✓ Governance actor spawned at {}", gov_store_path.display());
 
+            // Spawn UpgradeActor for network-wide upgrade coordination
+            let current_version = icn_governance::proposal::Version::new(
+                crate::upgrade::CURRENT_VERSION.0,
+                crate::upgrade::CURRENT_VERSION.1,
+                crate::upgrade::CURRENT_VERSION.2,
+            );
+            let version_tracker = Arc::new(tokio::sync::RwLock::new(
+                crate::supervisor::version_tracker::VersionTracker::new(current_version.clone())
+            ));
+            let version_string = format!("{}.{}.{}", 
+                current_version.major, current_version.minor, current_version.patch);
+            let upgrade_handle = crate::upgrade_actor::UpgradeActor::spawn(
+                did.clone(),
+                version_string.clone(),
+                version_tracker.clone(),
+                gossip_handle.clone(),
+                self.shutdown_tx.subscribe(),
+            );
+            info!("✓ Upgrade coordinator spawned (version: {})", version_string);
+            icn_obs::metrics::supervisor::actor_spawned_inc("upgrade");
+
             // Create dead-letter queue for failed operations recovery
             let dlq_store_path = self.config.store_path().join("dead_letter");
             let dlq_store = Arc::new(SledStore::open(&dlq_store_path)?);

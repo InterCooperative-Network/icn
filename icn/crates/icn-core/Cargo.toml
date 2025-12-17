@@ -37,6 +37,8 @@ icn-compute = { path = "../icn-compute" }
 icn-security.workspace = true
 icn-federation.workspace = true
 icn-steward.workspace = true
+icn-cooperative = { path = "../icn-cooperative" }
+icn-community = { path = "../icn-community" }
 
 [dev-dependencies]
 rustls.workspace = true
