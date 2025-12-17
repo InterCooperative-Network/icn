@@ -2565,6 +2565,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "icn-community"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "icn-cooperative",
+ "icn-governance",
+ "icn-identity",
+ "icn-ledger",
+ "icn-store",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "icn-compute"
 version = "0.1.0"
 dependencies = [
