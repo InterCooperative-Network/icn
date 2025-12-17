@@ -197,11 +197,20 @@ export {
   useAmendment,
   useAmendments,
   useAmendmentActions,
+  useAmendmentVoting,
+  useAmendmentResults,
   // Appeal hooks
   useAppeal,
   useAppeals,
   useAppealActions,
   useAppealAdmin,
+} from './constitutional-hooks';
+
+// Constitutional Governance Vote Types
+export type {
+  AmendmentVoteChoice,
+  AmendmentVote,
+  AmendmentResults,
 } from './constitutional-hooks';
 
 // Device Management Types
