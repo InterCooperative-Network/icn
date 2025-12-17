@@ -231,23 +231,50 @@ This audit provides a **factual, evidence-based** assessment of what is actually
 
 ## 🔴 DOCUMENTATION DEBT - Claims Not Backed by Code
 
-### 20. Upgrade Coordination Protocol ❌
+### 20. Upgrade Coordination Protocol ✅ **ACTUALLY IMPLEMENTED**
 - **Documented:** "Upgrade coordination for protocol changes"
-- **Reality:** No `icn-upgrade` crate, no version negotiation logic in network layer
-- **Impact:** Cannot coordinate network-wide protocol upgrades safely
-- **Action Required:** Implement version negotiation handshake in `icn-net`
+- **Reality:** FULLY IMPLEMENTED in `icn-net/src/version.rs` (403 lines)
+- **Evidence:**
+  - `VersionInfo` struct with min/max supported versions
+  - `negotiate_version()` function with backward/forward compatibility
+  - `CapabilityFlags` bitflag system for feature detection
+  - Handshake includes `version_info` in `Hello` message
+  - Actor performs negotiation and rejects incompatible versions
+  - 14 comprehensive unit tests covering all negotiation scenarios
+  - Handles legacy nodes (treats missing version_info as v1)
+- **Status:** Production-ready, no action required
 
-### 21. Dispute Resolution Mechanism ❌
+### 21. Dispute Resolution Mechanism ✅ **ACTUALLY IMPLEMENTED**
 - **Documented:** "Dispute resolution for ledger conflicts"
-- **Reality:** Quarantine exists, but no arbitration or resolution logic
-- **Impact:** Quarantined entries cannot be resolved democratically
-- **Action Required:** Add dispute domain in governance, link to ledger quarantine
+- **Reality:** FULLY IMPLEMENTED across three layers
+- **Evidence:**
+  - **Ledger Layer:** `icn-ledger/src/dispute.rs` - DisputeManager for filing/tracking disputes
+  - **Compute Layer:** `icn-compute/src/dispute.rs` - ComputeDispute for incorrect execution results
+  - **CCL Layer:** `icn-ccl/src/disputes.rs` - Contract execution dispute resolution with gossip
+  - **Governance Integration:** `DisputeResolution` proposal type in governance
+  - **Appeal System:** Disputes can be appealed via `AppealType::DisputeResolution`
+  - **Quarantine Integration:** Disputed entries linked to governance proposals
+  - Dispute states: Filed → Evidence Collection → Mediation → Resolution/Governance
+  - Penalty system with trust score reduction for incorrect results
+  - Tests: `ccl/tests/dispute_actor_integration.rs`
+- **Status:** Production-ready, no action required
 
-### 22. Economic Safeguards (Advanced) ❌
+### 22. Economic Safeguards (Trust-Adaptive) ✅ **ACTUALLY IMPLEMENTED**
 - **Documented:** "Dynamic credit limits based on trust"
-- **Reality:** Basic credit limits exist, but no trust-adaptive adjustment
-- **Impact:** Cannot prevent coordinated credit abuse
-- **Action Required:** Implement trust-weighted credit limit computation
+- **Reality:** FULLY IMPLEMENTED in `icn-ledger/src/credit_policy.rs`
+- **Evidence:**
+  - `CreditPolicy` struct with dynamic limit calculation
+  - Formula: `baseline + (baseline * trust_score * trust_multiplier) + (cleared_volume * history_bonus_rate)`
+  - Trust scores from `icn-trust` integrated into credit limit computation
+  - `NewMemberPolicy` for protective throttling of new members
+  - Cleared volume tracking for credit rewards
+  - Conservative and permissive policy presets
+  - `EconomicSafetyManager` coordinates policies and validations
+  - `validate_credit_limit()` function enforces limits during transaction validation
+  - Fork resolution uses trust scores (40% weight) to prefer trusted authors
+  - Entry validation rejects low-trust authors (`min_trust_for_entry` threshold)
+  - Tests demonstrate trust-weighted credit limits
+- **Status:** Production-ready, no action required
 
 ### 23. Snapshot Coordination ❌
 - **Documented:** "Distributed snapshot protocol"
