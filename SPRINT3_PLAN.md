@@ -7,9 +7,9 @@
 
 ### 1. Deployment Automation (High Priority)
 - [x] Create Kubernetes manifests
+- [x] Create Docker Compose stack
+- [x] Monitoring setup (Prometheus + Grafana)
 - [ ] Create Helm charts
-- [ ] Docker Compose production stack
-- [ ] Monitoring setup (Prometheus + Grafana)
 - [ ] Logging aggregation (Loki/ELK)
 
 ### 2. Integration Testing (High Priority)
