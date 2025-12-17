@@ -3050,11 +3050,16 @@ name = "icn-snapshot"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "bincode",
+ "getrandom 0.2.16",
  "hex",
+ "icn-identity",
  "proptest",
  "serde",
  "serde_json",
  "sha2",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
