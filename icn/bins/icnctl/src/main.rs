@@ -333,6 +333,10 @@ enum IdCommands {
         reason: Option<String>,
     },
 
+    /// Upgrade identity to post-quantum security
+    #[cfg(feature = "post-quantum")]
+    UpgradePq,
+
     /// Export identity (backup)
     Export {
         /// Output file path
@@ -1982,6 +1986,63 @@ fn handle_id_command(cmd: IdCommands, data_dir: &Path) -> Result<()> {
                 println!("  Reason: {:?}", rotation.reason);
             }
             println!("\nIMPORTANT: Publish the rotation proof to maintain identity continuity.");
+            println!("  Timestamp: {}", rotation.timestamp);
+        }
+
+        #[cfg(feature = "post-quantum")]
+        IdCommands::UpgradePq => {
+            // Check if keystore exists
+            if !keystore_path.exists() {
+                bail!("No identity found. Run 'icnctl id init' to create one.");
+            }
+
+            println!("Upgrading identity to post-quantum security...\n");
+            println!("This will add ML-DSA (Dilithium3) keys to your identity.");
+            println!("Your DID will remain the same, but signatures will be hybrid (Ed25519 + ML-DSA).\n");
+
+            // Get passphrase
+            let passphrase = read_passphrase("Enter passphrase: ")?;
+
+            // Open and unlock keystore
+            let mut keystore = AgeKeyStore::open(&keystore_path)?;
+            keystore.unlock(&passphrase)?;
+
+            let did = keystore.get_keypair()?.did().clone();
+
+            // Check if already has PQ keys
+            if keystore.get_keypair()?.has_pq_keys() {
+                println!("✓ Identity already has post-quantum keys!");
+                println!("  DID: {did}");
+                return Ok(());
+            }
+
+            // Generate new PQ keypair
+            println!("Generating ML-DSA keypair (this may take a moment)...");
+            let pq_keypair = icn_crypto_pq::MlDsaKeypair::generate()
+                .context("Failed to generate PQ keypair")?;
+
+            // Get current identity info
+            let old_keypair = keystore.get_keypair()?;
+            let (secret_bytes, public_bytes) = old_keypair.export_for_upgrade();
+
+            // Create new keypair with PQ keys
+            let upgraded_keypair = KeyPair::from_bytes_with_pq(
+                &secret_bytes,
+                &public_bytes,
+                pq_keypair.secret_key_bytes(),
+                pq_keypair.public_key().as_bytes(),
+            )?;
+
+            // Rotate to upgraded keypair (same DID, but with PQ keys)
+            let rotation = keystore.rotate(upgraded_keypair)?;
+
+            println!("\n✓ Post-quantum upgrade successful!");
+            println!("  DID: {did} (unchanged)");
+            println!("  Classical: Ed25519 (32-byte keys, 64-byte signatures)");
+            println!("  Post-Quantum: ML-DSA-65 (~2KB keys, ~3.3KB signatures)");
+            println!("  Security: Hybrid (both signatures required)");
+            println!("\nAll future signatures will use hybrid Ed25519+ML-DSA.");
+            println!("IMPORTANT: Backup your upgraded keystore!");
             println!("  Timestamp: {}", rotation.timestamp);
         }
 

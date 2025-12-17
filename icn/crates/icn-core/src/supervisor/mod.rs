@@ -7,6 +7,7 @@ pub mod init_rpc;
 pub mod init_trust;
 pub mod registry;
 pub mod shutdown;
+pub mod version_tracker;
 
 use anyhow::{bail, Context, Result};
 use icn_identity::{Did, IdentityBundle, RecoveryMessage, IDENTITY_RECOVERY_TOPIC};
@@ -2366,6 +2367,36 @@ impl Supervisor {
                                             icn_obs::metrics::governance::proposals_executed_inc("sdis_other");
                                         }
                                     }
+                                }
+
+                                ProposalPayload::ProtocolUpgrade {
+                                    version,
+                                    breaking_changes,
+                                    migration_guide,
+                                    deadline,
+                                    min_required_version,
+                                } => {
+                                    info!("🔄 Protocol upgrade proposal {} accepted: {} -> {}", 
+                                        proposal_id.0, 
+                                        "current", // TODO: get actual current version
+                                        version
+                                    );
+
+                                    // TODO: Implement version tracker integration
+                                    // For now, just log and emit metrics
+                                    info!("   Target version: {}", version);
+                                    info!("   Deadline: {}", deadline);
+                                    if !breaking_changes.is_empty() {
+                                        info!("   Breaking changes: {} items", breaking_changes.len());
+                                    }
+                                    if let Some(guide) = migration_guide {
+                                        info!("   Migration guide: {}", guide);
+                                    }
+                                    if let Some(min_ver) = min_required_version {
+                                        info!("   Minimum required version: {}", min_ver);
+                                    }
+
+                                    icn_obs::metrics::governance::proposals_executed_inc("protocol_upgrade");
                                 }
                             }
                         }

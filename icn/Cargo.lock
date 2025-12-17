@@ -3124,6 +3124,7 @@ dependencies = [
  "hex",
  "icn-ccl",
  "icn-core",
+ "icn-crypto-pq",
  "icn-federation",
  "icn-governance",
  "icn-identity",
