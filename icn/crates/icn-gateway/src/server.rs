@@ -128,11 +128,9 @@ impl GatewayServer {
         let auth_manager = Arc::new(AuthManager::new(self.jwt_secret));
         
         // Create cooperative manager (uses actor if handle available, otherwise in-memory)
-        let coop_manager: Arc<CoopManager> = if let Some(_handle) = self.coop_handle {
+        let coop_manager: Arc<CoopManager> = if let Some(handle) = self.coop_handle {
             info!("Cooperative manager connected to daemon (using CoopActor)");
-            // TODO: Create ActorCoopManager wrapper or make API endpoints use actor directly
-            // For now, fall back to in-memory until we implement integration
-            Arc::new(CoopManager::new())
+            Arc::new(CoopManager::with_handle(handle))
         } else {
             info!("Cooperative manager running standalone (in-memory only)");
             Arc::new(CoopManager::new())

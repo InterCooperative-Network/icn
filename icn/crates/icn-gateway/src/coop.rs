@@ -189,6 +189,8 @@ impl Coop {
 /// Cooperative namespace manager
 pub struct CoopManager {
     coops: Arc<RwLock<HashMap<CoopId, Coop>>>,
+    /// Cooperative handle from daemon (if connected)
+    coop_handle: Option<icn_coop::CoopHandle>,
 }
 
 impl Default for CoopManager {
@@ -198,15 +200,38 @@ impl Default for CoopManager {
 }
 
 impl CoopManager {
-    /// Create a new coop manager
+    /// Create a new coop manager (in-memory only)
     pub fn new() -> Self {
         Self {
             coops: Arc::new(RwLock::new(HashMap::new())),
+            coop_handle: None,
+        }
+    }
+
+    /// Create a coop manager connected to daemon
+    pub fn with_handle(handle: icn_coop::CoopHandle) -> Self {
+        Self {
+            coops: Arc::new(RwLock::new(HashMap::new())),
+            coop_handle: Some(handle),
         }
     }
 
     /// Create a new cooperative
-    pub fn create_coop(&self, id: CoopId, name: String, owner: Did, timestamp: u64) -> Result<()> {
+    pub async fn create_coop(&self, id: CoopId, name: String, owner: Did, timestamp: u64) -> Result<()> {
+        // If we have a daemon handle, use it for persistent storage
+        if let Some(ref handle) = self.coop_handle {
+            // Use actor for persistence
+            let coop_type = icn_coop::CoopType::Worker; // Default type
+            let _cooperative = handle
+                .create_cooperative(name.clone(), coop_type, owner.clone())
+                .await
+                .map_err(|e| GatewayError::InternalError(format!("CoopActor error: {e}")))?;
+            
+            // TODO: Actor generates its own ID, but gateway wants to use provided ID
+            // For now, also store in local cache for API compatibility
+        }
+        
+        // Store in local cache (used when no daemon, or for fast lookup)
         let mut coops = self
             .coops
             .write()
@@ -231,7 +256,21 @@ impl CoopManager {
     }
 
     /// Get a cooperative
-    pub fn get_coop(&self, id: &CoopId) -> Result<Coop> {
+    pub async fn get_coop(&self, id: &CoopId) -> Result<Coop> {
+        // Try daemon first if available
+        if let Some(ref handle) = self.coop_handle {
+            match handle.get_cooperative(id.clone()).await {
+                Ok(actor_coop) => {
+                    // Convert and return
+                    return Ok(convert_actor_coop_to_gateway(actor_coop));
+                }
+                Err(_) => {
+                    // Fall through to local cache
+                }
+            }
+        }
+        
+        // Fall back to local cache
         let coops = self
             .coops
             .read()
@@ -273,7 +312,20 @@ impl CoopManager {
     }
 
     /// List all cooperatives (for testing/admin)
-    pub fn list_coops(&self) -> Result<Vec<Coop>> {
+    pub async fn list_coops(&self) -> Result<Vec<Coop>> {
+        // Try daemon first if available
+        if let Some(ref handle) = self.coop_handle {
+            match handle.list_cooperatives().await {
+                Ok(actor_coops) => {
+                    return Ok(actor_coops.into_iter().map(convert_actor_coop_to_gateway).collect());
+                }
+                Err(_) => {
+                    // Fall through to local cache
+                }
+            }
+        }
+        
+        // Fall back to local cache
         let coops = self
             .coops
             .read()
@@ -395,8 +447,8 @@ mod tests {
             .as_secs()
     }
 
-    #[test]
-    fn test_create_coop() {
+    #[tokio::test]
+    async fn test_create_coop() {
         let manager = CoopManager::new();
         let steward = IdentityBundle::generate().unwrap();
 
@@ -407,17 +459,18 @@ mod tests {
                 steward.did().clone(),
                 timestamp(),
             )
+            .await
             .unwrap();
 
-        let coop = manager.get_coop(&"test-coop".to_string()).unwrap();
+        let coop = manager.get_coop(&"test-coop".to_string()).await.unwrap();
         assert_eq!(coop.id, "test-coop");
         assert_eq!(coop.name, "Test Coop");
         assert_eq!(coop.members.len(), 1);
         assert_eq!(coop.members[0].role, MemberRole::Steward);
     }
 
-    #[test]
-    fn test_add_member() {
+    #[tokio::test]
+    async fn test_add_member() {
         let manager = CoopManager::new();
         let steward = IdentityBundle::generate().unwrap();
         let participant = IdentityBundle::generate().unwrap();
@@ -429,9 +482,10 @@ mod tests {
                 steward.did().clone(),
                 timestamp(),
             )
+            .await
             .unwrap();
 
-        let mut coop = manager.get_coop(&"test-coop".to_string()).unwrap();
+        let mut coop = manager.get_coop(&"test-coop".to_string()).await.unwrap();
         coop.add_member(
             participant.did().clone(),
             MemberRole::Participant,
@@ -443,8 +497,8 @@ mod tests {
         assert!(coop.is_member(participant.did()));
     }
 
-    #[test]
-    fn test_remove_member() {
+    #[tokio::test]
+    async fn test_remove_member() {
         let manager = CoopManager::new();
         let steward = IdentityBundle::generate().unwrap();
         let participant = IdentityBundle::generate().unwrap();
@@ -456,9 +510,10 @@ mod tests {
                 steward.did().clone(),
                 timestamp(),
             )
+            .await
             .unwrap();
 
-        let mut coop = manager.get_coop(&"test-coop".to_string()).unwrap();
+        let mut coop = manager.get_coop(&"test-coop".to_string()).await.unwrap();
         coop.add_member(
             participant.did().clone(),
             MemberRole::Participant,
@@ -471,8 +526,8 @@ mod tests {
         assert!(!coop.is_member(participant.did()));
     }
 
-    #[test]
-    fn test_cannot_remove_last_steward() {
+    #[tokio::test]
+    async fn test_cannot_remove_last_steward() {
         let manager = CoopManager::new();
         let steward = IdentityBundle::generate().unwrap();
 
@@ -483,9 +538,10 @@ mod tests {
                 steward.did().clone(),
                 timestamp(),
             )
+            .await
             .unwrap();
 
-        let mut coop = manager.get_coop(&"test-coop".to_string()).unwrap();
+        let mut coop = manager.get_coop(&"test-coop".to_string()).await.unwrap();
         let result = coop.remove_member(steward.did());
 
         assert!(matches!(result, Err(GatewayError::BadRequest(_))));
@@ -531,5 +587,24 @@ mod tests {
         assert!(!coop.has_role(participant.did(), MemberRole::Steward));
         assert!(!coop.has_role(participant.did(), MemberRole::Facilitator));
         assert!(coop.has_role(participant.did(), MemberRole::Participant));
+    }
+}
+
+/// Convert icn_coop::Cooperative to gateway::Coop
+fn convert_actor_coop_to_gateway(actor_coop: icn_coop::Cooperative) -> Coop {
+    // TODO: Query members separately for accurate member list
+    // For now, create placeholder with founder
+    let placeholder_did: Did = serde_json::from_str("\"did:icn:placeholder\"").unwrap();
+    
+    Coop {
+        id: actor_coop.id,
+        name: actor_coop.name,
+        members: vec![CoopMember {
+            did: placeholder_did,
+            role: MemberRole::Steward,
+            joined_at: actor_coop.created_at.timestamp() as u64,
+        }],
+        settings: CoopSettings::default(),
+        created_at: actor_coop.created_at.timestamp() as u64,
     }
 }
