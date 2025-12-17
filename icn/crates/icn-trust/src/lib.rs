@@ -43,6 +43,7 @@
 //! let combined = multi.compute_combined_trust_score(&peer)?;
 //! ```
 
+pub mod anomaly;
 pub mod attestation;
 pub mod facade;
 pub mod multi_graph;
@@ -50,6 +51,7 @@ pub mod trust_cache;
 pub mod typed_graph;
 pub mod types;
 
+pub use anomaly::{TrustAnomaly, TrustGraphAnalyzer};
 pub use attestation::TrustAttestation;
 pub use facade::TrustGraphFacade;
 pub use multi_graph::MultiTrustGraph;
