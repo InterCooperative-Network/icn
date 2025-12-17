@@ -12,6 +12,7 @@ pub mod replication;
 pub mod runtime;
 pub mod supervisor;
 pub mod trust_propagation;
+pub mod upgrade;
 
 pub use anti_entropy::{spawn_anti_entropy_task, AntiEntropyConfig};
 pub use config::Config;
@@ -28,3 +29,7 @@ pub use policy::{Capability, DefaultPolicySource, PolicySource, TrustPolicy};
 pub use replication::{ReplicationConfig, ReplicationHandle, ReplicationManager};
 pub use runtime::Runtime;
 pub use trust_propagation::{AttestationLimits, AttestationRateLimiter, TRUST_ATTESTATIONS_TOPIC};
+pub use upgrade::{
+    PendingUpgrade, UpgradeAdoptionStats, UpgradeCoordinator, CURRENT_VERSION,
+    proposal_to_pending_upgrade,
+};

@@ -1448,6 +1448,48 @@ pub fn init_descriptions() {
         "icn_commons_enrollments_duration_seconds",
         "Duration of successful enrollments in seconds"
     );
+
+    // Protocol Upgrade metrics (Phase 19.1)
+    describe_gauge!(
+        "icn_upgrade_total_peers",
+        "Total number of connected peers tracked for upgrade adoption"
+    );
+    describe_gauge!(
+        "icn_upgrade_peers_at_target_version",
+        "Number of peers running the target upgrade version"
+    );
+    describe_gauge!(
+        "icn_upgrade_peers_compatible_version",
+        "Number of peers running compatible versions"
+    );
+    describe_gauge!(
+        "icn_upgrade_peers_deprecated_version",
+        "Number of peers running deprecated versions (below minimum required)"
+    );
+    describe_gauge!(
+        "icn_upgrade_adoption_rate",
+        "Upgrade adoption rate (0.0 to 1.0) for target version"
+    );
+    describe_gauge!(
+        "icn_upgrade_days_until_deadline",
+        "Days remaining until upgrade deadline enforcement"
+    );
+    describe_counter!(
+        "icn_upgrade_proposals_registered_total",
+        "Total number of upgrade proposals registered"
+    );
+    describe_counter!(
+        "icn_upgrade_deadlines_enforced_total",
+        "Total number of upgrade deadlines enforced"
+    );
+    describe_counter!(
+        "icn_upgrade_peer_versions_updated_total",
+        "Total number of peer version updates received"
+    );
+    describe_counter!(
+        "icn_upgrade_deprecated_peers_rejected_total",
+        "Total number of connection attempts from deprecated version peers rejected"
+    );
 }
 
 /// Network metrics
@@ -3625,5 +3667,91 @@ pub mod commons {
     /// Record enrollment duration
     pub fn enrollment_duration_observe(duration_secs: f64) {
         histogram!("icn_commons_enrollments_duration_seconds").record(duration_secs);
+    }
+
+    // ============================================================
+    // Protocol Upgrade Metrics (Phase 19.1)
+    // ============================================================
+
+    /// Set total number of peers
+    pub fn upgrade_total_peers_set(count: u64) {
+        gauge!("icn_upgrade_total_peers").set(count as f64);
+    }
+
+    /// Set number of peers at target version
+    pub fn upgrade_peers_at_target_set(version: &str, count: u64) {
+        gauge!(
+            "icn_upgrade_peers_at_target_version",
+            "version" => version.to_string()
+        )
+        .set(count as f64);
+    }
+
+    /// Set number of peers at compatible version
+    pub fn upgrade_peers_compatible_set(version: &str, count: u64) {
+        gauge!(
+            "icn_upgrade_peers_compatible_version",
+            "version" => version.to_string()
+        )
+        .set(count as f64);
+    }
+
+    /// Set number of peers at deprecated version
+    pub fn upgrade_peers_deprecated_set(count: u64) {
+        gauge!("icn_upgrade_peers_deprecated_version").set(count as f64);
+    }
+
+    /// Set adoption rate (0.0 to 1.0)
+    pub fn upgrade_adoption_rate_set(version: &str, rate: f64) {
+        gauge!(
+            "icn_upgrade_adoption_rate",
+            "version" => version.to_string()
+        )
+        .set(rate);
+    }
+
+    /// Set days until upgrade deadline
+    pub fn upgrade_days_until_deadline_set(version: &str, days: i64) {
+        gauge!(
+            "icn_upgrade_days_until_deadline",
+            "version" => version.to_string()
+        )
+        .set(days as f64);
+    }
+
+    /// Record upgrade proposal registered
+    pub fn upgrade_proposal_registered_inc(version: &str) {
+        counter!(
+            "icn_upgrade_proposals_registered_total",
+            "version" => version.to_string()
+        )
+        .increment(1);
+    }
+
+    /// Record upgrade deadline enforced
+    pub fn upgrade_deadline_enforced_inc(version: &str) {
+        counter!(
+            "icn_upgrade_deadlines_enforced_total",
+            "version" => version.to_string()
+        )
+        .increment(1);
+    }
+
+    /// Record peer version update
+    pub fn upgrade_peer_version_updated_inc(version: &str) {
+        counter!(
+            "icn_upgrade_peer_versions_updated_total",
+            "version" => version.to_string()
+        )
+        .increment(1);
+    }
+
+    /// Record deprecated peer rejected
+    pub fn upgrade_deprecated_peer_rejected_inc(version: &str) {
+        counter!(
+            "icn_upgrade_deprecated_peers_rejected_total",
+            "version" => version.to_string()
+        )
+        .increment(1);
     }
 }
