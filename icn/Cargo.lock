@@ -2629,6 +2629,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "icn-coop"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "chrono",
+ "icn-gossip",
+ "icn-governance",
+ "icn-identity",
+ "icn-ledger",
+ "icn-store",
+ "icn-trust",
+ "serde",
+ "sled",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "icn-cooperative"
 version = "0.1.0"
 dependencies = [
