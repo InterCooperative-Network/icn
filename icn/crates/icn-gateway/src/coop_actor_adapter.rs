@@ -88,7 +88,7 @@ impl ActorCoopManager {
         coop_id: &CoopId,
         did: Did,
         role: MemberRole,
-        timestamp: u64,
+        _timestamp: u64,
     ) -> Result<Coop> {
         // Map gateway MemberRole to icn-coop MemberRole
         let actor_role = match role {
