@@ -35,6 +35,7 @@ pub mod notification_processor;
 pub mod notification_queue;
 pub mod notification_triggers;
 pub mod notifications;
+pub mod openapi;
 pub mod pagination;
 pub mod rate_limit;
 pub mod security;

@@ -9,6 +9,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::info;
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
 
 use crate::api;
 use crate::auth::AuthManager;
@@ -321,6 +323,9 @@ impl GatewayServer {
             .build()
             .unwrap();
 
+        // Generate OpenAPI spec
+        let openapi = crate::openapi::ApiDoc::openapi();
+
         let server = HttpServer::new(move || {
             // Create JWT authentication middleware
             let auth = HttpAuthentication::bearer(crate::middleware::jwt_auth);
@@ -330,6 +335,11 @@ impl GatewayServer {
             let cors = configure_cors(&security_config);
 
             App::new()
+                // Swagger UI for API documentation
+                .service(
+                    SwaggerUi::new("/swagger-ui/{_:.*}")
+                        .url("/api-docs/openapi.json", openapi.clone()),
+                )
                 // Shared state
                 .app_data(web::Data::new(auth_manager.clone()))
                 .app_data(web::Data::new(coop_manager.clone()))
