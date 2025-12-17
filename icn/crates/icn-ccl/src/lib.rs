@@ -42,6 +42,7 @@
 
 pub mod actor;
 pub mod ast;
+pub mod charter_rules;
 pub mod disputes;
 pub mod interpreter;
 pub mod messages;
@@ -52,6 +53,7 @@ pub mod types;
 // Re-export commonly used types
 pub use actor::{ContractActor, GossipCallback, CONTRACTS_DEPLOY_TOPIC};
 pub use ast::{BinOp, Contract, Expr, Rule, Stmt, UnOp};
+pub use charter_rules::{CharterRule, CharterRuleSet, ValidationResult};
 pub use disputes::{
     Dispute, DisputeActor, DisputeActorHandle, DisputeConfig, DisputeEvidence,
     DisputeGossipCallback, DisputeId, DisputeMessage, DisputeOutcome, DisputeReason,
