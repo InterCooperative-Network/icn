@@ -46,7 +46,7 @@ impl CooperativeStore {
 
     /// Retrieve a cooperative by ID
     pub fn get(&self, id: &CooperativeId) -> Result<Option<Cooperative>> {
-        let key = format!("{}{}", COOP_PREFIX, id);
+        let key = format!("{COOP_PREFIX}{id}");
         
         match self.store.get(key.as_bytes()) {
             Ok(Some(value)) => {
@@ -66,7 +66,7 @@ impl CooperativeStore {
             self.remove_from_indices(&coop)?;
         }
 
-        let key = format!("{}{}", COOP_PREFIX, id);
+        let key = format!("{COOP_PREFIX}{id}");
         self.store
             .delete(key.as_bytes())
             .map_err(|e| CooperativeError::Storage(e.to_string()))?;
@@ -94,7 +94,7 @@ impl CooperativeStore {
                 }
             }
         } else if let Some(member_did) = &query.member_did {
-            let index_key = format!("{}{}", INDEX_BY_MEMBER, member_did);
+            let index_key = format!("{INDEX_BY_MEMBER}{member_did}");
             if let Ok(Some(index_data)) = self.store.get(index_key.as_bytes()) {
                 let ids: Vec<CooperativeId> = serde_json::from_slice(&index_data)
                     .map_err(|e| CooperativeError::Serialization(e.to_string()))?;
@@ -160,7 +160,7 @@ impl CooperativeStore {
 
     fn index_by_members(&self, coop: &Cooperative) -> Result<()> {
         for did in coop.members.keys() {
-            let index_key = format!("{}{}", INDEX_BY_MEMBER, did);
+            let index_key = format!("{INDEX_BY_MEMBER}{did}");
             self.add_to_index(&index_key, &coop.id)?;
         }
         Ok(())
@@ -196,7 +196,7 @@ impl CooperativeStore {
 
         // Remove from member indices
         for did in coop.members.keys() {
-            let member_key = format!("{}{}", INDEX_BY_MEMBER, did);
+            let member_key = format!("{INDEX_BY_MEMBER}{did}");
             self.remove_from_index(&member_key, &coop.id)?;
         }
 

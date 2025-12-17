@@ -20,7 +20,7 @@ impl CoopStore {
     }
 
     pub fn get_cooperative(&self, coop_id: &str) -> Result<Cooperative> {
-        let key = format!("coop:{}", coop_id);
+        let key = format!("coop:{coop_id}");
         let value = self.db.get(key.as_bytes())?
             .ok_or_else(|| CoopError::NotFound(coop_id.to_string()))?;
         Ok(bincode::deserialize(&value)?)
@@ -40,7 +40,7 @@ impl CoopStore {
     }
 
     pub fn delete_cooperative(&self, coop_id: &str) -> Result<()> {
-        let key = format!("coop:{}", coop_id);
+        let key = format!("coop:{coop_id}");
         self.db.remove(key.as_bytes())?;
         Ok(())
     }
@@ -53,7 +53,7 @@ impl CoopStore {
     }
 
     pub fn get_member(&self, coop_id: &str, did: &Did) -> Result<Member> {
-        let key = format!("member:{}:{}", coop_id, did);
+        let key = format!("member:{coop_id}:{did}");
         let value = self.db.get(key.as_bytes())?
             .ok_or_else(|| CoopError::MemberNotFound(did.to_string()))?;
         Ok(bincode::deserialize(&value)?)
@@ -61,7 +61,7 @@ impl CoopStore {
 
     pub fn list_members(&self, coop_id: &str) -> Result<Vec<Member>> {
         let mut members = Vec::new();
-        let prefix = format!("member:{}:", coop_id);
+        let prefix = format!("member:{coop_id}:");
         
         for item in self.db.scan_prefix(prefix.as_bytes()) {
             let (_, value) = item?;
@@ -73,7 +73,7 @@ impl CoopStore {
     }
 
     pub fn delete_member(&self, coop_id: &str, did: &Did) -> Result<()> {
-        let key = format!("member:{}:{}", coop_id, did);
+        let key = format!("member:{coop_id}:{did}");
         self.db.remove(key.as_bytes())?;
         Ok(())
     }

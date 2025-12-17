@@ -383,6 +383,10 @@ fn checksum_path(data_dir: impl AsRef<Path>) -> PathBuf {
     data_dir.as_ref().join(CHECKSUM_FILENAME)
 }
 
+// Re-export coordinator and protocol types
+pub use coordinator::{CompletedSnapshot, SnapshotCoordinator};
+pub use protocol::{SnapshotConfig, SnapshotId, SnapshotMessage, SnapshotMetadata, SnapshotState};
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1075,8 +1079,4 @@ mod tests {
         assert!(deserialized.gossip_state.is_some());
     }
 }
-
-// Re-export coordinator and protocol types
-pub use coordinator::{CompletedSnapshot, SnapshotCoordinator};
-pub use protocol::{SnapshotConfig, SnapshotId, SnapshotMessage, SnapshotMetadata, SnapshotState};
 

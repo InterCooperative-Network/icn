@@ -3,7 +3,7 @@ use icn_identity::Did;
 use tracing::{info, warn};
 
 pub struct MembershipManager {
-    // Will be wired to trust system later
+    trust_threshold: f64,
 }
 
 #[derive(Debug, Clone)]
@@ -16,9 +16,17 @@ pub enum MembershipChange {
     SharesUpdated { coop_id: String, member: Did, old: u64, new: u64 },
 }
 
+impl Default for MembershipManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MembershipManager {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            trust_threshold: 0.3, // Default minimum trust score
+        }
     }
 
     pub async fn add_member(
@@ -28,10 +36,18 @@ impl MembershipManager {
     ) -> Result<Member> {
         info!("Adding member {} to coop {}", member.did, member.coop_id);
         
-        // Trust check will be implemented when wired to trust system
-        // For now, accept if not a founder (founders bypass)
+        // Founders bypass trust checks (they're bootstrapping the coop)
         if member.role != MemberRole::Founder {
-            // TODO: Check trust score when integrated
+            // Use provided min_trust or fall back to default threshold
+            let threshold = if min_trust > 0.0 { min_trust } else { self.trust_threshold };
+            
+            // Note: In production, this would query the trust graph
+            // For now, we accept all non-founder members as pending
+            // The trust check will be enforced during approval
+            warn!(
+                "Trust check not yet wired for member {}. Required threshold: {}. Status: Pending",
+                member.did, threshold
+            );
         }
         
         member.status = MemberStatus::Pending;

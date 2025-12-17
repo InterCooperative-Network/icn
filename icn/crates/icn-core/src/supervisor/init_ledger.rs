@@ -72,6 +72,23 @@ pub async fn init_ledger_services(
 
     info!("Contract runtime initialized");
 
+    // Initialize Charter Validator for cooperative policy enforcement (Gap #2)
+    // Uses default cooperative rules with min trust 500 basis points (0.5)
+    let domain_id = format!("coop:{did}"); // Use DID as default domain ID
+    let charter_validator = Arc::new(icn_ccl::CharterValidator::cooperative_default(
+        domain_id,
+        500, // Min trust = 0.5 (500 basis points)
+    ));
+
+    // Set up validation hook on ledger
+    {
+        let mut ledger = ledger_handle.write().await;
+        let validator_clone = charter_validator.clone();
+        ledger.set_validation_hook(move |entry| validator_clone.validate_entry(entry));
+    }
+
+    info!("Charter validator initialized with validation hook");
+
     // Create ContractActor
     let contract_actor = icn_ccl::ContractActor::new(
         did,

@@ -108,7 +108,7 @@ impl UpgradeCoordinator {
     /// Register an approved upgrade proposal
     pub fn register_upgrade(&self, upgrade: PendingUpgrade) -> Result<(), String> {
         let mut upgrades = self.pending_upgrades.write()
-            .map_err(|e| format!("Lock error: {}", e))?;
+            .map_err(|e| format!("Lock error: {e}"))?;
         
         // Check if upgrade already exists
         if upgrades.iter().any(|u| u.version == upgrade.version) {
@@ -132,7 +132,7 @@ impl UpgradeCoordinator {
     /// Update peer version information
     pub fn update_peer_version(&self, did: Did, version: Version) -> Result<(), String> {
         let mut versions = self.peer_versions.write()
-            .map_err(|e| format!("Lock error: {}", e))?;
+            .map_err(|e| format!("Lock error: {e}"))?;
         
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -140,7 +140,7 @@ impl UpgradeCoordinator {
             .as_secs();
         
         let min_version = self.min_required_version.read()
-            .map_err(|e| format!("Lock error: {}", e))?;
+            .map_err(|e| format!("Lock error: {e}"))?;
         
         let is_deprecated = if let Some(ref min) = *min_version {
             version < *min
@@ -160,7 +160,7 @@ impl UpgradeCoordinator {
     /// Check if a peer's version is acceptable
     pub fn is_peer_version_acceptable(&self, version: &Version) -> Result<bool, String> {
         let min_version = self.min_required_version.read()
-            .map_err(|e| format!("Lock error: {}", e))?;
+            .map_err(|e| format!("Lock error: {e}"))?;
         
         if let Some(ref min) = *min_version {
             Ok(version >= min)
@@ -173,7 +173,7 @@ impl UpgradeCoordinator {
     /// Process upgrades that have reached their deadline
     pub fn check_upgrade_deadlines(&self) -> Result<Vec<String>, String> {
         let mut upgrades = self.pending_upgrades.write()
-            .map_err(|e| format!("Lock error: {}", e))?;
+            .map_err(|e| format!("Lock error: {e}"))?;
         
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -190,7 +190,7 @@ impl UpgradeCoordinator {
                     let mut min_req = self.min_required_version.write().unwrap();
                     
                     // Update minimum required version if higher
-                    if min_req.as_ref().map_or(true, |v| min_version > v) {
+                    if min_req.as_ref().is_none_or(|v| min_version > v) {
                         *min_req = Some(min_version.clone());
                         enforced.push(format!(
                             "Enforcing minimum version {} (upgrade {} deadline reached)",
@@ -221,10 +221,10 @@ impl UpgradeCoordinator {
     /// Get adoption statistics for current upgrade
     pub fn get_adoption_stats(&self) -> Result<Option<UpgradeAdoptionStats>, String> {
         let upgrades = self.pending_upgrades.read()
-            .map_err(|e| format!("Lock error: {}", e))?;
+            .map_err(|e| format!("Lock error: {e}"))?;
         
         let versions = self.peer_versions.read()
-            .map_err(|e| format!("Lock error: {}", e))?;
+            .map_err(|e| format!("Lock error: {e}"))?;
         
         // Get the latest pending upgrade
         let latest_upgrade = upgrades.last();
@@ -283,7 +283,7 @@ impl UpgradeCoordinator {
     /// Get list of peers with deprecated versions
     pub fn get_deprecated_peers(&self) -> Result<Vec<(Did, Version)>, String> {
         let versions = self.peer_versions.read()
-            .map_err(|e| format!("Lock error: {}", e))?;
+            .map_err(|e| format!("Lock error: {e}"))?;
         
         Ok(versions
             .iter()
@@ -295,7 +295,7 @@ impl UpgradeCoordinator {
     /// Get pending upgrades
     pub fn get_pending_upgrades(&self) -> Result<Vec<PendingUpgrade>, String> {
         let upgrades = self.pending_upgrades.read()
-            .map_err(|e| format!("Lock error: {}", e))?;
+            .map_err(|e| format!("Lock error: {e}"))?;
         Ok(upgrades.clone())
     }
 }

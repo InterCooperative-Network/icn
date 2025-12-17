@@ -53,7 +53,7 @@ impl MembershipManager {
             .iter()
             .find(|t| t.name == tier_name)
             .cloned()
-            .ok_or_else(|| CooperativeError::InvalidType(format!("Tier not found: {}", tier_name)))?;
+            .ok_or_else(|| CooperativeError::InvalidType(format!("Tier not found: {tier_name}")))?;
 
         let member = Member {
             did: did.clone(),
@@ -99,7 +99,7 @@ impl MembershipManager {
             .iter()
             .find(|t| t.name == new_tier_name)
             .cloned()
-            .ok_or_else(|| CooperativeError::InvalidType(format!("Tier not found: {}", new_tier_name)))?;
+            .ok_or_else(|| CooperativeError::InvalidType(format!("Tier not found: {new_tier_name}")))?;
 
         member.tier = new_tier;
         coop.updated_at = Utc::now();

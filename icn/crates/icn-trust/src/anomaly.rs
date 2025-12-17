@@ -238,6 +238,12 @@ impl TrustGraphAnalyzer {
             Ok(d) => d,
             Err(_) => return anomalies,
         };
+        
+        // If we have too few DIDs, can't have clusters
+        if dids.len() < self.min_cluster_size + 1 {
+            return anomalies;
+        }
+        
         let mut processed = HashSet::new();
         
         // Find strongly connected components
@@ -258,6 +264,7 @@ impl TrustGraphAnalyzer {
             let (internal_density, external_density) = 
                 self.calculate_cluster_density(graph, &cluster, &dids);
             
+            // Check if density ratio is suspicious
             if external_density > 0.0 {
                 let density_ratio = internal_density / external_density;
                 
@@ -270,6 +277,14 @@ impl TrustGraphAnalyzer {
                         density_ratio,
                     });
                 }
+            } else if internal_density > 0.0 {
+                // Cluster with no external connections is also suspicious
+                anomalies.push(TrustAnomaly::SybilCluster {
+                    cluster: cluster.clone(),
+                    internal_density,
+                    external_density: 0.0,
+                    density_ratio: f64::INFINITY,
+                });
             }
             
             processed.extend(cluster);
@@ -389,6 +404,7 @@ impl TrustGraphAnalyzer {
     }
 }
 
+#[allow(dead_code)]
 fn current_timestamp() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -460,7 +476,6 @@ mod tests {
     }
     
     #[test]
-    #[ignore] // TODO: Fix Sybil cluster detection logic
     fn test_sybil_cluster_detection() {
         let store = Arc::new(icn_store::SledStore::temporary().unwrap());
         let mut graph = TypedTrustGraph::new(store, test_did(0), TrustGraphType::Social);

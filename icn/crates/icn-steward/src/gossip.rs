@@ -252,6 +252,8 @@ pub enum RecoveryMessage {
         evidence_hash: [u8; 32],
         /// Timestamp
         timestamp: u64,
+        /// Signature
+        signature: Vec<u8>,
     },
 
     /// Attest to recovery (support the request)
@@ -285,6 +287,185 @@ pub enum RecoveryMessage {
         /// Coordinator signature
         signature: Vec<u8>,
     },
+}
+
+impl EnrollmentMessage {
+    /// Get the message bytes for signing
+    pub fn signing_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        
+        match self {
+            Self::ParticipationRequest {
+                ceremony_id,
+                steward_did,
+                vui_commitment,
+                pathway_hash,
+                threshold,
+                timestamp,
+                ..
+            } => {
+                bytes.extend_from_slice(b"icn-enrollment-participation-v1");
+                bytes.extend_from_slice(ceremony_id);
+                bytes.extend_from_slice(steward_did.as_str().as_bytes());
+                bytes.extend_from_slice(vui_commitment);
+                bytes.extend_from_slice(pathway_hash);
+                bytes.extend_from_slice(&threshold.to_le_bytes());
+                bytes.extend_from_slice(&timestamp.to_le_bytes());
+            }
+            Self::ParticipationAck {
+                ceremony_id,
+                steward_did,
+                share_index,
+                encrypted_prf_partial,
+                share_commitment,
+                timestamp,
+                ..
+            } => {
+                bytes.extend_from_slice(b"icn-enrollment-ack-v1");
+                bytes.extend_from_slice(ceremony_id);
+                bytes.extend_from_slice(steward_did.as_str().as_bytes());
+                bytes.push(*share_index);
+                bytes.extend_from_slice(encrypted_prf_partial);
+                bytes.extend_from_slice(share_commitment);
+                bytes.extend_from_slice(&timestamp.to_le_bytes());
+            }
+            Self::PrfPartialDelivery {
+                ceremony_id,
+                steward_did,
+                share_index,
+                encrypted_partial,
+                ..
+            } => {
+                bytes.extend_from_slice(b"icn-enrollment-prf-delivery-v1");
+                bytes.extend_from_slice(ceremony_id);
+                bytes.extend_from_slice(steward_did.as_str().as_bytes());
+                bytes.push(*share_index);
+                bytes.extend_from_slice(encrypted_partial);
+            }
+            Self::UniquenessCheck {
+                ceremony_id,
+                steward_did,
+                vui_hash,
+                timestamp,
+            } => {
+                bytes.extend_from_slice(b"icn-enrollment-uniqueness-check-v1");
+                bytes.extend_from_slice(ceremony_id);
+                bytes.extend_from_slice(steward_did.as_str().as_bytes());
+                bytes.extend_from_slice(vui_hash);
+                bytes.extend_from_slice(&timestamp.to_le_bytes());
+            }
+            Self::UniquenessResponse {
+                ceremony_id,
+                steward_did,
+                vui_hash,
+                is_unique,
+                timestamp,
+                ..
+            } => {
+                bytes.extend_from_slice(b"icn-enrollment-uniqueness-response-v1");
+                bytes.extend_from_slice(ceremony_id);
+                bytes.extend_from_slice(steward_did.as_str().as_bytes());
+                bytes.extend_from_slice(vui_hash);
+                bytes.push(if *is_unique { 1 } else { 0 });
+                bytes.extend_from_slice(&timestamp.to_le_bytes());
+            }
+            Self::CeremonyComplete {
+                ceremony_id,
+                coordinator_did,
+                vui_hash,
+                participants,
+                timestamp,
+                ..
+            } => {
+                bytes.extend_from_slice(b"icn-enrollment-complete-v1");
+                bytes.extend_from_slice(ceremony_id);
+                bytes.extend_from_slice(coordinator_did.as_str().as_bytes());
+                bytes.extend_from_slice(vui_hash);
+                for p in participants {
+                    bytes.extend_from_slice(p.as_str().as_bytes());
+                }
+                bytes.extend_from_slice(&timestamp.to_le_bytes());
+            }
+            Self::CeremonyFailed {
+                ceremony_id,
+                coordinator_did,
+                reason,
+                timestamp,
+                ..
+            } => {
+                bytes.extend_from_slice(b"icn-enrollment-failed-v1");
+                bytes.extend_from_slice(ceremony_id);
+                bytes.extend_from_slice(coordinator_did.as_str().as_bytes());
+                bytes.extend_from_slice(reason.as_bytes());
+                bytes.extend_from_slice(&timestamp.to_le_bytes());
+            }
+        }
+        
+        bytes
+    }
+}
+
+impl RecoveryMessage {
+    /// Get the message bytes for signing
+    pub fn signing_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        
+        match self {
+            Self::RecoveryRequest {
+                ceremony_id,
+                old_did,
+                new_did,
+                initiator_did,
+                evidence_hash,
+                timestamp,
+                ..
+            } => {
+                bytes.extend_from_slice(b"icn-recovery-request-v1");
+                bytes.extend_from_slice(ceremony_id);
+                bytes.extend_from_slice(old_did.as_str().as_bytes());
+                bytes.extend_from_slice(new_did.as_str().as_bytes());
+                bytes.extend_from_slice(initiator_did.as_str().as_bytes());
+                bytes.extend_from_slice(evidence_hash);
+                bytes.extend_from_slice(&timestamp.to_le_bytes());
+            }
+            Self::RecoveryAttestation {
+                ceremony_id,
+                steward_did,
+                supports,
+                reason,
+                timestamp,
+                ..
+            } => {
+                bytes.extend_from_slice(b"icn-recovery-attestation-v1");
+                bytes.extend_from_slice(ceremony_id);
+                bytes.extend_from_slice(steward_did.as_str().as_bytes());
+                bytes.push(if *supports { 1 } else { 0 });
+                if let Some(r) = reason {
+                    bytes.extend_from_slice(r.as_bytes());
+                }
+                bytes.extend_from_slice(&timestamp.to_le_bytes());
+            }
+            Self::RecoveryComplete {
+                ceremony_id,
+                old_did,
+                new_did,
+                attesters,
+                timestamp,
+                ..
+            } => {
+                bytes.extend_from_slice(b"icn-recovery-complete-v1");
+                bytes.extend_from_slice(ceremony_id);
+                bytes.extend_from_slice(old_did.as_str().as_bytes());
+                bytes.extend_from_slice(new_did.as_str().as_bytes());
+                for a in attesters {
+                    bytes.extend_from_slice(a.as_str().as_bytes());
+                }
+                bytes.extend_from_slice(&timestamp.to_le_bytes());
+            }
+        }
+        
+        bytes
+    }
 }
 
 #[cfg(test)]
@@ -416,6 +597,7 @@ mod tests {
             initiator_did: initiator_did.clone(),
             evidence_hash: [4u8; 32],
             timestamp: 54321,
+            signature: Vec::new(),
         };
 
         if let RecoveryMessage::RecoveryRequest {

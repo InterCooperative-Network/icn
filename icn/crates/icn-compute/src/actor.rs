@@ -443,6 +443,8 @@ pub struct ComputeActor {
     misbehavior_detector: Option<Arc<tokio::sync::RwLock<icn_security::MisbehaviorDetector>>>,
     /// Locality callback for network topology data (Phase 16C M5)
     locality_callback: Option<LocalityCallback>,
+    /// Node's own region identifier (e.g., "us-west", "eu-central")
+    own_region: Option<String>,
 }
 
 impl ComputeActor {
@@ -468,6 +470,7 @@ impl ComputeActor {
             dispute_resolution: None,   // Phase 18 Week 4
             misbehavior_detector: None, // Set via set_misbehavior_detector()
             locality_callback: None,    // Phase 16C M5: Set via set_locality_callback()
+            own_region: None,           // Set via set_region() or from config
         }
     }
 
@@ -508,6 +511,14 @@ impl ComputeActor {
     /// When set, placement offers will use real network topology data instead of defaults.
     pub fn set_locality_callback(&mut self, cb: LocalityCallback) {
         self.locality_callback = Some(cb);
+    }
+
+    /// Set the node's region identifier
+    ///
+    /// Used for region-based task placement constraints.
+    /// Region identifiers should follow a consistent naming scheme (e.g., "us-west", "eu-central").
+    pub fn set_region(&mut self, region: String) {
+        self.own_region = Some(region);
     }
 
     /// Set maximum concurrent tasks this executor will claim
@@ -1942,13 +1953,27 @@ impl ComputeActor {
             if let Some(ref constraints) = task.placement_constraints {
                 // Check required region
                 if let Some(ref required_region) = constraints.required_region {
-                    // TODO: Get own region from config/network context
-                    // For now, we don't have region info, so we'll skip this check
-                    tracing::debug!(
-                        task_hash = %task_hash_str,
-                        required_region = %required_region,
-                        "Task has region constraint (region checking not yet implemented)"
-                    );
+                    if let Some(ref own_region) = self.own_region {
+                        if own_region != required_region {
+                            tracing::debug!(
+                                task_hash = %task_hash_str,
+                                required_region = %required_region,
+                                own_region = %own_region,
+                                "Task requires different region, skipping claim"
+                            );
+                            drop(mgr);
+                            return Ok(());
+                        }
+                    } else {
+                        // No region configured, cannot claim region-specific tasks
+                        tracing::debug!(
+                            task_hash = %task_hash_str,
+                            required_region = %required_region,
+                            "Task requires region but node has no region configured, skipping claim"
+                        );
+                        drop(mgr);
+                        return Ok(());
+                    }
                 }
 
                 // Check executor whitelist

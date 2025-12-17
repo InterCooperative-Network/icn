@@ -31,7 +31,7 @@ impl CommunityStore {
     }
 
     pub fn get(&self, id: &CommunityId) -> Result<Option<Community>> {
-        let key = format!("{}{}", COMMUNITY_PREFIX, id);
+        let key = format!("{COMMUNITY_PREFIX}{id}");
         match self.store.get(key.as_bytes()) {
             Ok(Some(value)) => {
                 let community = serde_json::from_slice(&value)
@@ -44,7 +44,7 @@ impl CommunityStore {
     }
 
     pub fn delete(&self, id: &CommunityId) -> Result<()> {
-        let key = format!("{}{}", COMMUNITY_PREFIX, id);
+        let key = format!("{COMMUNITY_PREFIX}{id}");
         self.store
             .delete(key.as_bytes())
             .map_err(|e| CommunityError::Storage(e.to_string()))?;

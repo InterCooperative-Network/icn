@@ -180,7 +180,7 @@ impl SnapshotMetadata {
     pub fn record_channel_message(&mut self, sender: &Did, message: Vec<u8>) {
         self.channel_states
             .entry(sender.clone())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(message);
     }
 
@@ -316,7 +316,7 @@ mod tests {
         let root1 = metadata.compute_global_root();
 
         // Recompute with same data
-        let mut metadata2 = metadata.clone();
+        let metadata2 = metadata.clone();
         let root2 = metadata2.compute_global_root();
 
         assert_eq!(root1, root2, "Global root should be deterministic");

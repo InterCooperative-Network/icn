@@ -4,7 +4,7 @@
 //! for ICN's gossip-based architecture.
 
 use crate::protocol::{SnapshotConfig, SnapshotId, SnapshotMessage, SnapshotMetadata, SnapshotState};
-use crate::{GossipState, NetworkState, StateSnapshot};
+use crate::StateSnapshot;
 use anyhow::{anyhow, Context, Result};
 use icn_identity::Did;
 use std::collections::{HashMap, HashSet};
@@ -22,6 +22,16 @@ pub struct SnapshotCoordinator {
     active_snapshots: Arc<RwLock<HashMap<SnapshotId, SnapshotMetadata>>>,
     /// Completed snapshots
     completed_snapshots: Arc<RwLock<HashMap<SnapshotId, CompletedSnapshot>>>,
+    /// Chunk reassembly buffer (snapshot_id -> ChunkBuffer)
+    chunk_buffers: Arc<RwLock<HashMap<SnapshotId, ChunkBuffer>>>,
+}
+
+/// Buffer for reassembling chunked state data
+#[derive(Debug)]
+struct ChunkBuffer {
+    sender: Did,
+    received_chunks: HashMap<u32, Vec<u8>>,
+    data_size: usize,
 }
 
 /// A completed snapshot with global state
@@ -43,6 +53,7 @@ impl SnapshotCoordinator {
             config,
             active_snapshots: Arc::new(RwLock::new(HashMap::new())),
             completed_snapshots: Arc::new(RwLock::new(HashMap::new())),
+            chunk_buffers: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -95,7 +106,7 @@ impl SnapshotCoordinator {
     /// Handle incoming snapshot message
     pub async fn handle_message(
         &self,
-        sender: &Did,
+        _sender: &Did,
         message: SnapshotMessage,
     ) -> Result<Vec<SnapshotMessage>> {
         match message {
@@ -338,12 +349,54 @@ impl SnapshotCoordinator {
     /// Handle StateChunk message
     async fn handle_state_chunk(
         &self,
-        _snapshot_id: SnapshotId,
-        _chunk_index: u32,
-        _total_chunks: u32,
-        _data: Vec<u8>,
+        snapshot_id: SnapshotId,
+        chunk_index: u32,
+        total_chunks: u32,
+        data: Vec<u8>,
     ) -> Result<Vec<SnapshotMessage>> {
-        // TODO: Reassemble chunks and store state
+        let mut buffers = self.chunk_buffers.write().await;
+        
+        let buffer = buffers.entry(snapshot_id.clone()).or_insert_with(|| ChunkBuffer {
+            sender: self.own_did.clone(),
+            received_chunks: HashMap::new(),
+            data_size: 0,
+        });
+        
+        buffer.received_chunks.insert(chunk_index, data.clone());
+        buffer.data_size += data.len();
+        
+        debug!(
+            "Received chunk {}/{} for snapshot {:?}, total size: {} bytes",
+            chunk_index + 1, total_chunks, snapshot_id, buffer.data_size
+        );
+        
+        // Check if we have all chunks
+        if buffer.received_chunks.len() == total_chunks as usize {
+            // Reassemble in order
+            let mut reassembled = Vec::with_capacity(buffer.data_size);
+            for i in 0..total_chunks {
+                if let Some(chunk) = buffer.received_chunks.get(&i) {
+                    reassembled.extend_from_slice(chunk);
+                } else {
+                    return Err(anyhow!("Missing chunk {i} during reassembly"));
+                }
+            }
+            
+            info!(
+                "Reassembled complete state for snapshot {:?}: {} bytes from {} chunks",
+                snapshot_id, reassembled.len(), total_chunks
+            );
+            
+            // Store in completed snapshots
+            let mut completed = self.completed_snapshots.write().await;
+            if let Some(snapshot) = completed.get_mut(&snapshot_id) {
+                snapshot.participant_states.insert(buffer.sender.clone(), reassembled);
+            }
+            
+            // Clean up buffer
+            buffers.remove(&snapshot_id);
+        }
+        
         Ok(vec![])
     }
 
@@ -389,7 +442,7 @@ impl SnapshotCoordinator {
     async fn handle_verify_request(
         &self,
         snapshot_id: SnapshotId,
-        requester: Did,
+        _requester: Did,
         expected_root: [u8; 32],
     ) -> Result<Vec<SnapshotMessage>> {
         let completed = self.completed_snapshots.read().await;

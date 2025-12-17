@@ -331,7 +331,7 @@ impl DisputeManager {
             .map_err(|_| ComputeError::LockError)?;
         
         let dispute = disputes.get_mut(dispute_id)
-            .ok_or_else(|| ComputeError::NotFound)?;
+            .ok_or(ComputeError::NotFound)?;
         
         dispute.add_evidence(evidence)
     }
@@ -342,7 +342,7 @@ impl DisputeManager {
             .map_err(|_| ComputeError::LockError)?;
         
         let dispute = disputes.get_mut(dispute_id)
-            .ok_or_else(|| ComputeError::NotFound)?;
+            .ok_or(ComputeError::NotFound)?;
         
         if !dispute.is_evidence_period_over() {
             return Err(ComputeError::InvalidDisputeState);
@@ -352,7 +352,7 @@ impl DisputeManager {
         let mut result_groups: HashMap<[u8; 32], Vec<ComputeResult>> = HashMap::new();
         for result in &dispute.results {
             let hash = *blake3::hash(&result.output).as_bytes();
-            result_groups.entry(hash).or_insert_with(Vec::new).push(result.clone());
+            result_groups.entry(hash).or_default().push(result.clone());
         }
         
         // Find majority
@@ -400,7 +400,7 @@ impl DisputeManager {
             .map_err(|_| ComputeError::LockError)?;
         
         let dispute = disputes.get_mut(dispute_id)
-            .ok_or_else(|| ComputeError::NotFound)?;
+            .ok_or(ComputeError::NotFound)?;
         
         if !dispute.is_evidence_period_over() {
             return Err(ComputeError::InvalidDisputeState);
@@ -424,7 +424,7 @@ impl DisputeManager {
             .map_err(|_| ComputeError::LockError)?;
         
         let dispute = disputes.get_mut(dispute_id)
-            .ok_or_else(|| ComputeError::NotFound)?;
+            .ok_or(ComputeError::NotFound)?;
         
         if arbiter != canonical_result.executor {
             return Err(ComputeError::InvalidResult(
@@ -465,7 +465,7 @@ impl DisputeManager {
             .map_err(|_| ComputeError::LockError)?;
         
         let dispute = disputes.get_mut(dispute_id)
-            .ok_or_else(|| ComputeError::NotFound)?;
+            .ok_or(ComputeError::NotFound)?;
         
         let resolution = DisputeResolution::Quarantine { reason };
         dispute.resolution = Some(resolution);
@@ -481,7 +481,7 @@ impl DisputeManager {
         
         disputes.get(dispute_id)
             .cloned()
-            .ok_or_else(|| ComputeError::NotFound)
+            .ok_or(ComputeError::NotFound)
     }
     
     /// List all active disputes

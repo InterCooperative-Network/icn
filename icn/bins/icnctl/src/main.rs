@@ -4670,6 +4670,23 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &Path) -> Result<()> {
             }
 
             // Create rotation event for this device add (with both keys)
+            let timestamp = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)?
+                .as_secs();
+            let new_version = did_doc.version + 1;
+            
+            // Prepare event data for signing
+            let event_data = format!(
+                "{}:add_device:{}:{}:{}",
+                own_did.as_str(),
+                new_device_id,
+                timestamp,
+                new_version
+            );
+            
+            // Sign with current device key
+            let signature = keystore.get_keypair()?.sign(event_data.as_bytes());
+            
             let rotation_event = icn_identity::RotationEvent {
                 did: own_did.clone(),
                 event_type: icn_identity::RotationEventType::AddDeviceWithEncryption {
@@ -4679,12 +4696,10 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &Path) -> Result<()> {
                     x25519_public_key: x25519_bytes.clone(),
                     signing_capabilities: request.capabilities.clone(),
                 },
-                proof: vec![], // TODO: Sign this event with current device's key
+                proof: signature.to_bytes().to_vec(),
                 signed_by: device_id.to_string(),
-                timestamp: std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)?
-                    .as_secs(),
-                new_version: did_doc.version + 1,
+                timestamp,
+                new_version,
             };
 
             // Update DID document and save
@@ -4761,18 +4776,34 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &Path) -> Result<()> {
             };
 
             // Create rotation event for this device revocation
+            let timestamp = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)?
+                .as_secs();
+            let new_version = did_doc.version + 1;
+            let did = keystore.get_keypair()?.did().clone();
+            
+            // Prepare event data for signing
+            let event_data = format!(
+                "{}:revoke_device:{}:{}:{}",
+                did.as_str(),
+                device_id,
+                timestamp,
+                new_version
+            );
+            
+            // Sign with current device key
+            let signature = keystore.get_keypair()?.sign(event_data.as_bytes());
+            
             let rotation_event = icn_identity::RotationEvent {
-                did: keystore.get_keypair()?.did().clone(),
+                did,
                 event_type: icn_identity::RotationEventType::RevokeDevice {
                     device_id: device_id.clone(),
                     reason: revocation_reason,
                 },
-                proof: vec![], // TODO: Sign this event with current device's key
+                proof: signature.to_bytes().to_vec(),
                 signed_by: current_device_id.to_string(),
-                timestamp: std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)?
-                    .as_secs(),
-                new_version: did_doc.version + 1,
+                timestamp,
+                new_version,
             };
 
             // Update DID document

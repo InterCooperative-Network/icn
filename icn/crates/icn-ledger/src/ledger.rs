@@ -108,6 +108,11 @@ pub struct Ledger {
 
     /// Domain ID for this ledger (used in event payloads)
     domain_id: Option<String>,
+
+    /// Optional validation hook for charter/policy enforcement
+    /// Called before accepting entries. Returns Ok(()) if entry is valid,
+    /// Err with reason if entry should be rejected.
+    validation_hook: Option<Box<dyn Fn(&JournalEntry) -> Result<()> + Send + Sync>>,
 }
 
 impl Ledger {
@@ -133,8 +138,9 @@ impl Ledger {
             trust_graph: None,
             min_trust_for_entry: DEFAULT_MIN_TRUST_FOR_ENTRY,
             journal_version,
-            event_emitter: None, // Set via set_event_emitter()
-            domain_id: None,     // Set via set_domain_id()
+            event_emitter: None,     // Set via set_event_emitter()
+            domain_id: None,         // Set via set_domain_id()
+            validation_hook: None,   // Set via set_validation_hook()
         };
 
         // Load cached balances from storage
@@ -236,6 +242,17 @@ impl Ledger {
         self.domain_id.as_deref()
     }
 
+    /// Set validation hook for charter/policy enforcement
+    ///
+    /// The hook is called before accepting entries into the ledger.
+    /// If the hook returns Err, the entry will be rejected.
+    pub fn set_validation_hook<F>(&mut self, hook: F)
+    where
+        F: Fn(&JournalEntry) -> Result<()> + Send + Sync + 'static,
+    {
+        self.validation_hook = Some(Box::new(hook));
+    }
+
     /// Append a journal entry to the ledger
     #[instrument(skip(self, entry), fields(entry_hash = entry.id.as_ref().map(|h| h.to_hex()).unwrap_or_else(|| "none".to_string()), account_count = entry.accounts.len()))]
     pub fn append_entry(&mut self, entry: JournalEntry) -> Result<ContentHash> {
@@ -308,6 +325,37 @@ impl Ledger {
                     }
                 }
             }
+        }
+
+        // Charter/policy validation hook (Gap #2 fix)
+        // Allow external validation logic (e.g., charter rules) to validate entries
+        if let Some(ref hook) = self.validation_hook {
+            if let Err(e) = hook(&entry) {
+                warn!(
+                    entry_hash = %hash,
+                    author = %entry.author,
+                    error = %e,
+                    "Entry failed validation hook, quarantining"
+                );
+
+                // Quarantine the entry for governance review
+                let quarantine_item = QuarantineItem {
+                    entry_id: hash.clone(),
+                    reason: QuarantineReason::CharterViolation,
+                    author: entry.author.clone(),
+                    observed_at: SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs(),
+                    metadata: Some(e.to_string()),
+                };
+                
+                self.quarantine.add(entry.clone(), quarantine_item)?;
+
+                anyhow::bail!("Entry failed validation: {e}");
+            }
+            
+            debug!(
+                entry_hash = %hash,
+                "Entry passed validation hook"
+            );
         }
 
         // Serialize and store

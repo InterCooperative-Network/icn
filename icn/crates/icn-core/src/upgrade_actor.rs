@@ -77,9 +77,9 @@ impl UpgradeHandle {
         self.tx
             .send(UpgradeActorMsg::GetStatus { reply: reply_tx })
             .await
-            .map_err(|e| anyhow::anyhow!("Failed to send message: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to send message: {e}"))?;
         reply_rx.await
-            .map_err(|e| anyhow::anyhow!("Failed to receive reply: {}", e))
+            .map_err(|e| anyhow::anyhow!("Failed to receive reply: {e}"))
     }
 
     /// Propose a network-wide upgrade
@@ -92,9 +92,9 @@ impl UpgradeHandle {
                 reply: reply_tx,
             })
             .await
-            .map_err(|e| anyhow::anyhow!("Failed to send message: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to send message: {e}"))?;
         reply_rx.await
-            .map_err(|e| anyhow::anyhow!("Failed to receive reply: {}", e))?
+            .map_err(|e| anyhow::anyhow!("Failed to receive reply: {e}"))?
     }
 }
 
@@ -337,7 +337,7 @@ impl UpgradeActor {
 
                 // Accept proposal if we don't have one yet or this is newer
                 if self.target_version.is_none()
-                    || self.activation_time.map_or(true, |t| activation_time > t)
+                    || self.activation_time.is_none_or(|t| activation_time > t)
                 {
                     self.target_version = Some(target_version);
                     self.activation_time = Some(activation_time);

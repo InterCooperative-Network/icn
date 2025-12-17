@@ -4,6 +4,7 @@ pub mod background_tasks;
 pub mod init_gossip;
 pub mod init_ledger;
 pub mod init_rpc;
+pub mod init_snapshot;
 pub mod init_trust;
 pub mod registry;
 pub mod shutdown;
@@ -143,6 +144,10 @@ impl Supervisor {
             let trust_graph_handle = trust_services.trust_graph.clone();
             let misbehavior_detector = trust_services.misbehavior_detector.clone();
             let recovery_store = trust_services.recovery_store.clone();
+
+            // Initialize snapshot coordinator
+            let snapshot_coordinator = init_snapshot::init_snapshot_coordinator(did.clone()).await?;
+            info!("Snapshot coordinator initialized");
 
             // Create trust lookup closure for gossip actor
             let trust_lookup = init_trust::create_trust_lookup(trust_graph_handle.clone());
@@ -707,6 +712,11 @@ impl Supervisor {
 
                 let compute_handle_for_notifications = compute_handle_holder.clone();
                 let dispute_handle_for_notifications = dispute_handle_holder.clone();
+                
+                // Clone snapshot coordinator and network handle for notifications
+                let snapshot_coordinator_for_notifications = snapshot_coordinator.clone();
+                let network_handle_for_snapshots = network_handle.clone();
+                let gossip_handle_for_snapshots = gossip_handle.clone();
 
                 // Create profile cache for peer capability discovery
                 let profile_cache: Arc<
@@ -1233,6 +1243,61 @@ impl Supervisor {
                                 }
                             }
                         }
+                        // Handle distributed snapshot coordination
+                        else if topic == "snapshot:coordinate" {
+                            let entry_data = match entry.get_data() {
+                                Ok(data) => data,
+                                Err(e) => {
+                                    warn!("Failed to get snapshot entry data: {}", e);
+                                    return;
+                                }
+                            };
+
+                            match bincode::deserialize::<icn_snapshot::SnapshotMessage>(&entry_data) {
+                                Ok(snapshot_msg) => {
+                                    let coordinator = snapshot_coordinator_for_notifications.clone();
+                                    let sender = entry.author.clone();
+                                    let network = network_handle_for_snapshots.clone();
+                                    let gossip = gossip_handle_for_snapshots.clone();
+                                    
+                                    tokio::spawn(async move {
+                                        match coordinator.write().await.handle_message(&sender, snapshot_msg).await {
+                                            Ok(response_msgs) => {
+                                                // Broadcast any response messages
+                                                for response_msg in response_msgs {
+                                                    let response_bytes = match bincode::serialize(&response_msg) {
+                                                        Ok(bytes) => bytes,
+                                                        Err(e) => {
+                                                            warn!("Failed to serialize snapshot response: {}", e);
+                                                            continue;
+                                                        }
+                                                    };
+                                                    
+                                                    // Publish response via gossip
+                                                    let mut gossip_guard = gossip.write().await;
+                                                    match gossip_guard.publish("snapshot:coordinate", response_bytes) {
+                                                        Ok(hash) => {
+                                                            debug!("Published snapshot response with hash: {:?}", hash);
+                                                        }
+                                                        Err(e) => {
+                                                            warn!("Failed to publish snapshot response: {}", e);
+                                                        }
+                                                    }
+                                                }
+                                                
+                                                info!("Processed snapshot message from {}", sender);
+                                            }
+                                            Err(e) => {
+                                                warn!("Failed to handle snapshot message: {}", e);
+                                            }
+                                        }
+                                    });
+                                }
+                                Err(e) => {
+                                    warn!("Failed to deserialize snapshot message: {}", e);
+                                }
+                            }
+                        }
                         // Handle compute topics
                         else if topic == icn_compute::TOPIC_SUBMIT
                             || topic == icn_compute::TOPIC_CLAIM
@@ -1499,6 +1564,14 @@ impl Supervisor {
                     warn!("Failed to subscribe to network:candidates topic: {}", e);
                 } else {
                     info!("Subscribed to network:candidates topic");
+                }
+
+                // Subscribe to snapshot:coordinate topic for distributed snapshots
+                const SNAPSHOT_COORDINATE_TOPIC: &str = "snapshot:coordinate";
+                if let Err(e) = gossip.subscribe(SNAPSHOT_COORDINATE_TOPIC, did.clone()) {
+                    warn!("Failed to subscribe to snapshot:coordinate topic: {}", e);
+                } else {
+                    info!("Subscribed to snapshot:coordinate topic");
                 }
 
                 // Subscribe to federation topics if federation is enabled
@@ -2972,8 +3045,10 @@ impl Supervisor {
                     });
 
                 // Spawn steward actor
+                let keypair = identity_bundle.keypair().clone();
                 match icn_steward::StewardActor::spawn(
                     did.clone(),
+                    keypair,
                     steward_config,
                     self.shutdown_tx.clone(),
                     Some(send_gossip_callback),

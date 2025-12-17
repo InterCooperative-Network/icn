@@ -289,7 +289,7 @@ impl Version {
     pub fn parse(s: &str) -> Result<Self, String> {
         let parts: Vec<&str> = s.split('.').collect();
         if parts.len() != 3 {
-            return Err(format!("Invalid version format: {}", s));
+            return Err(format!("Invalid version format: {s}"));
         }
 
         let major = parts[0]

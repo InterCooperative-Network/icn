@@ -360,14 +360,28 @@ pub async fn finalize_enrollment(
     Ok(HttpResponse::Ok().json(response))
 }
 
-/// Simulate steward approval (for testing)
+/// Simulate steward approval (for testing/development only)
 ///
 /// POST /v1/sdis/enrollment/{ceremony_id}/approve
+///
+/// **WARNING**: This endpoint should NOT be enabled in production.
+/// Set environment variable `ICN_ENABLE_ADMIN_ENDPOINTS=false` to disable.
 #[post("/{ceremony_id}/approve")]
 pub async fn approve_ceremony(
     store: web::Data<Arc<EnrollmentStore>>,
     ceremony_id: web::Path<String>,
 ) -> Result<HttpResponse> {
+    // Production guard: check environment variable
+    let admin_enabled = std::env::var("ICN_ENABLE_ADMIN_ENDPOINTS")
+        .unwrap_or_else(|_| "false".to_string())
+        .to_lowercase() == "true";
+    
+    if !admin_enabled {
+        return Err(GatewayError::Forbidden(
+            "Admin endpoints are disabled in production".to_string(),
+        ));
+    }
+
     let mut ceremony = store
         .get_ceremony(&ceremony_id)?
         .ok_or_else(|| GatewayError::NotFound("Ceremony not found".to_string()))?;
@@ -455,7 +469,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .service(start_enrollment)
             .service(get_enrollment_status)
             .service(finalize_enrollment)
-            .service(approve_ceremony), // TODO: Remove in production, use steward votes
+            .service(approve_ceremony), // Guarded by ICN_ENABLE_ADMIN_ENDPOINTS env var
     );
 }
 

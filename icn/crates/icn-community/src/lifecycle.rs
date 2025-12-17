@@ -1,5 +1,5 @@
 use crate::error::{CommunityError, Result};
-use crate::types::{Community, CommunityId, CommunityStatus, CommunityType};
+use crate::types::{Community, CommunityStatus, CommunityType};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -17,6 +17,12 @@ pub enum LifecycleEvent {
     Dissolved { coop_id: String },
 }
 
+impl Default for LifecycleManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LifecycleManager {
     pub fn new() -> Self {
         Self {}
