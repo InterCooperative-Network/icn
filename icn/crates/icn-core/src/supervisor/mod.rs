@@ -1,6 +1,7 @@
 //! Supervisor for managing actors
 
 pub mod background_tasks;
+pub mod init_coop;
 pub mod init_gossip;
 pub mod init_ledger;
 pub mod init_rpc;
@@ -185,6 +186,16 @@ impl Supervisor {
             let dispute_manager_handle = ledger_services.dispute_manager.clone();
             let contract_runtime_handle = ledger_services.contract_runtime.clone();
             let contract_actor_handle = ledger_services.contract_actor.clone();
+
+            // Initialize cooperative services
+            let coop_services = init_coop::init_coop_services(
+                &self.config,
+                gossip_handle.clone(),
+            )
+            .await?;
+            icn_obs::metrics::supervisor::actor_spawned_inc("coop");
+            let _coop_handle = coop_services.coop_handle.clone(); // TODO: Wire to gateway
+            let _coop_store = coop_services.coop_store.clone(); // Available for future use
 
             // Spawn Identity actor (provides signing and trust graph access)
             let identity_handle = crate::identity::IdentityActor::spawn(

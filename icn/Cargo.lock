@@ -2679,6 +2679,7 @@ dependencies = [
  "icn-ccl",
  "icn-community",
  "icn-compute",
+ "icn-coop",
  "icn-cooperative",
  "icn-federation",
  "icn-gateway",
