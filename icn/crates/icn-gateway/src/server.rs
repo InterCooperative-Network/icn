@@ -41,6 +41,7 @@ pub struct GatewayServer {
     security_config: SecurityConfig,
     rate_limit_config: Option<RateLimitConfig>,
     compute_handle: Option<ComputeHandle>,
+    coop_handle: Option<icn_coop::CoopHandle>,
 }
 
 impl GatewayServer {
@@ -54,6 +55,7 @@ impl GatewayServer {
             security_config: SecurityConfig::development(), // Permissive for tests
             rate_limit_config: None,
             compute_handle: None,
+            coop_handle: None,
         }
     }
 
@@ -71,6 +73,7 @@ impl GatewayServer {
             security_config: SecurityConfig::production(), // Strict for production
             rate_limit_config: None,
             compute_handle: None,
+            coop_handle: None,
         }
     }
 
@@ -89,6 +92,7 @@ impl GatewayServer {
             security_config: SecurityConfig::production(),
             rate_limit_config: None,
             compute_handle: None,
+            coop_handle: None,
         }
     }
 
@@ -101,6 +105,12 @@ impl GatewayServer {
     /// Set compute handle for daemon integration
     pub fn with_compute_handle(mut self, handle: ComputeHandle) -> Self {
         self.compute_handle = Some(handle);
+        self
+    }
+
+    /// Set cooperative handle for daemon integration
+    pub fn with_coop_handle(mut self, handle: icn_coop::CoopHandle) -> Self {
+        self.coop_handle = Some(handle);
         self
     }
 

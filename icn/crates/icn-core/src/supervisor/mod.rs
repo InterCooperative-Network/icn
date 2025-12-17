@@ -110,6 +110,9 @@ impl Supervisor {
         // Compute handle for gateway integration
         let compute_handle_for_gateway: Option<icn_compute::ComputeHandle>;
 
+        // Cooperative handle for gateway integration
+        let coop_handle_for_gateway: Option<icn_coop::CoopHandle>;
+
         // Governance event subscription handles - MUST persist for daemon lifetime
         // Stored at function scope to prevent premature Drop (which would unsubscribe)
         let governance_event_subscription: Option<crate::events::SubscriptionHandle>;
@@ -194,8 +197,11 @@ impl Supervisor {
             )
             .await?;
             icn_obs::metrics::supervisor::actor_spawned_inc("coop");
-            let _coop_handle = coop_services.coop_handle.clone(); // TODO: Wire to gateway
+            let coop_handle = coop_services.coop_handle.clone();
             let _coop_store = coop_services.coop_store.clone(); // Available for future use
+            
+            // Store for gateway integration (outside of identity_bundle scope)
+            coop_handle_for_gateway = Some(coop_handle);
 
             // Spawn Identity actor (provides signing and trust graph access)
             let identity_handle = crate::identity::IdentityActor::spawn(
@@ -3211,6 +3217,7 @@ impl Supervisor {
             // No event broadcaster or compute handle without identity
             event_broadcaster = None;
             compute_handle_for_gateway = None;
+            coop_handle_for_gateway = None;
 
             (None, None, None)
         };
@@ -3261,6 +3268,11 @@ impl Supervisor {
                         // Connect compute handle if available
                         if let Some(handle) = compute_handle_for_gateway {
                             gateway_server = gateway_server.with_compute_handle(handle);
+                        }
+
+                        // Connect cooperative handle if available
+                        if let Some(handle) = coop_handle_for_gateway {
+                            gateway_server = gateway_server.with_coop_handle(handle);
                         }
 
                         if let Err(e) = gateway_server.run().await {
