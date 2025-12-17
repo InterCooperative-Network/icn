@@ -1490,6 +1490,40 @@ pub fn init_descriptions() {
         "icn_upgrade_deprecated_peers_rejected_total",
         "Total number of connection attempts from deprecated version peers rejected"
     );
+
+    // Compute Dispute Metrics (Phase 20 - Gap 2.3)
+    describe_counter!(
+        "icn_dispute_initiated_total",
+        "Total number of compute disputes initiated"
+    );
+    describe_gauge!(
+        "icn_dispute_active",
+        "Number of currently active disputes"
+    );
+    describe_counter!(
+        "icn_dispute_resolved_total",
+        "Total number of disputes resolved by type"
+    );
+    describe_counter!(
+        "icn_dispute_evidence_submitted_total",
+        "Total number of evidence submissions by type"
+    );
+    describe_counter!(
+        "icn_dispute_arbiter_assigned_total",
+        "Total number of arbiters assigned to disputes"
+    );
+    describe_counter!(
+        "icn_dispute_executor_penalized_total",
+        "Total number of executors penalized for incorrect results"
+    );
+    describe_counter!(
+        "icn_dispute_executor_rewarded_total",
+        "Total number of executors rewarded for correct results"
+    );
+    describe_histogram!(
+        "icn_dispute_resolution_time_seconds",
+        "Time taken to resolve disputes in seconds"
+    );
 }
 
 /// Network metrics
@@ -3753,5 +3787,57 @@ pub mod commons {
             "version" => version.to_string()
         )
         .increment(1);
+    }
+
+    // =========================================================================
+    // Compute Dispute Metrics (Phase 20 - Gap 2.3)
+    // =========================================================================
+
+    /// Increment total disputes initiated
+    pub fn dispute_initiated_inc() {
+        counter!("icn_dispute_initiated_total").increment(1);
+    }
+
+    /// Set number of active disputes
+    pub fn dispute_active_set(count: usize) {
+        gauge!("icn_dispute_active").set(count as f64);
+    }
+
+    /// Increment disputes resolved
+    pub fn dispute_resolved_inc(resolution_type: &str) {
+        counter!(
+            "icn_dispute_resolved_total",
+            "resolution_type" => resolution_type.to_string()
+        )
+        .increment(1);
+    }
+
+    /// Increment evidence submitted
+    pub fn dispute_evidence_submitted_inc(evidence_type: &str) {
+        counter!(
+            "icn_dispute_evidence_submitted_total",
+            "evidence_type" => evidence_type.to_string()
+        )
+        .increment(1);
+    }
+
+    /// Increment arbiters assigned
+    pub fn dispute_arbiter_assigned_inc() {
+        counter!("icn_dispute_arbiter_assigned_total").increment(1);
+    }
+
+    /// Increment executor penalties
+    pub fn dispute_executor_penalized_inc() {
+        counter!("icn_dispute_executor_penalized_total").increment(1);
+    }
+
+    /// Increment executor rewards (correct results)
+    pub fn dispute_executor_rewarded_inc() {
+        counter!("icn_dispute_executor_rewarded_total").increment(1);
+    }
+
+    /// Set dispute resolution time histogram
+    pub fn dispute_resolution_time(duration_secs: f64) {
+        histogram!("icn_dispute_resolution_time_seconds").record(duration_secs);
     }
 }

@@ -25,6 +25,7 @@ mod actor;
 mod actor_model;
 mod actor_runtime;
 mod checkpoint_store;
+mod dispute;
 mod error;
 mod executor;
 mod migration_manager;
@@ -50,6 +51,10 @@ pub use actor_runtime::{
 };
 pub use checkpoint_store::{
     CheckpointBackend, CheckpointStore, InMemoryBackend, SledCheckpointBackend,
+};
+pub use dispute::{
+    ComputeDispute, ComputeResult as DisputeComputeResult, DisputeManager, DisputeResolution,
+    DisputeStatus, Evidence, EvidenceType, VerificationMode,
 };
 pub use error::ComputeError;
 pub use executor::{ExecutionContext, Executor, LocalExecutor};
@@ -93,6 +98,9 @@ pub const TOPIC_CHECKPOINT: &str = "compute:checkpoint";
 
 /// Gossip topic for migration coordination (Phase 16D)
 pub const TOPIC_MIGRATION: &str = "compute:migration";
+
+/// Gossip topic for dispute resolution (Phase 20)
+pub const TOPIC_DISPUTE: &str = "compute:dispute";
 
 /// Minimum trust score to submit tasks (0.0 - 1.0)
 pub const MIN_TRUST_SUBMIT: f64 = 0.1;
