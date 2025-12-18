@@ -6,7 +6,7 @@
 
 use crate::{Did, KeyPair};
 use anyhow::{Context, Result};
-use rcgen::{CertificateParams, DnType};
+use rcgen::CertificateParams;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -242,35 +242,26 @@ impl IdentityBundle {
     /// The certificate includes:
     /// - Subject CN: DID string
     /// - SAN URI: DID string
+    /// - Ed25519 signature algorithm
     /// - 1 year validity
     fn generate_tls_cert(did: &Did) -> Result<(CertificateDer<'static>, Vec<u8>)> {
-        // For now, generate a simple self-signed certificate
-        // TODO: Add DID as subject/SAN once we figure out rcgen 0.13 API
+        let mut params = CertificateParams::new(vec![did.as_str().to_string()])?;
+        params.key_usages = vec![
+            rcgen::KeyUsagePurpose::DigitalSignature,
+            rcgen::KeyUsagePurpose::KeyEncipherment,
+        ];
 
-        let mut params = CertificateParams::default();
+        // Generate Ed25519 key pair for the certificate (same as tls.rs)
+        let key_pair = rcgen::KeyPair::generate_for(&rcgen::PKCS_ED25519)?;
 
-        // Set DID as Common Name
-        params
-            .distinguished_name
-            .push(DnType::CommonName, did.as_str());
+        // Create certificate with Ed25519 key
+        let cert = params.self_signed(&key_pair)?;
 
-        // Generate key pair and certificate
-        let key_pair = rcgen::KeyPair::generate().context("Failed to generate key pair")?;
-
-        // Create certificate (rcgen 0.13 API)
-        let cert = params
-            .self_signed(&key_pair)
-            .context("Failed to generate self-signed certificate")?;
-
-        // Serialize to PEM, then parse to DER
-        let cert_pem = cert.pem();
-        let pem_data = pem::parse(&cert_pem).context("Failed to parse certificate PEM")?;
-        let cert_der = pem_data.contents().to_vec();
-
-        // Serialize key to DER
+        // Export certificate and key
+        let cert_der = CertificateDer::from(cert.der().to_vec());
         let key_der = key_pair.serialize_der();
 
-        Ok((CertificateDer::from(cert_der), key_der))
+        Ok((cert_der, key_der))
     }
 
     /// Hash a certificate using SHA-256

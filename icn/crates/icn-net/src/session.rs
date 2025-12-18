@@ -7,7 +7,6 @@
 //! - DID-based peer authentication
 
 use anyhow::{Context, Result};
-use icn_identity::KeyPair;
 use quinn::{ClientConfig, Endpoint, ServerConfig};
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -94,7 +93,7 @@ impl SessionManager {
     /// fallback when direct connections fail.
     pub async fn start(
         &mut self,
-        keypair: &KeyPair,
+        identity_bundle: &icn_identity::IdentityBundle,
         listen_addr: SocketAddr,
         trust_graph: Option<Arc<RwLock<icn_trust::TrustGraph>>>,
         min_trust_threshold: Option<f64>,
@@ -103,10 +102,12 @@ impl SessionManager {
     ) -> Result<()> {
         info!("Session manager starting on {}", listen_addr);
 
-        let own_did = keypair.did().clone();
+        let own_did = identity_bundle.did().clone();
 
-        // Generate TLS certificate for this DID
-        let (certs, key) = tls::generate_self_signed_cert(keypair)?;
+        // Use TLS certificate from IdentityBundle (already bound to DID)
+        // This ensures the cert hash matches what's in BindingInfo
+        let certs = vec![identity_bundle.tls_cert().clone()];
+        let key = identity_bundle.tls_key();
 
         // Create server config
         // If trust_graph is provided, enable client certificate verification

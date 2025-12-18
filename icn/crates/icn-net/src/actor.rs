@@ -816,7 +816,7 @@ impl NetworkActor {
             .map(|cfg| cfg.min_trust_threshold);
         session_manager
             .start(
-                identity_bundle.keypair(),
+                &identity_bundle,
                 listen_addr,
                 trust_graph.clone(),
                 tls_trust_threshold,
