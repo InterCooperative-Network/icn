@@ -286,9 +286,38 @@ impl IdentityBundle {
     }
 }
 
-/// Verify a binding info against a peer's certificate
+/// Verify DID-TLS binding information matches the expected DID
 ///
-/// This is used during connection handshake to verify that:
+/// This is used during TOFU (Trust On First Use) handshake to verify that:
+/// 1. The binding signature is valid for the DID
+/// 2. The peer holds the DID's private key
+/// 3. The binding_info is correctly formed
+///
+/// This does NOT verify the cert hash against an actual TLS cert, since in TOFU
+/// we accept self-signed certs and verify identity at the application layer.
+pub fn verify_did_matches_binding(did: &Did, binding_info: &BindingInfo) -> Result<()> {
+    use ed25519_dalek::Verifier;
+
+    // 1. Verify the DID in binding_info matches expected DID
+    if binding_info.did != *did {
+        anyhow::bail!("DID mismatch: expected {}, got {}", did, binding_info.did);
+    }
+
+    // 2. Verify signature with DID public key
+    let verifying_key = binding_info.did.to_verifying_key()?;
+    let signature = ed25519_dalek::Signature::from_slice(&binding_info.tls_binding_sig)
+        .context("Invalid signature format")?;
+
+    verifying_key
+        .verify(&binding_info.tls_cert_hash, &signature)
+        .context("DID-TLS binding signature verification failed")?;
+
+    Ok(())
+}
+
+/// Verify a binding info against a peer's certificate (stricter verification)
+///
+/// This is used when you have access to the actual TLS certificate to verify that:
 /// 1. The peer's TLS cert matches the claimed hash
 /// 2. The binding signature is valid for the DID
 /// 3. The peer holds the DID's private key

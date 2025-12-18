@@ -109,22 +109,9 @@ impl SessionManager {
         let certs = vec![identity_bundle.tls_cert().clone()];
         let key = identity_bundle.tls_key();
 
-        // Create server config
-        // If trust_graph is provided, enable client certificate verification
-        // Otherwise, allow unauthenticated connections (development mode only)
-        let server_config = if let Some(trust_graph) = &trust_graph {
-            let server_min_trust = min_trust_threshold.unwrap_or(0.0);
-            tls::create_server_config(
-                certs.clone(),
-                key.clone_key(),
-                trust_graph.clone(),
-                own_did.clone(),
-                server_min_trust,
-            )?
-        } else {
-            warn!("Starting session manager WITHOUT client certificate verification (development mode)");
-            tls::create_server_config_no_client_auth(certs.clone(), key.clone_key())?
-        };
+        // Create server config with TOFU trust model
+        // Identity verification happens at application layer (Hello message), not TLS layer
+        let server_config = tls::create_server_config(certs.clone(), key.clone_key())?;
 
         let mut server_config = ServerConfig::with_crypto(Arc::new(
             quinn::crypto::rustls::QuicServerConfig::try_from(server_config)?,

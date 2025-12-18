@@ -67,22 +67,19 @@ pub fn generate_self_signed_cert(
     Ok((vec![cert_der], key_der))
 }
 
-/// Create a rustls server configuration for QUIC with client certificate verification
+/// Create a rustls server configuration for QUIC with TOFU trust model
+///
+/// This uses self-signed certificates and defers identity verification to the application
+/// layer (Hello message handler). This implements Trust-On-First-Use (TOFU):
+/// 1. Accept any TLS connection with valid self-signed cert
+/// 2. Verify DID-TLS binding in Hello message handler
+/// 3. Use trust graph for authorization decisions
 pub fn create_server_config(
     certs: Vec<CertificateDer<'static>>,
     key: PrivateKeyDer<'static>,
-    trust_graph: Arc<RwLock<TrustGraph>>,
-    own_did: Did,
-    min_trust_threshold: f64,
 ) -> Result<rustls::ServerConfig> {
-    let verifier = Arc::new(DidCertificateVerifier {
-        trust_graph,
-        own_did,
-        min_trust_threshold,
-    });
-
     let mut config = rustls::ServerConfig::builder()
-        .with_client_cert_verifier(verifier)
+        .with_no_client_auth()
         .with_single_cert(certs, key)
         .context("Failed to create server config")?;
 
@@ -532,13 +529,8 @@ mod tests {
         setup();
         let keypair = KeyPair::generate().unwrap();
         let (certs, key) = generate_self_signed_cert(&keypair).unwrap();
-        let own_did = keypair.did().clone();
 
-        // Create a temporary trust graph for testing
-        let store: Arc<dyn icn_store::Store> = Arc::new(icn_store::SledStore::temporary().unwrap());
-        let trust_graph = Arc::new(RwLock::new(TrustGraph::new(store, own_did.clone())));
-
-        let config = create_server_config(certs, key, trust_graph, own_did, 0.0).unwrap();
+        let config = create_server_config(certs, key).unwrap();
 
         // Should have ALPN configured
         assert_eq!(config.alpn_protocols, vec![b"icn/1".to_vec()]);

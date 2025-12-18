@@ -35,7 +35,7 @@ pub use anchor::{Anchor, EnrollmentPathway};
 pub use batch_verify::{
     verify_signatures_batched, BatchVerifier, BatchVerifyResult, SignatureToVerify,
 };
-pub use bundle::{verify_binding_info, BindingInfo, IdentityBundle};
+pub use bundle::{verify_binding_info, verify_did_matches_binding, BindingInfo, IdentityBundle};
 pub use commons::{
     Affiliation, CommonsHolderRecord, CommonsRight, CommonsRights, HolderStatus, JurisdictionId,
     JurisdictionType, MembershipCapability, MembershipStatus,
