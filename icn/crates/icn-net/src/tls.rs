@@ -81,14 +81,10 @@ pub fn create_server_config(
         min_trust_threshold,
     });
 
-    let mut config = rustls::ServerConfig::builder_with_provider(Arc::new(
-        rustls::crypto::ring::default_provider(),
-    ))
-    .with_protocol_versions(&[&rustls::version::TLS13])
-    .context("Failed to set protocol version")?
-    .with_client_cert_verifier(verifier)
-    .with_single_cert(certs, key)
-    .context("Failed to create server config")?;
+    let mut config = rustls::ServerConfig::builder()
+        .with_client_cert_verifier(verifier)
+        .with_single_cert(certs, key)
+        .context("Failed to create server config")?;
 
     // Enable ALPN for QUIC
     config.alpn_protocols = vec![b"icn/1".to_vec()];
