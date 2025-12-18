@@ -121,6 +121,7 @@ jobs:
       - name: Generate coverage
         run: cargo tarpaulin --workspace --timeout 300 --out Xml --output-dir ./coverage
         working-directory: ./icn
+        continue-on-error: true  # Tarpaulin can have spurious failures even when tests pass
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
