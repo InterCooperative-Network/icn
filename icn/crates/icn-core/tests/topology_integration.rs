@@ -349,6 +349,10 @@ async fn test_multi_region_topology() -> Result<()> {
     let node_c = TestNode::spawn(23302, "us-west".to_string(), "lax-1".to_string()).await?;
     let node_d = TestNode::spawn(23303, "eu-central".to_string(), "fra-1".to_string()).await?;
 
+    // Give network actors time to fully start before dialing
+    // This is especially important in CI environments
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
     // Node A connects to all others
     node_a.dial(&node_b).await?;
     node_a.dial(&node_c).await?;
@@ -418,6 +422,9 @@ async fn test_scope_aware_peer_sampling() -> Result<()> {
     let node_b = TestNode::spawn(23401, "us-west".to_string(), "sfo-1".to_string()).await?; // Local
     let node_c = TestNode::spawn(23402, "us-west".to_string(), "lax-1".to_string()).await?; // Regional
     let node_d = TestNode::spawn(23403, "eu-central".to_string(), "fra-1".to_string()).await?; // Backbone
+
+    // Give network actors time to fully start before dialing
+    tokio::time::sleep(Duration::from_millis(500)).await;
 
     // Node A connects to all (with delays to avoid QUIC handshake race conditions)
     node_a.dial(&node_b).await?;
