@@ -25,10 +25,11 @@ use std::sync::{Arc, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Verification mode for task execution
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(tag = "type")]
 pub enum VerificationMode {
     /// Single executor (default - fastest, cheapest)
+    #[default]
     SingleExecutor,
 
     /// Multiple executors with majority consensus
@@ -49,12 +50,6 @@ pub enum VerificationMode {
 
 fn default_consensus_threshold() -> f64 {
     0.67 // 2/3 majority
-}
-
-impl Default for VerificationMode {
-    fn default() -> Self {
-        Self::SingleExecutor
-    }
 }
 
 /// Result of a compute task execution
