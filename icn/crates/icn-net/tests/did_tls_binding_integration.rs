@@ -50,14 +50,25 @@ impl TestNode {
             let _ = msg_tx.send(net_msg);
         });
 
+        // Create trust graph for TOFU mode
+        let trust_store: Arc<dyn icn_store::Store> =
+            Arc::new(icn_store::SledStore::temporary()?);
+        let trust_graph = Arc::new(RwLock::new(icn_trust::TrustGraph::new(
+            trust_store,
+            did.clone(),
+        )));
+
         let listen_addr: SocketAddr = format!("127.0.0.1:{port}").parse()?;
         let network_handle = NetworkActor::spawn(
             identity_bundle,
             listen_addr,
             shutdown_tx.clone(),
             Some(incoming_handler),
-            None, // No trust graph for basic tests
-            None, // No trust-gated config
+            Some(trust_graph), // Enable trust graph for TLS client cert verification
+            Some(icn_net::rate_limit::TrustGatedRateLimitConfig {
+                min_trust_threshold: 0.0, // TOFU mode - accept all valid DIDs
+                ..Default::default()
+            }),
             None, // No fallback config
             None, // No topology config
             None, // No STUN servers for tests

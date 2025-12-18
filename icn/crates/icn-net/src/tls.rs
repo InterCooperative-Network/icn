@@ -150,21 +150,33 @@ pub fn create_client_config(
 /// This verifier extracts the DID from certificate SAN (Subject Alternative Name) and performs
 /// comprehensive validation including trust graph integration.
 ///
+/// ## Trust-on-First-Use (TOFU) Architecture
+///
+/// The verifier implements TOFU semantics:
+/// 1. **TLS layer**: Accept all valid DID certificates (verify cryptographic validity only)
+/// 2. **Application layer**: Gate operations based on trust scores
+/// 3. **Trust building**: Allow trust to develop through gossip/attestations over time
+///
+/// This approach avoids the chicken-and-egg problem where you need trust to establish
+/// connections, but need connections to build trust.
+///
 /// Security features:
 /// - Accepts self-signed certificates (required for P2P architecture)
-/// - Integrates with trust graph for trust score verification
-/// - Rejects connections from untrusted peers (score < min_trust_threshold)
-/// - Logs all certificate verifications for security auditing
+/// - Validates certificate cryptographic signatures
 /// - Validates DID format and certificate expiration
+/// - Optional trust gating for high-security deployments
+/// - Logs all certificate verifications for security auditing
 ///
-/// Trust-based access control:
-/// - Isolated peers (score < 0.1): Connection rejected
-/// - Known peers (score ≥ 0.1): Allowed by default
-/// - Configurable minimum threshold (default: 0.0 = allow all authenticated DIDs)
+/// Trust modes:
+/// - **TOFU mode (min_trust_threshold = 0.0)**: Accept all authenticated DIDs, gate operations by trust
+/// - **Trust-gated mode (min_trust_threshold > 0.0)**: Reject connections from low-trust peers at TLS layer
 #[derive(Clone)]
 struct DidCertificateVerifier {
     trust_graph: Arc<RwLock<icn_trust::TrustGraph>>,
     own_did: icn_identity::Did,
+    /// Minimum trust threshold for connection acceptance
+    /// - 0.0: TOFU mode - accept all valid DIDs (recommended)
+    /// - > 0.0: Trust-gated mode - reject low-trust peers at TLS handshake
     min_trust_threshold: f64,
 }
 

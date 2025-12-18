@@ -12,30 +12,40 @@
 
 ## Pending Security Enhancements
 
-### 1. Full Mutual TLS with Client Certificates (High Priority)
+### 1. Full Mutual TLS with Client Certificates - TOFU Mode (In Progress)
 
-**Current Status**: Partially implemented but disabled due to test failures.
+**Current Status**: Implemented with Trust-on-First-Use (TOFU) semantics - **functionally complete, tests need updating**.
 
-**Issue**: The current implementation adds client certificate verification on the server side (`DidCertificateVerifier`), but this breaks bidirectional communication in multi-node tests. The problem is that when Node A dials Node B, Node B needs to send messages back to Node A, but if Node B doesn't have a pre-existing trust relationship with Node A, the TLS handshake times out or is rejected.
+**Architecture Decision - RESOLVED**: ICN uses **TOFU (Trust-on-First-Use)** semantics:
+1. **TLS layer**: Accept all valid DID certificates (verify cryptographic validity only)
+2. **Application layer**: Gate operations based on trust scores 
+3. **Trust building**: Allow trust to develop through gossip/attestations over time
 
-**Files Modified**:
-- `icn-net/src/tls.rs`: Added `DidCertificateVerifier` for both client and server cert verification
-- `icn-net/src/session.rs`: Server config conditionally enables client cert verification based on trust graph presence
+This avoids the chicken-and-egg problem where you need trust to establish connections, but need connections to build trust.
 
-**Test Failures**:
-- `test_did_tls_binding_verified_on_hello`: TLS handshake timeout
-- `test_dev_mode_no_client_cert_verification`: Stream closed by peer
-- Multiple tests in `did_tls_binding_integration.rs`: Stream closure issues
+**Implementation Complete**:
+- `icn-net/src/tls.rs`: `DidCertificateVerifier` with TOFU mode (min_trust_threshold = 0.0)
+- `icn-net/src/session.rs`: Server config with client cert verification + trust graph integration
+- `icn-net/src/actor.rs`: Passes min_trust_threshold from rate limit config to session manager
+- Default production threshold: 0.1 (require Known trust class)
+- Tests can override with 0.0 for TOFU mode
 
-**Next Steps**:
-1. Investigate why TLS handshakes are timing out even when trust scores meet thresholds
-2. Consider implementing "trust-on-first-use" (TOFU) semantics for initial connections
-3. Update all integration tests to properly set up bidirectional trust relationships
-4. Add metrics/logging to track TLS handshake failures and reasons
-5. Document the trust setup requirements for production deployments
+**Test Status**:
+- ✅ Contract deployment tests: Pass with TOFU mode (min_trust_threshold = 0.0)
+- ✅ Multi-node gossip tests: Pass with explicit trust setup
+- ❌ DID-TLS binding tests: Need updating to provide trust_graph (currently use None = dev mode)
 
-**Architecture Decision Needed**:
-Should ICN require mutual trust BEFORE allowing QUIC connections, or should it allow connections and then gate specific operations based on trust? Current implementation attempts the former, but tests suggest the latter might be more practical.
+**Remaining Work**:
+1. Update `icn-net/tests/did_tls_binding_integration.rs` to provide trust_graph with TOFU threshold
+2. Add trust graph setup helper for tests
+3. Document TOFU mode in architecture docs
+4. Add metrics for TLS handshake failures by trust score
+
+**Security Properties**:
+- All TLS connections require valid Ed25519-signed certificates
+- DID-TLS binding verified during Hello message exchange
+- Trust scores gate sensitive operations (gossip topics, contract execution, etc.)
+- Production deployments can increase min_trust_threshold for stricter access control
 
 ### 2. Replay Protection Cleanup (Medium Priority)
 
