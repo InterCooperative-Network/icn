@@ -476,6 +476,38 @@ impl CoopManager {
     }
 }
 
+/// Convert icn_coop::Cooperative to gateway::Coop
+fn convert_actor_coop_to_gateway(actor_coop: icn_coop::Cooperative) -> Coop {
+    // TODO: Query members separately for accurate member list
+    // For now, create placeholder with founder
+    let placeholder_did: Did = serde_json::from_str("\"did:icn:placeholder\"").unwrap();
+
+    Coop {
+        id: actor_coop.id,
+        name: actor_coop.name,
+        members: vec![CoopMember {
+            did: placeholder_did,
+            role: MemberRole::Steward,
+            joined_at: actor_coop.created_at.timestamp() as u64,
+        }],
+        settings: CoopSettings::default(),
+        created_at: actor_coop.created_at.timestamp() as u64,
+    }
+}
+
+/// Convert actor role to gateway role
+fn convert_actor_role_to_gateway(role: &icn_coop::MemberRole) -> MemberRole {
+    match role {
+        icn_coop::MemberRole::Founder => MemberRole::Steward,
+        icn_coop::MemberRole::Officer => MemberRole::Facilitator,
+        icn_coop::MemberRole::BoardMember => MemberRole::Facilitator,
+        icn_coop::MemberRole::Member => MemberRole::Participant,
+        icn_coop::MemberRole::Worker => MemberRole::Participant,
+        icn_coop::MemberRole::Consumer => MemberRole::Participant,
+        icn_coop::MemberRole::Producer => MemberRole::Participant,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -629,37 +661,5 @@ mod tests {
         assert!(!coop.has_role(participant.did(), MemberRole::Steward));
         assert!(!coop.has_role(participant.did(), MemberRole::Facilitator));
         assert!(coop.has_role(participant.did(), MemberRole::Participant));
-    }
-}
-
-/// Convert icn_coop::Cooperative to gateway::Coop
-fn convert_actor_coop_to_gateway(actor_coop: icn_coop::Cooperative) -> Coop {
-    // TODO: Query members separately for accurate member list
-    // For now, create placeholder with founder
-    let placeholder_did: Did = serde_json::from_str("\"did:icn:placeholder\"").unwrap();
-
-    Coop {
-        id: actor_coop.id,
-        name: actor_coop.name,
-        members: vec![CoopMember {
-            did: placeholder_did,
-            role: MemberRole::Steward,
-            joined_at: actor_coop.created_at.timestamp() as u64,
-        }],
-        settings: CoopSettings::default(),
-        created_at: actor_coop.created_at.timestamp() as u64,
-    }
-}
-
-/// Convert actor role to gateway role
-fn convert_actor_role_to_gateway(role: &icn_coop::MemberRole) -> MemberRole {
-    match role {
-        icn_coop::MemberRole::Founder => MemberRole::Steward,
-        icn_coop::MemberRole::Officer => MemberRole::Facilitator,
-        icn_coop::MemberRole::BoardMember => MemberRole::Facilitator,
-        icn_coop::MemberRole::Member => MemberRole::Participant,
-        icn_coop::MemberRole::Worker => MemberRole::Participant,
-        icn_coop::MemberRole::Consumer => MemberRole::Participant,
-        icn_coop::MemberRole::Producer => MemberRole::Participant,
     }
 }

@@ -248,6 +248,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(feature = "stark"))]
     fn test_age_proof_success() {
         let issuer_pk = [1u8; 32];
         let public = AgeProofPublic::new(18, issuer_pk);

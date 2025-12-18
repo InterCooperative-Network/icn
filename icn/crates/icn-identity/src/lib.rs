@@ -104,7 +104,7 @@ impl HybridSignatureOrClassical {
 
     /// Parse from bytes
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        bincode::deserialize(bytes).map_err(|e| anyhow::anyhow!("Failed to parse signature: {}", e))
+        bincode::deserialize(bytes).map_err(|e| anyhow::anyhow!("Failed to parse signature: {e}"))
     }
 }
 
@@ -252,7 +252,7 @@ impl KeyPair {
         #[cfg(feature = "post-quantum")]
         let pq_keypair = Some(
             icn_crypto_pq::MlDsaKeypair::generate()
-                .map_err(|e| anyhow::anyhow!("PQ key generation failed: {}", e))?,
+                .map_err(|e| anyhow::anyhow!("PQ key generation failed: {e}"))?,
         );
 
         Ok(KeyPair {
@@ -303,7 +303,7 @@ impl KeyPair {
 
         // Reconstruct PQ keypair
         let pq_keypair = icn_crypto_pq::MlDsaKeypair::from_bytes(pq_secret, pq_public)
-            .map_err(|e| anyhow::anyhow!("Invalid PQ keypair: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Invalid PQ keypair: {e}"))?;
 
         Ok(KeyPair {
             secret_bytes: Zeroizing::new(*secret_bytes),

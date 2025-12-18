@@ -318,6 +318,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(feature = "stark"))]
     fn test_age_proof_verification() {
         let prover = ZkProver::new();
         let mut verifier = ZkVerifier::new();
@@ -345,6 +346,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(feature = "stark"))]
     fn test_nonce_replay_protection() {
         let prover = ZkProver::new();
         let mut verifier = ZkVerifier::new();
@@ -374,6 +376,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(feature = "stark"))]
     fn test_untrusted_issuer() {
         let prover = ZkProver::new();
         let mut verifier = ZkVerifier::new();

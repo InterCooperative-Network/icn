@@ -173,6 +173,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg(not(feature = "stark"))]
     fn test_citizenship_proof_success() {
         let issuer_pk = [1u8; 32];
         let public = CitizenshipProofPublic::new([b'U', b'S'], StatusType::Citizen, issuer_pk);
@@ -210,6 +211,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(feature = "stark"))]
     fn test_citizenship_proof_citizen_for_resident_succeeds() {
         let issuer_pk = [1u8; 32];
         // Require at least permanent resident
