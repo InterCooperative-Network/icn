@@ -81,10 +81,13 @@ impl SessionManager {
     /// Start the session manager with a QUIC endpoint
     ///
     /// This creates a QUIC endpoint bound to the given address and starts
-    /// listening for incoming connections.
+    /// listening for incoming connections using TOFU (Trust-On-First-Use) model:
+    /// - Server accepts all valid self-signed certificates
+    /// - Client accepts all valid self-signed certificates  
+    /// - Trust enforcement happens at application layer (Hello message handler)
     ///
-    /// If trust_graph is provided, enables trust-gated TLS verification where
-    /// connections from peers below min_trust_threshold are rejected.
+    /// If trust_graph is provided, it is used for application-layer trust decisions.
+    /// The min_trust_threshold parameter is currently ignored (always uses 0.0 at TLS layer).
     ///
     /// If stun_servers is provided, performs NAT traversal discovery to determine
     /// the node's public endpoint (IP and port visible from the internet).
@@ -121,10 +124,12 @@ impl SessionManager {
         let transport_config = Arc::new(create_transport_config());
         server_config.transport_config(transport_config.clone());
 
-        // Create client config with trust-gated verification if trust_graph provided
+        // Create client config with TOFU mode (trust enforcement at application layer)
+        // Always use threshold 0.0 at TLS layer to allow initial connections
+        // Trust-based access control happens in Hello message handler
         let client_config = if let Some(trust_graph) = trust_graph {
             info!(
-                "Trust-gated TLS verification enabled (min_threshold: {:?})",
+                "TOFU mode enabled - trust enforcement at application layer (requested threshold: {:?})",
                 min_trust_threshold
             );
             tls::create_client_config(
@@ -132,7 +137,7 @@ impl SessionManager {
                 key.clone_key(),
                 trust_graph,
                 own_did,
-                min_trust_threshold,
+                Some(0.0), // Always use TOFU mode at TLS layer
             )?
         } else {
             // Fallback: create a permissive client config for development mode
