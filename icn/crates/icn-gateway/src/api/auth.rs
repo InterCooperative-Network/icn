@@ -354,7 +354,14 @@ mod tests {
     #[actix_web::test]
     async fn test_ip_rate_limiting_on_verify() {
         let auth = Arc::new(AuthManager::new(b"test_secret".to_vec()));
-        let ip_limiter = Arc::new(IpRateLimiter::new_for_auth());
+        // Use zero refill rate to ensure exactly 20 requests allowed (no token regeneration during test)
+        let ip_limiter = Arc::new(IpRateLimiter::new_with_config(
+            crate::rate_limit::RateLimitConfig {
+                capacity: 20.0,
+                refill_rate: 0.0, // No refill during test - ensures deterministic behavior
+                cost_per_request: 1.0,
+            },
+        ));
         let bundle = IdentityBundle::generate().unwrap();
 
         // Create a valid challenge/signature for test
