@@ -109,7 +109,22 @@ impl SessionManager {
         let (certs, key) = tls::generate_self_signed_cert(keypair)?;
 
         // Create server config
-        let server_config = tls::create_server_config(certs.clone(), key.clone_key())?;
+        // If trust_graph is provided, enable client certificate verification
+        // Otherwise, allow unauthenticated connections (development mode only)
+        let server_config = if let Some(trust_graph) = &trust_graph {
+            let server_min_trust = min_trust_threshold.unwrap_or(0.0);
+            tls::create_server_config(
+                certs.clone(),
+                key.clone_key(),
+                trust_graph.clone(),
+                own_did.clone(),
+                server_min_trust,
+            )?
+        } else {
+            warn!("Starting session manager WITHOUT client certificate verification (development mode)");
+            tls::create_server_config_no_client_auth(certs.clone(), key.clone_key())?
+        };
+        
         let mut server_config = ServerConfig::with_crypto(Arc::new(
             quinn::crypto::rustls::QuicServerConfig::try_from(server_config)?,
         ));

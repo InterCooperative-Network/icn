@@ -1476,14 +1476,44 @@ impl NetworkActor {
                             // Handle handshake messages internally
                             match &message.payload {
                                 MessagePayload::Hello {
-                                    binding_info: _,
+                                    binding_info,
                                     version_info,
                                     topology_info,
                                     x25519_public,
                                 } => {
-                                    // NOTE: DID-TLS binding was already verified during TLS handshake
-                                    // by DidCertificateVerifier. No need to re-verify here.
-                                    // The TLS layer guarantees that the peer's DID matches their certificate.
+                                    // Verify DID-TLS binding
+                                    // The TLS layer verified the peer's certificate, but we must also
+                                    // verify that the binding_info in the Hello message matches the cert
+                                    if let Some(peer_cert) = connection.peer_identity() {
+                                        if let Some(cert_der) = peer_cert
+                                            .downcast_ref::<Vec<rustls::pki_types::CertificateDer>>()
+                                            .and_then(|certs| certs.first())
+                                        {
+                                            if let Err(e) = icn_identity::verify_binding_info(binding_info, cert_der) {
+                                                warn!(
+                                                    peer_did = %message.from,
+                                                    "DID-TLS binding verification failed: {}",
+                                                    e
+                                                );
+                                                return Err(anyhow::anyhow!(
+                                                    "DID-TLS binding verification failed: {}",
+                                                    e
+                                                ));
+                                            }
+                                        } else {
+                                            warn!(
+                                                peer_did = %message.from,
+                                                "No certificate available for binding verification"
+                                            );
+                                            return Err(anyhow::anyhow!("No peer certificate available"));
+                                        }
+                                    } else {
+                                        warn!(
+                                            peer_did = %message.from,
+                                            "No peer identity available for binding verification"
+                                        );
+                                        return Err(anyhow::anyhow!("No peer identity available"));
+                                    }
 
                                     // Perform version negotiation
                                     let local_version_info = crate::VersionInfo::new(format!(
