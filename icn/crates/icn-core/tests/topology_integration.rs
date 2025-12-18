@@ -361,14 +361,17 @@ async fn test_multi_region_topology() -> Result<()> {
     for attempt in 1..=40 {
         tokio::time::sleep(Duration::from_millis(250)).await;
         counts_a = node_a.get_neighbor_counts().await;
-        
+
         // Check if all peers are categorized correctly
         if counts_a.local_cluster == 1 && counts_a.regional == 1 && counts_a.backbone == 1 {
-            info!("All peers categorized correctly after {} attempts ({} ms)", 
-                  attempt, attempt * 250);
+            info!(
+                "All peers categorized correctly after {} attempts ({} ms)",
+                attempt,
+                attempt * 250
+            );
             break;
         }
-        
+
         if attempt % 5 == 0 {
             info!(
                 "Attempt {}: local_cluster={}, regional={}, backbone={} (waiting...)",
