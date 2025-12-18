@@ -258,20 +258,36 @@ See [docs/production-hardening.md](docs/production-hardening.md) for complete se
 
 ## Documentation
 
+**📚 [Complete Documentation Index](docs/INDEX.md)** - Organized guide to all documentation
+
 ### For Users
 - **[Getting Started Guide](docs/GETTING_STARTED.md)** - Complete onboarding from installation to first transaction
 - **[FAQ](docs/FAQ.md)** - 30+ common questions covering setup, security, usage, and troubleshooting
 - **[Migration Guides](docs/migration-guides/)** - Keystore version upgrades and safe version migration procedures
 
+### For Security Engineers
+- **[Security Status Report](docs/security/FINAL_SECURITY_STATUS.md)** - Production readiness assessment (A+ grade)
+- **[Security Improvements](docs/security/COMPREHENSIVE_SECURITY_IMPROVEMENTS.md)** - Complete security overview
+- **[Security Testing Guide](docs/security/SECURITY_TESTING_GUIDE.md)** - Testing procedures and validation
+- **[Educational Guide](docs/security/EDUCATIONAL_GUIDE_SECURITY_FIXES.md)** - Step-by-step security review walkthrough
+
 ### For Developers
 - **[Contributing Guide](CONTRIBUTING.md)** - Developer onboarding, code style, testing philosophy, and PR process
 - **[Architecture](docs/ARCHITECTURE.md)** - System design, component architecture, and implementation details
+- **[Architecture Index](docs/architecture/)** - Detailed architecture documentation (16+ documents)
 - **[Code of Conduct](CODE_OF_CONDUCT.md)** - Community standards and expectations
 - **[API Documentation](docs/)** - Topic subscriptions, governance primitives, and protocol references
+- **[Work Sessions](docs/sessions/)** - Development session summaries and decision history
 
 ### For Operators
 - **[Deployment Guide](docs/deployment-guide.md)** - Production deployment, monitoring, and operations
 - **[Project Governance](docs/PROJECT_GOVERNANCE.md)** - Decision-making process, roles, and release procedures
+- **[Security Deployment](docs/security/FINAL_SECURITY_STATUS.md#production-deployment)** - Production security configuration
+
+### Additional Resources
+- **[Development Journal](docs/dev-journal/)** - Historical development notes and decisions (90+ documents)
+- **[Sprint Documentation](docs/sprints/)** - Sprint planning and completion records
+- **[Testing Documentation](docs/testing/)** - Testing guides and procedures
 
 ## Building
 
