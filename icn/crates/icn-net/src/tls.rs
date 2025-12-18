@@ -125,6 +125,8 @@ pub fn create_server_config_no_client_auth(
 /// * `own_did` - This node's DID (for trust computation)
 /// * `min_trust_threshold` - Minimum trust score required (default: 0.0 = allow all authenticated DIDs)
 pub fn create_client_config(
+    certs: Vec<CertificateDer<'static>>,
+    key: PrivateKeyDer<'static>,
     trust_graph: Arc<RwLock<TrustGraph>>,
     own_did: Did,
     min_trust_threshold: Option<f64>,
@@ -138,7 +140,8 @@ pub fn create_client_config(
     let mut config = rustls::ClientConfig::builder()
         .dangerous()
         .with_custom_certificate_verifier(Arc::new(verifier))
-        .with_no_client_auth();
+        .with_client_auth_cert(certs, key)
+        .context("Failed to configure client certificate")?;
 
     // Enable ALPN for QUIC
     config.alpn_protocols = vec![b"icn/1".to_vec()];
