@@ -449,11 +449,11 @@ mod tests {
         setup();
 
         let mut manager = SessionManager::new();
-        let keypair = KeyPair::generate().unwrap();
+        let identity_bundle = icn_identity::IdentityBundle::generate().unwrap();
         let addr = "127.0.0.1:0".parse().unwrap();
 
         manager
-            .start(&keypair, addr, None, None, None, None)
+            .start(&identity_bundle, addr, None, None, None, None)
             .await
             .unwrap();
 
@@ -469,11 +469,11 @@ mod tests {
 
         // Start server
         let mut server_manager = SessionManager::new();
-        let server_keypair = KeyPair::generate().unwrap();
+        let server_identity = icn_identity::IdentityBundle::generate().unwrap();
         let server_addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
 
         server_manager
-            .start(&server_keypair, server_addr, None, None, None, None)
+            .start(&server_identity, server_addr, None, None, None, None)
             .await
             .unwrap();
 
@@ -488,11 +488,11 @@ mod tests {
 
         // Start client
         let mut client_manager = SessionManager::new();
-        let client_keypair = KeyPair::generate().unwrap();
+        let client_identity = icn_identity::IdentityBundle::generate().unwrap();
         let client_addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
 
         client_manager
-            .start(&client_keypair, client_addr, None, None, None, None)
+            .start(&client_identity, client_addr, None, None, None, None)
             .await
             .unwrap();
 

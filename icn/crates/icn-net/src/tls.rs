@@ -539,8 +539,8 @@ mod tests {
     #[test]
     fn test_create_client_config() {
         setup();
-        let keypair = KeyPair::generate().unwrap();
-        let own_did = keypair.did().clone();
+        let identity_bundle = icn_identity::IdentityBundle::generate().unwrap();
+        let own_did = identity_bundle.did().clone();
 
         // Create a temporary trust graph for testing
         let store: Arc<dyn icn_store::Store> = Arc::new(icn_store::SledStore::temporary().unwrap());
@@ -549,7 +549,9 @@ mod tests {
             own_did.clone(),
         )));
 
-        let config = create_client_config(trust_graph, own_did, None).unwrap();
+        let certs = vec![identity_bundle.tls_cert().clone()];
+        let key = identity_bundle.tls_key();
+        let config = create_client_config(certs, key, trust_graph, own_did, None).unwrap();
 
         // Should have ALPN configured
         assert_eq!(config.alpn_protocols, vec![b"icn/1".to_vec()]);

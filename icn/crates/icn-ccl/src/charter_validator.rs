@@ -195,8 +195,8 @@ mod tests {
         let pass = ValidationResult::pass("test");
         let fail = ValidationResult::fail("test", "failed");
 
-        assert!(!CharterValidator::has_failures(&[pass.clone()]));
-        assert!(CharterValidator::has_failures(&[fail.clone()]));
+        assert!(!CharterValidator::has_failures(std::slice::from_ref(&pass)));
+        assert!(CharterValidator::has_failures(std::slice::from_ref(&fail)));
         assert!(CharterValidator::has_failures(&[pass, fail]));
     }
 
