@@ -261,8 +261,8 @@ impl CoopManager {
         if let Some(ref handle) = self.coop_handle {
             match handle.get_cooperative(id.clone()).await {
                 Ok(actor_coop) => {
-                    // Convert and return
-                    return Ok(convert_actor_coop_to_gateway(actor_coop));
+                    // Convert and return with member list
+                    return self.convert_actor_coop_with_members(handle, actor_coop).await;
                 }
                 Err(_) => {
                     // Fall through to local cache
@@ -431,6 +431,34 @@ impl CoopManager {
         updater(coop)?;
 
         Ok(coop.clone())
+    }
+
+    /// Convert actor Cooperative to gateway Coop with member list populated
+    async fn convert_actor_coop_with_members(
+        &self,
+        handle: &icn_coop::CoopHandle,
+        actor_coop: icn_coop::Cooperative,
+    ) -> Result<Coop> {
+        // Query members from actor
+        let actor_members = handle.list_members(actor_coop.id.clone()).await
+            .unwrap_or_else(|_| Vec::new());
+        
+        // Convert actor members to gateway members
+        let members = actor_members.into_iter().map(|m| {
+            CoopMember {
+                did: m.did,
+                role: convert_actor_role_to_gateway(&m.role),
+                joined_at: m.joined_at.timestamp() as u64,
+            }
+        }).collect();
+        
+        Ok(Coop {
+            id: actor_coop.id,
+            name: actor_coop.name,
+            members,
+            settings: CoopSettings::default(),
+            created_at: actor_coop.created_at.timestamp() as u64,
+        })
     }
 }
 
@@ -606,5 +634,18 @@ fn convert_actor_coop_to_gateway(actor_coop: icn_coop::Cooperative) -> Coop {
         }],
         settings: CoopSettings::default(),
         created_at: actor_coop.created_at.timestamp() as u64,
+    }
+}
+
+/// Convert actor role to gateway role
+fn convert_actor_role_to_gateway(role: &icn_coop::MemberRole) -> MemberRole {
+    match role {
+        icn_coop::MemberRole::Founder => MemberRole::Steward,
+        icn_coop::MemberRole::Officer => MemberRole::Facilitator,
+        icn_coop::MemberRole::BoardMember => MemberRole::Facilitator,
+        icn_coop::MemberRole::Member => MemberRole::Participant,
+        icn_coop::MemberRole::Worker => MemberRole::Participant,
+        icn_coop::MemberRole::Consumer => MemberRole::Participant,
+        icn_coop::MemberRole::Producer => MemberRole::Participant,
     }
 }
