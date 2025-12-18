@@ -539,13 +539,10 @@ async fn test_two_node_contract_deployment() {
 
 /// Tests contract execution after deployment to verify the full contract lifecycle.
 ///
-/// NOTE: This test is marked as ignored in the full test suite because it experiences
-/// intermittent QUIC/TLS connection failures when run alongside other tests in the same
-/// process. The test passes reliably when run in isolation:
-/// `cargo test -p icn-core --test contract_deployment_integration test_contract_execution_after_deployment`
-///
-/// Root cause: QUIC session state corruption between tests running in the same process,
-/// causing "aborted by peer: application protocol caused connection to be closed during handshake".
+/// Verifies:
+/// - Contract deployment via gossip
+/// - Contract retrieval on remote nodes
+/// - Successful execution of contract rules on both deployer and remote nodes
 #[tokio::test(flavor = "multi_thread")]
 async fn test_contract_execution_after_deployment() {
     // Create two nodes
@@ -712,23 +709,10 @@ async fn test_untrusted_deployer_rejected() {
 
 /// Test three-participant contract deployment.
 ///
-/// NOTE: This test is marked #[ignore] because it experiences intermittent QUIC
-/// connection failures when run as part of the full test suite. The test passes
-/// reliably when run in isolation (`cargo test test_three_participant`).
-///
-/// The issue appears to be related to QUIC/TLS session state that persists between
-/// tests when running in the same process. The error "aborted by peer: the application
-/// or application protocol caused the connection to be closed during the handshake"
-/// occurs when trying to send messages after connections are established.
-///
-/// Root cause investigation:
-/// - Test passes 100% in isolation
-/// - Test fails when test_large_contract_near_limits runs before it
-/// - Issue is NOT port conflicts (different port ranges used)
-/// - Issue is NOT timing (delays up to 2s don't help)
-/// - Likely some global QUIC/TLS state corruption
-///
-/// Run this test in isolation: `cargo test -p icn-core --test contract_deployment_integration test_three_participant`
+/// Verifies that contracts can be deployed with multiple participants, where:
+/// - All participants provide signatures during deployment
+/// - Contract is propagated via gossip to all participants
+/// - All nodes can execute the contract rules
 #[tokio::test(flavor = "multi_thread")]
 async fn test_three_participant_contract_deployment() {
     // Create three nodes (Alice, Bob, Carol)
@@ -935,13 +919,7 @@ async fn test_three_participant_contract_deployment() {
 /// - Contract deployment with initial state variables
 /// - State variable persistence across deployment
 /// - Contract retrieval on remote nodes after gossip sync
-///
-/// **Note**: This test is flaky when run in the full test suite due to QUIC session
-/// state corruption from parallel test execution. Run in isolation for reliable results:
-///
-/// ```bash
-/// cargo test -p icn-core --test contract_deployment_integration test_contract_with_state_variables -- --ignored
-/// ```
+/// - State is reset to initial values on each execution (stateless design)
 #[tokio::test(flavor = "multi_thread")]
 async fn test_contract_with_state_variables() {
     // Create two nodes
@@ -958,7 +936,8 @@ async fn test_contract_with_state_variables() {
         .await
         .expect("Failed to trust A from B");
 
-    // Connect nodes bidirectionally
+    // Connect nodes unidirectionally (Node A dials Node B)
+    // QUIC connections are bidirectional, so only one dial is needed
     let addr_b: std::net::SocketAddr = "127.0.0.1:19011".parse().unwrap();
     node_a
         .network_handle
@@ -966,16 +945,10 @@ async fn test_contract_with_state_variables() {
         .await
         .expect("Failed to dial node B");
 
-    let addr_a: std::net::SocketAddr = "127.0.0.1:19010".parse().unwrap();
-    node_b
-        .network_handle
-        .dial(addr_a, node_a.did.clone())
-        .await
-        .expect("Failed to dial node A");
-
-    // Wait for bidirectional connections to establish (QUIC/TLS handshake + session setup)
-    // Increased from 500ms to 4s to handle parallel test execution under heavy load
-    sleep(Duration::from_millis(4000)).await;
+    // Wait for connection and Hello handshake to fully complete
+    // The Hello message is sent asynchronously after dial, so we need to wait
+    // for both the QUIC connection AND the Hello exchange to finish
+    sleep(Duration::from_millis(3000)).await;
 
     // Create contract with state variables
     let contract = Contract::new("CounterContract".to_string())
@@ -1172,7 +1145,8 @@ async fn test_contract_with_ledger_integration() {
         .await
         .expect("Failed to trust A from B");
 
-    // Connect nodes bidirectionally
+    // Connect nodes unidirectionally (Node A dials Node B)
+    // QUIC connections are bidirectional, so only one dial is needed
     let addr_b: std::net::SocketAddr = "127.0.0.1:19013".parse().unwrap();
     node_a
         .network_handle
@@ -1180,17 +1154,10 @@ async fn test_contract_with_ledger_integration() {
         .await
         .expect("Failed to dial node B");
 
-    let addr_a: std::net::SocketAddr = "127.0.0.1:19012".parse().unwrap();
-    node_b
-        .network_handle
-        .dial(addr_a, node_a.did.clone())
-        .await
-        .expect("Failed to dial node A");
-
-    // Wait for bidirectional connections to establish (QUIC/TLS handshake + session setup)
-    // Increased from 500ms to 5s to handle parallel test execution under heavy load
-    // This test is more complex (ledger capabilities) so needs extra time
-    sleep(Duration::from_millis(5000)).await;
+    // Wait for connection and Hello handshake to fully complete
+    // The Hello message is sent asynchronously after dial, so we need to wait
+    // for both the QUIC connection AND the Hello exchange to finish
+    sleep(Duration::from_millis(3000)).await;
 
     // Create contract with ledger capabilities and currency
     let contract = Contract::new("ServiceAgreement".to_string())
