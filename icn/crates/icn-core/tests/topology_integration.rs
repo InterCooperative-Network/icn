@@ -330,18 +330,11 @@ async fn test_backbone_categorization() -> Result<()> {
 
 /// Test multi-region topology neighbor categorization.
 ///
-/// NOTE: This test is marked #[ignore] because it experiences intermittent connection
-/// failures when run as part of the full test suite. The test passes reliably when
-/// run in isolation.
-///
-/// Similar to other multi-node tests, this appears to be related to QUIC/TLS session
-/// state corruption or insufficient warmup time when multiple tests run in parallel.
-///
-/// Run this test in isolation:
-/// ```
-/// cargo test -p icn-core --test topology_integration test_multi_region_topology -- --ignored
-/// ```
-#[tokio::test]
+/// Verifies that nodes correctly categorize peers based on topology metadata:
+/// - Local cluster: same region and cluster_id
+/// - Regional: same region, different cluster_id  
+/// - Backbone: different region
+#[tokio::test(flavor = "multi_thread")]
 async fn test_multi_region_topology() -> Result<()> {
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
     let _ = tracing_subscriber::fmt::try_init();
@@ -361,12 +354,31 @@ async fn test_multi_region_topology() -> Result<()> {
     node_a.dial(&node_c).await?;
     node_a.dial(&node_d).await?;
 
-    // Wait for handshakes (increased for CI environments)
-    tokio::time::sleep(Duration::from_millis(4000)).await;
+    // Wait for handshakes and categorization with retry logic
+    // Handshakes can take variable time depending on system load
+    // Use a longer timeout for CI environments (up to 10 seconds)
+    let mut counts_a = node_a.get_neighbor_counts().await;
+    for attempt in 1..=40 {
+        tokio::time::sleep(Duration::from_millis(250)).await;
+        counts_a = node_a.get_neighbor_counts().await;
+        
+        // Check if all peers are categorized correctly
+        if counts_a.local_cluster == 1 && counts_a.regional == 1 && counts_a.backbone == 1 {
+            info!("All peers categorized correctly after {} attempts ({} ms)", 
+                  attempt, attempt * 250);
+            break;
+        }
+        
+        if attempt % 5 == 0 {
+            info!(
+                "Attempt {}: local_cluster={}, regional={}, backbone={} (waiting...)",
+                attempt, counts_a.local_cluster, counts_a.regional, counts_a.backbone
+            );
+        }
+    }
 
     // Verify Node A's neighbor categorization
-    let counts_a = node_a.get_neighbor_counts().await;
-    info!("Node A neighbor counts: {:?}", counts_a);
+    info!("Final Node A neighbor counts: {:?}", counts_a);
 
     assert_eq!(
         counts_a.local_cluster, 1,
@@ -386,15 +398,11 @@ async fn test_multi_region_topology() -> Result<()> {
 
 /// Test scope-aware peer sampling with multiple topology levels.
 ///
-/// NOTE: This test is marked #[ignore] because it experiences intermittent connection
-/// failures when run as part of the full test suite. The test passes reliably when
-/// run in isolation (`cargo test test_scope_aware_peer_sampling`).
-///
-/// Similar to test_three_participant_contract_deployment, this appears to be related
-/// to QUIC/TLS session state corruption when multiple tests run in the same process.
-///
-/// Run this test in isolation: `cargo test -p icn-core --test topology_integration test_scope_aware_peer_sampling`
-#[tokio::test]
+/// Verifies that peer sampling respects topology scopes:
+/// - LocalCluster scope returns only local cluster peers
+/// - Regional scope returns regional (different cluster, same region) peers
+/// - Global scope returns all connected peers
+#[tokio::test(flavor = "multi_thread")]
 async fn test_scope_aware_peer_sampling() -> Result<()> {
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
     let _ = tracing_subscriber::fmt::try_init();
