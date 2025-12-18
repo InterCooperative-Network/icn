@@ -397,6 +397,9 @@ mod tests {
             );
         }
 
+        // Small delay to ensure rate limiter state is consistent
+        tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+
         // 21st request should be rate limited (exceeds burst capacity of 20)
         let req = test::TestRequest::post()
             .uri("/auth/verify")
