@@ -120,9 +120,9 @@ log_step "Step 4/5: Deploying to K3s cluster..."
 DEPLOY_STARTED=true
 "$SCRIPT_DIR/deploy.sh" "$K3S_HOST" "$TAG"
 
-# Step 5: Clean up old images to prevent disk exhaustion
+# Step 5: Clean up old images to prevent disk exhaustion (keep current tag)
 log_step "Step 5/5: Cleaning up old images..."
-"$SCRIPT_DIR/cleanup-images.sh" "$K3S_HOST" 2>/dev/null || echo "Cleanup skipped (non-fatal)"
+"$SCRIPT_DIR/cleanup-images.sh" "$K3S_HOST" "$TAG" 2>/dev/null || echo "Cleanup skipped (non-fatal)"
 
 # Verify deployment (optional)
 if [ "$VERIFY" = true ]; then
