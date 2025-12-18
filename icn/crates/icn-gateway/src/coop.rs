@@ -220,15 +220,15 @@ impl CoopManager {
     pub async fn create_coop(&self, id: CoopId, name: String, owner: Did, timestamp: u64) -> Result<()> {
         // If we have a daemon handle, use it for persistent storage
         if let Some(ref handle) = self.coop_handle {
-            // Use actor for persistence
+            // Use actor for persistence with explicit ID from gateway
             let coop_type = icn_coop::CoopType::Worker; // Default type
             let _cooperative = handle
-                .create_cooperative(name.clone(), coop_type, owner.clone())
+                .create_cooperative(Some(id.clone()), name.clone(), coop_type, owner.clone())
                 .await
                 .map_err(|e| GatewayError::InternalError(format!("CoopActor error: {e}")))?;
             
-            // TODO: Actor generates its own ID, but gateway wants to use provided ID
-            // For now, also store in local cache for API compatibility
+            // Also store in local cache for fast lookup
+            // This allows get_coop to succeed without hitting the actor every time
         }
         
         // Store in local cache (used when no daemon, or for fast lookup)

@@ -20,6 +20,7 @@ pub struct CoopActor {
 
 pub enum CoopMessage {
     CreateCooperative {
+        id: Option<String>,  // Optional explicit ID from gateway
         name: String,
         coop_type: CoopType,
         founder: Did,
@@ -88,8 +89,8 @@ impl CoopActor {
         
         while let Some(msg) = self.rx.recv().await {
             match msg {
-                CoopMessage::CreateCooperative { name, coop_type, founder, reply } => {
-                    let result = self.handle_create_cooperative(name, coop_type, founder).await;
+                CoopMessage::CreateCooperative { id, name, coop_type, founder, reply } => {
+                    let result = self.handle_create_cooperative(id, name, coop_type, founder).await;
                     let _ = reply.send(result);
                 }
                 CoopMessage::GetCooperative { coop_id, reply } => {
@@ -128,11 +129,16 @@ impl CoopActor {
 
     async fn handle_create_cooperative(
         &mut self,
+        id: Option<String>,
         name: String,
         coop_type: CoopType,
         founder: Did,
     ) -> Result<Cooperative> {
-        let coop = Cooperative::new(name, coop_type);
+        let coop = if let Some(id) = id {
+            Cooperative::new_with_id(id, name, coop_type)
+        } else {
+            Cooperative::new(name, coop_type)
+        };
         let coop = self.lifecycle.create_cooperative(coop, founder.clone()).await?;
         self.store.save_cooperative(&coop)?;
         

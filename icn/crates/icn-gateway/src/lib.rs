@@ -17,7 +17,6 @@ pub mod commons_store;
 pub mod compute_events;
 pub mod compute_mgr;
 pub mod coop;
-pub mod coop_actor_adapter;
 pub mod email_client;
 pub mod error;
 pub mod events;

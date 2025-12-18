@@ -14,12 +14,14 @@ impl CoopHandle {
 
     pub async fn create_cooperative(
         &self,
+        id: Option<String>,
         name: String,
         coop_type: CoopType,
         founder: Did,
     ) -> Result<Cooperative> {
         let (reply, rx) = oneshot::channel();
         self.tx.send(CoopMessage::CreateCooperative {
+            id,
             name,
             coop_type,
             founder,

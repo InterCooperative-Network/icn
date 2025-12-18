@@ -68,10 +68,11 @@ pub enum MemberStatus {
 }
 
 impl Cooperative {
-    pub fn new(name: String, coop_type: CoopType) -> Self {
+    /// Create a new cooperative with explicit ID
+    pub fn new_with_id(id: String, name: String, coop_type: CoopType) -> Self {
         let now = Utc::now();
         Self {
-            id: format!("coop:{}", uuid::Uuid::new_v4()),
+            id,
             name,
             coop_type,
             status: CoopStatus::Forming,
@@ -81,6 +82,12 @@ impl Cooperative {
             updated_at: now,
             metadata: HashMap::new(),
         }
+    }
+
+    /// Create a new cooperative with auto-generated ID
+    pub fn new(name: String, coop_type: CoopType) -> Self {
+        let id = format!("coop:{}", uuid::Uuid::new_v4());
+        Self::new_with_id(id, name, coop_type)
     }
 
     pub fn can_transition_to(&self, new_status: &CoopStatus) -> bool {
