@@ -168,6 +168,18 @@ impl ReplayGuard {
     /// Prunes:
     /// - Inactive peer windows (no messages in max_peer_age_secs)
     /// - Old finalized sequences (>24 hours old)
+    ///
+    /// # Note on Bloom Filter Saturation
+    ///
+    /// For long-lived, high-volume peers, Bloom filters may saturate over time,
+    /// leading to increased false positive rates. This is acceptable because:
+    /// - False positives only cause temporary reordering issues
+    /// - The finalized set provides definitive replay protection for critical sequences
+    /// - Peer inactivity timeout eventually clears saturated filters
+    ///
+    /// For extremely high-volume scenarios (>10k messages/peer), consider:
+    /// - Lowering max_peer_age_secs to rotate Bloom filters more frequently
+    /// - Implementing periodic Bloom filter reset (not currently implemented)
     pub fn cleanup(&mut self) {
         let max_age = Duration::from_secs(self.max_peer_age_secs);
         let finalized_max_age = Duration::from_secs(24 * 60 * 60); // 24 hours

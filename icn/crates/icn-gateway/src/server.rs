@@ -8,7 +8,7 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::info;
+use tracing::{info, warn};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
@@ -17,7 +17,7 @@ use crate::auth::AuthManager;
 use crate::commons_mgr::CommonsManager;
 use crate::compute_mgr::ComputeManager;
 use crate::coop::CoopManager;
-use crate::error::Result;
+use crate::error::{GatewayError, Result};
 use crate::events::EventBroadcaster;
 use crate::federation_mgr::FederationManager;
 use crate::governance_mgr::GovernanceManager;
@@ -123,6 +123,25 @@ impl GatewayServer {
     /// Run the gateway server
     pub async fn run(self) -> Result<()> {
         info!("Starting ICN Gateway on {}", self.bind_addr);
+
+        // SECURITY: Validate JWT secret is configured
+        if self.jwt_secret.is_empty() {
+            return Err(GatewayError::InternalError(
+                "SECURITY: Gateway cannot start with empty JWT secret. \
+                 Set ICN_GATEWAY_JWT_secret environment variable or provide --gateway-jwt-secret flag. \
+                 The secret should be at least 32 cryptographically random bytes.".to_string()
+            ));
+        }
+        
+        // SECURITY: Warn if JWT secret is too short
+        if self.jwt_secret.len() < 32 {
+            warn!(
+                "SECURITY WARNING: JWT secret is only {} bytes. \
+                 Recommended minimum is 32 bytes for HS256. \
+                 Tokens may be vulnerable to brute-force attacks.",
+                self.jwt_secret.len()
+            );
+        }
 
         // Create shared managers
         let auth_manager = Arc::new(AuthManager::new(self.jwt_secret));
