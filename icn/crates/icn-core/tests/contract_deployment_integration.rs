@@ -560,8 +560,8 @@ async fn test_contract_execution_after_deployment() {
         .await
         .expect("Failed to trust A from B");
 
-    // Connect nodes bidirectionally
-    // Node A dials Node B
+    // Connect nodes unidirectionally (Node A dials Node B)
+    // QUIC connections are bidirectional, so only one dial is needed
     let addr_b: std::net::SocketAddr = "127.0.0.1:19004".parse().unwrap();
     node_a
         .network_handle
@@ -569,17 +569,10 @@ async fn test_contract_execution_after_deployment() {
         .await
         .expect("Failed to dial node B");
 
-    // Node B dials Node A
-    let addr_a: std::net::SocketAddr = "127.0.0.1:19003".parse().unwrap();
-    node_b
-        .network_handle
-        .dial(addr_a, node_a.did.clone())
-        .await
-        .expect("Failed to dial node A");
-
-    // Wait for bidirectional connections to establish (QUIC/TLS handshake + session setup)
-    // Increased from 500ms to 4s to handle parallel test execution under heavy load
-    sleep(Duration::from_millis(4000)).await;
+    // Wait for connection and Hello handshake to fully complete
+    // The Hello message is sent asynchronously after dial, so we need to wait
+    // for both the QUIC connection AND the Hello exchange to finish
+    sleep(Duration::from_millis(3000)).await;
 
     // Create contract with a rule
     let contract = Contract::new("Calculator".to_string())
