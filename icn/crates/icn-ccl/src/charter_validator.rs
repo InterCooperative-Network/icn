@@ -21,7 +21,10 @@ pub struct CharterValidator {
 impl CharterValidator {
     /// Create a new charter validator
     pub fn new(domain_id: String, rules: CharterRuleSet) -> Self {
-        Self { _domain_id: domain_id, rules }
+        Self {
+            _domain_id: domain_id,
+            rules,
+        }
     }
 
     /// Create a default validator for cooperatives
@@ -72,7 +75,7 @@ impl CharterValidator {
         // Validate against transaction rules
         // For now, we perform basic structural validation
         // Full CCL expression evaluation can be added when needed
-        
+
         for rule in &self.rules.transaction_rules {
             let result = self.evaluate_rule_basic(rule, entry, &total_debits, &total_credits);
             results.push(result);
@@ -99,7 +102,7 @@ impl CharterValidator {
         // 1. Parse the rule expression AST
         // 2. Check against ledger state
         // 3. Evaluate conditions
-        
+
         // This is a hook point for future full CCL integration
         ValidationResult::pass(rule.name())
     }
@@ -149,7 +152,7 @@ mod tests {
 
     fn create_test_entry(author: icn_identity::Did, debit: i64, credit: i64) -> JournalEntry {
         let receiver = IdentityBundle::generate().unwrap().did().clone();
-        
+
         JournalEntryBuilder::new(author.clone())
             .debit(author, "hours".to_string(), debit)
             .credit(receiver, "hours".to_string(), credit)
@@ -211,8 +214,10 @@ mod tests {
 
     #[test]
     fn test_create_hook() {
-        let validator =
-            Arc::new(CharterValidator::cooperative_default("test-coop".to_string(), 500));
+        let validator = Arc::new(CharterValidator::cooperative_default(
+            "test-coop".to_string(),
+            500,
+        ));
 
         let hook = validator.create_hook();
 
@@ -226,8 +231,7 @@ mod tests {
 
     #[test]
     fn test_add_transaction_rule() {
-        let mut validator =
-            CharterValidator::cooperative_default("test-coop".to_string(), 500);
+        let mut validator = CharterValidator::cooperative_default("test-coop".to_string(), 500);
         let initial_count = validator.rules.transaction_rules.len();
 
         validator.add_transaction_rule(CharterRule::transaction_credit_limit());

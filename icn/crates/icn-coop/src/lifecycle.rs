@@ -1,6 +1,6 @@
-use crate::{Cooperative, CoopStatus, CoopError, Result};
-use icn_identity::Did;
+use crate::{CoopError, CoopStatus, Cooperative, Result};
 use chrono::Utc;
+use icn_identity::Did;
 use tracing::{info, warn};
 
 pub struct LifecycleManager {
@@ -34,14 +34,14 @@ impl LifecycleManager {
         founder: Did,
     ) -> Result<Cooperative> {
         info!("Creating cooperative: {} by {}", coop.name, founder);
-        
+
         // Create governance domain (will be implemented when wired to governance)
         let domain_id = format!("coop.{}", coop.id);
-        
+
         coop.domain_id = Some(domain_id);
         coop.status = CoopStatus::Forming;
         coop.updated_at = Utc::now();
-        
+
         Ok(coop)
     }
 
@@ -51,53 +51,53 @@ impl LifecycleManager {
         charter_hash: String,
     ) -> Result<Cooperative> {
         if !coop.can_transition_to(&CoopStatus::Active) {
-            return Err(CoopError::InvalidStateTransition(
-                format!("Cannot activate from {:?}", coop.status)
-            ));
+            return Err(CoopError::InvalidStateTransition(format!(
+                "Cannot activate from {:?}",
+                coop.status
+            )));
         }
 
         info!("Activating cooperative: {}", coop.id);
-        
+
         coop.status = CoopStatus::Active;
         coop.charter_hash = Some(charter_hash);
         coop.updated_at = Utc::now();
-        
+
         Ok(coop)
     }
 
-    pub async fn suspend(
-        &self,
-        mut coop: Cooperative,
-        reason: String,
-    ) -> Result<Cooperative> {
+    pub async fn suspend(&self, mut coop: Cooperative, reason: String) -> Result<Cooperative> {
         if !coop.can_transition_to(&CoopStatus::Suspended) {
-            return Err(CoopError::InvalidStateTransition(
-                format!("Cannot suspend from {:?}", coop.status)
-            ));
+            return Err(CoopError::InvalidStateTransition(format!(
+                "Cannot suspend from {:?}",
+                coop.status
+            )));
         }
 
         warn!("Suspending cooperative {}: {}", coop.id, reason);
-        
+
         coop.status = CoopStatus::Suspended;
-        coop.metadata.insert("suspension_reason".to_string(), reason);
+        coop.metadata
+            .insert("suspension_reason".to_string(), reason);
         coop.updated_at = Utc::now();
-        
+
         Ok(coop)
     }
 
     pub async fn resume(&self, mut coop: Cooperative) -> Result<Cooperative> {
         if coop.status != CoopStatus::Suspended {
-            return Err(CoopError::InvalidStateTransition(
-                format!("Cannot resume from {:?}", coop.status)
-            ));
+            return Err(CoopError::InvalidStateTransition(format!(
+                "Cannot resume from {:?}",
+                coop.status
+            )));
         }
 
         info!("Resuming cooperative: {}", coop.id);
-        
+
         coop.status = CoopStatus::Active;
         coop.metadata.remove("suspension_reason");
         coop.updated_at = Utc::now();
-        
+
         Ok(coop)
     }
 
@@ -107,32 +107,38 @@ impl LifecycleManager {
         initiator: Did,
     ) -> Result<Cooperative> {
         if !coop.can_transition_to(&CoopStatus::Dissolving) {
-            return Err(CoopError::InvalidStateTransition(
-                format!("Cannot dissolve from {:?}", coop.status)
-            ));
+            return Err(CoopError::InvalidStateTransition(format!(
+                "Cannot dissolve from {:?}",
+                coop.status
+            )));
         }
 
-        info!("Starting dissolution of cooperative {} by {}", coop.id, initiator);
-        
+        info!(
+            "Starting dissolution of cooperative {} by {}",
+            coop.id, initiator
+        );
+
         coop.status = CoopStatus::Dissolving;
-        coop.metadata.insert("dissolution_initiator".to_string(), initiator.to_string());
+        coop.metadata
+            .insert("dissolution_initiator".to_string(), initiator.to_string());
         coop.updated_at = Utc::now();
-        
+
         Ok(coop)
     }
 
     pub async fn complete_dissolution(&self, mut coop: Cooperative) -> Result<Cooperative> {
         if !coop.can_transition_to(&CoopStatus::Dissolved) {
-            return Err(CoopError::InvalidStateTransition(
-                format!("Cannot complete dissolution from {:?}", coop.status)
-            ));
+            return Err(CoopError::InvalidStateTransition(format!(
+                "Cannot complete dissolution from {:?}",
+                coop.status
+            )));
         }
 
         info!("Completing dissolution of cooperative: {}", coop.id);
-        
+
         coop.status = CoopStatus::Dissolved;
         coop.updated_at = Utc::now();
-        
+
         Ok(coop)
     }
 }

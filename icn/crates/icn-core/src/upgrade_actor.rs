@@ -1,7 +1,7 @@
 //! Upgrade Coordinator Actor
 //!
 //! Coordinates network-wide protocol upgrades using gossip and governance.
-//! 
+//!
 //! # Architecture
 //! - Monitors upgrade proposals via governance events
 //! - Tracks version adoption across network peers
@@ -41,14 +41,14 @@ pub struct UpgradeStatus {
 pub enum UpgradeMessage {
     /// Announce version running
     VersionAnnounce { version: String, did: Did },
-    
+
     /// Propose network upgrade
     UpgradeProposal {
         target_version: String,
         proposed_by: Did,
         activation_time: u64,
     },
-    
+
     /// Acknowledge upgrade readiness
     UpgradeReady { version: String, did: Did },
 }
@@ -78,12 +78,17 @@ impl UpgradeHandle {
             .send(UpgradeActorMsg::GetStatus { reply: reply_tx })
             .await
             .map_err(|e| anyhow::anyhow!("Failed to send message: {e}"))?;
-        reply_rx.await
+        reply_rx
+            .await
             .map_err(|e| anyhow::anyhow!("Failed to receive reply: {e}"))
     }
 
     /// Propose a network-wide upgrade
-    pub async fn propose_upgrade(&self, target_version: String, activation_time: u64) -> Result<()> {
+    pub async fn propose_upgrade(
+        &self,
+        target_version: String,
+        activation_time: u64,
+    ) -> Result<()> {
         let (reply_tx, reply_rx) = tokio::sync::oneshot::channel();
         self.tx
             .send(UpgradeActorMsg::ProposeUpgrade {
@@ -93,7 +98,8 @@ impl UpgradeHandle {
             })
             .await
             .map_err(|e| anyhow::anyhow!("Failed to send message: {e}"))?;
-        reply_rx.await
+        reply_rx
+            .await
             .map_err(|e| anyhow::anyhow!("Failed to receive reply: {e}"))?
     }
 }
@@ -104,7 +110,7 @@ pub struct UpgradeActor {
     current_version: String,
     _version_tracker: Arc<RwLock<VersionTracker>>,
     gossip_handle: GossipHandle,
-    
+
     // State
     target_version: Option<String>,
     activation_time: Option<u64>,
@@ -207,7 +213,7 @@ impl UpgradeActor {
         };
 
         let payload = bincode::serialize(&msg)?;
-        
+
         let mut gossip = self.gossip_handle.write().await;
         gossip
             .publish(UPGRADE_TOPIC, payload)
@@ -217,7 +223,11 @@ impl UpgradeActor {
         Ok(())
     }
 
-    async fn propose_upgrade(&mut self, target_version: String, activation_time: u64) -> Result<()> {
+    async fn propose_upgrade(
+        &mut self,
+        target_version: String,
+        activation_time: u64,
+    ) -> Result<()> {
         info!(
             "Proposing upgrade to version {} at {}",
             target_version, activation_time
@@ -233,7 +243,7 @@ impl UpgradeActor {
         };
 
         let payload = bincode::serialize(&msg)?;
-        
+
         let mut gossip = self.gossip_handle.write().await;
         gossip
             .publish(UPGRADE_TOPIC, payload)
@@ -245,11 +255,7 @@ impl UpgradeActor {
     async fn check_upgrade_readiness(&mut self) {
         if let Some(ref target) = self.target_version {
             let total_peers = self.peer_versions.len().max(1);
-            let target_count = self
-                .peer_versions
-                .values()
-                .filter(|v| *v == target)
-                .count();
+            let target_count = self.peer_versions.values().filter(|v| *v == target).count();
 
             let adoption_rate = target_count as f32 / total_peers as f32;
 
@@ -283,7 +289,7 @@ impl UpgradeActor {
             };
 
             let payload = bincode::serialize(&msg)?;
-            
+
             let mut gossip = self.gossip_handle.write().await;
             gossip
                 .publish(UPGRADE_TOPIC, payload)

@@ -67,7 +67,9 @@ pub async fn create_coop(
 
     // Note: Global cooperative limit is checked atomically inside create_coop()
     // to prevent TOCTOU race condition
-    coop_mgr.create_coop(req.id.clone(), req.name.clone(), owner, timestamp()?).await?;
+    coop_mgr
+        .create_coop(req.id.clone(), req.name.clone(), owner, timestamp()?)
+        .await?;
 
     // Track cooperative creation
     gateway::coops_created_inc();

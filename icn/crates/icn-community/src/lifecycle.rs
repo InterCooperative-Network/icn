@@ -21,13 +21,19 @@ impl CommunityLifecycle {
 
     pub fn form(&self, request: FormationRequest, governance_domain: String) -> Result<Community> {
         if request.founding_members.len() < self.min_founders {
-            return Err(CommunityError::NotPermitted(
-                format!("Need {} founders, have {}", self.min_founders, request.founding_members.len())
-            ));
+            return Err(CommunityError::NotPermitted(format!(
+                "Need {} founders, have {}",
+                self.min_founders,
+                request.founding_members.len()
+            )));
         }
 
-        let id = format!("community:{}", request.name.replace(' ', "-").to_lowercase());
-        let mut community = Community::new(id, request.name, request.community_type, governance_domain);
+        let id = format!(
+            "community:{}",
+            request.name.replace(' ', "-").to_lowercase()
+        );
+        let mut community =
+            Community::new(id, request.name, request.community_type, governance_domain);
         community.charter = request.charter_ccl;
         Ok(community)
     }

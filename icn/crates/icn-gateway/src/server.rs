@@ -126,7 +126,7 @@ impl GatewayServer {
 
         // Create shared managers
         let auth_manager = Arc::new(AuthManager::new(self.jwt_secret));
-        
+
         // Create cooperative manager (uses actor if handle available, otherwise in-memory)
         let coop_manager: Arc<CoopManager> = if let Some(handle) = self.coop_handle {
             info!("Cooperative manager connected to daemon (using CoopActor)");
@@ -135,7 +135,7 @@ impl GatewayServer {
             info!("Cooperative manager running standalone (in-memory only)");
             Arc::new(CoopManager::new())
         };
-        
+
         let governance_manager = Arc::new(GovernanceManager::new());
         let invite_manager = Arc::new(crate::invite::InviteManager::new());
         let trust_manager = Arc::new(TrustManager::new());

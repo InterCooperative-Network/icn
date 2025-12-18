@@ -39,12 +39,12 @@ pub async fn init_coop_services(
     // Create cooperative store in dedicated subdirectory
     let store_path = config.store_path().join("cooperative");
     let sled_store = Arc::new(SledStore::open(&store_path)?);
-    
+
     // CoopStore needs direct Sled Db access
     let db = Arc::new(sled_store.db().clone());
     let coop_store = CoopStore::new(db.clone());
     let coop_store_for_gateway = Arc::new(CoopStore::new(db));
-    
+
     info!("Cooperative store initialized at {:?}", store_path);
 
     // Subscribe to gossip topic for distributed cooperative updates

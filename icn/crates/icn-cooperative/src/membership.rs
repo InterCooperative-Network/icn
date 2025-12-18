@@ -17,12 +17,34 @@ pub struct MembershipApplication {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MembershipAction {
     Apply(MembershipApplication),
-    Approve { coop_id: String, did: String },
-    Reject { coop_id: String, did: String, reason: String },
-    Remove { coop_id: String, did: String, reason: String },
-    ChangeTier { coop_id: String, did: String, new_tier: String },
-    Suspend { coop_id: String, did: String, reason: String },
-    Reinstate { coop_id: String, did: String },
+    Approve {
+        coop_id: String,
+        did: String,
+    },
+    Reject {
+        coop_id: String,
+        did: String,
+        reason: String,
+    },
+    Remove {
+        coop_id: String,
+        did: String,
+        reason: String,
+    },
+    ChangeTier {
+        coop_id: String,
+        did: String,
+        new_tier: String,
+    },
+    Suspend {
+        coop_id: String,
+        did: String,
+        reason: String,
+    },
+    Reinstate {
+        coop_id: String,
+        did: String,
+    },
 }
 
 /// Manages cooperative membership
@@ -33,7 +55,9 @@ pub struct MembershipManager {
 
 impl MembershipManager {
     pub fn new(min_trust_score: f32) -> Self {
-        Self { _min_trust_score: min_trust_score }
+        Self {
+            _min_trust_score: min_trust_score,
+        }
     }
 
     /// Add a new member to the cooperative
@@ -71,24 +95,36 @@ impl MembershipManager {
     }
 
     /// Remove a member from the cooperative
-    pub fn remove_member(&self, coop: &mut Cooperative, did: &str, refund_capital: bool) -> Result<()> {
+    pub fn remove_member(
+        &self,
+        coop: &mut Cooperative,
+        did: &str,
+        refund_capital: bool,
+    ) -> Result<()> {
         let member = coop
             .members
             .get_mut(did)
             .ok_or_else(|| CooperativeError::MemberNotFound(did.to_string()))?;
 
         member.active = false;
-        
+
         if refund_capital {
-            coop.capital_pool = coop.capital_pool.saturating_sub(member.capital_contribution);
+            coop.capital_pool = coop
+                .capital_pool
+                .saturating_sub(member.capital_contribution);
         }
-        
+
         coop.updated_at = Utc::now();
         Ok(())
     }
 
     /// Change a member's tier
-    pub fn change_tier(&self, coop: &mut Cooperative, did: &str, new_tier_name: &str) -> Result<()> {
+    pub fn change_tier(
+        &self,
+        coop: &mut Cooperative,
+        did: &str,
+        new_tier_name: &str,
+    ) -> Result<()> {
         let member = coop
             .members
             .get_mut(did)
@@ -99,7 +135,9 @@ impl MembershipManager {
             .iter()
             .find(|t| t.name == new_tier_name)
             .cloned()
-            .ok_or_else(|| CooperativeError::InvalidType(format!("Tier not found: {new_tier_name}")))?;
+            .ok_or_else(|| {
+                CooperativeError::InvalidType(format!("Tier not found: {new_tier_name}"))
+            })?;
 
         member.tier = new_tier;
         coop.updated_at = Utc::now();
@@ -145,7 +183,12 @@ impl MembershipManager {
     }
 
     /// Calculate profit share for a member
-    pub fn calculate_profit_share(&self, coop: &Cooperative, did: &str, total_profit: u64) -> Result<u64> {
+    pub fn calculate_profit_share(
+        &self,
+        coop: &Cooperative,
+        did: &str,
+        total_profit: u64,
+    ) -> Result<u64> {
         let member = coop
             .members
             .get(did)
@@ -166,7 +209,8 @@ impl MembershipManager {
             return Ok(0);
         }
 
-        let share = (total_profit as u128 * member.tier.profit_share_weight as u128) / total_weight as u128;
+        let share =
+            (total_profit as u128 * member.tier.profit_share_weight as u128) / total_weight as u128;
         Ok(share as u64)
     }
 }
@@ -220,7 +264,9 @@ mod tests {
             .add_member(&mut coop, "did:icn:bob".to_string(), "Worker", 1000)
             .unwrap();
 
-        let share = manager.calculate_profit_share(&coop, "did:icn:alice", 10000).unwrap();
+        let share = manager
+            .calculate_profit_share(&coop, "did:icn:alice", 10000)
+            .unwrap();
         assert_eq!(share, 5000); // 50% of profits
     }
 
@@ -232,9 +278,11 @@ mod tests {
         manager
             .add_member(&mut coop, "did:icn:alice".to_string(), "Worker", 1000)
             .unwrap();
-        
-        manager.remove_member(&mut coop, "did:icn:alice", true).unwrap();
-        
+
+        manager
+            .remove_member(&mut coop, "did:icn:alice", true)
+            .unwrap();
+
         assert_eq!(coop.capital_pool, 0);
         assert!(!coop.members.get("did:icn:alice").unwrap().active);
     }

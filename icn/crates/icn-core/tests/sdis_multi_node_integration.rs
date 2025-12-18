@@ -43,15 +43,16 @@ impl SdisTestNode {
         let trust_graph = Arc::new(RwLock::new(TrustGraph::new(trust_store, did.clone())));
 
         let trust_graph_clone = trust_graph.clone();
-        let trust_lookup = Arc::new(move |peer_did: &icn_identity::Did| {
-            match trust_graph_clone.try_read() {
-                Ok(trust) => match trust.trust_class(peer_did) {
-                    Ok(class) => Some(class),
+        let trust_lookup =
+            Arc::new(
+                move |peer_did: &icn_identity::Did| match trust_graph_clone.try_read() {
+                    Ok(trust) => match trust.trust_class(peer_did) {
+                        Ok(class) => Some(class),
+                        Err(_) => Some(TrustClass::Known),
+                    },
                     Err(_) => Some(TrustClass::Known),
                 },
-                Err(_) => Some(TrustClass::Known),
-            }
-        });
+            );
         let gossip_handle = GossipActor::spawn(did.clone(), trust_lookup);
 
         {
@@ -69,20 +70,21 @@ impl SdisTestNode {
         }
 
         let config = StewardConfig::default();
-        
+
         // Create shutdown channel
         let (shutdown_tx, _shutdown_rx) = tokio::sync::broadcast::channel(16);
-        
+
         // For tests, we don't need actual gossip sending
         let send_gossip = None;
-        
+
         let steward_handle = icn_steward::StewardActor::spawn(
             did.clone(),
             keypair.clone(),
             config,
             shutdown_tx,
             send_gossip,
-        ).await?;
+        )
+        .await?;
 
         info!("Steward '{}' initialized", name);
 
@@ -117,13 +119,15 @@ async fn test_steward_actor_initialization() -> Result<()> {
 
     // Verify steward handle is responsive
     let stats = steward.steward_handle.get_stats().await?;
-    
+
     assert_eq!(stats.active_enrollments, 0);
     assert_eq!(stats.active_recoveries, 0);
     assert_eq!(stats.vui_registry_size, 0);
 
-    info!("✓ Steward initialized with stats: enrollments={}, recoveries={}, vui_size={}",
-        stats.active_enrollments, stats.active_recoveries, stats.vui_registry_size);
+    info!(
+        "✓ Steward initialized with stats: enrollments={}, recoveries={}, vui_size={}",
+        stats.active_enrollments, stats.active_recoveries, stats.vui_registry_size
+    );
 
     println!("✅ Steward actor initialization verified");
 
@@ -298,9 +302,13 @@ async fn test_steward_stats_tracking() -> Result<()> {
     assert_eq!(stats.enrollments_completed, 0);
     assert_eq!(stats.recoveries_completed, 0);
 
-    info!("Stats: enrollments={}/{}, recoveries={}/{}",
-        stats.active_enrollments, stats.enrollments_completed,
-        stats.active_recoveries, stats.recoveries_completed);
+    info!(
+        "Stats: enrollments={}/{}, recoveries={}/{}",
+        stats.active_enrollments,
+        stats.enrollments_completed,
+        stats.active_recoveries,
+        stats.recoveries_completed
+    );
 
     println!("✅ Statistics tracking verified");
 

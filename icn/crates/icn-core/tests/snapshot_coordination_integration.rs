@@ -4,7 +4,7 @@
 
 use anyhow::Result;
 use icn_identity::IdentityBundle;
-use icn_snapshot::{SnapshotCoordinator, SnapshotConfig, SnapshotMessage};
+use icn_snapshot::{SnapshotConfig, SnapshotCoordinator, SnapshotMessage};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::time::{sleep, Duration};
@@ -12,9 +12,7 @@ use tokio::time::{sleep, Duration};
 #[tokio::test]
 async fn test_three_node_snapshot_coordination() -> Result<()> {
     // Initialize tracing for debugging
-    let _ = tracing_subscriber::fmt()
-        .with_test_writer()
-        .try_init();
+    let _ = tracing_subscriber::fmt().with_test_writer().try_init();
 
     // Create three nodes with identities
     let node_a = IdentityBundle::generate()?;
@@ -70,7 +68,7 @@ async fn test_three_node_snapshot_coordination() -> Result<()> {
         .await
         .handle_message(&did_a, init_msg.clone())
         .await?;
-    
+
     let responses_c = coordinator_c
         .write()
         .await
@@ -78,15 +76,21 @@ async fn test_three_node_snapshot_coordination() -> Result<()> {
         .await?;
 
     println!("✓ Node B and C received initiate message");
-    
+
     // Verify Node B sent ACK and Marker
     assert_eq!(responses_b.len(), 2, "Node B should send ACK + Marker");
-    assert!(matches!(responses_b[0], SnapshotMessage::SnapshotAck { .. }));
+    assert!(matches!(
+        responses_b[0],
+        SnapshotMessage::SnapshotAck { .. }
+    ));
     assert!(matches!(responses_b[1], SnapshotMessage::Marker { .. }));
-    
+
     // Verify Node C sent ACK and Marker
     assert_eq!(responses_c.len(), 2, "Node C should send ACK + Marker");
-    assert!(matches!(responses_c[0], SnapshotMessage::SnapshotAck { .. }));
+    assert!(matches!(
+        responses_c[0],
+        SnapshotMessage::SnapshotAck { .. }
+    ));
     assert!(matches!(responses_c[1], SnapshotMessage::Marker { .. }));
 
     println!("✓ Node B and C sent ACK + Marker");
@@ -95,14 +99,14 @@ async fn test_three_node_snapshot_coordination() -> Result<()> {
     // Extract ACKs
     let ack_b = responses_b[0].clone();
     let ack_c = responses_c[0].clone();
-    
+
     // Node A also needs to ACK itself (since it's a participant)
     let responses_a_self = coordinator_a
         .write()
         .await
         .handle_message(&did_a, init_msg.clone())
         .await?;
-    
+
     assert_eq!(responses_a_self.len(), 2);
     let ack_a = responses_a_self[0].clone();
 
@@ -112,13 +116,13 @@ async fn test_three_node_snapshot_coordination() -> Result<()> {
         .await
         .handle_message(&did_a, ack_a)
         .await?;
-    
+
     let response_after_ack_b = coordinator_a
         .write()
         .await
         .handle_message(&did_b, ack_b)
         .await?;
-    
+
     let response_after_ack_c = coordinator_a
         .write()
         .await
@@ -156,10 +160,7 @@ async fn test_three_node_snapshot_coordination() -> Result<()> {
         assert_eq!(complete_id, &snapshot_id);
         assert_eq!(coordinator, &did_a);
         assert_eq!(complete_participants, &participants);
-        println!(
-            "✓ Global state root: {}",
-            hex::encode(global_state_root)
-        );
+        println!("✓ Global state root: {}", hex::encode(global_state_root));
     }
 
     // Nodes B and C receive SnapshotComplete
@@ -169,13 +170,13 @@ async fn test_three_node_snapshot_coordination() -> Result<()> {
             .await
             .handle_message(&did_a, complete.clone())
             .await?;
-        
+
         coordinator_c
             .write()
             .await
             .handle_message(&did_a, complete.clone())
             .await?;
-        
+
         // Node A also needs to handle its own SnapshotComplete
         coordinator_a
             .write()
@@ -197,7 +198,7 @@ async fn test_three_node_snapshot_coordination() -> Result<()> {
         coordinator_c.read().await.is_complete(&snapshot_id).await,
         "Node C should mark snapshot as complete"
     );
-    
+
     // Give async tasks time to complete
     sleep(Duration::from_millis(100)).await;
 

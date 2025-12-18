@@ -2,7 +2,7 @@
 
 use anyhow::Result;
 use icn_identity::Did;
-use icn_snapshot::{SnapshotCoordinator, SnapshotConfig};
+use icn_snapshot::{SnapshotConfig, SnapshotCoordinator};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::info;
@@ -11,11 +11,8 @@ use tracing::info;
 pub async fn init_snapshot_coordinator(did: Did) -> Result<Arc<RwLock<SnapshotCoordinator>>> {
     let config = SnapshotConfig::default();
     let coordinator = SnapshotCoordinator::new(did.clone(), config);
-    
-    info!(
-        "Snapshot coordinator initialized for DID: {}",
-        did
-    );
-    
+
+    info!("Snapshot coordinator initialized for DID: {}", did);
+
     Ok(Arc::new(RwLock::new(coordinator)))
 }

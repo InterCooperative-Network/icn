@@ -1,12 +1,12 @@
 use crate::{
-    Cooperative, Member, CoopType, MemberRole, Result,
-    LifecycleManager, MembershipManager, CoopStore,
+    CoopStore, CoopType, Cooperative, LifecycleManager, Member, MemberRole, MembershipManager,
+    Result,
 };
-use icn_identity::Did;
 use icn_gossip::GossipActor;
+use icn_identity::Did;
+use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
 use tracing::info;
-use std::sync::Arc;
 
 const _COOP_TOPIC: &str = "coop:updates";
 
@@ -20,7 +20,7 @@ pub struct CoopActor {
 
 pub enum CoopMessage {
     CreateCooperative {
-        id: Option<String>,  // Optional explicit ID from gateway
+        id: Option<String>, // Optional explicit ID from gateway
         name: String,
         coop_type: CoopType,
         founder: Did,
@@ -60,15 +60,12 @@ pub enum CoopMessage {
 }
 
 impl CoopActor {
-    pub fn spawn(
-        store: CoopStore,
-        gossip: Option<Arc<GossipActor>>,
-    ) -> mpsc::Sender<CoopMessage> {
+    pub fn spawn(store: CoopStore, gossip: Option<Arc<GossipActor>>) -> mpsc::Sender<CoopMessage> {
         let (tx, rx) = mpsc::channel(100);
-        
+
         let lifecycle = LifecycleManager::new();
         let membership = MembershipManager::new();
-        
+
         let mut actor = Self {
             rx,
             store,
@@ -76,21 +73,29 @@ impl CoopActor {
             membership,
             _gossip: gossip,
         };
-        
+
         tokio::spawn(async move {
             actor.run().await;
         });
-        
+
         tx
     }
 
     async fn run(&mut self) {
         info!("CoopActor started");
-        
+
         while let Some(msg) = self.rx.recv().await {
             match msg {
-                CoopMessage::CreateCooperative { id, name, coop_type, founder, reply } => {
-                    let result = self.handle_create_cooperative(id, name, coop_type, founder).await;
+                CoopMessage::CreateCooperative {
+                    id,
+                    name,
+                    coop_type,
+                    founder,
+                    reply,
+                } => {
+                    let result = self
+                        .handle_create_cooperative(id, name, coop_type, founder)
+                        .await;
                     let _ = reply.send(result);
                 }
                 CoopMessage::GetCooperative { coop_id, reply } => {
@@ -101,15 +106,30 @@ impl CoopActor {
                     let result = self.store.list_cooperatives();
                     let _ = reply.send(result);
                 }
-                CoopMessage::ActivateCooperative { coop_id, charter_hash, reply } => {
-                    let result = self.handle_activate_cooperative(coop_id, charter_hash).await;
+                CoopMessage::ActivateCooperative {
+                    coop_id,
+                    charter_hash,
+                    reply,
+                } => {
+                    let result = self
+                        .handle_activate_cooperative(coop_id, charter_hash)
+                        .await;
                     let _ = reply.send(result);
                 }
-                CoopMessage::AddMember { coop_id, did, role, reply } => {
+                CoopMessage::AddMember {
+                    coop_id,
+                    did,
+                    role,
+                    reply,
+                } => {
                     let result = self.handle_add_member(coop_id, did, role).await;
                     let _ = reply.send(result);
                 }
-                CoopMessage::ApproveMember { coop_id, did, reply } => {
+                CoopMessage::ApproveMember {
+                    coop_id,
+                    did,
+                    reply,
+                } => {
                     let result = self.handle_approve_member(coop_id, did).await;
                     let _ = reply.send(result);
                 }
@@ -123,7 +143,7 @@ impl CoopActor {
                 }
             }
         }
-        
+
         info!("CoopActor stopped");
     }
 
@@ -139,18 +159,21 @@ impl CoopActor {
         } else {
             Cooperative::new(name, coop_type)
         };
-        let coop = self.lifecycle.create_cooperative(coop, founder.clone()).await?;
+        let coop = self
+            .lifecycle
+            .create_cooperative(coop, founder.clone())
+            .await?;
         self.store.save_cooperative(&coop)?;
-        
+
         // Add founder as first member
         let member = Member::new(founder, coop.id.clone(), MemberRole::Founder);
         let member = self.membership.add_member(member, 0.0).await?;
         let member = self.membership.approve_member(member).await?;
         self.store.save_member(&member)?;
-        
+
         // Announce to network
         self.announce_coop_update(&coop).await;
-        
+
         Ok(coop)
     }
 
@@ -162,9 +185,9 @@ impl CoopActor {
         let coop = self.store.get_cooperative(&coop_id)?;
         let coop = self.lifecycle.activate(coop, charter_hash).await?;
         self.store.save_cooperative(&coop)?;
-        
+
         self.announce_coop_update(&coop).await;
-        
+
         Ok(coop)
     }
 
@@ -176,23 +199,19 @@ impl CoopActor {
     ) -> Result<Member> {
         // Verify coop exists
         let _ = self.store.get_cooperative(&coop_id)?;
-        
+
         let member = Member::new(did, coop_id, role);
         let member = self.membership.add_member(member, 0.3).await?;
         self.store.save_member(&member)?;
-        
+
         Ok(member)
     }
 
-    async fn handle_approve_member(
-        &mut self,
-        coop_id: String,
-        did: Did,
-    ) -> Result<Member> {
+    async fn handle_approve_member(&mut self, coop_id: String, did: Did) -> Result<Member> {
         let member = self.store.get_member(&coop_id, &did)?;
         let member = self.membership.approve_member(member).await?;
         self.store.save_member(&member)?;
-        
+
         Ok(member)
     }
 

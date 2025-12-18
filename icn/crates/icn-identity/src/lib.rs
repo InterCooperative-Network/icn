@@ -96,12 +96,12 @@ impl HybridSignatureOrClassical {
             }
         }
     }
-    
+
     /// Convert to bytes for serialization
     pub fn to_bytes(&self) -> Vec<u8> {
         bincode::serialize(self).expect("Failed to serialize signature")
     }
-    
+
     /// Parse from bytes
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         bincode::deserialize(bytes).map_err(|e| anyhow::anyhow!("Failed to parse signature: {}", e))
@@ -223,7 +223,7 @@ pub struct KeyPair {
     secret_bytes: Zeroizing<[u8; 32]>,
     verifying_key: VerifyingKey,
     did: Did,
-    
+
     // Post-quantum keypair (optional, feature-gated)
     #[cfg(feature = "post-quantum")]
     pq_keypair: Option<icn_crypto_pq::MlDsaKeypair>,
@@ -283,7 +283,7 @@ impl KeyPair {
             pq_keypair: None, // Legacy keys don't have PQ component
         })
     }
-    
+
     /// Reconstruct a keypair with PQ keys from raw bytes
     #[cfg(feature = "post-quantum")]
     pub fn from_bytes_with_pq(
@@ -327,13 +327,13 @@ impl KeyPair {
     pub(crate) fn secret_bytes(&self) -> &[u8; 32] {
         &self.secret_bytes
     }
-    
+
     /// Check if this keypair has post-quantum keys
     #[cfg(feature = "post-quantum")]
     pub fn has_pq_keys(&self) -> bool {
         self.pq_keypair.is_some()
     }
-    
+
     /// Get the PQ public key if available
     #[cfg(feature = "post-quantum")]
     pub fn pq_public_key(&self) -> Option<icn_crypto_pq::MlDsaPublicKey> {
@@ -346,18 +346,18 @@ impl KeyPair {
         let signing_key = SigningKey::from_bytes(&self.secret_bytes);
         signing_key.sign(message)
     }
-    
+
     /// Sign a message with hybrid signature (if PQ keys available)
     #[cfg(feature = "post-quantum")]
     pub fn sign_hybrid(&self, message: &[u8]) -> Result<HybridSignatureOrClassical> {
         use ed25519_dalek::Signer;
         let signing_key = SigningKey::from_bytes(&self.secret_bytes);
         let classical_sig = signing_key.sign(message);
-        
+
         if let Some(ref pq_kp) = self.pq_keypair {
             let pq_sig = pq_kp.sign(message)?;
             Ok(HybridSignatureOrClassical::Hybrid(
-                icn_crypto_pq::HybridSignature::new(classical_sig, pq_sig)
+                icn_crypto_pq::HybridSignature::new(classical_sig, pq_sig),
             ))
         } else {
             Ok(HybridSignatureOrClassical::Classical(classical_sig))
@@ -372,7 +372,7 @@ impl KeyPair {
     pub fn to_signing_key_bytes(&self) -> [u8; 32] {
         *self.secret_bytes
     }
-    
+
     /// Export keypair for upgrade (PQ feature only)
     #[cfg(feature = "post-quantum")]
     pub fn export_for_upgrade(&self) -> ([u8; 32], [u8; 32]) {

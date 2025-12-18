@@ -1079,4 +1079,3 @@ mod tests {
         assert!(deserialized.gossip_state.is_some());
     }
 }
-

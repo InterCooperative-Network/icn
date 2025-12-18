@@ -217,7 +217,13 @@ impl CoopManager {
     }
 
     /// Create a new cooperative
-    pub async fn create_coop(&self, id: CoopId, name: String, owner: Did, timestamp: u64) -> Result<()> {
+    pub async fn create_coop(
+        &self,
+        id: CoopId,
+        name: String,
+        owner: Did,
+        timestamp: u64,
+    ) -> Result<()> {
         // If we have a daemon handle, use it for persistent storage
         if let Some(ref handle) = self.coop_handle {
             // Use actor for persistence with explicit ID from gateway
@@ -226,11 +232,11 @@ impl CoopManager {
                 .create_cooperative(Some(id.clone()), name.clone(), coop_type, owner.clone())
                 .await
                 .map_err(|e| GatewayError::InternalError(format!("CoopActor error: {e}")))?;
-            
+
             // Also store in local cache for fast lookup
             // This allows get_coop to succeed without hitting the actor every time
         }
-        
+
         // Store in local cache (used when no daemon, or for fast lookup)
         let mut coops = self
             .coops
@@ -262,14 +268,16 @@ impl CoopManager {
             match handle.get_cooperative(id.clone()).await {
                 Ok(actor_coop) => {
                     // Convert and return with member list
-                    return self.convert_actor_coop_with_members(handle, actor_coop).await;
+                    return self
+                        .convert_actor_coop_with_members(handle, actor_coop)
+                        .await;
                 }
                 Err(_) => {
                     // Fall through to local cache
                 }
             }
         }
-        
+
         // Fall back to local cache
         let coops = self
             .coops
@@ -317,14 +325,17 @@ impl CoopManager {
         if let Some(ref handle) = self.coop_handle {
             match handle.list_cooperatives().await {
                 Ok(actor_coops) => {
-                    return Ok(actor_coops.into_iter().map(convert_actor_coop_to_gateway).collect());
+                    return Ok(actor_coops
+                        .into_iter()
+                        .map(convert_actor_coop_to_gateway)
+                        .collect());
                 }
                 Err(_) => {
                     // Fall through to local cache
                 }
             }
         }
-        
+
         // Fall back to local cache
         let coops = self
             .coops
@@ -440,18 +451,21 @@ impl CoopManager {
         actor_coop: icn_coop::Cooperative,
     ) -> Result<Coop> {
         // Query members from actor
-        let actor_members = handle.list_members(actor_coop.id.clone()).await
+        let actor_members = handle
+            .list_members(actor_coop.id.clone())
+            .await
             .unwrap_or_else(|_| Vec::new());
-        
+
         // Convert actor members to gateway members
-        let members = actor_members.into_iter().map(|m| {
-            CoopMember {
+        let members = actor_members
+            .into_iter()
+            .map(|m| CoopMember {
                 did: m.did,
                 role: convert_actor_role_to_gateway(&m.role),
                 joined_at: m.joined_at.timestamp() as u64,
-            }
-        }).collect();
-        
+            })
+            .collect();
+
         Ok(Coop {
             id: actor_coop.id,
             name: actor_coop.name,
@@ -623,7 +637,7 @@ fn convert_actor_coop_to_gateway(actor_coop: icn_coop::Cooperative) -> Coop {
     // TODO: Query members separately for accurate member list
     // For now, create placeholder with founder
     let placeholder_did: Did = serde_json::from_str("\"did:icn:placeholder\"").unwrap();
-    
+
     Coop {
         id: actor_coop.id,
         name: actor_coop.name,

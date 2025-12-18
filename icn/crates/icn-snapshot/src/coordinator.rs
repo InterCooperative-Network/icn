@@ -3,7 +3,9 @@
 //! Implements the Chandy-Lamport distributed snapshot algorithm adapted
 //! for ICN's gossip-based architecture.
 
-use crate::protocol::{SnapshotConfig, SnapshotId, SnapshotMessage, SnapshotMetadata, SnapshotState};
+use crate::protocol::{
+    SnapshotConfig, SnapshotId, SnapshotMessage, SnapshotMetadata, SnapshotState,
+};
 use crate::StateSnapshot;
 use anyhow::{anyhow, Context, Result};
 use icn_identity::Did;
@@ -95,10 +97,7 @@ impl SnapshotCoordinator {
             participants,
         };
 
-        info!(
-            "Initiated distributed snapshot: {}",
-            snapshot_id.to_hex()
-        );
+        info!("Initiated distributed snapshot: {}", snapshot_id.to_hex());
 
         Ok((snapshot_id, msg))
     }
@@ -128,9 +127,10 @@ impl SnapshotCoordinator {
                 self.handle_ack(snapshot_id, node, state_hash, state_size)
                     .await
             }
-            SnapshotMessage::Marker { snapshot_id, sender } => {
-                self.handle_marker(snapshot_id, sender.clone()).await
-            }
+            SnapshotMessage::Marker {
+                snapshot_id,
+                sender,
+            } => self.handle_marker(snapshot_id, sender.clone()).await,
             SnapshotMessage::RequestState {
                 snapshot_id,
                 requester,
@@ -184,10 +184,7 @@ impl SnapshotCoordinator {
     ) -> Result<Vec<SnapshotMessage>> {
         // Check if we're a participant
         if !participants.contains(&self.own_did) {
-            debug!(
-                "Not a participant in snapshot {}",
-                snapshot_id.to_hex()
-            );
+            debug!("Not a participant in snapshot {}", snapshot_id.to_hex());
             return Ok(vec![]);
         }
 
@@ -238,10 +235,10 @@ impl SnapshotCoordinator {
         _state_size: u64,
     ) -> Result<Vec<SnapshotMessage>> {
         let mut snapshots = self.active_snapshots.write().await;
-        
+
         if let Some(metadata) = snapshots.get_mut(&snapshot_id) {
             metadata.add_participant_hash(node.clone(), state_hash);
-            
+
             info!(
                 "Received snapshot ACK from {} for {}",
                 node,
@@ -278,10 +275,10 @@ impl SnapshotCoordinator {
         sender: Did,
     ) -> Result<Vec<SnapshotMessage>> {
         let mut snapshots = self.active_snapshots.write().await;
-        
+
         if let Some(metadata) = snapshots.get_mut(&snapshot_id) {
             metadata.add_marker(sender.clone());
-            
+
             debug!(
                 "Received marker from {} for snapshot {}",
                 sender,
@@ -290,10 +287,7 @@ impl SnapshotCoordinator {
 
             // Check if all markers received
             if metadata.all_markers_received(&metadata.participants.clone()) {
-                info!(
-                    "All markers received for snapshot {}",
-                    snapshot_id.to_hex()
-                );
+                info!("All markers received for snapshot {}", snapshot_id.to_hex());
                 metadata.state = SnapshotState::Complete;
             }
         }
@@ -355,21 +349,26 @@ impl SnapshotCoordinator {
         data: Vec<u8>,
     ) -> Result<Vec<SnapshotMessage>> {
         let mut buffers = self.chunk_buffers.write().await;
-        
-        let buffer = buffers.entry(snapshot_id.clone()).or_insert_with(|| ChunkBuffer {
-            sender: self.own_did.clone(),
-            received_chunks: HashMap::new(),
-            data_size: 0,
-        });
-        
+
+        let buffer = buffers
+            .entry(snapshot_id.clone())
+            .or_insert_with(|| ChunkBuffer {
+                sender: self.own_did.clone(),
+                received_chunks: HashMap::new(),
+                data_size: 0,
+            });
+
         buffer.received_chunks.insert(chunk_index, data.clone());
         buffer.data_size += data.len();
-        
+
         debug!(
             "Received chunk {}/{} for snapshot {:?}, total size: {} bytes",
-            chunk_index + 1, total_chunks, snapshot_id, buffer.data_size
+            chunk_index + 1,
+            total_chunks,
+            snapshot_id,
+            buffer.data_size
         );
-        
+
         // Check if we have all chunks
         if buffer.received_chunks.len() == total_chunks as usize {
             // Reassemble in order
@@ -381,22 +380,26 @@ impl SnapshotCoordinator {
                     return Err(anyhow!("Missing chunk {i} during reassembly"));
                 }
             }
-            
+
             info!(
                 "Reassembled complete state for snapshot {:?}: {} bytes from {} chunks",
-                snapshot_id, reassembled.len(), total_chunks
+                snapshot_id,
+                reassembled.len(),
+                total_chunks
             );
-            
+
             // Store in completed snapshots
             let mut completed = self.completed_snapshots.write().await;
             if let Some(snapshot) = completed.get_mut(&snapshot_id) {
-                snapshot.participant_states.insert(buffer.sender.clone(), reassembled);
+                snapshot
+                    .participant_states
+                    .insert(buffer.sender.clone(), reassembled);
             }
-            
+
             // Clean up buffer
             buffers.remove(&snapshot_id);
         }
-        
+
         Ok(vec![])
     }
 
@@ -446,7 +449,7 @@ impl SnapshotCoordinator {
         expected_root: [u8; 32],
     ) -> Result<Vec<SnapshotMessage>> {
         let completed = self.completed_snapshots.read().await;
-        
+
         if let Some(snapshot) = completed.get(&snapshot_id) {
             let valid = snapshot.global_state_root == expected_root;
             let result = SnapshotMessage::VerificationResult {
@@ -475,11 +478,7 @@ impl SnapshotCoordinator {
         computed_root: [u8; 32],
     ) -> Result<Vec<SnapshotMessage>> {
         if valid {
-            info!(
-                "Snapshot {} verified by {}",
-                snapshot_id.to_hex(),
-                verifier
-            );
+            info!("Snapshot {} verified by {}", snapshot_id.to_hex(), verifier);
         } else {
             warn!(
                 "Snapshot {} verification FAILED by {} (expected root mismatch: {})",
@@ -496,7 +495,7 @@ impl SnapshotCoordinator {
     async fn capture_local_state(&self) -> Result<Vec<u8>> {
         // Create a snapshot of local state
         let snapshot = StateSnapshot::new();
-        
+
         // Serialize to bytes
         bincode::serialize(&snapshot).context("Failed to serialize state snapshot")
     }
@@ -647,7 +646,7 @@ mod tests {
             .handle_ack(snapshot_id.clone(), peer1.clone(), hash2, 1000)
             .await
             .unwrap();
-        
+
         let result = coordinator
             .handle_ack(snapshot_id.clone(), peer2.clone(), hash3, 1000)
             .await
@@ -655,6 +654,9 @@ mod tests {
 
         // Should get SnapshotComplete message
         assert_eq!(result.len(), 1);
-        assert!(matches!(result[0], SnapshotMessage::SnapshotComplete { .. }));
+        assert!(matches!(
+            result[0],
+            SnapshotMessage::SnapshotComplete { .. }
+        ));
     }
 }

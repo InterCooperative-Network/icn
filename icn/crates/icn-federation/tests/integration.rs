@@ -12,7 +12,7 @@ fn test_keypair() -> (KeyPair, Did) {
 #[test]
 fn test_cooperative_info_creation() {
     let (_keypair, did) = test_keypair();
-    
+
     let info = CooperativeInfo::new(
         "food-coop".to_string(),
         "Food Co-op".to_string(),
@@ -21,7 +21,7 @@ fn test_cooperative_info_creation() {
     )
     .with_gateway("https://food-coop.icn".to_string())
     .with_capability("clearing");
-    
+
     assert_eq!(info.coop_id, "food-coop");
     assert_eq!(info.name, "Food Co-op");
     assert_eq!(info.gateway_endpoints.len(), 1);
@@ -31,7 +31,7 @@ fn test_cooperative_info_creation() {
 #[test]
 fn test_cooperative_info_signature() {
     let (keypair, did) = test_keypair();
-    
+
     let info = CooperativeInfo::new(
         "tech-coop".to_string(),
         "Tech Cooperative".to_string(),
@@ -39,7 +39,7 @@ fn test_cooperative_info_signature() {
         FederationPolicy::Open,
     )
     .sign(&keypair);
-    
+
     assert!(!info.signature.is_empty());
     assert!(info.verify_signature().is_ok());
 }
@@ -54,7 +54,7 @@ fn test_federation_policy_open() {
 #[test]
 fn test_federation_policy_vouched() {
     let policy = FederationPolicy::vouched(3);
-    
+
     match policy {
         FederationPolicy::Vouched { min_vouches } => {
             assert_eq!(min_vouches, 3);
@@ -74,7 +74,7 @@ fn test_federation_policy_closed() {
 #[test]
 fn test_currency_info() {
     let currency = CurrencyInfo::new("FCC", "Food Coop Credits", 2);
-    
+
     assert_eq!(currency.symbol, "FCC");
     assert_eq!(currency.decimals, 2);
 }
@@ -96,14 +96,14 @@ fn test_currency_info_usd() {
 #[test]
 fn test_vouch_creation() {
     let (_keypair, did) = test_keypair();
-    
+
     let vouch = Vouch::new(
         "voucher-coop".to_string(),
         did.clone(),
         "new-coop".to_string(),
         0.8,
     );
-    
+
     assert_eq!(vouch.target_coop_id, "new-coop");
     assert_eq!(vouch.trust_score, 0.8);
 }
@@ -111,7 +111,7 @@ fn test_vouch_creation() {
 #[test]
 fn test_vouch_signature() {
     let (keypair, did) = test_keypair();
-    
+
     let vouch = Vouch::new(
         "voucher-coop".to_string(),
         did,
@@ -119,7 +119,7 @@ fn test_vouch_signature() {
         0.9,
     )
     .sign(&keypair);
-    
+
     assert!(!vouch.signature.is_empty());
     assert!(vouch.verify_signature().is_ok());
 }
@@ -127,7 +127,7 @@ fn test_vouch_signature() {
 #[test]
 fn test_vouch_expiry() {
     let (_keypair, did) = test_keypair();
-    
+
     let vouch = Vouch::new(
         "voucher-coop".to_string(),
         did,
@@ -135,7 +135,7 @@ fn test_vouch_expiry() {
         0.9,
     )
     .with_expiry(0); // Expired
-    
+
     assert!(vouch.is_expired());
 }
 
@@ -143,7 +143,7 @@ fn test_vouch_expiry() {
 fn test_bilateral_clearing_agreement() {
     let (_keypair1, did1) = test_keypair();
     let (_keypair2, did2) = test_keypair();
-    
+
     let agreement = BilateralClearingAgreement::new(
         "agreement-1".to_string(),
         "coop-1".to_string(),
@@ -154,7 +154,7 @@ fn test_bilateral_clearing_agreement() {
     .with_rate("hours", "USD", 25.0)
     .with_interval(SettlementInterval::Weekly)
     .with_max_imbalance(10000);
-    
+
     assert_eq!(agreement.coop_a, "coop-1");
     assert_eq!(agreement.max_imbalance, 10000);
     assert_eq!(agreement.get_rate("hours", "USD"), Some(25.0));
@@ -175,12 +175,12 @@ fn test_gossip_scope() {
 fn test_trust_attestation() {
     let (_keypair, did1) = test_keypair();
     let (_keypair2, did2) = test_keypair();
-    
+
     let evidence = vec![
         EvidenceSummary::new("transactions", "Transaction history").with_count(10),
         EvidenceSummary::new("disputes", "Dispute record").with_count(0),
     ];
-    
+
     let attestation = FederatedTrustAttestation {
         source_coop_id: "coop-1".to_string(),
         source_coop_did: did1,
@@ -192,7 +192,7 @@ fn test_trust_attestation() {
         expires_at: 2592000,
         signature: vec![],
     };
-    
+
     assert_eq!(attestation.trust_score, 0.8);
     assert_eq!(attestation.evidence_summary.len(), 2);
 }
@@ -200,7 +200,7 @@ fn test_trust_attestation() {
 #[test]
 fn test_evidence_summary() {
     let evidence = EvidenceSummary::new("transactions", "Transaction count").with_count(50);
-    
+
     assert_eq!(evidence.kind, "transactions");
     assert_eq!(evidence.count, Some(50));
 }

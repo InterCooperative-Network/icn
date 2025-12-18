@@ -179,9 +179,9 @@ impl ReplayGuard {
 
         // Prune old finalized sequences from remaining windows
         for window in self.sequences.values_mut() {
-            window
-                .finalized
-                .retain(|_, &mut finalized_at| now.duration_since(finalized_at) < finalized_max_age);
+            window.finalized.retain(|_, &mut finalized_at| {
+                now.duration_since(finalized_at) < finalized_max_age
+            });
         }
     }
 
@@ -473,12 +473,12 @@ mod tests {
             b"tx3".to_vec(),
         )
         .unwrap();
-        
+
         assert!(guard.check(&envelope3).is_ok());
-        
+
         // Finalize sequence 2
         assert!(guard.finalize(keypair.did(), 2).is_ok());
-        
+
         // Now envelope3 can still be used (not finalized)
         // But envelope2 would be rejected as finalized if we check again
         assert!(guard.is_finalized(keypair.did(), 2));

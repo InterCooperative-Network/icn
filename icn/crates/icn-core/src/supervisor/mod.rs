@@ -150,7 +150,8 @@ impl Supervisor {
             let recovery_store = trust_services.recovery_store.clone();
 
             // Initialize snapshot coordinator
-            let snapshot_coordinator = init_snapshot::init_snapshot_coordinator(did.clone()).await?;
+            let snapshot_coordinator =
+                init_snapshot::init_snapshot_coordinator(did.clone()).await?;
             info!("Snapshot coordinator initialized");
 
             // Create trust lookup closure for gossip actor
@@ -191,15 +192,12 @@ impl Supervisor {
             let contract_actor_handle = ledger_services.contract_actor.clone();
 
             // Initialize cooperative services
-            let coop_services = init_coop::init_coop_services(
-                &self.config,
-                gossip_handle.clone(),
-            )
-            .await?;
+            let coop_services =
+                init_coop::init_coop_services(&self.config, gossip_handle.clone()).await?;
             icn_obs::metrics::supervisor::actor_spawned_inc("coop");
             let coop_handle = coop_services.coop_handle.clone();
             let _coop_store = coop_services.coop_store.clone(); // Available for future use
-            
+
             // Store for gateway integration (outside of identity_bundle scope)
             coop_handle_for_gateway = Some(coop_handle);
 
@@ -729,7 +727,7 @@ impl Supervisor {
 
                 let compute_handle_for_notifications = compute_handle_holder.clone();
                 let dispute_handle_for_notifications = dispute_handle_holder.clone();
-                
+
                 // Clone snapshot coordinator and network handle for notifications
                 let snapshot_coordinator_for_notifications = snapshot_coordinator.clone();
                 let network_handle_for_snapshots = network_handle.clone();
@@ -1270,29 +1268,41 @@ impl Supervisor {
                                 }
                             };
 
-                            match bincode::deserialize::<icn_snapshot::SnapshotMessage>(&entry_data) {
+                            match bincode::deserialize::<icn_snapshot::SnapshotMessage>(&entry_data)
+                            {
                                 Ok(snapshot_msg) => {
-                                    let coordinator = snapshot_coordinator_for_notifications.clone();
+                                    let coordinator =
+                                        snapshot_coordinator_for_notifications.clone();
                                     let sender = entry.author.clone();
                                     let _network = network_handle_for_snapshots.clone();
                                     let gossip = gossip_handle_for_snapshots.clone();
-                                    
+
                                     tokio::spawn(async move {
-                                        match coordinator.write().await.handle_message(&sender, snapshot_msg).await {
+                                        match coordinator
+                                            .write()
+                                            .await
+                                            .handle_message(&sender, snapshot_msg)
+                                            .await
+                                        {
                                             Ok(response_msgs) => {
                                                 // Broadcast any response messages
                                                 for response_msg in response_msgs {
-                                                    let response_bytes = match bincode::serialize(&response_msg) {
+                                                    let response_bytes = match bincode::serialize(
+                                                        &response_msg,
+                                                    ) {
                                                         Ok(bytes) => bytes,
                                                         Err(e) => {
                                                             warn!("Failed to serialize snapshot response: {}", e);
                                                             continue;
                                                         }
                                                     };
-                                                    
+
                                                     // Publish response via gossip
                                                     let mut gossip_guard = gossip.write().await;
-                                                    match gossip_guard.publish("snapshot:coordinate", response_bytes) {
+                                                    match gossip_guard.publish(
+                                                        "snapshot:coordinate",
+                                                        response_bytes,
+                                                    ) {
                                                         Ok(hash) => {
                                                             debug!("Published snapshot response with hash: {:?}", hash);
                                                         }
@@ -1301,7 +1311,7 @@ impl Supervisor {
                                                         }
                                                     }
                                                 }
-                                                
+
                                                 info!("Processed snapshot message from {}", sender);
                                             }
                                             Err(e) => {
@@ -1858,10 +1868,12 @@ impl Supervisor {
                 crate::upgrade::CURRENT_VERSION.2,
             );
             let version_tracker = Arc::new(tokio::sync::RwLock::new(
-                crate::supervisor::version_tracker::VersionTracker::new(current_version.clone())
+                crate::supervisor::version_tracker::VersionTracker::new(current_version.clone()),
             ));
-            let version_string = format!("{}.{}.{}", 
-                current_version.major, current_version.minor, current_version.patch);
+            let version_string = format!(
+                "{}.{}.{}",
+                current_version.major, current_version.minor, current_version.patch
+            );
             let _upgrade_handle = crate::upgrade_actor::UpgradeActor::spawn(
                 did.clone(),
                 version_string.clone(),
@@ -1869,7 +1881,10 @@ impl Supervisor {
                 gossip_handle.clone(),
                 self.shutdown_tx.subscribe(),
             );
-            info!("✓ Upgrade coordinator spawned (version: {})", version_string);
+            info!(
+                "✓ Upgrade coordinator spawned (version: {})",
+                version_string
+            );
             icn_obs::metrics::supervisor::actor_spawned_inc("upgrade");
 
             // Create dead-letter queue for failed operations recovery
@@ -2487,8 +2502,8 @@ impl Supervisor {
                                     deadline,
                                     min_required_version,
                                 } => {
-                                    info!("🔄 Protocol upgrade proposal {} accepted: {} -> {}", 
-                                        proposal_id.0, 
+                                    info!("🔄 Protocol upgrade proposal {} accepted: {} -> {}",
+                                        proposal_id.0,
                                         "current", // TODO: get actual current version
                                         version
                                     );

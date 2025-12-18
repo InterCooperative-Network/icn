@@ -51,12 +51,8 @@ impl FederationTestNode {
         let trust_store = Arc::new(SledStore::open(&trust_store_path)?);
 
         // Create cooperative info
-        let coop_info = CooperativeInfo::new(
-            coop_id.to_string(),
-            name.to_string(),
-            did.clone(),
-            policy,
-        );
+        let coop_info =
+            CooperativeInfo::new(coop_id.to_string(), name.to_string(), did.clone(), policy);
 
         // Create registry
         let registry = CooperativeRegistry::new(registry_store, coop_info)?;
@@ -71,14 +67,12 @@ impl FederationTestNode {
 
         // Create gossip actor
         let trust_graph_clone = trust_graph.clone();
-        let trust_lookup = Arc::new(move |peer_did: &Did| {
-            match trust_graph_clone.try_read() {
-                Ok(trust) => match trust.trust_class(peer_did) {
-                    Ok(class) => Some(class),
-                    Err(_) => Some(TrustClass::Known),
-                },
+        let trust_lookup = Arc::new(move |peer_did: &Did| match trust_graph_clone.try_read() {
+            Ok(trust) => match trust.trust_class(peer_did) {
+                Ok(class) => Some(class),
                 Err(_) => Some(TrustClass::Known),
-            }
+            },
+            Err(_) => Some(TrustClass::Known),
         });
         let gossip_handle = GossipActor::spawn(did.clone(), trust_lookup);
 
@@ -120,10 +114,7 @@ impl FederationTestNode {
         let registry = self.registry.write().await;
         registry.register(peer_info)?;
 
-        info!(
-            "Node '{}' registered peer '{}'",
-            self.coop_id, peer.coop_id
-        );
+        info!("Node '{}' registered peer '{}'", self.coop_id, peer.coop_id);
 
         Ok(())
     }
@@ -153,11 +144,7 @@ impl FederationTestNode {
     /// Establish local trust edge
     async fn add_trust_edge(&self, other: &FederationTestNode, weight: f64) -> Result<()> {
         let mut trust = self.trust_graph.write().await;
-        trust.add_edge(TrustEdge::new(
-            self.did.clone(),
-            other.did.clone(),
-            weight,
-        ))?;
+        trust.add_edge(TrustEdge::new(self.did.clone(), other.did.clone(), weight))?;
 
         info!(
             "Node '{}' added trust edge to '{}' (weight: {:.2})",
@@ -175,12 +162,20 @@ async fn test_two_federation_topology() -> Result<()> {
     info!("=== Test: Two-Federation Topology ===");
 
     // Federation A: food-coop and housing-coop
-    let food_coop = FederationTestNode::spawn("food-coop", "Food Cooperative", FederationPolicy::Open).await?;
-    let housing_coop = FederationTestNode::spawn("housing-coop", "Housing Cooperative", FederationPolicy::Open).await?;
+    let food_coop =
+        FederationTestNode::spawn("food-coop", "Food Cooperative", FederationPolicy::Open).await?;
+    let housing_coop = FederationTestNode::spawn(
+        "housing-coop",
+        "Housing Cooperative",
+        FederationPolicy::Open,
+    )
+    .await?;
 
     // Federation B: tech-coop and arts-coop
-    let tech_coop = FederationTestNode::spawn("tech-coop", "Tech Cooperative", FederationPolicy::Open).await?;
-    let arts_coop = FederationTestNode::spawn("arts-coop", "Arts Cooperative", FederationPolicy::Open).await?;
+    let tech_coop =
+        FederationTestNode::spawn("tech-coop", "Tech Cooperative", FederationPolicy::Open).await?;
+    let arts_coop =
+        FederationTestNode::spawn("arts-coop", "Arts Cooperative", FederationPolicy::Open).await?;
 
     // Within Federation A
     food_coop.register_peer(&housing_coop).await?;
@@ -217,13 +212,17 @@ async fn test_bridge_node_connects_federations() -> Result<()> {
     info!("=== Test: Bridge Node Connects Federations ===");
 
     // Federation A
-    let food_coop = FederationTestNode::spawn("food-coop", "Food Cooperative", FederationPolicy::Open).await?;
+    let food_coop =
+        FederationTestNode::spawn("food-coop", "Food Cooperative", FederationPolicy::Open).await?;
 
     // Federation B
-    let tech_coop = FederationTestNode::spawn("tech-coop", "Tech Cooperative", FederationPolicy::Open).await?;
+    let tech_coop =
+        FederationTestNode::spawn("tech-coop", "Tech Cooperative", FederationPolicy::Open).await?;
 
     // Bridge node (member of both federations)
-    let bridge_coop = FederationTestNode::spawn("bridge-coop", "Bridge Cooperative", FederationPolicy::Open).await?;
+    let bridge_coop =
+        FederationTestNode::spawn("bridge-coop", "Bridge Cooperative", FederationPolicy::Open)
+            .await?;
 
     // Bridge connects to both federations
     bridge_coop.register_peer(&food_coop).await?;
@@ -252,8 +251,10 @@ async fn test_cross_federation_trust_attestation() -> Result<()> {
     info!("=== Test: Cross-Federation Trust Attestation ===");
 
     // Two cooperatives from different "federations"
-    let coop_a = FederationTestNode::spawn("coop-a", "Cooperative A", FederationPolicy::Open).await?;
-    let coop_b = FederationTestNode::spawn("coop-b", "Cooperative B", FederationPolicy::Open).await?;
+    let coop_a =
+        FederationTestNode::spawn("coop-a", "Cooperative A", FederationPolicy::Open).await?;
+    let coop_b =
+        FederationTestNode::spawn("coop-b", "Cooperative B", FederationPolicy::Open).await?;
 
     // Coop A attests trust to Coop B across federation boundary
     coop_a
@@ -281,9 +282,12 @@ async fn test_federation_gossip_coordination() -> Result<()> {
 
     info!("=== Test: Federation Gossip Coordination ===");
 
-    let coop_a = FederationTestNode::spawn("coop-a", "Cooperative A", FederationPolicy::Open).await?;
-    let coop_b = FederationTestNode::spawn("coop-b", "Cooperative B", FederationPolicy::Open).await?;
-    let coop_c = FederationTestNode::spawn("coop-c", "Cooperative C", FederationPolicy::Open).await?;
+    let coop_a =
+        FederationTestNode::spawn("coop-a", "Cooperative A", FederationPolicy::Open).await?;
+    let coop_b =
+        FederationTestNode::spawn("coop-b", "Cooperative B", FederationPolicy::Open).await?;
+    let coop_c =
+        FederationTestNode::spawn("coop-c", "Cooperative C", FederationPolicy::Open).await?;
 
     // Verify all nodes subscribed to federation topics
     {
@@ -314,9 +318,12 @@ async fn test_trust_graph_across_federations() -> Result<()> {
     info!("=== Test: Trust Graph Across Federations ===");
 
     // Three nodes representing different cooperatives
-    let coop_a = FederationTestNode::spawn("coop-a", "Cooperative A", FederationPolicy::Open).await?;
-    let coop_b = FederationTestNode::spawn("coop-b", "Cooperative B", FederationPolicy::Open).await?;
-    let coop_c = FederationTestNode::spawn("coop-c", "Cooperative C", FederationPolicy::Open).await?;
+    let coop_a =
+        FederationTestNode::spawn("coop-a", "Cooperative A", FederationPolicy::Open).await?;
+    let coop_b =
+        FederationTestNode::spawn("coop-b", "Cooperative B", FederationPolicy::Open).await?;
+    let coop_c =
+        FederationTestNode::spawn("coop-c", "Cooperative C", FederationPolicy::Open).await?;
 
     // Establish trust network: A trusts B, B trusts C
     coop_a.add_trust_edge(&coop_b, 0.9).await?;
@@ -353,16 +360,19 @@ async fn test_federation_policy_enforcement() -> Result<()> {
     info!("=== Test: Federation Policy Enforcement ===");
 
     // Create cooperatives with different policies
-    let open_coop = FederationTestNode::spawn("open-coop", "Open Cooperative", FederationPolicy::Open).await?;
+    let open_coop =
+        FederationTestNode::spawn("open-coop", "Open Cooperative", FederationPolicy::Open).await?;
 
     let _vouched_coop = FederationTestNode::spawn(
         "vouched-coop",
         "Vouched Cooperative",
         FederationPolicy::Vouched { min_vouches: 1 },
-    ).await?;
+    )
+    .await?;
 
     // Open coop can register anyone
-    let new_coop = FederationTestNode::spawn("new-coop", "New Cooperative", FederationPolicy::Open).await?;
+    let new_coop =
+        FederationTestNode::spawn("new-coop", "New Cooperative", FederationPolicy::Open).await?;
     open_coop.register_peer(&new_coop).await?;
 
     info!("✓ Open policy allows registration");
@@ -386,10 +396,14 @@ async fn test_multi_hop_federation_path() -> Result<()> {
     info!("=== Test: Multi-Hop Federation Path ===");
 
     // Create a chain: A -> B -> C -> D
-    let coop_a = FederationTestNode::spawn("coop-a", "Cooperative A", FederationPolicy::Open).await?;
-    let coop_b = FederationTestNode::spawn("coop-b", "Cooperative B", FederationPolicy::Open).await?;
-    let coop_c = FederationTestNode::spawn("coop-c", "Cooperative C", FederationPolicy::Open).await?;
-    let coop_d = FederationTestNode::spawn("coop-d", "Cooperative D", FederationPolicy::Open).await?;
+    let coop_a =
+        FederationTestNode::spawn("coop-a", "Cooperative A", FederationPolicy::Open).await?;
+    let coop_b =
+        FederationTestNode::spawn("coop-b", "Cooperative B", FederationPolicy::Open).await?;
+    let coop_c =
+        FederationTestNode::spawn("coop-c", "Cooperative C", FederationPolicy::Open).await?;
+    let coop_d =
+        FederationTestNode::spawn("coop-d", "Cooperative D", FederationPolicy::Open).await?;
 
     // Register peers in chain
     coop_a.register_peer(&coop_b).await?;

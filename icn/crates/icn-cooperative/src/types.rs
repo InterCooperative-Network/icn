@@ -67,25 +67,25 @@ pub struct Cooperative {
     pub status: CooperativeStatus,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
-    
+
     /// Governance domain ID (links to icn-governance)
     pub governance_domain: String,
-    
+
     /// Members and their details
     pub members: HashMap<String, Member>,
-    
+
     /// Bylaws and governing documents (CCL contract IDs)
     pub bylaws: Vec<String>,
-    
+
     /// Minimum members required for operations
     pub min_members: usize,
-    
+
     /// Membership tiers available
     pub tiers: Vec<MembershipTier>,
-    
+
     /// Total capital pool
     pub capital_pool: u64,
-    
+
     /// Metadata
     pub metadata: HashMap<String, String>,
 }

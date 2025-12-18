@@ -76,8 +76,7 @@ pub async fn init_ledger_services(
     // Uses default cooperative rules with min trust 500 basis points (0.5)
     let domain_id = format!("coop:{did}"); // Use DID as default domain ID
     let charter_validator = Arc::new(icn_ccl::CharterValidator::cooperative_default(
-        domain_id,
-        500, // Min trust = 0.5 (500 basis points)
+        domain_id, 500, // Min trust = 0.5 (500 basis points)
     ));
 
     // Set up validation hook on ledger

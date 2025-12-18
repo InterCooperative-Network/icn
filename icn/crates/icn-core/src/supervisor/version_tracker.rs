@@ -61,7 +61,10 @@ pub struct PendingUpgrade {
 impl VersionTracker {
     /// Create a new version tracker
     pub fn new(current_version: Version) -> Self {
-        info!("Version tracker initialized with version {}", current_version);
+        info!(
+            "Version tracker initialized with version {}",
+            current_version
+        );
 
         Self {
             current_version,
@@ -83,7 +86,10 @@ impl VersionTracker {
             .entry(peer.clone())
             .and_modify(|info| {
                 if info.version != version {
-                    info!("Peer {} upgraded from {} to {}", peer, info.version, version);
+                    info!(
+                        "Peer {} upgraded from {} to {}",
+                        peer, info.version, version
+                    );
                 }
                 info.version = version.clone();
                 info.last_seen = now;

@@ -81,7 +81,7 @@ struct StoredKey {
     x25519_secret: Option<Vec<u8>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     x25519_public: Option<[u8; 32]>,
-    
+
     // PQ keys (v5 addition - feature gated)
     #[cfg(feature = "post-quantum")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -174,13 +174,13 @@ struct StoredKeyV4 {
     /// Current active KeyBundle version (0 if no SDIS keys)
     #[serde(default)]
     current_keybundle_version: u32,
-    
+
     // === Post-Quantum fields (v5 additions) ===
     /// PQ secret key for core identity (feature-gated)
     #[cfg(feature = "post-quantum")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pq_secret: Option<Vec<u8>>,
-    
+
     /// PQ public key for core identity (feature-gated)
     #[cfg(feature = "post-quantum")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -430,13 +430,17 @@ impl AgeKeyStore {
             keybundles: stored_keybundles,
             current_keybundle_version: self.current_keybundle_version,
             #[cfg(feature = "post-quantum")]
-            pq_secret: identity_bundle.keypair().pq_keypair.as_ref().map(|kp| {
-                kp.secret_key_bytes().to_vec()
-            }),
+            pq_secret: identity_bundle
+                .keypair()
+                .pq_keypair
+                .as_ref()
+                .map(|kp| kp.secret_key_bytes().to_vec()),
             #[cfg(feature = "post-quantum")]
-            pq_public: identity_bundle.keypair().pq_keypair.as_ref().map(|kp| {
-                kp.public_key().as_bytes().to_vec()
-            }),
+            pq_public: identity_bundle
+                .keypair()
+                .pq_keypair
+                .as_ref()
+                .map(|kp| kp.public_key().as_bytes().to_vec()),
         };
 
         Self::encrypt_and_save_v4(&self.path, &stored, passphrase)

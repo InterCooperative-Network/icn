@@ -141,9 +141,9 @@ impl Ledger {
             trust_graph: None,
             min_trust_for_entry: DEFAULT_MIN_TRUST_FOR_ENTRY,
             journal_version,
-            event_emitter: None,     // Set via set_event_emitter()
-            domain_id: None,         // Set via set_domain_id()
-            validation_hook: None,   // Set via set_validation_hook()
+            event_emitter: None,   // Set via set_event_emitter()
+            domain_id: None,       // Set via set_domain_id()
+            validation_hook: None, // Set via set_validation_hook()
         };
 
         // Load cached balances from storage
@@ -346,15 +346,18 @@ impl Ledger {
                     entry_id: hash.clone(),
                     reason: QuarantineReason::CharterViolation,
                     author: entry.author.clone(),
-                    observed_at: SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs(),
+                    observed_at: SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs(),
                     metadata: Some(e.to_string()),
                 };
-                
+
                 self.quarantine.add(entry.clone(), quarantine_item)?;
 
                 anyhow::bail!("Entry failed validation: {e}");
             }
-            
+
             debug!(
                 entry_hash = %hash,
                 "Entry passed validation hook"

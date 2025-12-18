@@ -377,16 +377,19 @@ impl StewardActor {
                 timestamp: now,
                 signature: Vec::new(),
             };
-            
+
             // Sign the message
             let signing_bytes = msg.signing_bytes();
             let signature = self.keypair.sign(&signing_bytes).to_vec();
-            
+
             // Update with signature
-            if let crate::gossip::EnrollmentMessage::ParticipationRequest { signature: sig, .. } = &mut msg {
+            if let crate::gossip::EnrollmentMessage::ParticipationRequest {
+                signature: sig, ..
+            } = &mut msg
+            {
                 *sig = signature;
             }
-            
+
             send_gossip(crate::gossip::StewardMessage::Enrollment(msg));
         }
 
@@ -533,16 +536,17 @@ impl StewardActor {
                 timestamp: now,
                 signature: Vec::new(),
             };
-            
+
             // Sign the message
             let signing_bytes = msg.signing_bytes();
             let signature = self.keypair.sign(&signing_bytes).to_vec();
-            
+
             // Update with signature
-            if let crate::gossip::RecoveryMessage::RecoveryRequest { signature: sig, .. } = &mut msg {
+            if let crate::gossip::RecoveryMessage::RecoveryRequest { signature: sig, .. } = &mut msg
+            {
                 *sig = signature;
             }
-            
+
             send_gossip(crate::gossip::StewardMessage::Recovery(msg));
         }
 

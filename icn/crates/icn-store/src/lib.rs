@@ -182,7 +182,7 @@ impl SledStore {
     }
 
     /// Get direct access to underlying Sled database
-    /// 
+    ///
     /// This is useful for components that need raw Sled access
     /// rather than the Store trait abstraction.
     pub fn db(&self) -> &sled::Db {

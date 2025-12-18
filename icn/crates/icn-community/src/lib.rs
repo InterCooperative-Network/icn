@@ -3,16 +3,16 @@
 //! This crate provides community structures that group cooperatives
 //! and individuals for shared governance, resources, and mutual support.
 
-pub mod types;
+pub mod error;
 pub mod lifecycle;
 pub mod membership;
 pub mod resources;
 pub mod store;
-pub mod error;
+pub mod types;
 
-pub use types::{Community, CommunityType, CommunityStatus, ResourcePool};
-pub use lifecycle::{CommunityLifecycle, FormationRequest};
-pub use membership::{MembershipManager, MemberApplication};
-pub use resources::{ResourceManager, ResourceAllocation};
-pub use store::{CommunityStore, CommunityQuery};
 pub use error::{CommunityError, Result};
+pub use lifecycle::{CommunityLifecycle, FormationRequest};
+pub use membership::{MemberApplication, MembershipManager};
+pub use resources::{ResourceAllocation, ResourceManager};
+pub use store::{CommunityQuery, CommunityStore};
+pub use types::{Community, CommunityStatus, CommunityType, ResourcePool};

@@ -383,7 +383,7 @@ impl ContributionValidator {
                 ineligible.push((attester_did.clone(), status));
             }
         }
-        
+
         // Check for attestation rings (circular attestations)
         if let Some(ring) = self.detect_attestation_ring(attestation) {
             fraud_indicators.push(ring);
@@ -411,60 +411,55 @@ impl ContributionValidator {
         };
         check_eligibility(attester_did, claim, &context)
     }
-    
+
     /// Detect attestation rings (circular attestation patterns)
     ///
     /// Uses depth-first search to detect cycles in the attestation graph.
     /// A ring is detected if there's a path from an attester back to themselves
     /// through the attestation relationships.
-    fn detect_attestation_ring(
-        &self,
-        claim: &ContributionAttestation,
-    ) -> Option<FraudIndicator> {
+    fn detect_attestation_ring(&self, claim: &ContributionAttestation) -> Option<FraudIndicator> {
         // Build attestation graph: who attested for whom
         // Using String keys to avoid lifetime issues
         let mut graph: HashMap<String, Vec<String>> = HashMap::new();
-        
+
         // Add edges from this claim
         for attestation in &claim.attestations {
-            graph.entry(attestation.attester.clone())
+            graph
+                .entry(attestation.attester.clone())
                 .or_default()
                 .push(claim.contributor().to_string());
         }
-        
+
         // Add edges from historical attestations via lookup
         for attestation in &claim.attestations {
             let attesters_of_attester = (self.attesters_of_lookup)(&attestation.attester);
             for attester_of_attester in attesters_of_attester {
-                graph.entry(attester_of_attester.clone())
+                graph
+                    .entry(attester_of_attester.clone())
                     .or_default()
                     .push(attestation.attester.clone());
             }
         }
-        
+
         // DFS cycle detection for each attester
         for attestation in &claim.attestations {
             let mut visited = HashSet::new();
             let mut rec_stack = HashSet::new();
-            
-            if Self::has_cycle_dfs(
-                &attestation.attester,
-                &graph,
-                &mut visited,
-                &mut rec_stack,
-            ) {
+
+            if Self::has_cycle_dfs(&attestation.attester, &graph, &mut visited, &mut rec_stack) {
                 return Some(FraudIndicator::AttestationRing {
-                    participants: claim.attestations
+                    participants: claim
+                        .attestations
                         .iter()
                         .map(|a| a.attester.clone())
                         .collect(),
                 });
             }
         }
-        
+
         None
     }
-    
+
     /// Helper for DFS cycle detection
     fn has_cycle_dfs(
         node: &str,
@@ -475,14 +470,14 @@ impl ContributionValidator {
         if rec_stack.contains(node) {
             return true; // Found cycle
         }
-        
+
         if visited.contains(node) {
             return false; // Already explored this path
         }
-        
+
         visited.insert(node.to_string());
         rec_stack.insert(node.to_string());
-        
+
         if let Some(neighbors) = graph.get(node) {
             for neighbor in neighbors {
                 if Self::has_cycle_dfs(neighbor, graph, visited, rec_stack) {
@@ -490,7 +485,7 @@ impl ContributionValidator {
                 }
             }
         }
-        
+
         rec_stack.remove(node);
         false
     }

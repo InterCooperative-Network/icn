@@ -1,6 +1,6 @@
-use serde::{Deserialize, Serialize};
-use icn_identity::Did;
 use chrono::{DateTime, Utc};
+use icn_identity::Did;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

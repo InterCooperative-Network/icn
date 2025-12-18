@@ -53,10 +53,13 @@ impl CommunityStore {
 
     pub fn list(&self) -> Result<Vec<Community>> {
         let prefix = COMMUNITY_PREFIX.as_bytes();
-        let items = self.store.scan(prefix)
+        let items = self
+            .store
+            .scan(prefix)
             .map_err(|e| CommunityError::Storage(e.to_string()))?;
-        
-        items.into_iter()
+
+        items
+            .into_iter()
             .map(|(_, value)| {
                 serde_json::from_slice(&value)
                     .map_err(|e| CommunityError::Serialization(e.to_string()))
@@ -85,7 +88,7 @@ mod tests {
 
         comm_store.put(&community).unwrap();
         let retrieved = comm_store.get(&"test-comm".to_string()).unwrap();
-        
+
         assert!(retrieved.is_some());
         assert_eq!(retrieved.unwrap().name, "Test Community");
     }

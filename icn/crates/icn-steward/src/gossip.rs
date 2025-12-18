@@ -293,7 +293,7 @@ impl EnrollmentMessage {
     /// Get the message bytes for signing
     pub fn signing_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
-        
+
         match self {
             Self::ParticipationRequest {
                 ceremony_id,
@@ -400,7 +400,7 @@ impl EnrollmentMessage {
                 bytes.extend_from_slice(&timestamp.to_le_bytes());
             }
         }
-        
+
         bytes
     }
 }
@@ -409,7 +409,7 @@ impl RecoveryMessage {
     /// Get the message bytes for signing
     pub fn signing_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
-        
+
         match self {
             Self::RecoveryRequest {
                 ceremony_id,
@@ -463,7 +463,7 @@ impl RecoveryMessage {
                 bytes.extend_from_slice(&timestamp.to_le_bytes());
             }
         }
-        
+
         bytes
     }
 }

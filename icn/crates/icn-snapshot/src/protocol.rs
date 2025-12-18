@@ -4,9 +4,9 @@
 //! consistent global state across the ICN network. Based on the Chandy-Lamport
 //! algorithm adapted for gossip-based systems.
 
+use icn_identity::Did;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use icn_identity::Did;
 
 /// Unique identifier for a snapshot operation
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -163,7 +163,9 @@ impl SnapshotMetadata {
     /// Check if all markers received
     pub fn all_markers_received(&self, expected_peers: &[Did]) -> bool {
         if let SnapshotState::WaitingForMarkers { received_from } = &self.state {
-            expected_peers.iter().all(|peer| received_from.contains(peer))
+            expected_peers
+                .iter()
+                .all(|peer| received_from.contains(peer))
         } else {
             false
         }
@@ -197,18 +199,18 @@ impl SnapshotMetadata {
     /// Compute global state root from participant hashes
     pub fn compute_global_root(&self) -> [u8; 32] {
         use sha2::{Digest, Sha256};
-        
+
         let mut hasher = Sha256::new();
-        
+
         // Sort participants for deterministic ordering
         let mut participants: Vec<_> = self.participant_hashes.iter().collect();
         participants.sort_by(|a, b| a.0.to_string().cmp(&b.0.to_string()));
-        
+
         for (did, hash) in participants {
             hasher.update(did.to_string().as_bytes());
             hasher.update(hash);
         }
-        
+
         let result = hasher.finalize();
         let mut root = [0u8; 32];
         root.copy_from_slice(&result);
@@ -236,8 +238,8 @@ impl Default for SnapshotConfig {
         Self {
             min_trust_for_snapshot: 0.5,
             max_snapshot_size: 100 * 1024 * 1024, // 100 MB
-            chunk_size: 1024 * 1024,             // 1 MB chunks
-            snapshot_timeout: 300,               // 5 minutes
+            chunk_size: 1024 * 1024,              // 1 MB chunks
+            snapshot_timeout: 300,                // 5 minutes
             min_participants: 3,
         }
     }
@@ -273,11 +275,8 @@ mod tests {
         let peer1 = IdentityBundle::generate().unwrap().did().clone();
         let peer2 = IdentityBundle::generate().unwrap().did().clone();
 
-        let mut metadata = SnapshotMetadata::new(
-            snapshot_id,
-            initiator,
-            vec![peer1.clone(), peer2.clone()],
-        );
+        let mut metadata =
+            SnapshotMetadata::new(snapshot_id, initiator, vec![peer1.clone(), peer2.clone()]);
 
         metadata.state = SnapshotState::WaitingForMarkers {
             received_from: HashSet::new(),
@@ -301,11 +300,8 @@ mod tests {
         let peer1 = IdentityBundle::generate().unwrap().did().clone();
         let peer2 = IdentityBundle::generate().unwrap().did().clone();
 
-        let mut metadata = SnapshotMetadata::new(
-            snapshot_id,
-            initiator,
-            vec![peer1.clone(), peer2.clone()],
-        );
+        let mut metadata =
+            SnapshotMetadata::new(snapshot_id, initiator, vec![peer1.clone(), peer2.clone()]);
 
         let hash1 = [1u8; 32];
         let hash2 = [2u8; 32];
@@ -336,7 +332,13 @@ mod tests {
         metadata.record_channel_message(&sender, vec![4, 5, 6]);
 
         assert_eq!(metadata.channel_states.get(&sender).unwrap().len(), 2);
-        assert_eq!(metadata.channel_states.get(&sender).unwrap()[0], vec![1, 2, 3]);
-        assert_eq!(metadata.channel_states.get(&sender).unwrap()[1], vec![4, 5, 6]);
+        assert_eq!(
+            metadata.channel_states.get(&sender).unwrap()[0],
+            vec![1, 2, 3]
+        );
+        assert_eq!(
+            metadata.channel_states.get(&sender).unwrap()[1],
+            vec![4, 5, 6]
+        );
     }
 }

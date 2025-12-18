@@ -17,7 +17,14 @@ impl ResourceManager {
         Self
     }
 
-    pub fn create_pool(&self, community: &mut Community, name: String, resource_type: String, capacity: u64, unit: String) -> Result<()> {
+    pub fn create_pool(
+        &self,
+        community: &mut Community,
+        name: String,
+        resource_type: String,
+        capacity: u64,
+        unit: String,
+    ) -> Result<()> {
         let pool = ResourcePool {
             name: name.clone(),
             resource_type,
@@ -31,9 +38,11 @@ impl ResourceManager {
     }
 
     pub fn allocate(&self, community: &mut Community, pool_name: &str, amount: u64) -> Result<()> {
-        let pool = community.resource_pools.get_mut(pool_name)
+        let pool = community
+            .resource_pools
+            .get_mut(pool_name)
             .ok_or_else(|| CommunityError::NotFound(format!("Resource pool: {pool_name}")))?;
-        
+
         if !pool.can_allocate(amount) {
             return Err(CommunityError::InsufficientResources {
                 required: amount,
@@ -46,10 +55,17 @@ impl ResourceManager {
         Ok(())
     }
 
-    pub fn deallocate(&self, community: &mut Community, pool_name: &str, amount: u64) -> Result<()> {
-        let pool = community.resource_pools.get_mut(pool_name)
+    pub fn deallocate(
+        &self,
+        community: &mut Community,
+        pool_name: &str,
+        amount: u64,
+    ) -> Result<()> {
+        let pool = community
+            .resource_pools
+            .get_mut(pool_name)
             .ok_or_else(|| CommunityError::NotFound(format!("Resource pool: {pool_name}")))?;
-        
+
         pool.allocated = pool.allocated.saturating_sub(amount);
         community.updated_at = chrono::Utc::now();
         Ok(())

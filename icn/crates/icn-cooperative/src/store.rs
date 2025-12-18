@@ -29,8 +29,8 @@ impl CooperativeStore {
     /// Store a cooperative
     pub fn put(&self, coop: &Cooperative) -> Result<()> {
         let key = format!("{}{}", COOP_PREFIX, coop.id);
-        let value = serde_json::to_vec(coop)
-            .map_err(|e| CooperativeError::Serialization(e.to_string()))?;
+        let value =
+            serde_json::to_vec(coop).map_err(|e| CooperativeError::Serialization(e.to_string()))?;
 
         self.store
             .put(key.as_bytes(), &value)
@@ -47,7 +47,7 @@ impl CooperativeStore {
     /// Retrieve a cooperative by ID
     pub fn get(&self, id: &CooperativeId) -> Result<Option<Cooperative>> {
         let key = format!("{COOP_PREFIX}{id}");
-        
+
         match self.store.get(key.as_bytes()) {
             Ok(Some(value)) => {
                 let coop: Cooperative = serde_json::from_slice(&value)
@@ -84,7 +84,7 @@ impl CooperativeStore {
             if let Ok(Some(index_data)) = self.store.get(index_key.as_bytes()) {
                 let ids: Vec<CooperativeId> = serde_json::from_slice(&index_data)
                     .map_err(|e| CooperativeError::Serialization(e.to_string()))?;
-                
+
                 for id in ids {
                     if let Some(coop) = self.get(&id)? {
                         if self.matches_query(&coop, query) {
@@ -98,7 +98,7 @@ impl CooperativeStore {
             if let Ok(Some(index_data)) = self.store.get(index_key.as_bytes()) {
                 let ids: Vec<CooperativeId> = serde_json::from_slice(&index_data)
                     .map_err(|e| CooperativeError::Serialization(e.to_string()))?;
-                
+
                 for id in ids {
                     if let Some(coop) = self.get(&id)? {
                         if self.matches_query(&coop, query) {
@@ -110,13 +110,15 @@ impl CooperativeStore {
         } else {
             // Scan all cooperatives
             let prefix = COOP_PREFIX.as_bytes();
-            let items = self.store.scan(prefix)
+            let items = self
+                .store
+                .scan(prefix)
                 .map_err(|e| CooperativeError::Storage(e.to_string()))?;
-            
+
             for (_, value) in items {
                 let coop: Cooperative = serde_json::from_slice(&value)
                     .map_err(|e| CooperativeError::Serialization(e.to_string()))?;
-                
+
                 if self.matches_query(&coop, query) {
                     results.push(coop);
                 }
@@ -154,7 +156,10 @@ impl CooperativeStore {
     }
 
     fn index_by_type(&self, coop: &Cooperative) -> Result<()> {
-        let index_key = format!("{}{}:{:?}", INDEX_BY_TYPE, coop.coop_type as u8, coop.coop_type);
+        let index_key = format!(
+            "{}{}:{:?}",
+            INDEX_BY_TYPE, coop.coop_type as u8, coop.coop_type
+        );
         self.add_to_index(&index_key, &coop.id)
     }
 
@@ -191,7 +196,10 @@ impl CooperativeStore {
         self.remove_from_index(&status_key, &coop.id)?;
 
         // Remove from type index
-        let type_key = format!("{}{}:{:?}", INDEX_BY_TYPE, coop.coop_type as u8, coop.coop_type);
+        let type_key = format!(
+            "{}{}:{:?}",
+            INDEX_BY_TYPE, coop.coop_type as u8, coop.coop_type
+        );
         self.remove_from_index(&type_key, &coop.id)?;
 
         // Remove from member indices
@@ -207,9 +215,9 @@ impl CooperativeStore {
         if let Ok(Some(data)) = self.store.get(index_key.as_bytes()) {
             let mut ids: Vec<CooperativeId> = serde_json::from_slice(&data)
                 .map_err(|e| CooperativeError::Serialization(e.to_string()))?;
-            
+
             ids.retain(|id| id != coop_id);
-            
+
             let value = serde_json::to_vec(&ids)
                 .map_err(|e| CooperativeError::Serialization(e.to_string()))?;
             self.store
@@ -242,7 +250,7 @@ mod tests {
 
         coop_store.put(&coop).unwrap();
         let retrieved = coop_store.get(&"test-id".to_string()).unwrap();
-        
+
         assert!(retrieved.is_some());
         assert_eq!(retrieved.unwrap().name, "Test Coop");
     }

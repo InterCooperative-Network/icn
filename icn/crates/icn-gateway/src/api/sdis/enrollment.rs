@@ -374,8 +374,9 @@ pub async fn approve_ceremony(
     // Production guard: check environment variable
     let admin_enabled = std::env::var("ICN_ENABLE_ADMIN_ENDPOINTS")
         .unwrap_or_else(|_| "false".to_string())
-        .to_lowercase() == "true";
-    
+        .to_lowercase()
+        == "true";
+
     if !admin_enabled {
         return Err(GatewayError::Forbidden(
             "Admin endpoints are disabled in production".to_string(),

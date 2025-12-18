@@ -31,7 +31,9 @@ pub use replication::{ReplicationConfig, ReplicationHandle, ReplicationManager};
 pub use runtime::Runtime;
 pub use trust_propagation::{AttestationLimits, AttestationRateLimiter, TRUST_ATTESTATIONS_TOPIC};
 pub use upgrade::{
-    PendingUpgrade, UpgradeAdoptionStats, UpgradeCoordinator, CURRENT_VERSION,
-    proposal_to_pending_upgrade,
+    proposal_to_pending_upgrade, PendingUpgrade, UpgradeAdoptionStats, UpgradeCoordinator,
+    CURRENT_VERSION,
 };
-pub use upgrade_actor::{UpgradeActor, UpgradeHandle, UpgradeMessage, UpgradeStatus, UPGRADE_TOPIC};
+pub use upgrade_actor::{
+    UpgradeActor, UpgradeHandle, UpgradeMessage, UpgradeStatus, UPGRADE_TOPIC,
+};

@@ -1,4 +1,4 @@
-use crate::{Cooperative, Member, Result, CoopError};
+use crate::{CoopError, Cooperative, Member, Result};
 use icn_identity::Did;
 use sled::Db;
 use std::sync::Arc;
@@ -21,7 +21,9 @@ impl CoopStore {
 
     pub fn get_cooperative(&self, coop_id: &str) -> Result<Cooperative> {
         let key = format!("coop:{coop_id}");
-        let value = self.db.get(key.as_bytes())?
+        let value = self
+            .db
+            .get(key.as_bytes())?
             .ok_or_else(|| CoopError::NotFound(coop_id.to_string()))?;
         Ok(bincode::deserialize(&value)?)
     }
@@ -29,13 +31,13 @@ impl CoopStore {
     pub fn list_cooperatives(&self) -> Result<Vec<Cooperative>> {
         let mut coops = Vec::new();
         let prefix = b"coop:";
-        
+
         for item in self.db.scan_prefix(prefix) {
             let (_, value) = item?;
             let coop: Cooperative = bincode::deserialize(&value)?;
             coops.push(coop);
         }
-        
+
         Ok(coops)
     }
 
@@ -54,7 +56,9 @@ impl CoopStore {
 
     pub fn get_member(&self, coop_id: &str, did: &Did) -> Result<Member> {
         let key = format!("member:{coop_id}:{did}");
-        let value = self.db.get(key.as_bytes())?
+        let value = self
+            .db
+            .get(key.as_bytes())?
             .ok_or_else(|| CoopError::MemberNotFound(did.to_string()))?;
         Ok(bincode::deserialize(&value)?)
     }
@@ -62,13 +66,13 @@ impl CoopStore {
     pub fn list_members(&self, coop_id: &str) -> Result<Vec<Member>> {
         let mut members = Vec::new();
         let prefix = format!("member:{coop_id}:");
-        
+
         for item in self.db.scan_prefix(prefix.as_bytes()) {
             let (_, value) = item?;
             let member: Member = bincode::deserialize(&value)?;
             members.push(member);
         }
-        
+
         Ok(members)
     }
 
@@ -81,7 +85,7 @@ impl CoopStore {
     pub fn get_member_coops(&self, did: &Did) -> Result<Vec<String>> {
         let mut coop_ids = Vec::new();
         let prefix = b"member:";
-        
+
         for item in self.db.scan_prefix(prefix) {
             let (_key, value) = item?;
             let member: Member = bincode::deserialize(&value)?;
@@ -89,7 +93,7 @@ impl CoopStore {
                 coop_ids.push(member.coop_id.clone());
             }
         }
-        
+
         Ok(coop_ids)
     }
 }
@@ -123,7 +127,7 @@ mod tests {
         // Generate a valid DID
         let keypair = icn_identity::KeyPair::generate().unwrap();
         let did = keypair.did().clone();
-        
+
         let member = Member::new(did.clone(), "coop:123".to_string(), MemberRole::Worker);
         store.save_member(&member).unwrap();
 

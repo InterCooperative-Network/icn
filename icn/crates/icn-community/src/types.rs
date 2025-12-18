@@ -7,10 +7,10 @@ pub type MemberId = String; // Can be DID or CooperativeId
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum CommunityType {
-    Geographic,     // Location-based community
-    Interest,       // Shared interest/profession
-    Solidarity,     // Mutual aid network
-    Ecosystem,      // Full cooperative ecosystem
+    Geographic, // Location-based community
+    Interest,   // Shared interest/profession
+    Solidarity, // Mutual aid network
+    Ecosystem,  // Full cooperative ecosystem
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -23,8 +23,8 @@ pub enum CommunityStatus {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MemberType {
-    Individual(String),      // DID
-    Cooperative(String),     // CooperativeId
+    Individual(String),  // DID
+    Cooperative(String), // CooperativeId
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -63,11 +63,11 @@ pub struct Community {
     pub status: CommunityStatus,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
-    
+
     pub governance_domain: String,
     pub members: HashMap<MemberId, Member>,
     pub resource_pools: HashMap<String, ResourcePool>,
-    
+
     pub charter: String, // CCL contract defining community rules
     pub metadata: HashMap<String, String>,
 }

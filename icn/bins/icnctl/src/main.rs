@@ -2018,8 +2018,8 @@ fn handle_id_command(cmd: IdCommands, data_dir: &Path) -> Result<()> {
 
             // Generate new PQ keypair
             println!("Generating ML-DSA keypair (this may take a moment)...");
-            let pq_keypair = icn_crypto_pq::MlDsaKeypair::generate()
-                .context("Failed to generate PQ keypair")?;
+            let pq_keypair =
+                icn_crypto_pq::MlDsaKeypair::generate().context("Failed to generate PQ keypair")?;
 
             // Get current identity info
             let old_keypair = keystore.get_keypair()?;
@@ -4674,7 +4674,7 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &Path) -> Result<()> {
                 .duration_since(std::time::UNIX_EPOCH)?
                 .as_secs();
             let new_version = did_doc.version + 1;
-            
+
             // Prepare event data for signing
             let event_data = format!(
                 "{}:add_device:{}:{}:{}",
@@ -4683,10 +4683,10 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &Path) -> Result<()> {
                 timestamp,
                 new_version
             );
-            
+
             // Sign with current device key
             let signature = keystore.get_keypair()?.sign(event_data.as_bytes());
-            
+
             let rotation_event = icn_identity::RotationEvent {
                 did: own_did.clone(),
                 event_type: icn_identity::RotationEventType::AddDeviceWithEncryption {
@@ -4781,7 +4781,7 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &Path) -> Result<()> {
                 .as_secs();
             let new_version = did_doc.version + 1;
             let did = keystore.get_keypair()?.did().clone();
-            
+
             // Prepare event data for signing
             let event_data = format!(
                 "{}:revoke_device:{}:{}:{}",
@@ -4790,10 +4790,10 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &Path) -> Result<()> {
                 timestamp,
                 new_version
             );
-            
+
             // Sign with current device key
             let signature = keystore.get_keypair()?.sign(event_data.as_bytes());
-            
+
             let rotation_event = icn_identity::RotationEvent {
                 did,
                 event_type: icn_identity::RotationEventType::RevokeDevice {

@@ -1496,10 +1496,7 @@ pub fn init_descriptions() {
         "icn_dispute_initiated_total",
         "Total number of compute disputes initiated"
     );
-    describe_gauge!(
-        "icn_dispute_active",
-        "Number of currently active disputes"
-    );
+    describe_gauge!("icn_dispute_active", "Number of currently active disputes");
     describe_counter!(
         "icn_dispute_resolved_total",
         "Total number of disputes resolved by type"

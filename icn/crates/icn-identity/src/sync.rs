@@ -241,7 +241,7 @@ impl DidDocumentCache {
                         );
                         return Ok(false);
                     }
-                    
+
                     // Verify each proof is from a valid trustee
                     let mut valid_proofs = 0;
                     for proof in recovery_proofs {
@@ -251,47 +251,58 @@ impl DidDocumentCache {
                             valid_proofs += 1;
                         }
                     }
-                    
+
                     if valid_proofs < recovery_config.threshold as usize {
                         tracing::warn!(
                             "Insufficient valid recovery proofs: got {}, need {}",
-                            valid_proofs, recovery_config.threshold
+                            valid_proofs,
+                            recovery_config.threshold
                         );
                         return Ok(false);
                     }
-                    
+
                     // Recovery verified - reset to new root key
                     // Clear all existing verification methods
                     updated_doc.verification_method.clear();
                     updated_doc.authentication.clear();
-                    
+
                     // Add new root device
                     let now = std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)?
                         .as_secs();
-                    
-                    updated_doc.verification_method.push(crate::VerificationMethod {
-                        id: "root-recovered".to_string(),
-                        label: "Recovered Root Device".to_string(),
-                        key_type: crate::KeyType::Ed25519,
-                        public_key: new_root_key.clone(),
-                        capabilities: vec![
-                            crate::Capability::Sign,
-                            crate::Capability::AddDevice,
-                            crate::Capability::RevokeDevice,
-                            crate::Capability::Recover,
-                        ],
-                        added_at: now,
-                        revoked_at: None,
-                    });
-                    
-                    updated_doc.authentication.push("root-recovered".to_string());
+
+                    updated_doc
+                        .verification_method
+                        .push(crate::VerificationMethod {
+                            id: "root-recovered".to_string(),
+                            label: "Recovered Root Device".to_string(),
+                            key_type: crate::KeyType::Ed25519,
+                            public_key: new_root_key.clone(),
+                            capabilities: vec![
+                                crate::Capability::Sign,
+                                crate::Capability::AddDevice,
+                                crate::Capability::RevokeDevice,
+                                crate::Capability::Recover,
+                            ],
+                            added_at: now,
+                            revoked_at: None,
+                        });
+
+                    updated_doc
+                        .authentication
+                        .push("root-recovered".to_string());
                     updated_doc.version += 1;
                     updated_doc.updated_at = now;
-                    
-                    tracing::info!("Successfully recovered DID {:?} with new root key", updated_doc.id);
+
+                    tracing::info!(
+                        "Successfully recovered DID {:?} with new root key",
+                        updated_doc.id
+                    );
                 } else {
-                    tracing::warn!("Cannot recover DID {:?}: no recovery config", updated_doc.id);
+                    tracing::warn!(
+                        "Cannot recover DID {:?}: no recovery config",
+                        updated_doc.id
+                    );
                     return Ok(false);
                 }
             }

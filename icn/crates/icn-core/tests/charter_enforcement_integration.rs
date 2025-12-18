@@ -101,10 +101,7 @@ async fn test_charter_validator_hook_integration() -> Result<()> {
     // Should be rejected by validation hook
     let result = ledger.append_entry(entry);
     assert!(result.is_err(), "Should be rejected by validation hook");
-    assert!(result
-        .unwrap_err()
-        .to_string()
-        .contains("Test rejection"));
+    assert!(result.unwrap_err().to_string().contains("Test rejection"));
 
     println!("✅ Validation hook correctly rejects transactions");
 

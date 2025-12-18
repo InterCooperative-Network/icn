@@ -17,7 +17,13 @@ impl MembershipManager {
         Self
     }
 
-    pub fn add_member(&self, community: &mut Community, member_id: MemberId, member_type: MemberType, voting_weight: u32) -> Result<()> {
+    pub fn add_member(
+        &self,
+        community: &mut Community,
+        member_id: MemberId,
+        member_type: MemberType,
+        voting_weight: u32,
+    ) -> Result<()> {
         let member = Member {
             id: member_id.clone(),
             member_type,
@@ -31,7 +37,9 @@ impl MembershipManager {
     }
 
     pub fn remove_member(&self, community: &mut Community, member_id: &str) -> Result<()> {
-        let member = community.members.get_mut(member_id)
+        let member = community
+            .members
+            .get_mut(member_id)
             .ok_or_else(|| CommunityError::MemberNotFound(member_id.to_string()))?;
         member.active = false;
         community.updated_at = chrono::Utc::now();
