@@ -51,8 +51,7 @@ impl TestNode {
         });
 
         // Create trust graph for TOFU mode
-        let trust_store: Arc<dyn icn_store::Store> =
-            Arc::new(icn_store::SledStore::temporary()?);
+        let trust_store: Arc<dyn icn_store::Store> = Arc::new(icn_store::SledStore::temporary()?);
         let trust_graph = Arc::new(RwLock::new(icn_trust::TrustGraph::new(
             trust_store,
             did.clone(),
