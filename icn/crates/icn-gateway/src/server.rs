@@ -132,7 +132,7 @@ impl GatewayServer {
                  The secret should be at least 32 cryptographically random bytes.".to_string()
             ));
         }
-        
+
         // SECURITY: Warn if JWT secret is too short
         if self.jwt_secret.len() < 32 {
             warn!(

@@ -13,26 +13,27 @@ fn test_scope_allowlist_validation() {
     assert!(validation::validate_scopes(&["coop:admin".to_string()]).is_ok());
     assert!(validation::validate_scopes(&["gov:read".to_string()]).is_ok());
     assert!(validation::validate_scopes(&["payments:write".to_string()]).is_ok());
-    
+
     // Multiple valid scopes
     assert!(validation::validate_scopes(&[
         "ledger:read".to_string(),
         "coop:write".to_string(),
         "gov:read".to_string(),
-    ]).is_ok());
-    
+    ])
+    .is_ok());
+
     // Invalid scopes should fail
     assert!(validation::validate_scopes(&["admin".to_string()]).is_err());
     assert!(validation::validate_scopes(&["superuser".to_string()]).is_err());
     assert!(validation::validate_scopes(&["ledger:admin".to_string()]).is_err());
     assert!(validation::validate_scopes(&["*".to_string()]).is_err());
     assert!(validation::validate_scopes(&["root".to_string()]).is_err());
-    
+
     // Mix of valid and invalid should fail
-    assert!(validation::validate_scopes(&[
-        "ledger:read".to_string(),
-        "invalid:scope".to_string(),
-    ]).is_err());
+    assert!(validation::validate_scopes(
+        &["ledger:read".to_string(), "invalid:scope".to_string(),]
+    )
+    .is_err());
 }
 
 #[test]
@@ -49,13 +50,12 @@ fn test_scope_allowlist_prevents_privilege_escalation() {
         "config:modify",
         "auth:bypass",
     ];
-    
+
     for scope in attack_scopes {
         let result = validation::validate_scopes(&[scope.to_string()]);
         assert!(
             result.is_err(),
-            "Attack scope '{}' should be rejected",
-            scope
+            "Attack scope '{scope}' should be rejected"
         );
     }
 }
@@ -63,15 +63,11 @@ fn test_scope_allowlist_prevents_privilege_escalation() {
 #[test]
 fn test_scope_count_limit() {
     // Max scopes (20) should work
-    let max_scopes: Vec<String> = (0..20)
-        .map(|_| "ledger:read".to_string())
-        .collect();
+    let max_scopes: Vec<String> = (0..20).map(|_| "ledger:read".to_string()).collect();
     assert!(validation::validate_scopes(&max_scopes).is_ok());
-    
+
     // Over limit should fail
-    let too_many_scopes: Vec<String> = (0..21)
-        .map(|_| "ledger:read".to_string())
-        .collect();
+    let too_many_scopes: Vec<String> = (0..21).map(|_| "ledger:read".to_string()).collect();
     assert!(validation::validate_scopes(&too_many_scopes).is_err());
 }
 
@@ -82,7 +78,7 @@ fn test_all_allowed_scopes_are_valid() {
         .iter()
         .map(|s| s.to_string())
         .collect::<Vec<String>>();
-    
+
     assert!(
         validation::validate_scopes(&all_allowed_scopes).is_ok(),
         "All ALLOWED_SCOPES should be valid"
@@ -116,13 +112,12 @@ fn test_scope_injection_attempts() {
         "$(admin)",
         "${admin}",
     ];
-    
+
     for attempt in injection_attempts {
         let result = validation::validate_scopes(&[attempt.to_string()]);
         assert!(
             result.is_err(),
-            "Injection attempt '{}' should be rejected",
-            attempt
+            "Injection attempt '{attempt}' should be rejected"
         );
     }
 }
@@ -146,7 +141,7 @@ fn test_scope_namespace_boundaries() {
     assert!(validation::validate_scopes(&[":read".to_string()]).is_err());
 }
 
-#[test] 
+#[test]
 fn test_duplicate_scopes() {
     // Duplicate scopes should be allowed (idempotent)
     let duplicate_scopes = vec![
@@ -162,11 +157,10 @@ fn test_scope_validation_error_messages() {
     // Error messages should be informative
     let result = validation::validate_scopes(&["invalid_scope".to_string()]);
     assert!(result.is_err());
-    
+
     let err_msg = result.unwrap_err().to_string();
     assert!(
         err_msg.contains("invalid_scope") || err_msg.contains("Invalid scope"),
-        "Error message should mention the invalid scope: {}",
-        err_msg
+        "Error message should mention the invalid scope: {err_msg}"
     );
 }

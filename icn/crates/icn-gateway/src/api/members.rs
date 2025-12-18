@@ -144,6 +144,7 @@ mod tests {
                 did.clone(),
                 timestamp,
             )
+            .await
             .unwrap();
 
         let trust_manager = Arc::new(TrustManager::new());

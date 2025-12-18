@@ -307,7 +307,9 @@ impl ZkVerifier {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "stark"))]
     use crate::prover::ZkProver;
+    #[cfg(not(feature = "stark"))]
     use crate::types::AgeAttestation;
 
     #[test]

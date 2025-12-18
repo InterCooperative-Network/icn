@@ -124,7 +124,7 @@ impl SessionManager {
             warn!("Starting session manager WITHOUT client certificate verification (development mode)");
             tls::create_server_config_no_client_auth(certs.clone(), key.clone_key())?
         };
-        
+
         let mut server_config = ServerConfig::with_crypto(Arc::new(
             quinn::crypto::rustls::QuicServerConfig::try_from(server_config)?,
         ));

@@ -559,20 +559,16 @@ mod tests {
         // Valid scopes
         assert!(validate_scopes(&["ledger:read".to_string()]).is_ok());
         assert!(validate_scopes(&["ledger:write".to_string(), "coop:read".to_string()]).is_ok());
-        
+
         // Invalid scope
         assert!(validate_scopes(&["invalid:scope".to_string()]).is_err());
         assert!(validate_scopes(&["admin".to_string()]).is_err());
-        
+
         // Too many valid scopes
-        let many_scopes: Vec<String> = (0..20)
-            .map(|_| "ledger:read".to_string())
-            .collect();
+        let many_scopes: Vec<String> = (0..20).map(|_| "ledger:read".to_string()).collect();
         assert!(validate_scopes(&many_scopes).is_ok());
-        
-        let too_many_scopes: Vec<String> = (0..21)
-            .map(|_| "ledger:read".to_string())
-            .collect();
+
+        let too_many_scopes: Vec<String> = (0..21).map(|_| "ledger:read".to_string()).collect();
         assert!(validate_scopes(&too_many_scopes).is_err());
     }
 

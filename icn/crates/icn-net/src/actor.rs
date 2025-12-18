@@ -1486,18 +1486,20 @@ impl NetworkActor {
                                     // verify that the binding_info in the Hello message matches the cert
                                     if let Some(peer_cert) = connection.peer_identity() {
                                         if let Some(cert_der) = peer_cert
-                                            .downcast_ref::<Vec<rustls::pki_types::CertificateDer>>()
+                                            .downcast_ref::<Vec<rustls::pki_types::CertificateDer>>(
+                                            )
                                             .and_then(|certs| certs.first())
                                         {
-                                            if let Err(e) = icn_identity::verify_binding_info(binding_info, cert_der) {
+                                            if let Err(e) = icn_identity::verify_binding_info(
+                                                binding_info,
+                                                cert_der,
+                                            ) {
                                                 warn!(
                                                     peer_did = %message.from,
-                                                    "DID-TLS binding verification failed: {}",
-                                                    e
+                                                    "DID-TLS binding verification failed: {e}"
                                                 );
                                                 return Err(anyhow::anyhow!(
-                                                    "DID-TLS binding verification failed: {}",
-                                                    e
+                                                    "DID-TLS binding verification failed: {e}"
                                                 ));
                                             }
                                         } else {
@@ -1505,7 +1507,9 @@ impl NetworkActor {
                                                 peer_did = %message.from,
                                                 "No certificate available for binding verification"
                                             );
-                                            return Err(anyhow::anyhow!("No peer certificate available"));
+                                            return Err(anyhow::anyhow!(
+                                                "No peer certificate available"
+                                            ));
                                         }
                                     } else {
                                         warn!(

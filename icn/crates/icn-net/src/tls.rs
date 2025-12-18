@@ -97,7 +97,7 @@ pub fn create_server_config(
 }
 
 /// Create a rustls server configuration for QUIC without client authentication
-/// 
+///
 /// **WARNING**: This is for development/testing only. Production deployments
 /// should always use `create_server_config` with client certificate verification.
 pub fn create_server_config_no_client_auth(
@@ -522,11 +522,11 @@ mod tests {
         let keypair = KeyPair::generate().unwrap();
         let (certs, key) = generate_self_signed_cert(&keypair).unwrap();
         let own_did = keypair.did().clone();
-        
+
         // Create a temporary trust graph for testing
         let store: Arc<dyn icn_store::Store> = Arc::new(icn_store::SledStore::temporary().unwrap());
         let trust_graph = Arc::new(RwLock::new(TrustGraph::new(store, own_did.clone())));
-        
+
         let config = create_server_config(certs, key, trust_graph, own_did, 0.0).unwrap();
 
         // Should have ALPN configured

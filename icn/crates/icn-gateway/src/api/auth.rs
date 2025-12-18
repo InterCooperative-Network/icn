@@ -86,7 +86,7 @@ pub async fn verify(
 
     // Validate scopes
     let validation_result = validation::validate_scopes(&req.scopes);
-    if let Err(_) = &validation_result {
+    if validation_result.is_err() {
         gateway::auth_failures_inc("invalid_scopes");
         // AUDIT: Log invalid scope request (potential privilege escalation)
         AuditLogger::log_invalid_scope_request(&req.did, &req.scopes, &client_ip);
@@ -123,7 +123,7 @@ pub async fn verify(
 
     // Track successful authentication
     gateway::auth_successes_inc();
-    
+
     // AUDIT: Log successful authentication
     AuditLogger::log_auth_attempt(&req.did, true, None, &client_ip);
 

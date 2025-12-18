@@ -67,7 +67,9 @@ pub async fn create_coop(
 
     // Note: Global cooperative limit is checked atomically inside create_coop()
     // to prevent TOCTOU race condition
-    coop_mgr.create_coop(req.id.clone(), req.name.clone(), owner, timestamp()?).await?;
+    coop_mgr
+        .create_coop(req.id.clone(), req.name.clone(), owner, timestamp()?)
+        .await?;
 
     // Track cooperative creation
     gateway::coops_created_inc();
@@ -438,6 +440,7 @@ mod tests {
                 owner.did().clone(),
                 timestamp().unwrap(),
             )
+            .await
             .unwrap();
 
         let app = test::init_service(
@@ -499,6 +502,7 @@ mod tests {
                 owner.did().clone(),
                 timestamp().unwrap(),
             )
+            .await
             .unwrap();
 
         let app = test::init_service(
@@ -597,7 +601,7 @@ mod tests {
         assert!(resp.status().is_success());
 
         // Verify that Alice is the steward
-        let coop = coop_mgr.get_coop(&"alice-coop".to_string()).unwrap();
+        let coop = coop_mgr.get_coop(&"alice-coop".to_string()).await.unwrap();
         assert_eq!(
             coop.members.len(),
             1,
@@ -631,6 +635,7 @@ mod tests {
                 alice.did().clone(),
                 timestamp().unwrap(),
             )
+            .await
             .unwrap();
 
         coop_mgr
@@ -640,6 +645,7 @@ mod tests {
                 bob.did().clone(),
                 timestamp().unwrap(),
             )
+            .await
             .unwrap();
 
         let app = test::init_service(
@@ -722,7 +728,7 @@ mod tests {
         assert_eq!(resp.status(), actix_web::http::StatusCode::FORBIDDEN);
 
         // Verify coop-tech still exists (wasn't deleted)
-        let coop_tech = coop_mgr.get_coop(&"coop-tech".to_string()).unwrap();
+        let coop_tech = coop_mgr.get_coop(&"coop-tech".to_string()).await.unwrap();
         assert_eq!(coop_tech.name, "Tech Coop");
     }
 }
