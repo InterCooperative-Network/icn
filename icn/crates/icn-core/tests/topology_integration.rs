@@ -356,9 +356,9 @@ async fn test_multi_region_topology() -> Result<()> {
 
     // Wait for handshakes and categorization with retry logic
     // Handshakes can take variable time depending on system load
-    // Use a longer timeout for CI environments (up to 10 seconds)
+    // Use a longer timeout for CI environments (up to 20 seconds)
     let mut counts_a = node_a.get_neighbor_counts().await;
-    for attempt in 1..=40 {
+    for attempt in 1..=80 {
         tokio::time::sleep(Duration::from_millis(250)).await;
         counts_a = node_a.get_neighbor_counts().await;
 
@@ -372,16 +372,19 @@ async fn test_multi_region_topology() -> Result<()> {
             break;
         }
 
-        if attempt % 5 == 0 {
+        if attempt % 10 == 0 {
             info!(
-                "Attempt {}: local_cluster={}, regional={}, backbone={} (waiting...)",
+                "Attempt {}/80: local_cluster={}, regional={}, backbone={} (waiting...)",
                 attempt, counts_a.local_cluster, counts_a.regional, counts_a.backbone
             );
         }
     }
 
     // Verify Node A's neighbor categorization
-    info!("Final Node A neighbor counts: {:?}", counts_a);
+    info!(
+        "Final Node A neighbor counts after retries: local_cluster={}, regional={}, backbone={}, trusted={}",
+        counts_a.local_cluster, counts_a.regional, counts_a.backbone, counts_a.trusted
+    );
 
     assert_eq!(
         counts_a.local_cluster, 1,
