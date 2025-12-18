@@ -33,7 +33,111 @@ use icn_trust::TrustGraph;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
+
+/// TOFU (Trust-On-First-Use) Certificate Verifier
+///
+/// Accepts any valid self-signed certificate during TLS handshake.
+/// Identity verification is deferred to the application layer (Hello message).
+#[derive(Debug)]
+struct TofuCertificateVerifier {}
+
+impl rustls::server::danger::ClientCertVerifier for TofuCertificateVerifier {
+    fn offer_client_auth(&self) -> bool {
+        // Request client certificates
+        true
+    }
+
+    fn client_auth_mandatory(&self) -> bool {
+        // Don't require client cert at TLS layer - Hello message will verify
+        false
+    }
+
+    fn root_hint_subjects(&self) -> &[rustls::DistinguishedName] {
+        // Self-signed certs don't have root CAs
+        &[]
+    }
+
+    fn verify_client_cert(
+        &self,
+        _end_entity: &CertificateDer<'_>,
+        _intermediates: &[CertificateDer<'_>],
+        _now: rustls::pki_types::UnixTime,
+    ) -> Result<rustls::server::danger::ClientCertVerified, rustls::Error> {
+        // Accept any certificate - verification happens at application layer
+        debug!(
+            "TOFU: Accepting client certificate (identity verification deferred to Hello message)"
+        );
+        Ok(rustls::server::danger::ClientCertVerified::assertion())
+    }
+
+    fn verify_tls12_signature(
+        &self,
+        _message: &[u8],
+        _cert: &CertificateDer<'_>,
+        _dss: &rustls::DigitallySignedStruct,
+    ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
+        // TLS 1.2 not used with QUIC
+        Err(rustls::Error::General("TLS 1.2 not supported".to_string()))
+    }
+
+    fn verify_tls13_signature(
+        &self,
+        message: &[u8],
+        cert: &CertificateDer<'_>,
+        dss: &rustls::DigitallySignedStruct,
+    ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
+        use rustls::SignatureScheme;
+
+        // Verify we're using Ed25519
+        if dss.scheme != SignatureScheme::ED25519 {
+            return Err(rustls::Error::General(format!(
+                "Unsupported signature scheme: {:?} (expected Ed25519)",
+                dss.scheme
+            )));
+        }
+
+        // Parse the certificate to extract the public key
+        use x509_parser::prelude::*;
+        let (_, parsed_cert) = X509Certificate::from_der(cert)
+            .map_err(|e| rustls::Error::General(format!("Failed to parse certificate: {e}")))?;
+
+        // Extract the public key bytes
+        let public_key_bytes = parsed_cert.public_key().subject_public_key.data.clone();
+
+        // Ed25519 public keys are 32 bytes
+        if public_key_bytes.len() != 32 {
+            return Err(rustls::Error::General(format!(
+                "Invalid Ed25519 public key length: {} (expected 32)",
+                public_key_bytes.len()
+            )));
+        }
+
+        // Convert to [u8; 32] array
+        let key_array: [u8; 32] = public_key_bytes[..32]
+            .try_into()
+            .map_err(|_| rustls::Error::General("Failed to convert public key".to_string()))?;
+
+        // Create Ed25519 verifying key
+        let verifying_key = VerifyingKey::from_bytes(&key_array)
+            .map_err(|e| rustls::Error::General(format!("Invalid Ed25519 public key: {e}")))?;
+
+        // Parse signature
+        let signature = Signature::from_slice(dss.signature())
+            .map_err(|e| rustls::Error::General(format!("Invalid Ed25519 signature: {e}")))?;
+
+        // Verify signature
+        verifying_key
+            .verify(message, &signature)
+            .map_err(|e| rustls::Error::General(format!("Signature verification failed: {e}")))?;
+
+        Ok(rustls::client::danger::HandshakeSignatureValid::assertion())
+    }
+
+    fn supported_verify_schemes(&self) -> Vec<rustls::SignatureScheme> {
+        vec![rustls::SignatureScheme::ED25519]
+    }
+}
 
 /// Generate a self-signed certificate for a DID
 ///
@@ -71,15 +175,18 @@ pub fn generate_self_signed_cert(
 ///
 /// This uses self-signed certificates and defers identity verification to the application
 /// layer (Hello message handler). This implements Trust-On-First-Use (TOFU):
-/// 1. Accept any TLS connection with valid self-signed cert
+/// 1. Accept any TLS connection with valid self-signed cert  
 /// 2. Verify DID-TLS binding in Hello message handler
 /// 3. Use trust graph for authorization decisions
 pub fn create_server_config(
     certs: Vec<CertificateDer<'static>>,
     key: PrivateKeyDer<'static>,
 ) -> Result<rustls::ServerConfig> {
+    // Create a permissive verifier that accepts all self-signed certificates
+    // Identity verification happens at the application layer (Hello message)
+    let verifier = TofuCertificateVerifier {};
     let mut config = rustls::ServerConfig::builder()
-        .with_no_client_auth()
+        .with_client_cert_verifier(Arc::new(verifier))
         .with_single_cert(certs, key)
         .context("Failed to create server config")?;
 

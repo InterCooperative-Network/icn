@@ -546,7 +546,6 @@ async fn test_two_node_contract_deployment() {
 ///
 /// Root cause: QUIC session state corruption between tests running in the same process,
 /// causing "aborted by peer: application protocol caused connection to be closed during handshake".
-#[ignore = "Flaky in full suite due to QUIC state corruption - run in isolation"]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_contract_execution_after_deployment() {
     // Create two nodes
@@ -730,7 +729,6 @@ async fn test_untrusted_deployer_rejected() {
 /// - Likely some global QUIC/TLS state corruption
 ///
 /// Run this test in isolation: `cargo test -p icn-core --test contract_deployment_integration test_three_participant`
-#[ignore = "Flaky in full suite due to QUIC state corruption - run in isolation"]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_three_participant_contract_deployment() {
     // Create three nodes (Alice, Bob, Carol)
@@ -945,7 +943,6 @@ async fn test_three_participant_contract_deployment() {
 /// cargo test -p icn-core --test contract_deployment_integration test_contract_with_state_variables -- --ignored
 /// ```
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "Flaky in full suite due to QUIC state corruption - run in isolation"]
 async fn test_contract_with_state_variables() {
     // Create two nodes
     let node_a = TestNode::new(19010).await.expect("Failed to create node A");
@@ -1160,7 +1157,6 @@ async fn test_contract_with_state_variables() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "Flaky in full suite due to QUIC state corruption - run in isolation"]
 async fn test_contract_with_ledger_integration() {
     // Create two nodes
     let node_a = TestNode::new(19012).await.expect("Failed to create node A");

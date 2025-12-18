@@ -341,7 +341,6 @@ async fn test_backbone_categorization() -> Result<()> {
 /// ```
 /// cargo test -p icn-core --test topology_integration test_multi_region_topology -- --ignored
 /// ```
-#[ignore = "Flaky in full suite due to QUIC timing issues - run in isolation"]
 #[tokio::test]
 async fn test_multi_region_topology() -> Result<()> {
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
@@ -395,7 +394,6 @@ async fn test_multi_region_topology() -> Result<()> {
 /// to QUIC/TLS session state corruption when multiple tests run in the same process.
 ///
 /// Run this test in isolation: `cargo test -p icn-core --test topology_integration test_scope_aware_peer_sampling`
-#[ignore = "Flaky in full suite due to QUIC state issues - run in isolation"]
 #[tokio::test]
 async fn test_scope_aware_peer_sampling() -> Result<()> {
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
