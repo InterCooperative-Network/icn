@@ -53,10 +53,7 @@ fn test_scope_allowlist_prevents_privilege_escalation() {
 
     for scope in attack_scopes {
         let result = validation::validate_scopes(&[scope.to_string()]);
-        assert!(
-            result.is_err(),
-            "Attack scope '{scope}' should be rejected"
-        );
+        assert!(result.is_err(), "Attack scope '{scope}' should be rejected");
     }
 }
 
