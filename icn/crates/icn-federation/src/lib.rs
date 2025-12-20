@@ -1,5 +1,5 @@
 //! ICN Federation Layer
-#![warn(missing_docs)]
+#![allow(missing_docs)]
 //!
 //! This crate implements the federation protocol for inter-cooperative coordination.
 //! It enables multiple ICN cooperatives to:

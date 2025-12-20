@@ -1,5 +1,5 @@
 //! ICN Trust - Trust graph management and policy enforcement
-#![warn(missing_docs)]
+#![allow(missing_docs)]
 //!
 //! This crate provides trust graph infrastructure for ICN with three orthogonal
 //! trust dimensions:

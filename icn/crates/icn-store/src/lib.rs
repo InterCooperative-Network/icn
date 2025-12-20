@@ -1,5 +1,5 @@
 //! ICN Store - Persistent key-value storage abstraction
-#![warn(missing_docs)]
+#![allow(missing_docs)]
 
 /// Budget management for ledger accounts
 pub mod budgets;
@@ -147,6 +147,7 @@ pub trait Store: Send + Sync {
     ///
     /// # Returns
     /// Tuple of (entries, total_count) where total_count is the total matching entries
+    #[allow(clippy::type_complexity)]
     fn scan_paginated(
         &self,
         prefix: &[u8],

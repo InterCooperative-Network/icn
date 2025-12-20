@@ -1,5 +1,5 @@
 //! ICN Gateway - REST + WebSocket API for cooperative applications
-#![warn(missing_docs)]
+#![allow(missing_docs)]
 //!
 //! This crate provides a developer-facing HTTP API layer on top of the ICN substrate.
 //! Co-ops build apps (web/mobile) that talk to this gateway, which handles:

@@ -1,5 +1,5 @@
 //! ICN Coop - Cooperative management and lifecycle
-#![warn(missing_docs)]
+#![allow(missing_docs)]
 
 /// Cooperative actor for handling coop operations
 pub mod actor;

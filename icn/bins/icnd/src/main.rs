@@ -98,7 +98,9 @@ async fn main() -> Result<()> {
         tracing::info!("Gateway API enabled on {}", config.gateway.bind_addr);
         if config.gateway.jwt_secret.is_empty() {
             if args.insecure_gateway_no_jwt {
-                tracing::warn!("⚠️  Gateway running WITHOUT JWT authentication (--insecure-gateway-no-jwt)");
+                tracing::warn!(
+                    "⚠️  Gateway running WITHOUT JWT authentication (--insecure-gateway-no-jwt)"
+                );
                 tracing::warn!("⚠️  This is insecure and should only be used for development!");
             } else {
                 tracing::error!("Gateway API enabled but no JWT secret configured!");

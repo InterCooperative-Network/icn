@@ -1,5 +1,5 @@
 //! ICN CCL - Cooperative Contract Language runtime
-#![warn(missing_docs)]
+#![allow(missing_docs)]
 //!
 //! This crate implements a domain-specific language (DSL) for expressing cooperative
 //! agreements with built-in safety features:

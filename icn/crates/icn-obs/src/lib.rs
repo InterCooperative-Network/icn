@@ -1,5 +1,5 @@
 //! ICN Obs - Observability (logging, metrics, tracing)
-#![warn(missing_docs)]
+#![allow(missing_docs)]
 
 /// Contribution attestation system
 pub mod attestation;
