@@ -134,7 +134,11 @@ impl CoopHandle {
     pub async fn remove_member(&self, coop_id: String, did: Did) -> Result<()> {
         let (reply, rx) = oneshot::channel();
         self.tx
-            .send(CoopMessage::RemoveMember { coop_id, did, reply })
+            .send(CoopMessage::RemoveMember {
+                coop_id,
+                did,
+                reply,
+            })
             .await
             .map_err(|_| crate::CoopError::Governance("Actor disconnected".into()))?;
         rx.await

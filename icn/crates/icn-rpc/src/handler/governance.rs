@@ -35,7 +35,10 @@ pub async fn handle_governance_domain_list(id: u64, state: &Arc<RpcServer>) -> R
                     },
                     params: GovernanceParamsInfo {
                         quorum_percentage: d.config.params.quorum_percentage,
-                        approval_threshold_percentage: d.config.params.approval_threshold_percentage,
+                        approval_threshold_percentage: d
+                            .config
+                            .params
+                            .approval_threshold_percentage,
                         voting_period_seconds: d.config.params.voting_period_seconds,
                     },
                 })
@@ -121,9 +124,10 @@ pub async fn handle_governance_proposal_list(id: u64, state: &Arc<RpcServer>) ->
                 .map(|p| {
                     let (state_str, opened_at, closes_at, closed_at) = match &p.state {
                         ProposalState::Draft => ("draft".to_string(), None, None, None),
-                        ProposalState::Open { opened_at, closes_at } => {
-                            ("open".to_string(), Some(*opened_at), Some(*closes_at), None)
-                        }
+                        ProposalState::Open {
+                            opened_at,
+                            closes_at,
+                        } => ("open".to_string(), Some(*opened_at), Some(*closes_at), None),
                         ProposalState::Accepted { closed_at } => {
                             ("accepted".to_string(), None, None, Some(*closed_at))
                         }
@@ -200,9 +204,10 @@ pub async fn handle_governance_proposal_get(
         Ok(Some(p)) => {
             let (state_str, opened_at, closes_at, closed_at) = match &p.state {
                 ProposalState::Draft => ("draft".to_string(), None, None, None),
-                ProposalState::Open { opened_at, closes_at } => {
-                    ("open".to_string(), Some(*opened_at), Some(*closes_at), None)
-                }
+                ProposalState::Open {
+                    opened_at,
+                    closes_at,
+                } => ("open".to_string(), Some(*opened_at), Some(*closes_at), None),
                 ProposalState::Accepted { closed_at } => {
                     ("accepted".to_string(), None, None, Some(*closed_at))
                 }
@@ -279,7 +284,7 @@ pub async fn handle_governance_domain_create(
                             return RpcResponse::error(
                                 id,
                                 -32602,
-                                format!("Invalid member DID '{}': {}", m, e),
+                                format!("Invalid member DID '{m}': {e}"),
                             );
                         }
                     }
@@ -301,7 +306,13 @@ pub async fn handle_governance_domain_create(
     let domain_id = icn_governance::GovernanceDomainId(request.domain_id);
 
     match governance_handle
-        .create_domain(domain_id, request.name, request.profile, params_config, membership)
+        .create_domain(
+            domain_id,
+            request.name,
+            request.profile,
+            params_config,
+            membership,
+        )
         .await
     {
         Ok(()) => {
@@ -346,11 +357,7 @@ pub async fn handle_governance_proposal_create(
             let recipient_did = match icn_identity::Did::from_str(recipient) {
                 Ok(d) => d,
                 Err(e) => {
-                    return RpcResponse::error(
-                        id,
-                        -32602,
-                        format!("Invalid recipient DID: {}", e),
-                    );
+                    return RpcResponse::error(id, -32602, format!("Invalid recipient DID: {e}"));
                 }
             };
             ProposalPayload::Budget {
@@ -371,18 +378,14 @@ pub async fn handle_governance_proposal_create(
                     return RpcResponse::error(
                         id,
                         -32602,
-                        format!("Invalid membership action: {}", action),
+                        format!("Invalid membership action: {action}"),
                     );
                 }
             };
             let member_did = match icn_identity::Did::from_str(member) {
                 Ok(d) => d,
                 Err(e) => {
-                    return RpcResponse::error(
-                        id,
-                        -32602,
-                        format!("Invalid member DID: {}", e),
-                    );
+                    return RpcResponse::error(id, -32602, format!("Invalid member DID: {e}"));
                 }
             };
             ProposalPayload::Membership {
@@ -474,7 +477,10 @@ pub async fn handle_governance_vote_cast(
             return RpcResponse::error(
                 id,
                 -32602,
-                format!("Invalid vote choice: {}. Must be 'for', 'against', or 'abstain'", request.choice),
+                format!(
+                    "Invalid vote choice: {}. Must be 'for', 'against', or 'abstain'",
+                    request.choice
+                ),
             );
         }
     };

@@ -74,7 +74,16 @@ jobs:
           sudo rm -rf /usr/local/.ghcup
           sudo rm -rf /usr/lib/jvm
           sudo rm -rf /opt/microsoft
+          sudo rm -rf /opt/hostedtoolcache/go
+          sudo rm -rf /opt/hostedtoolcache/node
+          sudo rm -rf /opt/hostedtoolcache/Python
+          sudo rm -rf /opt/hostedtoolcache/Ruby
+          sudo rm -rf /usr/local/share/chromium
+          sudo rm -rf /usr/local/share/vcpkg
+          sudo rm -rf /usr/share/miniconda
+          sudo rm -rf /imagegeneration
           docker system prune -af || true
+          sudo apt-get clean || true
           echo "Disk space after cleanup:"
           df -h /
 

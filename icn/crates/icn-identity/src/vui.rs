@@ -167,10 +167,12 @@ pub struct VuiResponse {
     pub share_commitment: [u8; 32],
 }
 
-/// Serializable PRF partial
+/// Serializable PRF partial for threshold combination
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SerializedPartial {
+    /// Shard index (1-based)
     pub index: u8,
+    /// Partial PRF value from this shard
     pub value: [u8; 32],
 }
 

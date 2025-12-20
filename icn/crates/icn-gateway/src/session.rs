@@ -362,7 +362,13 @@ mod tests {
 
         // Trying to approve should fail
         let result = mgr
-            .approve_session(&session.session_id, did.clone(), "token".to_string(), 3600, vec![])
+            .approve_session(
+                &session.session_id,
+                did.clone(),
+                "token".to_string(),
+                3600,
+                vec![],
+            )
             .await;
         assert!(result.is_err());
     }
