@@ -1,0 +1,561 @@
+//! Placement and executor management handlers for ComputeActor.
+//!
+//! Phase 16B/16C: Distributed task placement with deliberation protocol.
+
+use super::types::ExecutorInfo;
+use super::ComputeActor;
+use crate::error::ComputeError;
+use crate::scheduler::PlacementPolicy;
+use crate::task::TaskStatus;
+use crate::types::{ComputeMessage, ExecutorCapability, TaskHash};
+use crate::MIN_TRUST_EXECUTE;
+use std::collections::HashMap;
+
+impl ComputeActor {
+    /// Handle executor announcement
+    pub(super) async fn on_executor_announce(
+        &self,
+        did: String,
+        capabilities: Vec<ExecutorCapability>,
+    ) -> Result<(), ComputeError> {
+        let trust_score = (self.trust_callback)(&did);
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+
+        let info = ExecutorInfo {
+            did: did.clone(),
+            capabilities,
+            trust_score,
+            last_seen: now,
+            tasks_executing: 0,
+            capacity: None,
+        };
+
+        let mut registry = self.executor_registry.lock().await;
+        registry.insert(did.clone(), info);
+        icn_obs::metrics::compute::executors_available_set(registry.len() as f64);
+
+        // Update executor load metric
+        icn_obs::metrics::compute::executor_load_set(&did, 0.0);
+
+        Ok(())
+    }
+
+    /// Get list of available executors with required capabilities
+    #[allow(dead_code)]
+    pub async fn find_executors(&self, required_caps: &[ExecutorCapability]) -> Vec<String> {
+        let registry = self.executor_registry.lock().await;
+        registry
+            .values()
+            .filter(|info| {
+                // Check if executor has all required capabilities
+                required_caps
+                    .iter()
+                    .all(|cap| info.capabilities.contains(cap))
+            })
+            .map(|info| info.did.clone())
+            .collect()
+    }
+
+    /// Get capacity information for an executor
+    ///
+    /// Returns None if the executor is not registered or has no capacity info.
+    #[allow(dead_code)]
+    pub async fn get_executor_capacity(
+        &self,
+        executor_did: &str,
+    ) -> Option<crate::scheduler::NodeCapacity> {
+        let registry = self.executor_registry.lock().await;
+        registry
+            .get(executor_did)
+            .and_then(|info| info.capacity.clone())
+    }
+
+    /// Get capacity information for all registered executors
+    ///
+    /// Returns a map of executor DID to capacity. Executors without capacity info are excluded.
+    #[allow(dead_code)]
+    pub async fn get_all_executor_capacities(
+        &self,
+    ) -> HashMap<String, crate::scheduler::NodeCapacity> {
+        let registry = self.executor_registry.lock().await;
+        registry
+            .iter()
+            .filter_map(|(did, info)| info.capacity.clone().map(|cap| (did.clone(), cap)))
+            .collect()
+    }
+
+    /// Handle placement request (Phase 16B)
+    pub(super) async fn on_placement_request(
+        &self,
+        task_hash: TaskHash,
+        submitter: String,
+        resource_profile: crate::scheduler::ResourceProfile,
+        locality_hints: Vec<crate::scheduler::LocalityHint>,
+        _max_cost: Option<u64>,
+        requested_at: u64,
+    ) -> Result<(), ComputeError> {
+        let task_hash_str = hex::encode(task_hash);
+
+        tracing::debug!(
+            task_hash = %task_hash_str,
+            submitter = %submitter,
+            "Received placement request"
+        );
+
+        // Track placement request received
+        icn_obs::metrics::compute::placement_requests_received_inc();
+
+        // Check if we can execute
+        let our_trust = (self.trust_callback)(&self.own_did);
+        if our_trust < MIN_TRUST_EXECUTE {
+            tracing::debug!(
+                task_hash = %task_hash_str,
+                our_trust = our_trust,
+                required = MIN_TRUST_EXECUTE,
+                "Skipping placement: insufficient executor trust"
+            );
+            return Ok(());
+        }
+
+        // Check capacity
+        let mut registry = self.executor_registry.lock().await;
+        let capacity = if let Some(info) = registry.get_mut(&self.own_did) {
+            // Create temporary NodeCapacity from ExecutorInfo
+            // For now, we'll use placeholder values - Phase 16A will integrate real capacity tracking
+            crate::scheduler::NodeCapacity {
+                cpu_cores_total: 8.0,
+                cpu_cores_available: 8.0 - info.tasks_executing as f64 * 0.5,
+                memory_mb_total: 16384,
+                memory_mb_available: 16384 - info.tasks_executing as u64 * 1024,
+                storage_mb_available: 100_000,
+                network_mbps: 1000.0,
+                gpu_devices: vec![],
+                updated_at: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis() as u64,
+            }
+        } else {
+            // Not registered yet, use defaults
+            drop(registry);
+            return Ok(());
+        };
+
+        let node_state = crate::scheduler::NodeState {
+            did: self.own_did.clone(),
+            capacity: capacity.clone(),
+            executing_tasks: HashMap::new(),
+            queue_depth: registry
+                .get(&self.own_did)
+                .map(|i| i.tasks_executing)
+                .unwrap_or(0),
+        };
+        drop(registry);
+
+        // Check if we have a placement policy (for now, use default)
+        let policy = crate::scheduler::DefaultPlacementPolicy::default();
+
+        // Build locality context (Phase 16C / M5)
+        // Use locality callback if available, otherwise use empty context
+        let locality_ctx = if let Some(ref locality_cb) = self.locality_callback {
+            (locality_cb)(&submitter)
+        } else {
+            crate::scheduler::LocalityContext::empty()
+        };
+
+        // Check placement constraints from policy (Phase 16E)
+        // Look up task to get its placement_constraints
+        let mgr = self.task_manager.lock().await;
+        if let Some(task) = mgr.get(&task_hash) {
+            if let Some(ref constraints) = task.placement_constraints {
+                // Check required region
+                if let Some(ref required_region) = constraints.required_region {
+                    if let Some(ref own_region) = self.own_region {
+                        if own_region != required_region {
+                            tracing::debug!(
+                                task_hash = %task_hash_str,
+                                required_region = %required_region,
+                                own_region = %own_region,
+                                "Task requires different region, skipping claim"
+                            );
+                            drop(mgr);
+                            return Ok(());
+                        }
+                    } else {
+                        // No region configured, cannot claim region-specific tasks
+                        tracing::debug!(
+                            task_hash = %task_hash_str,
+                            required_region = %required_region,
+                            "Task requires region but node has no region configured, skipping claim"
+                        );
+                        drop(mgr);
+                        return Ok(());
+                    }
+                }
+
+                // Check executor whitelist
+                if !constraints.allowed_executors.is_empty()
+                    && !constraints.allowed_executors.contains(&self.own_did)
+                {
+                    tracing::info!(
+                        task_hash = %task_hash_str,
+                        executor = %self.own_did,
+                        "Executor not in whitelist, skipping placement"
+                    );
+                    icn_obs::metrics::compute::placement_constraints_enforced_inc("whitelist");
+                    drop(mgr);
+                    return Ok(());
+                }
+
+                // Check executor blacklist
+                if constraints.forbidden_executors.contains(&self.own_did) {
+                    tracing::info!(
+                        task_hash = %task_hash_str,
+                        executor = %self.own_did,
+                        "Executor in blacklist, skipping placement"
+                    );
+                    icn_obs::metrics::compute::placement_constraints_enforced_inc("blacklist");
+                    drop(mgr);
+                    return Ok(());
+                }
+
+                // Check required capabilities
+                if !constraints.required_capabilities.is_empty() {
+                    // Get our capabilities from registry
+                    let registry = self.executor_registry.lock().await;
+                    if let Some(info) = registry.get(&self.own_did) {
+                        let our_caps = &info.capabilities;
+                        for required in &constraints.required_capabilities {
+                            // Convert string to capability and check
+                            let has_cap = our_caps.iter().any(|cap| match cap {
+                                crate::types::ExecutorCapability::Ccl => required == "Ccl",
+                                crate::types::ExecutorCapability::Wasm => required == "Wasm",
+                                crate::types::ExecutorCapability::Custom(name) => name == required,
+                            });
+                            if !has_cap {
+                                tracing::info!(
+                                    task_hash = %task_hash_str,
+                                    executor = %self.own_did,
+                                    missing_capability = %required,
+                                    "Missing required capability, skipping placement"
+                                );
+                                icn_obs::metrics::compute::placement_constraints_enforced_inc(
+                                    "capability",
+                                );
+                                drop(registry);
+                                drop(mgr);
+                                return Ok(());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        drop(mgr);
+
+        // Score the task
+        let offer = match policy.score_task(
+            &task_hash,
+            &resource_profile,
+            &submitter,
+            &node_state,
+            our_trust,
+            &locality_hints,
+            &locality_ctx,
+        ) {
+            Some(o) => o,
+            None => {
+                tracing::debug!(
+                    task_hash = %task_hash_str,
+                    "Cannot execute task (capacity or policy rejection)"
+                );
+                return Ok(());
+            }
+        };
+
+        tracing::info!(
+            task_hash = %task_hash_str,
+            score = offer.score,
+            cost = offer.cost,
+            "Computed placement score, starting deliberation"
+        );
+
+        // Track placement score
+        icn_obs::metrics::compute::placement_score_observe(offer.score);
+
+        // Deliberation window: wait until deadline before broadcasting offer
+        // Uses relative timing based on request timestamp to avoid clock skew (M9 fix)
+        // This allows all executors to broadcast at approximately the same wall-clock time,
+        // regardless of network latency in receiving the request
+        let send_callback = self.send_callback.clone();
+        let task_manager = self.task_manager.clone();
+
+        // Calculate deadline based on request timestamp
+        let deadline = requested_at + crate::DELIBERATION_PERIOD_MS;
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+        let remaining_ms = deadline.saturating_sub(now);
+
+        tokio::spawn(async move {
+            // Wait remaining deliberation period (relative to request timestamp)
+            if remaining_ms > 0 {
+                tokio::time::sleep(tokio::time::Duration::from_millis(remaining_ms)).await;
+            }
+
+            // Check if task was already claimed by someone else
+            let mgr = task_manager.lock().await;
+            if let Some(status) = mgr.status(&task_hash) {
+                if matches!(status, TaskStatus::Claimed { .. }) {
+                    tracing::debug!(
+                        task_hash = %hex::encode(task_hash),
+                        "Task already claimed during deliberation, not broadcasting offer"
+                    );
+                    return;
+                }
+            }
+            drop(mgr);
+
+            // Broadcast offer after deliberation
+            if let Some(cb) = send_callback {
+                tracing::debug!(
+                    task_hash = %hex::encode(task_hash),
+                    score = offer.score,
+                    "Broadcasting placement offer after deliberation"
+                );
+
+                // Track offer sent
+                icn_obs::metrics::compute::placement_offers_sent_inc();
+
+                cb(ComputeMessage::PlacementOffer {
+                    task_hash,
+                    executor: offer.executor,
+                    score: offer.score,
+                    cost: offer.cost,
+                    estimated_start: offer.estimated_start,
+                    offered_at: offer.offered_at,
+                });
+            }
+        });
+
+        Ok(())
+    }
+
+    /// Handle placement offer (Phase 16B)
+    pub(super) async fn on_placement_offer(
+        &self,
+        task_hash: TaskHash,
+        executor: String,
+        score: f64,
+        cost: u64,
+        estimated_start: u64,
+        offered_at: u64,
+    ) -> Result<(), ComputeError> {
+        let task_hash_str = hex::encode(task_hash);
+
+        // Create PlacementOffer struct
+        let offer = crate::scheduler::PlacementOffer {
+            executor: executor.clone(),
+            score,
+            cost,
+            estimated_start,
+            offered_at,
+        };
+
+        // Add to pending offers
+        let mut offers_map = self.pending_offers.lock().await;
+        let task_offers = offers_map.entry(task_hash).or_insert_with(Vec::new);
+
+        // Check if we already have an offer from this executor (shouldn't happen)
+        if task_offers.iter().any(|o| o.executor == executor) {
+            tracing::warn!(
+                task_hash = %task_hash_str,
+                executor = %executor,
+                "Duplicate offer from executor, ignoring"
+            );
+            return Ok(());
+        }
+
+        task_offers.push(offer);
+        let offer_count = task_offers.len();
+        drop(offers_map);
+
+        tracing::debug!(
+            task_hash = %task_hash_str,
+            executor = %executor,
+            score = score,
+            offer_count = offer_count,
+            "Received placement offer"
+        );
+
+        // Track offer received
+        icn_obs::metrics::compute::placement_offers_received_inc();
+
+        // If this is the first offer, spawn selection task
+        if offer_count == 1 {
+            let task_hash_copy = task_hash;
+            let pending_offers = self.pending_offers.clone();
+            let pending_timestamps = self.pending_request_timestamps.clone();
+            let task_manager = self.task_manager.clone();
+            let send_callback = self.send_callback.clone();
+
+            tokio::spawn(async move {
+                // Wait for offers to arrive (1000ms: 500ms deliberation + 500ms grace)
+                tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
+
+                // Get all offers
+                let mut offers_map = pending_offers.lock().await;
+                let offers = offers_map.remove(&task_hash_copy).unwrap_or_default();
+                drop(offers_map);
+
+                // Always cleanup timestamp (prevent memory leak)
+                let mut timestamps = pending_timestamps.lock().await;
+                let requested_at = timestamps.remove(&task_hash_copy);
+                drop(timestamps);
+
+                if offers.is_empty() {
+                    tracing::warn!(
+                        task_hash = %hex::encode(task_hash_copy),
+                        "No offers received for task"
+                    );
+                    return;
+                }
+
+                // Select highest score with deterministic tie-breaking
+                // When scores are equal (within epsilon), use lexicographic DID comparison
+                // This ensures consistent selection across different platforms
+                let winner = offers
+                    .iter()
+                    .max_by(|a, b| {
+                        const EPSILON: f64 = 1e-9;
+                        let score_diff = a.score - b.score;
+                        if score_diff.abs() < EPSILON {
+                            // Scores are effectively equal, use DID as tie-breaker
+                            a.executor.cmp(&b.executor)
+                        } else if score_diff > 0.0 {
+                            std::cmp::Ordering::Greater
+                        } else {
+                            std::cmp::Ordering::Less
+                        }
+                    })
+                    .unwrap();
+
+                // Compute placement duration from original request time
+
+                if let Some(requested_at) = requested_at {
+                    let now = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_millis() as u64;
+                    let duration_ms = now.saturating_sub(requested_at);
+                    let duration_secs = duration_ms as f64 / 1000.0;
+
+                    tracing::info!(
+                        task_hash = %hex::encode(task_hash_copy),
+                        winner = %winner.executor,
+                        score = winner.score,
+                        offer_count = offers.len(),
+                        duration_secs = duration_secs,
+                        "Selected executor for task"
+                    );
+
+                    // Track placement duration (true end-to-end latency)
+                    icn_obs::metrics::compute::placement_duration_observe(duration_secs);
+                } else {
+                    tracing::info!(
+                        task_hash = %hex::encode(task_hash_copy),
+                        winner = %winner.executor,
+                        score = winner.score,
+                        offer_count = offers.len(),
+                        "Selected executor for task (no duration tracking)"
+                    );
+                }
+
+                // Track placement wins and losses
+                // Winner gets 1 win, all other offers are losses
+                icn_obs::metrics::compute::placement_wins_inc();
+                if offers.len() > 1 {
+                    for _ in 0..(offers.len() - 1) {
+                        icn_obs::metrics::compute::placement_losses_inc();
+                    }
+                }
+
+                // Claim task with winner
+                let mut mgr = task_manager.lock().await;
+                if let Err(e) = mgr.claim(&task_hash_copy, winner.executor.clone()) {
+                    tracing::warn!(
+                        task_hash = %hex::encode(task_hash_copy),
+                        error = %e,
+                        "Failed to claim task with winner"
+                    );
+                    return;
+                }
+                drop(mgr);
+
+                // Broadcast claim
+                if let Some(cb) = send_callback {
+                    cb(ComputeMessage::TaskClaimed {
+                        task_hash: task_hash_copy,
+                        executor: winner.executor.clone(),
+                    });
+                }
+            });
+        }
+
+        Ok(())
+    }
+
+    /// Handle capacity announcement (Phase 16A)
+    pub(super) async fn on_capacity_announce(
+        &self,
+        executor: String,
+        capacity: crate::scheduler::NodeCapacity,
+    ) -> Result<(), ComputeError> {
+        tracing::debug!(
+            executor = %executor,
+            cpu_available = capacity.cpu_cores_available,
+            memory_available = capacity.memory_mb_available,
+            "Received capacity announcement"
+        );
+
+        // Store capacity in executor registry for placement decisions
+        let mut registry = self.executor_registry.lock().await;
+        if let Some(info) = registry.get_mut(&executor) {
+            info.capacity = Some(capacity.clone());
+            info.last_seen = capacity.updated_at;
+            tracing::debug!(
+                executor = %executor,
+                cpu_cores = capacity.cpu_cores_available,
+                memory_mb = capacity.memory_mb_available,
+                storage_mb = capacity.storage_mb_available,
+                gpus = capacity.gpu_devices.len(),
+                "Updated executor capacity in registry"
+            );
+        } else {
+            // Executor not yet registered - create entry with capacity
+            let trust_score = (self.trust_callback)(&executor);
+            let info = ExecutorInfo {
+                did: executor.clone(),
+                capabilities: Vec::new(), // Will be populated on ExecutorAvailable message
+                trust_score,
+                last_seen: capacity.updated_at,
+                tasks_executing: 0,
+                capacity: Some(capacity.clone()),
+            };
+            registry.insert(executor.clone(), info);
+            tracing::debug!(
+                executor = %executor,
+                "Created executor entry from capacity announcement"
+            );
+        }
+
+        // Update metrics for executor capacity
+        icn_obs::metrics::compute::executors_available_set(registry.len() as f64);
+
+        Ok(())
+    }
+}

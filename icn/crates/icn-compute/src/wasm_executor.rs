@@ -222,7 +222,10 @@ impl WasmExecutor {
                 |_caller: wasmtime::Caller<'_, WasmState>| -> i64 {
                     std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap()
+                        .unwrap_or_else(|e| {
+                            tracing::warn!("System clock before UNIX epoch: {:?}", e);
+                            std::time::Duration::ZERO
+                        })
                         .as_millis() as i64
                 },
             )
@@ -288,7 +291,10 @@ impl Executor for WasmExecutor {
 
                 let timestamp = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
+                    .unwrap_or_else(|e| {
+                        tracing::warn!("System clock before UNIX epoch: {:?}", e);
+                        std::time::Duration::ZERO
+                    })
                     .as_secs();
 
                 let ccl_context = icn_ccl::ExecutionContext {

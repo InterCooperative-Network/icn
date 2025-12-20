@@ -14,6 +14,9 @@ pub enum GatewayError {
     #[error("Authorization failed: {0}")]
     AuthorizationFailed(String),
 
+    #[error("Forbidden: {0}")]
+    Forbidden(String),
+
     #[error("Resource not found: {0}")]
     NotFound(String),
 
@@ -41,6 +44,7 @@ impl ResponseError for GatewayError {
         match self {
             GatewayError::AuthenticationFailed(_) => StatusCode::UNAUTHORIZED,
             GatewayError::AuthorizationFailed(_) => StatusCode::FORBIDDEN,
+            GatewayError::Forbidden(_) => StatusCode::FORBIDDEN,
             GatewayError::NotFound(_) => StatusCode::NOT_FOUND,
             GatewayError::BadRequest(_) => StatusCode::BAD_REQUEST,
             GatewayError::RateLimitExceeded(_) => StatusCode::TOO_MANY_REQUESTS,
@@ -58,6 +62,7 @@ impl ResponseError for GatewayError {
             // User-facing errors - safe to expose
             GatewayError::AuthenticationFailed(msg) => msg.clone(),
             GatewayError::AuthorizationFailed(msg) => msg.clone(),
+            GatewayError::Forbidden(msg) => msg.clone(),
             GatewayError::NotFound(msg) => msg.clone(),
             GatewayError::BadRequest(msg) => msg.clone(),
             GatewayError::RateLimitExceeded(msg) => format!("Rate limit exceeded for DID: {msg}"),

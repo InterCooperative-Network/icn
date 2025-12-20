@@ -1,0 +1,16 @@
+apiVersion: v2
+name: icn
+description: A Helm chart for deploying ICN (Intercooperative Network)
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - icn
+  - cooperative
+  - p2p
+home: https://github.com/InterCooperative-Network/icn
+sources:
+  - https://github.com/InterCooperative-Network/icn
+maintainers:
+  - name: ICN Team
+    email: team@icn.coop

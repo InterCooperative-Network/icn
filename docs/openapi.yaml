@@ -1,0 +1,750 @@
+openapi: 3.0.3
+info:
+  title: ICN Gateway API
+  description: |
+    REST API for the Intercooperative Network (ICN) Gateway.
+    
+    ICN is a substrate daemon for the cooperative internet, providing:
+    - Decentralized identity (DIDs)
+    - Trust graph computation
+    - Mutual credit ledger
+    - Cooperative contract execution
+    - Distributed compute coordination
+    - Democratic governance primitives
+  version: 0.1.0
+  contact:
+    name: ICN Development Team
+    url: https://github.com/InterCooperative-Network/icn
+  license:
+    name: AGPL-3.0
+    url: https://www.gnu.org/licenses/agpl-3.0.en.html
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+  - url: https://gateway.icn.example
+    description: Production gateway
+
+tags:
+  - name: Health
+    description: Service health and readiness checks
+  - name: Identity
+    description: DID management and authentication
+  - name: Trust
+    description: Trust graph and reputation
+  - name: Ledger
+    description: Mutual credit accounting
+  - name: Governance
+    description: Democratic proposals and voting
+  - name: Cooperatives
+    description: Cooperative lifecycle and membership
+  - name: Federation
+    description: Cross-cooperative federation
+  - name: Compute
+    description: Distributed task execution
+  - name: Notifications
+    description: Real-time notifications
+  - name: Devices
+    description: Multi-device identity management
+  - name: Steward
+    description: Social key recovery
+  - name: Charter
+    description: Cooperative charter enforcement
+  - name: WebSocket
+    description: Real-time event streaming
+
+security:
+  - BearerAuth: []
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Health check
+      description: Returns service health status
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [healthy]
+                  version:
+                    type: string
+                    example: "0.1.0"
+
+  /ready:
+    get:
+      tags: [Health]
+      summary: Readiness check
+      description: Returns whether service is ready to accept traffic
+      security: []
+      responses:
+        '200':
+          description: Service is ready
+        '503':
+          description: Service is not ready
+
+  # Identity Endpoints
+  /identity/did:
+    get:
+      tags: [Identity]
+      summary: Get current DID
+      description: Returns the DID of the authenticated user
+      responses:
+        '200':
+          description: Current DID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DID'
+
+  /identity/public-key:
+    get:
+      tags: [Identity]
+      summary: Get public key
+      description: Returns the public key for the authenticated DID
+      responses:
+        '200':
+          description: Public key in base58 encoding
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  public_key:
+                    type: string
+                    example: "9wvx5pP..."
+
+  # Trust Endpoints
+  /trust/score/{did}:
+    get:
+      tags: [Trust]
+      summary: Get trust score
+      description: Get the trust score for a specific DID
+      parameters:
+        - name: did
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "did:icn:abc123"
+      responses:
+        '200':
+          description: Trust score
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrustScore'
+
+  /trust/edge:
+    post:
+      tags: [Trust]
+      summary: Create trust edge
+      description: Create or update a trust relationship
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [target_did, score]
+              properties:
+                target_did:
+                  type: string
+                  example: "did:icn:abc123"
+                score:
+                  type: number
+                  format: float
+                  minimum: 0.0
+                  maximum: 1.0
+                  example: 0.8
+      responses:
+        '201':
+          description: Trust edge created
+
+  # Ledger Endpoints
+  /ledger/balance:
+    get:
+      tags: [Ledger]
+      summary: Get balance
+      description: Get the current balance for the authenticated user
+      responses:
+        '200':
+          description: Current balance
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  balance:
+                    type: integer
+                    format: int64
+                    example: 1000
+
+  /ledger/transaction:
+    post:
+      tags: [Ledger]
+      summary: Record transaction
+      description: Record a mutual credit transaction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransactionRequest'
+      responses:
+        '201':
+          description: Transaction recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+
+  /ledger/history:
+    get:
+      tags: [Ledger]
+      summary: Get transaction history
+      description: Get transaction history for the authenticated user
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Transaction history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transactions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Transaction'
+                  total:
+                    type: integer
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+
+  # Governance Endpoints
+  /governance/proposals:
+    get:
+      tags: [Governance]
+      summary: List proposals
+      description: List all proposals in a governance domain
+      parameters:
+        - name: domain
+          in: query
+          required: true
+          schema:
+            type: string
+          example: "my-coop"
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [draft, active, passed, rejected, executed]
+      responses:
+        '200':
+          description: List of proposals
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Proposal'
+
+    post:
+      tags: [Governance]
+      summary: Create proposal
+      description: Create a new governance proposal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProposalRequest'
+      responses:
+        '201':
+          description: Proposal created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Proposal'
+
+  /governance/proposals/{id}/vote:
+    post:
+      tags: [Governance]
+      summary: Cast vote
+      description: Cast a vote on a proposal
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [choice]
+              properties:
+                choice:
+                  type: string
+                  enum: [approve, reject, abstain]
+      responses:
+        '200':
+          description: Vote recorded
+
+  # Cooperative Endpoints
+  /coops:
+    get:
+      tags: [Cooperatives]
+      summary: List cooperatives
+      description: List all cooperatives
+      responses:
+        '200':
+          description: List of cooperatives
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Cooperative'
+
+    post:
+      tags: [Cooperatives]
+      summary: Create cooperative
+      description: Create a new cooperative
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CooperativeRequest'
+      responses:
+        '201':
+          description: Cooperative created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cooperative'
+
+  /coops/{id}:
+    get:
+      tags: [Cooperatives]
+      summary: Get cooperative
+      description: Get details of a specific cooperative
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Cooperative details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cooperative'
+
+  /coops/{id}/members:
+    get:
+      tags: [Cooperatives]
+      summary: List members
+      description: List all members of a cooperative
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of members
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Member'
+
+    post:
+      tags: [Cooperatives]
+      summary: Add member
+      description: Add a member to a cooperative
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [did]
+              properties:
+                did:
+                  type: string
+                role:
+                  type: string
+      responses:
+        '201':
+          description: Member added
+
+  # Compute Endpoints
+  /compute/tasks:
+    get:
+      tags: [Compute]
+      summary: List tasks
+      description: List all compute tasks
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, running, completed, failed]
+      responses:
+        '200':
+          description: List of tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ComputeTask'
+
+    post:
+      tags: [Compute]
+      summary: Submit task
+      description: Submit a new compute task
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ComputeTaskRequest'
+      responses:
+        '201':
+          description: Task submitted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComputeTask'
+
+  /compute/tasks/{id}:
+    get:
+      tags: [Compute]
+      summary: Get task
+      description: Get details of a specific task
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Task details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComputeTask'
+
+  # WebSocket Endpoints
+  /ws:
+    get:
+      tags: [WebSocket]
+      summary: WebSocket connection
+      description: Establish WebSocket connection for real-time events
+      responses:
+        '101':
+          description: Switching Protocols (WebSocket upgrade)
+
+  # Notifications
+  /notifications:
+    get:
+      tags: [Notifications]
+      summary: List notifications
+      description: Get notifications for the authenticated user
+      parameters:
+        - name: unread_only
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: List of notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Notification'
+
+  /notifications/{id}/read:
+    post:
+      tags: [Notifications]
+      summary: Mark as read
+      description: Mark a notification as read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Notification marked as read
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    DID:
+      type: object
+      properties:
+        did:
+          type: string
+          example: "did:icn:abc123"
+          pattern: "^did:icn:[a-zA-Z0-9]+$"
+
+    TrustScore:
+      type: object
+      properties:
+        did:
+          type: string
+        score:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+        computed_at:
+          type: string
+          format: date-time
+
+    TransactionRequest:
+      type: object
+      required: [to, amount, description]
+      properties:
+        to:
+          type: string
+          description: Recipient DID
+        amount:
+          type: integer
+          format: int64
+          description: Transaction amount (positive for credit, negative for debit)
+        description:
+          type: string
+          maxLength: 500
+        metadata:
+          type: object
+          additionalProperties: true
+
+    Transaction:
+      type: object
+      properties:
+        id:
+          type: string
+        from:
+          type: string
+        to:
+          type: string
+        amount:
+          type: integer
+          format: int64
+        description:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        signature:
+          type: string
+
+    ProposalRequest:
+      type: object
+      required: [domain, title, description, rule_ccl]
+      properties:
+        domain:
+          type: string
+        title:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 5000
+        rule_ccl:
+          type: string
+          description: CCL contract defining the proposal logic
+        voting_duration_secs:
+          type: integer
+          minimum: 3600
+          default: 604800
+
+    Proposal:
+      type: object
+      properties:
+        id:
+          type: string
+        domain:
+          type: string
+        proposer:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        rule_ccl:
+          type: string
+        status:
+          type: string
+          enum: [draft, active, passed, rejected, executed]
+        votes:
+          type: object
+          properties:
+            approve:
+              type: integer
+            reject:
+              type: integer
+            abstain:
+              type: integer
+        created_at:
+          type: string
+          format: date-time
+        voting_ends_at:
+          type: string
+          format: date-time
+
+    CooperativeRequest:
+      type: object
+      required: [name, coop_type]
+      properties:
+        name:
+          type: string
+          maxLength: 200
+        coop_type:
+          type: string
+          enum: [worker, consumer, producer, multi_stakeholder]
+        description:
+          type: string
+          maxLength: 5000
+
+    Cooperative:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        coop_type:
+          type: string
+        status:
+          type: string
+          enum: [forming, active, suspended, dissolved]
+        member_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    Member:
+      type: object
+      properties:
+        did:
+          type: string
+        role:
+          type: string
+        joined_at:
+          type: string
+          format: date-time
+        voting_weight:
+          type: integer
+
+    ComputeTaskRequest:
+      type: object
+      required: [contract_id, function, args]
+      properties:
+        contract_id:
+          type: string
+        function:
+          type: string
+        args:
+          type: object
+          additionalProperties: true
+        min_trust:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+          default: 0.3
+
+    ComputeTask:
+      type: object
+      properties:
+        id:
+          type: string
+        contract_id:
+          type: string
+        function:
+          type: string
+        status:
+          type: string
+          enum: [pending, running, completed, failed]
+        result:
+          type: object
+          additionalProperties: true
+        executor:
+          type: string
+        submitted_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+
+    Notification:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        title:
+          type: string
+        message:
+          type: string
+        read:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        metadata:
+          type: object
+          additionalProperties: true

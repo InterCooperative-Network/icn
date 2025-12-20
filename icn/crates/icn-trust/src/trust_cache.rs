@@ -12,7 +12,9 @@ use std::time::{Duration, Instant};
 /// Trust score with timestamp
 #[derive(Debug, Clone)]
 pub struct CachedScore {
+    /// The cached trust score
     pub score: f64,
+    /// When this score was computed
     pub computed_at: Instant,
 }
 

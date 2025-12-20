@@ -46,24 +46,36 @@ impl FederationGossipHandler {
 
     /// Set the send callback for gossip messages
     pub fn set_send_callback(&self, callback: GossipSendCallback) {
-        *self.send_callback.write().unwrap() = Some(callback);
+        *self.send_callback.write().unwrap_or_else(|poisoned| {
+            warn!("Send callback lock poisoned, recovering");
+            poisoned.into_inner()
+        }) = Some(callback);
     }
 
     /// Set the keypair for signing outgoing messages
     pub fn set_keypair(&self, keypair: KeyPair) {
-        *self.keypair.write().unwrap() = Some(keypair);
+        *self.keypair.write().unwrap_or_else(|poisoned| {
+            warn!("Keypair lock poisoned, recovering");
+            poisoned.into_inner()
+        }) = Some(keypair);
     }
 
     /// Set our own cooperative info
     pub fn set_own_coop(&self, coop: CooperativeInfo) {
-        *self.own_coop.write().unwrap() = Some(coop);
+        *self.own_coop.write().unwrap_or_else(|poisoned| {
+            warn!("Own coop lock poisoned, recovering");
+            poisoned.into_inner()
+        }) = Some(coop);
     }
 
     /// Get our cooperative ID
     pub fn own_coop_id(&self) -> Option<String> {
         self.own_coop
             .read()
-            .unwrap()
+            .unwrap_or_else(|poisoned| {
+                warn!("Own coop lock poisoned, recovering");
+                poisoned.into_inner()
+            })
             .as_ref()
             .map(|c| c.coop_id.clone())
     }
@@ -129,7 +141,10 @@ impl FederationGossipHandler {
 
         // Don't process our own announcements
         {
-            let own_coop = self.own_coop.read().unwrap();
+            let own_coop = self.own_coop.read().unwrap_or_else(|poisoned| {
+                warn!("Own coop lock poisoned, recovering");
+                poisoned.into_inner()
+            });
             if let Some(ref own) = *own_coop {
                 if own.coop_id == coop_info.coop_id {
                     return Ok(());
@@ -200,7 +215,10 @@ impl FederationGossipHandler {
         for coop_info in cooperatives {
             // Skip our own info
             {
-                let own_coop = self.own_coop.read().unwrap();
+                let own_coop = self.own_coop.read().unwrap_or_else(|poisoned| {
+                    warn!("Own coop lock poisoned, recovering");
+                    poisoned.into_inner()
+                });
                 if let Some(ref own) = *own_coop {
                     if own.coop_id == coop_info.coop_id {
                         continue;
@@ -378,7 +396,10 @@ impl FederationGossipHandler {
 
         // If we're the requester, mark the accepter as federated
         {
-            let own_coop = self.own_coop.read().unwrap();
+            let own_coop = self.own_coop.read().unwrap_or_else(|poisoned| {
+                warn!("Own coop lock poisoned, recovering");
+                poisoned.into_inner()
+            });
             if let Some(ref own) = *own_coop {
                 if own.coop_id == requester_coop_id {
                     // The accepter is now our federation partner
@@ -408,8 +429,18 @@ impl FederationGossipHandler {
 
     /// Announce our cooperative to the network
     pub fn announce(&self) -> Result<()> {
-        let coop = self.own_coop.read().unwrap().clone();
-        let keypair = self.keypair.read().unwrap();
+        let coop = self
+            .own_coop
+            .read()
+            .unwrap_or_else(|poisoned| {
+                warn!("Own coop lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .clone();
+        let keypair = self.keypair.read().unwrap_or_else(|poisoned| {
+            warn!("Keypair lock poisoned, recovering");
+            poisoned.into_inner()
+        });
 
         if let Some(coop_info) = coop {
             // Sign the announcement if keypair is available
@@ -451,7 +482,10 @@ impl FederationGossipHandler {
             .own_coop_id()
             .ok_or_else(|| FederationError::NotInitialized("Own coop not set".to_string()))?;
 
-        let keypair = self.keypair.read().unwrap();
+        let keypair = self.keypair.read().unwrap_or_else(|poisoned| {
+            warn!("Keypair lock poisoned, recovering");
+            poisoned.into_inner()
+        });
 
         let vouch = Vouch::new(
             own_coop_id.clone(),
@@ -481,7 +515,14 @@ impl FederationGossipHandler {
 
     /// Request to federate with another cooperative
     pub fn request_federation(&self) -> Result<()> {
-        let coop = self.own_coop.read().unwrap().clone();
+        let coop = self
+            .own_coop
+            .read()
+            .unwrap_or_else(|poisoned| {
+                warn!("Own coop lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .clone();
 
         if let Some(coop_info) = coop {
             let message = FederationMessage::FederationRequest {
@@ -504,7 +545,10 @@ impl FederationGossipHandler {
             .own_coop_id()
             .ok_or_else(|| FederationError::NotInitialized("Own coop not set".to_string()))?;
 
-        let keypair = self.keypair.read().unwrap();
+        let keypair = self.keypair.read().unwrap_or_else(|poisoned| {
+            warn!("Keypair lock poisoned, recovering");
+            poisoned.into_inner()
+        });
 
         // Create signing bytes for the acceptance
         let signing_bytes = {
@@ -557,7 +601,10 @@ impl FederationGossipHandler {
 
     /// Send a message via the gossip callback
     fn send_message(&self, topic: &str, message: &FederationMessage) -> Result<()> {
-        let callback = self.send_callback.read().unwrap();
+        let callback = self.send_callback.read().unwrap_or_else(|poisoned| {
+            warn!("Send callback lock poisoned, recovering");
+            poisoned.into_inner()
+        });
 
         if let Some(ref cb) = *callback {
             let data = serde_json::to_vec(message)?;

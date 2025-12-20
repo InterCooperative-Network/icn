@@ -3,6 +3,10 @@ name = "icnctl"
 version.workspace = true
 edition.workspace = true
 
+[features]
+default = []
+post-quantum = ["icn-identity/post-quantum", "icn-crypto-pq"]
+
 [[bin]]
 name = "icnctl"
 path = "src/main.rs"
@@ -33,6 +37,7 @@ uuid = { version = "1.7", features = ["v4"] }
 # ICN crates
 icn-core.workspace = true
 icn-identity.workspace = true
+icn-crypto-pq = { workspace = true, optional = true }
 icn-store.workspace = true
 icn-trust.workspace = true
 icn-obs.workspace = true

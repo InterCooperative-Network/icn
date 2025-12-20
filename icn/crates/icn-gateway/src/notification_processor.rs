@@ -148,12 +148,20 @@ impl NotificationProcessor {
         config: ProcessorConfig,
     ) -> Self {
         // Create FCM client if config is provided
-        let fcm_client = config.fcm_config.as_ref().map(|fcm_config| {
-            info!(
-                "FCM client initialized for project: {}",
-                fcm_config.project_id
-            );
-            Arc::new(FcmClient::new(fcm_config.clone()))
+        let fcm_client = config.fcm_config.as_ref().and_then(|fcm_config| {
+            match FcmClient::new(fcm_config.clone()) {
+                Ok(client) => {
+                    info!(
+                        "FCM client initialized for project: {}",
+                        fcm_config.project_id
+                    );
+                    Some(Arc::new(client))
+                }
+                Err(e) => {
+                    tracing::error!("Failed to initialize FCM client: {}", e);
+                    None
+                }
+            }
         });
 
         // Create email client if SMTP config is provided

@@ -1,12 +1,15 @@
 //! Supervisor for managing actors
 
 pub mod background_tasks;
+pub mod init_coop;
 pub mod init_gossip;
 pub mod init_ledger;
 pub mod init_rpc;
+pub mod init_snapshot;
 pub mod init_trust;
 pub mod registry;
 pub mod shutdown;
+pub mod version_tracker;
 
 use anyhow::{bail, Context, Result};
 use icn_identity::{Did, IdentityBundle, RecoveryMessage, IDENTITY_RECOVERY_TOPIC};
@@ -107,6 +110,9 @@ impl Supervisor {
         // Compute handle for gateway integration
         let compute_handle_for_gateway: Option<icn_compute::ComputeHandle>;
 
+        // Cooperative handle for gateway integration
+        let coop_handle_for_gateway: Option<icn_coop::CoopHandle>;
+
         // Governance event subscription handles - MUST persist for daemon lifetime
         // Stored at function scope to prevent premature Drop (which would unsubscribe)
         let governance_event_subscription: Option<crate::events::SubscriptionHandle>;
@@ -142,6 +148,11 @@ impl Supervisor {
             let trust_graph_handle = trust_services.trust_graph.clone();
             let misbehavior_detector = trust_services.misbehavior_detector.clone();
             let recovery_store = trust_services.recovery_store.clone();
+
+            // Initialize snapshot coordinator
+            let snapshot_coordinator =
+                init_snapshot::init_snapshot_coordinator(did.clone()).await?;
+            info!("Snapshot coordinator initialized");
 
             // Create trust lookup closure for gossip actor
             let trust_lookup = init_trust::create_trust_lookup(trust_graph_handle.clone());
@@ -179,6 +190,17 @@ impl Supervisor {
             let dispute_manager_handle = ledger_services.dispute_manager.clone();
             let contract_runtime_handle = ledger_services.contract_runtime.clone();
             let contract_actor_handle = ledger_services.contract_actor.clone();
+
+            // Initialize cooperative services
+            let coop_services =
+                init_coop::init_coop_services(&self.config, gossip_handle.clone(), did.clone())
+                    .await?;
+            icn_obs::metrics::supervisor::actor_spawned_inc("coop");
+            let coop_handle = coop_services.coop_handle.clone();
+            let coop_store = coop_services.coop_store.clone(); // Used for gossip sync
+
+            // Store for gateway integration (outside of identity_bundle scope)
+            coop_handle_for_gateway = Some(coop_handle);
 
             // Spawn Identity actor (provides signing and trust graph access)
             let identity_handle = crate::identity::IdentityActor::spawn(
@@ -697,6 +719,7 @@ impl Supervisor {
                 let contract_actor_for_notifications = contract_actor_handle.clone();
                 let recovery_store_for_notifications = recovery_store.clone();
                 let ledger_for_notifications = ledger_handle.clone();
+                let coop_store_for_notifications = coop_store.clone();
 
                 // Create candidate cache for NAT traversal
                 let candidate_cache = Arc::new(icn_net::CandidateCache::new());
@@ -706,6 +729,11 @@ impl Supervisor {
 
                 let compute_handle_for_notifications = compute_handle_holder.clone();
                 let dispute_handle_for_notifications = dispute_handle_holder.clone();
+
+                // Clone snapshot coordinator and network handle for notifications
+                let snapshot_coordinator_for_notifications = snapshot_coordinator.clone();
+                let network_handle_for_snapshots = network_handle.clone();
+                let gossip_handle_for_snapshots = gossip_handle.clone();
 
                 // Create profile cache for peer capability discovery
                 let profile_cache: Arc<
@@ -1232,6 +1260,73 @@ impl Supervisor {
                                 }
                             }
                         }
+                        // Handle distributed snapshot coordination
+                        else if topic == "snapshot:coordinate" {
+                            let entry_data = match entry.get_data() {
+                                Ok(data) => data,
+                                Err(e) => {
+                                    warn!("Failed to get snapshot entry data: {}", e);
+                                    return;
+                                }
+                            };
+
+                            match bincode::deserialize::<icn_snapshot::SnapshotMessage>(&entry_data)
+                            {
+                                Ok(snapshot_msg) => {
+                                    let coordinator =
+                                        snapshot_coordinator_for_notifications.clone();
+                                    let sender = entry.author.clone();
+                                    let _network = network_handle_for_snapshots.clone();
+                                    let gossip = gossip_handle_for_snapshots.clone();
+
+                                    tokio::spawn(async move {
+                                        match coordinator
+                                            .write()
+                                            .await
+                                            .handle_message(&sender, snapshot_msg)
+                                            .await
+                                        {
+                                            Ok(response_msgs) => {
+                                                // Broadcast any response messages
+                                                for response_msg in response_msgs {
+                                                    let response_bytes = match bincode::serialize(
+                                                        &response_msg,
+                                                    ) {
+                                                        Ok(bytes) => bytes,
+                                                        Err(e) => {
+                                                            warn!("Failed to serialize snapshot response: {}", e);
+                                                            continue;
+                                                        }
+                                                    };
+
+                                                    // Publish response via gossip
+                                                    let mut gossip_guard = gossip.write().await;
+                                                    match gossip_guard.publish(
+                                                        "snapshot:coordinate",
+                                                        response_bytes,
+                                                    ) {
+                                                        Ok(hash) => {
+                                                            debug!("Published snapshot response with hash: {:?}", hash);
+                                                        }
+                                                        Err(e) => {
+                                                            warn!("Failed to publish snapshot response: {}", e);
+                                                        }
+                                                    }
+                                                }
+
+                                                info!("Processed snapshot message from {}", sender);
+                                            }
+                                            Err(e) => {
+                                                warn!("Failed to handle snapshot message: {}", e);
+                                            }
+                                        }
+                                    });
+                                }
+                                Err(e) => {
+                                    warn!("Failed to deserialize snapshot message: {}", e);
+                                }
+                            }
+                        }
                         // Handle compute topics
                         else if topic == icn_compute::TOPIC_SUBMIT
                             || topic == icn_compute::TOPIC_CLAIM
@@ -1421,6 +1516,56 @@ impl Supervisor {
                                 }
                             });
                         }
+                        // Handle cooperative updates from gossip
+                        else if topic == init_coop::COOP_UPDATES_TOPIC {
+                            let coop_store = coop_store_for_notifications.clone();
+
+                            // Get entry data (handles decompression if needed)
+                            let entry_data = match entry.get_data() {
+                                Ok(data) => data,
+                                Err(e) => {
+                                    warn!("Failed to get coop entry data: {}", e);
+                                    return;
+                                }
+                            };
+
+                            tokio::spawn(async move {
+                                // Deserialize cooperative from gossip
+                                match bincode::deserialize::<icn_coop::Cooperative>(&entry_data) {
+                                    Ok(coop) => {
+                                        // Check if we already have this coop (avoid overwriting local changes)
+                                        let existing = coop_store.get_cooperative(&coop.id);
+                                        if existing.is_ok() {
+                                            debug!(
+                                                coop_id = %coop.id,
+                                                "Received coop update for existing cooperative (merging)"
+                                            );
+                                        }
+
+                                        // Save to local store
+                                        if let Err(e) = coop_store.save_cooperative(&coop) {
+                                            warn!(
+                                                coop_id = %coop.id,
+                                                error = %e,
+                                                "Failed to save cooperative from gossip"
+                                            );
+                                        } else {
+                                            info!(
+                                                coop_id = %coop.id,
+                                                coop_name = %coop.name,
+                                                "Synced cooperative from gossip"
+                                            );
+                                        }
+                                    }
+                                    Err(e) => {
+                                        warn!(
+                                            error = %e,
+                                            "Failed to deserialize cooperative from gossip"
+                                        );
+                                    }
+                                }
+                            });
+                        }
                         // Handle federation topics
                         else if topic == icn_federation::TOPIC_FEDERATION_REGISTRY
                             || topic == icn_federation::TOPIC_FEDERATION_TRUST
@@ -1498,6 +1643,14 @@ impl Supervisor {
                     warn!("Failed to subscribe to network:candidates topic: {}", e);
                 } else {
                     info!("Subscribed to network:candidates topic");
+                }
+
+                // Subscribe to snapshot:coordinate topic for distributed snapshots
+                const SNAPSHOT_COORDINATE_TOPIC: &str = "snapshot:coordinate";
+                if let Err(e) = gossip.subscribe(SNAPSHOT_COORDINATE_TOPIC, did.clone()) {
+                    warn!("Failed to subscribe to snapshot:coordinate topic: {}", e);
+                } else {
+                    info!("Subscribed to snapshot:coordinate topic");
                 }
 
                 // Subscribe to federation topics if federation is enabled
@@ -1759,6 +1912,32 @@ impl Supervisor {
             .await?;
 
             info!("✓ Governance actor spawned at {}", gov_store_path.display());
+
+            // Spawn UpgradeActor for network-wide upgrade coordination
+            let current_version = icn_governance::proposal::Version::new(
+                crate::upgrade::CURRENT_VERSION.0,
+                crate::upgrade::CURRENT_VERSION.1,
+                crate::upgrade::CURRENT_VERSION.2,
+            );
+            let version_tracker = Arc::new(tokio::sync::RwLock::new(
+                crate::supervisor::version_tracker::VersionTracker::new(current_version.clone()),
+            ));
+            let version_string = format!(
+                "{}.{}.{}",
+                current_version.major, current_version.minor, current_version.patch
+            );
+            let _upgrade_handle = crate::upgrade_actor::UpgradeActor::spawn(
+                did.clone(),
+                version_string.clone(),
+                version_tracker.clone(),
+                gossip_handle.clone(),
+                self.shutdown_tx.subscribe(),
+            );
+            info!(
+                "✓ Upgrade coordinator spawned (version: {})",
+                version_string
+            );
+            icn_obs::metrics::supervisor::actor_spawned_inc("upgrade");
 
             // Create dead-letter queue for failed operations recovery
             let dlq_store_path = self.config.store_path().join("dead_letter");
@@ -2367,6 +2546,36 @@ impl Supervisor {
                                         }
                                     }
                                 }
+
+                                ProposalPayload::ProtocolUpgrade {
+                                    version,
+                                    breaking_changes,
+                                    migration_guide,
+                                    deadline,
+                                    min_required_version,
+                                } => {
+                                    info!("🔄 Protocol upgrade proposal {} accepted: {} -> {}",
+                                        proposal_id.0,
+                                        "current", // TODO: get actual current version
+                                        version
+                                    );
+
+                                    // TODO: Implement version tracker integration
+                                    // For now, just log and emit metrics
+                                    info!("   Target version: {}", version);
+                                    info!("   Deadline: {}", deadline);
+                                    if !breaking_changes.is_empty() {
+                                        info!("   Breaking changes: {} items", breaking_changes.len());
+                                    }
+                                    if let Some(guide) = migration_guide {
+                                        info!("   Migration guide: {}", guide);
+                                    }
+                                    if let Some(min_ver) = min_required_version {
+                                        info!("   Minimum required version: {}", min_ver);
+                                    }
+
+                                    icn_obs::metrics::governance::proposals_executed_inc("protocol_upgrade");
+                                }
                             }
                         }
 
@@ -2920,8 +3129,10 @@ impl Supervisor {
                     });
 
                 // Spawn steward actor
+                let keypair = identity_bundle.keypair().clone();
                 match icn_steward::StewardActor::spawn(
                     did.clone(),
+                    keypair,
                     steward_config,
                     self.shutdown_tx.clone(),
                     Some(send_gossip_callback),
@@ -3073,6 +3284,7 @@ impl Supervisor {
             // No event broadcaster or compute handle without identity
             event_broadcaster = None;
             compute_handle_for_gateway = None;
+            coop_handle_for_gateway = None;
 
             (None, None, None)
         };
@@ -3123,6 +3335,11 @@ impl Supervisor {
                         // Connect compute handle if available
                         if let Some(handle) = compute_handle_for_gateway {
                             gateway_server = gateway_server.with_compute_handle(handle);
+                        }
+
+                        // Connect cooperative handle if available
+                        if let Some(handle) = coop_handle_for_gateway {
+                            gateway_server = gateway_server.with_coop_handle(handle);
                         }
 
                         if let Err(e) = gateway_server.run().await {

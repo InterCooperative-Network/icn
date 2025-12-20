@@ -230,17 +230,17 @@ pub struct FcmClient {
 
 impl FcmClient {
     /// Create a new FCM client
-    pub fn new(config: FcmConfig) -> Self {
+    pub fn new(config: FcmConfig) -> Result<Self, String> {
         let http_client = reqwest::Client::builder()
             .timeout(config.timeout)
             .build()
-            .expect("Failed to create HTTP client");
+            .map_err(|e| format!("Failed to create HTTP client: {e}"))?;
 
-        Self {
+        Ok(Self {
             config,
             http_client,
             access_token: Arc::new(RwLock::new(None)),
-        }
+        })
     }
 
     /// Send a notification to a device
@@ -405,7 +405,7 @@ impl FcmClient {
     }
 
     /// Create FCM client with a pre-existing access token (for testing/development)
-    pub fn with_access_token(project_id: String, access_token: String) -> Self {
+    pub fn with_access_token(project_id: String, access_token: String) -> Result<Self, String> {
         let config = FcmConfig {
             project_id,
             service_account_email: String::new(),
@@ -416,23 +416,23 @@ impl FcmClient {
         let http_client = reqwest::Client::builder()
             .timeout(config.timeout)
             .build()
-            .expect("Failed to create HTTP client");
+            .map_err(|e| format!("Failed to create HTTP client: {e}"))?;
 
         let token = AccessToken {
             token: access_token,
             // Token expires in 1 hour (3600 seconds)
             expires_at: SystemTime::now()
                 .duration_since(UNIX_EPOCH)
-                .unwrap()
+                .unwrap_or(Duration::ZERO)
                 .as_secs()
                 + 3600,
         };
 
-        Self {
+        Ok(Self {
             config,
             http_client,
             access_token: Arc::new(RwLock::new(Some(token))),
-        }
+        })
     }
 }
 

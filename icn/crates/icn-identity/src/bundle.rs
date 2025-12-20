@@ -6,7 +6,7 @@
 
 use crate::{Did, KeyPair};
 use anyhow::{Context, Result};
-use rcgen::{CertificateParams, DnType};
+use rcgen::CertificateParams;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -65,9 +65,13 @@ impl Clone for IdentityBundle {
 /// Serializable binding info for network transmission
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BindingInfo {
+    /// The DID this binding belongs to
     pub did: Did,
+    /// SHA-256 hash of the TLS certificate
     pub tls_cert_hash: [u8; 32],
+    /// Cryptographic signature binding DID to TLS cert
     pub tls_binding_sig: Vec<u8>,
+    /// Unix timestamp when binding was created
     pub created_at: u64,
 }
 
@@ -242,35 +246,26 @@ impl IdentityBundle {
     /// The certificate includes:
     /// - Subject CN: DID string
     /// - SAN URI: DID string
+    /// - Ed25519 signature algorithm
     /// - 1 year validity
     fn generate_tls_cert(did: &Did) -> Result<(CertificateDer<'static>, Vec<u8>)> {
-        // For now, generate a simple self-signed certificate
-        // TODO: Add DID as subject/SAN once we figure out rcgen 0.13 API
+        let mut params = CertificateParams::new(vec![did.as_str().to_string()])?;
+        params.key_usages = vec![
+            rcgen::KeyUsagePurpose::DigitalSignature,
+            rcgen::KeyUsagePurpose::KeyEncipherment,
+        ];
 
-        let mut params = CertificateParams::default();
+        // Generate Ed25519 key pair for the certificate (same as tls.rs)
+        let key_pair = rcgen::KeyPair::generate_for(&rcgen::PKCS_ED25519)?;
 
-        // Set DID as Common Name
-        params
-            .distinguished_name
-            .push(DnType::CommonName, did.as_str());
+        // Create certificate with Ed25519 key
+        let cert = params.self_signed(&key_pair)?;
 
-        // Generate key pair and certificate
-        let key_pair = rcgen::KeyPair::generate().context("Failed to generate key pair")?;
-
-        // Create certificate (rcgen 0.13 API)
-        let cert = params
-            .self_signed(&key_pair)
-            .context("Failed to generate self-signed certificate")?;
-
-        // Serialize to PEM, then parse to DER
-        let cert_pem = cert.pem();
-        let pem_data = pem::parse(&cert_pem).context("Failed to parse certificate PEM")?;
-        let cert_der = pem_data.contents().to_vec();
-
-        // Serialize key to DER
+        // Export certificate and key
+        let cert_der = CertificateDer::from(cert.der().to_vec());
         let key_der = key_pair.serialize_der();
 
-        Ok((CertificateDer::from(cert_der), key_der))
+        Ok((cert_der, key_der))
     }
 
     /// Hash a certificate using SHA-256
@@ -295,9 +290,38 @@ impl IdentityBundle {
     }
 }
 
-/// Verify a binding info against a peer's certificate
+/// Verify DID-TLS binding information matches the expected DID
 ///
-/// This is used during connection handshake to verify that:
+/// This is used during TOFU (Trust On First Use) handshake to verify that:
+/// 1. The binding signature is valid for the DID
+/// 2. The peer holds the DID's private key
+/// 3. The binding_info is correctly formed
+///
+/// This does NOT verify the cert hash against an actual TLS cert, since in TOFU
+/// we accept self-signed certs and verify identity at the application layer.
+pub fn verify_did_matches_binding(did: &Did, binding_info: &BindingInfo) -> Result<()> {
+    use ed25519_dalek::Verifier;
+
+    // 1. Verify the DID in binding_info matches expected DID
+    if binding_info.did != *did {
+        anyhow::bail!("DID mismatch: expected {}, got {}", did, binding_info.did);
+    }
+
+    // 2. Verify signature with DID public key
+    let verifying_key = binding_info.did.to_verifying_key()?;
+    let signature = ed25519_dalek::Signature::from_slice(&binding_info.tls_binding_sig)
+        .context("Invalid signature format")?;
+
+    verifying_key
+        .verify(&binding_info.tls_cert_hash, &signature)
+        .context("DID-TLS binding signature verification failed")?;
+
+    Ok(())
+}
+
+/// Verify a binding info against a peer's certificate (stricter verification)
+///
+/// This is used when you have access to the actual TLS certificate to verify that:
 /// 1. The peer's TLS cert matches the claimed hash
 /// 2. The binding signature is valid for the DID
 /// 3. The peer holds the DID's private key

@@ -38,23 +38,33 @@ pub trait KeyStore: Send + Sync {
     fn path(&self) -> &Path;
 }
 
-/// Key rotation record
+/// Key rotation record documenting a DID key change
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KeyRotation {
+    /// DID before rotation
     pub old_did: Did,
+    /// DID after rotation
     pub new_did: Did,
+    /// Unix timestamp when rotation occurred
     pub timestamp: u64,
+    /// Reason for key rotation
     pub reason: RotationReason,
-    pub signature_old: Vec<u8>, // Signature from old key
-    pub signature_new: Vec<u8>, // Signature from new key
+    /// Signature from old key proving authorization
+    pub signature_old: Vec<u8>,
+    /// Signature from new key proving possession
+    pub signature_new: Vec<u8>,
 }
 
 /// Reason for key rotation
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RotationReason {
+    /// Regular scheduled rotation
     Scheduled,
+    /// Key was potentially compromised
     Compromised,
+    /// Upgrading to stronger key algorithm
     Upgrade,
+    /// Manual user-initiated rotation
     Manual,
 }
 
@@ -81,6 +91,14 @@ struct StoredKey {
     x25519_secret: Option<Vec<u8>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     x25519_public: Option<[u8; 32]>,
+
+    // PQ keys (v5 addition - feature gated)
+    #[cfg(feature = "post-quantum")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pq_secret: Option<Vec<u8>>,
+    #[cfg(feature = "post-quantum")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pq_public: Option<Vec<u8>>,
 }
 
 /// Keystore v3 format: Multi-device support with DID Document
@@ -166,6 +184,17 @@ struct StoredKeyV4 {
     /// Current active KeyBundle version (0 if no SDIS keys)
     #[serde(default)]
     current_keybundle_version: u32,
+
+    // === Post-Quantum fields (v5 additions) ===
+    /// PQ secret key for core identity (feature-gated)
+    #[cfg(feature = "post-quantum")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pq_secret: Option<Vec<u8>>,
+
+    /// PQ public key for core identity (feature-gated)
+    #[cfg(feature = "post-quantum")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pq_public: Option<Vec<u8>>,
 }
 
 /// Stored KeyBundle for v4 keystore
@@ -200,6 +229,12 @@ impl Drop for StoredKeyV4 {
         self.secret_bytes.zeroize();
         self.x25519_secret.zeroize();
         self.tls_key_der.zeroize();
+        #[cfg(feature = "post-quantum")]
+        {
+            if let Some(ref mut pq_sec) = self.pq_secret {
+                pq_sec.zeroize();
+            }
+        }
         for kb in &mut self.keybundles {
             kb.classical_secret.zeroize();
             kb.pq_secret.zeroize();
@@ -404,6 +439,18 @@ impl AgeKeyStore {
             anchor: self.anchor.clone(),
             keybundles: stored_keybundles,
             current_keybundle_version: self.current_keybundle_version,
+            #[cfg(feature = "post-quantum")]
+            pq_secret: identity_bundle
+                .keypair()
+                .pq_keypair
+                .as_ref()
+                .map(|kp| kp.secret_key_bytes().to_vec()),
+            #[cfg(feature = "post-quantum")]
+            pq_public: identity_bundle
+                .keypair()
+                .pq_keypair
+                .as_ref()
+                .map(|kp| kp.public_key().as_bytes().to_vec()),
         };
 
         Self::encrypt_and_save_v4(&self.path, &stored, passphrase)
@@ -780,6 +827,21 @@ impl KeyStore for AgeKeyStore {
             );
 
             // Reconstruct keypair
+            #[cfg(feature = "post-quantum")]
+            let keypair = if let (Some(pq_secret), Some(pq_public)) =
+                (stored_v4.pq_secret.as_ref(), stored_v4.pq_public.as_ref())
+            {
+                KeyPair::from_bytes_with_pq(
+                    &stored_v4.secret_bytes,
+                    &stored_v4.public_bytes,
+                    pq_secret,
+                    pq_public,
+                )?
+            } else {
+                KeyPair::from_bytes(&stored_v4.secret_bytes, &stored_v4.public_bytes)?
+            };
+
+            #[cfg(not(feature = "post-quantum"))]
             let keypair = KeyPair::from_bytes(&stored_v4.secret_bytes, &stored_v4.public_bytes)?;
 
             // Reconstruct IdentityBundle
@@ -1109,6 +1171,10 @@ mod tests {
             created_at: None,
             x25519_secret: None,
             x25519_public: None,
+            #[cfg(feature = "post-quantum")]
+            pq_secret: None,
+            #[cfg(feature = "post-quantum")]
+            pq_public: None,
         };
         AgeKeyStore::encrypt_and_save(&path, &stored_v1, passphrase).unwrap();
 
@@ -1212,6 +1278,10 @@ mod tests {
             created_at: Some(bundle.binding_info().created_at),
             x25519_secret: Some(bundle.x25519_secret_bytes().to_vec()),
             x25519_public: Some(*bundle.x25519_public_bytes()),
+            #[cfg(feature = "post-quantum")]
+            pq_secret: None,
+            #[cfg(feature = "post-quantum")]
+            pq_public: None,
         };
         AgeKeyStore::encrypt_and_save(&path, &stored_v21, passphrase).unwrap();
 

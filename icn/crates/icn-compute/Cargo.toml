@@ -42,7 +42,7 @@ chrono = "0.4"
 sled.workspace = true
 
 # WASM runtime (optional)
-wasmtime = { version = "27", optional = true }
+wasmtime = { version = "38", optional = true }
 
 [dev-dependencies]
 tokio = { version = "1.0", features = ["rt-multi-thread", "macros"] }

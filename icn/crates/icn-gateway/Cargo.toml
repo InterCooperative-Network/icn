@@ -68,6 +68,9 @@ icn-trust = { path = "../icn-trust" }
 icn-zkp = { path = "../icn-zkp" }
 icn-steward = { path = "../icn-steward" }
 icn-crypto-pq = { path = "../icn-crypto-pq" }
+icn-coop = { path = "../icn-coop" }
+icn-cooperative = { path = "../icn-cooperative" }
+icn-community = { path = "../icn-community" }
 
 # Caching
 lru = "0.12"
@@ -75,6 +78,10 @@ dashmap = "6.0"
 
 # Metrics
 metrics = "0.22"
+
+# OpenAPI documentation
+utoipa = { version = "4", features = ["actix_extras"] }
+utoipa-swagger-ui = { version = "6", features = ["actix-web"] }
 
 # HTTP client for FCM
 reqwest = { version = "0.11", features = ["json"] }

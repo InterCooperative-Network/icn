@@ -4431,7 +4431,7 @@ document.getElementById('join-form')?.addEventListener('submit', async (e) => {
 
 // Generate keypair (simplified - in production use icn-identity properly)
 async function generateKeypair() {
-    // This is a placeholder - in a real implementation, 
+    // This is a placeholder - in a real implementation,
     // you'd use the icn-identity library properly
     // For now, just generate random bytes and encode
     const array = new Uint8Array(32);
@@ -4441,12 +4441,252 @@ async function generateKeypair() {
         .replace(/\+/g, '-')
         .replace(/\//g, '_')
         .replace(/=/g, '');
-    
+
     return {
         privateKeyHex: hex,
         publicKeyBase58: base58
     };
 }
+
+// ============================================================================
+// QR Login System
+// ============================================================================
+
+// QR Login State
+const qrLoginState = {
+    sessionId: null,
+    pollInterval: null,
+    expiresAt: null,
+    countdownInterval: null,
+};
+
+// QR Login Modal Elements
+const qrLoginModal = document.getElementById('qr-login-modal');
+const qrCodeContainer = document.getElementById('qr-code-container');
+const qrLoginStatus = document.getElementById('qr-login-status');
+const qrTimeLeft = document.getElementById('qr-time-left');
+const closeQrLogin = document.getElementById('close-qr-login');
+const showQrLoginBtn = document.getElementById('show-qr-login-btn');
+
+// Show QR Login Modal
+async function showQrLogin() {
+    const gatewayUrl = elements.gatewayUrl.value.trim();
+    const coopId = elements.coopId.value.trim();
+
+    if (!gatewayUrl) {
+        showToast('Please enter Gateway URL first', 'warning');
+        return;
+    }
+
+    if (!coopId) {
+        showToast('Please enter Cooperative ID first', 'warning');
+        return;
+    }
+
+    // Show modal with loading state
+    qrLoginModal?.classList.remove('hidden');
+    qrCodeContainer.innerHTML = '<p class="loading">Generating QR code...</p>';
+    qrLoginStatus.textContent = 'Creating login session...';
+
+    try {
+        // Create session on gateway
+        const response = await fetch(`${gatewayUrl}/v1/sessions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ coop_id: coopId }),
+        });
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error || 'Failed to create login session');
+        }
+
+        const data = await response.json();
+        qrLoginState.sessionId = data.session_id;
+        qrLoginState.expiresAt = data.expires_at * 1000; // Convert to ms
+
+        // Generate QR code with session data
+        qrCodeContainer.innerHTML = '';
+
+        new QRCode(qrCodeContainer, {
+            text: JSON.stringify(data.qr_data),
+            width: 256,
+            height: 256,
+            colorDark: '#000000',
+            colorLight: '#ffffff',
+            correctLevel: QRCode.CorrectLevel.M,
+        });
+
+        // Update status
+        qrLoginStatus.textContent = 'Open your ICN Wallet app and scan this code';
+
+        // Start polling for approval
+        startSessionPolling(gatewayUrl);
+
+        // Start countdown timer
+        startQrCountdown();
+
+    } catch (error) {
+        console.error('QR login error:', error);
+        qrCodeContainer.innerHTML = `<p class="error">Failed to create QR code</p>`;
+        qrLoginStatus.textContent = error.message;
+        showToast(getUserFriendlyError(error), 'error');
+    }
+}
+
+// Poll for session approval
+function startSessionPolling(gatewayUrl) {
+    if (qrLoginState.pollInterval) {
+        clearInterval(qrLoginState.pollInterval);
+    }
+
+    qrLoginState.pollInterval = setInterval(async () => {
+        // Check if session expired
+        if (Date.now() > qrLoginState.expiresAt) {
+            stopQrLogin();
+            qrLoginStatus.textContent = 'Session expired. Please try again.';
+            qrCodeContainer.innerHTML = `
+                <p class="error">Session expired</p>
+                <button class="btn btn-primary" onclick="showQrLogin()">Try Again</button>
+            `;
+            return;
+        }
+
+        try {
+            const response = await fetch(
+                `${gatewayUrl}/v1/sessions/${qrLoginState.sessionId}`
+            );
+
+            if (!response.ok) {
+                if (response.status === 404) {
+                    // Session not found or expired
+                    stopQrLogin();
+                    qrLoginStatus.textContent = 'Session not found. Please try again.';
+                    return;
+                }
+                throw new Error('Session check failed');
+            }
+
+            const data = await response.json();
+
+            if (data.status === 'approved') {
+                // Success! Store credentials and proceed
+                stopQrLogin();
+                closeQrLoginModal();
+
+                // Update state
+                state.gatewayUrl = gatewayUrl;
+                state.coopId = elements.coopId.value.trim();
+                state.did = data.did;
+                state.token = data.token;
+                state.tokenExpiry = Date.now() + (data.token_expires_in || 3600) * 1000;
+
+                // Save to localStorage
+                localStorage.setItem('icn-gateway', state.gatewayUrl);
+                localStorage.setItem('icn-coop', state.coopId);
+                localStorage.setItem('icn-did', state.did);
+                localStorage.setItem('icn-token', state.token);
+                localStorage.setItem('icn-token-expiry', state.tokenExpiry.toString());
+
+                // Update form fields (for reference)
+                elements.did.value = state.did;
+                elements.token.value = state.token;
+
+                // Show main screen
+                elements.loginScreen.classList.add('hidden');
+                elements.mainScreen.classList.remove('hidden');
+
+                // Initialize app
+                initializeApp();
+
+                showToast('Login successful!', 'success');
+
+            } else if (data.status === 'expired' || data.status === 'consumed') {
+                stopQrLogin();
+                qrLoginStatus.textContent = 'Session expired. Please try again.';
+                qrCodeContainer.innerHTML = `
+                    <p class="error">Session expired</p>
+                    <button class="btn btn-primary" onclick="showQrLogin()">Try Again</button>
+                `;
+            }
+            // If status is 'pending', keep polling
+
+        } catch (error) {
+            console.error('Session poll error:', error);
+            // Don't stop polling on error, just log it
+        }
+    }, 2000); // Poll every 2 seconds
+}
+
+// Update countdown timer
+function startQrCountdown() {
+    if (qrLoginState.countdownInterval) {
+        clearInterval(qrLoginState.countdownInterval);
+    }
+
+    const updateTimer = () => {
+        const now = Date.now();
+        const remaining = Math.max(0, qrLoginState.expiresAt - now);
+
+        if (remaining === 0) {
+            qrTimeLeft.textContent = 'Expired';
+            qrTimeLeft.classList.add('expired');
+            stopQrLogin();
+            return;
+        }
+
+        const minutes = Math.floor(remaining / 60000);
+        const seconds = Math.floor((remaining % 60000) / 1000);
+        qrTimeLeft.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+        // Warning colors
+        if (remaining < 60000) {
+            qrTimeLeft.classList.add('warning');
+        }
+    };
+
+    updateTimer();
+    qrLoginState.countdownInterval = setInterval(updateTimer, 1000);
+}
+
+// Stop QR login polling and countdown
+function stopQrLogin() {
+    if (qrLoginState.pollInterval) {
+        clearInterval(qrLoginState.pollInterval);
+        qrLoginState.pollInterval = null;
+    }
+    if (qrLoginState.countdownInterval) {
+        clearInterval(qrLoginState.countdownInterval);
+        qrLoginState.countdownInterval = null;
+    }
+    qrLoginState.sessionId = null;
+}
+
+// Close QR login modal
+function closeQrLoginModal() {
+    qrLoginModal?.classList.add('hidden');
+    stopQrLogin();
+    // Reset UI state
+    qrTimeLeft.classList.remove('warning', 'expired');
+}
+
+// Event listeners for QR login
+showQrLoginBtn?.addEventListener('click', showQrLogin);
+closeQrLogin?.addEventListener('click', closeQrLoginModal);
+
+// Close modal on backdrop click
+qrLoginModal?.addEventListener('click', (e) => {
+    if (e.target === qrLoginModal) {
+        closeQrLoginModal();
+    }
+});
+
+// Close modal on Escape key
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !qrLoginModal?.classList.contains('hidden')) {
+        closeQrLoginModal();
+    }
+});
 
 // Create invite modal
 const createInviteModal = document.getElementById('create-invite-modal');

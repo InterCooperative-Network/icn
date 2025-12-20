@@ -122,15 +122,15 @@ async fn test_dispute_actor_mediator_management() {
     let mediator2_keypair = KeyPair::generate().unwrap();
     let mediator2 = mediator2_keypair.did().clone();
 
-    handle.add_mediator(mediator1.clone()).await;
-    handle.add_mediator(mediator2.clone()).await;
+    handle.add_mediator(mediator1.clone()).await.unwrap();
+    handle.add_mediator(mediator2.clone()).await.unwrap();
 
     // Note: We can't directly verify the mediator pool size through the handle
     // as it's internal state. In a real scenario, we'd file a dispute that
     // becomes inconclusive and verify a mediator was assigned.
 
     // Remove a mediator
-    handle.remove_mediator(mediator1).await;
+    handle.remove_mediator(mediator1).await.unwrap();
 
     // If we had a way to get mediator pool size, we'd verify here
     // For now, this test just ensures the API works without panicking

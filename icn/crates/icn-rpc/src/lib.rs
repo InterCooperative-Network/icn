@@ -1,4 +1,5 @@
 //! ICN RPC - JSON-RPC API for daemon communication
+#![allow(missing_docs)]
 //!
 //! Provides a simple HTTP-based JSON-RPC server for icnctl <-> icnd communication.
 //! The RPC server exposes NetworkActor operations for CLI access.
@@ -15,6 +16,8 @@
 
 pub mod auth;
 pub mod client;
+pub mod error_codes;
+pub mod handler;
 pub mod pagination;
 pub mod receipt;
 pub mod server;
@@ -22,6 +25,10 @@ pub mod types;
 
 pub use auth::{required_scope_for_method, scopes, AuthError, RpcAuthManager, RpcTokenClaims};
 pub use client::RpcClient;
+pub use error_codes::{
+    RpcErrorCode, INTERNAL_ERROR, INVALID_PARAMS, INVALID_REQUEST, METHOD_NOT_FOUND, NOT_FOUND,
+    PARSE_ERROR, PERMISSION_DENIED, RATE_LIMITED, RESOURCE_NOT_AVAILABLE, VALIDATION_FAILED,
+};
 pub use pagination::{
     paginate, paginate_owned, PageRequest, PageResponse, ABSOLUTE_MAX_PAGE_SIZE,
     DEFAULT_MAX_PAGE_SIZE,

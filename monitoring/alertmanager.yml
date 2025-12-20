@@ -1,0 +1,93 @@
+global:
+  resolve_timeout: 5m
+
+# Route tree for notification routing
+route:
+  group_by: ['alertname', 'cluster', 'severity']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 12h
+  receiver: 'default'
+  
+  routes:
+    # Critical alerts go to pagerduty/oncall
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      continue: true
+    
+    # Warning alerts go to slack/email
+    - match:
+        severity: warning
+      receiver: 'warning-alerts'
+      continue: true
+    
+    # Info alerts are logged only
+    - match:
+        severity: info
+      receiver: 'info-alerts'
+
+receivers:
+  # Default receiver (console logging)
+  - name: 'default'
+    # No configuration = alerts are logged to console
+  
+  # Critical alerts (configure for production)
+  - name: 'critical-alerts'
+    # Example: PagerDuty integration
+    # pagerduty_configs:
+    #   - service_key: '<your-pagerduty-key>'
+    #     description: '{{ .GroupLabels.alertname }}: {{ .CommonAnnotations.summary }}'
+    
+    # Example: Slack integration
+    # slack_configs:
+    #   - api_url: '<your-slack-webhook-url>'
+    #     channel: '#critical-alerts'
+    #     title: '{{ .GroupLabels.alertname }}'
+    #     text: '{{ .CommonAnnotations.description }}'
+  
+  # Warning alerts
+  - name: 'warning-alerts'
+    # Example: Slack integration
+    # slack_configs:
+    #   - api_url: '<your-slack-webhook-url>'
+    #     channel: '#monitoring'
+    #     title: '{{ .GroupLabels.alertname }}'
+    #     text: '{{ .CommonAnnotations.description }}'
+    
+    # Example: Email integration
+    # email_configs:
+    #   - to: 'ops-team@example.com'
+    #     from: 'alerts@icn.coop'
+    #     smarthost: 'smtp.example.com:587'
+    #     auth_username: 'alerts@icn.coop'
+    #     auth_password: '<password>'
+    #     headers:
+    #       Subject: 'ICN Alert: {{ .GroupLabels.alertname }}'
+  
+  # Info alerts (low priority)
+  - name: 'info-alerts'
+    # Usually just logged, no notifications
+
+# Inhibition rules to reduce alert noise
+inhibit_rules:
+  # If a node is down, don't alert on high latency/low connections
+  - source_match:
+      alertname: 'PrometheusTargetDown'
+    target_match_re:
+      alertname: '(NetworkPartitionSuspected|HighMessageFailureRate|GossipHighLatency)'
+    equal: ['instance']
+  
+  # If there are no connections, don't alert on gossip issues
+  - source_match:
+      alertname: 'NoNetworkConnections'
+    target_match_re:
+      alertname: '(GossipHighLatency|GossipMessageLoss)'
+    equal: ['instance']
+  
+  # If memory leak is detected, suppress high memory usage alert
+  - source_match:
+      alertname: 'MemoryLeak'
+    target_match:
+      alertname: 'HighMemoryUsage'
+    equal: ['instance']

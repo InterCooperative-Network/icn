@@ -74,7 +74,10 @@ impl FederatedGossipRouter {
 
     /// Add a federation channel
     pub async fn add_channel(&self, coop_id: String, channel: FederationChannel) -> Result<()> {
-        let mut channels = self.channels.write().unwrap();
+        let mut channels = self.channels.write().unwrap_or_else(|poisoned| {
+            warn!("Channels lock poisoned, recovering");
+            poisoned.into_inner()
+        });
 
         if channels.len() >= self.max_channels {
             return Err(FederationError::MaxChannelsExceeded(self.max_channels));
@@ -89,7 +92,10 @@ impl FederatedGossipRouter {
 
     /// Remove a federation channel
     pub async fn remove_channel(&self, coop_id: &str) -> Result<()> {
-        let mut channels = self.channels.write().unwrap();
+        let mut channels = self.channels.write().unwrap_or_else(|poisoned| {
+            warn!("Channels lock poisoned, recovering");
+            poisoned.into_inner()
+        });
         channels.remove(coop_id);
         metrics::channel::active_set(channels.len());
 
@@ -101,14 +107,25 @@ impl FederatedGossipRouter {
     pub fn get_channel(&self, coop_id: &str) -> Option<bool> {
         self.channels
             .read()
-            .unwrap()
+            .unwrap_or_else(|poisoned| {
+                warn!("Channels lock poisoned, recovering");
+                poisoned.into_inner()
+            })
             .get(coop_id)
             .map(|c| c.is_connected())
     }
 
     /// List all channel IDs
     pub fn list_channels(&self) -> Vec<String> {
-        self.channels.read().unwrap().keys().cloned().collect()
+        self.channels
+            .read()
+            .unwrap_or_else(|poisoned| {
+                warn!("Channels lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .keys()
+            .cloned()
+            .collect()
     }
 
     /// Publish a message with the given scope
@@ -118,7 +135,10 @@ impl FederatedGossipRouter {
             return Ok(0);
         }
 
-        let channels = self.channels.read().unwrap();
+        let channels = self.channels.read().unwrap_or_else(|poisoned| {
+            warn!("Channels lock poisoned, recovering");
+            poisoned.into_inner()
+        });
         let mut sent_count = 0;
 
         for (coop_id, channel) in channels.iter() {
@@ -151,7 +171,10 @@ impl FederatedGossipRouter {
 
     /// Remove stale channels
     pub async fn cleanup_stale(&self, timeout_secs: u64) -> Vec<String> {
-        let mut channels = self.channels.write().unwrap();
+        let mut channels = self.channels.write().unwrap_or_else(|poisoned| {
+            warn!("Channels lock poisoned, recovering");
+            poisoned.into_inner()
+        });
         let stale: Vec<String> = channels
             .iter()
             .filter(|(_, c)| c.is_timed_out(timeout_secs))
@@ -169,7 +192,13 @@ impl FederatedGossipRouter {
 
     /// Get the number of active channels
     pub fn channel_count(&self) -> usize {
-        self.channels.read().unwrap().len()
+        self.channels
+            .read()
+            .unwrap_or_else(|poisoned| {
+                warn!("Channels lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .len()
     }
 
     /// Get our cooperative ID
