@@ -586,9 +586,10 @@ fn test_binding_serialization() {
 
     // Serialize and deserialize
     let serialized = bincode::serde::encode_to_vec(&binding, bincode::config::legacy()).unwrap();
-    let deserialized: EphemeralBinding = bincode::serde::decode_from_slice(&serialized, bincode::config::legacy())
-        .map(|(v, _)| v)
-        .unwrap();
+    let deserialized: EphemeralBinding =
+        bincode::serde::decode_from_slice(&serialized, bincode::config::legacy())
+            .map(|(v, _)| v)
+            .unwrap();
 
     // Should still match the proof
     assert!(deserialized.matches_proof(&proof));

@@ -694,9 +694,8 @@ impl NetworkHandle {
             .map_err(|e| anyhow::anyhow!("Failed to create onion circuit: {e}"))?;
 
         // Serialize the payload
-        let payload_bytes =
-            bincode::serde::encode_to_vec(payload, bincode::config::legacy())
-                .context("Failed to serialize onion payload")?;
+        let payload_bytes = bincode::serde::encode_to_vec(payload, bincode::config::legacy())
+            .context("Failed to serialize onion payload")?;
 
         // Wrap message in onion layers
         let onion_msg = router
@@ -2240,10 +2239,14 @@ impl NetworkActor {
                                                     icn_obs::metrics::privacy::onion_messages_delivered_inc();
 
                                                     // Attempt to deserialize as NetworkMessage and forward
-                                                    match bincode::serde::decode_from_slice::<NetworkMessage, _>(
-                                                        &payload,
-                                                        bincode::config::legacy(),
-                                                    ).map(|(v, _)| v) {
+                                                    match bincode::serde::decode_from_slice::<
+                                                        NetworkMessage,
+                                                        _,
+                                                    >(
+                                                        &payload, bincode::config::legacy()
+                                                    )
+                                                    .map(|(v, _)| v)
+                                                    {
                                                         Ok(inner_msg) => {
                                                             debug!(
                                                                 "Extracted inner message: {:?}",

@@ -212,8 +212,9 @@ impl QuarantineStore {
 
         match value {
             Some(bytes) => {
-                let record: QuarantineRecord = bincode::serde::decode_from_slice(&bytes, bincode::config::legacy())
-                    .map(|(v, _)| v)?;
+                let record: QuarantineRecord =
+                    bincode::serde::decode_from_slice(&bytes, bincode::config::legacy())
+                        .map(|(v, _)| v)?;
 
                 // Check if expired
                 if record.is_expired() {
@@ -235,8 +236,9 @@ impl QuarantineStore {
 
         match value {
             Some(bytes) => {
-                let record: QuarantineRecord = bincode::serde::decode_from_slice(&bytes, bincode::config::legacy())
-                    .map(|(v, _)| v)?;
+                let record: QuarantineRecord =
+                    bincode::serde::decode_from_slice(&bytes, bincode::config::legacy())
+                        .map(|(v, _)| v)?;
 
                 // Check if expired
                 if record.is_expired() {
@@ -297,13 +299,14 @@ impl QuarantineStore {
                 continue;
             }
 
-            let record: QuarantineRecord = match bincode::serde::decode_from_slice(&value, bincode::config::legacy()) {
-                Ok((r, _)) => r,
-                Err(e) => {
-                    warn!("Failed to deserialize quarantine record: {}", e);
-                    continue;
-                }
-            };
+            let record: QuarantineRecord =
+                match bincode::serde::decode_from_slice(&value, bincode::config::legacy()) {
+                    Ok((r, _)) => r,
+                    Err(e) => {
+                        warn!("Failed to deserialize quarantine record: {}", e);
+                        continue;
+                    }
+                };
 
             if record.is_expired() {
                 self.store.delete(&key)?;
@@ -340,8 +343,9 @@ impl QuarantineStore {
 
         match value {
             Some(bytes) => {
-                let meta: QuarantineMeta = bincode::serde::decode_from_slice(&bytes, bincode::config::legacy())
-                    .map(|(v, _)| v)?;
+                let meta: QuarantineMeta =
+                    bincode::serde::decode_from_slice(&bytes, bincode::config::legacy())
+                        .map(|(v, _)| v)?;
                 Ok(meta)
             }
             None => {

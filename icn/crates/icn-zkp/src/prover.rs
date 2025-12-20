@@ -172,8 +172,10 @@ impl ZkProver {
         let private = NonRevocationPrivate {
             credential_id,
             witness: crate::circuit::non_revocation::NonMembershipWitness {
-                a: bincode::serde::encode_to_vec(&witness.a, bincode::config::legacy()).unwrap_or_default(),
-                b: bincode::serde::encode_to_vec(&witness.d, bincode::config::legacy()).unwrap_or_default(),
+                a: bincode::serde::encode_to_vec(&witness.a, bincode::config::legacy())
+                    .unwrap_or_default(),
+                b: bincode::serde::encode_to_vec(&witness.d, bincode::config::legacy())
+                    .unwrap_or_default(),
                 aux: credential_id,
             },
             blinding: rand::random(),
@@ -207,28 +209,34 @@ impl ZkProver {
         // Generate attribute proof based on type
         let attribute_proof = match &proof_type {
             ProofType::AgeAtLeast { threshold } => {
-                let age_att: AgeAttestation =
-                    bincode::serde::decode_from_slice(&attestation.payload, bincode::config::legacy())
-                        .map(|(v, _)| v)
-                        .map_err(|e| {
-                            ProverError::InvalidAttestation(format!("age attestation: {e}"))
-                        })?;
+                let age_att: AgeAttestation = bincode::serde::decode_from_slice(
+                    &attestation.payload,
+                    bincode::config::legacy(),
+                )
+                .map(|(v, _)| v)
+                .map_err(|e| ProverError::InvalidAttestation(format!("age attestation: {e}")))?;
                 self.prove_age(*threshold, &age_att, issuer_pk, &context)?
             }
             ProofType::Citizenship { country_code } => {
-                let cit_att: CitizenshipAttestation = bincode::serde::decode_from_slice(&attestation.payload, bincode::config::legacy())
-                    .map(|(v, _)| v)
-                    .map_err(|e| {
-                        ProverError::InvalidAttestation(format!("citizenship attestation: {e}"))
-                    })?;
+                let cit_att: CitizenshipAttestation = bincode::serde::decode_from_slice(
+                    &attestation.payload,
+                    bincode::config::legacy(),
+                )
+                .map(|(v, _)| v)
+                .map_err(|e| {
+                    ProverError::InvalidAttestation(format!("citizenship attestation: {e}"))
+                })?;
                 self.prove_citizenship(*country_code, &cit_att, issuer_pk, &context)?
             }
             ProofType::Membership { org_did } => {
-                let mem_att: MembershipAttestation = bincode::serde::decode_from_slice(&attestation.payload, bincode::config::legacy())
-                    .map(|(v, _)| v)
-                    .map_err(|e| {
-                        ProverError::InvalidAttestation(format!("membership attestation: {e}"))
-                    })?;
+                let mem_att: MembershipAttestation = bincode::serde::decode_from_slice(
+                    &attestation.payload,
+                    bincode::config::legacy(),
+                )
+                .map(|(v, _)| v)
+                .map_err(|e| {
+                    ProverError::InvalidAttestation(format!("membership attestation: {e}"))
+                })?;
                 // Pad subject_anchor to 32 bytes for DID creation
                 // In production, the anchor would already be 32 bytes
                 let mut anchor_full = [0u8; 32];

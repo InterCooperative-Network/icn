@@ -234,7 +234,8 @@ impl KeyBundle {
             new_x25519_public: new_bundle.x25519_public,
         };
 
-        let message_bytes = bincode::serde::encode_to_vec(&rotation_message, bincode::config::legacy())?;
+        let message_bytes =
+            bincode::serde::encode_to_vec(&rotation_message, bincode::config::legacy())?;
         let signature = self.sign(&message_bytes);
 
         Ok(RotationRequest {
@@ -380,7 +381,8 @@ impl KeyBundlePublic {
             new_x25519_public: request.new_public.x25519_public,
         };
 
-        let message_bytes = bincode::serde::encode_to_vec(&rotation_message, bincode::config::legacy())?;
+        let message_bytes =
+            bincode::serde::encode_to_vec(&rotation_message, bincode::config::legacy())?;
 
         Ok(self.verify(&message_bytes, &request.old_signature))
     }

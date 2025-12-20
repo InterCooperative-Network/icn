@@ -65,7 +65,8 @@ pub(crate) fn sha3_256(data: &[u8]) -> [u8; 32] {
 
 /// Helper to compute public inputs hash from structured data
 pub(crate) fn compute_public_inputs_hash<T: serde::Serialize>(public: &T) -> [u8; 32] {
-    let bytes = bincode::serde::encode_to_vec(public, bincode::config::legacy()).unwrap_or_default();
+    let bytes =
+        bincode::serde::encode_to_vec(public, bincode::config::legacy()).unwrap_or_default();
     sha3_256(&bytes)
 }
 

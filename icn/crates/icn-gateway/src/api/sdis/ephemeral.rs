@@ -182,7 +182,9 @@ impl EphemeralProof {
     pub fn signing_payload(&self) -> Vec<u8> {
         let mut payload = Vec::with_capacity(128);
         payload.push(self.v);
-        payload.extend_from_slice(&bincode::serde::encode_to_vec(&self.t, bincode::config::legacy()).unwrap_or_default());
+        payload.extend_from_slice(
+            &bincode::serde::encode_to_vec(&self.t, bincode::config::legacy()).unwrap_or_default(),
+        );
         payload.extend_from_slice(&self.a);
         payload.extend_from_slice(&self.k);
         payload.extend_from_slice(&self.x.to_le_bytes());
@@ -281,7 +283,9 @@ impl EphemeralBinding {
         let hybrid_sig = keybundle.sign(&payload);
 
         // Store the serialized hybrid signature
-        binding.hybrid_signature = bincode::serde::encode_to_vec(&hybrid_sig, bincode::config::legacy()).unwrap_or_default();
+        binding.hybrid_signature =
+            bincode::serde::encode_to_vec(&hybrid_sig, bincode::config::legacy())
+                .unwrap_or_default();
 
         // Extract classical signature for compatibility
         binding.signature = hybrid_sig.classical.clone();

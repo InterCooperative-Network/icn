@@ -25,8 +25,7 @@ impl CoopStore {
             .db
             .get(key.as_bytes())?
             .ok_or_else(|| CoopError::NotFound(coop_id.to_string()))?;
-        Ok(bincode::serde::decode_from_slice(&value, bincode::config::legacy())
-            .map(|(v, _)| v)?)
+        Ok(bincode::serde::decode_from_slice(&value, bincode::config::legacy()).map(|(v, _)| v)?)
     }
 
     pub fn list_cooperatives(&self) -> Result<Vec<Cooperative>> {
@@ -35,8 +34,9 @@ impl CoopStore {
 
         for item in self.db.scan_prefix(prefix) {
             let (_, value) = item?;
-            let coop: Cooperative = bincode::serde::decode_from_slice(&value, bincode::config::legacy())
-                .map(|(v, _)| v)?;
+            let coop: Cooperative =
+                bincode::serde::decode_from_slice(&value, bincode::config::legacy())
+                    .map(|(v, _)| v)?;
             coops.push(coop);
         }
 
@@ -62,8 +62,7 @@ impl CoopStore {
             .db
             .get(key.as_bytes())?
             .ok_or_else(|| CoopError::MemberNotFound(did.to_string()))?;
-        Ok(bincode::serde::decode_from_slice(&value, bincode::config::legacy())
-            .map(|(v, _)| v)?)
+        Ok(bincode::serde::decode_from_slice(&value, bincode::config::legacy()).map(|(v, _)| v)?)
     }
 
     pub fn list_members(&self, coop_id: &str) -> Result<Vec<Member>> {
@@ -72,8 +71,9 @@ impl CoopStore {
 
         for item in self.db.scan_prefix(prefix.as_bytes()) {
             let (_, value) = item?;
-            let member: Member = bincode::serde::decode_from_slice(&value, bincode::config::legacy())
-                .map(|(v, _)| v)?;
+            let member: Member =
+                bincode::serde::decode_from_slice(&value, bincode::config::legacy())
+                    .map(|(v, _)| v)?;
             members.push(member);
         }
 
@@ -92,8 +92,9 @@ impl CoopStore {
 
         for item in self.db.scan_prefix(prefix) {
             let (_key, value) = item?;
-            let member: Member = bincode::serde::decode_from_slice(&value, bincode::config::legacy())
-                .map(|(v, _)| v)?;
+            let member: Member =
+                bincode::serde::decode_from_slice(&value, bincode::config::legacy())
+                    .map(|(v, _)| v)?;
             if member.did == *did {
                 coop_ids.push(member.coop_id.clone());
             }

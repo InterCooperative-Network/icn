@@ -51,13 +51,15 @@ impl IdentityUpdateMessage {
 
     /// Serialize to bytes for gossip
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
-        Ok(bincode::serde::encode_to_vec(self, bincode::config::legacy())?)
+        Ok(bincode::serde::encode_to_vec(
+            self,
+            bincode::config::legacy(),
+        )?)
     }
 
     /// Deserialize from bytes
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        Ok(bincode::serde::decode_from_slice(bytes, bincode::config::legacy())
-            .map(|(v, _)| v)?)
+        Ok(bincode::serde::decode_from_slice(bytes, bincode::config::legacy()).map(|(v, _)| v)?)
     }
 }
 

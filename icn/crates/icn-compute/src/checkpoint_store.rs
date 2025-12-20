@@ -298,9 +298,8 @@ impl SledCheckpointBackend {
 impl CheckpointBackend for SledCheckpointBackend {
     fn store(&self, checkpoint: &ActorCheckpoint) -> Result<(), String> {
         let key = checkpoint.actor_id;
-        let value =
-            bincode::serde::encode_to_vec(checkpoint, bincode::config::legacy())
-                .map_err(|e| format!("Serialization error: {e}"))?;
+        let value = bincode::serde::encode_to_vec(checkpoint, bincode::config::legacy())
+            .map_err(|e| format!("Serialization error: {e}"))?;
 
         self.db
             .insert(key, value)
