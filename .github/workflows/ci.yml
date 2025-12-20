@@ -133,7 +133,7 @@ jobs:
         continue-on-error: true  # Tarpaulin can have spurious failures even when tests pass
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v5
         with:
           files: ./icn/coverage/cobertura.xml
           fail_ci_if_error: false
