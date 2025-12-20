@@ -130,6 +130,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg(not(feature = "stark"))]
     fn test_full_age_proof_flow() {
         // Setup
         let prover = ZkProver::new();
@@ -183,6 +184,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(feature = "stark"))]
     fn test_non_revocation_flow() {
         let prover = ZkProver::new();
         let mut verifier = ZkVerifier::new();

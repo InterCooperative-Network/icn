@@ -14,31 +14,45 @@ use tracing::{debug, warn};
 pub enum SystemEvent {
     /// A governance proposal was accepted
     ProposalAccepted {
+        /// Unique identifier for the proposal
         proposal_id: ProposalId,
+        /// Domain in which the proposal was made
         domain_id: String,
+        /// Payload describing the proposal action
         payload: ProposalPayload,
+        /// Unix timestamp when the proposal was decided
         decided_at: u64,
     },
 
     /// A governance proposal was rejected or failed to reach quorum
     ProposalRejected {
+        /// Unique identifier for the proposal
         proposal_id: ProposalId,
+        /// Domain in which the proposal was made
         domain_id: String,
+        /// Unix timestamp when the proposal was decided
         decided_at: u64,
     },
 
     /// A ledger transaction was executed (for contracts listening to ledger changes)
     TransactionExecuted {
+        /// Hash of the ledger entry
         entry_hash: [u8; 32],
+        /// Source DID of the transaction
         from: Did,
+        /// Destination DID of the transaction
         to: Did,
+        /// Transaction amount
         amount: i64,
+        /// Currency identifier
         currency: String,
     },
 
     /// A contract was executed
     ContractExecuted {
+        /// Contract identifier
         contract_id: String,
+        /// Execution outcome as JSON
         outcome: serde_json::Value,
     },
 }

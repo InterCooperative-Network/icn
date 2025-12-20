@@ -35,18 +35,18 @@ impl IdentityManager {
     }
 
     /// Create a new identity manager with persistent storage
-    pub fn new_with_storage(data_dir: std::path::PathBuf) -> Self {
+    pub fn new_with_storage(data_dir: std::path::PathBuf) -> Result<Self> {
         let store_path = data_dir.join("identity_store");
-        let store = Arc::new(
-            icn_store::SledStore::open(&store_path).expect("Failed to open identity store"),
-        );
+        let store = Arc::new(icn_store::SledStore::open(&store_path).map_err(|e| {
+            GatewayError::InternalError(format!("Failed to open identity store: {e}"))
+        })?);
 
-        Self {
+        Ok(Self {
             store,
             cache: RwLock::new(lru::LruCache::new(
-                std::num::NonZeroUsize::new(1000).unwrap(),
+                std::num::NonZeroUsize::new(1000).expect("1000 is non-zero"),
             )),
-        }
+        })
     }
 
     /// Get or create a DID document

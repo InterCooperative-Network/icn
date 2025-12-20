@@ -217,6 +217,9 @@ pub enum QuarantineReason {
 
     /// Fork conflict - lost fork resolution (Phase 18 Week 5)
     ForkConflict(String),
+
+    /// Charter rule violation - entry violates cooperative charter policies
+    CharterViolation,
 }
 
 /// Quarantined entry awaiting resolution

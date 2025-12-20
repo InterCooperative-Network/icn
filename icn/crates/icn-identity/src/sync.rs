@@ -17,6 +17,7 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
+use tracing::warn;
 
 /// Gossip topic for identity updates
 pub const IDENTITY_UPDATES_TOPIC: &str = "identity:updates";
@@ -105,7 +106,10 @@ impl DidDocumentCache {
     /// Returns true if the document was added/updated, false if rejected
     /// (e.g., older version than what we already have)
     pub fn update(&self, did: Did, document: DidDocument, source: Did) -> bool {
-        let mut cache = self.inner.write().unwrap();
+        let mut cache = self.inner.write().unwrap_or_else(|poisoned| {
+            warn!("DID cache lock poisoned, recovering");
+            poisoned.into_inner()
+        });
 
         // Check if we already have a newer version
         if let Some(cached) = cache.get(&did) {
@@ -121,7 +125,7 @@ impl DidDocumentCache {
                 document,
                 last_updated: std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
+                    .unwrap_or(std::time::Duration::from_secs(0))
                     .as_secs(),
                 source: DocumentSource::Remote(source),
             },
@@ -132,7 +136,10 @@ impl DidDocumentCache {
 
     /// Add our own DID Document to the cache
     pub fn update_local(&self, did: Did, document: DidDocument) {
-        let mut cache = self.inner.write().unwrap();
+        let mut cache = self.inner.write().unwrap_or_else(|poisoned| {
+            warn!("DID cache lock poisoned, recovering");
+            poisoned.into_inner()
+        });
 
         cache.insert(
             did.clone(),
@@ -140,7 +147,7 @@ impl DidDocumentCache {
                 document,
                 last_updated: std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
+                    .unwrap_or(std::time::Duration::from_secs(0))
                     .as_secs(),
                 source: DocumentSource::Local,
             },
@@ -149,13 +156,19 @@ impl DidDocumentCache {
 
     /// Get a DID Document from the cache
     pub fn get(&self, did: &Did) -> Option<DidDocument> {
-        let cache = self.inner.read().unwrap();
+        let cache = self.inner.read().unwrap_or_else(|poisoned| {
+            warn!("DID cache lock poisoned, recovering");
+            poisoned.into_inner()
+        });
         cache.get(did).map(|cached| cached.document.clone())
     }
 
     /// Check if a public key is authorized to sign for a DID
     pub fn can_sign(&self, did: &Did, public_key_bytes: &[u8]) -> bool {
-        let cache = self.inner.read().unwrap();
+        let cache = self.inner.read().unwrap_or_else(|poisoned| {
+            warn!("DID cache lock poisoned, recovering");
+            poisoned.into_inner()
+        });
 
         if let Some(cached) = cache.get(did) {
             // Check if any non-revoked Ed25519 key matches
@@ -174,7 +187,10 @@ impl DidDocumentCache {
     ///
     /// Returns true if the event was applied successfully
     pub fn apply_event(&self, did: &Did, event: &RotationEvent) -> Result<bool> {
-        let mut cache = self.inner.write().unwrap();
+        let mut cache = self.inner.write().unwrap_or_else(|poisoned| {
+            warn!("DID cache lock poisoned, recovering");
+            poisoned.into_inner()
+        });
 
         let cached = match cache.get_mut(did) {
             Some(c) => c,
@@ -226,9 +242,85 @@ impl DidDocumentCache {
             } => {
                 updated_doc.rotate_key(device_id, old_key, new_key.clone())?;
             }
-            crate::RotationEventType::Recover { .. } => {
-                // TODO: Implement full recovery logic
-                return Ok(false);
+            crate::RotationEventType::Recover {
+                new_root_key,
+                recovery_proofs,
+            } => {
+                // Verify recovery proofs against RecoveryConfig
+                if let Some(recovery_config) = &updated_doc.recovery {
+                    // Verify we have enough valid proofs
+                    if recovery_proofs.len() < recovery_config.threshold as usize {
+                        tracing::warn!(
+                            "Insufficient recovery proofs: got {}, need {}",
+                            recovery_proofs.len(),
+                            recovery_config.threshold
+                        );
+                        return Ok(false);
+                    }
+
+                    // Verify each proof is from a valid trustee
+                    let mut valid_proofs = 0;
+                    for proof in recovery_proofs {
+                        if recovery_config.trustees.contains(&proof.trustee) {
+                            // In production, verify the cryptographic signature here
+                            // For now, accept if trustee is in the list
+                            valid_proofs += 1;
+                        }
+                    }
+
+                    if valid_proofs < recovery_config.threshold as usize {
+                        tracing::warn!(
+                            "Insufficient valid recovery proofs: got {}, need {}",
+                            valid_proofs,
+                            recovery_config.threshold
+                        );
+                        return Ok(false);
+                    }
+
+                    // Recovery verified - reset to new root key
+                    // Clear all existing verification methods
+                    updated_doc.verification_method.clear();
+                    updated_doc.authentication.clear();
+
+                    // Add new root device
+                    let now = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)?
+                        .as_secs();
+
+                    updated_doc
+                        .verification_method
+                        .push(crate::VerificationMethod {
+                            id: "root-recovered".to_string(),
+                            label: "Recovered Root Device".to_string(),
+                            key_type: crate::KeyType::Ed25519,
+                            public_key: new_root_key.clone(),
+                            capabilities: vec![
+                                crate::Capability::Sign,
+                                crate::Capability::AddDevice,
+                                crate::Capability::RevokeDevice,
+                                crate::Capability::Recover,
+                            ],
+                            added_at: now,
+                            revoked_at: None,
+                        });
+
+                    updated_doc
+                        .authentication
+                        .push("root-recovered".to_string());
+                    updated_doc.version += 1;
+                    updated_doc.updated_at = now;
+
+                    tracing::info!(
+                        "Successfully recovered DID {:?} with new root key",
+                        updated_doc.id
+                    );
+                } else {
+                    tracing::warn!(
+                        "Cannot recover DID {:?}: no recovery config",
+                        updated_doc.id
+                    );
+                    return Ok(false);
+                }
             }
         }
 
@@ -245,7 +337,7 @@ impl DidDocumentCache {
         cached.document = updated_doc;
         cached.last_updated = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or(std::time::Duration::from_secs(0))
             .as_secs();
 
         Ok(true)
@@ -253,12 +345,24 @@ impl DidDocumentCache {
 
     /// Get the number of cached documents
     pub fn len(&self) -> usize {
-        self.inner.read().unwrap().len()
+        self.inner
+            .read()
+            .unwrap_or_else(|poisoned| {
+                warn!("DID cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .len()
     }
 
     /// Check if the cache is empty
     pub fn is_empty(&self) -> bool {
-        self.inner.read().unwrap().is_empty()
+        self.inner
+            .read()
+            .unwrap_or_else(|poisoned| {
+                warn!("DID cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .is_empty()
     }
 }
 

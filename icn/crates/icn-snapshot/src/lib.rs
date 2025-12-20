@@ -1,10 +1,10 @@
-//! State snapshot for graceful restarts
+//! State snapshot for graceful restarts and distributed snapshots
 //!
-//! This crate provides serializable state types for persisting runtime state
-//! across daemon restarts. It is intentionally dependency-free (except serde)
-//! to avoid circular dependencies.
+//! This crate provides:
+//! - Local state serialization for daemon restarts
+//! - Distributed snapshot protocol (Chandy-Lamport) for network-wide consistency
 //!
-//! ## Usage
+//! ## Local Snapshot Usage
 //!
 //! ```rust,ignore
 //! use icn_snapshot::{StateSnapshot, save_snapshot, load_snapshot};
@@ -25,6 +25,19 @@
 //!     }
 //! }
 //! ```
+//!
+//! ## Distributed Snapshot Usage
+//!
+//! ```rust,ignore
+//! use icn_snapshot::{SnapshotCoordinator, SnapshotConfig};
+//!
+//! let coordinator = SnapshotCoordinator::new(my_did, SnapshotConfig::default());
+//! let (snapshot_id, init_msg) = coordinator.initiate_snapshot(participants).await?;
+//! // Broadcast init_msg via gossip
+//! ```
+
+pub mod coordinator;
+pub mod protocol;
 
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
@@ -369,6 +382,10 @@ fn snapshot_path(data_dir: impl AsRef<Path>) -> PathBuf {
 fn checksum_path(data_dir: impl AsRef<Path>) -> PathBuf {
     data_dir.as_ref().join(CHECKSUM_FILENAME)
 }
+
+// Re-export coordinator and protocol types
+pub use coordinator::{CompletedSnapshot, SnapshotCoordinator};
+pub use protocol::{SnapshotConfig, SnapshotId, SnapshotMessage, SnapshotMetadata, SnapshotState};
 
 #[cfg(test)]
 mod tests {

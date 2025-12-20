@@ -20,6 +20,7 @@
 //! | Org anchor | Claims > 500 credits require org attestation |
 
 use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
 
 // ============================================================================
 // Gossip Topics
@@ -357,7 +358,7 @@ impl ContributionValidator {
         let mut weighted_score = 0.0;
         let mut eligible_count = 0;
         let mut ineligible = Vec::new();
-        let fraud_indicators = Vec::new(); // Fraud detection is a stub for now
+        let mut fraud_indicators = Vec::new();
 
         for peer_att in &attestation.attestations {
             let attester_did = &peer_att.attester;
@@ -383,6 +384,11 @@ impl ContributionValidator {
             }
         }
 
+        // Check for attestation rings (circular attestations)
+        if let Some(ring) = self.detect_attestation_ring(attestation) {
+            fraud_indicators.push(ring);
+        }
+
         let verified = weighted_score >= CONTRIBUTION_THRESHOLD;
 
         ValidationResult {
@@ -405,19 +411,113 @@ impl ContributionValidator {
         };
         check_eligibility(attester_did, claim, &context)
     }
+
+    /// Detect attestation rings (circular attestation patterns)
+    ///
+    /// Uses depth-first search to detect cycles in the attestation graph.
+    /// A ring is detected if there's a path from an attester back to themselves
+    /// through the attestation relationships.
+    fn detect_attestation_ring(&self, claim: &ContributionAttestation) -> Option<FraudIndicator> {
+        // Build attestation graph: who attested for whom
+        // Using String keys to avoid lifetime issues
+        let mut graph: HashMap<String, Vec<String>> = HashMap::new();
+
+        // Add edges from this claim
+        for attestation in &claim.attestations {
+            graph
+                .entry(attestation.attester.clone())
+                .or_default()
+                .push(claim.contributor().to_string());
+        }
+
+        // Add edges from historical attestations via lookup
+        for attestation in &claim.attestations {
+            let attesters_of_attester = (self.attesters_of_lookup)(&attestation.attester);
+            for attester_of_attester in attesters_of_attester {
+                graph
+                    .entry(attester_of_attester.clone())
+                    .or_default()
+                    .push(attestation.attester.clone());
+            }
+        }
+
+        // DFS cycle detection for each attester
+        for attestation in &claim.attestations {
+            let mut visited = HashSet::new();
+            let mut rec_stack = HashSet::new();
+
+            if Self::has_cycle_dfs(&attestation.attester, &graph, &mut visited, &mut rec_stack) {
+                return Some(FraudIndicator::AttestationRing {
+                    participants: claim
+                        .attestations
+                        .iter()
+                        .map(|a| a.attester.clone())
+                        .collect(),
+                });
+            }
+        }
+
+        None
+    }
+
+    /// Helper for DFS cycle detection
+    fn has_cycle_dfs(
+        node: &str,
+        graph: &HashMap<String, Vec<String>>,
+        visited: &mut HashSet<String>,
+        rec_stack: &mut HashSet<String>,
+    ) -> bool {
+        if rec_stack.contains(node) {
+            return true; // Found cycle
+        }
+
+        if visited.contains(node) {
+            return false; // Already explored this path
+        }
+
+        visited.insert(node.to_string());
+        rec_stack.insert(node.to_string());
+
+        if let Some(neighbors) = graph.get(node) {
+            for neighbor in neighbors {
+                if Self::has_cycle_dfs(neighbor, graph, visited, rec_stack) {
+                    return true;
+                }
+            }
+        }
+
+        rec_stack.remove(node);
+        false
+    }
 }
 
 /// Fraud indicator for suspicious activity
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FraudIndicator {
-    /// Unusually high claim amount
-    UnusuallyHighAmount { amount: u64, average: u64 },
-    /// Rapid successive claims
-    RapidClaims { count: u32, window_secs: u64 },
+    /// Unusually high claim amount compared to historical average
+    UnusuallyHighAmount {
+        /// The claimed amount
+        amount: u64,
+        /// The historical average for comparison
+        average: u64,
+    },
+    /// Rapid successive claims in a short time window
+    RapidClaims {
+        /// Number of claims in the window
+        count: u32,
+        /// Window duration in seconds
+        window_secs: u64,
+    },
     /// Attestation ring detected (circular attestations)
-    AttestationRing { participants: Vec<String> },
+    AttestationRing {
+        /// DIDs of participants in the ring
+        participants: Vec<String>,
+    },
     /// Claim conflicts with network observations
-    ConflictsWithObservations { reason: String },
+    ConflictsWithObservations {
+        /// Description of the conflict
+        reason: String,
+    },
 }
 
 // ============================================================================
@@ -587,19 +687,6 @@ impl FraudDetector {
 
         None
     }
-
-    /// Detect attestation rings (circular attestation patterns)
-    ///
-    /// STUB: Returns None (no ring detected) - actual implementation pending
-    /// This would require graph analysis to detect cycles in the attestation graph.
-    pub fn detect_attestation_ring(
-        &self,
-        _claim: &ContributionAttestation,
-    ) -> Option<FraudIndicator> {
-        // TODO: Implement cycle detection in attestation graph
-        // For now, this is a stub that returns None
-        None
-    }
 }
 
 /// Gossip message types for contribution attestation
@@ -609,17 +696,23 @@ pub enum ContributionMessage {
     ClaimSubmitted(ContributionClaim),
     /// An attestation was added to a claim
     AttestationAdded {
+        /// Hash of the claim being attested
         claim_hash: ContentHash,
+        /// The attestation being added
         attestation: PeerAttestation,
     },
     /// A claim was verified (reached threshold)
     ClaimVerified {
+        /// Hash of the verified claim
         claim_hash: ContentHash,
+        /// Final weighted attestation score
         weighted_score: f64,
     },
     /// A claim was rejected
     ClaimRejected {
+        /// Hash of the rejected claim
         claim_hash: ContentHash,
+        /// Reason for rejection
         reason: String,
     },
 }

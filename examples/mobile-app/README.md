@@ -1,56 +1,146 @@
-# ICN Mobile App Examples
+# ICN Mobile App
 
-Example React Native components demonstrating ICN pilot features.
+A complete mobile application for the Intercooperative Network (ICN), built with React Native and Expo.
 
-## Examples
+## Features
 
-- `NotificationCenter.tsx` - In-app notification center with real-time updates
-- `RecurringPaymentSetup.tsx` - Create and manage recurring payments
-- `VotingScreen.tsx` - Amendment voting interface
-- `BudgetManager.tsx` - Budget creation and monitoring
+### 🏠 Home Dashboard
+- Real-time balance display
+- Quick stats (cooperatives, notifications)
+- Quick action buttons
+- Pull-to-refresh
 
-## Usage
+### 💰 Ledger Management
+- Transaction history
+- Create payments
+- Balance tracking
+- Credit limit monitoring
 
-These are reference implementations. Copy and adapt for your app:
+### 🗳️ Governance
+- View proposals
+- Cast votes (For/Against/Abstain)
+- Create new proposals
+- Track voting results
 
-```tsx
-import { NotificationCenter } from './examples/mobile-app/NotificationCenter';
+### 🤝 Cooperatives
+- Browse cooperatives
+- Join/leave cooperatives
+- View member lists
+- Create new cooperatives
 
-function App() {
-  return <NotificationCenter />;
-}
-```
+### 👤 Profile & Settings
+- User profile management
+- Budget management
+- Recurring payment setup
+- Push notification preferences
 
-## Prerequisites
+## Quick Start
+
+### Prerequisites
+
+- Node.js 16+ and npm
+- Expo CLI: `npm install -g expo-cli`
+- iOS Simulator (Mac) or Android Studio
+- Or Expo Go app on your phone
+
+### Installation
 
 ```bash
-npm install @icn/react-native
-npm install @react-native-firebase/app
-npm install @react-native-firebase/messaging
+cd examples/mobile-app
+npm install
 ```
 
-## Features Demonstrated
+### Running
 
-### Notifications
-- Real-time WebSocket connection
-- In-app notification list
-- Push notification registration
-- Read/unread state management
+```bash
+# Start development server
+npm start
 
-### Recurring Payments
-- Payment frequency selection
-- Start/end date pickers
-- Payment preview
-- Edit and cancel flows
+# Run on iOS (Mac only)
+npm run ios
 
-### Governance
-- Amendment voting UI
-- Vote results visualization
-- User's vote status
-- Quorum indicators
+# Run on Android
+npm run android
 
-### Budgets
-- Spending visualization
-- Threshold alerts
-- Period selection
-- Multi-account support
+# Run on web
+npm run web
+```
+
+### On Physical Device
+
+1. Install Expo Go from App Store/Google Play
+2. Run `npm start`
+3. Scan QR code with camera (iOS) or Expo Go (Android)
+
+## Configuration
+
+### API Endpoint
+
+Configure in login screen:
+- Local: `http://localhost:8000`
+- Network: `http://192.168.1.x:8000`
+- Production: `https://api.your-coop.org`
+
+### Authentication
+
+1. Enter DID and API URL
+2. Request challenge
+3. Sign challenge with private key
+4. Paste signature to authenticate
+5. JWT token stored in AsyncStorage
+
+## Project Structure
+
+```
+icn-mobile/
+├── App.tsx                    # Main entry
+├── src/
+│   ├── screens/              # Main screens
+│   ├── services/             # API client
+│   ├── contexts/             # React contexts
+│   └── components/           # Reusable components
+├── BudgetManager.tsx         # Budget management
+├── CooperativeManager.tsx    # Cooperative CRUD
+├── NotificationCenter.tsx    # Notifications
+├── RecurringPaymentSetup.tsx # Recurring payments
+└── VotingScreen.tsx          # Governance voting
+```
+
+## Building for Production
+
+### iOS (Mac only)
+
+```bash
+expo build:ios
+```
+
+### Android
+
+```bash
+expo build:android
+```
+
+## Troubleshooting
+
+### "Unable to connect to server"
+- Check API URL
+- Ensure Gateway is running
+- Use IP address (not localhost) for physical devices
+
+### Cache Issues
+```bash
+expo start -c
+```
+
+## License
+
+MIT - See [LICENSE](../../LICENSE)
+
+## Support
+
+- Docs: https://github.com/InterCooperative-Network/icn/tree/main/docs
+- Issues: https://github.com/InterCooperative-Network/icn/issues
+
+---
+
+Built with ❤️ by the ICN community

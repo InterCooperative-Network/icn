@@ -1,4 +1,4 @@
-.PHONY: help build sync deploy full-deploy status logs clean build-ui deploy-ui
+.PHONY: help build sync deploy full-deploy status logs clean build-ui deploy-ui cleanup setup-auto-cleanup
 
 # Configuration
 IMAGE_NAME ?= icn
@@ -197,4 +197,28 @@ full-deploy-with-ui: build-all-images sync-all-images deploy-all ## Full deploym
 	@echo "View logs: make logs (daemon) or make ui-logs (UI)"
 
 status-all: status ui-status ## Check status of all deployments
+
+# ============================================================================
+# Disk Cleanup
+# ============================================================================
+
+cleanup: ## Clean up old container images on K3s nodes
+	@echo "Cleaning up old images..."
+	./scripts/cleanup-images.sh $(K3S_HOST)
+
+setup-auto-cleanup: ## Set up automatic image cleanup on K3s nodes
+	@echo "Setting up auto-cleanup..."
+	./scripts/setup-auto-cleanup.sh $(K3S_HOST)
+
+disk-usage: ## Show disk usage on all K3s nodes
+	@echo "Disk usage on K3s nodes:"
+	@ssh $(K3S_HOST) "echo 'k3s-control:' && df -h / | tail -1"
+	@ssh $(K3S_WORKER1) "echo 'k3s-worker-1:' && df -h / | tail -1"
+	@ssh $(K3S_WORKER2) "echo 'k3s-worker-2:' && df -h / | tail -1"
+
+image-count: ## Show container image count on all nodes
+	@echo "ICN images on K3s nodes:"
+	@ssh $(K3S_HOST) "echo -n 'k3s-control: ' && sudo crictl images | grep -c 'icn ' || echo 0"
+	@ssh $(K3S_WORKER1) "echo -n 'k3s-worker-1: ' && sudo crictl images | grep -c 'icn ' || echo 0"
+	@ssh $(K3S_WORKER2) "echo -n 'k3s-worker-2: ' && sudo crictl images | grep -c 'icn ' || echo 0"
 

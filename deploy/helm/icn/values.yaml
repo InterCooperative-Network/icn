@@ -1,0 +1,66 @@
+# ICN Helm Chart Values
+
+global:
+  domain: "example.com"
+
+icn:
+  replicaCount: 1
+  image:
+    repository: icn/icnd
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  
+  service:
+    gateway:
+      port: 8000
+    p2p:
+      type: LoadBalancer
+      port: 3000
+    metrics:
+      port: 9090
+  
+  ingress:
+    enabled: true
+    className: "nginx"
+    annotations:
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    host: "api.example.com"
+  
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "2000m"
+  
+  persistence:
+    enabled: true
+    size: 10Gi
+  
+  env:
+    LOG_LEVEL: "info"
+    RUST_LOG: "icn=info"
+  
+  secrets:
+    jwtSecret: "change-me-in-production"
+
+prometheus:
+  enabled: true
+  retention: "30d"
+  persistence:
+    size: 20Gi
+
+grafana:
+  enabled: true
+  adminPassword: "admin"
+  persistence:
+    size: 5Gi
+
+dashboard:
+  enabled: true
+  host: "dashboard.example.com"
+
+apiDocs:
+  enabled: true
+  host: "docs.example.com"

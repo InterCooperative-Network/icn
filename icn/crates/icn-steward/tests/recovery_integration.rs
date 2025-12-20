@@ -401,6 +401,7 @@ fn test_recovery_gossip_message_serialization() {
         initiator_did: initiator_did.clone(),
         evidence_hash: [2u8; 32],
         timestamp: 12345,
+        signature: Vec::new(),
     };
 
     let serialized = serde_json::to_string(&msg).unwrap();

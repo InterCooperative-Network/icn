@@ -4047,6 +4047,119 @@ footer .sync-status.error {
     }
 }
 
+/* ============================================================================
+   QR Login Styles
+   ============================================================================ */
+
+/* QR Login Button */
+.btn-qr {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.btn-qr .qr-icon {
+    font-size: 1.25rem;
+}
+
+/* QR Modal */
+.modal-qr {
+    max-width: 400px;
+    text-align: center;
+}
+
+.qr-modal-body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem 1.5rem;
+}
+
+/* QR Code Container */
+.qr-code-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 256px;
+    margin-bottom: 1.5rem;
+}
+
+.qr-code-container canvas {
+    border: 4px solid var(--gray-200);
+    border-radius: 12px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.qr-code-container .loading {
+    color: var(--gray-500);
+}
+
+.qr-code-container .error {
+    color: var(--danger);
+    margin-bottom: 1rem;
+}
+
+/* QR Status */
+.qr-status {
+    color: var(--gray-600);
+    margin: 0 0 1rem 0;
+    font-size: 0.95rem;
+}
+
+/* QR Countdown */
+.qr-countdown {
+    background: var(--gray-100);
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    color: var(--gray-600);
+    margin-bottom: 1.5rem;
+}
+
+.qr-countdown #qr-time-left {
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+    font-weight: 600;
+    color: var(--primary);
+}
+
+.qr-countdown #qr-time-left.warning {
+    color: var(--warning);
+}
+
+.qr-countdown #qr-time-left.expired {
+    color: var(--danger);
+}
+
+/* QR Instructions */
+.qr-instructions {
+    text-align: left;
+    width: 100%;
+    background: var(--gray-50);
+    padding: 1rem 1.5rem;
+    border-radius: 8px;
+    margin-top: 0.5rem;
+}
+
+.qr-instructions h3 {
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin: 0 0 0.75rem 0;
+    color: var(--gray-700);
+}
+
+.qr-instructions ol {
+    margin: 0;
+    padding-left: 1.25rem;
+    color: var(--gray-600);
+    font-size: 0.875rem;
+    line-height: 1.6;
+}
+
+.qr-instructions li {
+    margin-bottom: 0.25rem;
+}
+
 /* Dark mode support (respects system preference) */
 @media (prefers-color-scheme: dark) {
     :root {
@@ -4074,6 +4187,28 @@ footer .sync-status.error {
 
     .modal-content {
         background: var(--bg-light);
+    }
+
+    /* QR modal dark mode */
+    .qr-code-container canvas {
+        border-color: var(--gray-600);
+    }
+
+    .qr-countdown {
+        background: var(--gray-700);
+        color: var(--gray-300);
+    }
+
+    .qr-instructions {
+        background: var(--gray-700);
+    }
+
+    .qr-instructions h3 {
+        color: var(--gray-200);
+    }
+
+    .qr-instructions ol {
+        color: var(--gray-300);
     }
 }
 

@@ -7,7 +7,7 @@
 //! - Token issuance
 
 use anyhow::{bail, Context, Result};
-use icn_identity::Did;
+use icn_identity::{Did, KeyPair};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc};
@@ -29,6 +29,9 @@ pub type SendGossipCallback = Arc<dyn Fn(crate::gossip::StewardMessage) + Send +
 pub struct StewardActor {
     /// This steward's DID
     own_did: Did,
+
+    /// This steward's keypair for signing
+    keypair: KeyPair,
 
     /// Steward profile (if active)
     profile: Option<StewardProfile>,
@@ -61,9 +64,10 @@ impl StewardActor {
     /// Spawn a new steward actor
     ///
     /// Returns a handle for interacting with the actor.
-    #[instrument(skip(shutdown_tx, send_gossip))]
+    #[instrument(skip(keypair, shutdown_tx, send_gossip))]
     pub async fn spawn(
         own_did: Did,
+        keypair: KeyPair,
         config: StewardConfig,
         shutdown_tx: broadcast::Sender<()>,
         send_gossip: Option<SendGossipCallback>,
@@ -74,6 +78,7 @@ impl StewardActor {
 
         let actor = StewardActor {
             own_did: own_did.clone(),
+            keypair,
             profile: None,
             config: config.clone(),
             vui_registry: VuiRegistry::new(config),
@@ -101,9 +106,10 @@ impl StewardActor {
     }
 
     /// Spawn with a steward profile (active steward)
-    #[instrument(skip(shutdown_tx, send_gossip, profile))]
+    #[instrument(skip(keypair, shutdown_tx, send_gossip, profile))]
     pub async fn spawn_with_profile(
         own_did: Did,
+        keypair: KeyPair,
         profile: StewardProfile,
         config: StewardConfig,
         shutdown_tx: broadcast::Sender<()>,
@@ -115,6 +121,7 @@ impl StewardActor {
 
         let actor = StewardActor {
             own_did: own_did.clone(),
+            keypair,
             profile: Some(profile),
             config: config.clone(),
             vui_registry: VuiRegistry::new(config),
@@ -361,15 +368,28 @@ impl StewardActor {
 
         // Broadcast ceremony initiation
         if let Some(ref send_gossip) = self.send_gossip {
-            let msg = crate::gossip::EnrollmentMessage::ParticipationRequest {
+            let mut msg = crate::gossip::EnrollmentMessage::ParticipationRequest {
                 ceremony_id,
                 steward_did: self.own_did.clone(),
                 vui_commitment,
                 pathway_hash,
                 threshold: self.config.vui_threshold,
                 timestamp: now,
-                signature: Vec::new(), // TODO: Sign in production
+                signature: Vec::new(),
             };
+
+            // Sign the message
+            let signing_bytes = msg.signing_bytes();
+            let signature = self.keypair.sign(&signing_bytes).to_vec();
+
+            // Update with signature
+            if let crate::gossip::EnrollmentMessage::ParticipationRequest {
+                signature: sig, ..
+            } = &mut msg
+            {
+                *sig = signature;
+            }
+
             send_gossip(crate::gossip::StewardMessage::Enrollment(msg));
         }
 
@@ -507,14 +527,26 @@ impl StewardActor {
 
         // Broadcast recovery request
         if let Some(ref send_gossip) = self.send_gossip {
-            let msg = crate::gossip::RecoveryMessage::RecoveryRequest {
+            let mut msg = crate::gossip::RecoveryMessage::RecoveryRequest {
                 ceremony_id,
                 old_did,
                 new_did,
                 initiator_did: self.own_did.clone(),
                 evidence_hash,
                 timestamp: now,
+                signature: Vec::new(),
             };
+
+            // Sign the message
+            let signing_bytes = msg.signing_bytes();
+            let signature = self.keypair.sign(&signing_bytes).to_vec();
+
+            // Update with signature
+            if let crate::gossip::RecoveryMessage::RecoveryRequest { signature: sig, .. } = &mut msg
+            {
+                *sig = signature;
+            }
+
             send_gossip(crate::gossip::StewardMessage::Recovery(msg));
         }
 
@@ -708,18 +740,19 @@ use sha2::Digest;
 mod tests {
     use super::*;
 
-    fn test_did() -> Did {
+    fn test_did() -> (Did, KeyPair) {
         let keypair = icn_identity::KeyPair::generate().unwrap();
-        keypair.did().clone()
+        let did = keypair.did().clone();
+        (did, keypair)
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_steward_actor_spawn() {
-        let own_did = test_did();
+        let (own_did, keypair) = test_did();
         let config = StewardConfig::default();
         let (shutdown_tx, _shutdown_rx) = broadcast::channel::<()>(16);
 
-        let handle = StewardActor::spawn(own_did.clone(), config, shutdown_tx, None)
+        let handle = StewardActor::spawn(own_did.clone(), keypair, config, shutdown_tx, None)
             .await
             .unwrap();
 
@@ -736,11 +769,11 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_enrollment_lifecycle() {
-        let own_did = test_did();
+        let (own_did, keypair) = test_did();
         let config = StewardConfig::with_threshold(2, 3);
         let (shutdown_tx, _shutdown_rx) = broadcast::channel(16);
 
-        let handle = StewardActor::spawn(own_did.clone(), config, shutdown_tx, None)
+        let handle = StewardActor::spawn(own_did.clone(), keypair, config, shutdown_tx, None)
             .await
             .unwrap();
 
@@ -760,7 +793,7 @@ mod tests {
         assert!(ceremony.is_some());
 
         // Add contributions
-        let steward1 = test_did();
+        let (steward1, _) = test_did();
         handle
             .add_enrollment_share(
                 ceremony_id,
@@ -772,7 +805,7 @@ mod tests {
             .await
             .unwrap();
 
-        let steward2 = test_did();
+        let (steward2, _) = test_did();
         handle
             .add_enrollment_share(
                 ceremony_id,
@@ -801,11 +834,11 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_recovery_lifecycle() {
-        let own_did = test_did();
+        let (own_did, keypair) = test_did();
         let config = StewardConfig::with_threshold(2, 3);
         let (shutdown_tx, _shutdown_rx) = broadcast::channel(16);
 
-        let handle = StewardActor::spawn(own_did.clone(), config, shutdown_tx, None)
+        let handle = StewardActor::spawn(own_did.clone(), keypair, config, shutdown_tx, None)
             .await
             .unwrap();
 
@@ -813,8 +846,8 @@ mod tests {
         tokio::time::sleep(std::time::Duration::from_millis(10)).await;
 
         // Start recovery
-        let old_did = test_did();
-        let new_did = test_did();
+        let (old_did, _) = test_did();
+        let (new_did, _) = test_did();
         let evidence_hash = [42u8; 32];
         let anchor_commitment = [43u8; 32];
 
@@ -833,13 +866,13 @@ mod tests {
         assert!(ceremony.is_some());
 
         // Add attestations
-        let steward1 = test_did();
+        let (steward1, _) = test_did();
         handle
             .add_recovery_attestation(ceremony_id, steward1, true, None, vec![1, 2, 3])
             .await
             .unwrap();
 
-        let steward2 = test_did();
+        let (steward2, _) = test_did();
         handle
             .add_recovery_attestation(ceremony_id, steward2, true, None, vec![4, 5, 6])
             .await
@@ -861,11 +894,11 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_vui_registration() {
-        let own_did = test_did();
+        let (own_did, keypair) = test_did();
         let config = StewardConfig::default();
         let (shutdown_tx, _shutdown_rx) = broadcast::channel(16);
 
-        let handle = StewardActor::spawn(own_did.clone(), config, shutdown_tx, None)
+        let handle = StewardActor::spawn(own_did.clone(), keypair, config, shutdown_tx, None)
             .await
             .unwrap();
 
@@ -874,7 +907,7 @@ mod tests {
 
         // Register VUI
         let vui_hash = [42u8; 32];
-        let user_did = test_did();
+        let (user_did, _) = test_did();
         handle
             .register_vui(vui_hash, user_did.clone())
             .await
@@ -901,11 +934,11 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_token_issuance() {
-        let own_did = test_did();
+        let (own_did, keypair) = test_did();
         let config = StewardConfig::default();
         let (shutdown_tx, _shutdown_rx) = broadcast::channel(16);
 
-        let handle = StewardActor::spawn(own_did.clone(), config, shutdown_tx, None)
+        let handle = StewardActor::spawn(own_did.clone(), keypair, config, shutdown_tx, None)
             .await
             .unwrap();
 

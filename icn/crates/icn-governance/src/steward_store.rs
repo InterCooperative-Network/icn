@@ -13,7 +13,7 @@ use lru::LruCache;
 use serde::{Deserialize, Serialize};
 use std::num::NonZeroUsize;
 use std::sync::RwLock;
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 /// Storage key prefixes
 const PREFIX_STEWARD: &[u8] = b"steward/records/";
@@ -60,24 +60,36 @@ impl Default for InMemoryStewardStore {
 #[async_trait]
 impl StewardStoreBackend for InMemoryStewardStore {
     async fn get(&self, key: &[u8]) -> anyhow::Result<Option<Vec<u8>>> {
-        let data = self.data.read().unwrap();
+        let data = self.data.read().unwrap_or_else(|poisoned| {
+            warn!("Data lock poisoned, recovering");
+            poisoned.into_inner()
+        });
         Ok(data.get(key).cloned())
     }
 
     async fn set(&self, key: &[u8], value: &[u8]) -> anyhow::Result<()> {
-        let mut data = self.data.write().unwrap();
+        let mut data = self.data.write().unwrap_or_else(|poisoned| {
+            warn!("Data lock poisoned, recovering");
+            poisoned.into_inner()
+        });
         data.insert(key.to_vec(), value.to_vec());
         Ok(())
     }
 
     async fn delete(&self, key: &[u8]) -> anyhow::Result<()> {
-        let mut data = self.data.write().unwrap();
+        let mut data = self.data.write().unwrap_or_else(|poisoned| {
+            warn!("Data lock poisoned, recovering");
+            poisoned.into_inner()
+        });
         data.remove(key);
         Ok(())
     }
 
     async fn list_keys(&self, prefix: &[u8]) -> anyhow::Result<Vec<Vec<u8>>> {
-        let data = self.data.read().unwrap();
+        let data = self.data.read().unwrap_or_else(|poisoned| {
+            warn!("Data lock poisoned, recovering");
+            poisoned.into_inner()
+        });
         let keys: Vec<Vec<u8>> = data
             .keys()
             .filter(|k| k.starts_with(prefix))
@@ -131,7 +143,10 @@ impl<B: StewardStoreBackend> StewardStore<B> {
 
         // Update cache
         {
-            let mut cache = self.cache.write().unwrap();
+            let mut cache = self.cache.write().unwrap_or_else(|poisoned| {
+                warn!("Cache lock poisoned, recovering");
+                poisoned.into_inner()
+            });
             cache.put(*steward_id, record.clone());
         }
 
@@ -145,7 +160,10 @@ impl<B: StewardStoreBackend> StewardStore<B> {
 
         // Check cache first
         {
-            let mut cache = self.cache.write().unwrap();
+            let mut cache = self.cache.write().unwrap_or_else(|poisoned| {
+                warn!("Cache lock poisoned, recovering");
+                poisoned.into_inner()
+            });
             if let Some(record) = cache.get(id_bytes) {
                 return Ok(Some(record.clone()));
             }
@@ -160,7 +178,10 @@ impl<B: StewardStoreBackend> StewardStore<B> {
 
             // Update cache
             {
-                let mut cache = self.cache.write().unwrap();
+                let mut cache = self.cache.write().unwrap_or_else(|poisoned| {
+                    warn!("Cache lock poisoned, recovering");
+                    poisoned.into_inner()
+                });
                 cache.put(*id_bytes, record.clone());
             }
 
@@ -376,7 +397,10 @@ impl<B: StewardStoreBackend> StewardStore<B> {
 
             // Remove from cache
             {
-                let mut cache = self.cache.write().unwrap();
+                let mut cache = self.cache.write().unwrap_or_else(|poisoned| {
+                    warn!("Cache lock poisoned, recovering");
+                    poisoned.into_inner()
+                });
                 cache.pop(steward_id.as_bytes());
             }
 

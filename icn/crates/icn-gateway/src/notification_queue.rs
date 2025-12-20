@@ -410,7 +410,10 @@ pub fn calculate_backoff(retries: u32) -> Duration {
 fn current_timestamp() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .expect("System time before UNIX epoch")
+        .unwrap_or_else(|e| {
+            tracing::warn!("System clock before UNIX epoch: {:?}", e);
+            std::time::Duration::ZERO
+        })
         .as_secs()
 }
 

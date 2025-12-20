@@ -7,7 +7,6 @@
 //! - DID-based peer authentication
 
 use anyhow::{Context, Result};
-use icn_identity::KeyPair;
 use quinn::{ClientConfig, Endpoint, ServerConfig};
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -82,10 +81,13 @@ impl SessionManager {
     /// Start the session manager with a QUIC endpoint
     ///
     /// This creates a QUIC endpoint bound to the given address and starts
-    /// listening for incoming connections.
+    /// listening for incoming connections using TOFU (Trust-On-First-Use) model:
+    /// - Server accepts all valid self-signed certificates
+    /// - Client accepts all valid self-signed certificates  
+    /// - Trust enforcement happens at application layer (Hello message handler)
     ///
-    /// If trust_graph is provided, enables trust-gated TLS verification where
-    /// connections from peers below min_trust_threshold are rejected.
+    /// If trust_graph is provided, it is used for application-layer trust decisions.
+    /// The min_trust_threshold parameter is currently ignored (always uses 0.0 at TLS layer).
     ///
     /// If stun_servers is provided, performs NAT traversal discovery to determine
     /// the node's public endpoint (IP and port visible from the internet).
@@ -94,7 +96,7 @@ impl SessionManager {
     /// fallback when direct connections fail.
     pub async fn start(
         &mut self,
-        keypair: &KeyPair,
+        identity_bundle: &icn_identity::IdentityBundle,
         listen_addr: SocketAddr,
         trust_graph: Option<Arc<RwLock<icn_trust::TrustGraph>>>,
         min_trust_threshold: Option<f64>,
@@ -103,13 +105,17 @@ impl SessionManager {
     ) -> Result<()> {
         info!("Session manager starting on {}", listen_addr);
 
-        let own_did = keypair.did().clone();
+        let own_did = identity_bundle.did().clone();
 
-        // Generate TLS certificate for this DID
-        let (certs, key) = tls::generate_self_signed_cert(keypair)?;
+        // Use TLS certificate from IdentityBundle (already bound to DID)
+        // This ensures the cert hash matches what's in BindingInfo
+        let certs = vec![identity_bundle.tls_cert().clone()];
+        let key = identity_bundle.tls_key();
 
-        // Create server config
+        // Create server config with TOFU trust model
+        // Identity verification happens at application layer (Hello message), not TLS layer
         let server_config = tls::create_server_config(certs.clone(), key.clone_key())?;
+
         let mut server_config = ServerConfig::with_crypto(Arc::new(
             quinn::crypto::rustls::QuicServerConfig::try_from(server_config)?,
         ));
@@ -118,13 +124,21 @@ impl SessionManager {
         let transport_config = Arc::new(create_transport_config());
         server_config.transport_config(transport_config.clone());
 
-        // Create client config with trust-gated verification if trust_graph provided
+        // Create client config with TOFU mode (trust enforcement at application layer)
+        // Always use threshold 0.0 at TLS layer to allow initial connections
+        // Trust-based access control happens in Hello message handler
         let client_config = if let Some(trust_graph) = trust_graph {
             info!(
-                "Trust-gated TLS verification enabled (min_threshold: {:?})",
+                "TOFU mode enabled - trust enforcement at application layer (requested threshold: {:?})",
                 min_trust_threshold
             );
-            tls::create_client_config(trust_graph, own_did, min_trust_threshold)?
+            tls::create_client_config(
+                certs.clone(),
+                key.clone_key(),
+                trust_graph,
+                own_did,
+                Some(0.0), // Always use TOFU mode at TLS layer
+            )?
         } else {
             // Fallback: create a permissive client config for development mode
             // Note: In production, trust_graph should always be provided
@@ -134,7 +148,13 @@ impl SessionManager {
                 Arc::new(icn_store::SledStore::temporary()?);
             let temp_trust_graph = icn_trust::TrustGraph::new(temp_store, own_did.clone());
             // Development mode uses 0.0 threshold; production should use trust_graph with proper threshold
-            tls::create_client_config(Arc::new(RwLock::new(temp_trust_graph)), own_did, Some(0.0))?
+            tls::create_client_config(
+                certs.clone(),
+                key.clone_key(),
+                Arc::new(RwLock::new(temp_trust_graph)),
+                own_did,
+                Some(0.0),
+            )?
         };
         let mut client_config = ClientConfig::new(Arc::new(
             quinn::crypto::rustls::QuicClientConfig::try_from(client_config)?,
@@ -148,28 +168,30 @@ impl SessionManager {
         info!("QUIC endpoint listening on {}", endpoint.local_addr()?);
 
         // Perform STUN discovery if enabled (NAT traversal)
-        if let Some(servers) = stun_servers {
-            info!("NAT traversal enabled - discovering public endpoint via STUN");
-            let stun_client = crate::stun::StunClient::new(servers);
-
-            // Get the UDP socket from the QUIC endpoint for STUN queries
-            // Note: We use the same socket to ensure the discovered port matches the QUIC port
-            let local_addr = endpoint.local_addr()?;
-            let socket = tokio::net::UdpSocket::bind(local_addr).await?;
-
-            match stun_client.discover_public_endpoint(&socket).await {
-                Ok(public_addr) => {
-                    info!(
-                        "✅ Discovered public endpoint: {} (local: {})",
-                        public_addr, local_addr
-                    );
-                    *self.public_endpoint.write().await = Some(public_addr);
-                }
-                Err(e) => {
-                    // Log warning but don't fail startup - node can still function on local network
-                    tracing::warn!("Failed to discover public endpoint via STUN: {}. Node will only be reachable on local network.", e);
-                }
-            }
+        // TEMPORARY FIX: Disabled due to double-bind bug
+        // TODO: Fix by either reusing endpoint's socket or binding before endpoint creation
+        if let Some(_servers) = stun_servers {
+            tracing::warn!("STUN discovery temporarily disabled due to socket reuse issue");
+            tracing::warn!("Node will only be reachable on local network until fixed");
+            // let stun_client = crate::stun::StunClient::new(servers);
+            //
+            // // BUG: This tries to bind to the same address as the QUIC endpoint above
+            // // causing "Address already in use" error
+            // let local_addr = endpoint.local_addr()?;
+            // let socket = tokio::net::UdpSocket::bind(local_addr).await?;
+            //
+            // match stun_client.discover_public_endpoint(&socket).await {
+            //     Ok(public_addr) => {
+            //         info!(
+            //             "✅ Discovered public endpoint: {} (local: {})",
+            //             public_addr, local_addr
+            //         );
+            //         *self.public_endpoint.write().await = Some(public_addr);
+            //     }
+            //     Err(e) => {
+            //         tracing::warn!("Failed to discover public endpoint via STUN: {}. Node will only be reachable on local network.", e);
+            //     }
+            // }
         }
 
         // Initialize TURN relay if configured (NAT traversal fallback)
@@ -421,11 +443,11 @@ mod tests {
         setup();
 
         let mut manager = SessionManager::new();
-        let keypair = KeyPair::generate().unwrap();
+        let identity_bundle = icn_identity::IdentityBundle::generate().unwrap();
         let addr = "127.0.0.1:0".parse().unwrap();
 
         manager
-            .start(&keypair, addr, None, None, None, None)
+            .start(&identity_bundle, addr, None, None, None, None)
             .await
             .unwrap();
 
@@ -441,11 +463,11 @@ mod tests {
 
         // Start server
         let mut server_manager = SessionManager::new();
-        let server_keypair = KeyPair::generate().unwrap();
+        let server_identity = icn_identity::IdentityBundle::generate().unwrap();
         let server_addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
 
         server_manager
-            .start(&server_keypair, server_addr, None, None, None, None)
+            .start(&server_identity, server_addr, None, None, None, None)
             .await
             .unwrap();
 
@@ -460,11 +482,11 @@ mod tests {
 
         // Start client
         let mut client_manager = SessionManager::new();
-        let client_keypair = KeyPair::generate().unwrap();
+        let client_identity = icn_identity::IdentityBundle::generate().unwrap();
         let client_addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
 
         client_manager
-            .start(&client_keypair, client_addr, None, None, None, None)
+            .start(&client_identity, client_addr, None, None, None, None)
             .await
             .unwrap();
 

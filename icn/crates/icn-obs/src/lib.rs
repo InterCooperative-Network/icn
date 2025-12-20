@@ -1,8 +1,13 @@
 //! ICN Obs - Observability (logging, metrics, tracing)
+#![allow(missing_docs)]
 
+/// Contribution attestation system
 pub mod attestation;
+/// Contribution metrics aggregation
 pub mod contribution;
+/// Health monitoring and status reporting
 pub mod health;
+/// Prometheus metrics collection
 pub mod metrics;
 
 use anyhow::{Context, Result};
