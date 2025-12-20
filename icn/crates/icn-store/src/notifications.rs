@@ -62,6 +62,7 @@ pub struct NotificationStore {
 }
 
 impl NotificationStore {
+    /// Create a new notification store with the given database
     pub fn new(db: Db) -> Self {
         Self { db }
     }

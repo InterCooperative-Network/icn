@@ -28,6 +28,7 @@ pub struct HealthStatus {
     pub timestamp: u64,
 }
 
+/// Current health state of the node
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum HealthState {

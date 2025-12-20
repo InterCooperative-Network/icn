@@ -173,15 +173,9 @@ impl TrustPolicy {
     pub fn federated() -> Self {
         let mut quotas = HashMap::new();
         // Federated: very generous read quotas
-        quotas.insert(
-            Capability::ReadLedger,
-            CapabilityQuota::new(500, 5000, 50),
-        );
+        quotas.insert(Capability::ReadLedger, CapabilityQuota::new(500, 5000, 50));
         // Federated: 500 ledger writes/min, 2000/hour, burst 50
-        quotas.insert(
-            Capability::WriteLedger,
-            CapabilityQuota::new(500, 2000, 50),
-        );
+        quotas.insert(Capability::WriteLedger, CapabilityQuota::new(500, 2000, 50));
         // Federated: 50 contract deploys/hour (expensive operation)
         quotas.insert(Capability::DeployContract, CapabilityQuota::new(10, 50, 5));
         // Federated: 200 contract executions/min

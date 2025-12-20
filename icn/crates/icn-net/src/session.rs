@@ -174,12 +174,12 @@ impl SessionManager {
             tracing::warn!("STUN discovery temporarily disabled due to socket reuse issue");
             tracing::warn!("Node will only be reachable on local network until fixed");
             // let stun_client = crate::stun::StunClient::new(servers);
-            // 
+            //
             // // BUG: This tries to bind to the same address as the QUIC endpoint above
             // // causing "Address already in use" error
             // let local_addr = endpoint.local_addr()?;
             // let socket = tokio::net::UdpSocket::bind(local_addr).await?;
-            // 
+            //
             // match stun_client.discover_public_endpoint(&socket).await {
             //     Ok(public_addr) => {
             //         info!(

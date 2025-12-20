@@ -24,11 +24,20 @@ pub enum EscrowStatus {
 #[serde(rename_all = "snake_case")]
 pub enum EscrowCondition {
     /// Requires approval from specific DID
-    RequiresApproval { did: String },
+    RequiresApproval {
+        /// DID of the approver
+        did: String,
+    },
     /// Releases after timestamp
-    TimeRelease { timestamp: u64 },
+    TimeRelease {
+        /// Unix timestamp for release
+        timestamp: u64,
+    },
     /// Requires external proof (e.g., delivery confirmation)
-    ProofRequired { proof_type: String },
+    ProofRequired {
+        /// Type of proof required
+        proof_type: String,
+    },
 }
 
 /// Escrow record

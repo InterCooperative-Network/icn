@@ -800,11 +800,7 @@ impl Ledger {
         entries.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
 
         // Apply pagination
-        let paginated: Vec<JournalEntry> = entries
-            .into_iter()
-            .skip(offset)
-            .take(limit)
-            .collect();
+        let paginated: Vec<JournalEntry> = entries.into_iter().skip(offset).take(limit).collect();
 
         Ok((paginated, total))
     }
@@ -845,11 +841,7 @@ impl Ledger {
         entries.sort_by_key(|e| e.timestamp);
 
         // Apply pagination
-        let paginated: Vec<JournalEntry> = entries
-            .into_iter()
-            .skip(offset)
-            .take(limit)
-            .collect();
+        let paginated: Vec<JournalEntry> = entries.into_iter().skip(offset).take(limit).collect();
 
         Ok((paginated, total))
     }
