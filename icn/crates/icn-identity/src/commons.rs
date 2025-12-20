@@ -373,18 +373,29 @@ pub enum HolderStatus {
 
     /// Temporarily suspended (with appeal rights)
     Suspended {
+        /// Reason for suspension
         reason: String,
+        /// Unix timestamp deadline for appeal
         appeal_deadline: u64,
+        /// Unix timestamp when suspended
         suspended_at: u64,
     },
 
     /// Voluntarily exited the commons
-    Exited { reason: String, exit_timestamp: u64 },
+    Exited {
+        /// Reason for voluntary exit
+        reason: String,
+        /// Unix timestamp of exit
+        exit_timestamp: u64,
+    },
 
     /// Revoked by network governance (serious violations)
     Revoked {
+        /// Reason for revocation
         reason: String,
+        /// Hashes of evidence supporting revocation
         evidence: Vec<[u8; 32]>,
+        /// Unix timestamp when revoked
         revoked_at: u64,
     },
 }

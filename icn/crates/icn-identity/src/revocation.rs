@@ -225,9 +225,15 @@ pub enum RevocationScope {
     /// Network-wide (affects all jurisdictions)
     Global,
     /// Within a federation
-    Federation { federation_id: JurisdictionId },
+    Federation {
+        /// Federation identifier
+        federation_id: JurisdictionId,
+    },
     /// Within a single cooperative/community
-    Jurisdiction { jurisdiction_id: JurisdictionId },
+    Jurisdiction {
+        /// Jurisdiction identifier
+        jurisdiction_id: JurisdictionId,
+    },
 }
 
 impl fmt::Display for RevocationScope {
@@ -248,24 +254,46 @@ impl fmt::Display for RevocationScope {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CommonsRevocationReason {
     /// Sybil attack detected (multiple identities)
-    SybilAttack { evidence_summary: String },
+    SybilAttack {
+        /// Summary of evidence for Sybil attack
+        evidence_summary: String,
+    },
     /// Identity fraud
-    IdentityFraud { details: String },
+    IdentityFraud {
+        /// Details of the fraud
+        details: String,
+    },
     /// Policy violation
-    PolicyViolation { policy_ref: String, details: String },
+    PolicyViolation {
+        /// Reference to violated policy
+        policy_ref: String,
+        /// Details of the violation
+        details: String,
+    },
     /// Governance decision
     GovernanceDecision {
+        /// Proposal ID from governance system
         proposal_id: String,
+        /// Outcome of the vote
         vote_outcome: String,
     },
     /// Key compromise (not punitive)
     KeyCompromise,
     /// Voluntary exit
-    VoluntaryExit { reason: String },
+    VoluntaryExit {
+        /// Reason for voluntary exit
+        reason: String,
+    },
     /// Inactive/abandoned
-    Abandoned { last_activity: u64 },
+    Abandoned {
+        /// Unix timestamp of last activity
+        last_activity: u64,
+    },
     /// Custom reason
-    Other { description: String },
+    Other {
+        /// Description of the reason
+        description: String,
+    },
 }
 
 impl fmt::Display for CommonsRevocationReason {
@@ -293,9 +321,19 @@ pub enum AppealStatus {
     /// No appeal filed
     None,
     /// Appeal pending review
-    Pending { filed_at: u64, reason: String },
+    Pending {
+        /// Unix timestamp when appeal was filed
+        filed_at: u64,
+        /// Reason for appeal
+        reason: String,
+    },
     /// Appeal denied, revocation stands
-    Denied { resolved_at: u64, notes: String },
+    Denied {
+        /// Unix timestamp when appeal was resolved
+        resolved_at: u64,
+        /// Notes explaining the denial
+        notes: String,
+    },
     /// Appeal upheld, revocation nullified
     Upheld,
 }

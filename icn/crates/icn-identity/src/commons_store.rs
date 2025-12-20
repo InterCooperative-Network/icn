@@ -22,7 +22,7 @@ use anyhow::{Context, Result};
 use lru::LruCache;
 use std::num::NonZeroUsize;
 use std::sync::{Arc, RwLock};
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 /// Storage key prefixes
 const HOLDER_PREFIX: &[u8] = b"commons/holders/";
@@ -155,7 +155,13 @@ impl<S: PersonhoodStore> CommonsHolderStore<S> {
         self.store.put(&status_key, &timestamp)?;
 
         // Update cache
-        self.cache.write().unwrap().put(*holder_id, holder.clone());
+        self.cache
+            .write()
+            .unwrap_or_else(|poisoned| {
+                warn!("Commons holder cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .put(*holder_id, holder.clone());
 
         debug!("Stored CommonsHolderRecord: {}", hex::encode(holder_id));
         Ok(())
@@ -164,7 +170,15 @@ impl<S: PersonhoodStore> CommonsHolderStore<S> {
     /// Get a CommonsHolderRecord by ID
     pub fn get(&self, holder_id: &[u8; 32]) -> Result<Option<CommonsHolderRecord>> {
         // Check cache first
-        if let Some(cached) = self.cache.write().unwrap().get(holder_id) {
+        if let Some(cached) = self
+            .cache
+            .write()
+            .unwrap_or_else(|poisoned| {
+                warn!("Commons holder cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .get(holder_id)
+        {
             return Ok(Some(cached.clone()));
         }
 
@@ -175,7 +189,13 @@ impl<S: PersonhoodStore> CommonsHolderStore<S> {
                 .context("Failed to deserialize CommonsHolderRecord")?;
 
             // Update cache
-            self.cache.write().unwrap().put(*holder_id, holder.clone());
+            self.cache
+                .write()
+                .unwrap_or_else(|poisoned| {
+                    warn!("Commons holder cache lock poisoned, recovering");
+                    poisoned.into_inner()
+                })
+                .put(*holder_id, holder.clone());
 
             return Ok(Some(holder));
         }
@@ -237,7 +257,13 @@ impl<S: PersonhoodStore> CommonsHolderStore<S> {
             self.store.delete(&status_key)?;
 
             // Remove from cache
-            self.cache.write().unwrap().pop(holder_id);
+            self.cache
+                .write()
+                .unwrap_or_else(|poisoned| {
+                    warn!("Commons holder cache lock poisoned, recovering");
+                    poisoned.into_inner()
+                })
+                .pop(holder_id);
 
             debug!("Deleted CommonsHolderRecord: {}", hex::encode(holder_id));
             return Ok(true);
@@ -369,7 +395,7 @@ impl<S: PersonhoodStore> CommonsHolderStore<S> {
             holder.status = new_status;
             holder.updated_at = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
+                .unwrap_or(std::time::Duration::from_secs(0))
                 .as_secs();
 
             // Store updated holder (will create new status index)
@@ -401,7 +427,7 @@ impl<S: PersonhoodStore> CommonsHolderStore<S> {
             let aff_key = Self::affiliation_index_key(&affiliation.jurisdiction_id, holder_id);
             let timestamp = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
+                .unwrap_or(std::time::Duration::from_secs(0))
                 .as_secs();
             self.store.put(&aff_key, &timestamp.to_le_bytes())?;
 
@@ -429,7 +455,7 @@ impl<S: PersonhoodStore> CommonsHolderStore<S> {
             holder.remove_affiliation(jurisdiction_id);
             holder.updated_at = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
+                .unwrap_or(std::time::Duration::from_secs(0))
                 .as_secs();
             self.store(&holder)?;
 
@@ -450,7 +476,7 @@ impl<S: PersonhoodStore> CommonsHolderStore<S> {
                 affiliation.membership_status = new_status;
                 holder.updated_at = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
+                    .unwrap_or(std::time::Duration::from_secs(0))
                     .as_secs();
                 self.store(&holder)?;
                 return Ok(Some(holder));
@@ -468,7 +494,7 @@ impl<S: PersonhoodStore> CommonsHolderStore<S> {
         let suspended = self.list_suspended()?;
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or(std::time::Duration::from_secs(0))
             .as_secs();
 
         let mut expired = Vec::new();
@@ -492,7 +518,7 @@ impl<S: PersonhoodStore> CommonsHolderStore<S> {
         let all = self.list_all()?;
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or(std::time::Duration::from_secs(0))
             .as_secs();
 
         let mut expired = Vec::new();
@@ -512,7 +538,13 @@ impl<S: PersonhoodStore> CommonsHolderStore<S> {
 
     /// Clear the cache
     pub fn clear_cache(&self) {
-        self.cache.write().unwrap().clear();
+        self.cache
+            .write()
+            .unwrap_or_else(|poisoned| {
+                warn!("Commons holder cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .clear();
     }
 }
 

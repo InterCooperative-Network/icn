@@ -9,7 +9,8 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, RwLock};
-use std::time::{Duration, SystemTime};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use tracing::warn;
 
 /// Health status of the ICN node
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -28,6 +29,7 @@ pub struct HealthStatus {
     pub timestamp: u64,
 }
 
+/// Current health state of the node
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum HealthState {
@@ -57,8 +59,8 @@ impl HealthService {
                 gossip_topics: 0,
                 ledger_quarantine_size: 0,
                 timestamp: SystemTime::now()
-                    .duration_since(SystemTime::UNIX_EPOCH)
-                    .unwrap()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap_or(Duration::from_secs(0))
                     .as_secs(),
             })),
             start_time: SystemTime::now(),
@@ -67,7 +69,10 @@ impl HealthService {
 
     /// Update health metrics
     pub fn update(&self, active_connections: u64, gossip_topics: u64, ledger_quarantine_size: u64) {
-        let mut status = self.inner.write().unwrap();
+        let mut status = self.inner.write().unwrap_or_else(|poisoned| {
+            warn!("Health status lock poisoned, recovering");
+            poisoned.into_inner()
+        });
 
         status.uptime_seconds = self
             .start_time
@@ -78,8 +83,8 @@ impl HealthService {
         status.gossip_topics = gossip_topics;
         status.ledger_quarantine_size = ledger_quarantine_size;
         status.timestamp = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or(Duration::from_secs(0))
             .as_secs();
 
         // Determine health state based on metrics
@@ -95,7 +100,13 @@ impl HealthService {
 
     /// Get current health status
     pub fn get_status(&self) -> HealthStatus {
-        self.inner.read().unwrap().clone()
+        self.inner
+            .read()
+            .unwrap_or_else(|poisoned| {
+                warn!("Health status lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .clone()
     }
 }
 

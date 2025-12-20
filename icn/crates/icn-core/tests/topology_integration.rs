@@ -6,6 +6,8 @@
 //! - Scope-aware gossip fanout
 //! - Trust + topology combined peer selection
 
+#![allow(dead_code, unused_imports, unused_variables)]
+
 use anyhow::Result;
 use icn_gossip::{GossipActor, Scope};
 use icn_identity::{Did, IdentityBundle, KeyPair};
@@ -394,7 +396,7 @@ async fn test_multi_region_topology() -> Result<()> {
 
     // Log which peers are missing if we didn't get all 3
     if global_peers.len() < 3 {
-        let expected = vec![&node_b.did, &node_c.did, &node_d.did];
+        let expected = [&node_b.did, &node_c.did, &node_d.did];
         let missing: Vec<_> = expected
             .iter()
             .filter(|did| !global_peers.contains(did))
