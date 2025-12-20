@@ -693,6 +693,147 @@ impl Config {
     pub fn store_path(&self) -> PathBuf {
         self.data_dir.join("store")
     }
+
+    /// Validate configuration and return a list of warnings/errors
+    ///
+    /// Returns Ok(warnings) if config is valid (warnings are non-fatal),
+    /// Returns Err(errors) if config has fatal issues.
+    pub fn validate(&self) -> Result<Vec<String>, Vec<String>> {
+        let mut warnings = Vec::new();
+        let mut errors = Vec::new();
+
+        // Gateway validation
+        if self.gateway.enabled {
+            if self.gateway.jwt_secret.is_empty() {
+                errors.push(
+                    "Gateway is enabled but jwt_secret is empty. Set via:\n  \
+                     - Config: gateway.jwt_secret = \"your-secret\"\n  \
+                     - Environment: ICN_GATEWAY_JWT_SECRET\n  \
+                     - CLI: --gateway-jwt-secret"
+                        .to_string(),
+                );
+            } else if self.gateway.jwt_secret.len() < 32 {
+                warnings.push(format!(
+                    "Gateway jwt_secret is {} bytes, recommend at least 32 bytes for security",
+                    self.gateway.jwt_secret.len()
+                ));
+            }
+
+            if self.gateway.bind_addr.starts_with("0.0.0.0") {
+                warnings.push(
+                    "Gateway binding to 0.0.0.0 - ensure proper firewall/reverse proxy in production"
+                        .to_string(),
+                );
+            }
+        }
+
+        // Network validation
+        if self.network.listen_addr.is_empty() {
+            errors.push("network.listen_addr cannot be empty".to_string());
+        }
+
+        if self.network.min_trust_threshold < 0.0 || self.network.min_trust_threshold > 1.0 {
+            errors.push(format!(
+                "network.min_trust_threshold must be 0.0-1.0, got {}",
+                self.network.min_trust_threshold
+            ));
+        }
+
+        // Trust threshold warnings
+        if self.network.min_trust_threshold == 0.0 {
+            warnings.push(
+                "network.min_trust_threshold is 0.0 - trust-gated TLS is disabled, \
+                 all authenticated DIDs will be accepted"
+                    .to_string(),
+            );
+        }
+
+        // Federation validation
+        if self.federation.enabled {
+            if self.federation.coop_id.is_empty() {
+                warnings.push(
+                    "Federation enabled but coop_id is empty - will be derived from network_name"
+                        .to_string(),
+                );
+            }
+
+            if self.federation.bootstrap_peer_trust < 0.0
+                || self.federation.bootstrap_peer_trust > 1.0
+            {
+                errors.push(format!(
+                    "federation.bootstrap_peer_trust must be 0.0-1.0, got {}",
+                    self.federation.bootstrap_peer_trust
+                ));
+            }
+        }
+
+        // Privacy validation
+        if self.privacy.enabled && self.privacy.onion_routing_enabled {
+            if self.privacy.onion_hops < 2 {
+                warnings.push(format!(
+                    "privacy.onion_hops is {} - recommend at least 2 for meaningful anonymity",
+                    self.privacy.onion_hops
+                ));
+            }
+            if self.privacy.onion_hops > 5 {
+                warnings.push(format!(
+                    "privacy.onion_hops is {} - high latency expected, consider reducing",
+                    self.privacy.onion_hops
+                ));
+            }
+        }
+
+        // Steward validation
+        if self.steward.enabled {
+            if self.steward.vui_threshold > self.steward.vui_total_shares {
+                errors.push(format!(
+                    "steward.vui_threshold ({}) cannot exceed vui_total_shares ({})",
+                    self.steward.vui_threshold, self.steward.vui_total_shares
+                ));
+            }
+            if self.steward.vui_threshold < 2 {
+                warnings.push(
+                    "steward.vui_threshold < 2 provides no threshold security".to_string(),
+                );
+            }
+        }
+
+        // Rate limiting validation
+        if self.rate_limiting.enabled && self.rate_limiting.refill_interval_ms == 0 {
+            errors.push("rate_limiting.refill_interval_ms cannot be 0".to_string());
+        }
+
+        // Topology validation
+        if self.topology.fanout.local_cluster == 0 {
+            errors.push("topology.fanout.local_cluster cannot be 0".to_string());
+        }
+
+        if errors.is_empty() {
+            Ok(warnings)
+        } else {
+            Err(errors)
+        }
+    }
+
+    /// Print validation results to stderr with formatting
+    pub fn print_validation_results(&self) {
+        match self.validate() {
+            Ok(warnings) => {
+                for warning in warnings {
+                    eprintln!("\x1b[33mWarning:\x1b[0m {}", warning);
+                }
+            }
+            Err(errors) => {
+                for error in &errors {
+                    eprintln!("\x1b[31mError:\x1b[0m {}", error);
+                }
+                eprintln!(
+                    "\n\x1b[31mConfiguration has {} error(s). Fix them before starting.\x1b[0m",
+                    errors.len()
+                );
+            }
+        }
+    }
 }
 
 /// Supervisor configuration for background tasks and timeouts (A5 fix)
@@ -1194,5 +1335,72 @@ log_level = "info"
             .rate_limiting
             .to_trust_gated_config(config.network.min_trust_threshold);
         assert!((trust_gated.min_trust_threshold - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_config_validation_default_passes() {
+        let config = Config::default();
+        let result = config.validate();
+        // Default config should pass validation (may have warnings)
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_config_validation_gateway_jwt_required() {
+        let mut config = Config::default();
+        config.gateway.enabled = true;
+        config.gateway.jwt_secret = String::new();
+
+        let result = config.validate();
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors.iter().any(|e| e.contains("jwt_secret")));
+    }
+
+    #[test]
+    fn test_config_validation_gateway_jwt_short_warning() {
+        let mut config = Config::default();
+        config.gateway.enabled = true;
+        config.gateway.jwt_secret = "short".to_string();
+
+        let result = config.validate();
+        assert!(result.is_ok());
+        let warnings = result.unwrap();
+        assert!(warnings.iter().any(|w| w.contains("32 bytes")));
+    }
+
+    #[test]
+    fn test_config_validation_steward_threshold() {
+        let mut config = Config::default();
+        config.steward.enabled = true;
+        config.steward.vui_threshold = 10;
+        config.steward.vui_total_shares = 5;
+
+        let result = config.validate();
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors.iter().any(|e| e.contains("vui_threshold")));
+    }
+
+    #[test]
+    fn test_config_validation_trust_threshold_range() {
+        let mut config = Config::default();
+        config.network.min_trust_threshold = 1.5;
+
+        let result = config.validate();
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors.iter().any(|e| e.contains("min_trust_threshold")));
+    }
+
+    #[test]
+    fn test_config_validation_zero_trust_warning() {
+        let mut config = Config::default();
+        config.network.min_trust_threshold = 0.0;
+
+        let result = config.validate();
+        assert!(result.is_ok());
+        let warnings = result.unwrap();
+        assert!(warnings.iter().any(|w| w.contains("trust-gated TLS is disabled")));
     }
 }

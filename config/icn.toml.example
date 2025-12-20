@@ -1,626 +1,273 @@
-# ICN Configuration Example
-# This file demonstrates all available configuration options.
-# Copy to ~/.icn/icn.toml or specify with --config flag.
+# ICN Daemon Configuration
+# =========================
+# Copy this file to icn.toml and customize for your deployment.
+# All values shown are defaults unless noted otherwise.
+#
+# Environment variable overrides:
+#   ICN_GATEWAY_JWT_SECRET - Gateway JWT signing key (required if gateway enabled)
+#   ICN_KEYSTORE_PASSPHRASE - Keystore unlock passphrase
+#   ICN_SKIP_CORS - Skip CORS validation (development only)
 
-# ============================================================================
-# Node Configuration
-# ============================================================================
+# Data directory for ICN state (keystore, ledger, gossip data)
+data_dir = "~/.icn"
 
-# Data directory for node state, keystore, and databases
-# Default: ~/.icn
-data_dir = "/home/user/.icn"
-
-# ============================================================================
-# Network Configuration
-# ============================================================================
-
+# =============================================================================
+# NETWORK CONFIGURATION
+# =============================================================================
 [network]
+# Enable mDNS local network discovery
+mdns_enabled = true
 
-# QUIC listener address for peer-to-peer connections
-# Format: "IP:PORT" - Port is UDP
-# Default: "0.0.0.0:7777"
+# QUIC/TLS listen address (format: "IP:PORT")
 listen_addr = "0.0.0.0:7777"
 
 # RPC (JSON-RPC over HTTP) listen port
-# Used by icnctl to control the daemon
-# Default: 5601
 rpc_port = 5601
 
-# Enable mDNS for automatic local network peer discovery
-# Set to false for WAN-only deployments
-# Default: true
-mdns_enabled = true
+# Bootstrap rendezvous endpoints (format: "icn://DID@IP:PORT")
+# Leave empty for isolated local network, or add known peers
+bootstrap_peers = [
+    # "icn://did:icn:z6MkExample@192.168.1.100:7777",
+]
 
-# Bootstrap peers for initial network connectivity (WAN seed nodes)
-# Format: ["icn://did:icn:PEER_DID@IP:PORT"]
-# Note: Currently only IP addresses are supported (DNS hostnames will be added later)
-# Default: []
-bootstrap_peers = []
+# STUN servers for NAT traversal (multiple servers enable majority vote)
+stun_servers = [
+    "stun.l.google.com:19302",
+    "stun1.l.google.com:19302",
+]
 
-# Example bootstrap configuration (commented out):
-# bootstrap_peers = [
-#     "icn://did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK@203.0.113.50:7777",
-#     "icn://did:icn:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH@203.0.113.51:7777"
-# ]
-
-# Minimum trust score required for TLS connection acceptance (0.0 to 1.0)
-# This setting controls trust-gated TLS verification at the transport layer:
-#   0.0 = Accept all authenticated DIDs (trust-gated TLS disabled)
-#   0.1 = Require "Known" trust class (at least one trust edge)
-#   0.4 = Require "Partner" trust class
-#   0.7 = Require "Federated" trust class
-# 
-# Recommendation:
-#   - Development/testing: 0.0 (allows easy local testing)
-#   - Controlled cooperative networks: 0.0 (if all nodes are pre-authorized)
-#   - Public networks: 0.1 or higher (protect against untrusted connections)
-# 
-# Note: This is separate from rate limiting thresholds. Even with 0.0, you still
-# get DID-TLS binding (cryptographic authentication), just without trust-based rejection.
-# 
-# Default: 0.1
+# Minimum trust score for TLS connection acceptance (0.0 to 1.0)
+# - 0.0 = Accept all authenticated DIDs (trust-gating disabled)
+# - 0.1 = Require at least "Known" trust class
+# - 0.4 = Require "Partner" trust class
 min_trust_threshold = 0.1
 
-# ============================================================================
-# Observability Configuration
-# ============================================================================
+# TURN relay configuration (optional, for symmetric NAT fallback)
+# turn_server = "turn.example.com:3478"
+# turn_username = "icn"
+# turn_password = "secret"
 
+# =============================================================================
+# OBSERVABILITY
+# =============================================================================
 [observability]
-
-# Prometheus metrics exporter port (HTTP)
-# Metrics exposed at http://0.0.0.0:<port>/metrics
-# Default: 9100
+# Prometheus metrics server port
 metrics_port = 9100
 
-# Health check endpoint port (HTTP)
-# Health status at http://0.0.0.0:<port>/health
-# Default: 8080
+# Health check server port
 health_port = 8080
 
-# Log level for structured logging
-# Options: "trace", "debug", "info", "warn", "error"
-# Default: "info"
+# Log level: trace, debug, info, warn, error
 log_level = "info"
 
-# ============================================================================
-# Rate Limiting Configuration (Trust-Gated)
-# ============================================================================
-# Trust-gated rate limiting provides different message rate limits based on
-# peer trust classification. This protects against DoS attacks while allowing
-# trusted peers higher throughput.
-
+# =============================================================================
+# RATE LIMITING (Trust-Gated)
+# =============================================================================
 [rate_limiting]
-
 # Enable trust-gated rate limiting
-# Default: true
 enabled = true
 
-# Token bucket refill interval (milliseconds)
-# How often tokens are added back to peer buckets
-# Default: 100
+# Token bucket refill interval in milliseconds
 refill_interval_ms = 100
 
-# Rate limits for Isolated peers (trust score 0.0 - 0.1)
-# These are untrusted or newly connected peers
+# Rate limits for isolated peers (trust score < 0.1)
 [rate_limiting.isolated]
 max_messages_per_second = 10
 burst_capacity = 2
 
-# Rate limits for Known peers (trust score 0.1 - 0.4)
-# These have basic trust but limited history
+# Rate limits for known peers (trust score 0.1-0.4)
 [rate_limiting.known]
 max_messages_per_second = 50
 burst_capacity = 10
 
-# Rate limits for Partner peers (trust score 0.4 - 0.7)
-# These are trusted collaborators
+# Rate limits for partner peers (trust score 0.4-0.7)
 [rate_limiting.partner]
 max_messages_per_second = 100
 burst_capacity = 20
 
-# Rate limits for Federated peers (trust score 0.7 - 1.0)
-# These are highly trusted federation members
+# Rate limits for federated peers (trust score 0.7+)
 [rate_limiting.federated]
 max_messages_per_second = 200
 burst_capacity = 50
 
-# Fallback rate limits when trust graph is unavailable
-# Used during startup or if trust computation fails
+# Fallback rate limit when trust graph unavailable
 [rate_limiting.fallback]
 max_messages_per_second = 100
 burst_capacity = 20
 
-# ============================================================================
-# Topology Configuration (Regional/Cluster-Based Federation)
-# ============================================================================
-# Topology-aware networking enables efficient regional and cluster-based
-# message routing. Nodes categorize peers based on geographic/logical location
-# and trust scores, optimizing gossip propagation.
-
+# =============================================================================
+# TOPOLOGY (Regional/Cluster-Based Networking)
+# =============================================================================
 [topology]
-
-# Geographic region identifier
-# Used to group nodes into regional clusters for efficient routing
-# Examples: "us-west", "eu-central", "ap-southeast"
-# Default: "" (topology disabled)
-region = "us-west"
+# Geographic region for this node
+region = "default"
 
 # Cluster identifier within the region
-# Groups nodes that should coordinate tightly (e.g., same data center)
-# Examples: "sfo-1", "lax-2", "pdx-1"
-# Default: "" (topology disabled)
-cluster_id = "sfo-1"
+cluster_id = "default"
 
-# Node role in the network topology
-# Options:
-#   - "edge": Regular node (default)
-#   - "rendezvous": Bootstrap/discovery hub
-#   - "archive": Long-term storage node
-# Default: "edge"
+# Node role: "edge", "rendezvous", or "archive"
 role = "edge"
 
-# Neighbor set size limits (prevents unbounded memory usage)
-# These limits are enforced per category with LRU eviction
-[topology.neighbor_limits]
-
-# Maximum local cluster neighbors (same region + cluster_id)
-# These are the tightest coordinated peers
-# Default: 50
-max_local_cluster = 50
-
-# Maximum regional neighbors (same region, different cluster)
-# Cross-cluster peers within the same geographic region
-# Default: 30
-max_regional = 30
-
-# Maximum backbone neighbors (different region)
-# Cross-regional connectivity for global propagation
-# Default: 20
-max_backbone = 20
-
-# Maximum trusted neighbors (high trust score >= 0.7)
-# Highly trusted peers override location limits
-# Default: 100
-max_trusted = 100
-
-# Gossip fanout configuration per scope
-# Controls how many peers receive each gossip message
+# Gossip fanout configuration (how many peers to forward to)
 [topology.fanout]
+local_cluster = 8  # Fanout within same cluster
+regional = 6       # Fanout to regional peers
+global = 4         # Fanout to global/backbone peers
 
-# Local cluster fanout (tight coordination)
-# Higher fanout ensures fast convergence within cluster
-# Default: 8
-local_cluster = 8
+# Maximum neighbors per topology tier
+[topology.neighbor_limits]
+max_local_cluster = 50
+max_regional = 30
+max_backbone = 20
+max_trusted = 10
 
-# Regional fanout (cross-cluster sync)
-# Medium fanout balances latency and bandwidth
-# Default: 6
-regional = 6
-
-# Global fanout (cross-regional propagation)
-# Lower fanout minimizes WAN traffic
-# Default: 4
-global = 4
-
-# ============================================================================
-# Topology Configuration Examples
-# ============================================================================
-#
-# Example 1: Edge node in US West, San Francisco cluster
-# [topology]
-# region = "us-west"
-# cluster_id = "sfo-1"
-# role = "edge"
-#
-# Example 2: Rendezvous node in EU Central (no specific cluster)
-# [topology]
-# region = "eu-central"
-# cluster_id = "hub-1"
-# role = "rendezvous"
-#
-# Example 3: Archive node for long-term storage
-# [topology]
-# region = "us-east"
-# cluster_id = "nyc-archive"
-# role = "archive"
-#
-# To disable topology-aware networking, omit the [topology] section entirely
-# or set region = "" and cluster_id = "".
-
-# ============================================================================
-# Federation Configuration (Cross-Network Connectivity)
-# ============================================================================
-# Federation enables nodes from different cooperatives or networks to discover
-# each other and exchange gossip. This is essential for connecting isolated
-# networks into a larger ecosystem.
-
-[federation]
-
-# Enable federation features
-# When enabled, this node will:
-#   - Accept connections from federated networks
-#   - Share gossip with trusted peers from other networks
-#   - Potentially forward messages between networks
-# Default: false
-enabled = false
-
-# Network name for identification
-# Nodes with the same network name will preferentially connect
-# Use unique names for private networks, "icn-mainnet" for public
-# Default: "icn-mainnet"
-network_name = "icn-mainnet"
-
-# Initial trust score assigned to bootstrap peers
-# Range: 0.0 to 1.0
-#   - 0.1-0.3: Minimal trust (can send gossip but limited bandwidth)
-#   - 0.3-0.5: Moderate trust (standard operations)
-#   - 0.5-0.7: High trust (can introduce new peers)
-# Default: 0.3
-bootstrap_peer_trust = 0.3
-
-# Automatically accept federation invites from trusted peers
-# When true, peers with trust >= min_invite_trust can add this node
-# to their network without manual approval
-# Default: false (requires manual approval via CLI)
-auto_accept_invites = false
-
-# Minimum trust score required to accept automatic invites
-# Only used when auto_accept_invites = true
-# Range: 0.0 to 1.0
-# Default: 0.5
-min_invite_trust = 0.5
-
-# Maximum number of federated networks to join
-# Prevents resource exhaustion from joining too many networks
-# Default: 10
-max_federations = 10
-
-# Announce this node's public address to federation peers
-# Set to false if behind NAT without proper port forwarding
-# When false, this node can initiate connections but not receive them
-# Default: true
-announce_public_addr = true
-
-# Connection retry settings for federation peers
-[federation.retry]
-
-# Maximum number of connection retry attempts before giving up
-# After max_retries failures, the peer is marked as unreachable
-# Default: 5
-max_retries = 5
-
-# Initial retry delay in seconds (exponential backoff)
-# Delay doubles with each retry: 1s, 2s, 4s, 8s, ...
-# Default: 1
-initial_delay_secs = 1
-
-# Maximum retry delay in seconds
-# Exponential backoff caps at this value
-# Default: 60
-max_delay_secs = 60
-
-# Reconnect interval for established peers that disconnect
-# After a peer disconnects, wait this long before reconnecting
-# Default: 30
-reconnect_interval_secs = 30
-
-# ============================================================================
-# Federation Configuration Examples
-# ============================================================================
-#
-# Example 1: Private cooperative network (no external federation)
-# [federation]
-# enabled = false
-#
-# Example 2: Public network node accepting federation
-# [federation]
-# enabled = true
-# network_name = "icn-mainnet"
-# bootstrap_peer_trust = 0.3
-# auto_accept_invites = true
-# min_invite_trust = 0.6
-#
-# Example 3: Node behind NAT (outbound-only connections)
-# [federation]
-# enabled = true
-# announce_public_addr = false
-#
-# Example 4: High-availability federation node
-# [federation]
-# enabled = true
-# max_federations = 20
-# [federation.retry]
-# max_retries = 10
-# initial_delay_secs = 1
-# max_delay_secs = 120
-# reconnect_interval_secs = 15
-
-# ============================================================================
-# Gateway API Configuration (REST + WebSocket)
-# ============================================================================
-# The Gateway provides a REST API and WebSocket interface for cooperative
-# applications to interact with the ICN node. It includes JWT authentication,
-# rate limiting, and scope-based authorization.
-
+# =============================================================================
+# GATEWAY API (REST + WebSocket)
+# =============================================================================
 [gateway]
-
-# Enable the gateway API server
-# Default: false (disabled - opt-in for security)
+# Enable the Gateway API server
+# Default: false (opt-in)
 enabled = false
 
-# HTTP bind address for the gateway
-# Format: "IP:PORT"
-# Use "127.0.0.1:8080" for local-only access (recommended for development)
-# Use "0.0.0.0:8080" for external access (use with reverse proxy in production)
-# Default: "127.0.0.1:8080"
+# Gateway HTTP bind address
+# Use 127.0.0.1 for local development, 0.0.0.0 for production (with reverse proxy)
 bind_addr = "127.0.0.1:8080"
 
 # JWT token expiration time in hours
-# Tokens must be refreshed after this period
-# Default: 24
 token_expiry_hours = 24
 
-# Challenge TTL in minutes
-# Authentication challenges expire after this period
-# Default: 5
+# Challenge TTL in minutes (how long DID auth challenges are valid)
 challenge_ttl_minutes = 5
 
-# JWT secret key for token signing
-# SECURITY: MUST be set before enabling gateway!
-# Options:
-#   1. Set via config (not recommended for production)
-#   2. Set via ICN_GATEWAY_JWT_SECRET environment variable (recommended)
-#   3. Set via --gateway-jwt-secret CLI argument
-# Generate a strong secret: openssl rand -base64 32
-# Default: "" (gateway fails to start if empty)
+# JWT secret key for signing tokens
+# REQUIRED if gateway is enabled. Options:
+#   1. Set here: jwt_secret = "your-strong-secret-32-chars-min"
+#   2. Environment: export ICN_GATEWAY_JWT_SECRET="your-secret"
+#   3. CLI: --gateway-jwt-secret "your-secret"
 jwt_secret = ""
 
-# Gateway rate limiting configuration
-# Per-DID token bucket algorithm prevents API abuse
-[gateway.rate_limiting]
+# =============================================================================
+# FEDERATION (Cross-Cooperative Connectivity)
+# =============================================================================
+[federation]
+# Enable federation features
+enabled = false
 
-# Maximum tokens in bucket (burst capacity)
-# Higher values allow larger request bursts
-# Default: 100
-capacity = 100
+# Cooperative identifier (unique in the federation)
+coop_id = ""
 
-# Tokens refilled per second (sustained rate)
-# 10 tokens/sec = 600 requests/minute sustained
-# Default: 10
-refill_rate = 10
+# Human-readable cooperative name
+coop_name = ""
 
-# Tokens consumed per request
-# Default: 1
-cost_per_request = 1
+# Federation network name (nodes with same name preferentially connect)
+network_name = "icn-mainnet"
 
-# ============================================================================
-# Gateway Configuration Examples
-# ============================================================================
-#
-# Example 1: Development setup (local only)
-# [gateway]
-# enabled = true
-# bind_addr = "127.0.0.1:8080"
-# jwt_secret = "dev-secret-change-in-production"
-#
-# Example 2: Production with environment variable
-# [gateway]
-# enabled = true
-# bind_addr = "0.0.0.0:8080"  # Behind reverse proxy
-# token_expiry_hours = 12     # Shorter token lifetime
-# # JWT secret loaded from ICN_GATEWAY_JWT_SECRET env var
-#
-# Example 3: High-security configuration
-# [gateway]
-# enabled = true
-# bind_addr = "127.0.0.1:8080"  # Local only, accessed via Unix socket proxy
-# token_expiry_hours = 1        # Very short token lifetime
-# challenge_ttl_minutes = 2     # Fast challenge expiry
-#
-# Example 4: Custom rate limiting
-# [gateway.rate_limiting]
-# capacity = 50           # Lower burst for stricter control
-# refill_rate = 5         # 300 requests/minute sustained
-# cost_per_request = 1
+# Initial trust score for bootstrap peers (0.0 to 1.0)
+bootstrap_peer_trust = 0.3
 
-# ============================================================================
-# Privacy Configuration (Metadata Protection)
-# ============================================================================
-# Privacy features provide metadata protection through onion routing,
-# topic encryption, and traffic obfuscation. These features add latency
-# but significantly improve privacy for sensitive communications.
+# Auto-accept federation invites from trusted peers
+auto_accept_invites = false
 
+# Minimum trust score to auto-accept invites
+min_invite_trust = 0.5
+
+# Maximum federated networks to join
+max_federations = 10
+
+# Announce public address to federation peers
+announce_public_addr = true
+
+# Connection retry settings
+[federation.retry]
+max_retries = 5
+initial_delay_secs = 1
+max_delay_secs = 60
+reconnect_interval_secs = 30
+
+# =============================================================================
+# PRIVACY (Onion Routing & Metadata Protection)
+# =============================================================================
 [privacy]
-
 # Enable privacy features
-# Default: false (disabled - opt-in due to performance impact)
 enabled = false
 
 # Enable onion routing for anonymous message delivery
-# Messages are routed through multiple relay nodes to hide sender/receiver
-# Adds latency but provides strong sender/receiver anonymity
-# Default: false
 onion_routing_enabled = false
 
-# Number of relay hops for onion routing
-# More hops = stronger privacy but higher latency
-# Recommended: 2-5 hops
-# Default: 2
+# Number of relay hops (2-5 recommended, more = more privacy, higher latency)
 onion_hops = 2
 
-# Minimum trust score for relay node selection
-# Higher values = fewer available relays but more trusted
-# Range: 0.0 to 1.0
-# Default: 0.3
+# Minimum trust score for relay selection (0.0 to 1.0)
 min_relay_trust = 0.3
 
 # Enable topic name encryption
-# Topic names are encrypted so observers can't see subscriptions
-# Requires all participants to share topic key
-# Default: false
 topic_encryption_enabled = false
 
 # Enable traffic obfuscation (padding, delays, cover traffic)
-# Hides traffic patterns that could reveal activity
-# Default: false
 traffic_obfuscation_enabled = false
 
-# Message padding target size (bytes)
-# Messages are padded to this size to hide actual content length
-# Set to 0 to disable padding
-# Default: 0 (disabled)
+# Message padding target size in bytes (0 = disabled)
 padding_target = 0
 
-# Maximum random delay for messages (milliseconds)
-# Adds random delay to hide timing patterns
-# Set to 0 to disable delays
-# Default: 0 (disabled)
+# Maximum random delay in milliseconds (0 = disabled)
 max_delay_ms = 0
 
-# Cover traffic rate (messages per minute)
-# Generates decoy traffic to hide real activity patterns
-# Set to 0 to disable cover traffic
-# Default: 0 (disabled)
+# Cover traffic rate (messages per minute, 0 = disabled)
 cover_traffic_rate = 0
 
-# ============================================================================
-# Privacy Configuration Examples
-# ============================================================================
-#
-# Example 1: Basic privacy (onion routing only)
-# [privacy]
-# enabled = true
-# onion_routing_enabled = true
-# onion_hops = 2
-# min_relay_trust = 0.3
-#
-# Example 2: Strong privacy (all features)
-# [privacy]
-# enabled = true
-# onion_routing_enabled = true
-# onion_hops = 4
-# min_relay_trust = 0.5
-# topic_encryption_enabled = true
-# traffic_obfuscation_enabled = true
-# padding_target = 4096
-# max_delay_ms = 500
-# cover_traffic_rate = 10
-#
-# Example 3: Performance-balanced privacy
-# [privacy]
-# enabled = true
-# onion_routing_enabled = true
-# onion_hops = 2  # Minimal hops for lower latency
-# topic_encryption_enabled = true  # Low overhead
-# # No traffic obfuscation for better performance
-
-# ============================================================================
-# Cooperative Configuration
-# ============================================================================
-# Cooperative-specific settings for identity and financial operations.
-
+# =============================================================================
+# COOPERATIVE SETTINGS
+# =============================================================================
 [cooperative]
+# Treasury DID for this cooperative (receives fees, issues credits)
+# treasury_did = "did:icn:z6MkTreasury..."
 
-# Treasury DID for the cooperative
-# This DID is used as the source for governance budget payouts and other
-# financial operations that should come from the cooperative's shared funds.
-# If not set, the node's own DID will be used as a fallback.
-# Format: "did:icn:<base58-pubkey>"
-# Default: not set (uses node DID)
-# treasury_did = "did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK"
-
-# Cooperative display name (human-readable)
-# Default: not set
-# name = "Food Cooperative"
+# Cooperative name
+# name = "My Cooperative"
 
 # Cooperative description
-# Default: not set
-# description = "A community food cooperative serving the local area"
+# description = "A cooperative for..."
 
-# ============================================================================
-# Cooperative Configuration Examples
-# ============================================================================
-#
-# Example 1: Cooperative with dedicated treasury
-# [cooperative]
-# treasury_did = "did:icn:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH"
-# name = "Worker-Owned Tech Coop"
-# description = "Employee-owned software development cooperative"
-#
-# Example 2: Simple setup (uses node DID for treasury)
-# [cooperative]
-# name = "Local Time Bank"
-# # treasury_did not set - budget payouts use node DID
-#
-# Example 3: Federated cooperative
-# [cooperative]
-# treasury_did = "did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK"
-# name = "Regional Food Network"
-# description = "Federation of local food cooperatives"
+# =============================================================================
+# STEWARD (SDIS Steward Network)
+# =============================================================================
+[steward]
+# Enable steward functionality (identity verification network)
+enabled = false
 
-# ============================================================================
-# PLANNED FEATURES (Not Yet Implemented)
-# ============================================================================
-# The following sections are shown for completeness but are not yet supported.
-# They will be implemented in future releases.
+# VUI threshold - minimum stewards for VUI computation (t in t-of-n)
+vui_threshold = 3
 
-# [identity]
-# # DID for this node (auto-generated if not specified)
-# did = "did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK"
-#
-# # Key rotation grace period (seconds)
-# rotation_grace_period = 86400  # 24 hours
+# Total stewards holding pepper shares (n in t-of-n)
+vui_total_shares = 5
 
-# [rpc]
-# # JSON-RPC over HTTP listener address
-# # Default: "0.0.0.0:5050"
-# listen_addr = "0.0.0.0:5050"
-#
-# # Enable TLS for RPC endpoint
-# # Default: false (uses HTTP in development)
-# tls_enabled = false
+# Maximum concurrent enrollment ceremonies
+max_concurrent_enrollments = 100
 
-# [trust]
-# # Trust computation policy
-# # Options: "default", "strict", "permissive"
-# # Default: "default"
-# policy = "default"
-#
-# # Trust score thresholds for access classes
-# [trust.thresholds]
-# isolated = 0.0   # Untrusted
-# known = 0.1      # Basic interaction
-# partner = 0.4    # Trusted collaboration
-# federated = 0.7  # Full cooperation
+# Maximum concurrent recovery ceremonies
+max_concurrent_recoveries = 50
 
-# [gossip]
-# # Maximum entries per topic (prevents unbounded growth)
-# # Default: 1000
-# max_entries_per_topic = 1000
-#
-# # Compression threshold (bytes)
-# # Entries larger than this are compressed with zstd
-# # Default: 1024 (1KB)
-# compression_threshold = 1024
-#
-# # Anti-entropy digest interval (milliseconds)
-# # Default: 10000 (10 seconds)
-# digest_interval_ms = 10000
+# Token validity period in seconds (default: 7 days)
+token_validity_secs = 604800
 
-# [ledger]
-# # Quarantine conflicting entries instead of rejecting
-# # Default: true
-# merge_quarantine_on_conflict = true
-#
-# # Maximum journal entries before compaction
-# # Default: 10000
-# max_journal_size = 10000
+# =============================================================================
+# SUPERVISOR (Background Tasks & Timeouts)
+# =============================================================================
+[supervisor]
+# Candidate cache cleanup interval in seconds
+candidate_cleanup_interval_secs = 300
 
-# [contracts]
-# # Maximum fuel per contract execution
-# # Default: 1000000
-# max_fuel = 1000000
-#
-# # Maximum expression depth (prevents stack overflow)
-# # Default: 50
-# max_expression_depth = 50
+# Delay before requesting peer exchange in milliseconds
+peer_exchange_delay_ms = 500
+
+# Maximum peers to request in peer exchange
+peer_exchange_max_peers = 50
+
+# Metrics update interval in seconds
+metrics_update_interval_secs = 10
+
+# Graceful shutdown timeout in seconds
+shutdown_timeout_secs = 5
+
+# Clock synchronization interval in seconds
+clock_sync_interval_secs = 600
