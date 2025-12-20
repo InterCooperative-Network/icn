@@ -3,12 +3,16 @@
 use anyhow::Result;
 use icn_coop::{CoopActor, CoopHandle, CoopStore};
 use icn_gossip::GossipActor;
+use icn_identity::Did;
 use icn_store::SledStore;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::info;
+use tracing::{info, warn};
 
 use crate::config::Config;
+
+/// Topic for cooperative state updates
+pub const COOP_UPDATES_TOPIC: &str = "coop:updates";
 
 /// Services provided by cooperative layer
 pub struct CoopServices {
@@ -27,12 +31,14 @@ pub struct CoopServices {
 /// # Arguments
 /// * `config` - Configuration with storage path
 /// * `gossip_handle` - Handle to gossip actor for distributed sync
+/// * `node_did` - The DID of this node for gossip subscriptions
 ///
 /// # Returns
 /// CoopServices containing handle and store references
 pub async fn init_coop_services(
     config: &Config,
-    _gossip_handle: Arc<RwLock<GossipActor>>, // TODO: Wire up gossip sync
+    gossip_handle: Arc<RwLock<GossipActor>>,
+    node_did: Did,
 ) -> Result<CoopServices> {
     info!("Initializing cooperative services");
 
@@ -49,16 +55,17 @@ pub async fn init_coop_services(
 
     // Subscribe to gossip topic for distributed cooperative updates
     // This allows coops created on one node to sync to others
-    // Note: We need a DID for subscription - use node's DID from config or identity
-    // For now, skip gossip subscription and add it later when we wire up the notification handler
-    // {
-    //     let mut gossip = gossip_handle.write().await;
-    //     gossip.subscribe("coop:updates", node_did)?;
-    // }
-    info!("Note: Gossip subscription for coop:updates will be added in next iteration");
+    {
+        let mut gossip = gossip_handle.write().await;
+        if let Err(e) = gossip.subscribe(COOP_UPDATES_TOPIC, node_did) {
+            warn!("Failed to subscribe to coop:updates topic: {}", e);
+        } else {
+            info!("Subscribed to coop:updates topic");
+        }
+    }
 
-    // Spawn CoopActor with store (gossip integration pending)
-    let tx = CoopActor::spawn(coop_store, None);
+    // Spawn CoopActor with store and gossip handle for distributed sync
+    let tx = CoopActor::spawn(coop_store, Some(gossip_handle));
     let coop_handle = CoopHandle::new(tx);
 
     info!("✓ Cooperative actor spawned");

@@ -23,7 +23,7 @@ impl ActorCoopManager {
     /// Create a new cooperative
     pub async fn create_coop(
         &self,
-        _id: CoopId,
+        id: CoopId,
         name: String,
         owner: Did,
         _timestamp: u64,
@@ -32,20 +32,17 @@ impl ActorCoopManager {
         // For now, default to Worker type
         let coop_type = icn_coop::CoopType::Worker;
 
-        // Create cooperative via actor
+        // Create cooperative via actor with the provided ID
         let _coop = self
             .handle
-            .create_cooperative(name, coop_type, owner)
+            .create_cooperative(Some(id), name, coop_type, owner)
             .await
             .map_err(|e| GatewayError::InternalError(format!("CoopActor error: {e}")))?;
 
-        // Note: The actor generates its own ID, but gateway wants to use provided ID
-        // TODO: Update CoopActor to accept optional ID parameter
-        
         Ok(())
     }
 
-    /// Get a cooperative
+    /// Get a cooperative with members
     pub async fn get_coop(&self, id: &CoopId) -> Result<Coop> {
         let actor_coop = self
             .handle
@@ -53,11 +50,18 @@ impl ActorCoopManager {
             .await
             .map_err(|e| GatewayError::NotFound(format!("Coop not found: {e}")))?;
 
-        // Convert icn-coop::Cooperative to gateway::Coop
-        Ok(convert_to_gateway_coop(actor_coop))
+        // Query members for this coop
+        let members = self
+            .handle
+            .list_members(id.clone())
+            .await
+            .unwrap_or_default();
+
+        // Convert with actual members
+        Ok(convert_to_gateway_coop_with_members(actor_coop, members))
     }
 
-    /// List all cooperatives
+    /// List all cooperatives with members
     pub async fn list_coops(&self) -> Result<Vec<Coop>> {
         let actor_coops = self
             .handle
@@ -65,15 +69,26 @@ impl ActorCoopManager {
             .await
             .map_err(|e| GatewayError::InternalError(format!("CoopActor error: {e}")))?;
 
-        Ok(actor_coops.into_iter().map(convert_to_gateway_coop).collect())
+        // For each coop, query its members
+        let mut coops = Vec::with_capacity(actor_coops.len());
+        for actor_coop in actor_coops {
+            let members = self
+                .handle
+                .list_members(actor_coop.id.clone())
+                .await
+                .unwrap_or_default();
+            coops.push(convert_to_gateway_coop_with_members(actor_coop, members));
+        }
+
+        Ok(coops)
     }
 
     /// Delete a cooperative
-    pub async fn delete_coop(&self, _id: &CoopId) -> Result<()> {
-        // TODO: Add delete method to CoopActor
-        Err(GatewayError::InternalError(
-            "Delete not yet implemented in CoopActor".to_string(),
-        ))
+    pub async fn delete_coop(&self, id: &CoopId) -> Result<()> {
+        self.handle
+            .delete_cooperative(id.clone())
+            .await
+            .map_err(|e| GatewayError::InternalError(format!("CoopActor error: {e}")))
     }
 
     /// Count cooperatives
@@ -119,43 +134,82 @@ impl ActorCoopManager {
     }
 
     /// Remove member from cooperative
-    pub async fn remove_member_atomic(&self, _coop_id: &CoopId, _did: &Did) -> Result<Coop> {
-        // TODO: Add remove_member method to CoopActor
-        Err(GatewayError::InternalError(
-            "Remove member not yet implemented".to_string(),
-        ))
+    pub async fn remove_member_atomic(&self, coop_id: &CoopId, did: &Did) -> Result<Coop> {
+        self.handle
+            .remove_member(coop_id.clone(), did.clone())
+            .await
+            .map_err(|e| GatewayError::InternalError(format!("CoopActor error: {e}")))?;
+
+        // Return updated coop
+        self.get_coop(coop_id).await
     }
 
     /// Update member role
     pub async fn update_role_atomic(
         &self,
-        _coop_id: &CoopId,
-        _did: &Did,
-        _new_role: MemberRole,
+        coop_id: &CoopId,
+        did: &Did,
+        new_role: MemberRole,
     ) -> Result<Coop> {
-        // TODO: Add update_role method to CoopActor
-        Err(GatewayError::InternalError(
-            "Update role not yet implemented".to_string(),
-        ))
+        // Map gateway MemberRole to icn-coop MemberRole
+        let actor_role = match new_role {
+            MemberRole::Steward => icn_coop::MemberRole::Founder,
+            MemberRole::Facilitator => icn_coop::MemberRole::Officer,
+            MemberRole::Participant => icn_coop::MemberRole::Member,
+        };
+
+        self.handle
+            .update_member_role(coop_id.clone(), did.clone(), actor_role)
+            .await
+            .map_err(|e| GatewayError::InternalError(format!("CoopActor error: {e}")))?;
+
+        // Return updated coop
+        self.get_coop(coop_id).await
     }
 
     /// Update cooperative settings
-    pub async fn update_settings_atomic<F>(&self, _coop_id: &CoopId, _updater: F) -> Result<Coop>
+    pub async fn update_settings_atomic<F>(&self, coop_id: &CoopId, updater: F) -> Result<Coop>
     where
         F: FnOnce(&mut CoopSettings) -> Result<()>,
     {
-        // TODO: Add update_settings method to CoopActor
-        Err(GatewayError::InternalError(
-            "Update settings not yet implemented".to_string(),
-        ))
+        // Get current coop to get settings
+        let current_coop = self.get_coop(coop_id).await?;
+        let mut settings = current_coop.settings;
+
+        // Apply updater
+        updater(&mut settings)?;
+
+        // Convert settings to metadata map
+        let mut metadata = std::collections::HashMap::new();
+        metadata.insert("governance_model".to_string(), settings.governance_model);
+        metadata.insert("credit_policy".to_string(), settings.credit_policy);
+        metadata.insert("currency".to_string(), settings.currency);
+
+        // Update via actor
+        self.handle
+            .update_cooperative(coop_id.clone(), None, Some(metadata))
+            .await
+            .map_err(|e| GatewayError::InternalError(format!("CoopActor error: {e}")))?;
+
+        // Return updated coop
+        self.get_coop(coop_id).await
     }
 
     /// Update cooperative
-    pub async fn update_coop(&self, _id: &CoopId, _coop: Coop) -> Result<()> {
-        // TODO: Add update method to CoopActor
-        Err(GatewayError::InternalError(
-            "Update coop not yet implemented".to_string(),
-        ))
+    pub async fn update_coop(&self, id: &CoopId, coop: Coop) -> Result<()> {
+        // Convert settings to metadata
+        let mut metadata = std::collections::HashMap::new();
+        metadata.insert("governance_model".to_string(), coop.settings.governance_model);
+        metadata.insert("credit_policy".to_string(), coop.settings.credit_policy);
+        metadata.insert("currency".to_string(), coop.settings.currency);
+
+        // Update name and metadata
+        self.handle
+            .update_cooperative(id.clone(), Some(coop.name), Some(metadata))
+            .await
+            .map_err(|e| GatewayError::InternalError(format!("CoopActor error: {e}")))?;
+
+        Ok(())
     }
 
     /// List all coop IDs
@@ -165,21 +219,41 @@ impl ActorCoopManager {
     }
 }
 
-/// Convert icn-coop::Cooperative to gateway::Coop
-fn convert_to_gateway_coop(actor_coop: icn_coop::Cooperative) -> Coop {
-    // Create a placeholder DID - in reality we'd query members separately
-    // This is a temporary limitation until we integrate member queries
-    let placeholder_did: Did = serde_json::from_str("\"did:icn:placeholder\"").unwrap();
-    
+/// Convert icn-coop::Cooperative to gateway::Coop with member list
+fn convert_to_gateway_coop_with_members(
+    actor_coop: icn_coop::Cooperative,
+    actor_members: Vec<icn_coop::Member>,
+) -> Coop {
+    // Convert members
+    let members: Vec<CoopMember> = actor_members
+        .into_iter()
+        .map(convert_to_gateway_member)
+        .collect();
+
+    // Extract settings from metadata if present
+    let settings = CoopSettings {
+        governance_model: actor_coop
+            .metadata
+            .get("governance_model")
+            .cloned()
+            .unwrap_or_else(|| "consensus".to_string()),
+        credit_policy: actor_coop
+            .metadata
+            .get("credit_policy")
+            .cloned()
+            .unwrap_or_else(|| "conservative".to_string()),
+        currency: actor_coop
+            .metadata
+            .get("currency")
+            .cloned()
+            .unwrap_or_else(|| "hours".to_string()),
+    };
+
     Coop {
         id: actor_coop.id,
         name: actor_coop.name,
-        members: vec![CoopMember {
-            did: placeholder_did,
-            role: MemberRole::Steward,
-            joined_at: actor_coop.created_at.timestamp() as u64,
-        }],
-        settings: CoopSettings::default(),
+        members,
+        settings,
         created_at: actor_coop.created_at.timestamp() as u64,
     }
 }

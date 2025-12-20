@@ -168,28 +168,30 @@ impl SessionManager {
         info!("QUIC endpoint listening on {}", endpoint.local_addr()?);
 
         // Perform STUN discovery if enabled (NAT traversal)
-        if let Some(servers) = stun_servers {
-            info!("NAT traversal enabled - discovering public endpoint via STUN");
-            let stun_client = crate::stun::StunClient::new(servers);
-
-            // Get the UDP socket from the QUIC endpoint for STUN queries
-            // Note: We use the same socket to ensure the discovered port matches the QUIC port
-            let local_addr = endpoint.local_addr()?;
-            let socket = tokio::net::UdpSocket::bind(local_addr).await?;
-
-            match stun_client.discover_public_endpoint(&socket).await {
-                Ok(public_addr) => {
-                    info!(
-                        "✅ Discovered public endpoint: {} (local: {})",
-                        public_addr, local_addr
-                    );
-                    *self.public_endpoint.write().await = Some(public_addr);
-                }
-                Err(e) => {
-                    // Log warning but don't fail startup - node can still function on local network
-                    tracing::warn!("Failed to discover public endpoint via STUN: {}. Node will only be reachable on local network.", e);
-                }
-            }
+        // TEMPORARY FIX: Disabled due to double-bind bug
+        // TODO: Fix by either reusing endpoint's socket or binding before endpoint creation
+        if let Some(_servers) = stun_servers {
+            tracing::warn!("STUN discovery temporarily disabled due to socket reuse issue");
+            tracing::warn!("Node will only be reachable on local network until fixed");
+            // let stun_client = crate::stun::StunClient::new(servers);
+            // 
+            // // BUG: This tries to bind to the same address as the QUIC endpoint above
+            // // causing "Address already in use" error
+            // let local_addr = endpoint.local_addr()?;
+            // let socket = tokio::net::UdpSocket::bind(local_addr).await?;
+            // 
+            // match stun_client.discover_public_endpoint(&socket).await {
+            //     Ok(public_addr) => {
+            //         info!(
+            //             "✅ Discovered public endpoint: {} (local: {})",
+            //             public_addr, local_addr
+            //         );
+            //         *self.public_endpoint.write().await = Some(public_addr);
+            //     }
+            //     Err(e) => {
+            //         tracing::warn!("Failed to discover public endpoint via STUN: {}. Node will only be reachable on local network.", e);
+            //     }
+            // }
         }
 
         // Initialize TURN relay if configured (NAT traversal fallback)

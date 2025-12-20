@@ -157,6 +157,7 @@ impl GatewayServer {
 
         let governance_manager = Arc::new(GovernanceManager::new());
         let invite_manager = Arc::new(crate::invite::InviteManager::new());
+        let session_manager = Arc::new(crate::session::SessionManager::new());
         let trust_manager = Arc::new(TrustManager::new());
         let compute_manager = if let Some(handle) = self.compute_handle {
             info!("Compute manager connected to daemon");
@@ -222,7 +223,7 @@ impl GatewayServer {
 
         // Create identity manager for multi-device support
         let identity_manager = if let Some(ref data_dir) = self.data_dir {
-            Arc::new(IdentityManager::new_with_storage(data_dir.clone()))
+            Arc::new(IdentityManager::new_with_storage(data_dir.clone())?)
         } else {
             Arc::new(IdentityManager::new())
         };
@@ -383,6 +384,7 @@ impl GatewayServer {
                 .app_data(web::Data::new(coop_manager.clone()))
                 .app_data(web::Data::new(governance_manager.clone()))
                 .app_data(web::Data::new(invite_manager.clone()))
+                .app_data(web::Data::new(session_manager.clone()))
                 .app_data(web::Data::new(trust_manager.clone()))
                 .app_data(web::Data::new(compute_manager.clone()))
                 .app_data(web::Data::new(federation_manager.clone()))
@@ -428,6 +430,19 @@ impl GatewayServer {
                         .service(api::auth::challenge)
                         .service(api::auth::verify)
                         .service(api::websocket::websocket)
+                        // QR login session endpoints
+                        // Note: create_session and get_session_status are public
+                        // approve_session requires auth (wrapped with auth middleware)
+                        .service(
+                            web::scope("/sessions")
+                                .service(api::sessions::create_session)
+                                .service(api::sessions::get_session_status)
+                                .service(
+                                    web::resource("/{session_id}/approve")
+                                        .route(web::post().to(api::sessions::approve_session_handler))
+                                        .wrap(auth.clone()),
+                                ),
+                        )
                         // Public identity resolution (for federation)
                         .service(
                             web::scope("/identity")

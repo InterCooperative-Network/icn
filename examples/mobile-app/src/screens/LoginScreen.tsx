@@ -51,7 +51,8 @@ export default function LoginScreen() {
       if (!response.ok) throw new Error('Invalid signature');
 
       const data = await response.json();
-      await login(data.token, apiUrl);
+      // Store credentials securely including DID for display
+      await login(data.token, apiUrl, did);
     } catch (err: any) {
       setError(err.message || 'Authentication failed');
     } finally {

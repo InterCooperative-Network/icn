@@ -68,7 +68,7 @@ impl LocalExecutor {
         if let Some(deadline) = task.deadline {
             let now = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
-                .unwrap()
+                .unwrap_or(std::time::Duration::ZERO)
                 .as_millis() as u64;
             if now > deadline {
                 return Err(ComputeError::DeadlineExceeded);
@@ -95,7 +95,7 @@ impl LocalExecutor {
 
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or(std::time::Duration::ZERO)
             .as_millis() as u64;
 
         // Parse signing key and sign the result

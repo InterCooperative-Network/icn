@@ -15,6 +15,7 @@
 
 pub mod auth;
 pub mod client;
+pub mod handler;
 pub mod pagination;
 pub mod receipt;
 pub mod server;

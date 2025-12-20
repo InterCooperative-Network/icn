@@ -3,8 +3,10 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Provider as PaperProvider, DefaultTheme } from 'react-native-paper';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
+
+// Secure storage for credentials
+import { SecureStorage } from './src/services/SecureStorage';
 
 // Import screens
 import HomeScreen from './src/screens/HomeScreen';
@@ -13,9 +15,11 @@ import GovernanceScreen from './src/screens/GovernanceScreen';
 import CooperativesScreen from './src/screens/CooperativesScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import LoginScreen from './src/screens/LoginScreen';
+import QRScannerScreen from './src/screens/QRScannerScreen';
 
 // Import components
-import NotificationCenter from './NotificationCenter';
+// NotificationCenter disabled - requires @icn/react-native which is not yet implemented
+// import NotificationCenter from './NotificationCenter';
 
 // Import services
 import { ICNClient } from './src/services/ICNClient';
@@ -106,11 +110,14 @@ export default function App() {
 
   const checkAuthentication = async () => {
     try {
-      const token = await AsyncStorage.getItem('auth_token');
-      const apiUrl = await AsyncStorage.getItem('api_url') || 'http://localhost:8000';
-      
-      if (token) {
-        const icnClient = new ICNClient(apiUrl, token);
+      // Migrate old credentials from AsyncStorage to SecureStore (one-time)
+      await SecureStorage.migrateFromAsyncStorage();
+
+      // Get credentials from secure storage
+      const credentials = await SecureStorage.getCredentials();
+
+      if (credentials.token && credentials.apiUrl) {
+        const icnClient = new ICNClient(credentials.apiUrl, credentials.token);
         setClient(icnClient);
         setIsAuthenticated(true);
       }
@@ -121,17 +128,23 @@ export default function App() {
     }
   };
 
-  const login = async (token: string, apiUrl: string) => {
-    await AsyncStorage.setItem('auth_token', token);
-    await AsyncStorage.setItem('api_url', apiUrl);
+  const login = async (token: string, apiUrl: string, did?: string, coopId?: string) => {
+    // Store credentials securely (encrypted in device keychain/keystore)
+    await SecureStorage.setCredentials({
+      token,
+      apiUrl,
+      did,
+      coopId,
+    });
+
     const icnClient = new ICNClient(apiUrl, token);
     setClient(icnClient);
     setIsAuthenticated(true);
   };
 
   const logout = async () => {
-    await AsyncStorage.removeItem('auth_token');
-    await AsyncStorage.removeItem('api_url');
+    // Clear all secure credentials
+    await SecureStorage.clearCredentials();
     setClient(null);
     setIsAuthenticated(false);
   };
@@ -148,6 +161,18 @@ export default function App() {
           {isAuthenticated ? (
             <Stack.Navigator screenOptions={{ headerShown: false }}>
               <Stack.Screen name="Main" component={MainTabs} />
+              <Stack.Screen
+                name="QRScanner"
+                component={QRScannerScreen}
+                options={{
+                  headerShown: true,
+                  headerTitle: 'Approve Web Login',
+                  headerTransparent: true,
+                  headerTintColor: '#fff',
+                  headerStyle: { backgroundColor: 'transparent' },
+                  presentation: 'modal',
+                }}
+              />
             </Stack.Navigator>
           ) : (
             <Stack.Navigator>
@@ -159,7 +184,7 @@ export default function App() {
             </Stack.Navigator>
           )}
         </NavigationContainer>
-        <NotificationCenter />
+        {/* <NotificationCenter /> */}
       </PaperProvider>
     </AuthContext.Provider>
   );

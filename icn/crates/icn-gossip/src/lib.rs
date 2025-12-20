@@ -29,6 +29,7 @@
 //! ```
 
 pub mod bloom;
+pub mod error;
 pub mod gossip;
 pub mod partition;
 pub mod scalability;
@@ -37,6 +38,7 @@ pub mod types;
 pub mod vector_clock;
 
 pub use bloom::BloomFilter;
+pub use error::{GossipError, Result};
 pub use gossip::{
     start_digest_emitter, start_partition_checker, EntryNotificationCallback, GossipActor,
     GossipHandle, PeerSamplingCallback, SendMessageCallback,

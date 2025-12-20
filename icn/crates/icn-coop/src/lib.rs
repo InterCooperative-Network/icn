@@ -5,7 +5,7 @@ pub mod membership;
 pub mod store;
 pub mod types;
 
-pub use actor::{CoopActor, CoopMessage};
+pub use actor::{CoopActor, CoopMessage, GossipHandle, COOP_TOPIC};
 pub use handle::CoopHandle;
 pub use lifecycle::{LifecycleEvent, LifecycleManager};
 pub use membership::{MembershipChange, MembershipManager};

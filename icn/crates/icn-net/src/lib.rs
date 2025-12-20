@@ -2,6 +2,7 @@
 
 pub mod actor;
 pub mod blob_registry;
+pub mod error;
 pub mod candidate;
 pub mod candidate_cache;
 pub mod discovery;
@@ -20,6 +21,7 @@ pub mod version;
 
 pub use actor::{IncomingMessageHandler, NetworkActor, NetworkHandle, NetworkMsg, NetworkStats};
 pub use blob_registry::{BlobLocation, BlobLocationRegistry};
+pub use error::{NetError, Result};
 pub use candidate::ConnectionCandidate;
 pub use candidate_cache::CandidateCache;
 pub use discovery::{Discovery, PeerInfo};

@@ -120,4 +120,64 @@ impl CoopHandle {
         rx.await
             .map_err(|_| crate::CoopError::Governance("Reply failed".into()))?
     }
+
+    pub async fn delete_cooperative(&self, coop_id: String) -> Result<()> {
+        let (reply, rx) = oneshot::channel();
+        self.tx
+            .send(CoopMessage::DeleteCooperative { coop_id, reply })
+            .await
+            .map_err(|_| crate::CoopError::Governance("Actor disconnected".into()))?;
+        rx.await
+            .map_err(|_| crate::CoopError::Governance("Reply failed".into()))?
+    }
+
+    pub async fn remove_member(&self, coop_id: String, did: Did) -> Result<()> {
+        let (reply, rx) = oneshot::channel();
+        self.tx
+            .send(CoopMessage::RemoveMember { coop_id, did, reply })
+            .await
+            .map_err(|_| crate::CoopError::Governance("Actor disconnected".into()))?;
+        rx.await
+            .map_err(|_| crate::CoopError::Governance("Reply failed".into()))?
+    }
+
+    pub async fn update_member_role(
+        &self,
+        coop_id: String,
+        did: Did,
+        new_role: MemberRole,
+    ) -> Result<Member> {
+        let (reply, rx) = oneshot::channel();
+        self.tx
+            .send(CoopMessage::UpdateMemberRole {
+                coop_id,
+                did,
+                new_role,
+                reply,
+            })
+            .await
+            .map_err(|_| crate::CoopError::Governance("Actor disconnected".into()))?;
+        rx.await
+            .map_err(|_| crate::CoopError::Governance("Reply failed".into()))?
+    }
+
+    pub async fn update_cooperative(
+        &self,
+        coop_id: String,
+        name: Option<String>,
+        metadata: Option<std::collections::HashMap<String, String>>,
+    ) -> Result<Cooperative> {
+        let (reply, rx) = oneshot::channel();
+        self.tx
+            .send(CoopMessage::UpdateCooperative {
+                coop_id,
+                name,
+                metadata,
+                reply,
+            })
+            .await
+            .map_err(|_| crate::CoopError::Governance("Actor disconnected".into()))?;
+        rx.await
+            .map_err(|_| crate::CoopError::Governance("Reply failed".into()))?
+    }
 }

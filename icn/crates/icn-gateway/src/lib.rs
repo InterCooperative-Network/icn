@@ -41,6 +41,7 @@ pub mod pagination;
 pub mod rate_limit;
 pub mod security;
 pub mod server;
+pub mod session;
 pub mod trust_mgr;
 pub mod validation;
 pub mod websocket;

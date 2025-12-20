@@ -1202,68 +1202,72 @@ impl DisputeActorHandle {
     }
 
     /// Add a mediator to the pool
-    pub async fn add_mediator(&self, mediator: Did) {
-        let _ = self
-            .tx
+    pub async fn add_mediator(&self, mediator: Did) -> Result<()> {
+        self.tx
             .send(DisputeActorMsg::AddMediator { mediator })
-            .await;
+            .await
+            .map_err(|_| anyhow!("DisputeActor channel closed"))
     }
 
     /// Remove a mediator from the pool
-    pub async fn remove_mediator(&self, mediator: Did) {
-        let _ = self
-            .tx
+    pub async fn remove_mediator(&self, mediator: Did) -> Result<()> {
+        self.tx
             .send(DisputeActorMsg::RemoveMediator { mediator })
-            .await;
+            .await
+            .map_err(|_| anyhow!("DisputeActor channel closed"))
     }
 
     /// Set misbehavior callback for recording violations
-    pub async fn set_misbehavior_callback(&self, callback: MisbehaviorCallback) {
-        let _ = self
-            .tx
+    pub async fn set_misbehavior_callback(&self, callback: MisbehaviorCallback) -> Result<()> {
+        self.tx
             .send(DisputeActorMsg::SetMisbehaviorCallback { callback })
-            .await;
+            .await
+            .map_err(|_| anyhow!("DisputeActor channel closed"))
     }
 
     /// Set trust callback for mediator scoring
-    pub async fn set_trust_callback(&self, callback: TrustCallback) {
-        let _ = self
-            .tx
+    pub async fn set_trust_callback(&self, callback: TrustCallback) -> Result<()> {
+        self.tx
             .send(DisputeActorMsg::SetTrustCallback { callback })
-            .await;
+            .await
+            .map_err(|_| anyhow!("DisputeActor channel closed"))
     }
 
     /// Set gossip callback for broadcasting dispute events
     ///
     /// When set, dispute events (filed, resolved) will be broadcast to mediators
     /// and observers via gossip topics.
-    pub async fn set_gossip_callback(&self, callback: DisputeGossipCallback) {
-        let _ = self
-            .tx
+    pub async fn set_gossip_callback(&self, callback: DisputeGossipCallback) -> Result<()> {
+        self.tx
             .send(DisputeActorMsg::SetGossipCallback { callback })
-            .await;
+            .await
+            .map_err(|_| anyhow!("DisputeActor channel closed"))
     }
 
     /// Add a mediator with expertise tags
-    pub async fn add_mediator_with_expertise(&self, mediator: Did, expertise_tags: Vec<String>) {
-        let _ = self
-            .tx
+    pub async fn add_mediator_with_expertise(
+        &self,
+        mediator: Did,
+        expertise_tags: Vec<String>,
+    ) -> Result<()> {
+        self.tx
             .send(DisputeActorMsg::AddMediatorWithExpertise {
                 mediator,
                 expertise_tags,
             })
-            .await;
+            .await
+            .map_err(|_| anyhow!("DisputeActor channel closed"))
     }
 
     /// Set trust penalty callback for applying penalties to dispute losers
     ///
     /// When set, executors who lose disputes will have their trust scores reduced
     /// according to the penalty configuration.
-    pub async fn set_trust_penalty_callback(&self, callback: TrustPenaltyCallback) {
-        let _ = self
-            .tx
+    pub async fn set_trust_penalty_callback(&self, callback: TrustPenaltyCallback) -> Result<()> {
+        self.tx
             .send(DisputeActorMsg::SetTrustPenaltyCallback { callback })
-            .await;
+            .await
+            .map_err(|_| anyhow!("DisputeActor channel closed"))
     }
 
     /// Get offender record for a DID

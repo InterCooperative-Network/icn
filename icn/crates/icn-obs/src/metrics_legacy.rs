@@ -1,4 +1,4 @@
-//! Metrics definitions for ICN components
+// Metrics definitions for ICN components (legacy file)
 
 use metrics::{describe_counter, describe_gauge, describe_histogram};
 

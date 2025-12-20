@@ -27,6 +27,7 @@
 pub mod amendment;
 pub mod appeal;
 pub mod charter;
+pub mod error;
 pub mod charter_store;
 pub mod config;
 pub mod domain;
@@ -59,6 +60,7 @@ pub use charter::{
 };
 pub use charter_store::{CharterStore, CharterStoreBackend, InMemoryCharterStore};
 pub use config::{EmergencyThresholds, GovernanceConfig, GovernanceParams};
+pub use error::{GovernanceError, Result};
 pub use domain::{GovernanceDomain, GovernanceDomainId};
 pub use handle::GovernanceOps;
 pub use membership::{MembershipConfig, MembershipSource};

@@ -193,10 +193,11 @@ impl Supervisor {
 
             // Initialize cooperative services
             let coop_services =
-                init_coop::init_coop_services(&self.config, gossip_handle.clone()).await?;
+                init_coop::init_coop_services(&self.config, gossip_handle.clone(), did.clone())
+                    .await?;
             icn_obs::metrics::supervisor::actor_spawned_inc("coop");
             let coop_handle = coop_services.coop_handle.clone();
-            let _coop_store = coop_services.coop_store.clone(); // Available for future use
+            let coop_store = coop_services.coop_store.clone(); // Used for gossip sync
 
             // Store for gateway integration (outside of identity_bundle scope)
             coop_handle_for_gateway = Some(coop_handle);
@@ -718,6 +719,7 @@ impl Supervisor {
                 let contract_actor_for_notifications = contract_actor_handle.clone();
                 let recovery_store_for_notifications = recovery_store.clone();
                 let ledger_for_notifications = ledger_handle.clone();
+                let coop_store_for_notifications = coop_store.clone();
 
                 // Create candidate cache for NAT traversal
                 let candidate_cache = Arc::new(icn_net::CandidateCache::new());
@@ -1510,6 +1512,56 @@ impl Supervisor {
                                     }
                                     Err(e) => {
                                         warn!("Failed to deserialize profile message: {}", e);
+                                    }
+                                }
+                            });
+                        }
+                        // Handle cooperative updates from gossip
+                        else if topic == init_coop::COOP_UPDATES_TOPIC {
+                            let coop_store = coop_store_for_notifications.clone();
+
+                            // Get entry data (handles decompression if needed)
+                            let entry_data = match entry.get_data() {
+                                Ok(data) => data,
+                                Err(e) => {
+                                    warn!("Failed to get coop entry data: {}", e);
+                                    return;
+                                }
+                            };
+
+                            tokio::spawn(async move {
+                                // Deserialize cooperative from gossip
+                                match bincode::deserialize::<icn_coop::Cooperative>(&entry_data) {
+                                    Ok(coop) => {
+                                        // Check if we already have this coop (avoid overwriting local changes)
+                                        let existing = coop_store.get_cooperative(&coop.id);
+                                        if existing.is_ok() {
+                                            debug!(
+                                                coop_id = %coop.id,
+                                                "Received coop update for existing cooperative (merging)"
+                                            );
+                                        }
+
+                                        // Save to local store
+                                        if let Err(e) = coop_store.save_cooperative(&coop) {
+                                            warn!(
+                                                coop_id = %coop.id,
+                                                error = %e,
+                                                "Failed to save cooperative from gossip"
+                                            );
+                                        } else {
+                                            info!(
+                                                coop_id = %coop.id,
+                                                coop_name = %coop.name,
+                                                "Synced cooperative from gossip"
+                                            );
+                                        }
+                                    }
+                                    Err(e) => {
+                                        warn!(
+                                            error = %e,
+                                            "Failed to deserialize cooperative from gossip"
+                                        );
                                     }
                                 }
                             });
