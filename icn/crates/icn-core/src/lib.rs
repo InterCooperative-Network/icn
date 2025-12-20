@@ -29,7 +29,7 @@ pub use node::{
     CapabilityValue, ExtendedCapabilities, NodePolicy, NodeProfile, NodeStage, ProfileMessage,
     ResourceCaps, RolePolicy, ServiceRole, TOPIC_NODE_PROFILES,
 };
-pub use policy::{Capability, DefaultPolicySource, PolicySource, TrustPolicy};
+pub use policy::{Capability, CapabilityQuota, DefaultPolicySource, PolicySource, TrustPolicy};
 pub use replication::{ReplicationConfig, ReplicationHandle, ReplicationManager};
 pub use runtime::Runtime;
 pub use trust_propagation::{AttestationLimits, AttestationRateLimiter, TRUST_ATTESTATIONS_TOPIC};
