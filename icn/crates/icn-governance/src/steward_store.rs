@@ -114,6 +114,8 @@ pub struct StewardStore<B: StewardStoreBackend> {
 impl<B: StewardStoreBackend> StewardStore<B> {
     /// Create a new StewardStore with the given backend and cache size
     pub fn new(backend: B, cache_size: usize) -> Self {
+        // SAFETY: .max(1) ensures the value is always non-zero
+        #[allow(clippy::unwrap_used)]
         let cache_size = NonZeroUsize::new(cache_size.max(1)).unwrap();
         Self {
             backend,

@@ -83,11 +83,13 @@ pub struct DistributedCheckResult {
 impl VuiRegistry {
     /// Create a new VUI registry with given configuration
     pub fn new(config: StewardConfig) -> Self {
+        // SAFETY: StewardConfig provides valid bloom filter parameters
+        #[allow(clippy::unwrap_used)]
         let bloom = Bloom::new_for_fp_rate(
             config.bloom_expected_items,
             config.bloom_false_positive_rate,
         )
-        .expect("Failed to create bloom filter with given parameters");
+        .unwrap();
 
         Self {
             bloom,

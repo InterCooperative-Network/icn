@@ -357,7 +357,16 @@ impl GatewayServer {
         let security_config = self.security_config.clone();
 
         // Initialize Prometheus metrics
+        // SAFETY: PrometheusMetricsBuilder with valid config always succeeds
+        #[allow(clippy::unwrap_used)]
         let prometheus = PrometheusMetricsBuilder::new("api")
+            .endpoint("/metrics")
+            .build()
+            .unwrap();
+
+        // SAFETY: PrometheusMetricsBuilder with valid config always succeeds
+        #[allow(clippy::unwrap_used)]
+        let icn_gateway_metrics = PrometheusMetricsBuilder::new("icn_gateway")
             .endpoint("/metrics")
             .build()
             .unwrap();
@@ -407,12 +416,7 @@ impl GatewayServer {
                 .app_data(web::JsonConfig::default().limit(262_144))
                 // Middleware (order: last wrapped runs first for REQUEST, first runs last for RESPONSE)
                 // For CORS header removal when behind reverse proxy, SecurityHeaders must run AFTER cors
-                .wrap(
-                    PrometheusMetricsBuilder::new("icn_gateway")
-                        .endpoint("/metrics")
-                        .build()
-                        .unwrap(),
-                )
+                .wrap(icn_gateway_metrics.clone())
                 .wrap(crate::middleware::MetricsMiddleware)
                 .wrap(prometheus.clone())
                 .wrap(cors)

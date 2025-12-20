@@ -23,14 +23,18 @@ pub struct IdentityManager {
 impl IdentityManager {
     /// Create a new identity manager with temporary storage (for testing)
     pub fn new() -> Self {
+        // SAFETY: SledStore::temporary() only fails on I/O errors which are unrecoverable
+        #[allow(clippy::expect_used)]
         let store =
             Arc::new(icn_store::SledStore::temporary().expect("Failed to create temp store"));
 
+        // SAFETY: 1000 is always non-zero
+        #[allow(clippy::unwrap_used)]
+        let capacity = std::num::NonZeroUsize::new(1000).unwrap();
+
         Self {
             store,
-            cache: RwLock::new(lru::LruCache::new(
-                std::num::NonZeroUsize::new(1000).unwrap(),
-            )),
+            cache: RwLock::new(lru::LruCache::new(capacity)),
         }
     }
 
@@ -41,11 +45,13 @@ impl IdentityManager {
             GatewayError::InternalError(format!("Failed to open identity store: {e}"))
         })?);
 
+        // SAFETY: 1000 is always non-zero
+        #[allow(clippy::unwrap_used)]
+        let capacity = std::num::NonZeroUsize::new(1000).unwrap();
+
         Ok(Self {
             store,
-            cache: RwLock::new(lru::LruCache::new(
-                std::num::NonZeroUsize::new(1000).expect("1000 is non-zero"),
-            )),
+            cache: RwLock::new(lru::LruCache::new(capacity)),
         })
     }
 

@@ -1737,6 +1737,8 @@ fn create_rpc_client(
 
     // Use authenticated client if passphrase is available and keystore exists
     if passphrase_available && keystore_exists {
+        // SAFETY: passphrase_available is true, so ICN_PASSPHRASE env var exists
+        #[allow(clippy::unwrap_used)]
         let passphrase = std::env::var("ICN_PASSPHRASE").unwrap();
         let mut keystore = AgeKeyStore::open(&keystore_path)?;
         keystore.unlock(passphrase.as_bytes())?;

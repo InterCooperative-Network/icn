@@ -391,8 +391,9 @@ impl EnrollmentService {
             .as_ref()
             .ok_or_else(|| anyhow::anyhow!("Pepper share not initialized"))?;
 
-        let mut mac = Hmac::<Sha3_256>::new_from_slice(&pepper_share.value)
-            .expect("HMAC key length should be valid");
+        // SAFETY: HMAC-SHA3-256 accepts any key length, so new_from_slice never fails
+        #[allow(clippy::unwrap_used)]
+        let mut mac = Hmac::<Sha3_256>::new_from_slice(&pepper_share.value).unwrap();
         mac.update(b"icn-blind-sig-v1");
         mac.update(blinded_message);
 
@@ -459,6 +460,8 @@ impl EnrollmentClient {
     pub fn create_request(&mut self, pathway_hash: [u8; 8]) -> &EnrollmentRequest {
         let request = EnrollmentRequest::new(&self.id_data_hash, pathway_hash);
         self.request = Some(request);
+        // SAFETY: We just set self.request to Some above
+        #[allow(clippy::unwrap_used)]
         self.request.as_ref().unwrap()
     }
 

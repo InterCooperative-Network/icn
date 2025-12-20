@@ -142,9 +142,12 @@ where
                 let headers = res.headers_mut();
 
                 // Content Security Policy
+                // SAFETY: csp_directive is validated at config load time
+                #[allow(clippy::unwrap_used)]
+                let csp_value = HeaderValue::from_str(&config.csp_directive).unwrap();
                 headers.insert(
                     HeaderName::from_static("content-security-policy"),
-                    HeaderValue::from_str(&config.csp_directive).unwrap(),
+                    csp_value,
                 );
 
                 // Prevent clickjacking

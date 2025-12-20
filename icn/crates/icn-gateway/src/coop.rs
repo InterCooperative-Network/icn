@@ -179,7 +179,9 @@ impl Coop {
         }
 
         // Update role
-        let member = self.members.iter_mut().find(|m| &m.did == did).unwrap(); // Safe: we already checked it exists
+        // SAFETY: We already checked that member exists via get_member() above
+        #[allow(clippy::unwrap_used)]
+        let member = self.members.iter_mut().find(|m| &m.did == did).unwrap();
 
         member.role = new_role;
         Ok(())
@@ -480,6 +482,8 @@ impl CoopManager {
 fn convert_actor_coop_to_gateway(actor_coop: icn_coop::Cooperative) -> Coop {
     // TODO: Query members separately for accurate member list
     // For now, create placeholder with founder
+    // SAFETY: This is a valid JSON string literal for a DID
+    #[allow(clippy::unwrap_used)]
     let placeholder_did: Did = serde_json::from_str("\"did:icn:placeholder\"").unwrap();
 
     Coop {

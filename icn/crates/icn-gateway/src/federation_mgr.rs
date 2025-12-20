@@ -27,6 +27,8 @@ pub struct FederationManager {
 impl FederationManager {
     /// Create a new federation manager with temporary storage (for testing)
     pub fn new() -> Self {
+        // SAFETY: SledStore::temporary() only fails on I/O errors which are unrecoverable
+        #[allow(clippy::expect_used)]
         let store = Arc::new(SledStore::temporary().expect("Failed to create temp store"));
         let attestation_store = AttestationStore::new(store.clone());
 

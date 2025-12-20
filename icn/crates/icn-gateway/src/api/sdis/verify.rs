@@ -39,24 +39,30 @@ impl Default for EphemeralVerifier {
 impl EphemeralVerifier {
     /// Create a new verifier with default cache sizes
     pub fn new() -> Self {
+        // SAFETY: DEFAULT_*_CACHE_SIZE constants are non-zero
+        #[allow(clippy::unwrap_used)]
+        let nonce_capacity = NonZeroUsize::new(DEFAULT_NONCE_CACHE_SIZE).unwrap();
+        #[allow(clippy::unwrap_used)]
+        let binding_capacity = NonZeroUsize::new(DEFAULT_BINDING_CACHE_SIZE).unwrap();
+
         Self {
-            nonce_cache: Mutex::new(LruCache::new(
-                NonZeroUsize::new(DEFAULT_NONCE_CACHE_SIZE).unwrap(),
-            )),
-            binding_cache: Mutex::new(LruCache::new(
-                NonZeroUsize::new(DEFAULT_BINDING_CACHE_SIZE).unwrap(),
-            )),
+            nonce_cache: Mutex::new(LruCache::new(nonce_capacity)),
+            binding_cache: Mutex::new(LruCache::new(binding_capacity)),
             zk_verifier: Mutex::new(ZkVerifier::new()),
         }
     }
 
     /// Create with custom cache sizes
     pub fn with_cache_sizes(nonce_size: usize, binding_size: usize) -> Self {
+        // SAFETY: .max(1) ensures the value is always non-zero
+        #[allow(clippy::unwrap_used)]
+        let nonce_capacity = NonZeroUsize::new(nonce_size.max(1)).unwrap();
+        #[allow(clippy::unwrap_used)]
+        let binding_capacity = NonZeroUsize::new(binding_size.max(1)).unwrap();
+
         Self {
-            nonce_cache: Mutex::new(LruCache::new(NonZeroUsize::new(nonce_size.max(1)).unwrap())),
-            binding_cache: Mutex::new(LruCache::new(
-                NonZeroUsize::new(binding_size.max(1)).unwrap(),
-            )),
+            nonce_cache: Mutex::new(LruCache::new(nonce_capacity)),
+            binding_cache: Mutex::new(LruCache::new(binding_capacity)),
             zk_verifier: Mutex::new(ZkVerifier::new()),
         }
     }

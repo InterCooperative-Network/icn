@@ -130,8 +130,11 @@ impl WsSession {
                                         act.poll_events(ctx);
 
                                         // Send success message with current sequence
+                                        // SAFETY: did was set above when auth succeeded
+                                        #[allow(clippy::unwrap_used)]
+                                        let did_str = act.did.as_ref().unwrap().to_string();
                                         let msg = ServerMessage::AuthOk {
-                                            did: act.did.as_ref().unwrap().to_string(),
+                                            did: did_str,
                                             current_seq,
                                         };
                                         act.send_message(msg, ctx);

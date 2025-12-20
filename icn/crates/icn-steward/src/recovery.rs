@@ -386,6 +386,8 @@ impl RecoveryClient {
         anchor_commitment: [u8; 32],
     ) -> &RecoveryEvidence {
         self.evidence = Some(RecoveryEvidence::new(vui, anchor_commitment));
+        // SAFETY: We just set self.evidence to Some above
+        #[allow(clippy::unwrap_used)]
         self.evidence.as_ref().unwrap()
     }
 

@@ -5,7 +5,12 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[features]
+default = []
+governance_sled = ["sled"]
+
 [dependencies]
+sled = { version = "0.34", optional = true }
 anyhow.workspace = true
 async-trait = "0.1"
 serde = { workspace = true, features = ["derive"] }

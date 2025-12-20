@@ -288,32 +288,25 @@ impl<S: CommonsStoreBackend> CommonsStore<S> {
 
     /// Create with custom cache configuration
     pub fn with_config(store: Arc<S>, config: CacheConfig) -> Self {
+        // Helper to ensure cache size is at least 1
+        // SAFETY: .max(1) ensures the value is always non-zero
+        #[allow(clippy::unwrap_used)]
+        fn cache_size(size: usize) -> NonZeroUsize {
+            NonZeroUsize::new(size.max(1)).unwrap()
+        }
+
         Self {
             store,
-            anchor_cache: RwLock::new(LruCache::new(
-                NonZeroUsize::new(config.anchor_cache_size).unwrap(),
-            )),
-            holder_cache: RwLock::new(LruCache::new(
-                NonZeroUsize::new(config.holder_cache_size).unwrap(),
-            )),
-            charter_cache: RwLock::new(LruCache::new(
-                NonZeroUsize::new(config.charter_cache_size).unwrap(),
-            )),
-            steward_cache: RwLock::new(LruCache::new(
-                NonZeroUsize::new(config.steward_cache_size).unwrap(),
-            )),
-            amendment_cache: RwLock::new(LruCache::new(
-                NonZeroUsize::new(config.amendment_cache_size).unwrap(),
-            )),
-            appeal_cache: RwLock::new(LruCache::new(
-                NonZeroUsize::new(config.appeal_cache_size).unwrap(),
-            )),
-            ceremony_cache: RwLock::new(LruCache::new(
-                NonZeroUsize::new(config.ceremony_cache_size).unwrap(),
-            )),
-            enrollment_session_cache: RwLock::new(LruCache::new(
-                NonZeroUsize::new(config.enrollment_session_cache_size).unwrap(),
-            )),
+            anchor_cache: RwLock::new(LruCache::new(cache_size(config.anchor_cache_size))),
+            holder_cache: RwLock::new(LruCache::new(cache_size(config.holder_cache_size))),
+            charter_cache: RwLock::new(LruCache::new(cache_size(config.charter_cache_size))),
+            steward_cache: RwLock::new(LruCache::new(cache_size(config.steward_cache_size))),
+            amendment_cache: RwLock::new(LruCache::new(cache_size(config.amendment_cache_size))),
+            appeal_cache: RwLock::new(LruCache::new(cache_size(config.appeal_cache_size))),
+            ceremony_cache: RwLock::new(LruCache::new(cache_size(config.ceremony_cache_size))),
+            enrollment_session_cache: RwLock::new(LruCache::new(cache_size(
+                config.enrollment_session_cache_size,
+            ))),
         }
     }
 

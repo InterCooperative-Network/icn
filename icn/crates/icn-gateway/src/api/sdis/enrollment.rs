@@ -338,6 +338,8 @@ pub async fn finalize_enrollment(
         store.update_ceremony(&ceremony_id, ceremony.clone())?;
     }
 
+    // SAFETY: We just ensured anchor is Some above
+    #[allow(clippy::unwrap_used)]
     let anchor = ceremony.anchor.as_ref().unwrap();
 
     // Generate DID from anchor
