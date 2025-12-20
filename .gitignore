@@ -38,8 +38,18 @@ examples/*/Cargo.lock
 *.dll
 *.exe
 
-# Build logs
+# Build/test logs
 build_errors*.log
+build.log
+test.log
+*.log
+!sims/mutual-credit/all_scenarios.log
+
+# Debug/error output files
+check_output.txt
+*_error.txt
+*_failure.txt
+*_fail.log
 
 # Testing
 /coverage/
