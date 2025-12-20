@@ -6,9 +6,13 @@ use sled::Db;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum BudgetPeriod {
+    /// Daily budget period
     Daily,
+    /// Weekly budget period
     Weekly,
+    /// Monthly budget period
     Monthly,
+    /// Yearly budget period
     Yearly,
 }
 
@@ -16,9 +20,13 @@ pub enum BudgetPeriod {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum BudgetStatus {
+    /// Budget is active and tracking spending
     Active,
+    /// Budget is paused (not tracking)
     Paused,
+    /// Budget limit has been exceeded
     Exceeded,
+    /// Budget has expired
     Expired,
 }
 
@@ -95,6 +103,7 @@ pub struct BudgetStore {
 }
 
 impl BudgetStore {
+    /// Create a new BudgetStore backed by the given Sled database
     pub fn new(db: Db) -> Self {
         Self { db }
     }

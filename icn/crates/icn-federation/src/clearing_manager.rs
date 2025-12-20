@@ -12,7 +12,7 @@ use icn_store::Store;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::RwLock;
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 /// Storage key prefixes
 const AGREEMENT_PREFIX: &[u8] = b"federation/clearing/agreements/";
@@ -44,7 +44,10 @@ impl ClearingManager {
     fn load_from_store(&self) -> Result<()> {
         // Load agreements
         let agreement_entries = self.store.scan(AGREEMENT_PREFIX)?;
-        let mut agreements = self.agreements.write().unwrap();
+        let mut agreements = self.agreements.write().unwrap_or_else(|poisoned| {
+            warn!("Agreements lock poisoned, recovering");
+            poisoned.into_inner()
+        });
         for (_key, value) in agreement_entries {
             if let Ok(agreement) = serde_json::from_slice::<BilateralClearingAgreement>(&value) {
                 agreements.insert(agreement.agreement_id.clone(), agreement);
@@ -54,7 +57,10 @@ impl ClearingManager {
 
         // Load positions
         let position_entries = self.store.scan(POSITION_PREFIX)?;
-        let mut positions = self.positions.write().unwrap();
+        let mut positions = self.positions.write().unwrap_or_else(|poisoned| {
+            warn!("Positions lock poisoned, recovering");
+            poisoned.into_inner()
+        });
         for (_key, value) in position_entries {
             if let Ok(position) = serde_json::from_slice::<ClearingPosition>(&value) {
                 positions.insert(position.agreement_id.clone(), position);
@@ -62,11 +68,16 @@ impl ClearingManager {
         }
         drop(positions);
 
-        metrics::clearing::agreements_active_set(self.agreements.read().unwrap().len());
-        info!(
-            "Loaded {} clearing agreements",
-            self.agreements.read().unwrap().len()
-        );
+        let count = self
+            .agreements
+            .read()
+            .unwrap_or_else(|poisoned| {
+                warn!("Agreements lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .len();
+        metrics::clearing::agreements_active_set(count);
+        info!("Loaded {} clearing agreements", count);
         Ok(())
     }
 
@@ -93,7 +104,15 @@ impl ClearingManager {
         let agreement_id = agreement.agreement_id.clone();
 
         // Check if agreement already exists
-        if self.agreements.read().unwrap().contains_key(&agreement_id) {
+        if self
+            .agreements
+            .read()
+            .unwrap_or_else(|poisoned| {
+                warn!("Agreements lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .contains_key(&agreement_id)
+        {
             return Err(FederationError::ClearingAgreementExists(
                 agreement.coop_a.clone(),
                 agreement.coop_b.clone(),
@@ -114,16 +133,30 @@ impl ClearingManager {
         // Update caches
         self.agreements
             .write()
-            .unwrap()
+            .unwrap_or_else(|poisoned| {
+                warn!("Agreements lock poisoned, recovering");
+                poisoned.into_inner()
+            })
             .insert(agreement_id.clone(), agreement.clone());
         self.positions
             .write()
-            .unwrap()
+            .unwrap_or_else(|poisoned| {
+                warn!("Positions lock poisoned, recovering");
+                poisoned.into_inner()
+            })
             .insert(agreement_id.clone(), position);
 
         // Metrics
         metrics::clearing::agreements_created_inc(&agreement.coop_a, &agreement.coop_b);
-        metrics::clearing::agreements_active_set(self.agreements.read().unwrap().len());
+        let count = self
+            .agreements
+            .read()
+            .unwrap_or_else(|poisoned| {
+                warn!("Agreements lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .len();
+        metrics::clearing::agreements_active_set(count);
 
         info!("Created clearing agreement: {}", agreement_id);
         Ok(agreement_id)
@@ -136,7 +169,10 @@ impl ClearingManager {
         signer_did: icn_identity::Did,
         signature: Vec<u8>,
     ) -> Result<()> {
-        let mut agreements = self.agreements.write().unwrap();
+        let mut agreements = self.agreements.write().unwrap_or_else(|poisoned| {
+            warn!("Agreements lock poisoned, recovering");
+            poisoned.into_inner()
+        });
         let agreement = agreements
             .get_mut(agreement_id)
             .ok_or_else(|| FederationError::ClearingAgreementNotFound(agreement_id.to_string()))?;
@@ -155,12 +191,28 @@ impl ClearingManager {
 
     /// Get an agreement by ID
     pub fn get_agreement(&self, agreement_id: &str) -> Result<Option<BilateralClearingAgreement>> {
-        Ok(self.agreements.read().unwrap().get(agreement_id).cloned())
+        Ok(self
+            .agreements
+            .read()
+            .unwrap_or_else(|poisoned| {
+                warn!("Agreements lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .get(agreement_id)
+            .cloned())
     }
 
     /// List all agreements
     pub fn list_agreements(&self) -> Vec<BilateralClearingAgreement> {
-        self.agreements.read().unwrap().values().cloned().collect()
+        self.agreements
+            .read()
+            .unwrap_or_else(|poisoned| {
+                warn!("Agreements lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .values()
+            .cloned()
+            .collect()
     }
 
     /// Propose a cross-cooperative transfer
@@ -171,7 +223,10 @@ impl ClearingManager {
         let agreement_id = self.find_agreement(&transfer.from_coop, &transfer.to_coop)?;
 
         // Validate exchange rate exists
-        let agreements = self.agreements.read().unwrap();
+        let agreements = self.agreements.read().unwrap_or_else(|poisoned| {
+            warn!("Agreements lock poisoned, recovering");
+            poisoned.into_inner()
+        });
         let agreement = agreements
             .get(&agreement_id)
             .ok_or_else(|| FederationError::ClearingAgreementNotFound(agreement_id.clone()))?;
@@ -191,7 +246,10 @@ impl ClearingManager {
         drop(agreements);
 
         // Check imbalance limit
-        let positions = self.positions.read().unwrap();
+        let positions = self.positions.read().unwrap_or_else(|poisoned| {
+            warn!("Positions lock poisoned, recovering");
+            poisoned.into_inner()
+        });
         if let Some(position) = positions.get(&agreement_id) {
             if position.exceeds_limit(max_imbalance) {
                 return Err(FederationError::ImbalanceLimitExceeded {
@@ -208,7 +266,10 @@ impl ClearingManager {
         self.store.put(&key, &value)?;
 
         // Add to position
-        let mut positions = self.positions.write().unwrap();
+        let mut positions = self.positions.write().unwrap_or_else(|poisoned| {
+            warn!("Positions lock poisoned, recovering");
+            poisoned.into_inner()
+        });
         if let Some(position) = positions.get_mut(&agreement_id) {
             position.add_transfer(transfer.clone());
 
@@ -243,7 +304,10 @@ impl ClearingManager {
 
         // Update position
         let agreement_id = self.find_agreement(&transfer.from_coop, &transfer.to_coop)?;
-        let mut positions = self.positions.write().unwrap();
+        let mut positions = self.positions.write().unwrap_or_else(|poisoned| {
+            warn!("Positions lock poisoned, recovering");
+            poisoned.into_inner()
+        });
         if let Some(position) = positions.get_mut(&agreement_id) {
             // Update the owes amount
             if transfer.from_coop == self.own_coop_id {
@@ -275,7 +339,10 @@ impl ClearingManager {
     pub fn calculate_position(&self, agreement_id: &str) -> Result<ClearingPosition> {
         self.positions
             .read()
-            .unwrap()
+            .unwrap_or_else(|poisoned| {
+                warn!("Positions lock poisoned, recovering");
+                poisoned.into_inner()
+            })
             .get(agreement_id)
             .cloned()
             .ok_or_else(|| FederationError::ClearingAgreementNotFound(agreement_id.to_string()))
@@ -283,7 +350,10 @@ impl ClearingManager {
 
     /// Trigger settlement for an agreement
     pub fn trigger_settlement(&self, agreement_id: &str) -> Result<SettlementReport> {
-        let mut positions = self.positions.write().unwrap();
+        let mut positions = self.positions.write().unwrap_or_else(|poisoned| {
+            warn!("Positions lock poisoned, recovering");
+            poisoned.into_inner()
+        });
         let position = positions
             .get_mut(agreement_id)
             .ok_or_else(|| FederationError::ClearingAgreementNotFound(agreement_id.to_string()))?;
@@ -339,7 +409,10 @@ impl ClearingManager {
 
     /// Find agreement between two cooperatives
     fn find_agreement(&self, coop_a: &str, coop_b: &str) -> Result<String> {
-        let agreements = self.agreements.read().unwrap();
+        let agreements = self.agreements.read().unwrap_or_else(|poisoned| {
+            warn!("Agreements lock poisoned, recovering");
+            poisoned.into_inner()
+        });
         for (id, agreement) in agreements.iter() {
             if (agreement.coop_a == coop_a && agreement.coop_b == coop_b)
                 || (agreement.coop_a == coop_b && agreement.coop_b == coop_a)

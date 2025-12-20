@@ -9,12 +9,8 @@ pub(crate) fn outcome_to_value(outcome: &ExecutionOutcome) -> icn_ccl::Value {
             // Convert bytes to hex string for dispute evidence
             icn_ccl::Value::String(format!("success:{}", hex::encode(data)))
         }
-        ExecutionOutcome::Failed(error) => {
-            icn_ccl::Value::String(format!("failed:{error}"))
-        }
-        ExecutionOutcome::OutOfFuel => {
-            icn_ccl::Value::String("out_of_fuel".to_string())
-        }
+        ExecutionOutcome::Failed(error) => icn_ccl::Value::String(format!("failed:{error}")),
+        ExecutionOutcome::OutOfFuel => icn_ccl::Value::String("out_of_fuel".to_string()),
         ExecutionOutcome::Timeout => icn_ccl::Value::String("timeout".to_string()),
     }
 }
@@ -94,7 +90,10 @@ mod tests {
     fn test_outcome_to_value_success() {
         let outcome = ExecutionOutcome::Success(vec![0xde, 0xad, 0xbe, 0xef]);
         let value = outcome_to_value(&outcome);
-        assert_eq!(value, icn_ccl::Value::String("success:deadbeef".to_string()));
+        assert_eq!(
+            value,
+            icn_ccl::Value::String("success:deadbeef".to_string())
+        );
     }
 
     #[test]

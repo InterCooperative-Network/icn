@@ -8,10 +8,12 @@
 //! Validates that nodes with different trust levels can still synchronize
 //! their ledgers while respecting trust-based access controls.
 
+#![allow(dead_code, unused_imports, unused_variables)]
+
 use anyhow::Result;
 use icn_gossip::{AccessControl, GossipActor, GossipMessage, Topic};
 use icn_identity::{Did, KeyPair};
-use icn_ledger::{entry::JournalEntryBuilder, balance::compute_all_balances, Ledger};
+use icn_ledger::{balance::compute_all_balances, entry::JournalEntryBuilder, Ledger};
 use icn_store::SledStore;
 use icn_trust::{TrustClass, TrustEdge, TrustGraph};
 use std::collections::HashMap;
@@ -143,10 +145,7 @@ async fn test_trust_gated_gossip_delivery() -> Result<()> {
     let mid_class = node_high.get_trust_class(&node_mid.did).await;
     let low_class = node_high.get_trust_class(&node_low.did).await;
 
-    info!(
-        "Trust classes: mid={:?}, low={:?}",
-        mid_class, low_class
-    );
+    info!("Trust classes: mid={:?}, low={:?}", mid_class, low_class);
 
     // Both should have some trust class assigned
     assert!(
@@ -303,10 +302,22 @@ async fn test_deterministic_ordering_across_nodes() -> Result<()> {
     let bob_balance_2 = node2.get_balance(bob.did(), "hours").await;
     let bob_balance_3 = node3.get_balance(bob.did(), "hours").await;
 
-    assert_eq!(alice_balance_1, alice_balance_2, "Alice balance should match on nodes 1 and 2");
-    assert_eq!(alice_balance_2, alice_balance_3, "Alice balance should match on nodes 2 and 3");
-    assert_eq!(bob_balance_1, bob_balance_2, "Bob balance should match on nodes 1 and 2");
-    assert_eq!(bob_balance_2, bob_balance_3, "Bob balance should match on nodes 2 and 3");
+    assert_eq!(
+        alice_balance_1, alice_balance_2,
+        "Alice balance should match on nodes 1 and 2"
+    );
+    assert_eq!(
+        alice_balance_2, alice_balance_3,
+        "Alice balance should match on nodes 2 and 3"
+    );
+    assert_eq!(
+        bob_balance_1, bob_balance_2,
+        "Bob balance should match on nodes 1 and 2"
+    );
+    assert_eq!(
+        bob_balance_2, bob_balance_3,
+        "Bob balance should match on nodes 2 and 3"
+    );
 
     // Verify the actual balances
     assert_eq!(alice_balance_1, 12, "Alice should have 12 hours");

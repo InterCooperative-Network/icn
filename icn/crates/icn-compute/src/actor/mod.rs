@@ -414,9 +414,6 @@ impl ComputeActor {
         ComputeHandle { tx }
     }
 
-
-
-
     /// Handle incoming compute message
     async fn handle_message(&self, msg: ComputeMessage) -> Result<(), ComputeError> {
         match msg {
@@ -531,15 +528,7 @@ impl ComputeActor {
             }
         }
     }
-
-
-
-
-
-
-
 }
-
 
 #[cfg(test)]
 mod tests;

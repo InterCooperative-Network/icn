@@ -17,10 +17,7 @@ use crate::{MIN_TRUST_EXECUTE, MIN_TRUST_SUBMIT};
 
 impl ComputeActor {
     /// Handle task result with consensus checking
-    pub(super) async fn on_task_result(
-        &self,
-        result: ComputeResult,
-    ) -> Result<(), ComputeError> {
+    pub(super) async fn on_task_result(&self, result: ComputeResult) -> Result<(), ComputeError> {
         let task_hash_str = hex::encode(result.task_hash);
 
         tracing::debug!(
@@ -311,10 +308,7 @@ impl ComputeActor {
     }
 
     /// Handle received task submission
-    pub(super) async fn on_task_submitted(
-        &self,
-        task: ComputeTask,
-    ) -> Result<(), ComputeError> {
+    pub(super) async fn on_task_submitted(&self, task: ComputeTask) -> Result<(), ComputeError> {
         let task_hash_str = hex::encode(task.hash());
 
         tracing::debug!(

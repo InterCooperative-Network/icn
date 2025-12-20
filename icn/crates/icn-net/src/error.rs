@@ -89,12 +89,12 @@ impl From<quinn::ConnectionError> for NetError {
 
 impl From<quinn::WriteError> for NetError {
     fn from(e: quinn::WriteError) -> Self {
-        NetError::Io(std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))
+        NetError::Io(std::io::Error::other(e.to_string()))
     }
 }
 
 impl From<quinn::ReadExactError> for NetError {
     fn from(e: quinn::ReadExactError) -> Self {
-        NetError::Io(std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))
+        NetError::Io(std::io::Error::other(e.to_string()))
     }
 }

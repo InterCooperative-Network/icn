@@ -479,27 +479,51 @@ async fn dispatch_request(
 
         // Ledger methods
         "ledger.head" => handler::ledger::handle_ledger_head(req.id, state).await,
-        "ledger.balance" => handler::ledger::handle_ledger_balance(req.id, &req.params, state).await,
-        "ledger.history" => handler::ledger::handle_ledger_history(req.id, &req.params, state).await,
-        "ledger.quarantine.list" => handler::ledger::handle_quarantine_list(req.id, &req.params, state).await,
-        "ledger.quarantine.get" => handler::ledger::handle_quarantine_get(req.id, &req.params, state).await,
-        "ledger.quarantine.release" => handler::ledger::handle_quarantine_release(req.id, &req.params, state).await,
-        "ledger.quarantine.drop" => handler::ledger::handle_quarantine_drop(req.id, &req.params, state).await,
+        "ledger.balance" => {
+            handler::ledger::handle_ledger_balance(req.id, &req.params, state).await
+        }
+        "ledger.history" => {
+            handler::ledger::handle_ledger_history(req.id, &req.params, state).await
+        }
+        "ledger.quarantine.list" => {
+            handler::ledger::handle_quarantine_list(req.id, &req.params, state).await
+        }
+        "ledger.quarantine.get" => {
+            handler::ledger::handle_quarantine_get(req.id, &req.params, state).await
+        }
+        "ledger.quarantine.release" => {
+            handler::ledger::handle_quarantine_release(req.id, &req.params, state).await
+        }
+        "ledger.quarantine.drop" => {
+            handler::ledger::handle_quarantine_drop(req.id, &req.params, state).await
+        }
         "ledger.quarantine.purge" => handler::ledger::handle_quarantine_purge(req.id, state).await,
 
         // Contract methods
-        "contract.deploy" => handler::contract::handle_contract_deploy(req.id, &req.params, state).await,
-        "contract.call" => handler::contract::handle_contract_call(req.id, &req.params, state).await,
-        "contract.list" => handler::contract::handle_contract_list(req.id, &req.params, state).await,
+        "contract.deploy" => {
+            handler::contract::handle_contract_deploy(req.id, &req.params, state).await
+        }
+        "contract.call" => {
+            handler::contract::handle_contract_call(req.id, &req.params, state).await
+        }
+        "contract.list" => {
+            handler::contract::handle_contract_list(req.id, &req.params, state).await
+        }
         "receipt.get" => handler::ledger::handle_receipt_get(req.id, &req.params, state).await,
 
         // Governance methods
-        "governance.domain.list" => handler::governance::handle_governance_domain_list(req.id, state).await,
-        "governance.domain.get" => handler::governance::handle_governance_domain_get(req.id, &req.params, state).await,
+        "governance.domain.list" => {
+            handler::governance::handle_governance_domain_list(req.id, state).await
+        }
+        "governance.domain.get" => {
+            handler::governance::handle_governance_domain_get(req.id, &req.params, state).await
+        }
         "governance.domain.create" => {
             handler::governance::handle_governance_domain_create(req.id, &req.params, state).await
         }
-        "governance.proposal.list" => handler::governance::handle_governance_proposal_list(req.id, state).await,
+        "governance.proposal.list" => {
+            handler::governance::handle_governance_proposal_list(req.id, state).await
+        }
         "governance.proposal.get" => {
             handler::governance::handle_governance_proposal_get(req.id, &req.params, state).await
         }
@@ -512,12 +536,20 @@ async fn dispatch_request(
         "governance.proposal.close" => {
             handler::governance::handle_governance_proposal_close(req.id, &req.params, state).await
         }
-        "governance.vote.cast" => handler::governance::handle_governance_vote_cast(req.id, &req.params, state).await,
+        "governance.vote.cast" => {
+            handler::governance::handle_governance_vote_cast(req.id, &req.params, state).await
+        }
 
         // Compute methods (pass claims for authenticated submitter)
-        "compute.submit" => handler::compute::handle_compute_submit(req.id, &req.params, state, claims).await,
-        "compute.status" => handler::compute::handle_compute_status(req.id, &req.params, state).await,
-        "compute.cancel" => handler::compute::handle_compute_cancel(req.id, &req.params, state, claims).await,
+        "compute.submit" => {
+            handler::compute::handle_compute_submit(req.id, &req.params, state, claims).await
+        }
+        "compute.status" => {
+            handler::compute::handle_compute_status(req.id, &req.params, state).await
+        }
+        "compute.cancel" => {
+            handler::compute::handle_compute_cancel(req.id, &req.params, state, claims).await
+        }
 
         // Policy methods
         "policy.set" => handler::policy::handle_policy_set(req.id, &req.params, state).await,
@@ -534,27 +566,44 @@ async fn dispatch_request(
         "trust.compute" => handler::trust::handle_trust_compute(req.id, &req.params, state).await,
 
         // Recovery methods
-        "recovery.initiate" => handler::recovery::handle_recovery_initiate(req.id, &req.params, state, claims).await,
-        "recovery.attest" => handler::recovery::handle_recovery_attest(req.id, &req.params, state).await,
+        "recovery.initiate" => {
+            handler::recovery::handle_recovery_initiate(req.id, &req.params, state, claims).await
+        }
+        "recovery.attest" => {
+            handler::recovery::handle_recovery_attest(req.id, &req.params, state).await
+        }
         "recovery.list" => handler::recovery::handle_recovery_list(req.id, state).await,
-        "recovery.status" => handler::recovery::handle_recovery_status(req.id, &req.params, state).await,
-        "recovery.finalize" => handler::recovery::handle_recovery_finalize(req.id, &req.params, state).await,
-        "recovery.cancel" => handler::recovery::handle_recovery_cancel(req.id, &req.params, state, claims).await,
+        "recovery.status" => {
+            handler::recovery::handle_recovery_status(req.id, &req.params, state).await
+        }
+        "recovery.finalize" => {
+            handler::recovery::handle_recovery_finalize(req.id, &req.params, state).await
+        }
+        "recovery.cancel" => {
+            handler::recovery::handle_recovery_cancel(req.id, &req.params, state, claims).await
+        }
 
         // Dispute methods (ledger entry disputes)
-        "dispute.file" => handler::dispute::handle_dispute_file(req.id, &req.params, state, claims).await,
+        "dispute.file" => {
+            handler::dispute::handle_dispute_file(req.id, &req.params, state, claims).await
+        }
         "dispute.list" => handler::dispute::handle_dispute_list(req.id, &req.params, state).await,
         "dispute.get" => handler::dispute::handle_dispute_get(req.id, &req.params, state).await,
         "dispute.add_evidence" => {
             handler::dispute::handle_dispute_add_evidence(req.id, &req.params, state, claims).await
         }
         "dispute.assign_mediator" => {
-            handler::dispute::handle_dispute_assign_mediator(req.id, &req.params, state, claims).await
+            handler::dispute::handle_dispute_assign_mediator(req.id, &req.params, state, claims)
+                .await
         }
-        "dispute.resolve" => handler::dispute::handle_dispute_resolve(req.id, &req.params, state, claims).await,
+        "dispute.resolve" => {
+            handler::dispute::handle_dispute_resolve(req.id, &req.params, state, claims).await
+        }
 
         // Federation methods (inter-cooperative coordination)
-        "federation.coop.list" => handler::federation::handle_federation_coop_list(req.id, state).await,
+        "federation.coop.list" => {
+            handler::federation::handle_federation_coop_list(req.id, state).await
+        }
         "federation.coop.get" => {
             handler::federation::handle_federation_coop_get(req.id, &req.params, state).await
         }
@@ -572,7 +621,8 @@ async fn dispatch_request(
             handler::federation::handle_federation_vouch_list(req.id, &req.params, state).await
         }
         "federation.vouch.issue" => {
-            handler::federation::handle_federation_vouch_issue(req.id, &req.params, state, claims).await
+            handler::federation::handle_federation_vouch_issue(req.id, &req.params, state, claims)
+                .await
         }
         "federation.vouch.remove" => {
             handler::federation::handle_federation_vouch_remove(req.id, &req.params, state).await
@@ -580,28 +630,51 @@ async fn dispatch_request(
 
         // Attestation methods (cross-cooperative trust)
         "federation.attestation.list" => {
-            handler::federation::handle_federation_attestation_list(req.id, &req.params, state).await
+            handler::federation::handle_federation_attestation_list(req.id, &req.params, state)
+                .await
         }
         "federation.attestation.from" => {
-            handler::federation::handle_federation_attestation_from(req.id, &req.params, state).await
+            handler::federation::handle_federation_attestation_from(req.id, &req.params, state)
+                .await
         }
         "federation.attestation.issue" => {
-            handler::federation::handle_federation_attestation_issue(req.id, &req.params, state, claims).await
+            handler::federation::handle_federation_attestation_issue(
+                req.id,
+                &req.params,
+                state,
+                claims,
+            )
+            .await
         }
 
         // Clearing methods (bilateral settlement)
-        "federation.clearing.list" => handler::federation::handle_federation_clearing_list(req.id, state).await,
+        "federation.clearing.list" => {
+            handler::federation::handle_federation_clearing_list(req.id, state).await
+        }
         "federation.clearing.show" => {
             handler::federation::handle_federation_clearing_show(req.id, &req.params, state).await
         }
         "federation.clearing.create" => {
-            handler::federation::handle_federation_clearing_create(req.id, &req.params, state, claims).await
+            handler::federation::handle_federation_clearing_create(
+                req.id,
+                &req.params,
+                state,
+                claims,
+            )
+            .await
         }
         "federation.clearing.position" => {
-            handler::federation::handle_federation_clearing_position(req.id, &req.params, state).await
+            handler::federation::handle_federation_clearing_position(req.id, &req.params, state)
+                .await
         }
         "federation.clearing.settle" => {
-            handler::federation::handle_federation_clearing_settle(req.id, &req.params, state, claims).await
+            handler::federation::handle_federation_clearing_settle(
+                req.id,
+                &req.params,
+                state,
+                claims,
+            )
+            .await
         }
 
         _ => {

@@ -6,9 +6,13 @@ use sled::Db;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum PaymentFrequency {
+    /// Execute payment once per day
     Daily,
+    /// Execute payment once per week
     Weekly,
+    /// Execute payment once per month
     Monthly,
+    /// Execute payment once per year
     Yearly,
 }
 
@@ -16,9 +20,13 @@ pub enum PaymentFrequency {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum RecurringStatus {
+    /// Payment is active and will execute on schedule
     Active,
+    /// Payment is temporarily paused
     Paused,
+    /// Payment has been cancelled
     Cancelled,
+    /// Payment has completed its schedule
     Completed,
 }
 
@@ -64,6 +72,7 @@ pub struct RecurringPaymentStore {
 }
 
 impl RecurringPaymentStore {
+    /// Create a new recurring payment store with the given database
     pub fn new(db: Db) -> Self {
         Self { db }
     }

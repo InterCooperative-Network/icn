@@ -64,4 +64,3 @@ pub enum GossipError {
     #[error("internal error: {0}")]
     Internal(String),
 }
-
