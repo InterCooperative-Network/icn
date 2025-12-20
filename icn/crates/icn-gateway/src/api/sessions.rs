@@ -15,7 +15,9 @@ use std::sync::Arc;
 use crate::auth::AuthManager;
 use crate::error::{GatewayError, Result};
 use crate::middleware::get_claims;
-use crate::models::{CreateSessionRequest, CreateSessionResponse, SessionQrData, SessionStatusResponse};
+use crate::models::{
+    CreateSessionRequest, CreateSessionResponse, SessionQrData, SessionStatusResponse,
+};
 use crate::rate_limit::IpRateLimiter;
 use crate::session::{SessionManager, SessionStatus};
 use crate::validation;
@@ -63,11 +65,7 @@ fn get_gateway_url(req: &HttpRequest) -> String {
         .headers()
         .get("x-forwarded-host")
         .and_then(|v| v.to_str().ok())
-        .or_else(|| {
-            req.headers()
-                .get("host")
-                .and_then(|v| v.to_str().ok())
-        });
+        .or_else(|| req.headers().get("host").and_then(|v| v.to_str().ok()));
 
     if let Some(h) = host {
         // Strip port for standard ports
@@ -78,7 +76,7 @@ fn get_gateway_url(req: &HttpRequest) -> String {
         } else {
             h
         };
-        return format!("{}://{}", scheme, clean_host);
+        return format!("{scheme}://{clean_host}");
     }
 
     // Fallback
@@ -218,13 +216,13 @@ pub async fn approve_session(
     let session_id = path.into_inner();
 
     // Get authenticated DID from JWT claims
-    let claims = get_claims(&http_req).ok_or_else(|| {
-        GatewayError::AuthenticationFailed("Authentication required".to_string())
-    })?;
+    let claims = get_claims(&http_req)
+        .ok_or_else(|| GatewayError::AuthenticationFailed("Authentication required".to_string()))?;
 
-    let did: Did = claims.sub.parse().map_err(|e| {
-        GatewayError::BadRequest(format!("Invalid DID in token: {e}"))
-    })?;
+    let did: Did = claims
+        .sub
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
 
     // Get session to validate coop_id
     let session = session_mgr
@@ -286,13 +284,13 @@ pub async fn approve_session_handler(
     let session_id = path.into_inner();
 
     // Get authenticated DID from JWT claims
-    let claims = get_claims(&http_req).ok_or_else(|| {
-        GatewayError::AuthenticationFailed("Authentication required".to_string())
-    })?;
+    let claims = get_claims(&http_req)
+        .ok_or_else(|| GatewayError::AuthenticationFailed("Authentication required".to_string()))?;
 
-    let did: Did = claims.sub.parse().map_err(|e| {
-        GatewayError::BadRequest(format!("Invalid DID in token: {e}"))
-    })?;
+    let did: Did = claims
+        .sub
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
 
     // Get session to validate coop_id
     let session = session_mgr

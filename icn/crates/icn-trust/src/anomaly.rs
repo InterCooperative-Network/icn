@@ -18,9 +18,13 @@ use std::time::{SystemTime, UNIX_EPOCH};
 /// Trust edge for anomaly detection
 #[derive(Debug, Clone)]
 pub struct TrustEdge {
+    /// Source DID
     pub from: Did,
+    /// Target DID
     pub to: Did,
+    /// Trust score
     pub score: f64,
+    /// Creation timestamp
     pub created_at: u64,
 }
 

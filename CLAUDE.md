@@ -54,11 +54,14 @@ The Cargo workspace is located in `icn/` subdirectory. All build/test commands m
 
 ## Documentation Structure
 
-**Project root `/home/matt/projects/icn/`:**
-- `CLAUDE.md` - This file
+**IMPORTANT: Never save documentation files to the project root.** All documentation (session notes, status reports, guides, etc.) must go in the appropriate `docs/` subdirectory.
+
+**Project root `/home/matt/projects/icn/`** (only these files):
 - `README.md` - Project overview and quick start
-- `ROADMAP.md` - Strategic roadmap (see this for "what's next")
 - `CHANGELOG.md` - User-facing changelog
+- `CLAUDE.md` - This file (Claude Code guidance)
+- `CODE_OF_CONDUCT.md` - Community guidelines
+- `CONTRIBUTING.md` - Contribution guidelines
 
 **Documentation directory `/home/matt/projects/icn/docs/`:**
 - `ARCHITECTURE.md` - System architecture and component design
@@ -67,7 +70,12 @@ The Cargo workspace is located in `icn/` subdirectory. All build/test commands m
 - `glossary.md` - ICN terminology definitions
 - `production-hardening.md` - Security hardening measures
 - `trust-multi-graph-migration.md` - Multi-graph trust migration guide
-- `dev-journal/` - Development session journals
+- `dev-journal/` - Development session journals and technical notes
+- `demo/` - Demo session documentation and guides
+- `security/` - Security audits, threat models, and fixes
+- `ci/` - CI/CD status reports and configurations
+- `status/` - System status reports and deployment verification
+- `performance/` - Performance benchmarks and optimization docs
 
 ## Build & Test Commands
 
@@ -159,7 +167,7 @@ CCL (`icn-ccl`) is a domain-specific language for expressing agreements:
 
 See **[docs/PHASE_HISTORY.md](docs/PHASE_HISTORY.md)** for complete phase history.
 
-**What's Next**: See [ROADMAP.md](ROADMAP.md) - Track C1 (Pilot Community Selection) is next priority.
+**What's Next**: See [docs/dev-journal/ROADMAP.md](docs/dev-journal/ROADMAP.md) for the strategic roadmap.
 
 ## Common Development Workflows
 

@@ -1,5 +1,6 @@
 // Allow unused_assignments from Zeroize derive macro generated code
 #![allow(unused_assignments)]
+#![allow(missing_docs)]
 
 //! ICN Identity - DID management, key generation, and cryptographic operations
 //!

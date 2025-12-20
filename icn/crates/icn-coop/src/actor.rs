@@ -154,7 +154,11 @@ impl CoopActor {
                     let result = self.handle_add_member(coop_id, did, role).await;
                     let _ = reply.send(result);
                 }
-                CoopMessage::RemoveMember { coop_id, did, reply } => {
+                CoopMessage::RemoveMember {
+                    coop_id,
+                    did,
+                    reply,
+                } => {
                     let result = self.handle_remove_member(coop_id, did).await;
                     let _ = reply.send(result);
                 }
@@ -189,7 +193,9 @@ impl CoopActor {
                     metadata,
                     reply,
                 } => {
-                    let result = self.handle_update_cooperative(coop_id, name, metadata).await;
+                    let result = self
+                        .handle_update_cooperative(coop_id, name, metadata)
+                        .await;
                     let _ = reply.send(result);
                 }
             }

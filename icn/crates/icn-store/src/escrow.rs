@@ -7,10 +7,15 @@ use std::collections::HashSet;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum EscrowStatus {
+    /// Escrow created but not yet funded
     Pending,
+    /// Funds are locked in escrow
     Locked,
+    /// Funds have been released to beneficiary
     Released,
+    /// Funds have been refunded to creator
     Refunded,
+    /// Escrow expired before completion
     Expired,
 }
 
@@ -19,11 +24,20 @@ pub enum EscrowStatus {
 #[serde(rename_all = "snake_case")]
 pub enum EscrowCondition {
     /// Requires approval from specific DID
-    RequiresApproval { did: String },
+    RequiresApproval {
+        /// DID of the approver
+        did: String,
+    },
     /// Releases after timestamp
-    TimeRelease { timestamp: u64 },
+    TimeRelease {
+        /// Unix timestamp for release
+        timestamp: u64,
+    },
     /// Requires external proof (e.g., delivery confirmation)
-    ProofRequired { proof_type: String },
+    ProofRequired {
+        /// Type of proof required
+        proof_type: String,
+    },
 }
 
 /// Escrow record
@@ -66,6 +80,7 @@ pub struct EscrowStore {
 }
 
 impl EscrowStore {
+    /// Create a new EscrowStore backed by the given Sled database
     pub fn new(db: Db) -> Self {
         Self { db }
     }

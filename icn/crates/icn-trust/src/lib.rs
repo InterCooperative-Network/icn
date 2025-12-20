@@ -1,4 +1,5 @@
 //! ICN Trust - Trust graph management and policy enforcement
+#![allow(missing_docs)]
 //!
 //! This crate provides trust graph infrastructure for ICN with three orthogonal
 //! trust dimensions:
@@ -104,12 +105,19 @@ impl TrustClass {
 /// A trust edge in the graph
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TrustEdge {
+    /// Source DID (truster)
     pub source: Did,
+    /// Target DID (trustee)
     pub target: Did,
+    /// Labels describing the trust relationship
     pub labels: Vec<String>,
+    /// Trust score (0.0 to 1.0)
     pub score: f64,
-    pub evidence: Vec<String>, // Evidence references (content hashes)
+    /// Evidence references (content hashes)
+    pub evidence: Vec<String>,
+    /// Optional expiration timestamp
     pub expires_at: Option<u64>,
+    /// Creation timestamp
     pub created_at: u64,
     /// The type of trust graph this edge belongs to
     ///

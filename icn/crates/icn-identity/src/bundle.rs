@@ -65,9 +65,13 @@ impl Clone for IdentityBundle {
 /// Serializable binding info for network transmission
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BindingInfo {
+    /// The DID this binding belongs to
     pub did: Did,
+    /// SHA-256 hash of the TLS certificate
     pub tls_cert_hash: [u8; 32],
+    /// Cryptographic signature binding DID to TLS cert
     pub tls_binding_sig: Vec<u8>,
+    /// Unix timestamp when binding was created
     pub created_at: u64,
 }
 

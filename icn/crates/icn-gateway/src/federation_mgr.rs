@@ -41,10 +41,9 @@ impl FederationManager {
     /// Create a new federation manager with persistent storage
     pub fn new_with_storage(data_dir: std::path::PathBuf) -> Result<Self> {
         let store_path = data_dir.join("federation_store");
-        let store = Arc::new(
-            SledStore::open(&store_path)
-                .map_err(|e| GatewayError::InternalError(format!("Failed to open federation store: {}", e)))?
-        );
+        let store = Arc::new(SledStore::open(&store_path).map_err(|e| {
+            GatewayError::InternalError(format!("Failed to open federation store: {e}"))
+        })?);
         let attestation_store = AttestationStore::new(store.clone());
 
         Ok(Self {

@@ -123,6 +123,7 @@ impl StewardNodeConfig {
     }
 }
 
+/// Network layer configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkConfig {
     /// Enable mDNS discovery
@@ -199,6 +200,7 @@ fn default_min_trust_threshold() -> f64 {
     0.1 // Require at least "Known" trust class by default
 }
 
+/// Observability and monitoring configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ObservabilityConfig {
     /// Metrics server port

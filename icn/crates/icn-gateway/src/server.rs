@@ -439,7 +439,9 @@ impl GatewayServer {
                                 .service(api::sessions::get_session_status)
                                 .service(
                                     web::resource("/{session_id}/approve")
-                                        .route(web::post().to(api::sessions::approve_session_handler))
+                                        .route(
+                                            web::post().to(api::sessions::approve_session_handler),
+                                        )
                                         .wrap(auth.clone()),
                                 ),
                         )

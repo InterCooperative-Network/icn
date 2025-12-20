@@ -494,14 +494,30 @@ impl ContributionValidator {
 /// Fraud indicator for suspicious activity
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FraudIndicator {
-    /// Unusually high claim amount
-    UnusuallyHighAmount { amount: u64, average: u64 },
-    /// Rapid successive claims
-    RapidClaims { count: u32, window_secs: u64 },
+    /// Unusually high claim amount compared to historical average
+    UnusuallyHighAmount {
+        /// The claimed amount
+        amount: u64,
+        /// The historical average for comparison
+        average: u64,
+    },
+    /// Rapid successive claims in a short time window
+    RapidClaims {
+        /// Number of claims in the window
+        count: u32,
+        /// Window duration in seconds
+        window_secs: u64,
+    },
     /// Attestation ring detected (circular attestations)
-    AttestationRing { participants: Vec<String> },
+    AttestationRing {
+        /// DIDs of participants in the ring
+        participants: Vec<String>,
+    },
     /// Claim conflicts with network observations
-    ConflictsWithObservations { reason: String },
+    ConflictsWithObservations {
+        /// Description of the conflict
+        reason: String,
+    },
 }
 
 // ============================================================================
@@ -680,17 +696,23 @@ pub enum ContributionMessage {
     ClaimSubmitted(ContributionClaim),
     /// An attestation was added to a claim
     AttestationAdded {
+        /// Hash of the claim being attested
         claim_hash: ContentHash,
+        /// The attestation being added
         attestation: PeerAttestation,
     },
     /// A claim was verified (reached threshold)
     ClaimVerified {
+        /// Hash of the verified claim
         claim_hash: ContentHash,
+        /// Final weighted attestation score
         weighted_score: f64,
     },
     /// A claim was rejected
     ClaimRejected {
+        /// Hash of the rejected claim
         claim_hash: ContentHash,
+        /// Reason for rejection
         reason: String,
     },
 }

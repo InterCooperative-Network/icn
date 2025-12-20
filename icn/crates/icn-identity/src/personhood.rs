@@ -200,10 +200,15 @@ pub enum POPMethod {
 /// Type of biometric used for verification
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BiometricType {
+    /// Facial recognition
     Face,
+    /// Fingerprint scan
     Fingerprint,
+    /// Iris scan
     Iris,
+    /// Voice recognition
     Voice,
+    /// Other biometric type with description
     Other(String),
 }
 
