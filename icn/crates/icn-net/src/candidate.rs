@@ -8,7 +8,6 @@
 use icn_identity::Did;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Connection candidate announced by a node
 ///
@@ -62,10 +61,7 @@ impl ConnectionCandidate {
         public_addr: Option<SocketAddr>,
         relay_addr: Option<SocketAddr>,
     ) -> Self {
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
+        let timestamp = icn_time::current_timestamp_secs();
 
         Self {
             did,
@@ -82,21 +78,13 @@ impl ConnectionCandidate {
     /// Candidates older than the given max_age (in seconds) are considered stale.
     /// Default recommendation: 300 seconds (5 minutes).
     pub fn is_fresh(&self, max_age_secs: u64) -> bool {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
-
+        let now = icn_time::current_timestamp_secs();
         now.saturating_sub(self.timestamp) <= max_age_secs
     }
 
     /// Get age of this candidate in seconds
     pub fn age_secs(&self) -> u64 {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs();
-
+        let now = icn_time::current_timestamp_secs();
         now.saturating_sub(self.timestamp)
     }
 }

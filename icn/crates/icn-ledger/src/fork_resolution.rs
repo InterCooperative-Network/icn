@@ -250,10 +250,7 @@ impl ForkResolver {
 
         // Timestamp component (30% weight) - favor earlier entries
         // Normalize timestamp to 0-1 range (assuming recent entries)
-        let now = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
         let age_hours = (now.saturating_sub(entry.timestamp)) / 3600;
         let recency_score = if age_hours == 0 {
             1.0

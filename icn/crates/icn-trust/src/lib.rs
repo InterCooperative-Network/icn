@@ -135,10 +135,7 @@ impl TrustEdge {
 
     /// Create a new trust edge with explicit graph type
     pub fn new_typed(source: Did, target: Did, score: f64, graph_type: TrustGraphType) -> Self {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         Self {
             source,

@@ -10,6 +10,7 @@ rustls.workspace = true
 tokio-rustls.workspace = true
 mdns-sd.workspace = true
 icn-identity.workspace = true
+icn-time = { path = "../icn-time" }
 icn-gossip.workspace = true
 icn-trust.workspace = true
 icn-ledger.workspace = true

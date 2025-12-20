@@ -29,6 +29,8 @@ fn create_transport_config() -> quinn::TransportConfig {
 
     // Set reasonable idle timeout (60 seconds)
     // Connections idle longer than this are closed
+    // SAFETY: 60 seconds is a valid VarInt value (< 2^62 ms)
+    #[allow(clippy::unwrap_used)]
     config.max_idle_timeout(Some(std::time::Duration::from_secs(60).try_into().unwrap()));
 
     // Enable keep-alive to detect broken connections (30 seconds)

@@ -200,19 +200,13 @@ impl NetworkMessage {
 
     /// Create a ping message with current timestamp
     pub fn ping(from: Did, to: Did) -> Self {
-        let sent_at = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as u64;
+        let sent_at = icn_time::current_timestamp_millis();
         Self::new(from, Some(to), MessagePayload::Ping { sent_at })
     }
 
     /// Create a pong message echoing ping timestamp
     pub fn pong(from: Did, to: Did, ping_sent_at: u64) -> Self {
-        let pong_sent_at = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as u64;
+        let pong_sent_at = icn_time::current_timestamp_millis();
         Self::new(
             from,
             Some(to),

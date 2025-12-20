@@ -114,6 +114,8 @@ impl StunClient {
         }
 
         // Find the most common result
+        // SAFETY: vote_counts is non-empty because results was checked above
+        #[allow(clippy::expect_used)]
         let consensus = vote_counts
             .iter()
             .max_by_key(|(_, &count)| count)

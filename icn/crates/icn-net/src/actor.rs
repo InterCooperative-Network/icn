@@ -1881,11 +1881,7 @@ impl NetworkActor {
                                     pong_sent_at,
                                 } => {
                                     // Calculate RTT
-                                    let now = std::time::SystemTime::now()
-                                        .duration_since(std::time::UNIX_EPOCH)
-                                        .unwrap()
-                                        .as_millis()
-                                        as u64;
+                                    let now = icn_time::current_timestamp_millis();
                                     let rtt_ms = now.saturating_sub(*ping_sent_at);
 
                                     info!(

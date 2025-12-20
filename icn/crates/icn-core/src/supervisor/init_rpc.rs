@@ -46,6 +46,7 @@ impl RpcConfig {
     /// Create RPC config from daemon config
     pub fn from_daemon_config(config: &crate::config::Config) -> Self {
         // SAFETY: 127.0.0.1 is always valid, and rpc_port is u16, so this format always parses
+        #[allow(clippy::expect_used)]
         let rpc_addr: SocketAddr = format!("127.0.0.1:{}", config.network.rpc_port)
             .parse()
             .expect("127.0.0.1:port is always a valid socket address");
@@ -179,6 +180,8 @@ pub fn spawn_gateway_server(config: GatewayConfig, deps: GatewayDeps) -> JoinHan
 
     // Spawn gateway in a dedicated thread (actix-web has its own runtime)
     let join_handle = std::thread::spawn(move || {
+        // SAFETY: Runtime creation only fails with invalid config or resource exhaustion
+        #[allow(clippy::unwrap_used)]
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async move {
             let mut gateway_server = if let Some(b) = broadcaster {

@@ -16,7 +16,6 @@ use crate::{Did, KeyPair};
 use anyhow::{bail, Result};
 use ed25519_dalek::Signature;
 use serde::{Deserialize, Serialize};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 /// A recovery event represents an attempt to recover a lost identity
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -351,10 +350,7 @@ impl RecoveryAttestation {
 
 /// Get current Unix timestamp in seconds
 fn current_timestamp() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("System time before UNIX epoch")
-        .as_secs()
+    icn_time::current_timestamp_secs()
 }
 
 // ============================================================================

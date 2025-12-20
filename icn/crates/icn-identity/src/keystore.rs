@@ -387,6 +387,7 @@ impl AgeKeyStore {
         info!("Rotated to KeyBundle v{}", new_version);
 
         // SAFETY: We just pushed to keybundles above, so last() is guaranteed Some
+        #[allow(clippy::expect_used)]
         Ok(self
             .keybundles
             .last()

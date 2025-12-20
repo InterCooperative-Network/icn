@@ -71,10 +71,7 @@ impl NotificationStore {
 
     /// Register a device
     pub fn register_device(&self, did: &str, device_token: &str, platform: Platform) -> Result<()> {
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let timestamp = icn_time::current_timestamp_secs();
 
         let device = RegisteredDevice {
             did: did.to_string(),

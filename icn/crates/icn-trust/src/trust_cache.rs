@@ -57,6 +57,8 @@ impl TrustCache {
 
     /// Create a new trust cache with custom configuration
     pub fn with_config(max_entries: usize, ttl: Duration) -> Self {
+        // SAFETY: 1 is always non-zero, and max_entries defaults to 1 if zero
+        #[allow(clippy::unwrap_used)]
         let capacity = NonZeroUsize::new(max_entries).unwrap_or(NonZeroUsize::new(1).unwrap());
         Self {
             cache: Mutex::new(LruCache::new(capacity)),

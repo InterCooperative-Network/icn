@@ -5,15 +5,11 @@
 use icn_governance::proposal::Version;
 use icn_identity::Did;
 use std::collections::HashMap;
-use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::info;
 
 /// Get current Unix timestamp in seconds
 fn now_secs() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs()
+    icn_time::current_timestamp_secs()
 }
 
 /// Tracks protocol versions across the network

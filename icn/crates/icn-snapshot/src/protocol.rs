@@ -16,6 +16,8 @@ impl SnapshotId {
     /// Generate a new random snapshot ID
     pub fn generate() -> Self {
         let mut bytes = [0u8; 32];
+        // SAFETY: getrandom only fails on unsupported platforms or during early boot
+        #[allow(clippy::expect_used)]
         getrandom::getrandom(&mut bytes).expect("Failed to generate random snapshot ID");
         Self(bytes)
     }
@@ -144,15 +146,10 @@ pub struct SnapshotMetadata {
 impl SnapshotMetadata {
     /// Create new snapshot metadata
     pub fn new(snapshot_id: SnapshotId, initiator: Did, participants: Vec<Did>) -> Self {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-
         Self {
             snapshot_id,
             initiator,
-            started_at: now,
+            started_at: icn_time::current_timestamp_secs(),
             participants,
             state: SnapshotState::Idle,
             channel_states: HashMap::new(),

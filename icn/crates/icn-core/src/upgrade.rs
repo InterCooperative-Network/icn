@@ -263,11 +263,11 @@ impl UpgradeCoordinator {
         // Get the latest pending upgrade
         let latest_upgrade = upgrades.last();
 
-        if latest_upgrade.is_none() {
-            return Ok(None);
-        }
-
-        let upgrade = latest_upgrade.unwrap();
+        // Use if-let pattern to avoid unwrap
+        let upgrade = match latest_upgrade {
+            Some(u) => u,
+            None => return Ok(None),
+        };
         let target_version = &upgrade.version;
 
         let total_peers = versions.len();

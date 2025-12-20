@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
 use std::sync::Arc;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 use tokio::sync::{mpsc, RwLock};
 use tracing::{info, warn};
 
@@ -367,6 +367,8 @@ impl GovernanceActor {
                             let mut scheduler = scheduler_clone.write().await;
                             while let Some(Reverse(scheduled)) = scheduler.peek() {
                                 if scheduled.closes_at <= now {
+                                    // SAFETY: We just peeked and confirmed an element exists
+                                    #[allow(clippy::unwrap_used)]
                                     expired.push(scheduler.pop().unwrap().0.proposal_id.clone());
                                 } else {
                                     break;
@@ -817,10 +819,7 @@ impl GovernanceActor {
                 }
 
                 // Update timestamp
-                domain.updated_at = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs();
+                domain.updated_at = icn_time::current_timestamp_secs();
 
                 // Persist locally
                 self.store
@@ -995,8 +994,5 @@ fn load_json<T: for<'a> serde::Deserialize<'a>>(
 }
 
 fn now_seconds() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs()
+    icn_time::current_timestamp_secs()
 }

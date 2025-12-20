@@ -69,10 +69,7 @@ struct QuarantineRecord {
 impl QuarantineRecord {
     /// Create a new quarantine record with TTL
     fn new(entry: JournalEntry, item: QuarantineItem, ttl_seconds: u64) -> Self {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         QuarantineRecord {
             entry,
@@ -83,12 +80,7 @@ impl QuarantineRecord {
 
     /// Check if this record has expired
     fn is_expired(&self) -> bool {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-
-        now >= self.expires_at
+        icn_time::current_timestamp_secs() >= self.expires_at
     }
 }
 

@@ -38,7 +38,6 @@ use icn_store::Store;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::{info, warn};
 
 /// Storage key prefix for frozen members
@@ -69,10 +68,7 @@ pub struct FrozenMember {
 impl FrozenMember {
     /// Create a new frozen member record
     pub fn new(did: Did, reason: String, duration_seconds: Option<u64>) -> Self {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         Self {
             did,
@@ -99,11 +95,7 @@ impl FrozenMember {
     /// Check if the freeze has expired
     pub fn is_expired(&self) -> bool {
         if let Some(expires_at) = self.expires_at {
-            let now = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
-            now >= expires_at
+            icn_time::current_timestamp_secs() >= expires_at
         } else {
             false // No expiration = frozen indefinitely
         }
@@ -112,10 +104,7 @@ impl FrozenMember {
     /// Get remaining duration in seconds (0 if expired, None if indefinite)
     pub fn remaining_seconds(&self) -> Option<u64> {
         if let Some(expires_at) = self.expires_at {
-            let now = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
+            let now = icn_time::current_timestamp_secs();
             if now >= expires_at {
                 Some(0)
             } else {
@@ -248,10 +237,7 @@ impl FreezeManager {
             let event = UnfreezeEvent {
                 did: did.clone(),
                 reason,
-                unfrozen_at: SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs(),
+                unfrozen_at: icn_time::current_timestamp_secs(),
                 proposal_id: None,
                 unfrozen_by: None,
             };
@@ -289,10 +275,7 @@ impl FreezeManager {
             let event = UnfreezeEvent {
                 did: did.clone(),
                 reason,
-                unfrozen_at: SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs(),
+                unfrozen_at: icn_time::current_timestamp_secs(),
                 proposal_id,
                 unfrozen_by,
             };

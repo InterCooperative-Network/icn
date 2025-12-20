@@ -169,9 +169,12 @@ impl TurnConfig {
 
 impl Default for TurnConfig {
     fn default() -> Self {
+        // SAFETY: "0.0.0.0:3478" is a valid socket address literal
+        #[allow(clippy::unwrap_used)]
+        let server = "0.0.0.0:3478".parse().unwrap();
         Self {
             // Default to no TURN server - must be configured
-            server: "0.0.0.0:3478".parse().unwrap(),
+            server,
             username: None,
             password: None,
             timeout: TURN_TIMEOUT,

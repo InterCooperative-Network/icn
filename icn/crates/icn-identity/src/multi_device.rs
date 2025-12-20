@@ -10,7 +10,6 @@ use crate::Did;
 use anyhow::{bail, Result};
 use ed25519_dalek::{Signature, VerifyingKey};
 use serde::{Deserialize, Serialize};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 /// DID Document version 2: Multi-device identity
 ///
@@ -604,10 +603,7 @@ impl RotationEvent {
 
 /// Get current Unix timestamp in seconds
 fn current_timestamp() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("System time before UNIX epoch")
-        .as_secs()
+    icn_time::current_timestamp_secs()
 }
 
 #[cfg(test)]

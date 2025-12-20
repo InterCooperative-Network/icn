@@ -5,6 +5,7 @@ edition.workspace = true
 
 [dependencies]
 icn-identity.workspace = true
+icn-time = { path = "../icn-time" }
 sled.workspace = true
 serde.workspace = true
 serde_json.workspace = true

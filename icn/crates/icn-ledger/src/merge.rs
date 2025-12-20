@@ -73,10 +73,7 @@ impl MergeDecision {
             discarded: Vec::new(),
             quarantined: Vec::new(),
             conflicts: Vec::new(),
-            timestamp: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
+            timestamp: icn_time::current_timestamp_secs(),
             accepted_count: 0,
         }
     }
@@ -138,10 +135,7 @@ impl QuarantineItem {
             entry_id,
             reason,
             author,
-            observed_at: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
+            observed_at: icn_time::current_timestamp_secs(),
             metadata: None,
         }
     }

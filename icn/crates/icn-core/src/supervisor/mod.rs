@@ -2079,10 +2079,7 @@ impl Supervisor {
                                                             "currency": currency,
                                                             "recipient": recipient.to_string(),
                                                             "decided_at": decision_time,  // When governance decision was made
-                                                            "executed_at": std::time::SystemTime::now()
-                                                                .duration_since(std::time::UNIX_EPOCH)
-                                                                .unwrap()
-                                                                .as_secs(),  // When ledger transaction completed
+                                                            "executed_at": icn_time::current_timestamp_secs(),  // When ledger transaction completed
                                                         });
 
                                                         // CRITICAL: Store audit trail - failure here creates inconsistent state
@@ -2428,10 +2425,7 @@ impl Supervisor {
                                                         "action": "ledger_rollback",
                                                         "target_hash": target_hash_str,
                                                         "archived_count": archived_hashes.len(),
-                                                        "executed_at": std::time::SystemTime::now()
-                                                            .duration_since(std::time::UNIX_EPOCH)
-                                                            .unwrap()
-                                                            .as_secs()
+                                                        "executed_at": icn_time::current_timestamp_secs()
                                                     }).to_string().as_bytes(),
                                                 ) {
                                                     warn!("Failed to record rollback execution: {}", e);
@@ -3026,10 +3020,7 @@ impl Supervisor {
                                                 "proposal_id": prop_id.0,
                                                 "coop_id": coop,
                                                 "decided_at": decision_time,
-                                                "executed_at": std::time::SystemTime::now()
-                                                    .duration_since(std::time::UNIX_EPOCH)
-                                                    .unwrap()
-                                                    .as_secs(),
+                                                "executed_at": icn_time::current_timestamp_secs(),
                                             });
 
                                             if let Ok(audit_json) = serde_json::to_vec(&audit_record) {
@@ -3385,6 +3376,8 @@ impl Supervisor {
 
                 // Spawn gateway in a dedicated thread (actix-web has its own runtime)
                 std::thread::spawn(move || {
+                    // SAFETY: Runtime creation only fails with invalid config or resource exhaustion
+                    #[allow(clippy::unwrap_used)]
                     let rt = tokio::runtime::Runtime::new().unwrap();
                     rt.block_on(async move {
                         let mut gateway_server = if let Some(broadcaster) = broadcaster_for_gateway

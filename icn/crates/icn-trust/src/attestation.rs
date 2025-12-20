@@ -71,10 +71,7 @@ impl TrustAttestation {
     /// Note: This returns an attestation with an empty signature.
     /// You must call `sign()` before broadcasting.
     pub fn new_typed(issuer: Did, subject: Did, score: f64, graph_type: TrustGraphType) -> Self {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         Self {
             issuer,

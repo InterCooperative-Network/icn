@@ -25,9 +25,12 @@ pub struct AttestationStore {
 impl AttestationStore {
     /// Create a new attestation store
     pub fn new(store: Arc<dyn Store>) -> Self {
+        // SAFETY: 1000 is always non-zero
+        #[allow(clippy::unwrap_used)]
+        let capacity = NonZeroUsize::new(1000).unwrap();
         Self {
             store,
-            cache: RwLock::new(LruCache::new(NonZeroUsize::new(1000).unwrap())),
+            cache: RwLock::new(LruCache::new(capacity)),
         }
     }
 

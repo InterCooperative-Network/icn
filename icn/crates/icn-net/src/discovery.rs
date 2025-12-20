@@ -97,14 +97,13 @@ impl Discovery {
         let mut shutdown_rx = self.shutdown_tx.subscribe();
 
         tokio::spawn(async move {
-            let browse_result = daemon.browse(SERVICE_TYPE);
-
-            if let Err(e) = browse_result {
-                warn!("Failed to start mDNS browse: {}", e);
-                return;
-            }
-
-            let receiver = browse_result.unwrap();
+            let receiver = match daemon.browse(SERVICE_TYPE) {
+                Ok(r) => r,
+                Err(e) => {
+                    warn!("Failed to start mDNS browse: {}", e);
+                    return;
+                }
+            };
 
             info!("Started browsing for ICN peers on mDNS");
 

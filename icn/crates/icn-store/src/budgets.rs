@@ -226,10 +226,7 @@ impl BudgetStore {
         for mut budget in budgets {
             if budget.account == account && budget.status == BudgetStatus::Active {
                 budget.spent += amount;
-                budget.updated_at = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs();
+                budget.updated_at = icn_time::current_timestamp_secs();
 
                 // Check if exceeded
                 if budget.is_exceeded() {

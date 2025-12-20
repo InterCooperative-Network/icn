@@ -74,14 +74,9 @@ pub struct StateSnapshot {
 impl StateSnapshot {
     /// Create a new snapshot with current timestamp
     pub fn new() -> Self {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-
         Self {
             version: 1,
-            created_at: now,
+            created_at: icn_time::current_timestamp_secs(),
             gossip_state: None,
             network_state: None,
         }

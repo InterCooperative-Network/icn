@@ -80,6 +80,8 @@ impl FederatedDidResolver {
 
     /// Create a resolver with a specific cache size
     pub fn with_cache_size(registry: Arc<CooperativeRegistry>, cache_size: usize) -> Self {
+        // SAFETY: 1 is always non-zero, and cache_size defaults to 1 if zero
+        #[allow(clippy::unwrap_used)]
         let cache_size = NonZeroUsize::new(cache_size).unwrap_or(NonZeroUsize::new(1).unwrap());
         Self {
             registry,

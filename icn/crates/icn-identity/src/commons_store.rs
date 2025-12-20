@@ -40,19 +40,23 @@ pub struct CommonsHolderStore<S: PersonhoodStore> {
 impl<S: PersonhoodStore> CommonsHolderStore<S> {
     /// Create a new CommonsHolderStore
     pub fn new(store: Arc<S>) -> Self {
+        // SAFETY: 1000 is always non-zero
+        #[allow(clippy::unwrap_used)]
+        let capacity = NonZeroUsize::new(1000).unwrap();
         Self {
             store,
-            cache: RwLock::new(LruCache::new(NonZeroUsize::new(1000).unwrap())),
+            cache: RwLock::new(LruCache::new(capacity)),
         }
     }
 
     /// Create with custom cache size
     pub fn with_cache_size(store: Arc<S>, cache_size: usize) -> Self {
+        // SAFETY: 100 is always non-zero, and cache_size defaults to 100 if zero
+        #[allow(clippy::unwrap_used)]
+        let capacity = NonZeroUsize::new(cache_size).unwrap_or(NonZeroUsize::new(100).unwrap());
         Self {
             store,
-            cache: RwLock::new(LruCache::new(
-                NonZeroUsize::new(cache_size).unwrap_or(NonZeroUsize::new(100).unwrap()),
-            )),
+            cache: RwLock::new(LruCache::new(capacity)),
         }
     }
 

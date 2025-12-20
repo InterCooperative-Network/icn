@@ -346,10 +346,7 @@ impl Ledger {
                     entry_id: hash.clone(),
                     reason: QuarantineReason::CharterViolation,
                     author: entry.author.clone(),
-                    observed_at: SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap()
-                        .as_secs(),
+                    observed_at: icn_time::current_timestamp_secs(),
                     metadata: Some(e.to_string()),
                 };
 
@@ -1680,7 +1677,7 @@ impl Ledger {
         reason: &str,
         broadcast: bool,
     ) -> Result<Vec<ContentHash>> {
-        use std::time::{SystemTime, UNIX_EPOCH};
+        
 
         info!(
             "🚨 ROLLBACK: Beginning rollback to entry {} (reason: {})",
@@ -1718,10 +1715,7 @@ impl Ledger {
 
         // Step 3: Archive entries to separate namespace
         let mut archived_hashes = Vec::with_capacity(archived_count);
-        let archive_timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let archive_timestamp = icn_time::current_timestamp_secs();
 
         for entry in &entries_to_archive {
             if let Some(ref hash) = entry.id {

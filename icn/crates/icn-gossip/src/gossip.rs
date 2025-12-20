@@ -1909,7 +1909,9 @@ impl GossipActor {
         };
 
         // Get topic scope and fanout
-        let topic_obj = self.topics.get(topic).unwrap(); // Safe: checked above
+        // SAFETY: topic existence was checked above via contains_key()
+        #[allow(clippy::unwrap_used)]
+        let topic_obj = self.topics.get(topic).unwrap();
         let scope = topic_obj.scope;
         let fanout = match scope {
             crate::types::Scope::LocalCluster => 8, // Default local fanout
