@@ -4,7 +4,6 @@ use crate::bloom::BloomFilter;
 use crate::sync::PeerSyncManager;
 use crate::types::{
     AccessControl, ContentHash, GossipEntry, GossipMessage, Subscription, Topic,
-    TrustResourceLimits,
 };
 use crate::vector_clock::VectorClock;
 use anyhow::{bail, Context as _, Result};
@@ -42,7 +41,7 @@ const MAX_SUBSCRIBERS_PER_TOPIC: usize = 10_000;
 /// Gossip actor manages topics and entry synchronization
 pub struct GossipActor {
     /// This node's DID
-    own_did: Did,
+    pub(crate) own_did: Did,
 
     /// Keypair for signing outgoing messages (optional for testing)
     keypair: Option<KeyPair>,
@@ -52,22 +51,22 @@ pub struct GossipActor {
     sequence: u64,
 
     /// Vector clock for this node
-    clock: VectorClock,
+    pub(crate) clock: VectorClock,
 
     /// Topics (topic name -> Topic)
-    topics: HashMap<String, Topic>,
+    pub(crate) topics: HashMap<String, Topic>,
 
     /// Entries (topic -> hash -> entry)
-    entries: HashMap<String, HashMap<ContentHash, GossipEntry>>,
+    pub(crate) entries: HashMap<String, HashMap<ContentHash, GossipEntry>>,
 
     /// Bloom filters (topic -> filter)
-    bloom_filters: HashMap<String, BloomFilter>,
+    pub(crate) bloom_filters: HashMap<String, BloomFilter>,
 
     /// Subscriptions (topic -> subscribers)
     subscriptions: HashMap<String, Vec<Did>>,
 
     /// Trust lookup function (returns trust class for resource limits)
-    trust_lookup: TrustLookup,
+    pub(crate) trust_lookup: TrustLookup,
 
     /// Trust graph for fine-grained trust score computation (optional)
     /// When provided, enables trust-gated subscription authorization
@@ -83,19 +82,19 @@ pub struct GossipActor {
     peer_sampling: Option<PeerSamplingCallback>,
 
     /// Per-peer sync state manager
-    peer_sync: PeerSyncManager,
+    pub(crate) peer_sync: PeerSyncManager,
 
     /// Store for replica metadata tracking (Phase 17 - optional)
-    store: Option<Arc<dyn icn_store::Store>>,
+    pub(crate) store: Option<Arc<dyn icn_store::Store>>,
 
     /// Byzantine fault detector (Phase 18 Week 1-2 - optional)
     misbehavior_detector: Option<Arc<RwLock<icn_security::MisbehaviorDetector>>>,
 
     /// Network partition detector (Phase 18 Week 3 - optional)
-    partition_detector: Option<Arc<RwLock<crate::partition::PartitionDetector>>>,
+    pub(crate) partition_detector: Option<Arc<RwLock<crate::partition::PartitionDetector>>>,
 
     /// Network partition healer (Phase 18 Week 3 - optional)
-    partition_healer: Option<Arc<RwLock<crate::partition::PartitionHealer>>>,
+    pub(crate) partition_healer: Option<Arc<RwLock<crate::partition::PartitionHealer>>>,
 
     /// Storage quota manager (Phase 18 Week 6 - optional)
     /// Enforces per-DID storage limits and provides priority-based eviction
@@ -314,7 +313,7 @@ impl GossipActor {
     }
 
     /// Send a message to a peer (if callback is set)
-    fn send_message(&self, recipient: Option<Did>, message: GossipMessage) {
+    pub(crate) fn send_message(&self, recipient: Option<Did>, message: GossipMessage) {
         if let Some(callback) = &self.send_callback {
             callback(recipient, message);
         } else {
@@ -426,7 +425,7 @@ impl GossipActor {
     }
 
     /// Store an entry (from publish or receive)
-    fn store_entry(&mut self, entry: GossipEntry) -> Result<()> {
+    pub(crate) fn store_entry(&mut self, entry: GossipEntry) -> Result<()> {
         let topic = &entry.topic;
         let hash = entry.hash;
         let entry_size = entry.data.len() as u64;
@@ -936,217 +935,28 @@ impl GossipActor {
             }
         }
 
+        // Dispatch to handler methods (extracted to handlers/ module)
         match message {
             GossipMessage::Announce {
                 hash,
                 author,
                 clock: _,
                 topic,
-            } => {
-                debug!(
-                    peer_did = %sender,
-                    topic = %topic,
-                    entry_hash = %hex::encode(hash),
-                    author_did = %author,
-                    message_type = "Announce",
-                    "Received gossip Announce"
-                );
-                icn_obs::metrics::gossip::announces_received_inc();
+            } => self.handle_announce(sender, hash, author, topic),
 
-                // Check if we already have this entry
-                if let Some(entries) = self.entries.get(&topic) {
-                    if entries.contains_key(&hash) {
-                        debug!(
-                            entry_hash = %hex::encode(hash),
-                            topic = %topic,
-                            "Already have entry, skipping"
-                        );
-                        return Ok(());
-                    }
-                }
+            GossipMessage::Request { hash } => self.handle_request(sender, hash),
 
-                // Request full entry if we don't have it
-                debug!(
-                    entry_hash = %hex::encode(hash),
-                    from_did = %author,
-                    topic = %topic,
-                    message_type = "Request",
-                    "Requesting missing entry"
-                );
-                self.send_message(Some(author), GossipMessage::Request { hash });
-
-                // Store the announcement metadata for future reference
-                // We'll update it when we receive the full entry via Response
-                Ok(())
-            }
-
-            GossipMessage::Request { hash } => {
-                icn_obs::metrics::gossip::requests_received_inc();
-                debug!(
-                    peer_did = %sender,
-                    entry_hash = %hex::encode(hash),
-                    message_type = "Request",
-                    "Received gossip Request"
-                );
-
-                // Find entry across all topics
-                for entries in self.entries.values() {
-                    if let Some(entry) = entries.get(&hash) {
-                        debug!(
-                            entry_hash = %hex::encode(hash),
-                            topic = %entry.topic,
-                            to_did = %sender,
-                            message_type = "Response",
-                            "Found entry, sending Response"
-                        );
-
-                        // Send Response back to the requester
-                        self.send_message(
-                            Some(sender.clone()),
-                            GossipMessage::Response {
-                                entry: entry.clone(),
-                            },
-                        );
-
-                        return Ok(());
-                    }
-                }
-
-                debug!(
-                    entry_hash = %hex::encode(hash),
-                    peer_did = %sender,
-                    "Entry not found for Request"
-                );
-                Ok(())
-            }
-
-            GossipMessage::Response { entry } => {
-                icn_obs::metrics::gossip::responses_received_inc();
-                debug!(
-                    peer_did = %sender,
-                    topic = %entry.topic,
-                    entry_hash = %hex::encode(entry.hash),
-                    entry_size = entry.data.len(),
-                    message_type = "Response",
-                    "Received gossip Response"
-                );
-
-                // Store the entry using store_entry() to ensure:
-                // 1. Subscriber notifications are triggered
-                // 2. Vector clock is merged
-                // 3. max_entries limit is enforced
-                // 4. Duplicate entries are detected
-                self.store_entry(entry)?;
-
-                // Track metrics
-                icn_obs::metrics::gossip::entries_received_inc();
-                self.update_gauge_metrics();
-
-                Ok(())
-            }
+            GossipMessage::Response { entry } => self.handle_response(sender, entry),
 
             GossipMessage::RequestBloomFilter { topic } => {
-                debug!("Received RequestBloomFilter for topic: {}", topic);
-
-                // Get bloom filter for the topic
-                if let Some(filter) = self.bloom_filters.get(&topic) {
-                    let filter_data = filter.to_data();
-                    debug!(
-                        "Sending bloom filter for topic: {} ({} bits) to {}",
-                        topic, filter_data.size, sender
-                    );
-
-                    // Send bloom filter back to the requester
-                    self.send_message(
-                        Some(sender.clone()),
-                        GossipMessage::SendBloomFilter {
-                            topic: topic.clone(),
-                            filter: filter_data,
-                        },
-                    );
-                } else {
-                    debug!("Topic not found: {}", topic);
-                }
-
-                Ok(())
+                self.handle_request_bloom_filter(sender, topic)
             }
 
             GossipMessage::SendBloomFilter { topic, filter } => {
-                debug!("Received SendBloomFilter for topic: {}", topic);
-
-                // Reconstruct remote bloom filter
-                let _remote_filter = BloomFilter::from_data(&filter);
-
-                // Find entries we're missing (present in remote but not in local)
-                let mut _missing_hashes: Vec<ContentHash> = Vec::new();
-
-                // Check if topic exists locally
-                if !self.entries.contains_key(&topic) {
-                    debug!("Topic {} doesn't exist locally, cannot compare", topic);
-                    return Ok(());
-                }
-
-                // For a full implementation, we'd need to:
-                // 1. Compare our bloom filter with the remote one
-                // 2. Identify hashes present in remote but not in ours
-                // 3. Request those missing hashes
-                //
-                // However, bloom filters are probabilistic - they can only tell us
-                // "definitely not present" or "might be present". We can't extract
-                // the actual hashes from a bloom filter.
-                //
-                // The proper approach is for the sender to also send their entry hashes
-                // or we need a different anti-entropy approach.
-
-                debug!(
-                    "Remote filter size: {}, hashes: {}",
-                    filter.size, filter.num_hashes
-                );
-                debug!("Anti-entropy comparison complete for topic: {}", topic);
-
-                Ok(())
+                self.handle_send_bloom_filter(sender, topic, filter)
             }
 
-            GossipMessage::RequestMissing { hashes } => {
-                debug!("Received RequestMissing: {} hashes", hashes.len());
-
-                // Send Response messages for each requested hash that we have
-                let mut sent_count = 0;
-                let mut not_found_count = 0;
-
-                for hash in hashes {
-                    // Find entry across all topics
-                    let mut found = false;
-                    for entries in self.entries.values() {
-                        if let Some(entry) = entries.get(&hash) {
-                            debug!(
-                                "Sending requested entry: hash={:?}, topic={}",
-                                hash, entry.topic
-                            );
-                            self.send_message(
-                                None,
-                                GossipMessage::Response {
-                                    entry: entry.clone(),
-                                },
-                            );
-                            sent_count += 1;
-                            found = true;
-                            break;
-                        }
-                    }
-
-                    if !found {
-                        debug!("Requested entry not found: hash={:?}", hash);
-                        not_found_count += 1;
-                    }
-                }
-
-                debug!(
-                    "RequestMissing complete: sent={}, not_found={}",
-                    sent_count, not_found_count
-                );
-                Ok(())
-            }
+            GossipMessage::RequestMissing { hashes } => self.handle_request_missing(sender, hashes),
 
             GossipMessage::Digest {
                 topic,
@@ -1154,552 +964,50 @@ impl GossipActor {
                 bloom,
                 hint_count,
                 nonce,
-            } => {
-                // Digest Handler: Anti-entropy synchronization flow
-                // 1. Reconstruct remote bloom filter from data
-                // 2. Find entries we have that remote doesn't (bloom intersection)
-                // 3. Check trust class and get resource limits
-                // 4. Check backpressure: can we send to this peer?
-                // 5. Select entries to request (capped by max_pull_bytes)
-                // 6. Update peer sync state (vector, bloom, nonce, deficit)
-                // 7. Send PullRequest with selected entry hashes
-                icn_obs::metrics::gossip::digests_received_inc();
-                debug!(
-                    "Received Digest: topic={}, hint_count={}, nonce={}",
-                    topic, hint_count, nonce
-                );
-
-                // Check if we have this topic
-                if !self.topics.contains_key(&topic) {
-                    debug!("Received Digest for unknown topic: {}", topic);
-                    return Ok(());
-                }
-
-                // Reconstruct remote bloom filter
-                let _remote_bloom = BloomFilter::from_data(&bloom);
-
-                // PULL LOGIC: Detect if we're missing entries by comparing vector clocks
-                // Use the sender parameter to identify who sent this Digest
-                let peer_did = sender.clone();
-
-                // Check if we're behind this peer's sequence
-                let mut are_we_behind = false;
-                for (did, remote_seq) in &vector.clock {
-                    let our_seq = self.clock.get(did);
-                    if *remote_seq > our_seq {
-                        debug!(
-                            "We're behind on {}: remote_seq={} > our_seq={}",
-                            did, remote_seq, our_seq
-                        );
-                        are_we_behind = true;
-                        break;
-                    }
-                }
-
-                // Also check entry count hint
-                let our_entry_count = self.entries.get(&topic).map(|e| e.len()).unwrap_or(0);
-                if hint_count > our_entry_count as u32 {
-                    debug!(
-                        "Remote has {} entries, we have {} - we're behind",
-                        hint_count, our_entry_count
-                    );
-                    are_we_behind = true;
-                }
-
-                if !are_we_behind {
-                    debug!("We're not behind remote peer - no pull needed");
-                    return Ok(());
-                }
-
-                // We're behind! Send PullRequest with empty want_ids to request ALL entries
-                // The responder will interpret empty want_ids as "send everything (up to max_bytes)"
-                debug!("Detected we're behind - sending PullRequest for all entries");
-
-                // Get trust class and limits
-                let trust_class =
-                    (self.trust_lookup)(&peer_did).unwrap_or(icn_trust::TrustClass::Isolated);
-                let limits = TrustResourceLimits::for_trust_class(trust_class);
-                let max_bytes = limits.max_pull_bytes;
-
-                // Empty want_ids means "send all entries"
-                let want_ids = Vec::new();
-                let estimated_bytes = hint_count * 512; // Rough estimate
-
-                // Update peer sync state (borrow mutable)
-                let (request_nonce, deficit_after) = {
-                    let peer_state = self.peer_sync.get_or_create(peer_did.clone());
-
-                    // Update peer's known state
-                    peer_state.update_vector(vector.clone());
-                    peer_state.update_bloom(bloom.clone());
-
-                    // Check if we can send (backpressure + limits + backoff)
-                    if !peer_state.can_send(limits.max_outstanding_reqs, 10000) {
-                        debug!(
-                            "Cannot send to peer {} - backpressured or at limit",
-                            peer_did
-                        );
-                        let deficit = peer_state.deficit_bytes;
-                        icn_obs::metrics::gossip::peer_deficit_bytes_set(
-                            peer_did.as_str(),
-                            deficit,
-                        );
-                        return Ok(());
-                    }
-
-                    // Generate nonce for this request
-                    let request_nonce = peer_state.next_nonce();
-
-                    // Record outgoing request
-                    peer_state.record_request();
-                    peer_state.debit_bytes(estimated_bytes);
-
-                    (request_nonce, peer_state.deficit_bytes)
-                };
-                // Mutable borrow of peer_sync ends here
-
-                debug!(
-                    "Sending PullRequest to {}: {} entries, ~{} bytes, nonce={}",
-                    peer_did,
-                    want_ids.len(),
-                    estimated_bytes,
-                    request_nonce
-                );
-
-                // Send PullRequest (immutable borrow of self)
-                self.send_message(
-                    Some(peer_did.clone()),
-                    GossipMessage::PullRequest {
-                        topic: topic.clone(),
-                        want_ids,
-                        max_bytes,
-                        nonce: request_nonce,
-                    },
-                );
-
-                // Track metrics
-                icn_obs::metrics::gossip::pull_requests_sent_inc();
-                icn_obs::metrics::gossip::peer_deficit_bytes_set(peer_did.as_str(), deficit_after);
-
-                Ok(())
-            }
+            } => self.handle_digest(sender, topic, vector, bloom, hint_count, nonce),
 
             GossipMessage::PullRequest {
                 topic,
                 want_ids,
                 max_bytes,
                 nonce,
-            } => {
-                icn_obs::metrics::gossip::pull_requests_received_inc();
-                debug!(
-                    "Received PullRequest: topic={}, want_ids={}, max_bytes={}, nonce={}",
-                    topic,
-                    want_ids.len(),
-                    max_bytes,
-                    nonce
-                );
-
-                // Get entries for the topic
-                let topic_entries = match self.entries.get(&topic) {
-                    Some(entries) => entries,
-                    None => {
-                        debug!("Topic not found: {}", topic);
-                        return Ok(());
-                    }
-                };
-
-                // Collect requested entries
-                let mut response_entries = Vec::new();
-                let mut total_bytes = 0u32;
-                let mut truncated = false;
-
-                // If want_ids is empty, interpret as "send all entries" (up to max_bytes)
-                // This supports the case where requester detects missing entries via vector
-                // clock but doesn't know specific hashes
-                let hashes_to_send: Vec<ContentHash> = if want_ids.is_empty() {
-                    debug!("Empty want_ids - sending all entries for topic (up to max_bytes)");
-                    topic_entries.keys().copied().collect()
-                } else {
-                    want_ids.clone()
-                };
-
-                for hash in hashes_to_send {
-                    if let Some(entry) = topic_entries.get(&hash) {
-                        // Estimate entry size (rough approximation)
-                        let entry_bytes = entry.data.len() as u32 + 256; // Data + overhead
-
-                        if total_bytes + entry_bytes > max_bytes {
-                            truncated = true;
-                            icn_obs::metrics::gossip::pull_truncated_inc();
-                            break;
-                        }
-
-                        response_entries.push(entry.clone());
-                        total_bytes += entry_bytes;
-                    }
-                }
-
-                debug!(
-                    "Sending PullResponse: {} entries, {} bytes, truncated={}",
-                    response_entries.len(),
-                    total_bytes,
-                    truncated
-                );
-
-                // Send pull response
-                self.send_message(
-                    None,
-                    GossipMessage::PullResponse {
-                        topic: topic.clone(),
-                        entries: response_entries,
-                        truncated,
-                        nonce,
-                    },
-                );
-
-                icn_obs::metrics::gossip::pull_responses_sent_inc();
-                icn_obs::metrics::gossip::bytes_pushed_add(total_bytes as u64);
-
-                Ok(())
-            }
+            } => self.handle_pull_request(sender, topic, want_ids, max_bytes, nonce),
 
             GossipMessage::PullResponse {
                 topic,
                 entries,
                 truncated,
                 nonce,
-            } => {
-                icn_obs::metrics::gossip::pull_responses_received_inc();
-                debug!(
-                    "Received PullResponse: topic={}, entries={}, truncated={}, nonce={}",
-                    topic,
-                    entries.len(),
-                    truncated,
-                    nonce
-                );
-
-                // Calculate total bytes received and extract peer DID from first entry
-                let mut total_bytes = 0u32;
-                let mut peer_did: Option<Did> = None;
-
-                for entry in &entries {
-                    let entry_bytes = entry.data.len() as u32 + 256;
-                    total_bytes += entry_bytes;
-
-                    // Extract peer DID from entry author (first entry)
-                    if peer_did.is_none() {
-                        peer_did = Some(entry.author.clone());
-                    }
-                }
-
-                // Store all entries
-                for entry in entries {
-                    // Store the entry using store_entry() to ensure:
-                    // 1. Subscriber notifications are triggered
-                    // 2. Vector clock is merged
-                    // 3. max_entries limit is enforced
-                    // 4. Duplicate entries are detected
-                    self.store_entry(entry)?;
-                }
-
-                // Update peer sync state if we can identify the peer
-                if let Some(did) = peer_did {
-                    if let Some(peer_state) = self.peer_sync.get_mut(&did) {
-                        peer_state.record_response(total_bytes);
-
-                        debug!(
-                            "Updated peer {} sync state: deficit={}, outstanding={}",
-                            did, peer_state.deficit_bytes, peer_state.outstanding_requests
-                        );
-
-                        // Track peer deficit metric
-                        icn_obs::metrics::gossip::peer_deficit_bytes_set(
-                            did.as_str(),
-                            peer_state.deficit_bytes,
-                        );
-                    }
-                }
-
-                icn_obs::metrics::gossip::bytes_pulled_add(total_bytes as u64);
-                icn_obs::metrics::gossip::entries_received_inc();
-                self.update_gauge_metrics();
-
-                debug!(
-                    "PullResponse processed: {} bytes received, truncated={}",
-                    total_bytes, truncated
-                );
-                Ok(())
-            }
+            } => self.handle_pull_response(sender, topic, entries, truncated, nonce),
 
             GossipMessage::BlobAnnounce {
                 blob_hash,
                 peer_did,
                 size_bytes,
-            } => {
-                debug!(
-                    peer_did = %peer_did,
-                    blob_hash = %hex::encode(blob_hash),
-                    size_bytes = size_bytes,
-                    message_type = "BlobAnnounce",
-                    "Received blob announcement"
-                );
+            } => self.handle_blob_announce(sender, blob_hash, peer_did, size_bytes),
 
-                // BlobAnnounce is handled by the NetworkActor/BlobLocationRegistry
-                // This message type is just forwarded through gossip, not stored
-                Ok(())
-            }
-
-            // Phase 17: Replica coordination messages
             GossipMessage::ReplicaRequest {
                 content_hash,
                 requesting_peer,
-            } => {
-                debug!(
-                    peer_did = %requesting_peer,
-                    content_hash = %hex::encode(content_hash),
-                    message_type = "ReplicaRequest",
-                    "Received replica request"
-                );
-
-                // Check if we have this content hash in any topic
-                let mut have_content = false;
-                for entries in self.entries.values() {
-                    if entries.contains_key(&content_hash) {
-                        have_content = true;
-                        break;
-                    }
-                }
-
-                if have_content {
-                    debug!(
-                        content_hash = %hex::encode(content_hash),
-                        "We have this content, responding with ReplicaOffer"
-                    );
-
-                    // Respond with ReplicaOffer
-                    use crate::types::ReplicaHealth;
-                    self.send_message(
-                        Some(requesting_peer.clone()),
-                        GossipMessage::ReplicaOffer {
-                            content_hash,
-                            offering_peer: self.own_did.clone(),
-                            health: ReplicaHealth::Healthy,
-                        },
-                    );
-
-                    // Record ourselves as a replica in the store (if available)
-                    if let Some(store) = &self.store {
-                        if let Err(e) = store.add_replica(
-                            &content_hash,
-                            self.own_did.to_string(),
-                            icn_store::ReplicaHealth::Healthy,
-                        ) {
-                            warn!(
-                                content_hash = %hex::encode(content_hash),
-                                error = %e,
-                                "Failed to record replica metadata"
-                            );
-                        }
-                    }
-                } else {
-                    debug!(
-                        content_hash = %hex::encode(content_hash),
-                        "We don't have this content, ignoring request"
-                    );
-                }
-
-                Ok(())
-            }
+            } => self.handle_replica_request(sender, content_hash, requesting_peer),
 
             GossipMessage::ReplicaOffer {
                 content_hash,
                 offering_peer,
                 health,
-            } => {
-                debug!(
-                    peer_did = %offering_peer,
-                    content_hash = %hex::encode(content_hash),
-                    health = ?health,
-                    message_type = "ReplicaOffer",
-                    "Received replica offer"
-                );
-
-                // Record replica metadata in store (if available)
-                if let Some(store) = &self.store {
-                    // Convert gossip ReplicaHealth to store ReplicaHealth
-                    let store_health = match health {
-                        crate::types::ReplicaHealth::Healthy => icn_store::ReplicaHealth::Healthy,
-                        crate::types::ReplicaHealth::Stale => icn_store::ReplicaHealth::Stale,
-                        crate::types::ReplicaHealth::Unreachable => {
-                            icn_store::ReplicaHealth::Unreachable
-                        }
-                    };
-
-                    match store.add_replica(&content_hash, offering_peer.to_string(), store_health)
-                    {
-                        Ok(_) => {
-                            debug!(
-                                content_hash = %hex::encode(content_hash),
-                                peer = %offering_peer,
-                                "Recorded replica metadata"
-                            );
-
-                            // Get updated replica count for logging
-                            if let Ok(count) = store.get_replica_count(&content_hash) {
-                                info!(
-                                    content_hash = %hex::encode(content_hash),
-                                    replica_count = count,
-                                    "Replica count updated"
-                                );
-                            }
-                        }
-                        Err(e) => {
-                            warn!(
-                                content_hash = %hex::encode(content_hash),
-                                peer = %offering_peer,
-                                error = %e,
-                                "Failed to record replica metadata"
-                            );
-                        }
-                    }
-                } else {
-                    debug!("No store configured, replica metadata not persisted");
-                }
-
-                Ok(())
-            }
+            } => self.handle_replica_offer(sender, content_hash, offering_peer, health),
 
             GossipMessage::ReplicaStatus {
                 content_hash,
                 replicas,
-            } => {
-                debug!(
-                    content_hash = %hex::encode(content_hash),
-                    replica_count = replicas.len(),
-                    message_type = "ReplicaStatus",
-                    "Received replica status update"
-                );
+            } => self.handle_replica_status(sender, content_hash, replicas),
 
-                // Batch update replica metadata in store (if available)
-                if let Some(store) = &self.store {
-                    let mut updated_count = 0;
-                    let mut failed_count = 0;
-
-                    for (did, health) in replicas {
-                        // Convert gossip ReplicaHealth to store ReplicaHealth
-                        let store_health = match health {
-                            crate::types::ReplicaHealth::Healthy => {
-                                icn_store::ReplicaHealth::Healthy
-                            }
-                            crate::types::ReplicaHealth::Stale => icn_store::ReplicaHealth::Stale,
-                            crate::types::ReplicaHealth::Unreachable => {
-                                icn_store::ReplicaHealth::Unreachable
-                            }
-                        };
-
-                        match store.add_replica(&content_hash, did.to_string(), store_health) {
-                            Ok(_) => updated_count += 1,
-                            Err(e) => {
-                                warn!(
-                                    content_hash = %hex::encode(content_hash),
-                                    peer = %did,
-                                    error = %e,
-                                    "Failed to update replica status"
-                                );
-                                failed_count += 1;
-                            }
-                        }
-                    }
-
-                    info!(
-                        content_hash = %hex::encode(content_hash),
-                        updated = updated_count,
-                        failed = failed_count,
-                        "Batch updated replica status"
-                    );
-
-                    // Phase 17 Week 3: Check if replica count below threshold
-                    // The ReplicationManager handles remediation through its periodic health check.
-                    // Here we emit a metric for immediate observability.
-                    const DEFAULT_REPLICA_TARGET: usize = 3;
-                    if let Ok(Some(metadata)) = store.get_replica_metadata(&content_hash) {
-                        let healthy_count = metadata
-                            .replicas
-                            .iter()
-                            .filter(|r| r.health == icn_store::ReplicaHealth::Healthy)
-                            .count();
-
-                        if healthy_count < DEFAULT_REPLICA_TARGET {
-                            icn_obs::metrics::replication::content_under_replicated_detected_inc();
-                            warn!(
-                                content_hash = %hex::encode(content_hash),
-                                healthy_replicas = healthy_count,
-                                target_replicas = DEFAULT_REPLICA_TARGET,
-                                "Content under-replicated - ReplicationManager will request additional replicas"
-                            );
-                        }
-                    }
-                } else {
-                    debug!("No store configured, replica status not persisted");
-                }
-
-                Ok(())
-            }
-
-            // Phase 18 Week 3: Partition healing messages
             GossipMessage::PartitionHealRequest {
                 requesting_peer,
                 vector_clock,
                 last_contact_ms,
             } => {
-                info!(
-                    peer_did = %requesting_peer,
-                    last_contact_ms = last_contact_ms,
-                    message_type = "PartitionHealRequest",
-                    "Received partition heal request"
-                );
-                icn_obs::metrics::gossip::partition_detected_inc();
-
-                // Get list of topics that may have diverged
-                // (topics where our vector clock has entries they don't)
-                let mut diverged_topics = Vec::new();
-                let mut entries_behind = 0u64;
-
-                for (topic_name, entries) in &self.entries {
-                    // Count entries they might be missing
-                    for entry in entries.values() {
-                        // Check if our entry clock is ahead of their clock for any peer
-                        let our_version = entry.clock.get(&entry.author);
-                        let their_version = vector_clock.get(&entry.author);
-                        if our_version > their_version {
-                            if !diverged_topics.contains(topic_name) {
-                                diverged_topics.push(topic_name.clone());
-                            }
-                            entries_behind += 1;
-                        }
-                    }
-                }
-
-                info!(
-                    peer = %requesting_peer,
-                    diverged_topics = ?diverged_topics,
-                    entries_behind = entries_behind,
-                    "Preparing partition heal response"
-                );
-
-                // Send our vector clock back
-                self.send_message(
-                    Some(requesting_peer.clone()),
-                    GossipMessage::PartitionHealResponse {
-                        responding_peer: self.own_did.clone(),
-                        vector_clock: self.clock.clone(),
-                        diverged_topics,
-                        entries_behind,
-                    },
-                );
-
-                icn_obs::metrics::gossip::partition_vector_clock_merges_inc();
-                Ok(())
+                self.handle_partition_heal_request(sender, requesting_peer, vector_clock, last_contact_ms)
             }
 
             GossipMessage::PartitionHealResponse {
@@ -1708,69 +1016,13 @@ impl GossipActor {
                 diverged_topics,
                 entries_behind,
             } => {
-                info!(
-                    peer_did = %responding_peer,
-                    diverged_topics_count = diverged_topics.len(),
-                    entries_behind = entries_behind,
-                    message_type = "PartitionHealResponse",
-                    "Received partition heal response"
-                );
-
-                // Merge their vector clock with ours (sync operation)
-                self.clock.merge(&vector_clock);
-                icn_obs::metrics::gossip::partition_vector_clock_merges_inc();
-
-                info!(
-                    peer = %responding_peer,
-                    "Vector clocks merged during partition healing"
-                );
-                icn_obs::metrics::gossip::partition_healed_inc();
-
-                // Update partition detector to clear partitioned status
-                if let Some(ref detector) = self.partition_detector {
-                    if let Ok(mut d) = detector.try_write() {
-                        d.record_contact(&responding_peer);
-                    }
-                }
-
-                // Mark healing as complete with this peer
-                if let Some(ref healer) = self.partition_healer {
-                    if let Ok(mut h) = healer.try_write() {
-                        h.mark_healing_complete(&responding_peer);
-                    }
-                }
-
-                // Request entries from diverged topics
-                if entries_behind > 0 && !diverged_topics.is_empty() {
-                    info!(
-                        peer = %responding_peer,
-                        diverged_topics = ?diverged_topics,
-                        entries_behind = entries_behind,
-                        "Requesting missing entries from diverged topics"
-                    );
-
-                    // For each diverged topic, send a PullRequest
-                    for topic in diverged_topics {
-                        if self.topics.contains_key(&topic) {
-                            // Request all entries (empty want_ids means "send everything")
-                            let nonce = self
-                                .peer_sync
-                                .get_or_create(responding_peer.clone())
-                                .next_nonce();
-                            self.send_message(
-                                Some(responding_peer.clone()),
-                                GossipMessage::PullRequest {
-                                    topic,
-                                    want_ids: vec![],
-                                    max_bytes: 1_000_000, // 1MB max
-                                    nonce,
-                                },
-                            );
-                        }
-                    }
-                }
-
-                Ok(())
+                self.handle_partition_heal_response(
+                    sender,
+                    responding_peer,
+                    vector_clock,
+                    diverged_topics,
+                    entries_behind,
+                )
             }
         }
     }
@@ -1846,7 +1098,7 @@ impl GossipActor {
     }
 
     /// Update gauge metrics for topics and entries
-    fn update_gauge_metrics(&self) {
+    pub(crate) fn update_gauge_metrics(&self) {
         // Count total topics
         icn_obs::metrics::gossip::topics_total_set(self.topics.len() as u64);
 

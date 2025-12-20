@@ -33,6 +33,7 @@ pub mod bloom;
 #[allow(missing_docs)]
 pub mod error;
 pub mod gossip;
+mod handlers;
 #[allow(missing_docs)]
 pub mod partition;
 #[allow(missing_docs)]
