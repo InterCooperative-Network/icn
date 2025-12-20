@@ -64,7 +64,10 @@ impl CooperativeRegistry {
     fn load_from_store(&self) -> Result<()> {
         // Load cooperatives
         let coop_entries = self.store.scan(COOP_PREFIX)?;
-        let mut cache = self.cache.write().unwrap();
+        let mut cache = self.cache.write().unwrap_or_else(|poisoned| {
+            warn!("Cache lock poisoned during load, recovering");
+            poisoned.into_inner()
+        });
 
         for (key, value) in coop_entries {
             let key_str = String::from_utf8_lossy(&key[COOP_PREFIX.len()..]);
@@ -82,7 +85,10 @@ impl CooperativeRegistry {
 
         // Load vouches
         let vouch_entries = self.store.scan(VOUCH_PREFIX)?;
-        let mut vouches = self.vouches.write().unwrap();
+        let mut vouches = self.vouches.write().unwrap_or_else(|poisoned| {
+            warn!("Vouches lock poisoned during load, recovering");
+            poisoned.into_inner()
+        });
 
         for (key, value) in vouch_entries {
             let target_coop = String::from_utf8_lossy(&key[VOUCH_PREFIX.len()..]).to_string();
@@ -103,12 +109,17 @@ impl CooperativeRegistry {
         drop(vouches);
 
         // Update metrics
-        metrics::registry::coops_known_set(self.cache.read().unwrap().len());
+        let cache_len = self
+            .cache
+            .read()
+            .unwrap_or_else(|poisoned| {
+                warn!("Cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .len();
+        metrics::registry::coops_known_set(cache_len);
 
-        info!(
-            "Loaded {} cooperatives from storage",
-            self.cache.read().unwrap().len()
-        );
+        info!("Loaded {} cooperatives from storage", cache_len);
         Ok(())
     }
 
@@ -140,7 +151,13 @@ impl CooperativeRegistry {
 
     /// Get our own cooperative info
     pub fn own_coop_info(&self) -> CooperativeInfo {
-        self.own_coop_info.read().unwrap().clone()
+        self.own_coop_info
+            .read()
+            .unwrap_or_else(|poisoned| {
+                warn!("Own coop info lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .clone()
     }
 
     /// Update our own cooperative info
@@ -151,7 +168,10 @@ impl CooperativeRegistry {
             ));
         }
         self.save_own_info(&info)?;
-        *self.own_coop_info.write().unwrap() = info;
+        *self.own_coop_info.write().unwrap_or_else(|poisoned| {
+            warn!("Own coop info lock poisoned, recovering");
+            poisoned.into_inner()
+        }) = info;
         Ok(())
     }
 
@@ -169,7 +189,15 @@ impl CooperativeRegistry {
         }
 
         // Check if already registered
-        if self.cache.read().unwrap().contains_key(&coop_id) {
+        if self
+            .cache
+            .read()
+            .unwrap_or_else(|poisoned| {
+                warn!("Cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .contains_key(&coop_id)
+        {
             return Err(FederationError::CooperativeAlreadyExists(coop_id));
         }
 
@@ -199,11 +227,25 @@ impl CooperativeRegistry {
         self.store.put(&key, &value)?;
 
         // Update cache
-        self.cache.write().unwrap().insert(coop_id.clone(), info);
+        self.cache
+            .write()
+            .unwrap_or_else(|poisoned| {
+                warn!("Cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .insert(coop_id.clone(), info);
 
         // Update metrics
         metrics::registry::coops_registered_inc();
-        metrics::registry::coops_known_set(self.cache.read().unwrap().len());
+        let cache_len = self
+            .cache
+            .read()
+            .unwrap_or_else(|poisoned| {
+                warn!("Cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .len();
+        metrics::registry::coops_known_set(cache_len);
 
         info!("Registered cooperative: {}", coop_id);
         Ok(())
@@ -212,7 +254,15 @@ impl CooperativeRegistry {
     /// Get a cooperative by ID
     pub fn get(&self, coop_id: &str) -> Result<Option<CooperativeInfo>> {
         // Check cache first
-        if let Some(info) = self.cache.read().unwrap().get(coop_id) {
+        if let Some(info) = self
+            .cache
+            .read()
+            .unwrap_or_else(|poisoned| {
+                warn!("Cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .get(coop_id)
+        {
             return Ok(Some(info.clone()));
         }
 
@@ -223,7 +273,10 @@ impl CooperativeRegistry {
             // Update cache
             self.cache
                 .write()
-                .unwrap()
+                .unwrap_or_else(|poisoned| {
+                    warn!("Cache lock poisoned, recovering");
+                    poisoned.into_inner()
+                })
                 .insert(coop_id.to_string(), info.clone());
             return Ok(Some(info));
         }
@@ -233,12 +286,29 @@ impl CooperativeRegistry {
 
     /// List all known cooperatives
     pub fn list(&self) -> Result<Vec<CooperativeInfo>> {
-        Ok(self.cache.read().unwrap().values().cloned().collect())
+        Ok(self
+            .cache
+            .read()
+            .unwrap_or_else(|poisoned| {
+                warn!("Cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .values()
+            .cloned()
+            .collect())
     }
 
     /// List cooperative IDs only
     pub fn list_ids(&self) -> Vec<String> {
-        self.cache.read().unwrap().keys().cloned().collect()
+        self.cache
+            .read()
+            .unwrap_or_else(|poisoned| {
+                warn!("Cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .keys()
+            .cloned()
+            .collect()
     }
 
     /// Remove a cooperative from the registry
@@ -255,16 +325,36 @@ impl CooperativeRegistry {
         self.store.delete(&key)?;
 
         // Remove from cache
-        self.cache.write().unwrap().remove(coop_id);
+        self.cache
+            .write()
+            .unwrap_or_else(|poisoned| {
+                warn!("Cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .remove(coop_id);
 
         // Also remove any vouches for this coop
         let vouch_key = Self::vouch_key(coop_id);
         let _ = self.store.delete(&vouch_key);
-        self.vouches.write().unwrap().remove(coop_id);
+        self.vouches
+            .write()
+            .unwrap_or_else(|poisoned| {
+                warn!("Vouches lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .remove(coop_id);
 
         // Update metrics
         metrics::registry::coops_removed_inc();
-        metrics::registry::coops_known_set(self.cache.read().unwrap().len());
+        let cache_len = self
+            .cache
+            .read()
+            .unwrap_or_else(|poisoned| {
+                warn!("Cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .len();
+        metrics::registry::coops_known_set(cache_len);
 
         info!("Removed cooperative: {}", coop_id);
         Ok(())
@@ -276,7 +366,10 @@ impl CooperativeRegistry {
 
         // Update cache
         {
-            let mut cache = self.cache.write().unwrap();
+            let mut cache = self.cache.write().unwrap_or_else(|poisoned| {
+                warn!("Cache lock poisoned, recovering");
+                poisoned.into_inner()
+            });
             if let Some(info) = cache.get_mut(coop_id) {
                 info.last_seen = timestamp;
                 // Persist updated info
@@ -291,7 +384,10 @@ impl CooperativeRegistry {
 
     /// Check if a cooperative can federate according to our policy
     pub fn check_policy(&self, info: &CooperativeInfo) -> Result<PolicyResult> {
-        let own_info = self.own_coop_info.read().unwrap();
+        let own_info = self.own_coop_info.read().unwrap_or_else(|poisoned| {
+            warn!("Own coop info lock poisoned, recovering");
+            poisoned.into_inner()
+        });
 
         match &own_info.federation_policy {
             FederationPolicy::Open => Ok(PolicyResult::Allowed),
@@ -321,13 +417,27 @@ impl CooperativeRegistry {
 
     /// Check if a cooperative is already federated with us
     pub fn is_federated(&self, coop_id: &str) -> bool {
-        self.cache.read().unwrap().contains_key(coop_id)
+        self.cache
+            .read()
+            .unwrap_or_else(|poisoned| {
+                warn!("Cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .contains_key(coop_id)
     }
 
     /// Get vouches for a cooperative
     pub fn get_vouches(&self, coop_id: &str) -> Result<Vec<String>> {
         // Check cache first
-        if let Some(vouchers) = self.vouches.read().unwrap().get(coop_id) {
+        if let Some(vouchers) = self
+            .vouches
+            .read()
+            .unwrap_or_else(|poisoned| {
+                warn!("Vouches lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .get(coop_id)
+        {
             return Ok(vouchers.clone());
         }
 
@@ -338,7 +448,10 @@ impl CooperativeRegistry {
             // Update cache
             self.vouches
                 .write()
-                .unwrap()
+                .unwrap_or_else(|poisoned| {
+                    warn!("Vouches lock poisoned, recovering");
+                    poisoned.into_inner()
+                })
                 .insert(coop_id.to_string(), vouchers.clone());
             return Ok(vouchers);
         }
@@ -393,7 +506,10 @@ impl CooperativeRegistry {
         // Update cache
         self.vouches
             .write()
-            .unwrap()
+            .unwrap_or_else(|poisoned| {
+                warn!("Vouches lock poisoned, recovering");
+                poisoned.into_inner()
+            })
             .insert(target.clone(), vouches);
 
         // Update metrics
@@ -425,11 +541,20 @@ impl CooperativeRegistry {
 
         // Update cache
         if vouches.is_empty() {
-            self.vouches.write().unwrap().remove(target);
+            self.vouches
+                .write()
+                .unwrap_or_else(|poisoned| {
+                    warn!("Vouches lock poisoned, recovering");
+                    poisoned.into_inner()
+                })
+                .remove(target);
         } else {
             self.vouches
                 .write()
-                .unwrap()
+                .unwrap_or_else(|poisoned| {
+                    warn!("Vouches lock poisoned, recovering");
+                    poisoned.into_inner()
+                })
                 .insert(target.to_string(), vouches);
         }
 
@@ -439,7 +564,13 @@ impl CooperativeRegistry {
 
     /// Get the count of known cooperatives
     pub fn count(&self) -> usize {
-        self.cache.read().unwrap().len()
+        self.cache
+            .read()
+            .unwrap_or_else(|poisoned| {
+                warn!("Cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .len()
     }
 
     /// Check if any cooperatives are stale (not seen recently)
@@ -449,7 +580,10 @@ impl CooperativeRegistry {
 
         self.cache
             .read()
-            .unwrap()
+            .unwrap_or_else(|poisoned| {
+                warn!("Cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
             .iter()
             .filter_map(|(id, info)| {
                 if info.last_seen < cutoff {
@@ -465,7 +599,10 @@ impl CooperativeRegistry {
     pub fn find_by_capability(&self, capability: &str) -> Vec<CooperativeInfo> {
         self.cache
             .read()
-            .unwrap()
+            .unwrap_or_else(|poisoned| {
+                warn!("Cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
             .values()
             .filter(|info| info.has_capability(capability))
             .cloned()
@@ -476,7 +613,10 @@ impl CooperativeRegistry {
     pub fn find_by_currency(&self, currency: &str) -> Vec<CooperativeInfo> {
         self.cache
             .read()
-            .unwrap()
+            .unwrap_or_else(|poisoned| {
+                warn!("Cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
             .values()
             .filter(|info| info.currencies.iter().any(|c| c.symbol == currency))
             .cloned()

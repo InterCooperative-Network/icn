@@ -96,11 +96,11 @@ echo "  Auto-rollback: $AUTO_ROLLBACK"
 echo ""
 
 # Step 1: Build image
-log_step "Step 1/4: Building Docker image..."
+log_step "Step 1/5: Building Docker image..."
 "$SCRIPT_DIR/build-image.sh" "$TAG" $NO_CACHE
 
 # Step 2: Validate image locally
-log_step "Step 2/4: Validating image..."
+log_step "Step 2/5: Validating image..."
 echo "Checking image exists..."
 if docker image inspect "icn:$TAG" > /dev/null 2>&1; then
     echo "✓ Image icn:$TAG exists"
@@ -112,15 +112,19 @@ else
 fi
 
 # Step 3: Sync image to cluster
-log_step "Step 3/4: Syncing image to K3s cluster..."
+log_step "Step 3/5: Syncing image to K3s cluster..."
 "$SCRIPT_DIR/sync-image.sh" "$TAG" "$K3S_HOST"
 
 # Step 4: Deploy to cluster
-log_step "Step 4/4: Deploying to K3s cluster..."
+log_step "Step 4/5: Deploying to K3s cluster..."
 DEPLOY_STARTED=true
 "$SCRIPT_DIR/deploy.sh" "$K3S_HOST" "$TAG"
 
-# Step 5: Verify deployment (optional)
+# Step 5: Clean up old images to prevent disk exhaustion (keep current tag)
+log_step "Step 5/5: Cleaning up old images..."
+"$SCRIPT_DIR/cleanup-images.sh" "$K3S_HOST" "$TAG" 2>/dev/null || echo "Cleanup skipped (non-fatal)"
+
+# Verify deployment (optional)
 if [ "$VERIFY" = true ]; then
     log_step "Verification: Waiting for healthy deployment..."
 

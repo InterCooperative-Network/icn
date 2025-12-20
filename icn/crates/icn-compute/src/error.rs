@@ -2,6 +2,9 @@
 
 use thiserror::Error;
 
+/// Result type for compute operations
+pub type Result<T> = std::result::Result<T, ComputeError>;
+
 /// Errors that can occur in the compute layer
 #[derive(Debug, Error)]
 pub enum ComputeError {
@@ -56,6 +59,26 @@ pub enum ComputeError {
     /// Internal error
     #[error("internal error: {0}")]
     Internal(String),
+
+    /// Invalid result
+    #[error("invalid result: {0}")]
+    InvalidResult(String),
+
+    /// Dispute closed
+    #[error("dispute closed")]
+    DisputeClosed,
+
+    /// Invalid dispute state
+    #[error("invalid dispute state")]
+    InvalidDisputeState,
+
+    /// Resource not found
+    #[error("not found")]
+    NotFound,
+
+    /// Lock error
+    #[error("lock error")]
+    LockError,
 }
 
 impl From<bincode::Error> for ComputeError {

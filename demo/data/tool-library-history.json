@@ -1,0 +1,84 @@
+{
+  "transactions": [
+    {
+      "date": "2024-11-01T10:00:00Z",
+      "from": "Alice Chen",
+      "to": "Bob Martinez",
+      "hours": 2.5,
+      "activity": "Woodworking instruction - table saw safety",
+      "status": "confirmed"
+    },
+    {
+      "date": "2024-11-05T14:30:00Z",
+      "from": "Carol Johnson",
+      "to": "community_pool",
+      "hours": 3.0,
+      "activity": "Tool maintenance and organization",
+      "status": "confirmed"
+    },
+    {
+      "date": "2024-11-08T09:00:00Z",
+      "from": "David Lee",
+      "to": "Elena Rodriguez",
+      "hours": 1.5,
+      "activity": "Helped with car brake repair",
+      "status": "confirmed"
+    },
+    {
+      "date": "2024-11-12T16:00:00Z",
+      "from": "Frank Wilson",
+      "to": "Grace Park",
+      "hours": 2.0,
+      "activity": "Computer repair - replaced hard drive",
+      "status": "confirmed"
+    },
+    {
+      "date": "2024-11-15T11:00:00Z",
+      "from": "Henry Brown",
+      "to": "Isabel Garcia",
+      "hours": 1.0,
+      "activity": "Bicycle tune-up",
+      "status": "confirmed"
+    },
+    {
+      "date": "2024-11-20T14:00:00Z",
+      "from": "Jack Thompson",
+      "to": "Kelly O'Brien",
+      "hours": 1.5,
+      "activity": "HVAC troubleshooting and repair advice",
+      "status": "confirmed"
+    },
+    {
+      "date": "2024-11-25T10:30:00Z",
+      "from": "Luis Sanchez",
+      "to": "Alice Chen",
+      "hours": 2.0,
+      "activity": "Roof inspection and gutter cleaning",
+      "status": "confirmed"
+    },
+    {
+      "date": "2024-12-01T09:00:00Z",
+      "from": "Bob Martinez",
+      "to": "Carol Johnson",
+      "hours": 3.0,
+      "activity": "Home plumbing repair - fixed leaky faucet",
+      "status": "confirmed"
+    },
+    {
+      "date": "2024-12-05T15:00:00Z",
+      "from": "Elena Rodriguez",
+      "to": "Frank Wilson",
+      "hours": 1.0,
+      "activity": "Welding lesson - basic techniques",
+      "status": "confirmed"
+    },
+    {
+      "date": "2024-12-10T11:00:00Z",
+      "from": "Grace Park",
+      "to": "Henry Brown",
+      "hours": 2.5,
+      "activity": "Furniture upholstery repair",
+      "status": "confirmed"
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: icn-gateway
+  namespace: icn
+  labels:
+    app: icn-node
+    component: gateway
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 8000
+    targetPort: 8000
+    protocol: TCP
+  - name: websocket
+    port: 8001
+    targetPort: 8000
+    protocol: TCP
+  selector:
+    app: icn-node
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: icn-p2p
+  namespace: icn
+  labels:
+    app: icn-node
+    component: p2p
+spec:
+  type: LoadBalancer  # Or NodePort for local testing
+  ports:
+  - name: quic
+    port: 3000
+    targetPort: 3000
+    protocol: UDP
+  selector:
+    app: icn-node
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: icn-metrics
+  namespace: icn
+  labels:
+    app: icn-node
+    component: metrics
+spec:
+  type: ClusterIP
+  ports:
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  selector:
+    app: icn-node

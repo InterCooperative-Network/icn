@@ -14,6 +14,8 @@
     <link rel="stylesheet" href="style.css">
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <!-- QR Code library for wallet login -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
     <!-- Skip Navigation Link -->
@@ -86,6 +88,15 @@
 
                     <div id="login-error" class="error-message" role="alert" aria-live="assertive"></div>
                 </form>
+
+                <div class="login-divider">
+                    <span>or</span>
+                </div>
+
+                <button id="show-qr-login-btn" type="button" class="btn btn-secondary btn-qr">
+                    <span class="qr-icon">📱</span>
+                    Scan with Mobile Wallet
+                </button>
 
                 <div class="login-divider">
                     <span>or</span>
@@ -184,6 +195,46 @@
 
                     <div class="help-note">
                         <strong>Note:</strong> Your token is like a password - keep it secure and don't share it. It expires after 24 hours for security.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- QR Login Modal -->
+        <div
+            id="qr-login-modal"
+            class="modal hidden"
+            role="dialog"
+            aria-labelledby="qr-modal-title"
+            aria-modal="true"
+            aria-hidden="true"
+        >
+            <div class="modal-content modal-qr">
+                <div class="modal-header">
+                    <h2 id="qr-modal-title">Scan to Login</h2>
+                    <button id="close-qr-login" class="modal-close" aria-label="Close QR login dialog">&times;</button>
+                </div>
+                <div class="modal-body qr-modal-body">
+                    <div id="qr-code-container" class="qr-code-container">
+                        <p class="loading">Generating QR code...</p>
+                    </div>
+
+                    <p id="qr-login-status" class="qr-status">
+                        Open your ICN Wallet app and scan this code
+                    </p>
+
+                    <div id="qr-countdown" class="qr-countdown">
+                        Expires in: <span id="qr-time-left">5:00</span>
+                    </div>
+
+                    <div class="qr-instructions">
+                        <h3>How to use:</h3>
+                        <ol>
+                            <li>Open the ICN Wallet app on your phone</li>
+                            <li>Tap "Approve Web Login"</li>
+                            <li>Point your camera at this QR code</li>
+                            <li>Confirm the login on your phone</li>
+                        </ol>
                     </div>
                 </div>
             </div>

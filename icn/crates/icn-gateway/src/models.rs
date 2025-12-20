@@ -320,3 +320,48 @@ pub struct JoinResponse {
     pub role: String,
     pub private_key: String,
 }
+
+// === QR Login Sessions ===
+
+/// Create a new login session for QR-based authentication
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateSessionRequest {
+    pub coop_id: String,
+}
+
+/// Data to encode in the QR code (shown to mobile wallet)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SessionQrData {
+    pub session_id: String,
+    pub gateway_url: String,
+    pub coop_id: String,
+    pub expires_at: u64,
+}
+
+/// Session creation response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateSessionResponse {
+    pub session_id: String,
+    pub expires_at: u64,
+    pub qr_data: SessionQrData,
+}
+
+/// Session status check response (polling endpoint)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SessionStatusResponse {
+    pub session_id: String,
+    pub status: String, // "pending", "approved", "expired", "consumed"
+    pub expires_at: u64,
+    /// Token for the web session (only present when status is "approved")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub token: Option<String>,
+    /// Token expiry in seconds (only present when status is "approved")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub token_expires_in: Option<u64>,
+    /// DID that approved the session (only present when status is "approved")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub did: Option<String>,
+    /// Scopes granted (only present when status is "approved")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scopes: Option<Vec<String>>,
+}

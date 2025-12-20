@@ -24,6 +24,24 @@
 //! - Nonce uniqueness (derived from monotonic sequence)
 //! - Replay protection (inherited from SignedEnvelope)
 //!
+//! ## Security Considerations
+//!
+//! ### Nonce Reuse Risk (Sequence Persistence)
+//!
+//! **KNOWN LIMITATION**: Sequence counters are NOT persisted across restarts.
+//!
+//! Nonces are derived from: `BLAKE2b(sequence || from_did || to_did)`.
+//! If a node restarts and reuses sequence numbers, nonces could repeat,
+//! completely breaking ChaCha20-Poly1305 security (keystream reuse).
+//!
+//! **Mitigations**:
+//! - TLS provides independent transport-layer encryption
+//! - SignedEnvelope has separate replay protection
+//! - Restarts are infrequent in production
+//! - Sequence numbers typically have large gaps
+//!
+//! **Future Work**: Persist per-recipient sequence counters to disk.
+//!
 //! ## Limitations
 //!
 //! - No Perfect Forward Secrecy (static keys, add in Phase 11)

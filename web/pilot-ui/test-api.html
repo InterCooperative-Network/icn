@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ICN API Test</title>
+</head>
+<body>
+    <h1>ICN API Direct Test</h1>
+    <button onclick="testAPI()">Test API</button>
+    <pre id="output"></pre>
+
+    <script>
+    const TOKEN = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJkaWQ6aWNuOnpCRm5oSmhndlJqZ3VraFFta3E5ZGRCejV3aUV0MzJwdGtRa0JEald4NnVQaCIsImlhdCI6MTc2NjA5NTU0MSwiZXhwIjoxNzY2MDk5MTQxLCJjb29wX2lkIjoicm9jaGVzdGVyLXRvb2wtbGlicmFyeSIsInNjb3BlcyI6WyJsZWRnZXI6cmVhZCIsImxlZGdlcjp3cml0ZSIsImNvb3A6cmVhZCIsImdvdjpyZWFkIiwiZ292OndyaXRlIl19.P1lN9Kx1Uf67I2dBggFn8Px1KEXNiiXjaTQxK7MkyCI';
+    
+    async function testAPI() {
+        const output = document.getElementById('output');
+        output.textContent = 'Testing...\n';
+        
+        try {
+            // Test 1: Health
+            output.textContent += '\n1. Testing health endpoint...\n';
+            const health = await fetch('http://localhost:8080/v1/health');
+            output.textContent += `Status: ${health.status}\n`;
+            output.textContent += `Response: ${await health.text()}\n`;
+            
+            // Test 2: Cooperative
+            output.textContent += '\n2. Testing cooperative endpoint...\n';
+            const coop = await fetch('http://localhost:8080/v1/coops/rochester-tool-library', {
+                headers: { 'Authorization': `Bearer ${TOKEN}` }
+            });
+            output.textContent += `Status: ${coop.status}\n`;
+            output.textContent += `Response: ${await coop.text()}\n`;
+            
+            // Test 3: Balance
+            output.textContent += '\n3. Testing balance endpoint...\n';
+            const balance = await fetch('http://localhost:8080/v1/ledger/rochester-tool-library/balance/did:icn:zBFnhJhgvRjgukhQmkq9ddBz5wiEt32ptkQkBDjWx6uPh', {
+                headers: { 'Authorization': `Bearer ${TOKEN}` }
+            });
+            output.textContent += `Status: ${balance.status}\n`;
+            output.textContent += `Response: ${await balance.text()}\n`;
+            
+            output.textContent += '\n✅ ALL TESTS PASSED!\n';
+            
+        } catch (error) {
+            output.textContent += `\n❌ ERROR: ${error.message}\n`;
+            output.textContent += `Stack: ${error.stack}\n`;
+        }
+    }
+    </script>
+</body>
+</html>

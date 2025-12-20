@@ -41,6 +41,14 @@ spec:
           value: "/data"
         - name: HOME
           value: "/data"
+        # Gateway base URL for QR login - set this to the external URL where the gateway is accessible
+        # This is used in QR codes for mobile wallet login
+        - name: GATEWAY_BASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: icn-config
+              key: gateway_base_url
+              optional: true
         # CORS is handled by the gateway directly (not via reverse proxy)
         # Uncomment ICN_SKIP_CORS=1 only when behind Cloudflare or similar proxy
         # - name: ICN_SKIP_CORS

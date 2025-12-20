@@ -20,6 +20,9 @@ use std::sync::Arc;
 use std::time::SystemTime;
 use tracing::{debug, error, info, instrument, warn};
 
+/// Type alias for validation hook callback
+pub type ValidationHook = Box<dyn Fn(&JournalEntry) -> Result<()> + Send + Sync>;
+
 /// Key prefix for journal entries in storage
 const JOURNAL_PREFIX: &str = "ledger:journal:";
 
@@ -108,6 +111,11 @@ pub struct Ledger {
 
     /// Domain ID for this ledger (used in event payloads)
     domain_id: Option<String>,
+
+    /// Optional validation hook for charter/policy enforcement
+    /// Called before accepting entries. Returns Ok(()) if entry is valid,
+    /// Err with reason if entry should be rejected.
+    validation_hook: Option<ValidationHook>,
 }
 
 impl Ledger {
@@ -133,8 +141,9 @@ impl Ledger {
             trust_graph: None,
             min_trust_for_entry: DEFAULT_MIN_TRUST_FOR_ENTRY,
             journal_version,
-            event_emitter: None, // Set via set_event_emitter()
-            domain_id: None,     // Set via set_domain_id()
+            event_emitter: None,   // Set via set_event_emitter()
+            domain_id: None,       // Set via set_domain_id()
+            validation_hook: None, // Set via set_validation_hook()
         };
 
         // Load cached balances from storage
@@ -236,6 +245,17 @@ impl Ledger {
         self.domain_id.as_deref()
     }
 
+    /// Set validation hook for charter/policy enforcement
+    ///
+    /// The hook is called before accepting entries into the ledger.
+    /// If the hook returns Err, the entry will be rejected.
+    pub fn set_validation_hook<F>(&mut self, hook: F)
+    where
+        F: Fn(&JournalEntry) -> Result<()> + Send + Sync + 'static,
+    {
+        self.validation_hook = Some(Box::new(hook));
+    }
+
     /// Append a journal entry to the ledger
     #[instrument(skip(self, entry), fields(entry_hash = entry.id.as_ref().map(|h| h.to_hex()).unwrap_or_else(|| "none".to_string()), account_count = entry.accounts.len()))]
     pub fn append_entry(&mut self, entry: JournalEntry) -> Result<ContentHash> {
@@ -308,6 +328,40 @@ impl Ledger {
                     }
                 }
             }
+        }
+
+        // Charter/policy validation hook (Gap #2 fix)
+        // Allow external validation logic (e.g., charter rules) to validate entries
+        if let Some(ref hook) = self.validation_hook {
+            if let Err(e) = hook(&entry) {
+                warn!(
+                    entry_hash = %hash,
+                    author = %entry.author,
+                    error = %e,
+                    "Entry failed validation hook, quarantining"
+                );
+
+                // Quarantine the entry for governance review
+                let quarantine_item = QuarantineItem {
+                    entry_id: hash.clone(),
+                    reason: QuarantineReason::CharterViolation,
+                    author: entry.author.clone(),
+                    observed_at: SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs(),
+                    metadata: Some(e.to_string()),
+                };
+
+                self.quarantine.add(entry.clone(), quarantine_item)?;
+
+                anyhow::bail!("Entry failed validation: {e}");
+            }
+
+            debug!(
+                entry_hash = %hash,
+                "Entry passed validation hook"
+            );
         }
 
         // Serialize and store
@@ -694,6 +748,102 @@ impl Ledger {
         entries.sort_by_key(|e| e.timestamp);
 
         Ok(entries)
+    }
+
+    /// Count the total number of journal entries
+    ///
+    /// More efficient than `get_all_entries().len()` as it doesn't
+    /// deserialize entries.
+    pub fn count_entries(&self) -> Result<usize> {
+        let prefix = JOURNAL_PREFIX.as_bytes();
+        self.store.scan_count(prefix)
+    }
+
+    /// Get journal entries with pagination (newest first)
+    ///
+    /// Returns entries in reverse chronological order (most recent first),
+    /// which is the typical use case for displaying transaction history.
+    ///
+    /// # Arguments
+    /// * `offset` - Number of entries to skip (0-based)
+    /// * `limit` - Maximum number of entries to return
+    ///
+    /// # Returns
+    /// Tuple of (entries, total_count)
+    ///
+    /// # Performance Note
+    /// Currently loads and sorts all entries in memory before paginating.
+    /// For very large ledgers (100K+ entries), consider implementing a
+    /// secondary timestamp index for O(log n) access. See issue #111.
+    pub fn get_entries_paginated(
+        &self,
+        offset: usize,
+        limit: usize,
+    ) -> Result<(Vec<JournalEntry>, usize)> {
+        let prefix = JOURNAL_PREFIX.as_bytes();
+        let pairs = self.store.scan(prefix)?;
+        let total = pairs.len();
+
+        // Early return if offset is beyond total
+        if offset >= total {
+            return Ok((Vec::new(), total));
+        }
+
+        // Deserialize and sort entries
+        let mut entries = Vec::with_capacity(pairs.len());
+        for (_key, value) in pairs {
+            let entry: JournalEntry = serde_json::from_slice(&value)?;
+            entries.push(entry);
+        }
+
+        // Sort by timestamp descending (newest first)
+        entries.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+
+        // Apply pagination
+        let paginated: Vec<JournalEntry> = entries.into_iter().skip(offset).take(limit).collect();
+
+        Ok((paginated, total))
+    }
+
+    /// Get journal entries with pagination (oldest first)
+    ///
+    /// Returns entries in chronological order (oldest first).
+    /// Useful for auditing and sequential processing.
+    ///
+    /// # Arguments
+    /// * `offset` - Number of entries to skip (0-based)
+    /// * `limit` - Maximum number of entries to return
+    ///
+    /// # Returns
+    /// Tuple of (entries, total_count)
+    pub fn get_entries_paginated_asc(
+        &self,
+        offset: usize,
+        limit: usize,
+    ) -> Result<(Vec<JournalEntry>, usize)> {
+        let prefix = JOURNAL_PREFIX.as_bytes();
+        let pairs = self.store.scan(prefix)?;
+        let total = pairs.len();
+
+        // Early return if offset is beyond total
+        if offset >= total {
+            return Ok((Vec::new(), total));
+        }
+
+        // Deserialize and sort entries
+        let mut entries = Vec::with_capacity(pairs.len());
+        for (_key, value) in pairs {
+            let entry: JournalEntry = serde_json::from_slice(&value)?;
+            entries.push(entry);
+        }
+
+        // Sort by timestamp ascending (oldest first)
+        entries.sort_by_key(|e| e.timestamp);
+
+        // Apply pagination
+        let paginated: Vec<JournalEntry> = entries.into_iter().skip(offset).take(limit).collect();
+
+        Ok((paginated, total))
     }
 
     // === Phase 18 Week 5: Fork Detection and Resolution ===

@@ -3,6 +3,10 @@ name = "icn-identity"
 version.workspace = true
 edition.workspace = true
 
+[features]
+default = []
+post-quantum = []
+
 [dependencies]
 tokio.workspace = true
 ed25519-dalek.workspace = true

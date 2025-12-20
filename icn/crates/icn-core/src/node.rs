@@ -46,14 +46,17 @@ pub enum CapabilityValue {
 }
 
 impl CapabilityValue {
+    /// Create a "present" capability (boolean true)
     pub fn present() -> Self {
         Self::Present(true)
     }
 
+    /// Create a numeric capability without unit
     pub fn numeric(value: f64) -> Self {
         Self::Numeric { value, unit: None }
     }
 
+    /// Create a numeric capability with unit (e.g., "GB", "MHz")
     pub fn numeric_with_unit(value: f64, unit: &str) -> Self {
         Self::Numeric {
             value,
@@ -61,6 +64,7 @@ impl CapabilityValue {
         }
     }
 
+    /// Create a text capability
     pub fn text(s: impl Into<String>) -> Self {
         Self::Text(s.into())
     }

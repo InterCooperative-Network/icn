@@ -1444,6 +1444,83 @@ export class ICNMobileClient extends ICNClient {
   }
 
   /**
+   * Vote on an amendment
+   *
+   * @param amendmentId - Amendment ID (hex)
+   * @param choice - Vote choice: 'approve', 'reject', or 'abstain'
+   * @param comment - Optional comment
+   * @returns Vote record
+   */
+  async voteOnAmendment(
+    amendmentId: string,
+    choice: 'approve' | 'reject' | 'abstain',
+    comment?: string
+  ): Promise<import('./constitutional-hooks').AmendmentVote> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/constitutional/amendments/${amendmentId}/vote`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+      body: JSON.stringify({ choice, comment }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to vote on amendment: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Get current user's vote on an amendment
+   *
+   * @param amendmentId - Amendment ID (hex)
+   * @returns Vote record or null if not voted
+   */
+  async getMyAmendmentVote(amendmentId: string): Promise<import('./constitutional-hooks').AmendmentVote> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/constitutional/amendments/${amendmentId}/my-vote`, {
+      method: 'GET',
+      headers: {
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to get my vote: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Get amendment voting results
+   *
+   * @param amendmentId - Amendment ID (hex)
+   * @returns Voting results with counts and quorum status
+   */
+  async getAmendmentResults(amendmentId: string): Promise<import('./constitutional-hooks').AmendmentResults> {
+    const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const response = await fetch(`${baseUrl}/v1/constitutional/amendments/${amendmentId}/results`, {
+      method: 'GET',
+      headers: {
+        ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to get amendment results: ${error}`);
+    }
+
+    return response.json();
+  }
+
+  /**
    * File an appeal
    *
    * @param request - Appeal filing request
