@@ -11,6 +11,7 @@ pub mod init_network;
 pub mod init_notifications;
 pub mod init_rpc;
 pub mod init_snapshot;
+pub mod init_steward;
 pub mod init_trust;
 pub mod registry;
 pub mod shutdown;
@@ -25,7 +26,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::select;
 use tokio::task::JoinSet;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 
 use crate::config::Config;
 use crate::runtime::ShutdownTx;
@@ -855,95 +856,13 @@ impl Supervisor {
 
             // Subscribe to governance events for scheduling policy updates (Phase 16E integration)
             policy_governance_subscription = Some({
-                use crate::events::SystemEvent;
-                use icn_governance::ProposalPayload;
-
-                let compute = compute_handle.clone();
-                let audit_store = gov_store.clone();
-
-                event_bus.subscribe(Arc::new(move |event| {
-                    if let SystemEvent::ProposalAccepted {
-                        proposal_id,
-                        payload: ProposalPayload::SchedulingPolicy { coop_id, policy_json },
-                        decided_at,
-                        ..
-                    } = event {
-                        info!("📋 Executing scheduling policy proposal {}: update policy for {}",
-                              proposal_id.0, coop_id);
-
-                        // Spawn async task to apply policy update
-                        let compute_handle = compute.clone();
-                        let prop_id = proposal_id.clone();
-                        let store = audit_store.clone();
-                        let coop = coop_id.clone();
-                        let policy_str = policy_json.clone();
-                        let decision_time = decided_at;
-
-                        tokio::spawn(async move {
-                            // Track execution duration
-                            let start = std::time::Instant::now();
-
-                            // IDEMPOTENCY CHECK: Skip if proposal already executed
-                            let audit_key = format!("gov:audit:policy:{}", prop_id.0);
-                            match store.get(audit_key.as_bytes()) {
-                                Ok(Some(_)) => {
-                                    debug!("Policy proposal {} already executed, skipping duplicate", prop_id.0);
-                                    return;
-                                }
-                                Ok(None) => {
-                                    // Not executed yet, proceed
-                                }
-                                Err(e) => {
-                                    error!("🚨 Failed to check audit trail for policy proposal {}: {}", prop_id.0, e);
-                                    error!("   Refusing to execute to prevent potential duplicate");
-                                    return;
-                                }
-                            }
-
-                            // Parse policy JSON
-                            match serde_json::from_str::<icn_compute::CoopSchedulingPolicy>(&policy_str) {
-                                Ok(policy) => {
-                                    // Apply policy update via ComputeHandle
-                                    match compute_handle.set_policy(policy.clone()).await {
-                                        Ok(_) => {
-                                            info!("✅ Scheduling policy proposal {} executed: policy updated for {}",
-                                                  prop_id.0, coop);
-
-                                            // Store audit trail
-                                            let audit_record = serde_json::json!({
-                                                "proposal_id": prop_id.0,
-                                                "coop_id": coop,
-                                                "decided_at": decision_time,
-                                                "executed_at": icn_time::current_timestamp_secs(),
-                                            });
-
-                                            if let Ok(audit_json) = serde_json::to_vec(&audit_record) {
-                                                if let Err(e) = store.put(audit_key.as_bytes(), &audit_json) {
-                                                    error!("🚨 Failed to store audit trail for policy proposal {}: {}", prop_id.0, e);
-                                                } else {
-                                                    info!("📋 Audit trail recorded for policy proposal {}", prop_id.0);
-
-                                                    // Metrics: successful execution
-                                                    let duration = start.elapsed().as_secs_f64();
-                                                    icn_obs::metrics::governance::proposals_executed_inc("scheduling_policy");
-                                                    icn_obs::metrics::governance::execution_duration_record("scheduling_policy", duration);
-                                                }
-                                            }
-                                        }
-                                        Err(e) => {
-                                            error!("❌ Failed to apply scheduling policy for proposal {}: {}", prop_id.0, e);
-                                            icn_obs::metrics::governance::execution_failures_inc("policy_apply");
-                                        }
-                                    }
-                                }
-                                Err(e) => {
-                                    error!("❌ Failed to parse policy JSON for proposal {}: {}", prop_id.0, e);
-                                    icn_obs::metrics::governance::execution_failures_inc("policy_parse");
-                                }
-                            }
-                        });
-                    }
-                })).await
+                let policy_handler = governance_handlers::PolicyEventHandler::new(
+                    compute_handle.clone(),
+                    gov_store.clone(),
+                );
+                event_bus
+                    .subscribe(governance_handlers::create_policy_subscription(policy_handler))
+                    .await
             });
 
             info!("✓ Policy governance integration active");
@@ -1030,146 +949,18 @@ impl Supervisor {
             info!("Clock sync background task spawned (interval: 10 minutes)");
 
             // Spawn steward actor if enabled (SDIS Phase S3)
-            if self.config.steward.enabled {
-                let steward_config = self.config.steward.to_steward_config();
-
-                // Create gossip send callback for steward messages
-                let gossip_handle_for_steward = gossip_handle.clone();
-
-                let send_gossip_callback: icn_steward::actor::SendGossipCallback =
-                    Arc::new(move |steward_msg| {
-                        let gossip = gossip_handle_for_steward.clone();
-
-                        tokio::spawn(async move {
-                            // Determine topic based on message type
-                            let topic = match &steward_msg {
-                                icn_steward::StewardMessage::Announce(_) => {
-                                    icn_steward::topics::STEWARD_ANNOUNCE
-                                }
-                                icn_steward::StewardMessage::Enrollment(_) => {
-                                    icn_steward::topics::ENROLLMENT
-                                }
-                                icn_steward::StewardMessage::Recovery(_) => {
-                                    icn_steward::topics::RECOVERY
-                                }
-                                icn_steward::StewardMessage::VuiSync(_) => {
-                                    icn_steward::topics::VUI_SYNC
-                                }
-                            };
-
-                            // Serialize message
-                            let data = match bincode::serde::encode_to_vec(
-                                &steward_msg,
-                                bincode::config::legacy(),
-                            ) {
-                                Ok(d) => d,
-                                Err(e) => {
-                                    warn!("Failed to serialize steward message: {}", e);
-                                    return;
-                                }
-                            };
-
-                            // Publish via gossip (handles topic creation, ACL, and broadcast)
-                            {
-                                let mut gossip = gossip.write().await;
-                                if let Err(e) = gossip.publish(topic, data) {
-                                    warn!("Failed to publish steward message: {}", e);
-                                }
-                            }
-                        });
-                    });
-
-                // Spawn steward actor
-                let keypair = identity_bundle.keypair().clone();
-                match icn_steward::StewardActor::spawn(
-                    did.clone(),
-                    keypair,
-                    steward_config,
-                    self.shutdown_tx.clone(),
-                    Some(send_gossip_callback),
-                )
-                .await
-                {
-                    Ok(handle) => {
-                        info!("✓ Steward actor spawned for DID: {}", did);
-
-                        // Fill steward handle holder
-                        *steward_handle_holder.write().await = Some(handle.clone());
-
-                        // Subscribe to steward gossip topics
-                        {
-                            let mut gossip = gossip_handle.write().await;
-                            for topic in &[
-                                icn_steward::topics::STEWARD_ANNOUNCE,
-                                icn_steward::topics::VUI_SYNC,
-                                icn_steward::topics::ENROLLMENT,
-                                icn_steward::topics::RECOVERY,
-                            ] {
-                                if let Err(e) = gossip.subscribe(topic, did.clone()) {
-                                    warn!("Failed to subscribe to steward topic {}: {}", topic, e);
-                                } else {
-                                    info!("Subscribed to steward topic: {}", topic);
-                                }
-                            }
-                        }
-
-                        // Set up notification callback for steward messages
-                        let steward_handle_for_callback = steward_handle_holder.clone();
-                        {
-                            let mut gossip = gossip_handle.write().await;
-                            gossip.set_notification_callback(Arc::new(
-                                move |topic, entry, _subscriber_did| {
-                                    // Only process steward topics
-                                    if !topic.starts_with("steward:") {
-                                        return;
-                                    }
-
-                                    let steward_holder = steward_handle_for_callback.clone();
-                                    let data = entry.data.clone();
-                                    let topic_clone = topic.clone();
-
-                                    tokio::spawn(async move {
-                                        let steward_guard = steward_holder.read().await;
-                                        if steward_guard.is_none() {
-                                            return;
-                                        }
-
-                                        // Parse steward message
-                                        match bincode::serde::decode_from_slice::<icn_steward::StewardMessage, _>(
-                                            &data,
-                                            bincode::config::legacy(),
-                                        ).map(|(v, _)| v) {
-                                            Ok(msg) => {
-                                                debug!(
-                                                    "Received steward message on topic {}: {:?}",
-                                                    topic_clone, msg
-                                                );
-                                                // Message handling would be routed to StewardActor here
-                                                // via handle methods in a full implementation
-                                            }
-                                            Err(e) => {
-                                                debug!(
-                                                    "Failed to deserialize steward message on {}: {}",
-                                                    topic_clone, e
-                                                );
-                                            }
-                                        }
-                                    });
-                                },
-                            ));
-                        }
-
-                        info!(
-                            "Steward network participation enabled (threshold: {}-of-{})",
-                            self.config.steward.vui_threshold, self.config.steward.vui_total_shares
-                        );
-                    }
-                    Err(e) => {
-                        error!("Failed to spawn steward actor: {}", e);
-                        icn_obs::metrics::supervisor::actor_spawn_failed_inc("steward");
-                    }
-                }
-            }
+            let _steward_services = init_steward::init_steward_services(
+                &self.config.steward,
+                init_steward::StewardDeps {
+                    gossip_handle: gossip_handle.clone(),
+                    steward_handle_holder: steward_handle_holder.clone(),
+                    did: did.clone(),
+                    keypair: identity_bundle.keypair().clone(),
+                    shutdown_tx: self.shutdown_tx.clone(),
+                },
+            )
+            .await
+            .ok();
 
             // Spawn metrics update task
             let _metrics_handle = background_tasks::spawn_metrics_update_task(

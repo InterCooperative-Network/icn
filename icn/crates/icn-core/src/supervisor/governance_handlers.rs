@@ -817,6 +817,156 @@ pub fn create_governance_subscription(
     })
 }
 
+/// Handler for scheduling policy governance events
+///
+/// Separate from the main GovernanceEventHandler because it requires
+/// access to the compute handle, which is initialized after governance.
+#[derive(Clone)]
+pub struct PolicyEventHandler {
+    /// Compute handle for applying policy updates
+    compute_handle: icn_compute::ComputeHandle,
+    /// Audit store for idempotency and audit trail
+    audit_store: AuditStore,
+}
+
+impl PolicyEventHandler {
+    /// Create a new policy event handler
+    pub fn new(compute_handle: icn_compute::ComputeHandle, audit_store: AuditStore) -> Self {
+        Self {
+            compute_handle,
+            audit_store,
+        }
+    }
+
+    /// Handle a scheduling policy proposal
+    pub fn handle_scheduling_policy(
+        &self,
+        proposal_id: ProposalId,
+        coop_id: String,
+        policy_json: String,
+        decided_at: u64,
+    ) {
+        info!(
+            "📋 Executing scheduling policy proposal {}: update policy for {}",
+            proposal_id.0, coop_id
+        );
+
+        let compute_handle = self.compute_handle.clone();
+        let store = self.audit_store.clone();
+
+        tokio::spawn(async move {
+            let start = std::time::Instant::now();
+
+            // IDEMPOTENCY CHECK: Skip if proposal already executed
+            let audit_key = format!("gov:audit:policy:{}", proposal_id.0);
+            match store.get(audit_key.as_bytes()) {
+                Ok(Some(_)) => {
+                    debug!(
+                        "Policy proposal {} already executed, skipping duplicate",
+                        proposal_id.0
+                    );
+                    return;
+                }
+                Ok(None) => {}
+                Err(e) => {
+                    error!(
+                        "🚨 Failed to check audit trail for policy proposal {}: {}",
+                        proposal_id.0, e
+                    );
+                    error!("   Refusing to execute to prevent potential duplicate");
+                    return;
+                }
+            }
+
+            // Parse policy JSON
+            match serde_json::from_str::<icn_compute::CoopSchedulingPolicy>(&policy_json) {
+                Ok(policy) => {
+                    // Apply policy update via ComputeHandle
+                    match compute_handle.set_policy(policy.clone()).await {
+                        Ok(_) => {
+                            info!(
+                                "✅ Scheduling policy proposal {} executed: policy updated for {}",
+                                proposal_id.0, coop_id
+                            );
+
+                            // Store audit trail
+                            let audit_record = serde_json::json!({
+                                "proposal_id": proposal_id.0,
+                                "coop_id": coop_id,
+                                "decided_at": decided_at,
+                                "executed_at": icn_time::current_timestamp_secs(),
+                            });
+
+                            if let Ok(audit_json) = serde_json::to_vec(&audit_record) {
+                                if let Err(e) = store.put(audit_key.as_bytes(), &audit_json) {
+                                    error!(
+                                        "🚨 Failed to store audit trail for policy proposal {}: {}",
+                                        proposal_id.0, e
+                                    );
+                                } else {
+                                    info!(
+                                        "📋 Audit trail recorded for policy proposal {}",
+                                        proposal_id.0
+                                    );
+
+                                    // Metrics: successful execution
+                                    let duration = start.elapsed().as_secs_f64();
+                                    icn_obs::metrics::governance::proposals_executed_inc(
+                                        "scheduling_policy",
+                                    );
+                                    icn_obs::metrics::governance::execution_duration_record(
+                                        "scheduling_policy",
+                                        duration,
+                                    );
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            error!(
+                                "❌ Failed to apply scheduling policy for proposal {}: {}",
+                                proposal_id.0, e
+                            );
+                            icn_obs::metrics::governance::execution_failures_inc("policy_apply");
+                        }
+                    }
+                }
+                Err(e) => {
+                    error!(
+                        "❌ Failed to parse policy JSON for proposal {}: {}",
+                        proposal_id.0, e
+                    );
+                    icn_obs::metrics::governance::execution_failures_inc("policy_parse");
+                }
+            }
+        });
+    }
+}
+
+/// Create the policy subscription callback using the handler
+pub fn create_policy_subscription(
+    handler: PolicyEventHandler,
+) -> Arc<dyn Fn(crate::events::SystemEvent) + Send + Sync> {
+    Arc::new(move |event| {
+        use crate::events::SystemEvent;
+        use icn_governance::ProposalPayload;
+
+        if let SystemEvent::ProposalAccepted {
+            proposal_id,
+            payload: ProposalPayload::SchedulingPolicy { coop_id, policy_json },
+            decided_at,
+            ..
+        } = &event
+        {
+            handler.handle_scheduling_policy(
+                proposal_id.clone(),
+                coop_id.clone(),
+                policy_json.clone(),
+                *decided_at,
+            );
+        }
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
