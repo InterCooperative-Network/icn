@@ -46,8 +46,8 @@ tokio-rustls = "0.26"
 hyper = { version = "1.5", features = ["full"] }
 
 # RPC
-tonic = "0.12"
-prost = "0.13"
+tonic = "0.14"
+prost = "0.14"
 
 # Discovery
 mdns-sd = "0.11"
