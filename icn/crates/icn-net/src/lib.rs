@@ -2,6 +2,7 @@
 #![allow(missing_docs)]
 
 pub mod actor;
+mod handlers;
 pub mod blob_registry;
 pub mod candidate;
 pub mod candidate_cache;

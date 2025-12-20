@@ -16,6 +16,7 @@ use tokio::sync::{mpsc, oneshot, RwLock};
 use tracing::{debug, info, instrument, warn};
 
 use crate::{
+    handlers::ConnectionContext,
     protocol::{read_message, write_message, MessagePayload, NetworkMessage},
     rate_limit::{RateLimitConfig, RateLimiter},
     replay_guard::ReplayGuard,
@@ -1435,6 +1436,22 @@ impl NetworkActor {
     ) -> Result<()> {
         info!("Handling connection from {}", connection.remote_address());
 
+        // Create connection context for handlers (clone shared state)
+        let _ctx = ConnectionContext::new(
+            handler.clone(),
+            rate_limiter.clone(),
+            replay_guard.clone(),
+            neighbor_sets.clone(),
+            topology_config.clone(),
+            trust_graph.clone(),
+            session_manager.clone(),
+            peer_connections.clone(),
+            blob_registry.clone(),
+            misbehavior_detector.clone(),
+            identity_bundle.clone(),
+            own_did.clone(),
+        );
+
         loop {
             // Accept incoming bidirectional stream
             match connection.accept_bi().await {
@@ -1473,7 +1490,7 @@ impl NetworkActor {
                             // Track metrics
                             icn_obs::metrics::network::messages_received_inc();
 
-                            // Handle handshake messages internally
+                            // Dispatch to handlers
                             match &message.payload {
                                 MessagePayload::Hello {
                                     binding_info,
