@@ -24,7 +24,7 @@
 //!
 //! // Sign a message (creates both Ed25519 and ML-DSA signatures)
 //! let message = b"important document";
-//! let signature = keypair.sign(message);
+//! let signature = keypair.sign(message).unwrap();
 //!
 //! // Verify (both signatures must be valid)
 //! let public_key = keypair.public_key();
@@ -92,7 +92,7 @@ mod tests {
         let keypair = HybridKeypair::generate().unwrap();
         let message = b"test message for signing";
 
-        let signature = keypair.sign(message);
+        let signature = keypair.sign(message).unwrap();
         let public_key = keypair.public_key();
 
         assert!(signature.verify(message, &public_key));
@@ -103,7 +103,7 @@ mod tests {
         let keypair = HybridKeypair::generate().unwrap();
         let message = b"original message";
 
-        let signature = keypair.sign(message);
+        let signature = keypair.sign(message).unwrap();
         let public_key = keypair.public_key();
 
         // Tampered message should fail
@@ -116,7 +116,7 @@ mod tests {
         let keypair2 = HybridKeypair::generate().unwrap();
         let message = b"test message";
 
-        let signature = keypair1.sign(message);
+        let signature = keypair1.sign(message).unwrap();
         let wrong_key = keypair2.public_key();
 
         // Wrong key should fail

@@ -337,10 +337,7 @@ impl PersonhoodAnchor {
     ///
     /// This is the migration path for existing anchors to Commons participation.
     pub fn from_anchor(anchor: Anchor) -> Self {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         Self {
             anchor,
@@ -355,10 +352,7 @@ impl PersonhoodAnchor {
 
     /// Create a new PersonhoodAnchor with initial POP attestation
     pub fn new(anchor: Anchor, initial_attestation: POPAttestation, current_key: [u8; 32]) -> Self {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         Self {
             anchor,
@@ -374,10 +368,7 @@ impl PersonhoodAnchor {
     /// Create a genesis PersonhoodAnchor (for bootstrap/testing)
     pub fn genesis(reason: &str, current_key: [u8; 32]) -> Self {
         let anchor = Anchor::genesis(reason);
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         // Create a genesis attestation
         let attestation =
@@ -441,37 +432,25 @@ impl PersonhoodAnchor {
     /// Add a POP attestation
     pub fn add_attestation(&mut self, attestation: POPAttestation) {
         self.pop_attestations.push(attestation);
-        self.updated_at = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        self.updated_at = icn_time::current_timestamp_secs();
     }
 
     /// Add a uniqueness proof
     pub fn add_uniqueness_proof(&mut self, proof: UniquenessProof) {
         self.uniqueness_proofs.push(proof);
-        self.updated_at = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        self.updated_at = icn_time::current_timestamp_secs();
     }
 
     /// Record a key rotation
     pub fn record_key_rotation(&mut self, rotation: KeyRotationRecord) {
         self.current_key = Some(rotation.new_key);
         self.key_rotations.push(rotation);
-        self.updated_at = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        self.updated_at = icn_time::current_timestamp_secs();
     }
 
     /// Suspend this anchor
     pub fn suspend(&mut self, reason: String, authority: Did, until: Option<u64>) {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         self.status = AnchorStatus::Suspended {
             reason,
@@ -487,10 +466,7 @@ impl PersonhoodAnchor {
         match &self.status {
             AnchorStatus::Suspended { .. } => {
                 self.status = AnchorStatus::Active;
-                self.updated_at = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs();
+                self.updated_at = icn_time::current_timestamp_secs();
                 Ok(())
             }
             AnchorStatus::Active => Err("Anchor is already active"),
@@ -500,10 +476,7 @@ impl PersonhoodAnchor {
 
     /// Revoke this anchor (permanent)
     pub fn revoke(&mut self, reason: String, authority: Did, evidence: Vec<[u8; 32]>) {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         self.status = AnchorStatus::Revoked {
             reason,
@@ -538,10 +511,7 @@ impl POPAttestation {
         signature: Vec<u8>,
         expiry: Option<u64>,
     ) -> Self {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         // Compute attestation ID
         let mut hasher = Sha256::new();
@@ -583,10 +553,7 @@ impl POPAttestation {
     /// Check if this attestation is expired
     pub fn is_expired(&self) -> bool {
         if let Some(expiry) = self.expiry {
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
+            let now = icn_time::current_timestamp_secs();
             now > expiry
         } else {
             false

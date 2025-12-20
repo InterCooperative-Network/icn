@@ -83,10 +83,7 @@ impl RecoveryEvidence {
             vui_hash,
             zk_proof: proof,
             anchor_commitment,
-            generated_at: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
+            generated_at: icn_time::current_timestamp_secs(),
         }
     }
 
@@ -225,10 +222,7 @@ impl RecoveryService {
         }
 
         // Generate ceremony ID
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
         let ceremony_id =
             RecoveryCeremony::generate_ceremony_id(&request.old_did, &request.new_did, now);
 

@@ -247,10 +247,7 @@ impl RecoveryCeremony {
 
         self.phase = RecoveryPhase::Completed;
 
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         Ok(RecoveryResult {
             ceremony_id: self.state.ceremony_id,
@@ -291,10 +288,7 @@ impl RecoveryCeremony {
 impl RecoveryAttestation {
     /// Create a new supporting attestation
     pub fn support(steward_did: Did, signature: Vec<u8>) -> Self {
-        let timestamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let timestamp = icn_time::current_timestamp_secs();
 
         Self {
             steward_did,
@@ -307,10 +301,7 @@ impl RecoveryAttestation {
 
     /// Create a new rejecting attestation
     pub fn reject(steward_did: Did, reason: String, signature: Vec<u8>) -> Self {
-        let timestamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let timestamp = icn_time::current_timestamp_secs();
 
         Self {
             steward_did,

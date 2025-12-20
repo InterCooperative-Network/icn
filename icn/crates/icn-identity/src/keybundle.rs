@@ -125,10 +125,7 @@ impl KeyBundle {
             hybrid_keypair,
             x25519_secret: x25519_secret.to_bytes(),
             x25519_public: x25519_public.to_bytes(),
-            issued_at: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
+            issued_at: icn_time::current_timestamp_secs(),
             expires_at: None,
         })
     }
@@ -152,10 +149,7 @@ impl KeyBundle {
             hybrid_keypair,
             x25519_secret: x25519_secret.to_bytes(),
             x25519_public: x25519_public.to_bytes(),
-            issued_at: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
+            issued_at: icn_time::current_timestamp_secs(),
             expires_at: None,
         })
     }
@@ -163,8 +157,18 @@ impl KeyBundle {
     /// Sign a message with hybrid signatures (Ed25519 + ML-DSA)
     ///
     /// Both signatures must verify for the message to be considered valid.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the underlying ML-DSA signing fails, which should never happen
+    /// with a valid keypair.
     pub fn sign(&self, message: &[u8]) -> HybridSignature {
-        self.hybrid_keypair.sign(message)
+        // SAFETY: A valid HybridKeypair constructed by generate() or from valid bytes
+        // should never fail to sign. This is a programming error if it happens.
+        #[allow(clippy::expect_used)]
+        self.hybrid_keypair
+            .sign(message)
+            .expect("valid keypair should always sign successfully")
     }
 
     /// Sign a message with classical (Ed25519) only
@@ -245,10 +249,7 @@ impl KeyBundle {
             new_public: new_bundle.public_bundle(),
             old_signature: signature,
             reason,
-            requested_at: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
+            requested_at: icn_time::current_timestamp_secs(),
         })
     }
 
@@ -260,11 +261,7 @@ impl KeyBundle {
     /// Check if this bundle has expired
     pub fn is_expired(&self) -> bool {
         if let Some(expires) = self.expires_at {
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
-            now > expires
+            icn_time::current_timestamp_secs() > expires
         } else {
             false
         }
@@ -390,11 +387,7 @@ impl KeyBundlePublic {
     /// Check if this bundle has expired
     pub fn is_expired(&self) -> bool {
         if let Some(expires) = self.expires_at {
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
-            now > expires
+            icn_time::current_timestamp_secs() > expires
         } else {
             false
         }

@@ -150,10 +150,7 @@ impl Charter {
         membership_policy: MembershipPolicy,
         dispute_policy: DisputePolicy,
     ) -> Self {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         // Generate charter ID from content
         let content = format!(
@@ -288,10 +285,7 @@ impl Charter {
 
     /// Dissolve the charter
     pub fn dissolve(&mut self, reason: String, governance_ref: String) {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
         self.status = CharterStatus::Dissolved {
             reason,
             dissolved_at: now,
@@ -364,10 +358,7 @@ pub struct FounderSignature {
 impl FounderSignature {
     /// Create a new founder signature
     pub fn new(did: Did, signature: Vec<u8>) -> Self {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
         Self {
             did,
             signature,

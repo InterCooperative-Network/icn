@@ -474,10 +474,7 @@ impl<S: CharterStoreBackend> CharterStore<S> {
         reason: String,
         governance_ref: String,
     ) -> Result<Option<Charter>> {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         self.update_status(
             charter_id,

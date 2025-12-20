@@ -76,8 +76,11 @@ impl PrfPartial {
     ///
     /// partial_i = HMAC-SHA3-256(pepper_share_i, input)
     pub fn compute(share: &PepperShare, input: &[u8]) -> Self {
+        // SAFETY: HMAC-SHA3-256 accepts any key length. PepperShare.value is [u8; 32]
+        // which is an optimal key size. This cannot fail.
+        #[allow(clippy::expect_used)]
         let mut mac = Hmac::<Sha3_256>::new_from_slice(&share.value)
-            .expect("HMAC key length should be valid");
+            .expect("HMAC-SHA3-256 accepts 32-byte keys");
         mac.update(input);
         let result = mac.finalize().into_bytes();
 

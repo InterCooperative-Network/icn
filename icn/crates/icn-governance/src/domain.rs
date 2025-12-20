@@ -53,10 +53,7 @@ pub struct GovernanceDomain {
 impl GovernanceDomain {
     /// Create a new governance domain
     pub fn new(name: String, config: GovernanceConfig) -> Self {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         Self {
             id: GovernanceDomainId::generate(),
@@ -70,10 +67,7 @@ impl GovernanceDomain {
 
     /// Create a domain with a specific ID (for testing or import)
     pub fn with_id(id: GovernanceDomainId, name: String, config: GovernanceConfig) -> Self {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         Self {
             id,
@@ -94,10 +88,7 @@ impl GovernanceDomain {
     /// Update the governance configuration
     pub fn update_config(&mut self, config: GovernanceConfig) {
         self.config = config;
-        self.updated_at = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        self.updated_at = icn_time::current_timestamp_secs();
     }
 }
 

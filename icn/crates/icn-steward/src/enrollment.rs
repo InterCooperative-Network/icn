@@ -216,10 +216,7 @@ impl EnrollmentService {
 
     /// Start a new enrollment ceremony (coordinator role)
     pub fn start_ceremony(&mut self, request: &EnrollmentRequest) -> Result<CeremonyStartResponse> {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         // Generate ceremony ID
         let ceremony_id = EnrollmentCeremony::generate_ceremony_id(&request.vui_commitment, now);

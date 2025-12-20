@@ -152,10 +152,7 @@ pub struct CommonsHolderRecord {
 impl CommonsHolderRecord {
     /// Create a new CommonsHolderRecord from a PersonhoodAnchor
     pub fn new(anchor_id: [u8; 32], holder_did: Did, personhood_level: POPLevel) -> Self {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         // Holder ID is derived from anchor_id (they're the same for now)
         let holder_id = anchor_id;
@@ -184,10 +181,7 @@ impl CommonsHolderRecord {
     /// Set the display name
     pub fn set_display_name(&mut self, name: impl Into<String>) {
         self.display_name = Some(name.into());
-        self.updated_at = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        self.updated_at = icn_time::current_timestamp_secs();
     }
 
     /// Get the holder ID
@@ -220,25 +214,16 @@ impl CommonsHolderRecord {
         self.status = HolderStatus::Suspended {
             reason,
             appeal_deadline,
-            suspended_at: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
+            suspended_at: icn_time::current_timestamp_secs(),
         };
-        self.updated_at = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        self.updated_at = icn_time::current_timestamp_secs();
     }
 
     /// Reinstate a suspended holder
     pub fn reinstate(&mut self) -> bool {
         if matches!(self.status, HolderStatus::Suspended { .. }) {
             self.status = HolderStatus::Active;
-            self.updated_at = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
+            self.updated_at = icn_time::current_timestamp_secs();
             true
         } else {
             false
@@ -247,10 +232,7 @@ impl CommonsHolderRecord {
 
     /// Exit the commons voluntarily
     pub fn exit(&mut self, reason: String) {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
         self.status = HolderStatus::Exited {
             reason,
             exit_timestamp: now,
@@ -260,10 +242,7 @@ impl CommonsHolderRecord {
 
     /// Revoke holder status (network governance only)
     pub fn revoke(&mut self, reason: String, evidence: Vec<[u8; 32]>) {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
         self.status = HolderStatus::Revoked {
             reason,
             evidence,
@@ -281,10 +260,7 @@ impl CommonsHolderRecord {
             .any(|a| a.jurisdiction_id == affiliation.jurisdiction_id)
         {
             self.affiliations.push(affiliation);
-            self.updated_at = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
+            self.updated_at = icn_time::current_timestamp_secs();
         }
     }
 
@@ -295,10 +271,7 @@ impl CommonsHolderRecord {
             .iter()
             .position(|a| &a.jurisdiction_id == jurisdiction_id)
         {
-            self.updated_at = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
+            self.updated_at = icn_time::current_timestamp_secs();
             Some(self.affiliations.remove(pos))
         } else {
             None
@@ -348,18 +321,12 @@ impl CommonsHolderRecord {
     /// Update personhood level
     pub fn update_personhood_level(&mut self, level: POPLevel) {
         self.personhood_level = level;
-        self.updated_at = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        self.updated_at = icn_time::current_timestamp_secs();
     }
 
     /// Record a governance review
     pub fn record_review(&mut self) {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
         self.last_review_at = Some(now);
         self.updated_at = now;
     }
@@ -436,10 +403,7 @@ pub struct Affiliation {
 impl Affiliation {
     /// Create a new affiliation
     pub fn new(jurisdiction_id: JurisdictionId) -> Self {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         Self {
             jurisdiction_id,
@@ -491,10 +455,7 @@ impl Affiliation {
     /// Check if membership has expired
     pub fn is_expired(&self) -> bool {
         if let Some(expires_at) = self.expires_at {
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
+            let now = icn_time::current_timestamp_secs();
             now >= expires_at
         } else {
             false

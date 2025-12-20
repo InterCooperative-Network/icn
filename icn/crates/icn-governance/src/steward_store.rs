@@ -526,10 +526,7 @@ mod tests {
     }
 
     fn create_test_record() -> StewardRecord {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         StewardRecord::new(
             test_did(),

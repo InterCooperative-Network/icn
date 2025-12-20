@@ -8,7 +8,7 @@
 use crate::error::{Result, TimeError};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 use tokio::net::UdpSocket;
 use tokio::time::sleep;
 use tracing::{debug, info, warn};
@@ -203,7 +203,12 @@ impl ClockSync {
             return Err(TimeError::Protocol("Invalid response length".to_string()));
         }
 
-        let server_time_millis = u64::from_be_bytes(buf[0..8].try_into().unwrap());
+        // SAFETY: We verified len >= 8 above, so buf[0..8] is guaranteed to be 8 bytes
+        let server_time_millis = u64::from_be_bytes(
+            buf[0..8]
+                .try_into()
+                .map_err(|_| TimeError::Protocol("Buffer conversion failed".to_string()))?,
+        );
 
         debug!(
             "Time server {} responded: {}ms (RTT: {:?})",
@@ -286,10 +291,7 @@ impl ClockSync {
 
     /// Get system time as milliseconds since epoch
     fn system_time_millis() -> u64 {
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as u64
+        crate::current_timestamp_millis()
     }
 }
 

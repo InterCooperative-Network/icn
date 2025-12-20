@@ -58,10 +58,7 @@ impl StewardAnnouncement {
         region: String,
         sequence: u64,
     ) -> Self {
-        let timestamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let timestamp = icn_time::current_timestamp_secs();
 
         Self {
             steward_did,

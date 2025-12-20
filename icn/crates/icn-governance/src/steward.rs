@@ -122,10 +122,7 @@ impl StewardRecord {
         governance_approval: String,
     ) -> Self {
         let steward_id = StewardId::from_did(&steward_did);
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         Self {
             steward_id,
@@ -166,10 +163,7 @@ impl StewardRecord {
 
     /// Check if steward term has expired
     pub fn is_term_expired(&self) -> bool {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
         now >= self.term_end
     }
 
@@ -189,29 +183,20 @@ impl StewardRecord {
         let spec = specialization.into();
         if !self.specializations.contains(&spec) {
             self.specializations.push(spec);
-            self.updated_at = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
+            self.updated_at = icn_time::current_timestamp_secs();
         }
     }
 
     /// Set contact info
     pub fn set_contact(&mut self, contact: StewardContact) {
         self.contact_info = Some(contact);
-        self.updated_at = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        self.updated_at = icn_time::current_timestamp_secs();
     }
 
     /// Record an attestation issued
     pub fn record_attestation(&mut self) {
         self.attestations_issued += 1;
-        self.updated_at = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        self.updated_at = icn_time::current_timestamp_secs();
     }
 
     /// Record a disputed attestation
@@ -219,20 +204,14 @@ impl StewardRecord {
         self.attestations_disputed += 1;
         self.disputes_against += 1;
         self.recalculate_reputation();
-        self.updated_at = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        self.updated_at = icn_time::current_timestamp_secs();
     }
 
     /// Record a dispute won
     pub fn record_dispute_won(&mut self) {
         self.disputes_won += 1;
         self.recalculate_reputation();
-        self.updated_at = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        self.updated_at = icn_time::current_timestamp_secs();
     }
 
     /// Recalculate reputation score based on attestation history
@@ -259,20 +238,14 @@ impl StewardRecord {
     /// Suspend the steward
     pub fn suspend(&mut self, reason: String) {
         self.status = StewardStatus::Suspended { reason };
-        self.updated_at = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        self.updated_at = icn_time::current_timestamp_secs();
     }
 
     /// Reinstate a suspended steward
     pub fn reinstate(&mut self) -> bool {
         if matches!(self.status, StewardStatus::Suspended { .. }) {
             self.status = StewardStatus::Active;
-            self.updated_at = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
+            self.updated_at = icn_time::current_timestamp_secs();
             true
         } else {
             false
@@ -282,49 +255,34 @@ impl StewardRecord {
     /// Retire the steward
     pub fn retire(&mut self) {
         self.status = StewardStatus::Retired;
-        self.updated_at = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        self.updated_at = icn_time::current_timestamp_secs();
     }
 
     /// Revoke the steward for cause
     pub fn revoke(&mut self, reason: String, evidence: Vec<[u8; 32]>) {
         self.status = StewardStatus::Revoked { reason, evidence };
-        self.updated_at = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        self.updated_at = icn_time::current_timestamp_secs();
     }
 
     /// Extend the steward's term
     pub fn extend_term(&mut self, new_term_end: u64) {
         if new_term_end > self.term_end {
             self.term_end = new_term_end;
-            self.updated_at = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
+            self.updated_at = icn_time::current_timestamp_secs();
         }
     }
 
     /// Add to the bond
     pub fn add_bond(&mut self, amount: u64) {
         self.bond_amount += amount;
-        self.updated_at = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        self.updated_at = icn_time::current_timestamp_secs();
     }
 
     /// Slash the bond (for misbehavior)
     pub fn slash_bond(&mut self, amount: u64) -> u64 {
         let slashed = amount.min(self.bond_amount);
         self.bond_amount -= slashed;
-        self.updated_at = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        self.updated_at = icn_time::current_timestamp_secs();
         slashed
     }
 
@@ -498,10 +456,7 @@ mod tests {
     }
 
     fn create_test_steward() -> StewardRecord {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         StewardRecord::new(
             test_did(),

@@ -58,10 +58,7 @@ impl RevocationRecord {
         reason: CommonsRevocationReason,
         appeal_window_days: u64,
     ) -> Self {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         let appeal_deadline = now + (appeal_window_days * 24 * 60 * 60);
 
@@ -105,10 +102,7 @@ impl RevocationRecord {
         reason: CommonsRevocationReason,
     ) -> Self {
         let mut record = Self::new(target_type, target_id, scope, authority, reason, 0);
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
         record.effective_at = now;
         record
     }
@@ -125,10 +119,7 @@ impl RevocationRecord {
 
     /// Check if revocation is currently effective
     pub fn is_effective(&self) -> bool {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         // Not effective if successfully appealed
         if matches!(self.appeal_status, AppealStatus::Upheld) {
@@ -140,10 +131,7 @@ impl RevocationRecord {
 
     /// Check if appeal window is still open
     pub fn can_appeal(&self) -> bool {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         matches!(self.appeal_status, AppealStatus::None) && now < self.appeal_deadline
     }
@@ -154,10 +142,7 @@ impl RevocationRecord {
             return false;
         }
         self.appeal_status = AppealStatus::Pending {
-            filed_at: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
+            filed_at: icn_time::current_timestamp_secs(),
             reason: appeal_reason,
         };
         true
@@ -165,10 +150,7 @@ impl RevocationRecord {
 
     /// Resolve an appeal
     pub fn resolve_appeal(&mut self, upheld: bool, resolution_notes: String) {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         if upheld {
             self.appeal_status = AppealStatus::Upheld;
@@ -184,10 +166,7 @@ impl RevocationRecord {
 
     /// Make effective immediately (e.g., after appeal window passes)
     pub fn make_effective(&mut self) {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
         self.effective_at = now;
     }
 }

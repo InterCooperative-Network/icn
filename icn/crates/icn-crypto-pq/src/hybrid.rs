@@ -160,7 +160,10 @@ impl HybridPublicKey {
         }
 
         // Validate classical key
-        let classical_bytes: [u8; 32] = classical.try_into().unwrap();
+        // SAFETY: We verified classical.len() == 32 above
+        let classical_bytes: [u8; 32] = classical
+            .try_into()
+            .map_err(|_| CryptoError::InvalidKey("Classical key length mismatch".to_string()))?;
         let _ = VerifyingKey::from_bytes(&classical_bytes)
             .map_err(|e| CryptoError::InvalidKey(format!("Invalid Ed25519 public key: {e}")))?;
 
@@ -231,7 +234,10 @@ impl HybridKeypair {
         }
 
         // Ed25519 from first 32 bytes
-        let classical_seed: [u8; 32] = seed[..32].try_into().unwrap();
+        // SAFETY: We verified seed.len() >= 64 above
+        let classical_seed: [u8; 32] = seed[..32]
+            .try_into()
+            .map_err(|_| CryptoError::InvalidKey("Seed slice conversion failed".to_string()))?;
         let classical_signing = SigningKey::from_bytes(&classical_seed);
 
         // For ML-DSA, we can't do deterministic generation with the current library
@@ -246,17 +252,18 @@ impl HybridKeypair {
     }
 
     /// Sign a message with both algorithms
-    pub fn sign(&self, message: &[u8]) -> HybridSignature {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if ML-DSA signing fails (should not happen with valid keypair).
+    pub fn sign(&self, message: &[u8]) -> Result<HybridSignature> {
         // Ed25519 signature
         let classical_sig = self.classical_signing.sign(message);
 
         // ML-DSA signature
-        let pq_sig = self
-            .pq_keypair
-            .sign(message)
-            .expect("ML-DSA signing failed");
+        let pq_sig = self.pq_keypair.sign(message)?;
 
-        HybridSignature::new(classical_sig, pq_sig)
+        Ok(HybridSignature::new(classical_sig, pq_sig))
     }
 
     /// Get the public key
@@ -358,7 +365,7 @@ mod tests {
         let keypair = HybridKeypair::generate().unwrap();
         let message = b"test message for hybrid signing";
 
-        let signature = keypair.sign(message);
+        let signature = keypair.sign(message).unwrap();
         let public_key = keypair.public_key();
 
         assert!(signature.verify(message, &public_key));
@@ -367,7 +374,7 @@ mod tests {
     #[test]
     fn test_hybrid_signature_size() {
         let keypair = HybridKeypair::generate().unwrap();
-        let signature = keypair.sign(b"test");
+        let signature = keypair.sign(b"test").unwrap();
 
         // Ed25519 (64) + ML-DSA (~3293) = ~3357 bytes
         assert!(signature.size() > 3000);
@@ -391,7 +398,7 @@ mod tests {
     #[test]
     fn test_hybrid_tampered_message() {
         let keypair = HybridKeypair::generate().unwrap();
-        let signature = keypair.sign(b"original message");
+        let signature = keypair.sign(b"original message").unwrap();
         let public_key = keypair.public_key();
 
         assert!(!signature.verify(b"tampered message", &public_key));
@@ -403,7 +410,7 @@ mod tests {
         let keypair2 = HybridKeypair::generate().unwrap();
         let message = b"test message";
 
-        let signature = keypair1.sign(message);
+        let signature = keypair1.sign(message).unwrap();
         let wrong_key = keypair2.public_key();
 
         assert!(!signature.verify(message, &wrong_key));
@@ -427,7 +434,7 @@ mod tests {
     fn test_hybrid_serialization() {
         let keypair = HybridKeypair::generate().unwrap();
         let message = b"test message";
-        let signature = keypair.sign(message);
+        let signature = keypair.sign(message).unwrap();
         let public_key = keypair.public_key();
 
         // Serialize
@@ -446,7 +453,7 @@ mod tests {
     fn test_partial_verification() {
         let keypair = HybridKeypair::generate().unwrap();
         let message = b"test message";
-        let signature = keypair.sign(message);
+        let signature = keypair.sign(message).unwrap();
         let public_key = keypair.public_key();
 
         // Test individual verification methods

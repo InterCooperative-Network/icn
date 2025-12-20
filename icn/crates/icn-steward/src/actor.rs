@@ -340,10 +340,7 @@ impl StewardActor {
         }
 
         // Generate ceremony ID
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
         let ceremony_id = EnrollmentCeremony::generate_ceremony_id(&vui_commitment, now);
 
         // Check for duplicate
@@ -500,10 +497,7 @@ impl StewardActor {
         }
 
         // Generate ceremony ID
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
         let ceremony_id = RecoveryCeremony::generate_ceremony_id(&old_did, &new_did, now);
 
         // Check for duplicate
@@ -633,10 +627,7 @@ impl StewardActor {
 
         // Broadcast new VUI
         if let Some(ref send_gossip) = self.send_gossip {
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
+            let now = icn_time::current_timestamp_secs();
             let msg = crate::gossip::VuiSyncMessage::NewVui {
                 from_did: self.own_did.clone(),
                 vui_hash,

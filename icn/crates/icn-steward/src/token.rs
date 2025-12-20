@@ -52,10 +52,7 @@ impl EnrollmentToken {
         vui_commitment: [u8; 32],
         validity_secs: Option<u64>,
     ) -> Self {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         // Generate token ID from signature and timestamp
         let mut hasher = Sha256::new();
@@ -80,10 +77,7 @@ impl EnrollmentToken {
 
     /// Check if the token has expired
     pub fn is_expired(&self) -> bool {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
         now > self.expires_at
     }
 
@@ -94,10 +88,7 @@ impl EnrollmentToken {
 
     /// Get remaining validity time in seconds
     pub fn remaining_validity(&self) -> u64 {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         self.expires_at.saturating_sub(now)
     }
@@ -152,10 +143,7 @@ impl TokenIssuanceRecord {
         pathway_hash: [u8; 8],
         jurisdiction_tier: u8,
     ) -> Self {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         Self {
             blinded_token_hash,
@@ -206,10 +194,7 @@ impl TokenRequest {
         let mut nonce = [0u8; 16];
         rand::RngCore::fill_bytes(&mut rand::rngs::OsRng, &mut nonce);
 
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         Self {
             blinded_message,
@@ -244,10 +229,7 @@ pub struct TokenResponse {
 impl TokenResponse {
     /// Create a new token response
     pub fn new(blinded_signature: Vec<u8>, steward_did: Did, nonce: [u8; 16]) -> Self {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         Self {
             blinded_signature,

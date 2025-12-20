@@ -372,10 +372,7 @@ impl Amendment {
         description: String,
         proposer: Did,
     ) -> Self {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         // Generate ID from content
         let content = format!("{amendment_type}:{scope}:{title}:{now}");
@@ -675,10 +672,7 @@ impl Amendment {
     }
 
     fn now(&self) -> Timestamp {
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs()
+        icn_time::current_timestamp_secs()
     }
 
     fn touch(&mut self) {

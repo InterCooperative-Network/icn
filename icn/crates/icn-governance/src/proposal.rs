@@ -402,10 +402,7 @@ impl Proposal {
         description: String,
         payload: ProposalPayload,
     ) -> Self {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         Self {
             id: ProposalId::generate(),
@@ -426,10 +423,7 @@ impl Proposal {
             anyhow::bail!("Can only open proposals in Draft state");
         }
 
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         self.state = ProposalState::Open {
             opened_at: now,
@@ -451,10 +445,7 @@ impl Proposal {
         }
 
         self.state = final_state;
-        self.updated_at = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        self.updated_at = icn_time::current_timestamp_secs();
 
         Ok(())
     }
@@ -465,10 +456,7 @@ impl Proposal {
             anyhow::bail!("Cannot cancel a closed proposal");
         }
 
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         self.state = ProposalState::Cancelled { cancelled_at: now };
         self.updated_at = now;
@@ -485,10 +473,7 @@ impl Proposal {
             anyhow::bail!("Cannot veto a closed proposal");
         }
 
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         self.state = ProposalState::Vetoed {
             vetoed_at: now,
@@ -512,10 +497,7 @@ impl Proposal {
             anyhow::bail!("Can only force close proposals in Open state");
         }
 
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         self.state = ProposalState::ForceClosed {
             closed_at: now,
@@ -586,10 +568,7 @@ mod tests {
         assert!(proposal.open(3600).is_err());
 
         // Close as accepted
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
         proposal
             .close(ProposalState::Accepted { closed_at: now })
             .unwrap();

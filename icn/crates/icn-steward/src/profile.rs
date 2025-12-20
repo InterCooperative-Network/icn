@@ -131,10 +131,7 @@ impl StewardProfile {
         token_signing_key: Vec<u8>,
         pepper_share_commitment: [u8; 32],
     ) -> Self {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         Self {
             steward_did,
@@ -164,10 +161,7 @@ impl StewardProfile {
     /// Check if term has expired
     pub fn is_term_expired(&self) -> bool {
         if let Some(term_end) = self.term_end {
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
+            let now = icn_time::current_timestamp_secs();
             now > term_end
         } else {
             false
@@ -176,10 +170,7 @@ impl StewardProfile {
 
     /// Activate the steward (called after bond is posted)
     pub fn activate(&mut self, bond_amount: i64, term_duration_secs: Option<u64>) {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         self.status = StewardStatus::Active;
         self.bond_amount = bond_amount;
@@ -190,10 +181,7 @@ impl StewardProfile {
     /// Suspend the steward
     pub fn suspend(&mut self, reason: String, duration_secs: Option<u64>) {
         let until = duration_secs.map(|d| {
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs()
+            icn_time::current_timestamp_secs()
                 + d
         });
 
@@ -202,20 +190,14 @@ impl StewardProfile {
 
     /// Revoke the steward permanently
     pub fn revoke(&mut self, reason: String) {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         self.status = StewardStatus::Revoked { reason, at: now };
     }
 
     /// Record a heartbeat
     pub fn record_heartbeat(&mut self) {
-        self.stats.last_heartbeat = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        self.stats.last_heartbeat = icn_time::current_timestamp_secs();
     }
 
     /// Increment POP issued counter

@@ -11,6 +11,7 @@ repository = "https://github.com/icn-foundation/icn"
 icn-identity = { path = "../icn-identity" }
 icn-crypto-pq = { path = "../icn-crypto-pq" }
 icn-store = { path = "../icn-store" }
+icn-time = { path = "../icn-time" }
 
 # Async runtime
 tokio = { version = "1", features = ["sync", "time", "macros", "rt-multi-thread"] }

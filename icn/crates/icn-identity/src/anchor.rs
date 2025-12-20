@@ -124,10 +124,7 @@ impl Anchor {
 
         Self {
             id,
-            created_at: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
+            created_at: icn_time::current_timestamp_secs(),
             pathway,
             vui_commitment,
         }
@@ -143,10 +140,7 @@ impl Anchor {
 
         Self {
             id,
-            created_at: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
+            created_at: icn_time::current_timestamp_secs(),
             pathway: EnrollmentPathway::Genesis {
                 reason: reason.to_string(),
             },

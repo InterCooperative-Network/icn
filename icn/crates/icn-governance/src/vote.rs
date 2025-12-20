@@ -43,10 +43,7 @@ pub struct Vote {
 impl Vote {
     /// Create a new vote
     pub fn new(proposal_id: ProposalId, voter: Did, choice: VoteChoice) -> Self {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         Self {
             proposal_id,

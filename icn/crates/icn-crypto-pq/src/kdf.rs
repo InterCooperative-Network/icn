@@ -35,8 +35,11 @@ pub fn derive_hybrid_key(
     // Use HKDF-SHA3-256
     let hk = Hkdf::<Sha3_256>::new(None, &combined);
     let mut output = vec![0u8; output_len];
+    // SAFETY: HKDF-SHA3-256 supports up to 255 * 32 = 8160 bytes output.
+    // Callers requesting more than this will panic, but this is a caller bug.
+    #[allow(clippy::expect_used)]
     hk.expand(context, &mut output)
-        .expect("HKDF output length should be valid");
+        .expect("HKDF output length exceeds maximum (8160 bytes)");
 
     output
 }
@@ -65,23 +68,29 @@ pub fn derive_keybundle_keys(
     // Context includes version to get different keys per version
     let version_bytes = version.to_le_bytes();
 
+    // SAFETY: All output sizes below are fixed at compile time and well within
+    // HKDF-SHA3-256's maximum of 8160 bytes (255 * 32). These cannot fail.
+
     // Derive Ed25519 seed
     let mut ed25519_seed = [0u8; 32];
     let ed25519_context = [b"icn-sdis-ed25519-v", version_bytes.as_slice()].concat();
+    #[allow(clippy::expect_used)]
     hk.expand(&ed25519_context, &mut ed25519_seed)
-        .expect("Ed25519 seed derivation failed");
+        .expect("32-byte HKDF expand cannot fail");
 
     // Derive ML-DSA seed (larger for key expansion)
     let mut ml_dsa_seed = [0u8; 64];
     let ml_dsa_context = [b"icn-sdis-ml-dsa-v", version_bytes.as_slice()].concat();
+    #[allow(clippy::expect_used)]
     hk.expand(&ml_dsa_context, &mut ml_dsa_seed)
-        .expect("ML-DSA seed derivation failed");
+        .expect("64-byte HKDF expand cannot fail");
 
     // Derive X25519 seed
     let mut x25519_seed = [0u8; 32];
     let x25519_context = [b"icn-sdis-x25519-v", version_bytes.as_slice()].concat();
+    #[allow(clippy::expect_used)]
     hk.expand(&x25519_context, &mut x25519_seed)
-        .expect("X25519 seed derivation failed");
+        .expect("32-byte HKDF expand cannot fail");
 
     (ed25519_seed, ml_dsa_seed, x25519_seed)
 }
@@ -101,8 +110,10 @@ pub fn derive_session_key(
 
     let hk = Hkdf::<Sha3_256>::new(None, &combined);
     let mut session_key = [0u8; 32];
+    // SAFETY: 32 bytes is well within HKDF-SHA3-256's 8160 byte limit
+    #[allow(clippy::expect_used)]
     hk.expand(session_context, &mut session_key)
-        .expect("Session key derivation failed");
+        .expect("32-byte HKDF expand cannot fail");
 
     session_key
 }
@@ -115,8 +126,11 @@ pub fn derive_session_key(
 pub fn prf_partial(pepper_share: &[u8; 32], input: &[u8]) -> [u8; 32] {
     use hmac::{Hmac, Mac};
 
+    // SAFETY: HMAC-SHA3-256 accepts any key length, but 32 bytes is optimal.
+    // The only way new_from_slice can fail is with an invalid algorithm, not key length.
+    #[allow(clippy::expect_used)]
     let mut mac =
-        Hmac::<Sha3_256>::new_from_slice(pepper_share).expect("HMAC key length should be valid");
+        Hmac::<Sha3_256>::new_from_slice(pepper_share).expect("HMAC-SHA3-256 accepts 32-byte keys");
     mac.update(input);
     mac.finalize().into_bytes().into()
 }

@@ -114,10 +114,7 @@ impl IdDataHash {
         Self {
             hash,
             pathway,
-            computed_at: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
+            computed_at: icn_time::current_timestamp_secs(),
         }
     }
 

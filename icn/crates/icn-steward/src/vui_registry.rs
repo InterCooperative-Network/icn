@@ -131,10 +131,7 @@ impl VuiRegistry {
             return Err(VuiRegistryError::AlreadyRegistered);
         }
 
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         let registration = VuiRegistration {
             vui_hash,

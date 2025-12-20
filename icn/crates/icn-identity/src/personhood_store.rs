@@ -408,10 +408,7 @@ impl<S: PersonhoodStore> PersonhoodAnchorStore<S> {
 
             // Update status
             anchor.status = new_status;
-            anchor.updated_at = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
+            anchor.updated_at = icn_time::current_timestamp_secs();
 
             // Store updated anchor (will create new status index)
             self.store(&anchor)?;
@@ -474,10 +471,7 @@ impl<S: PersonhoodStore> PersonhoodAnchorStore<S> {
 
             // Update current key
             anchor.current_key = Some(new_key);
-            anchor.updated_at = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
+            anchor.updated_at = icn_time::current_timestamp_secs();
 
             // Store updated anchor (will create new key index)
             self.store(&anchor)?;
@@ -499,10 +493,7 @@ impl<S: PersonhoodStore> PersonhoodAnchorStore<S> {
     /// Check for auto-reinstatable suspended anchors
     pub fn check_auto_reinstate(&self) -> Result<Vec<PersonhoodAnchor>> {
         let suspended = self.list_suspended()?;
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         let mut reinstated = Vec::new();
 

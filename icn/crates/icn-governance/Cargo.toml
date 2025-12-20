@@ -12,6 +12,7 @@ serde = { workspace = true, features = ["derive"] }
 serde_json = "1.0"
 icn-identity = { path = "../icn-identity" }
 icn-trust = { path = "../icn-trust" }
+icn-time.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true }
 uuid = { version = "1.0", features = ["v4", "serde"] }

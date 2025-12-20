@@ -463,10 +463,7 @@ impl Appeal {
         statement: String,
         requested_remedy: AppealRemedy,
     ) -> Self {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         // Generate ID from content
         let content = format!("{appeal_type}:{scope}:{appellant}:{now}");
@@ -712,10 +709,7 @@ impl Appeal {
     }
 
     fn now(&self) -> Timestamp {
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs()
+        icn_time::current_timestamp_secs()
     }
 
     fn touch(&mut self) {

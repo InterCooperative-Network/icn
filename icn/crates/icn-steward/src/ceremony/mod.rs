@@ -61,10 +61,7 @@ impl CeremonyState {
 
     /// Create a new ceremony state
     pub fn new(ceremony_id: CeremonyId, coordinator: Did, threshold: u32) -> Self {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         Self {
             ceremony_id,
@@ -78,10 +75,7 @@ impl CeremonyState {
 
     /// Check if ceremony has expired
     pub fn is_expired(&self) -> bool {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
         now > self.expires_at
     }
 

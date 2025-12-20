@@ -245,10 +245,7 @@ impl EnrollmentCeremony {
 
         self.phase = EnrollmentPhase::Completed;
 
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         Ok(EnrollmentResult {
             ceremony_id: self.state.ceremony_id,
