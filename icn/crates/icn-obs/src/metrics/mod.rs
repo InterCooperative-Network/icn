@@ -18,4 +18,10 @@
 
 // Include the legacy metrics file directly
 // This keeps backwards compatibility while allowing gradual migration
-include!("../metrics_legacy.rs");
+// Allow missing docs for legacy metrics - documenting these incrementally
+#[allow(missing_docs)]
+mod legacy {
+    include!("../metrics_legacy.rs");
+}
+
+pub use legacy::*;

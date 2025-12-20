@@ -54,58 +54,90 @@ impl PartialOrd for ScheduledClose {
 /// Lightweight config for creating domains
 #[derive(Clone, Debug)]
 pub struct GovernanceConfigLite {
+    /// Governance profile name (e.g., "consensus", "majority")
     pub profile: String,
+    /// Core governance parameters
     pub params: GovernanceParams,
+    /// Membership configuration
     pub membership: MembershipConfig,
 }
 
 /// Commands that can be submitted to the governance actor
 #[derive(Debug)]
 pub enum GovernanceCommand {
+    /// Create a new governance domain
     CreateDomain {
+        /// Unique identifier for the domain
         domain_id: GovernanceDomainId,
+        /// Human-readable name
         name: String,
+        /// Domain configuration
         config: GovernanceConfigLite,
     },
+    /// Create a new proposal
     CreateProposal {
+        /// Unique proposal identifier
         proposal_id: ProposalId,
+        /// Domain in which to create the proposal
         domain_id: GovernanceDomainId,
+        /// Proposal title
         title: String,
+        /// Detailed description
         description: String,
+        /// Proposal action payload
         payload: ProposalPayload,
     },
+    /// Open a proposal for voting
     OpenProposal {
+        /// Proposal to open
         proposal_id: ProposalId,
+        /// Duration of voting period in seconds
         voting_period_seconds: u64,
     },
+    /// Cast a vote on a proposal
     CastVote {
+        /// Proposal to vote on
         proposal_id: ProposalId,
+        /// Vote choice
         choice: VoteChoice,
+        /// Optional comment explaining the vote
         comment: Option<String>,
     },
+    /// Close voting on a proposal
     CloseProposal {
+        /// Proposal to close
         proposal_id: ProposalId,
     },
     /// Emergency veto - marks a proposal as vetoed
     VetoProposal {
+        /// Proposal to veto
         proposal_id: ProposalId,
+        /// Reason for veto
         reason: String,
     },
     /// Emergency force close - closes a proposal with a forced outcome
     ForceCloseProposal {
+        /// Proposal to force close
         proposal_id: ProposalId,
+        /// Outcome to force
         forced_outcome: icn_governance::ForcedOutcome,
+        /// Reason for forcing
         reason: String,
     },
     /// Update domain configuration (from accepted ConfigChange proposal)
     UpdateDomainConfig {
+        /// Domain to update
         domain_id: GovernanceDomainId,
+        /// New configuration
         new_config: GovernanceConfig,
     },
     /// Update domain membership (from accepted Membership proposal)
     UpdateMembership {
+        /// Domain to update
         domain_id: GovernanceDomainId,
+        /// Membership action (add/remove/etc.)
         action: MembershipAction,
+        /// Member DID to act upon
         member: Did,
     },
 }

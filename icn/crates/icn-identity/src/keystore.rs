@@ -38,23 +38,33 @@ pub trait KeyStore: Send + Sync {
     fn path(&self) -> &Path;
 }
 
-/// Key rotation record
+/// Key rotation record documenting a DID key change
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KeyRotation {
+    /// DID before rotation
     pub old_did: Did,
+    /// DID after rotation
     pub new_did: Did,
+    /// Unix timestamp when rotation occurred
     pub timestamp: u64,
+    /// Reason for key rotation
     pub reason: RotationReason,
-    pub signature_old: Vec<u8>, // Signature from old key
-    pub signature_new: Vec<u8>, // Signature from new key
+    /// Signature from old key proving authorization
+    pub signature_old: Vec<u8>,
+    /// Signature from new key proving possession
+    pub signature_new: Vec<u8>,
 }
 
 /// Reason for key rotation
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RotationReason {
+    /// Regular scheduled rotation
     Scheduled,
+    /// Key was potentially compromised
     Compromised,
+    /// Upgrading to stronger key algorithm
     Upgrade,
+    /// Manual user-initiated rotation
     Manual,
 }
 
