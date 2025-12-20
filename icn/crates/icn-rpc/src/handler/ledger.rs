@@ -128,6 +128,9 @@ pub async fn handle_ledger_balance(
 }
 
 /// Handle ledger.history RPC call - get recent ledger entries (paginated)
+///
+/// Uses the ledger's efficient pagination API to avoid loading all entries
+/// into memory when only a subset is requested.
 pub async fn handle_ledger_history(
     id: u64,
     params: &serde_json::Value,
@@ -157,13 +160,17 @@ pub async fn handle_ledger_history(
         }
     };
 
+    // Cap limit to server maximum
+    let limit = page_request.limit.min(DEFAULT_MAX_PAGE_SIZE);
+
     let ledger = ledger_handle.read().await;
-    match ledger.get_all_entries() {
-        Ok(entries) => {
-            // Convert all entries (in reverse order - most recent first)
-            let all_entries: Vec<LedgerEntry> = entries
+
+    // Use paginated API - entries are returned newest-first
+    match ledger.get_entries_paginated(page_request.offset, limit) {
+        Ok((entries, total)) => {
+            // Convert only the paginated entries to RPC types
+            let rpc_entries: Vec<LedgerEntry> = entries
                 .iter()
-                .rev()
                 .map(|entry| {
                     let hash = entry
                         .id
@@ -189,10 +196,17 @@ pub async fn handle_ledger_history(
                 })
                 .collect();
 
-            // Apply pagination
-            let page = paginate(all_entries, &page_request, DEFAULT_MAX_PAGE_SIZE);
+            // Build paginated response
+            let has_more = page_request.offset + rpc_entries.len() < total;
+            let response = crate::pagination::PageResponse {
+                items: rpc_entries,
+                total,
+                has_more,
+                offset: Some(page_request.offset),
+                limit: Some(limit),
+            };
 
-            match serde_json::to_value(&page) {
+            match serde_json::to_value(&response) {
                 Ok(value) => RpcResponse::success(id, value),
                 Err(e) => RpcResponse::error(id, INTERNAL_ERROR, format!("Internal error: {e}")),
             }

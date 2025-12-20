@@ -750,6 +750,110 @@ impl Ledger {
         Ok(entries)
     }
 
+    /// Count the total number of journal entries
+    ///
+    /// More efficient than `get_all_entries().len()` as it doesn't
+    /// deserialize entries.
+    pub fn count_entries(&self) -> Result<usize> {
+        let prefix = JOURNAL_PREFIX.as_bytes();
+        self.store.scan_count(prefix)
+    }
+
+    /// Get journal entries with pagination (newest first)
+    ///
+    /// Returns entries in reverse chronological order (most recent first),
+    /// which is the typical use case for displaying transaction history.
+    ///
+    /// # Arguments
+    /// * `offset` - Number of entries to skip (0-based)
+    /// * `limit` - Maximum number of entries to return
+    ///
+    /// # Returns
+    /// Tuple of (entries, total_count)
+    ///
+    /// # Performance Note
+    /// Currently loads and sorts all entries in memory before paginating.
+    /// For very large ledgers (100K+ entries), consider implementing a
+    /// secondary timestamp index for O(log n) access. See issue #111.
+    pub fn get_entries_paginated(
+        &self,
+        offset: usize,
+        limit: usize,
+    ) -> Result<(Vec<JournalEntry>, usize)> {
+        let prefix = JOURNAL_PREFIX.as_bytes();
+        let pairs = self.store.scan(prefix)?;
+        let total = pairs.len();
+
+        // Early return if offset is beyond total
+        if offset >= total {
+            return Ok((Vec::new(), total));
+        }
+
+        // Deserialize and sort entries
+        let mut entries = Vec::with_capacity(pairs.len());
+        for (_key, value) in pairs {
+            let entry: JournalEntry = serde_json::from_slice(&value)?;
+            entries.push(entry);
+        }
+
+        // Sort by timestamp descending (newest first)
+        entries.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+
+        // Apply pagination
+        let paginated: Vec<JournalEntry> = entries
+            .into_iter()
+            .skip(offset)
+            .take(limit)
+            .collect();
+
+        Ok((paginated, total))
+    }
+
+    /// Get journal entries with pagination (oldest first)
+    ///
+    /// Returns entries in chronological order (oldest first).
+    /// Useful for auditing and sequential processing.
+    ///
+    /// # Arguments
+    /// * `offset` - Number of entries to skip (0-based)
+    /// * `limit` - Maximum number of entries to return
+    ///
+    /// # Returns
+    /// Tuple of (entries, total_count)
+    pub fn get_entries_paginated_asc(
+        &self,
+        offset: usize,
+        limit: usize,
+    ) -> Result<(Vec<JournalEntry>, usize)> {
+        let prefix = JOURNAL_PREFIX.as_bytes();
+        let pairs = self.store.scan(prefix)?;
+        let total = pairs.len();
+
+        // Early return if offset is beyond total
+        if offset >= total {
+            return Ok((Vec::new(), total));
+        }
+
+        // Deserialize and sort entries
+        let mut entries = Vec::with_capacity(pairs.len());
+        for (_key, value) in pairs {
+            let entry: JournalEntry = serde_json::from_slice(&value)?;
+            entries.push(entry);
+        }
+
+        // Sort by timestamp ascending (oldest first)
+        entries.sort_by_key(|e| e.timestamp);
+
+        // Apply pagination
+        let paginated: Vec<JournalEntry> = entries
+            .into_iter()
+            .skip(offset)
+            .take(limit)
+            .collect();
+
+        Ok((paginated, total))
+    }
+
     // === Phase 18 Week 5: Fork Detection and Resolution ===
 
     /// Rebuild the fork detection index from stored entries

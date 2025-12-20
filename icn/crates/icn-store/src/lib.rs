@@ -118,6 +118,39 @@ pub trait Store: Send + Sync {
     fn delete(&self, key: &[u8]) -> Result<()>;
     fn scan(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>>;
 
+    /// Count entries with a given prefix without loading values
+    ///
+    /// More efficient than `scan().len()` as it doesn't deserialize values.
+    fn scan_count(&self, prefix: &[u8]) -> Result<usize> {
+        // Default implementation uses scan - backends can override for efficiency
+        Ok(self.scan(prefix)?.len())
+    }
+
+    /// Scan entries with pagination support
+    ///
+    /// Returns entries starting at `offset` with a maximum of `limit` entries.
+    /// More memory-efficient than loading all entries for large datasets.
+    ///
+    /// # Arguments
+    /// * `prefix` - Key prefix to scan
+    /// * `offset` - Number of entries to skip
+    /// * `limit` - Maximum number of entries to return
+    ///
+    /// # Returns
+    /// Tuple of (entries, total_count) where total_count is the total matching entries
+    fn scan_paginated(
+        &self,
+        prefix: &[u8],
+        offset: usize,
+        limit: usize,
+    ) -> Result<(Vec<(Vec<u8>, Vec<u8>)>, usize)> {
+        // Default implementation - backends can override for efficiency
+        let all = self.scan(prefix)?;
+        let total = all.len();
+        let paginated = all.into_iter().skip(offset).take(limit).collect();
+        Ok((paginated, total))
+    }
+
     // Replica tracking operations (Phase 17)
     /// Get replica metadata for a content hash
     fn get_replica_metadata(&self, content_hash: &ContentHash) -> Result<Option<ReplicaMetadata>>;
@@ -214,6 +247,31 @@ impl Store for SledStore {
         }
 
         Ok(results)
+    }
+
+    fn scan_count(&self, prefix: &[u8]) -> Result<usize> {
+        // Efficient count using iterator - doesn't materialize values
+        let count = self.db.scan_prefix(prefix).count();
+        Ok(count)
+    }
+
+    fn scan_paginated(
+        &self,
+        prefix: &[u8],
+        offset: usize,
+        limit: usize,
+    ) -> Result<(Vec<(Vec<u8>, Vec<u8>)>, usize)> {
+        // First get total count efficiently
+        let total = self.db.scan_prefix(prefix).count();
+
+        // Then get paginated results
+        let mut results = Vec::with_capacity(limit.min(total.saturating_sub(offset)));
+        for item in self.db.scan_prefix(prefix).skip(offset).take(limit) {
+            let (k, v) = item?;
+            results.push((k.to_vec(), v.to_vec()));
+        }
+
+        Ok((results, total))
     }
 
     // Replica tracking implementation
