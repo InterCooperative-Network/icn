@@ -625,13 +625,7 @@ pub async fn open_proposal(
         closes_at
     } else {
         // Fallback to current time + voting period if state doesn't match
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map_err(|e| {
-                crate::error::GatewayError::InternalError(format!("System clock error: {e}"))
-            })?
-            .as_secs();
-        now + voting_period_seconds
+        icn_time::current_timestamp_secs() + voting_period_seconds
     };
 
     // Broadcast event to WebSocket subscribers

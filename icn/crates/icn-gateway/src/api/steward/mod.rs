@@ -442,10 +442,7 @@ pub async fn extend_steward_term(
     let new_term_end = steward.term_end + additional_secs;
 
     // Validate (max 2 years from now)
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
+    let now = icn_time::current_timestamp_secs();
     let max_term = now + (730 * 24 * 60 * 60);
     if new_term_end > max_term {
         return Err(GatewayError::BadRequest(

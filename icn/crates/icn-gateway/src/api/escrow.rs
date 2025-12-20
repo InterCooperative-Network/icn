@@ -50,10 +50,7 @@ pub async fn create_escrow(
         .parse()
         .map_err(|e| GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
 
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
+    let now = icn_time::current_timestamp_secs();
 
     let escrow = Escrow {
         id: uuid::Uuid::new_v4().to_string(),
@@ -231,10 +228,7 @@ pub async fn release_escrow(
         };
 
         escrow.status = EscrowStatus::Released;
-        escrow.updated_at = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        escrow.updated_at = icn_time::current_timestamp_secs();
 
         store
             .update(&escrow_id, escrow.clone())
@@ -248,10 +242,7 @@ pub async fn release_escrow(
         })))
     } else {
         escrow.status = EscrowStatus::Locked;
-        escrow.updated_at = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        escrow.updated_at = icn_time::current_timestamp_secs();
 
         store
             .update(&escrow_id, escrow.clone())
@@ -310,10 +301,7 @@ pub async fn refund_escrow(
     info!(escrow_id = %escrow_id, "Escrow cancelled/refunded (no ledger transaction required)");
 
     escrow.status = EscrowStatus::Refunded;
-    escrow.updated_at = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
+    escrow.updated_at = icn_time::current_timestamp_secs();
 
     store
         .update(&escrow_id, escrow.clone())
@@ -328,10 +316,7 @@ pub async fn refund_escrow(
 
 /// Check if all escrow conditions are met
 pub fn check_conditions(escrow: &Escrow, approver: &str, _proof: Option<&str>) -> bool {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
+    let now = icn_time::current_timestamp_secs();
 
     // Check expiration
     if let Some(expires_at) = escrow.expires_at {

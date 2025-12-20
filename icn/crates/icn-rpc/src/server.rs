@@ -686,10 +686,11 @@ async fn dispatch_request(
 
 /// Create a JSON response
 fn json_response(status: StatusCode, response: &RpcResponse) -> Response<Full<Bytes>> {
-    let json = serde_json::to_string(response).unwrap();
+    let json = serde_json::to_string(response).unwrap_or_else(|_| "{}".to_string());
+    let body = Full::new(Bytes::from(json));
     Response::builder()
         .status(status)
         .header("Content-Type", "application/json")
-        .body(Full::new(Bytes::from(json)))
-        .unwrap()
+        .body(body)
+        .unwrap_or_else(|_| Response::new(Full::new(Bytes::from("{}"))))
 }

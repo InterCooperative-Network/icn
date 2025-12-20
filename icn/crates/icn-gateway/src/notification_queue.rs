@@ -10,7 +10,7 @@ use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 use tokio::sync::mpsc;
 use tracing::debug;
 
@@ -408,13 +408,7 @@ pub fn calculate_backoff(retries: u32) -> Duration {
 
 /// Get current Unix timestamp
 fn current_timestamp() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_else(|e| {
-            tracing::warn!("System clock before UNIX epoch: {:?}", e);
-            std::time::Duration::ZERO
-        })
-        .as_secs()
+    icn_time::current_timestamp_secs()
 }
 
 // ============================================================================

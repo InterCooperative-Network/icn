@@ -6,7 +6,7 @@
 use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 use tokio::sync::RwLock;
 
 /// FCM HTTP v1 API endpoint format
@@ -63,10 +63,7 @@ struct AccessToken {
 
 impl AccessToken {
     fn is_expired(&self) -> bool {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
         // Consider expired 60 seconds before actual expiry
         now >= self.expires_at.saturating_sub(60)
     }
@@ -344,10 +341,7 @@ impl FcmClient {
 
     /// Refresh the OAuth2 access token using JWT assertion
     async fn refresh_access_token(&self) -> Result<AccessToken, String> {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         // Create JWT claims
         let claims = JwtClaims {
@@ -421,11 +415,7 @@ impl FcmClient {
         let token = AccessToken {
             token: access_token,
             // Token expires in 1 hour (3600 seconds)
-            expires_at: SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap_or(Duration::ZERO)
-                .as_secs()
-                + 3600,
+            expires_at: icn_time::current_timestamp_secs() + 3600,
         };
 
         Ok(Self {

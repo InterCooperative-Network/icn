@@ -47,7 +47,7 @@ use icn_identity::Did;
 use serde::{Deserialize, Serialize};
 use sha3::{Digest, Sha3_256};
 use std::collections::HashMap;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
 use crate::ceremony::enrollment::{EnrollmentCeremony, EnrollmentResult, ShareContribution};
 use crate::ceremony::CeremonyId;

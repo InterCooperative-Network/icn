@@ -224,7 +224,7 @@ pub async fn handle_recovery_list(id: u64, state: &Arc<RpcServer>) -> RpcRespons
         recoveries.push(recovery_to_info(&recovery));
     }
 
-    RpcResponse::success(id, serde_json::to_value(recoveries).unwrap())
+    RpcResponse::success(id, serde_json::to_value(recoveries).unwrap_or_default())
 }
 
 /// Handle recovery.status RPC call - get status of a specific recovery

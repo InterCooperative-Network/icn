@@ -13,7 +13,6 @@ use icn_compute::{
 };
 use std::collections::HashMap;
 use std::sync::RwLock;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Hash type for task identification
 pub type TaskHash = [u8; 32];
@@ -102,10 +101,7 @@ impl ComputeManager {
         payment_currency: Option<String>,
         resource_profile: Option<ResourceProfileRequest>,
     ) -> Result<TaskHash> {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as u64;
+        let now = icn_time::current_timestamp_millis();
 
         // Convert relative deadline to absolute timestamp
         let absolute_deadline = deadline_ms.map(|ms| now + ms);

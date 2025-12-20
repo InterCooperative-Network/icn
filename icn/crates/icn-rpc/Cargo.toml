@@ -25,6 +25,7 @@ metrics = "0.24"
 
 # ICN crates
 icn-identity.workspace = true
+icn-time = { path = "../icn-time" }
 icn-net.workspace = true
 icn-ledger.workspace = true
 icn-ccl.workspace = true

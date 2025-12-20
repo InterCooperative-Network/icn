@@ -180,10 +180,7 @@ impl StewardProfile {
 
     /// Suspend the steward
     pub fn suspend(&mut self, reason: String, duration_secs: Option<u64>) {
-        let until = duration_secs.map(|d| {
-            icn_time::current_timestamp_secs()
-                + d
-        });
+        let until = duration_secs.map(|d| icn_time::current_timestamp_secs() + d);
 
         self.status = StewardStatus::Suspended { reason, until };
     }

@@ -55,10 +55,7 @@ pub async fn create_recurring_payment(
         .parse()
         .map_err(|e| GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
 
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
+    let now = icn_time::current_timestamp_secs();
 
     let next_execution = req.start_date.unwrap_or(now);
 
@@ -198,10 +195,7 @@ pub async fn update_recurring_payment(
         payment.status = status;
     }
 
-    payment.updated_at = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
+    payment.updated_at = icn_time::current_timestamp_secs();
 
     store
         .update(&payment_id, payment.clone())
@@ -238,10 +232,7 @@ pub async fn cancel_recurring_payment(
 
     // Mark as cancelled
     payment.status = RecurringStatus::Cancelled;
-    payment.updated_at = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
+    payment.updated_at = icn_time::current_timestamp_secs();
 
     store
         .update(&payment_id, payment.clone())
@@ -281,10 +272,7 @@ pub async fn execute_due_payments(
     store: &RecurringPaymentStore,
     ledger_mgr: &Arc<LedgerManager>,
 ) -> Vec<(String, std::result::Result<String, String>)> {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
+    let now = icn_time::current_timestamp_secs();
 
     let due_payments = match store.get_due_payments(now) {
         Ok(payments) => payments,
@@ -348,10 +336,7 @@ pub async fn execute_due_payments(
                     "Recurring payment executed"
                 );
 
-                let now = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs();
+                let now = icn_time::current_timestamp_secs();
 
                 // Update payment state
                 payment.execution_count += 1;

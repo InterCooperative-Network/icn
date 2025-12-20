@@ -46,10 +46,7 @@ pub async fn create_budget(
         .parse()
         .map_err(|e| GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
 
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
+    let now = icn_time::current_timestamp_secs();
 
     // Calculate period end based on period type
     let period_end = calculate_period_end(now, req.period);
@@ -201,10 +198,7 @@ pub async fn update_budget(
         budget.notification_thresholds = thresholds.clone();
     }
 
-    budget.updated_at = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
+    budget.updated_at = icn_time::current_timestamp_secs();
 
     store
         .update(&budget_id, budget.clone())

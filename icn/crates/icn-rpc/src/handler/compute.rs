@@ -122,10 +122,7 @@ pub async fn handle_compute_submit(
         fuel_limit: icn_compute::FuelLimit(request.fuel_limit),
         required_capabilities,
         priority,
-        created_at: std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as u64,
+        created_at: icn_time::current_timestamp_millis(),
         deadline: request.deadline_ms,
         payment_rate: request.payment_rate,
         payment_currency: request.payment_currency,
@@ -139,7 +136,7 @@ pub async fn handle_compute_submit(
             let response = SubmitTaskResponse {
                 task_hash: hex::encode(hash),
             };
-            RpcResponse::success(id, serde_json::to_value(response).unwrap())
+            RpcResponse::success(id, serde_json::to_value(response).unwrap_or_default())
         }
         Err(e) => RpcResponse::error(id, -32000, format!("Failed to submit task: {e}")),
     }
@@ -250,7 +247,7 @@ pub async fn handle_compute_status(
                 executor,
                 result,
             };
-            RpcResponse::success(id, serde_json::to_value(info).unwrap())
+            RpcResponse::success(id, serde_json::to_value(info).unwrap_or_default())
         }
         Ok(None) => RpcResponse::error(id, -32000, "Task not found".to_string()),
         Err(e) => RpcResponse::error(id, -32000, format!("Failed to get status: {e}")),
@@ -322,7 +319,7 @@ pub async fn handle_compute_cancel(
                 task_hash: params.task_hash,
                 status: "cancelled".to_string(),
             };
-            RpcResponse::success(id, serde_json::to_value(response).unwrap())
+            RpcResponse::success(id, serde_json::to_value(response).unwrap_or_default())
         }
         Err(e) => RpcResponse::error(id, -32000, format!("Failed to cancel task: {e}")),
     }

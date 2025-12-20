@@ -137,7 +137,6 @@ pub struct AddDeviceResponse {
 
 use std::collections::HashMap;
 use std::sync::RwLock;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 /// In-memory storage for anchors and their metadata
 pub struct AnchorStore {
@@ -206,10 +205,7 @@ impl AnchorRecord {
     }
 
     pub fn rotate_keys(&mut self, new_did: String, reason: Option<String>) {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         let old_did = self.current_did.clone();
         let old_version = self.keybundle_version;
@@ -342,10 +338,7 @@ pub async fn add_device(
         .get_anchor(&req.anchor_id)?
         .ok_or_else(|| GatewayError::NotFound("Anchor not found".to_string()))?;
 
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
+    let now = icn_time::current_timestamp_secs();
 
     // Create device info
     let device_id = Uuid::new_v4().to_string();

@@ -148,7 +148,6 @@ pub struct FinalizeEnrollmentResponse {
 
 use std::collections::HashMap;
 use std::sync::RwLock;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 /// In-memory storage for enrollment ceremonies
 pub struct EnrollmentStore {
@@ -216,10 +215,7 @@ impl EnrollmentCeremony {
         proof_data: serde_json::Value,
         initial_keybundle: KeyBundleDto,
     ) -> Self {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         Self {
             pathway,

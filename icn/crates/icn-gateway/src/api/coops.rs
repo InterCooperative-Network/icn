@@ -2,7 +2,6 @@
 
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::coop::{CoopManager, MemberRole};
 use crate::error::Result;
@@ -14,15 +13,8 @@ use crate::models::{
 use crate::validation;
 use icn_obs::metrics::gateway;
 
-fn timestamp() -> Result<u64> {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .map_err(|e| {
-            crate::error::GatewayError::InternalError(format!(
-                "System clock error (clock may be set before 1970): {e}"
-            ))
-        })
+fn timestamp() -> u64 {
+    icn_time::current_timestamp_secs()
 }
 
 fn parse_role(role_str: &str) -> Result<MemberRole> {
@@ -68,7 +60,7 @@ pub async fn create_coop(
     // Note: Global cooperative limit is checked atomically inside create_coop()
     // to prevent TOCTOU race condition
     coop_mgr
-        .create_coop(req.id.clone(), req.name.clone(), owner, timestamp()?)
+        .create_coop(req.id.clone(), req.name.clone(), owner, timestamp())
         .await?;
 
     // Track cooperative creation
@@ -201,7 +193,7 @@ pub async fn add_member(
 
     // Note: Member count limit is checked atomically inside add_member()
     // to prevent TOCTOU race condition
-    let coop = coop_mgr.add_member_atomic(&id, did.clone(), role.clone(), timestamp()?)?;
+    let coop = coop_mgr.add_member_atomic(&id, did.clone(), role.clone(), timestamp())?;
 
     // Track member addition
     gateway::members_added_inc();
@@ -438,7 +430,7 @@ mod tests {
                 "test-coop".to_string(),
                 "Test".to_string(),
                 owner.did().clone(),
-                timestamp().unwrap(),
+                timestamp(),
             )
             .await
             .unwrap();
@@ -500,7 +492,7 @@ mod tests {
                 "test-coop".to_string(),
                 "Test".to_string(),
                 owner.did().clone(),
-                timestamp().unwrap(),
+                timestamp(),
             )
             .await
             .unwrap();
@@ -633,7 +625,7 @@ mod tests {
                 "coop-food".to_string(),
                 "Food Coop".to_string(),
                 alice.did().clone(),
-                timestamp().unwrap(),
+                timestamp(),
             )
             .await
             .unwrap();
@@ -643,7 +635,7 @@ mod tests {
                 "coop-tech".to_string(),
                 "Tech Coop".to_string(),
                 bob.did().clone(),
-                timestamp().unwrap(),
+                timestamp(),
             )
             .await
             .unwrap();

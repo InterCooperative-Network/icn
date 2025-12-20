@@ -1,5 +1,6 @@
 //! Contract-related RPC handlers
 
+use icn_time;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -172,10 +173,7 @@ pub async fn handle_contract_call(
     // Create execution context with generous fuel
     let context = icn_ccl::ExecutionContext::new(
         caller_did.clone(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs(),
+        icn_time::current_timestamp_secs(),
         10000,  // Generous fuel limit
         vec![], // No capabilities for now
         vec![], // No participants for now
@@ -230,11 +228,13 @@ pub async fn handle_contract_call(
             };
 
             // Add receipt_id to response
-            let mut value = serde_json::to_value(&response).unwrap();
-            value.as_object_mut().unwrap().insert(
-                "receipt_id".to_string(),
-                serde_json::Value::String(receipt_id.to_string()),
-            );
+            let mut value = serde_json::to_value(&response).unwrap_or_default();
+            if let Some(obj) = value.as_object_mut() {
+                obj.insert(
+                    "receipt_id".to_string(),
+                    serde_json::Value::String(receipt_id.to_string()),
+                );
+            }
 
             RpcResponse::success(id, value)
         }

@@ -222,10 +222,7 @@ pub async fn start_enrollment(
 ) -> Result<HttpResponse> {
     let enrollment_id = Uuid::new_v4().to_string();
     let verification_code = generate_verification_code();
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
+    let now = icn_time::current_timestamp_secs();
     let expires_at = now + 86400; // 24 hours
 
     // Generate QR code data
@@ -278,10 +275,7 @@ pub async fn verify_level1(
         .ok_or_else(|| GatewayError::NotFound("Enrollment not found".to_string()))?;
 
     // Verify not expired
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
+    let now = icn_time::current_timestamp_secs();
     if now > session.expires_at {
         return Err(GatewayError::BadRequest("Enrollment expired".to_string()));
     }
@@ -408,10 +402,7 @@ pub async fn verify_level2(
         )));
     }
 
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
+    let now = icn_time::current_timestamp_secs();
 
     session.level = 2;
     session.steward_vouch = Some(req.vouch_statement.clone());
@@ -654,10 +645,7 @@ pub async fn list_pending_enrollments(
     store: web::Data<Arc<EnrollmentStore>>,
 ) -> Result<HttpResponse> {
     let enrollments = store.enrollments.read().await;
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
+    let now = icn_time::current_timestamp_secs();
 
     // Filter: level < 2, not rejected, not expired
     let pending: Vec<_> = enrollments
@@ -701,10 +689,7 @@ pub async fn steward_vouch(
     }
 
     // Check not expired
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
+    let now = icn_time::current_timestamp_secs();
     if now > session.expires_at {
         return Err(GatewayError::BadRequest("Enrollment expired".to_string()));
     }
@@ -799,10 +784,7 @@ pub async fn reject_enrollment(
         ));
     }
 
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
+    let now = icn_time::current_timestamp_secs();
 
     // Record the rejection
     session.rejected = true;
@@ -871,10 +853,7 @@ pub async fn get_steward_stats(
     let total_vouches = vouched.len();
 
     // Calculate monthly vouches (last 30 days)
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
+    let now = icn_time::current_timestamp_secs();
     let month_ago = now.saturating_sub(30 * 24 * 60 * 60);
 
     let monthly_vouches = vouched
@@ -1070,10 +1049,7 @@ mod tests {
 
     #[test]
     fn test_enrollment_session_status_levels() {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         let session = EnrollmentSession {
             enrollment_id: "test-123".to_string(),
@@ -1100,10 +1076,7 @@ mod tests {
 
     #[test]
     fn test_enrollment_session_level1() {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         let session = EnrollmentSession {
             enrollment_id: "test-123".to_string(),
@@ -1130,10 +1103,7 @@ mod tests {
 
     #[test]
     fn test_enrollment_session_level2() {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         let session = EnrollmentSession {
             enrollment_id: "test-123".to_string(),
@@ -1161,10 +1131,7 @@ mod tests {
 
     #[test]
     fn test_enrollment_session_rejected() {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         let session = EnrollmentSession {
             enrollment_id: "test-123".to_string(),
@@ -1195,10 +1162,7 @@ mod tests {
     #[tokio::test]
     async fn test_enrollment_store_insert_and_get() {
         let store = EnrollmentStore::new();
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         let session = EnrollmentSession {
             enrollment_id: "test-abc".to_string(),
@@ -1235,10 +1199,7 @@ mod tests {
     #[tokio::test]
     async fn test_enrollment_expiry_check() {
         let store = EnrollmentStore::new();
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         // Create expired session
         let expired_session = EnrollmentSession {

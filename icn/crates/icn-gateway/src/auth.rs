@@ -10,7 +10,7 @@
 
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
 use ed25519_dalek::{Signature, Verifier};
 use icn_identity::Did;
@@ -67,7 +67,7 @@ impl AuthManager {
         let challenge = Challenge {
             nonce: nonce.clone(),
             did: did.clone(),
-            created_at: Self::current_timestamp()?,
+            created_at: Self::current_timestamp(),
         };
 
         let mut challenges = self
@@ -148,7 +148,7 @@ impl AuthManager {
 
         // Check expiration AFTER signature verification
         // This prevents timing attacks by ensuring we always do the expensive crypto
-        let now = Self::current_timestamp()?;
+        let now = Self::current_timestamp();
         let is_expired = now - challenge.created_at >= self.challenge_ttl.as_secs();
 
         // Only succeed if signature is valid AND not expired
@@ -164,7 +164,7 @@ impl AuthManager {
 
     /// Issue a JWT capability token
     pub fn issue_token(&self, did: &Did, coop_id: &str, scopes: Vec<String>) -> Result<String> {
-        let now = Self::current_timestamp()?;
+        let now = Self::current_timestamp();
         let claims = TokenClaims {
             sub: did.to_string(),
             iat: now,
@@ -206,15 +206,8 @@ impl AuthManager {
     }
 
     /// Get current Unix timestamp
-    fn current_timestamp() -> Result<u64> {
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .map_err(|e| {
-                GatewayError::InternalError(format!(
-                    "System clock error (clock may be set before 1970): {e}"
-                ))
-            })
+    fn current_timestamp() -> u64 {
+        icn_time::current_timestamp_secs()
     }
 
     /// Clean up expired challenges (periodic task)
@@ -224,7 +217,7 @@ impl AuthManager {
             .write()
             .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
-        let now = Self::current_timestamp()?;
+        let now = Self::current_timestamp();
         let ttl = self.challenge_ttl.as_secs();
         let initial_count = challenges.len();
 
@@ -256,13 +249,7 @@ impl AuthManager {
                     }
                 };
 
-                let now = match std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH) {
-                    Ok(duration) => duration.as_secs(),
-                    Err(e) => {
-                        tracing::warn!("Failed to get current timestamp for cleanup: {}", e);
-                        continue;
-                    }
-                };
+                let now = icn_time::current_timestamp_secs();
 
                 let ttl = challenge_ttl.as_secs();
                 let initial_count = challenges_guard.len();

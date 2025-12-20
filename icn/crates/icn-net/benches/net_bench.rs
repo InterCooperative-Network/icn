@@ -208,9 +208,7 @@ fn bench_message_sizes(c: &mut Criterion) {
             from: test_did(1),
             to: None,
             payload: MessagePayload::Subscribe {
-                topics: (0..10)
-                    .map(|i| format!("topic:category{}", i))
-                    .collect(),
+                topics: (0..10).map(|i| format!("topic:category{}", i)).collect(),
             },
         };
         b.iter(|| {

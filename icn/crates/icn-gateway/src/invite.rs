@@ -8,7 +8,6 @@ use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::RwLock;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Stored invite data
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -52,10 +51,7 @@ impl InviteManager {
         expires_in_seconds: u64,
     ) -> Result<Invite> {
         let code = Self::generate_code();
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
         let expires_at = now + expires_in_seconds;
 
         let invite = Invite {
@@ -123,10 +119,7 @@ impl InviteManager {
             anyhow::bail!("Invite already used");
         }
 
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         if now > invite.expires_at {
             anyhow::bail!("Invite expired");
@@ -154,10 +147,7 @@ impl InviteManager {
             anyhow::bail!("Invite already used");
         }
 
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         if now > invite.expires_at {
             anyhow::bail!("Invite expired");

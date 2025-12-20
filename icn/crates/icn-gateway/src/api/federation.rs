@@ -273,11 +273,7 @@ pub async fn vouch_for_coop(
     let target_coop_id = path.into_inner();
 
     let vouch = if let Some(days) = req.expires_in_days {
-        let expires_at = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs()
-            + (days * 24 * 60 * 60);
+        let expires_at = icn_time::current_timestamp_secs() + (days * 24 * 60 * 60);
         Vouch::new(
             own_info.coop_id.clone(),
             voucher_did,

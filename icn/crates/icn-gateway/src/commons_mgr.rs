@@ -115,10 +115,7 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
         let pathway = if let Some(did) = steward_did {
             EnrollmentPathway::WebOfTrust {
                 vouchers: vec![did.clone()],
-                vouched_at: std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs(),
+                vouched_at: icn_time::current_timestamp_secs(),
             }
         } else {
             EnrollmentPathway::Genesis {
@@ -216,10 +213,7 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
             .ok_or_else(|| anyhow::anyhow!("Anchor not found: {anchor_id}"))?;
 
         anchor.status = status.clone();
-        anchor.updated_at = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        anchor.updated_at = icn_time::current_timestamp_secs();
 
         self.store.put_anchor(&anchor)?;
 
@@ -363,10 +357,7 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
             .ok_or_else(|| anyhow::anyhow!("Holder not found: {holder_id}"))?;
 
         holder.status = status.clone();
-        holder.updated_at = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        holder.updated_at = icn_time::current_timestamp_secs();
 
         self.store.put_holder(&holder)?;
 
@@ -412,10 +403,7 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
         }
 
         // Create affiliation (starts as Candidate by default)
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         let affiliation = Affiliation {
             jurisdiction_id: jurisdiction.clone(),
@@ -465,10 +453,7 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
             .find(|a| &a.jurisdiction_id == jurisdiction)
         {
             affiliation.membership_status = MembershipStatus::Exited;
-            holder.updated_at = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
+            holder.updated_at = icn_time::current_timestamp_secs();
             self.store.put_holder(&holder)?;
 
             // Record exit metric
@@ -510,10 +495,7 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
             .find(|a| &a.jurisdiction_id == jurisdiction)
         {
             affiliation.membership_status = status;
-            holder.updated_at = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
+            holder.updated_at = icn_time::current_timestamp_secs();
             self.store.put_holder(&holder)?;
 
             // Record status-specific metrics
@@ -753,10 +735,7 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
         }
 
         // Calculate term
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
         let term_end = now + (term_duration_days * 24 * 60 * 60);
 
         // Create steward record

@@ -514,11 +514,7 @@ mod tests {
     use icn_identity::IdentityBundle;
 
     fn timestamp() -> u64 {
-        use std::time::{SystemTime, UNIX_EPOCH};
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("System clock is set before Unix epoch (1970-01-01). This indicates a system misconfiguration.")
-            .as_secs()
+        icn_time::current_timestamp_secs()
     }
 
     #[tokio::test]

@@ -99,7 +99,6 @@ pub struct CompleteRecoveryResponse {
 
 use std::collections::HashMap;
 use std::sync::RwLock;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 /// In-memory storage for recovery ceremonies
 pub struct RecoveryStore {
@@ -169,10 +168,7 @@ impl RecoveryCeremony {
         verification_data: serde_json::Value,
         new_keybundle: KeyBundleDto,
     ) -> Self {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         Self {
             anchor_id,

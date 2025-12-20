@@ -77,7 +77,7 @@ pub async fn handle_policy_get(
 
     match compute_handle.get_policy(&params.coop_id).await {
         Some(policy) => {
-            let result = serde_json::to_value(policy).unwrap();
+            let result = serde_json::to_value(policy).unwrap_or_default();
             RpcResponse::success(id, result)
         }
         None => RpcResponse::success(id, serde_json::Value::Null),
@@ -98,7 +98,7 @@ pub async fn handle_policy_list(
     };
 
     let policies = compute_handle.list_policies().await;
-    let result = serde_json::to_value(policies).unwrap();
+    let result = serde_json::to_value(policies).unwrap_or_default();
     RpcResponse::success(id, result)
 }
 
@@ -129,7 +129,7 @@ pub async fn handle_policy_remove(
 
     match compute_handle.remove_policy(&params.coop_id).await {
         Some(policy) => {
-            let result = serde_json::to_value(policy).unwrap();
+            let result = serde_json::to_value(policy).unwrap_or_default();
             RpcResponse::success(id, result)
         }
         None => RpcResponse::success(id, serde_json::Value::Null),
@@ -167,7 +167,7 @@ pub async fn handle_quota_usage(
         .await
     {
         Ok(usage) => {
-            let result = serde_json::to_value(usage).unwrap();
+            let result = serde_json::to_value(usage).unwrap_or_default();
             RpcResponse::success(id, result)
         }
         Err(e) => RpcResponse::error(id, -32000, format!("Failed to get usage: {e}")),
@@ -201,7 +201,7 @@ pub async fn handle_quota_list(
 
     match compute_handle.list_coop_usage(&params.coop_id).await {
         Ok(usage_records) => {
-            let result = serde_json::to_value(usage_records).unwrap();
+            let result = serde_json::to_value(usage_records).unwrap_or_default();
             RpcResponse::success(id, result)
         }
         Err(e) => RpcResponse::error(id, -32000, format!("Failed to list usage: {e}")),

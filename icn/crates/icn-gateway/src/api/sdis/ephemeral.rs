@@ -13,7 +13,7 @@ use icn_identity::KeyBundle;
 use icn_zkp::ProofType;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 use thiserror::Error;
 
 /// Epoch for relative timestamps (2024-01-01 00:00:00 UTC)
@@ -140,10 +140,7 @@ impl EphemeralProof {
         let ephemeral_pk = ephemeral_signing.verifying_key();
 
         // Calculate expiry
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
         let expiry = now + validity.as_secs();
 
         // Generate nonce
@@ -194,11 +191,7 @@ impl EphemeralProof {
 
     /// Check if proof has expired
     pub fn is_expired(&self) -> bool {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
-        now > self.x
+        icn_time::current_timestamp_secs() > self.x
     }
 
     /// Verify the Ed25519 signature (Level 1)
@@ -340,10 +333,7 @@ impl VerifyResult {
             level,
             proof_type: Some(proof_type),
             warnings: Vec::new(),
-            verified_at: SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs(),
+            verified_at: icn_time::current_timestamp_secs(),
         }
     }
 
@@ -354,10 +344,7 @@ impl VerifyResult {
             level: 0,
             proof_type: None,
             warnings: vec![reason.to_string()],
-            verified_at: SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs(),
+            verified_at: icn_time::current_timestamp_secs(),
         }
     }
 

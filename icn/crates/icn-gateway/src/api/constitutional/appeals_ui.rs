@@ -204,10 +204,7 @@ pub async fn assign_reviewer(
     // Add to appeal body if not already present
     if !appeal.appeal_body.contains(&reviewer_did) {
         appeal.appeal_body.push(reviewer_did.clone());
-        appeal.updated_at = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        appeal.updated_at = icn_time::current_timestamp_secs();
 
         // Store updated appeal
         commons_mgr.store_appeal(appeal.clone()).await?;
@@ -378,10 +375,7 @@ fn build_timeline(appeal: &Appeal) -> Vec<AppealTimelineEvent> {
 
 /// Build detailed status with next steps
 fn build_status_detail(appeal: &Appeal, _caller: Option<&Did>) -> AppealStatusDetail {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
+    let now = icn_time::current_timestamp_secs();
 
     let (status, description, next_steps) = match &appeal.status {
         AppealStatus::Filed { .. } => (

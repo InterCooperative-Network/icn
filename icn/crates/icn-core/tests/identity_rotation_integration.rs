@@ -85,11 +85,7 @@ async fn test_trust_edge_migration_on_rotation() -> Result<()> {
     // Bob records a trust edge for Alice in his graph
     {
         let mut bob_trust = bob.trust_graph.write().await;
-        bob_trust.add_edge(TrustEdge::new(
-            bob.did.clone(),
-            alice_old_did.clone(),
-            0.9,
-        ))?;
+        bob_trust.add_edge(TrustEdge::new(bob.did.clone(), alice_old_did.clone(), 0.9))?;
     }
 
     // Alice rotates her identity
@@ -98,11 +94,7 @@ async fn test_trust_edge_migration_on_rotation() -> Result<()> {
     // Bob adds a trust edge for Alice's new DID
     {
         let mut bob_trust = bob.trust_graph.write().await;
-        bob_trust.add_edge(TrustEdge::new(
-            bob.did.clone(),
-            alice_new_did.clone(),
-            0.9,
-        ))?;
+        bob_trust.add_edge(TrustEdge::new(bob.did.clone(), alice_new_did.clone(), 0.9))?;
     }
 
     // Verify both edges exist in Bob's trust graph
@@ -117,7 +109,10 @@ async fn test_trust_edge_migration_on_rotation() -> Result<()> {
         // Check edge to new DID exists
         let new_edge = bob_trust.get_edge(&bob.did, &alice_new_did)?;
         assert!(new_edge.is_some(), "Edge to new DID should exist");
-        assert!((new_edge.unwrap().score - 0.9).abs() < 0.001, "New edge should have correct score");
+        assert!(
+            (new_edge.unwrap().score - 0.9).abs() < 0.001,
+            "New edge should have correct score"
+        );
     }
 
     info!("Trust edge migration test passed");
@@ -183,11 +178,7 @@ async fn test_complete_rotation_flow() -> Result<()> {
     // Setup: Bob and Charlie both add trust edges for Alice
     for node in [&bob, &charlie] {
         let mut trust = node.trust_graph.write().await;
-        trust.add_edge(TrustEdge::new(
-            node.did.clone(),
-            alice_old_did.clone(),
-            0.9,
-        ))?;
+        trust.add_edge(TrustEdge::new(node.did.clone(), alice_old_did.clone(), 0.9))?;
     }
 
     // Setup: Alice has balance
@@ -211,11 +202,7 @@ async fn test_complete_rotation_flow() -> Result<()> {
     // Simulate each node adding trust edge for new DID
     for node in [&bob, &charlie] {
         let mut trust = node.trust_graph.write().await;
-        trust.add_edge(TrustEdge::new(
-            node.did.clone(),
-            alice_new_did.clone(),
-            0.9,
-        ))?;
+        trust.add_edge(TrustEdge::new(node.did.clone(), alice_new_did.clone(), 0.9))?;
     }
 
     // Migrate ledger balance

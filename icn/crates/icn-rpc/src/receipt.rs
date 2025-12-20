@@ -41,7 +41,6 @@ use icn_identity::Did;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
@@ -98,14 +97,9 @@ pub struct Receipt {
 impl Receipt {
     /// Create a new receipt
     pub fn new(caller: Did, operation: Operation, outcome: Outcome) -> Self {
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-
         Receipt {
             id: ReceiptId::new(),
-            timestamp,
+            timestamp: icn_time::current_timestamp_secs(),
             caller,
             operation,
             outcome,
@@ -120,14 +114,9 @@ impl Receipt {
         outcome: Outcome,
         resources: Resources,
     ) -> Self {
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-
         Receipt {
             id: ReceiptId::new(),
-            timestamp,
+            timestamp: icn_time::current_timestamp_secs(),
             caller,
             operation,
             outcome,
@@ -237,10 +226,7 @@ impl ReceiptStore {
         let mut receipts = self.receipts.write().await;
 
         // Evict expired receipts
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
         receipts.retain(|_, r| now - r.timestamp < self.ttl_seconds);
 
         // Evict oldest if at capacity (simple LRU)

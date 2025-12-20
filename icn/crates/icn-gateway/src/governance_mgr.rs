@@ -223,9 +223,7 @@ impl GovernanceManager {
                 0
             };
 
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)?
-                .as_secs();
+            let now = icn_time::current_timestamp_secs();
 
             // Evaluate outcome based on governance params
             let final_state = if quorum_percentage < domain.config.params.quorum_percentage {

@@ -243,10 +243,7 @@ pub async fn cast_vote(
             ratifier_type: RatifierType::CommonsHolder,
             authority_did: voter.clone(),
             approved: false, // Abstain doesn't count toward approval
-            timestamp: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
+            timestamp: icn_time::current_timestamp_secs(),
             comment,
             signature: Vec::new(), // Simplified - real impl would require signature
         };
@@ -268,10 +265,7 @@ pub async fn cast_vote(
         ratifier_type: RatifierType::CommonsHolder,
         authority_did: voter.clone(),
         approved: req.vote.to_approved(),
-        timestamp: std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs(),
+        timestamp: icn_time::current_timestamp_secs(),
         comment: req.comment.clone(),
         signature: Vec::new(), // Simplified - real impl would require signature
     };
@@ -363,10 +357,7 @@ pub async fn get_results(
     // Get voting end time and time remaining
     let (voting_ends_at_ts, time_remaining_secs) = match &amendment.status {
         AmendmentStatus::Voting { voting_ends_at, .. } => {
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
+            let now = icn_time::current_timestamp_secs();
             let remaining = if *voting_ends_at > now {
                 voting_ends_at - now
             } else {
@@ -457,10 +448,7 @@ pub async fn get_my_vote(
     // Determine if user can vote
     let (can_vote, reason) = match &amendment.status {
         AmendmentStatus::Voting { voting_ends_at, .. } => {
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
+            let now = icn_time::current_timestamp_secs();
 
             if my_vote.is_some() {
                 (false, Some("Already voted".to_string()))

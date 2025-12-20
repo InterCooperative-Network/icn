@@ -132,10 +132,7 @@ mod tests {
         let keypair = icn_identity::KeyPair::generate().unwrap();
         let did = keypair.did().clone();
         let did_str = did.to_string();
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let timestamp = icn_time::current_timestamp_secs();
 
         coop_manager
             .create_coop(

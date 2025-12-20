@@ -1,5 +1,6 @@
 //! Dispute-related RPC handlers
 
+use icn_time;
 use std::sync::Arc;
 
 use tracing::info;
@@ -67,10 +68,7 @@ pub async fn handle_dispute_file(
     };
 
     // File dispute
-    let filed_at = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
+    let filed_at = icn_time::current_timestamp_secs();
 
     let mut manager = dispute_manager.write().await;
     match manager.file_dispute(
@@ -425,10 +423,7 @@ pub async fn handle_dispute_resolve(
         }
     };
 
-    let resolved_at = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
+    let resolved_at = icn_time::current_timestamp_secs();
 
     let mut manager = dispute_manager.write().await;
     match manager.resolve_dispute(

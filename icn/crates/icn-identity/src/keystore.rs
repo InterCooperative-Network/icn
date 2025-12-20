@@ -387,7 +387,10 @@ impl AgeKeyStore {
         info!("Rotated to KeyBundle v{}", new_version);
 
         // SAFETY: We just pushed to keybundles above, so last() is guaranteed Some
-        Ok(self.keybundles.last().expect("keybundles cannot be empty after push"))
+        Ok(self
+            .keybundles
+            .last()
+            .expect("keybundles cannot be empty after push"))
     }
 
     /// Save keystore in v4 format

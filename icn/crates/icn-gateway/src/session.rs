@@ -13,7 +13,7 @@ use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::RwLock;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
 /// Session status
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -87,10 +87,7 @@ impl SessionManager {
     /// Create a new login session
     pub async fn create_session(&self, coop_id: String) -> Result<LoginSession> {
         let session_id = Self::generate_session_id();
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
         let expires_at = now + self.session_ttl.as_secs();
 
         let session = LoginSession {
@@ -118,10 +115,7 @@ impl SessionManager {
 
     /// Get a session by ID, checking for expiration
     pub async fn get_session(&self, session_id: &str) -> Result<Option<LoginSession>> {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         let mut sessions = self
             .sessions
@@ -148,10 +142,7 @@ impl SessionManager {
         token_expires_in: u64,
         scopes: Vec<String>,
     ) -> Result<()> {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         let mut sessions = self
             .sessions
@@ -213,10 +204,7 @@ impl SessionManager {
 
     /// Clean up expired and consumed sessions
     pub fn cleanup_expired(&self) -> Result<usize> {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
 
         let mut sessions = self
             .sessions

@@ -820,10 +820,7 @@ pub async fn ratify_amendment(
         ratifier_type: parse_ratifier_type(&req.ratifier_type)?,
         authority_did: authority,
         approved: req.approved,
-        timestamp: std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs(),
+        timestamp: icn_time::current_timestamp_secs(),
         comment: req.comment.clone(),
         signature,
     };
@@ -1122,10 +1119,7 @@ pub async fn add_appeal_evidence(
     };
 
     // Generate evidence ID
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
+    let now = icn_time::current_timestamp_secs();
     let evidence_content = format!("{}:{}:{}", id_hex, req.description, now);
     let evidence_id = {
         use sha2::{Digest, Sha256};
@@ -1182,10 +1176,7 @@ pub async fn add_appeal_response(
     let mut appeal_id = [0u8; 32];
     appeal_id.copy_from_slice(&id_bytes);
 
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
+    let now = icn_time::current_timestamp_secs();
 
     let response = AppealResponse {
         responder,

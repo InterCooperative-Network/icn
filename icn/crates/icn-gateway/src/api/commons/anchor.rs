@@ -234,13 +234,9 @@ pub async fn add_attestation(
     };
 
     // Calculate expiry
-    let expiry = body.expiry_seconds.map(|secs| {
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs()
-            + secs
-    });
+    let expiry = body
+        .expiry_seconds
+        .map(|secs| icn_time::current_timestamp_secs() + secs);
 
     // Create attestation
     let attestation = POPAttestation::new(
@@ -303,10 +299,7 @@ pub async fn update_anchor_status(
                 .reason
                 .clone()
                 .unwrap_or_else(|| "No reason provided".to_string());
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
+            let now = icn_time::current_timestamp_secs();
             AnchorStatus::Suspended {
                 reason,
                 suspended_at: now,
@@ -319,10 +312,7 @@ pub async fn update_anchor_status(
                 .reason
                 .clone()
                 .unwrap_or_else(|| "No reason provided".to_string());
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
+            let now = icn_time::current_timestamp_secs();
             AnchorStatus::Revoked {
                 reason,
                 revoked_at: now,

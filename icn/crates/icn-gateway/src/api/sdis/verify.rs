@@ -11,7 +11,6 @@ use icn_zkp::{RsaAccumulator, StarkProof, ZkVerifier};
 use lru::LruCache;
 use std::num::NonZeroUsize;
 use std::sync::Mutex;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Default nonce cache size
 const DEFAULT_NONCE_CACHE_SIZE: usize = 10000;
@@ -113,10 +112,7 @@ impl EphemeralVerifier {
                 return VerifyResult::invalid("Replay detected: nonce already used");
             }
 
-            let now = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs();
+            let now = icn_time::current_timestamp_secs();
             cache.put(proof.n, now);
         }
 
@@ -157,10 +153,7 @@ impl EphemeralVerifier {
         }
 
         // 3. Check binding not expired
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
         if now > binding.expires {
             return VerifyResult::invalid("Binding expired");
         }
