@@ -2,6 +2,9 @@
 
 use std::sync::Arc;
 
+use crate::error_codes::{
+    INTERNAL_ERROR, INVALID_PARAMS, RESOURCE_NOT_AVAILABLE,
+};
 use crate::pagination::{paginate, PageRequest, DEFAULT_MAX_PAGE_SIZE};
 use crate::server::RpcServer;
 use crate::types::{LedgerAccountDelta, LedgerBalance, LedgerEntry, RpcResponse};
@@ -11,7 +14,7 @@ pub async fn handle_ledger_head(id: u64, state: &Arc<RpcServer>) -> RpcResponse 
     let ledger_handle = match state.ledger_handle() {
         Some(handle) => handle,
         None => {
-            return RpcResponse::error(id, -32000, "Ledger not available".to_string());
+            return RpcResponse::error(id, RESOURCE_NOT_AVAILABLE, "Ledger not available".to_string());
         }
     };
 
@@ -43,13 +46,13 @@ pub async fn handle_ledger_head(id: u64, state: &Arc<RpcServer>) -> RpcResponse 
 
                 match serde_json::to_value(&rpc_entry) {
                     Ok(value) => RpcResponse::success(id, value),
-                    Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {e}")),
+                    Err(e) => RpcResponse::error(id, INTERNAL_ERROR, format!("Internal error: {e}")),
                 }
             } else {
                 RpcResponse::success(id, serde_json::json!(null))
             }
         }
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to get entries: {e}")),
+        Err(e) => RpcResponse::error(id, RESOURCE_NOT_AVAILABLE, format!("Failed to get entries: {e}")),
     }
 }
 
@@ -62,7 +65,7 @@ pub async fn handle_ledger_balance(
     let ledger_handle = match state.ledger_handle() {
         Some(handle) => handle,
         None => {
-            return RpcResponse::error(id, -32000, "Ledger not available".to_string());
+            return RpcResponse::error(id, RESOURCE_NOT_AVAILABLE, "Ledger not available".to_string());
         }
     };
 
@@ -76,7 +79,7 @@ pub async fn handle_ledger_balance(
     let balance_params: BalanceParams = match serde_json::from_value(params.clone()) {
         Ok(p) => p,
         Err(e) => {
-            return RpcResponse::error(id, -32602, format!("Invalid params: {e}"));
+            return RpcResponse::error(id, INVALID_PARAMS, format!("Invalid params: {e}"));
         }
     };
 
@@ -85,7 +88,7 @@ pub async fn handle_ledger_balance(
     )) {
         Ok(d) => d,
         Err(e) => {
-            return RpcResponse::error(id, -32602, format!("Invalid DID: {e}"));
+            return RpcResponse::error(id, INVALID_PARAMS, format!("Invalid DID: {e}"));
         }
     };
 
@@ -102,7 +105,7 @@ pub async fn handle_ledger_balance(
 
         match serde_json::to_value(&balance) {
             Ok(value) => RpcResponse::success(id, value),
-            Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {e}")),
+            Err(e) => RpcResponse::error(id, INTERNAL_ERROR, format!("Internal error: {e}")),
         }
     } else {
         // Get all balances for account
@@ -119,7 +122,7 @@ pub async fn handle_ledger_balance(
 
         match serde_json::to_value(&balances) {
             Ok(value) => RpcResponse::success(id, value),
-            Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {e}")),
+            Err(e) => RpcResponse::error(id, INTERNAL_ERROR, format!("Internal error: {e}")),
         }
     }
 }
@@ -133,12 +136,26 @@ pub async fn handle_ledger_history(
     let ledger_handle = match state.ledger_handle() {
         Some(handle) => handle,
         None => {
-            return RpcResponse::error(id, -32000, "Ledger not available".to_string());
+            return RpcResponse::error(id, RESOURCE_NOT_AVAILABLE, "Ledger not available".to_string());
         }
     };
 
-    // Parse pagination parameters
-    let page_request: PageRequest = serde_json::from_value(params.clone()).unwrap_or_default();
+    // Parse pagination parameters with explicit validation
+    let page_request: PageRequest = match serde_json::from_value(params.clone()) {
+        Ok(req) => req,
+        Err(e) => {
+            // Check if params is null/empty (allow default) vs malformed (reject)
+            if params.is_null() || (params.is_object() && params.as_object().map_or(true, |o| o.is_empty())) {
+                PageRequest::default()
+            } else {
+                return RpcResponse::error(
+                    id,
+                    INVALID_PARAMS,
+                    format!("Invalid pagination params: {e}. Expected {{\"offset\": <number>, \"limit\": <number>}}")
+                );
+            }
+        }
+    };
 
     let ledger = ledger_handle.read().await;
     match ledger.get_all_entries() {
@@ -177,10 +194,10 @@ pub async fn handle_ledger_history(
 
             match serde_json::to_value(&page) {
                 Ok(value) => RpcResponse::success(id, value),
-                Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {e}")),
+                Err(e) => RpcResponse::error(id, INTERNAL_ERROR, format!("Internal error: {e}")),
             }
         }
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to get entries: {e}")),
+        Err(e) => RpcResponse::error(id, RESOURCE_NOT_AVAILABLE, format!("Failed to get entries: {e}")),
     }
 }
 
@@ -193,12 +210,25 @@ pub async fn handle_quarantine_list(
     let ledger_handle = match state.ledger_handle() {
         Some(handle) => handle,
         None => {
-            return RpcResponse::error(id, -32000, "Ledger not available".to_string());
+            return RpcResponse::error(id, RESOURCE_NOT_AVAILABLE, "Ledger not available".to_string());
         }
     };
 
-    // Parse pagination parameters
-    let page_request: PageRequest = serde_json::from_value(params.clone()).unwrap_or_default();
+    // Parse pagination parameters with explicit validation
+    let page_request: PageRequest = match serde_json::from_value(params.clone()) {
+        Ok(req) => req,
+        Err(e) => {
+            if params.is_null() || (params.is_object() && params.as_object().map_or(true, |o| o.is_empty())) {
+                PageRequest::default()
+            } else {
+                return RpcResponse::error(
+                    id,
+                    INVALID_PARAMS,
+                    format!("Invalid pagination params: {e}. Expected {{\"offset\": <number>, \"limit\": <number>}}")
+                );
+            }
+        }
+    };
 
     let ledger = ledger_handle.read().await;
     match ledger.quarantine().list() {
@@ -221,10 +251,10 @@ pub async fn handle_quarantine_list(
 
             match serde_json::to_value(&page) {
                 Ok(value) => RpcResponse::success(id, value),
-                Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {e}")),
+                Err(e) => RpcResponse::error(id, INTERNAL_ERROR, format!("Internal error: {e}")),
             }
         }
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to list quarantine: {e}")),
+        Err(e) => RpcResponse::error(id, RESOURCE_NOT_AVAILABLE, format!("Failed to list quarantine: {e}")),
     }
 }
 
@@ -234,10 +264,12 @@ pub async fn handle_quarantine_get(
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
 ) -> RpcResponse {
+    use crate::error_codes::NOT_FOUND;
+
     let ledger_handle = match state.ledger_handle() {
         Some(handle) => handle,
         None => {
-            return RpcResponse::error(id, -32000, "Ledger not available".to_string());
+            return RpcResponse::error(id, RESOURCE_NOT_AVAILABLE, "Ledger not available".to_string());
         }
     };
 
@@ -250,7 +282,7 @@ pub async fn handle_quarantine_get(
     let get_params: GetParams = match serde_json::from_value(params.clone()) {
         Ok(p) => p,
         Err(e) => {
-            return RpcResponse::error(id, -32602, format!("Invalid params: {e}"));
+            return RpcResponse::error(id, INVALID_PARAMS, format!("Invalid params: {e}"));
         }
     };
 
@@ -262,7 +294,7 @@ pub async fn handle_quarantine_get(
             arr
         }
         _ => {
-            return RpcResponse::error(id, -32602, "Invalid entry ID format".to_string());
+            return RpcResponse::error(id, INVALID_PARAMS, "Invalid entry ID format. Expected 64 hex characters.".to_string());
         }
     };
     let entry_id = icn_ledger::ContentHash::from_bytes(hash_bytes);
@@ -288,8 +320,8 @@ pub async fn handle_quarantine_get(
             });
             RpcResponse::success(id, result)
         }
-        Ok(None) => RpcResponse::error(id, -32000, "Entry not found in quarantine".to_string()),
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to get quarantine entry: {e}")),
+        Ok(None) => RpcResponse::error(id, NOT_FOUND, "Entry not found in quarantine".to_string()),
+        Err(e) => RpcResponse::error(id, RESOURCE_NOT_AVAILABLE, format!("Failed to get quarantine entry: {e}")),
     }
 }
 
@@ -299,10 +331,12 @@ pub async fn handle_quarantine_release(
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
 ) -> RpcResponse {
+    use crate::error_codes::{NOT_FOUND, LEDGER_ERROR};
+
     let ledger_handle = match state.ledger_handle() {
         Some(handle) => handle,
         None => {
-            return RpcResponse::error(id, -32000, "Ledger not available".to_string());
+            return RpcResponse::error(id, RESOURCE_NOT_AVAILABLE, "Ledger not available".to_string());
         }
     };
 
@@ -315,7 +349,7 @@ pub async fn handle_quarantine_release(
     let release_params: ReleaseParams = match serde_json::from_value(params.clone()) {
         Ok(p) => p,
         Err(e) => {
-            return RpcResponse::error(id, -32602, format!("Invalid params: {e}"));
+            return RpcResponse::error(id, INVALID_PARAMS, format!("Invalid params: {e}"));
         }
     };
 
@@ -327,7 +361,7 @@ pub async fn handle_quarantine_release(
             arr
         }
         _ => {
-            return RpcResponse::error(id, -32602, "Invalid entry ID format".to_string());
+            return RpcResponse::error(id, INVALID_PARAMS, "Invalid entry ID format. Expected 64 hex characters.".to_string());
         }
     };
     let entry_id = icn_ledger::ContentHash::from_bytes(hash_bytes);
@@ -349,13 +383,13 @@ pub async fn handle_quarantine_release(
                 ),
                 Err(e) => RpcResponse::error(
                     id,
-                    -32000,
+                    LEDGER_ERROR,
                     format!("Entry released from quarantine but reappend failed: {e}"),
                 ),
             }
         }
-        Ok(None) => RpcResponse::error(id, -32000, "Entry not found in quarantine".to_string()),
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to release entry: {e}")),
+        Ok(None) => RpcResponse::error(id, NOT_FOUND, "Entry not found in quarantine".to_string()),
+        Err(e) => RpcResponse::error(id, RESOURCE_NOT_AVAILABLE, format!("Failed to release entry: {e}")),
     }
 }
 
@@ -365,10 +399,12 @@ pub async fn handle_quarantine_drop(
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
 ) -> RpcResponse {
+    use crate::error_codes::NOT_FOUND;
+
     let ledger_handle = match state.ledger_handle() {
         Some(handle) => handle,
         None => {
-            return RpcResponse::error(id, -32000, "Ledger not available".to_string());
+            return RpcResponse::error(id, RESOURCE_NOT_AVAILABLE, "Ledger not available".to_string());
         }
     };
 
@@ -381,7 +417,7 @@ pub async fn handle_quarantine_drop(
     let drop_params: DropParams = match serde_json::from_value(params.clone()) {
         Ok(p) => p,
         Err(e) => {
-            return RpcResponse::error(id, -32602, format!("Invalid params: {e}"));
+            return RpcResponse::error(id, INVALID_PARAMS, format!("Invalid params: {e}"));
         }
     };
 
@@ -393,7 +429,7 @@ pub async fn handle_quarantine_drop(
             arr
         }
         _ => {
-            return RpcResponse::error(id, -32602, "Invalid entry ID format".to_string());
+            return RpcResponse::error(id, INVALID_PARAMS, "Invalid entry ID format. Expected 64 hex characters.".to_string());
         }
     };
     let entry_id = icn_ledger::ContentHash::from_bytes(hash_bytes);
@@ -407,8 +443,8 @@ pub async fn handle_quarantine_drop(
                 "entry_id": entry_id.to_hex()
             }),
         ),
-        Ok(false) => RpcResponse::error(id, -32000, "Entry not found in quarantine".to_string()),
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to drop entry: {e}")),
+        Ok(false) => RpcResponse::error(id, NOT_FOUND, "Entry not found in quarantine".to_string()),
+        Err(e) => RpcResponse::error(id, RESOURCE_NOT_AVAILABLE, format!("Failed to drop entry: {e}")),
     }
 }
 
@@ -417,7 +453,7 @@ pub async fn handle_quarantine_purge(id: u64, state: &Arc<RpcServer>) -> RpcResp
     let ledger_handle = match state.ledger_handle() {
         Some(handle) => handle,
         None => {
-            return RpcResponse::error(id, -32000, "Ledger not available".to_string());
+            return RpcResponse::error(id, RESOURCE_NOT_AVAILABLE, "Ledger not available".to_string());
         }
     };
 
@@ -429,7 +465,7 @@ pub async fn handle_quarantine_purge(id: u64, state: &Arc<RpcServer>) -> RpcResp
                 "purged": purged
             }),
         ),
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to purge expired entries: {e}")),
+        Err(e) => RpcResponse::error(id, RESOURCE_NOT_AVAILABLE, format!("Failed to purge expired entries: {e}")),
     }
 }
 
@@ -439,6 +475,8 @@ pub async fn handle_receipt_get(
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
 ) -> RpcResponse {
+    use crate::error_codes::NOT_FOUND;
+
     // Parse parameters
     #[derive(serde::Deserialize)]
     struct GetReceiptParams {
@@ -448,7 +486,7 @@ pub async fn handle_receipt_get(
     let get_params: GetReceiptParams = match serde_json::from_value(params.clone()) {
         Ok(p) => p,
         Err(e) => {
-            return RpcResponse::error(id, -32602, format!("Invalid params: {e}"));
+            return RpcResponse::error(id, INVALID_PARAMS, format!("Invalid params: {e}"));
         }
     };
 
@@ -457,8 +495,8 @@ pub async fn handle_receipt_get(
     match state.receipt_store().get(&receipt_id).await {
         Some(receipt) => match serde_json::to_value(&receipt) {
             Ok(value) => RpcResponse::success(id, value),
-            Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {e}")),
+            Err(e) => RpcResponse::error(id, INTERNAL_ERROR, format!("Internal error: {e}")),
         },
-        None => RpcResponse::error(id, -32000, "Receipt not found".to_string()),
+        None => RpcResponse::error(id, NOT_FOUND, "Receipt not found".to_string()),
     }
 }

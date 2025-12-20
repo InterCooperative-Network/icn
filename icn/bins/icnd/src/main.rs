@@ -36,6 +36,10 @@ struct Args {
     /// Gateway JWT secret
     #[arg(long)]
     gateway_jwt_secret: Option<String>,
+
+    /// Allow running Gateway API without JWT authentication (INSECURE - development only)
+    #[arg(long)]
+    insecure_gateway_no_jwt: bool,
 }
 
 #[tokio::main]
@@ -93,7 +97,19 @@ async fn main() -> Result<()> {
     if config.gateway.enabled {
         tracing::info!("Gateway API enabled on {}", config.gateway.bind_addr);
         if config.gateway.jwt_secret.is_empty() {
-            tracing::warn!("Gateway enabled but JWT secret not configured!");
+            if args.insecure_gateway_no_jwt {
+                tracing::warn!("⚠️  Gateway running WITHOUT JWT authentication (--insecure-gateway-no-jwt)");
+                tracing::warn!("⚠️  This is insecure and should only be used for development!");
+            } else {
+                tracing::error!("Gateway API enabled but no JWT secret configured!");
+                tracing::error!("Set JWT secret via:");
+                tracing::error!("  - CLI: --gateway-jwt-secret <secret>");
+                tracing::error!("  - Environment: ICN_GATEWAY_JWT_SECRET=<secret>");
+                tracing::error!("  - Config file: gateway.jwt_secret");
+                tracing::error!("");
+                tracing::error!("For development only, use --insecure-gateway-no-jwt to bypass (NOT recommended)");
+                std::process::exit(1);
+            }
         } else {
             tracing::info!(
                 "Gateway JWT secret configured (length: {})",
