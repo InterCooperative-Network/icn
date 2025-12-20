@@ -40,6 +40,10 @@ struct Args {
     /// Allow running Gateway API without JWT authentication (INSECURE - development only)
     #[arg(long)]
     insecure_gateway_no_jwt: bool,
+
+    /// Validate configuration and exit (useful for CI/CD)
+    #[arg(long)]
+    validate_config: bool,
 }
 
 #[tokio::main]
@@ -88,6 +92,60 @@ async fn main() -> Result<()> {
         );
     }
 
+    // If --insecure-gateway-no-jwt is set, use a placeholder to pass validation
+    // (the actual insecure mode warning is logged later)
+    let insecure_no_jwt = args.insecure_gateway_no_jwt
+        && config.gateway.enabled
+        && config.gateway.jwt_secret.is_empty();
+    if insecure_no_jwt {
+        config.gateway.jwt_secret = "__INSECURE_NO_JWT__".to_string();
+    }
+
+    // Handle --validate-config flag
+    if args.validate_config {
+        println!("Validating configuration...\n");
+        match config.validate() {
+            Ok(warnings) => {
+                if warnings.is_empty() {
+                    println!("\x1b[32m✓ Configuration is valid (no warnings)\x1b[0m");
+                } else {
+                    println!("\x1b[32m✓ Configuration is valid\x1b[0m\n");
+                    println!("Warnings:");
+                    for warning in &warnings {
+                        println!("  \x1b[33m⚠\x1b[0m {}", warning);
+                    }
+                }
+                std::process::exit(0);
+            }
+            Err(errors) => {
+                println!("\x1b[31m✗ Configuration has errors:\x1b[0m\n");
+                for error in &errors {
+                    println!("  \x1b[31m✗\x1b[0m {}", error);
+                }
+                std::process::exit(1);
+            }
+        }
+    }
+
+    // Validate config on normal startup (log warnings, exit on errors)
+    match config.validate() {
+        Ok(warnings) => {
+            for warning in warnings {
+                tracing::warn!("Config: {}", warning);
+            }
+        }
+        Err(errors) => {
+            for error in &errors {
+                tracing::error!("Config error: {}", error);
+            }
+            tracing::error!(
+                "Configuration has {} error(s). Run with --validate-config for details.",
+                errors.len()
+            );
+            std::process::exit(1);
+        }
+    }
+
     // Ensure data directory exists
     std::fs::create_dir_all(&config.data_dir)?;
 
@@ -96,22 +154,13 @@ async fn main() -> Result<()> {
 
     if config.gateway.enabled {
         tracing::info!("Gateway API enabled on {}", config.gateway.bind_addr);
-        if config.gateway.jwt_secret.is_empty() {
-            if args.insecure_gateway_no_jwt {
-                tracing::warn!(
-                    "⚠️  Gateway running WITHOUT JWT authentication (--insecure-gateway-no-jwt)"
-                );
-                tracing::warn!("⚠️  This is insecure and should only be used for development!");
-            } else {
-                tracing::error!("Gateway API enabled but no JWT secret configured!");
-                tracing::error!("Set JWT secret via:");
-                tracing::error!("  - CLI: --gateway-jwt-secret <secret>");
-                tracing::error!("  - Environment: ICN_GATEWAY_JWT_SECRET=<secret>");
-                tracing::error!("  - Config file: gateway.jwt_secret");
-                tracing::error!("");
-                tracing::error!("For development only, use --insecure-gateway-no-jwt to bypass (NOT recommended)");
-                std::process::exit(1);
-            }
+        if insecure_no_jwt {
+            tracing::warn!(
+                "⚠️  Gateway running WITHOUT JWT authentication (--insecure-gateway-no-jwt)"
+            );
+            tracing::warn!("⚠️  This is insecure and should only be used for development!");
+            // Clear the placeholder so gateway knows to skip JWT validation
+            config.gateway.jwt_secret = String::new();
         } else {
             tracing::info!(
                 "Gateway JWT secret configured (length: {})",
