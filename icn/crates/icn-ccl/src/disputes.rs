@@ -1360,7 +1360,9 @@ impl DisputeActor {
                     let result = sys
                         .file_dispute(task_hash, executor, challenger, evidence)
                         .await;
-                    let _ = reply.send(result);
+                    if reply.send(result).is_err() {
+                        warn!("DisputeActor: reply channel closed for file_dispute");
+                    }
                 }
                 DisputeActorMsg::InvestigateDispute {
                     dispute_id,
@@ -1373,15 +1375,21 @@ impl DisputeActor {
                     let result = sys
                         .investigate_dispute(dispute_id, &contract, &rule_name, args)
                         .await;
-                    let _ = reply.send(result);
+                    if reply.send(result).is_err() {
+                        warn!("DisputeActor: reply channel closed for investigate_dispute");
+                    }
                 }
                 DisputeActorMsg::GetDispute { dispute_id, reply } => {
                     let sys = system.read().await;
-                    let _ = reply.send(sys.get_dispute(&dispute_id).cloned());
+                    if reply.send(sys.get_dispute(&dispute_id).cloned()).is_err() {
+                        warn!("DisputeActor: reply channel closed for get_dispute");
+                    }
                 }
                 DisputeActorMsg::GetStats { reply } => {
                     let sys = system.read().await;
-                    let _ = reply.send(sys.get_stats());
+                    if reply.send(sys.get_stats()).is_err() {
+                        warn!("DisputeActor: reply channel closed for get_stats");
+                    }
                 }
                 DisputeActorMsg::AddMediator { mediator } => {
                     let mut sys = system.write().await;
@@ -1416,7 +1424,9 @@ impl DisputeActor {
                 }
                 DisputeActorMsg::GetOffenderRecord { did, reply } => {
                     let sys = system.read().await;
-                    let _ = reply.send(sys.get_offender_record(&did).cloned());
+                    if reply.send(sys.get_offender_record(&did).cloned()).is_err() {
+                        warn!("DisputeActor: reply channel closed for get_offender_record");
+                    }
                 }
             }
         }
@@ -1441,7 +1451,9 @@ impl DisputeActor {
                         .system
                         .file_dispute(task_hash, executor, challenger, evidence)
                         .await;
-                    let _ = reply.send(result);
+                    if reply.send(result).is_err() {
+                        warn!("DisputeActor: reply channel closed for file_dispute");
+                    }
                 }
                 DisputeActorMsg::InvestigateDispute {
                     dispute_id,
@@ -1454,15 +1466,21 @@ impl DisputeActor {
                         .system
                         .investigate_dispute(dispute_id, &contract, &rule_name, args)
                         .await;
-                    let _ = reply.send(result);
+                    if reply.send(result).is_err() {
+                        warn!("DisputeActor: reply channel closed for investigate_dispute");
+                    }
                 }
                 DisputeActorMsg::GetDispute { dispute_id, reply } => {
                     let dispute = self.system.get_dispute(&dispute_id).cloned();
-                    let _ = reply.send(dispute);
+                    if reply.send(dispute).is_err() {
+                        warn!("DisputeActor: reply channel closed for get_dispute");
+                    }
                 }
                 DisputeActorMsg::GetStats { reply } => {
                     let stats = self.system.get_stats();
-                    let _ = reply.send(stats);
+                    if reply.send(stats).is_err() {
+                        warn!("DisputeActor: reply channel closed for get_stats");
+                    }
                 }
                 DisputeActorMsg::AddMediator { mediator } => {
                     self.system.add_mediator(mediator);
@@ -1490,7 +1508,9 @@ impl DisputeActor {
                         .add_mediator_with_expertise(mediator, expertise_tags);
                 }
                 DisputeActorMsg::GetOffenderRecord { did, reply } => {
-                    let _ = reply.send(self.system.get_offender_record(&did).cloned());
+                    if reply.send(self.system.get_offender_record(&did).cloned()).is_err() {
+                        warn!("DisputeActor: reply channel closed for get_offender_record");
+                    }
                 }
             }
         }
