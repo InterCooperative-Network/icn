@@ -627,21 +627,14 @@ impl PlacementPolicy for DefaultPlacementPolicy {
         let cost = (self.base_cost as f64 * load_factor) as u64;
 
         // Estimated start time
-        let estimated_start = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as u64
-            + node_state.queue_depth_ms();
+        let estimated_start = icn_time::current_timestamp_millis() + node_state.queue_depth_ms();
 
         Some(PlacementOffer {
             executor: node_state.did.clone(),
             score,
             cost,
             estimated_start,
-            offered_at: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_millis() as u64,
+            offered_at: icn_time::current_timestamp_millis(),
         })
     }
 }

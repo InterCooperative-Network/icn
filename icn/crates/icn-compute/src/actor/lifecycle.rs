@@ -654,10 +654,7 @@ impl ComputeActor {
         executor_registry: &Arc<Mutex<HashMap<String, ExecutorInfo>>>,
         send_callback: &Option<SendCallback>,
     ) -> Result<(), ComputeError> {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as u64;
+        let now = icn_time::current_timestamp_millis();
 
         let mgr = task_manager.lock().await;
         let timed_out_tasks = mgr.find_timed_out(now);
@@ -826,10 +823,7 @@ impl ComputeActor {
         if let Some(ref cb) = self.send_callback {
             if let Some(ref profile) = task.resource_profile {
                 // Phase 16B: Use placement negotiation
-                let now = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_millis() as u64;
+                let now = icn_time::current_timestamp_millis();
 
                 tracing::debug!(
                     task_hash = %hex::encode(hash),
@@ -881,10 +875,7 @@ impl ComputeActor {
         );
 
         // Cancel in local manager (validates authorization)
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as u64;
+        let now = icn_time::current_timestamp_millis();
 
         let mut mgr = self.task_manager.lock().await;
         mgr.cancel(task_hash, requester, reason.clone())?;

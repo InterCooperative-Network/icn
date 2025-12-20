@@ -615,10 +615,7 @@ impl UsageTracker {
     }
 
     fn now_millis() -> u64 {
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as u64
+        icn_time::current_timestamp_millis()
     }
 
     fn should_reset_monthly(last_reset: u64, now: u64) -> bool {

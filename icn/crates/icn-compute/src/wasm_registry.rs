@@ -70,10 +70,7 @@ impl WasmMetadata {
             name: None,
             size_bytes: wasm_bytes.len(),
             owner: owner.to_string(),
-            deployed_at: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_millis() as u64,
+            deployed_at: icn_time::current_timestamp_millis(),
             description: None,
             capabilities: Vec::new(),
         }

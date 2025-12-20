@@ -19,10 +19,7 @@ impl ComputeActor {
         capabilities: Vec<ExecutorCapability>,
     ) -> Result<(), ComputeError> {
         let trust_score = (self.trust_callback)(&did);
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as u64;
+        let now = icn_time::current_timestamp_millis();
 
         let info = ExecutorInfo {
             did: did.clone(),
@@ -133,10 +130,7 @@ impl ComputeActor {
                 storage_mb_available: 100_000,
                 network_mbps: 1000.0,
                 gpu_devices: vec![],
-                updated_at: std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_millis() as u64,
+                updated_at: icn_time::current_timestamp_millis(),
             }
         } else {
             // Not registered yet, use defaults
@@ -295,10 +289,7 @@ impl ComputeActor {
 
         // Calculate deadline based on request timestamp
         let deadline = requested_at + crate::DELIBERATION_PERIOD_MS;
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as u64;
+        let now = icn_time::current_timestamp_millis();
         let remaining_ms = deadline.saturating_sub(now);
 
         tokio::spawn(async move {
@@ -428,6 +419,8 @@ impl ComputeActor {
                 // Select highest score with deterministic tie-breaking
                 // When scores are equal (within epsilon), use lexicographic DID comparison
                 // This ensures consistent selection across different platforms
+                // SAFETY: We checked !offers.is_empty() above, so max_by always returns Some
+                #[allow(clippy::unwrap_used)]
                 let winner = offers
                     .iter()
                     .max_by(|a, b| {
@@ -447,10 +440,7 @@ impl ComputeActor {
                 // Compute placement duration from original request time
 
                 if let Some(requested_at) = requested_at {
-                    let now = std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap()
-                        .as_millis() as u64;
+                    let now = icn_time::current_timestamp_millis();
                     let duration_ms = now.saturating_sub(requested_at);
                     let duration_secs = duration_ms as f64 / 1000.0;
 

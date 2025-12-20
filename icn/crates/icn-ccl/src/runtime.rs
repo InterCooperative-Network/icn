@@ -64,6 +64,8 @@ impl ContractRuntime {
     /// Install a contract (deprecated - use install_contract_with_metadata)
     pub fn install_contract(&mut self, code_hash: ContentHash, contract: Contract) -> Result<()> {
         // Create a basic installation for backward compatibility
+        // SAFETY: KeyPair::generate() only fails if system entropy is exhausted
+        #[allow(clippy::unwrap_used)]
         let installation = crate::types::ContractInstallation {
             code_hash: code_hash.clone(),
             installed_by: contract.participants.first().cloned().unwrap_or_else(|| {
@@ -82,10 +84,7 @@ impl ContractRuntime {
             ],
             participants: contract.participants.clone(),
             signatures: vec![],
-            installed_at: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
+            installed_at: icn_time::current_timestamp_secs(),
             min_caller_trust: None,
         };
 

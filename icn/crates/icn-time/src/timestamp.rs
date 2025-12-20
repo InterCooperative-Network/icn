@@ -47,6 +47,26 @@ pub fn current_timestamp_millis() -> u64 {
         .unwrap_or(0)
 }
 
+/// Get current timestamp in nanoseconds since UNIX epoch.
+///
+/// Returns 0 if system time is somehow before UNIX epoch (should never happen).
+///
+/// # Example
+///
+/// ```
+/// use icn_time::current_timestamp_nanos;
+///
+/// let now = current_timestamp_nanos();
+/// assert!(now > 1700000000000000000); // After Nov 2023
+/// ```
+#[inline]
+pub fn current_timestamp_nanos() -> u128 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

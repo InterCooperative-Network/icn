@@ -17,6 +17,8 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tracing::{info, warn};
 
+use icn_time;
+
 /// Gossip topic for filing disputes
 pub const TOPIC_DISPUTES_FILE: &str = "disputes:file";
 
@@ -461,10 +463,7 @@ impl DisputeResolutionSystem {
 
         // Broadcast DisputeFiled message via gossip
         if let Some(ref callback) = self.gossip_callback {
-            let filed_at = SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
+            let filed_at = icn_time::current_timestamp_secs();
 
             let message = DisputeMessage::DisputeFiled {
                 dispute_id,
@@ -521,7 +520,9 @@ impl DisputeResolutionSystem {
         };
 
         // Update status to investigating
+        // SAFETY: dispute_id was validated above in get() call on line 511-514
         {
+            #[allow(clippy::unwrap_used)]
             let dispute = self.disputes.get_mut(&dispute_id).unwrap();
             dispute.status = DisputeStatus::Investigating;
             dispute.updated_at = SystemTime::now();
@@ -535,10 +536,7 @@ impl DisputeResolutionSystem {
         // Create execution context for re-execution
         let context = crate::types::ExecutionContext {
             caller: challenger.clone(),
-            timestamp: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
+            timestamp: icn_time::current_timestamp_secs(),
             fuel: 10000, // Sufficient fuel for re-execution
             capabilities: vec![],
             participants: vec![executor.clone(), challenger.clone()],
@@ -568,6 +566,8 @@ impl DisputeResolutionSystem {
                     );
 
                     // If re-execution fails, mark as inconclusive
+                    // SAFETY: dispute_id was validated at function entry
+                    #[allow(clippy::unwrap_used)]
                     let mediator = {
                         let dispute = self.disputes.get(&dispute_id).unwrap();
                         self.assign_mediator(dispute)?
@@ -578,6 +578,8 @@ impl DisputeResolutionSystem {
                         mediator_assigned: mediator,
                     };
 
+                    // SAFETY: dispute_id was validated at function entry
+                    #[allow(clippy::unwrap_used)]
                     {
                         let dispute = self.disputes.get_mut(&dispute_id).unwrap();
                         dispute.status = DisputeStatus::Resolved {
@@ -595,6 +597,8 @@ impl DisputeResolutionSystem {
                         join_error
                     );
 
+                    // SAFETY: dispute_id was validated at function entry
+                    #[allow(clippy::unwrap_used)]
                     let mediator = {
                         let dispute = self.disputes.get(&dispute_id).unwrap();
                         self.assign_mediator(dispute)?
@@ -605,6 +609,8 @@ impl DisputeResolutionSystem {
                         mediator_assigned: mediator,
                     };
 
+                    // SAFETY: dispute_id was validated at function entry
+                    #[allow(clippy::unwrap_used)]
                     {
                         let dispute = self.disputes.get_mut(&dispute_id).unwrap();
                         dispute.status = DisputeStatus::Resolved {
@@ -623,6 +629,8 @@ impl DisputeResolutionSystem {
                         hex::encode(dispute_id)
                     );
 
+                    // SAFETY: dispute_id was validated at function entry
+                    #[allow(clippy::unwrap_used)]
                     let mediator = {
                         let dispute = self.disputes.get(&dispute_id).unwrap();
                         self.assign_mediator(dispute)?
@@ -636,6 +644,8 @@ impl DisputeResolutionSystem {
                         mediator_assigned: mediator,
                     };
 
+                    // SAFETY: dispute_id was validated at function entry
+                    #[allow(clippy::unwrap_used)]
                     {
                         let dispute = self.disputes.get_mut(&dispute_id).unwrap();
                         dispute.status = DisputeStatus::Resolved {
@@ -649,6 +659,8 @@ impl DisputeResolutionSystem {
             };
 
         // Get dispute reason for penalty calculation
+        // SAFETY: dispute_id was validated at function entry
+        #[allow(clippy::unwrap_used)]
         let dispute_reason = {
             let dispute = self.disputes.get(&dispute_id).unwrap();
             dispute.evidence.reason.clone()
@@ -662,6 +674,8 @@ impl DisputeResolutionSystem {
             }
         } else {
             // Check if challenger's expected result matches re-execution
+            // SAFETY: dispute_id was validated at function entry
+            #[allow(clippy::unwrap_used)]
             let challenger_correct = {
                 let dispute = self.disputes.get(&dispute_id).unwrap();
                 match &dispute.evidence.reason {
@@ -714,6 +728,8 @@ impl DisputeResolutionSystem {
         );
 
         // Update dispute status
+        // SAFETY: dispute_id was validated at function entry
+        #[allow(clippy::unwrap_used)]
         let dispute_for_persist = {
             let dispute = self.disputes.get_mut(&dispute_id).unwrap();
             dispute.status = DisputeStatus::Resolved {
@@ -728,10 +744,7 @@ impl DisputeResolutionSystem {
 
         // Broadcast DisputeResolved message via gossip
         if let Some(ref callback) = self.gossip_callback {
-            let resolved_at = SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
+            let resolved_at = icn_time::current_timestamp_secs();
 
             let message = DisputeMessage::DisputeResolved {
                 dispute_id,
@@ -970,13 +983,7 @@ impl DisputeResolutionSystem {
         let mut hasher = Sha256::new();
         hasher.update(task_hash);
         hasher.update(challenger.to_string().as_bytes());
-        hasher.update(
-            SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-                .to_le_bytes(),
-        );
+        hasher.update(icn_time::current_timestamp_nanos().to_le_bytes());
 
         let result = hasher.finalize();
         let mut id = [0u8; 32];

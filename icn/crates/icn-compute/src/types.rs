@@ -190,10 +190,7 @@ impl ComputeTask {
 
         // Validate deadline is in the future if provided
         if let Some(deadline) = self.deadline {
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_millis() as u64;
+            let now = icn_time::current_timestamp_millis();
 
             if deadline <= now {
                 return Err(crate::error::ComputeError::DeadlineExceeded);

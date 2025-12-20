@@ -150,10 +150,7 @@ impl ComputeActor {
                 storage_mb_available: 100_000,
                 network_mbps: 1000.0,
                 gpu_devices: vec![],
-                updated_at: std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_millis() as u64,
+                updated_at: icn_time::current_timestamp_millis(),
             };
 
             // Get current queue depth
