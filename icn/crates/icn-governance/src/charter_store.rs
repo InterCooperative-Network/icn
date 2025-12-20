@@ -17,7 +17,7 @@ use lru::LruCache;
 use std::collections::BTreeMap;
 use std::num::NonZeroUsize;
 use std::sync::{Arc, RwLock};
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 /// Storage key prefixes
 const CHARTER_PREFIX: &[u8] = b"charters/";
@@ -47,24 +47,36 @@ impl InMemoryCharterStore {
 
 impl CharterStoreBackend for InMemoryCharterStore {
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
-        Ok(self.data.read().unwrap().get(key).cloned())
+        Ok(self.data.read().unwrap_or_else(|poisoned| {
+            warn!("Data lock poisoned, recovering");
+            poisoned.into_inner()
+        }).get(key).cloned())
     }
 
     fn put(&self, key: &[u8], value: &[u8]) -> Result<()> {
         self.data
             .write()
-            .unwrap()
+            .unwrap_or_else(|poisoned| {
+                warn!("Data lock poisoned, recovering");
+                poisoned.into_inner()
+            })
             .insert(key.to_vec(), value.to_vec());
         Ok(())
     }
 
     fn delete(&self, key: &[u8]) -> Result<()> {
-        self.data.write().unwrap().remove(key);
+        self.data.write().unwrap_or_else(|poisoned| {
+            warn!("Data lock poisoned, recovering");
+            poisoned.into_inner()
+        }).remove(key);
         Ok(())
     }
 
     fn scan(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
-        let data = self.data.read().unwrap();
+        let data = self.data.read().unwrap_or_else(|poisoned| {
+            warn!("Data lock poisoned, recovering");
+            poisoned.into_inner()
+        });
         Ok(data
             .range(prefix.to_vec()..)
             .take_while(|(k, _)| k.starts_with(prefix))
@@ -193,7 +205,10 @@ impl<S: CharterStoreBackend> CharterStore<S> {
         // Update cache
         self.cache
             .write()
-            .unwrap()
+            .unwrap_or_else(|poisoned| {
+                warn!("Cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
             .put(*charter_id.as_bytes(), charter.clone());
 
         debug!("Stored Charter: {}", charter_id);
@@ -203,7 +218,10 @@ impl<S: CharterStoreBackend> CharterStore<S> {
     /// Get a Charter by ID
     pub fn get(&self, charter_id: &CharterId) -> Result<Option<Charter>> {
         // Check cache first
-        if let Some(cached) = self.cache.write().unwrap().get(charter_id.as_bytes()) {
+        if let Some(cached) = self.cache.write().unwrap_or_else(|poisoned| {
+            warn!("Cache lock poisoned, recovering");
+            poisoned.into_inner()
+        }).get(charter_id.as_bytes()) {
             return Ok(Some(cached.clone()));
         }
 
@@ -216,7 +234,10 @@ impl<S: CharterStoreBackend> CharterStore<S> {
             // Update cache
             self.cache
                 .write()
-                .unwrap()
+                .unwrap_or_else(|poisoned| {
+                    warn!("Cache lock poisoned, recovering");
+                    poisoned.into_inner()
+                })
                 .put(*charter_id.as_bytes(), charter.clone());
 
             return Ok(Some(charter));
@@ -259,7 +280,10 @@ impl<S: CharterStoreBackend> CharterStore<S> {
             self.store.delete(&status_key)?;
 
             // Remove from cache
-            self.cache.write().unwrap().pop(charter_id.as_bytes());
+            self.cache.write().unwrap_or_else(|poisoned| {
+                warn!("Cache lock poisoned, recovering");
+                poisoned.into_inner()
+            }).pop(charter_id.as_bytes());
 
             debug!("Deleted Charter: {}", charter_id);
             return Ok(true);
@@ -455,7 +479,10 @@ impl<S: CharterStoreBackend> CharterStore<S> {
 
     /// Clear the cache
     pub fn clear_cache(&self) {
-        self.cache.write().unwrap().clear();
+        self.cache.write().unwrap_or_else(|poisoned| {
+            warn!("Cache lock poisoned, recovering");
+            poisoned.into_inner()
+        }).clear();
     }
 }
 
