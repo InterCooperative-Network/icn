@@ -1,0 +1,102 @@
+{
+  "organization": "Rochester Tool Library",
+  "type": "timebank",
+  "members": [
+    {
+      "name": "Alice Chen",
+      "role": "Tool Coordinator",
+      "skills": ["Woodworking", "Metal Fabrication", "Tool Maintenance"],
+      "email": "alice@demo.example",
+      "phone": "585-555-0101",
+      "joined": "2024-01-15"
+    },
+    {
+      "name": "Bob Martinez", 
+      "role": "Member",
+      "skills": ["Home Repair", "Plumbing", "Electrical"],
+      "email": "bob@demo.example",
+      "phone": "585-555-0102",
+      "joined": "2024-02-01"
+    },
+    {
+      "name": "Carol Johnson",
+      "role": "Member", 
+      "skills": ["Carpentry", "Painting", "Gardening"],
+      "email": "carol@demo.example",
+      "phone": "585-555-0103",
+      "joined": "2024-02-15"
+    },
+    {
+      "name": "David Lee",
+      "role": "Treasurer",
+      "skills": ["Bookkeeping", "Tool Repair", "3D Printing"],
+      "email": "david@demo.example",
+      "phone": "585-555-0104",
+      "joined": "2024-01-20"
+    },
+    {
+      "name": "Elena Rodriguez",
+      "role": "Member",
+      "skills": ["Auto Repair", "Welding", "Metalwork"],
+      "email": "elena@demo.example",
+      "phone": "585-555-0105",
+      "joined": "2024-03-01"
+    },
+    {
+      "name": "Frank Wilson",
+      "role": "Member",
+      "skills": ["Electronics", "Computer Repair", "Soldering"],
+      "email": "frank@demo.example",
+      "phone": "585-555-0106",
+      "joined": "2024-03-10"
+    },
+    {
+      "name": "Grace Park",
+      "role": "Board Member",
+      "skills": ["Sewing", "Textile Arts", "Furniture Repair"],
+      "email": "grace@demo.example",
+      "phone": "585-555-0107",
+      "joined": "2024-01-15"
+    },
+    {
+      "name": "Henry Brown",
+      "role": "Member",
+      "skills": ["Bicycle Repair", "Machining", "Woodturning"],
+      "email": "henry@demo.example",
+      "phone": "585-555-0108",
+      "joined": "2024-04-01"
+    },
+    {
+      "name": "Isabel Garcia",
+      "role": "Member",
+      "skills": ["Gardening", "Landscaping", "Stone Masonry"],
+      "email": "isabel@demo.example",
+      "phone": "585-555-0109",
+      "joined": "2024-04-15"
+    },
+    {
+      "name": "Jack Thompson",
+      "role": "Member",
+      "skills": ["HVAC", "Refrigeration", "Small Engine Repair"],
+      "email": "jack@demo.example",
+      "phone": "585-555-0110",
+      "joined": "2024-05-01"
+    },
+    {
+      "name": "Kelly O'Brien",
+      "role": "Member",
+      "skills": ["Glass Work", "Ceramics", "Tile Setting"],
+      "email": "kelly@demo.example",
+      "phone": "585-555-0111",
+      "joined": "2024-05-10"
+    },
+    {
+      "name": "Luis Sanchez",
+      "role": "Member",
+      "skills": ["Roofing", "Gutters", "Ladder Safety"],
+      "email": "luis@demo.example",
+      "phone": "585-555-0112",
+      "joined": "2024-06-01"
+    }
+  ]
+}

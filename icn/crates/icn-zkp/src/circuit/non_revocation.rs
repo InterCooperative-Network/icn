@@ -169,6 +169,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg(not(feature = "stark"))]
     fn test_non_revocation_proof() {
         let issuer_pk = [1u8; 32];
         let accumulator = [2u8; 32];

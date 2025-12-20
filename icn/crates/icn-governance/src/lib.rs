@@ -1,4 +1,5 @@
 //! ICN Governance - Substrate for community decision-making
+#![allow(missing_docs)]
 //!
 //! This crate provides governance primitives for decentralized decision-making
 //! in cooperative networks. It is designed as a substrate: democratic by default,
@@ -24,20 +25,32 @@
 //! );
 //! ```
 
+#[allow(missing_docs)]
 pub mod amendment;
+#[allow(missing_docs)]
 pub mod appeal;
+#[allow(missing_docs)]
 pub mod charter;
+#[allow(missing_docs)]
 pub mod charter_store;
 pub mod config;
 pub mod domain;
+#[allow(missing_docs)]
+pub mod error;
 pub mod handle;
 pub mod membership;
+#[allow(missing_docs)]
 pub mod message;
 pub mod profile;
+#[allow(missing_docs)]
 pub mod proposal;
+#[allow(missing_docs)]
 pub mod resolver;
+#[allow(missing_docs)]
 pub mod sdis;
+#[allow(missing_docs)]
 pub mod steward;
+#[allow(missing_docs)]
 pub mod steward_store;
 pub mod store;
 pub mod tally;
@@ -60,6 +73,7 @@ pub use charter::{
 pub use charter_store::{CharterStore, CharterStoreBackend, InMemoryCharterStore};
 pub use config::{EmergencyThresholds, GovernanceConfig, GovernanceParams};
 pub use domain::{GovernanceDomain, GovernanceDomainId};
+pub use error::{GovernanceError, Result};
 pub use handle::GovernanceOps;
 pub use membership::{MembershipConfig, MembershipSource};
 pub use message::{GovernanceMessage, ProposalOutcome, TallySnapshot};

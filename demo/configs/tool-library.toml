@@ -1,0 +1,23 @@
+# Tool Library Demo Configuration
+
+[node]
+name = "Rochester Tool Library"
+data_dir = "~/.icn-demo/tool-library"
+
+[network]
+listen_addr = "127.0.0.1:7777"
+enable_mdns = true
+
+[api]
+listen_addr = "127.0.0.1:5601"
+
+[gateway]
+listen_addr = "127.0.0.1:8080"
+cors_origins = ["http://localhost:3000", "http://localhost:8000"]
+
+[metrics]
+enabled = true
+listen_addr = "127.0.0.1:9100"
+
+[ledger]
+type = "timebank"

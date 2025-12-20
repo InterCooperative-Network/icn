@@ -6,6 +6,10 @@ metadata:
   labels:
     app: icn
 data:
+  # External URL where the gateway is accessible (used for QR login)
+  # Update this to your actual domain or external IP
+  # Examples: "https://icn.example.com", "http://10.8.10.40:30080"
+  gateway_base_url: "http://10.8.10.40:30080"
   icn.toml: |
     data_dir = "/data"
 

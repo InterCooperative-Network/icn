@@ -7,8 +7,11 @@ use std::time::{SystemTime, UNIX_EPOCH};
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum Platform {
+    /// Apple iOS device
     Ios,
+    /// Android device
     Android,
+    /// Web browser
     Web,
 }
 
@@ -59,6 +62,7 @@ pub struct NotificationStore {
 }
 
 impl NotificationStore {
+    /// Create a new notification store with the given database
     pub fn new(db: Db) -> Self {
         Self { db }
     }

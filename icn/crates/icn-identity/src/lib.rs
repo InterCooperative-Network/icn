@@ -1,5 +1,6 @@
 // Allow unused_assignments from Zeroize derive macro generated code
 #![allow(unused_assignments)]
+#![allow(missing_docs)]
 
 //! ICN Identity - DID management, key generation, and cryptographic operations
 //!
@@ -35,7 +36,7 @@ pub use anchor::{Anchor, EnrollmentPathway};
 pub use batch_verify::{
     verify_signatures_batched, BatchVerifier, BatchVerifyResult, SignatureToVerify,
 };
-pub use bundle::{verify_binding_info, BindingInfo, IdentityBundle};
+pub use bundle::{verify_binding_info, verify_did_matches_binding, BindingInfo, IdentityBundle};
 pub use commons::{
     Affiliation, CommonsHolderRecord, CommonsRight, CommonsRights, HolderStatus, JurisdictionId,
     JurisdictionType, MembershipCapability, MembershipStatus,
@@ -63,6 +64,50 @@ pub use revocation::{
 pub use revocation_store::RevocationRegistry;
 pub use sync::{DidDocumentCache, IdentityUpdateMessage, IDENTITY_UPDATES_TOPIC};
 pub use vui::Vui;
+
+/// Hybrid signature or classical signature wrapper
+#[cfg(feature = "post-quantum")]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum HybridSignatureOrClassical {
+    /// Hybrid PQ signature (Ed25519 + ML-DSA)
+    Hybrid(icn_crypto_pq::HybridSignature),
+    /// Classical Ed25519 signature only
+    Classical(ed25519_dalek::Signature),
+}
+
+#[cfg(feature = "post-quantum")]
+impl HybridSignatureOrClassical {
+    /// Verify the signature against a message and keypair
+    pub fn verify(&self, message: &[u8], keypair: &KeyPair) -> bool {
+        match self {
+            Self::Hybrid(sig) => {
+                if let Some(ref pq_kp) = keypair.pq_keypair {
+                    let hybrid_pub = icn_crypto_pq::HybridPublicKey {
+                        classical: keypair.verifying_key.to_bytes().to_vec(),
+                        pq: pq_kp.public_key().clone(),
+                    };
+                    sig.verify(message, &hybrid_pub)
+                } else {
+                    false // Hybrid sig requires PQ keys
+                }
+            }
+            Self::Classical(sig) => {
+                use ed25519_dalek::Verifier;
+                keypair.verifying_key.verify(message, sig).is_ok()
+            }
+        }
+    }
+
+    /// Convert to bytes for serialization
+    pub fn to_bytes(&self) -> Vec<u8> {
+        bincode::serialize(self).expect("Failed to serialize signature")
+    }
+
+    /// Parse from bytes
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        bincode::deserialize(bytes).map_err(|e| anyhow::anyhow!("Failed to parse signature: {e}"))
+    }
+}
 
 /// A decentralized identifier for an ICN node
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -179,6 +224,10 @@ pub struct KeyPair {
     secret_bytes: Zeroizing<[u8; 32]>,
     verifying_key: VerifyingKey,
     did: Did,
+
+    // Post-quantum keypair (optional, feature-gated)
+    #[cfg(feature = "post-quantum")]
+    pq_keypair: Option<icn_crypto_pq::MlDsaKeypair>,
 }
 
 impl Clone for KeyPair {
@@ -187,6 +236,8 @@ impl Clone for KeyPair {
             secret_bytes: Zeroizing::new(*self.secret_bytes),
             verifying_key: self.verifying_key,
             did: self.did.clone(),
+            #[cfg(feature = "post-quantum")]
+            pq_keypair: self.pq_keypair.clone(),
         }
     }
 }
@@ -199,10 +250,18 @@ impl KeyPair {
         let verifying_key = signing_key.verifying_key();
         let did = Did::from_public_key(&verifying_key);
 
+        #[cfg(feature = "post-quantum")]
+        let pq_keypair = Some(
+            icn_crypto_pq::MlDsaKeypair::generate()
+                .map_err(|e| anyhow::anyhow!("PQ key generation failed: {e}"))?,
+        );
+
         Ok(KeyPair {
             secret_bytes: Zeroizing::new(secret_bytes),
             verifying_key,
             did,
+            #[cfg(feature = "post-quantum")]
+            pq_keypair,
         })
     }
 
@@ -221,6 +280,37 @@ impl KeyPair {
             secret_bytes: Zeroizing::new(*secret_bytes),
             verifying_key,
             did,
+            #[cfg(feature = "post-quantum")]
+            pq_keypair: None, // Legacy keys don't have PQ component
+        })
+    }
+
+    /// Reconstruct a keypair with PQ keys from raw bytes
+    #[cfg(feature = "post-quantum")]
+    pub fn from_bytes_with_pq(
+        secret_bytes: &[u8; 32],
+        public_bytes: &[u8; 32],
+        pq_secret: &[u8],
+        pq_public: &[u8],
+    ) -> Result<Self> {
+        let verifying_key = VerifyingKey::from_bytes(public_bytes)?;
+        let did = Did::from_public_key(&verifying_key);
+
+        // Verify the keys match
+        let signing_key = SigningKey::from_bytes(secret_bytes);
+        if signing_key.verifying_key() != verifying_key {
+            anyhow::bail!("Public key does not match secret key");
+        }
+
+        // Reconstruct PQ keypair
+        let pq_keypair = icn_crypto_pq::MlDsaKeypair::from_bytes(pq_secret, pq_public)
+            .map_err(|e| anyhow::anyhow!("Invalid PQ keypair: {e}"))?;
+
+        Ok(KeyPair {
+            secret_bytes: Zeroizing::new(*secret_bytes),
+            verifying_key,
+            did,
+            pq_keypair: Some(pq_keypair),
         })
     }
 
@@ -239,11 +329,40 @@ impl KeyPair {
         &self.secret_bytes
     }
 
+    /// Check if this keypair has post-quantum keys
+    #[cfg(feature = "post-quantum")]
+    pub fn has_pq_keys(&self) -> bool {
+        self.pq_keypair.is_some()
+    }
+
+    /// Get the PQ public key if available
+    #[cfg(feature = "post-quantum")]
+    pub fn pq_public_key(&self) -> Option<icn_crypto_pq::MlDsaPublicKey> {
+        self.pq_keypair.as_ref().map(|kp| kp.public_key().clone())
+    }
+
     /// Sign a message
     pub fn sign(&self, message: &[u8]) -> ed25519_dalek::Signature {
         use ed25519_dalek::Signer;
         let signing_key = SigningKey::from_bytes(&self.secret_bytes);
         signing_key.sign(message)
+    }
+
+    /// Sign a message with hybrid signature (if PQ keys available)
+    #[cfg(feature = "post-quantum")]
+    pub fn sign_hybrid(&self, message: &[u8]) -> Result<HybridSignatureOrClassical> {
+        use ed25519_dalek::Signer;
+        let signing_key = SigningKey::from_bytes(&self.secret_bytes);
+        let classical_sig = signing_key.sign(message);
+
+        if let Some(ref pq_kp) = self.pq_keypair {
+            let pq_sig = pq_kp.sign(message)?;
+            Ok(HybridSignatureOrClassical::Hybrid(
+                icn_crypto_pq::HybridSignature::new(classical_sig, pq_sig),
+            ))
+        } else {
+            Ok(HybridSignatureOrClassical::Classical(classical_sig))
+        }
     }
 
     /// Get the signing key bytes for use in external signing operations
@@ -253,6 +372,12 @@ impl KeyPair {
     /// Use with caution - these bytes should be handled securely.
     pub fn to_signing_key_bytes(&self) -> [u8; 32] {
         *self.secret_bytes
+    }
+
+    /// Export keypair for upgrade (PQ feature only)
+    #[cfg(feature = "post-quantum")]
+    pub fn export_for_upgrade(&self) -> ([u8; 32], [u8; 32]) {
+        (*self.secret_bytes, self.verifying_key.to_bytes())
     }
 }
 

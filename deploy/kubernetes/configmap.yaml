@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: icn-config
+  namespace: icn
+data:
+  # ICN Node Configuration
+  LOG_LEVEL: "info"
+  RUST_LOG: "icn=info,actix_web=info"
+  
+  # Network Configuration
+  BIND_ADDRESS: "0.0.0.0:3000"
+  GATEWAY_PORT: "8000"
+  
+  # Storage Configuration
+  DATA_DIR: "/data/icn"
+  
+  # Feature Flags
+  ENABLE_METRICS: "true"
+  ENABLE_TRACING: "true"
+  
+  # Security
+  RATE_LIMIT_REQUESTS_PER_MINUTE: "100"
+  RATE_LIMIT_BURST: "20"

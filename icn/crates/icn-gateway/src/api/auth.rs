@@ -3,6 +3,7 @@
 use actix_web::{post, web, HttpRequest, HttpResponse};
 use std::sync::Arc;
 
+use crate::audit::AuditLogger;
 use crate::auth::AuthManager;
 use crate::error::Result;
 use crate::models::{ChallengeRequest, ChallengeResponse, TokenResponse, VerifyRequest};
@@ -84,9 +85,13 @@ pub async fn verify(
     })?;
 
     // Validate scopes
-    validation::validate_scopes(&req.scopes).inspect_err(|_e| {
+    let validation_result = validation::validate_scopes(&req.scopes);
+    if validation_result.is_err() {
         gateway::auth_failures_inc("invalid_scopes");
-    })?;
+        // AUDIT: Log invalid scope request (potential privilege escalation)
+        AuditLogger::log_invalid_scope_request(&req.did, &req.scopes, &client_ip);
+    }
+    validation_result?;
 
     // Validate coop_id format
     validation::validate_coop_id(&req.coop_id).inspect_err(|_e| {
@@ -110,12 +115,17 @@ pub async fn verify(
 
     let token = auth
         .verify_challenge(&did, &signature, &req.coop_id, req.scopes.clone())
-        .inspect_err(|_e| {
+        .inspect_err(|e| {
             gateway::auth_failures_inc("verification_failed");
+            // AUDIT: Log failed authentication attempt
+            AuditLogger::log_auth_attempt(&req.did, false, Some(&e.to_string()), &client_ip);
         })?;
 
     // Track successful authentication
     gateway::auth_successes_inc();
+
+    // AUDIT: Log successful authentication
+    AuditLogger::log_auth_attempt(&req.did, true, None, &client_ip);
 
     let response = TokenResponse {
         token,
@@ -344,7 +354,14 @@ mod tests {
     #[actix_web::test]
     async fn test_ip_rate_limiting_on_verify() {
         let auth = Arc::new(AuthManager::new(b"test_secret".to_vec()));
-        let ip_limiter = Arc::new(IpRateLimiter::new_for_auth());
+        // Use zero refill rate to ensure exactly 20 requests allowed (no token regeneration during test)
+        let ip_limiter = Arc::new(IpRateLimiter::new_with_config(
+            crate::rate_limit::RateLimitConfig {
+                capacity: 20.0,
+                refill_rate: 0.0, // No refill during test - ensures deterministic behavior
+                cost_per_request: 1.0,
+            },
+        ));
         let bundle = IdentityBundle::generate().unwrap();
 
         // Create a valid challenge/signature for test
@@ -386,6 +403,9 @@ mod tests {
                 i + 1
             );
         }
+
+        // Small delay to ensure rate limiter state is consistent
+        tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
 
         // 21st request should be rate limited (exceeds burst capacity of 20)
         let req = test::TestRequest::post()

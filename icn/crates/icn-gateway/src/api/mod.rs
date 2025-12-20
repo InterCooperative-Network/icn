@@ -21,6 +21,7 @@ pub mod membership;
 pub mod notifications;
 pub mod recurring_payments;
 pub mod sdis;
+pub mod sessions;
 pub mod steward;
 pub mod trust;
 pub mod websocket;

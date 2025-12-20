@@ -816,7 +816,7 @@ impl NetworkActor {
             .map(|cfg| cfg.min_trust_threshold);
         session_manager
             .start(
-                identity_bundle.keypair(),
+                &identity_bundle,
                 listen_addr,
                 trust_graph.clone(),
                 tls_trust_threshold,
@@ -1476,14 +1476,31 @@ impl NetworkActor {
                             // Handle handshake messages internally
                             match &message.payload {
                                 MessagePayload::Hello {
-                                    binding_info: _,
+                                    binding_info,
                                     version_info,
                                     topology_info,
                                     x25519_public,
                                 } => {
-                                    // NOTE: DID-TLS binding was already verified during TLS handshake
-                                    // by DidCertificateVerifier. No need to re-verify here.
-                                    // The TLS layer guarantees that the peer's DID matches their certificate.
+                                    // Verify DID-TLS binding using TOFU model
+                                    // The binding_info contains the cert hash that we must verify
+                                    // This happens at application layer since TLS uses self-signed certs
+                                    if let Err(e) = icn_identity::verify_did_matches_binding(
+                                        &message.from,
+                                        binding_info,
+                                    ) {
+                                        warn!(
+                                            peer_did = %message.from,
+                                            "DID-TLS binding verification failed: {e}"
+                                        );
+                                        return Err(anyhow::anyhow!(
+                                            "DID-TLS binding verification failed: {e}"
+                                        ));
+                                    }
+
+                                    debug!(
+                                        peer_did = %message.from,
+                                        "DID-TLS binding verified successfully"
+                                    );
 
                                     // Perform version negotiation
                                     let local_version_info = crate::VersionInfo::new(format!(

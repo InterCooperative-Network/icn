@@ -372,6 +372,15 @@ impl IpRateLimiter {
         }
     }
 
+    /// Create a new IP-based rate limiter with custom config (for testing)
+    #[cfg(test)]
+    pub fn new_with_config(config: RateLimitConfig) -> Self {
+        Self {
+            buckets: Arc::new(RwLock::new(HashMap::new())),
+            config,
+        }
+    }
+
     /// Check if request should be allowed for an IP address
     pub fn check_rate_limit(&self, ip: &str) -> Result<(), GatewayError> {
         let mut buckets = self

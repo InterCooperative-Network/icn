@@ -33,10 +33,10 @@ pub fn start_notification_listener(
 
         info!("Notification listener ready (manual trigger mode)");
 
-        // Keep task alive
-        tokio::signal::ctrl_c()
-            .await
-            .expect("Failed to listen for ctrl+c");
+        // Keep task alive until shutdown signal
+        if let Err(e) = tokio::signal::ctrl_c().await {
+            warn!("Failed to listen for ctrl+c: {}", e);
+        }
     })
 }
 

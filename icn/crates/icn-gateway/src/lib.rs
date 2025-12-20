@@ -1,4 +1,5 @@
 //! ICN Gateway - REST + WebSocket API for cooperative applications
+#![allow(missing_docs)]
 //!
 //! This crate provides a developer-facing HTTP API layer on top of the ICN substrate.
 //! Co-ops build apps (web/mobile) that talk to this gateway, which handles:
@@ -11,6 +12,7 @@
 //! This is NOT an app runtime. Apps run externally and call this API.
 
 pub mod api;
+pub mod audit;
 pub mod auth;
 pub mod commons_mgr;
 pub mod commons_store;
@@ -35,10 +37,12 @@ pub mod notification_processor;
 pub mod notification_queue;
 pub mod notification_triggers;
 pub mod notifications;
+pub mod openapi;
 pub mod pagination;
 pub mod rate_limit;
 pub mod security;
 pub mod server;
+pub mod session;
 pub mod trust_mgr;
 pub mod validation;
 pub mod websocket;

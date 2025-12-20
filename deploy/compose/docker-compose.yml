@@ -1,0 +1,105 @@
+version: '3.8'
+
+services:
+  # ICN Node
+  icnd:
+    build:
+      context: ../..
+      dockerfile: deploy/Dockerfile.icnd
+    container_name: icn-node
+    restart: unless-stopped
+    ports:
+      - "3000:3000/udp"  # P2P QUIC
+      - "8000:8000"      # Gateway HTTP/WS
+      - "9090:9090"      # Metrics
+    environment:
+      - RUST_LOG=icn=info,actix_web=info
+      - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
+      - DATA_DIR=/data/icn
+      - BIND_ADDRESS=0.0.0.0:3000
+      - GATEWAY_PORT=8000
+    volumes:
+      - icn-data:/data/icn
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - icn-network
+
+  # Dashboard
+  dashboard:
+    image: nginx:alpine
+    container_name: icn-dashboard
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - ../../web/dashboard:/usr/share/nginx/html:ro
+    networks:
+      - icn-network
+    depends_on:
+      - icnd
+
+  # API Documentation
+  api-docs:
+    image: nginx:alpine
+    container_name: icn-api-docs
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    volumes:
+      - ../../web/api-docs:/usr/share/nginx/html:ro
+    networks:
+      - icn-network
+
+  # Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: icn-prometheus
+    restart: unless-stopped
+    ports:
+      - "9091:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - icn-network
+    depends_on:
+      - icnd
+
+  # Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: icn-grafana
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    volumes:
+      - ./grafana-datasources.yml:/etc/grafana/provisioning/datasources/prometheus.yml:ro
+      - grafana-data:/var/lib/grafana
+    networks:
+      - icn-network
+    depends_on:
+      - prometheus
+
+volumes:
+  icn-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+
+networks:
+  icn-network:
+    driver: bridge

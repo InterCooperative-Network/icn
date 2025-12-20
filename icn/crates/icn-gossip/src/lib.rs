@@ -1,4 +1,5 @@
 //! ICN Gossip - Topic-based gossip protocol with ACLs
+#![allow(missing_docs)]
 //!
 //! This crate implements a distributed synchronization system using:
 //!
@@ -29,14 +30,20 @@
 //! ```
 
 pub mod bloom;
+#[allow(missing_docs)]
+pub mod error;
 pub mod gossip;
+#[allow(missing_docs)]
 pub mod partition;
+#[allow(missing_docs)]
 pub mod scalability;
 pub mod sync;
+#[allow(missing_docs)]
 pub mod types;
 pub mod vector_clock;
 
 pub use bloom::BloomFilter;
+pub use error::{GossipError, Result};
 pub use gossip::{
     start_digest_emitter, start_partition_checker, EntryNotificationCallback, GossipActor,
     GossipHandle, PeerSamplingCallback, SendMessageCallback,

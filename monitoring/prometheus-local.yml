@@ -1,0 +1,41 @@
+# Prometheus configuration for local ICN monitoring
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    environment: 'local'
+    cluster: 'icn-dev'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - 'alertmanager:9093'
+
+# Load alert rules
+rule_files:
+  - '/etc/prometheus/alert_rules.yml'
+
+# Scrape configurations
+scrape_configs:
+  # Local ICN node (default port 9100)
+  - job_name: 'icn-local'
+    static_configs:
+      - targets:
+          - 'host.docker.internal:9100'  # Docker for Mac/Windows
+          # - '172.17.0.1:9100'           # Docker on Linux
+        labels:
+          node_role: 'dev'
+          cluster: 'local'
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Alertmanager monitoring
+  - job_name: 'alertmanager'
+    static_configs:
+      - targets: ['alertmanager:9093']

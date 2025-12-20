@@ -1,0 +1,83 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: icn-node
+  namespace: icn
+  labels:
+    app: icn-node
+    component: daemon
+spec:
+  replicas: 1  # Single node for now, can scale later
+  selector:
+    matchLabels:
+      app: icn-node
+  template:
+    metadata:
+      labels:
+        app: icn-node
+        component: daemon
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: icnd
+        image: icn/icnd:latest  # Replace with your image
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: p2p
+          containerPort: 3000
+          protocol: UDP
+        - name: gateway
+          containerPort: 8000
+          protocol: TCP
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        env:
+        - name: RUST_LOG
+          valueFrom:
+            configMapKeyRef:
+              name: icn-config
+              key: RUST_LOG
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: icn-secrets
+              key: JWT_SECRET
+        - name: DATA_DIR
+          valueFrom:
+            configMapKeyRef:
+              name: icn-config
+              key: DATA_DIR
+        volumeMounts:
+        - name: data
+          mountPath: /data/icn
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "2000m"
+        livenessProbe:
+          httpGet:
+            path: /health/liveness
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health/readiness
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: icn-data-pvc
