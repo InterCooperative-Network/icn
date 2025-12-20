@@ -47,6 +47,13 @@ wasmtime = { version = "38", optional = true }
 [dev-dependencies]
 tokio = { version = "1.0", features = ["rt-multi-thread", "macros"] }
 wat = "1.219"
+criterion = "0.5"
+tempfile = "3.10"
+icn-identity = { path = "../icn-identity" }
+
+[[bench]]
+name = "compute_bench"
+harness = false
 
 [features]
 default = []

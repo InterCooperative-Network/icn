@@ -42,6 +42,12 @@ bitflags = "2.4"
 icn-store.workspace = true
 tracing-subscriber.workspace = true
 rand_core.workspace = true
+criterion = "0.5"
+tempfile = "3.10"
+
+[[bench]]
+name = "net_bench"
+harness = false
 
 [lints]
 workspace = true
