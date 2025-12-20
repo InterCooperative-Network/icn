@@ -1,4 +1,5 @@
 //! ICN Net - Network transport, discovery, and session management
+#![warn(missing_docs)]
 
 pub mod actor;
 pub mod blob_registry;

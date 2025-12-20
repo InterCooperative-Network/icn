@@ -7,10 +7,15 @@ use std::collections::HashSet;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum EscrowStatus {
+    /// Escrow created but not yet funded
     Pending,
+    /// Funds are locked in escrow
     Locked,
+    /// Funds have been released to beneficiary
     Released,
+    /// Funds have been refunded to creator
     Refunded,
+    /// Escrow expired before completion
     Expired,
 }
 
@@ -66,6 +71,7 @@ pub struct EscrowStore {
 }
 
 impl EscrowStore {
+    /// Create a new EscrowStore backed by the given Sled database
     pub fn new(db: Db) -> Self {
         Self { db }
     }

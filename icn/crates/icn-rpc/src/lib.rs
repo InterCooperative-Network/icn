@@ -1,4 +1,5 @@
 //! ICN RPC - JSON-RPC API for daemon communication
+#![warn(missing_docs)]
 //!
 //! Provides a simple HTTP-based JSON-RPC server for icnctl <-> icnd communication.
 //! The RPC server exposes NetworkActor operations for CLI access.

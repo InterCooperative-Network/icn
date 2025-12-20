@@ -1,9 +1,15 @@
 //! ICN Store - Persistent key-value storage abstraction
+#![warn(missing_docs)]
 
+/// Budget management for ledger accounts
 pub mod budgets;
+/// Escrow functionality for conditional payments
 pub mod escrow;
+/// Notification storage and management
 pub mod notifications;
+/// Storage quota management
 pub mod quotas;
+/// Recurring payment scheduling
 pub mod recurring_payments;
 
 use anyhow::{Context, Result};
@@ -112,10 +118,13 @@ impl ReplicaMetadata {
 
 /// Storage trait for pluggable backends
 pub trait Store: Send + Sync {
-    // Core KV operations
+    /// Get a value by key
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>>;
+    /// Store a key-value pair
     fn put(&self, key: &[u8], value: &[u8]) -> Result<()>;
+    /// Delete a key
     fn delete(&self, key: &[u8]) -> Result<()>;
+    /// Scan all key-value pairs with the given prefix
     fn scan(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>>;
 
     /// Count entries with a given prefix without loading values
@@ -204,11 +213,13 @@ pub struct SledStore {
 }
 
 impl SledStore {
+    /// Open a Sled database at the given path
     pub fn open(path: impl AsRef<std::path::Path>) -> Result<Self> {
         let db = sled::open(path)?;
         Ok(SledStore { db })
     }
 
+    /// Create a temporary in-memory Sled database
     pub fn temporary() -> Result<Self> {
         let db = sled::Config::new().temporary(true).open()?;
         Ok(SledStore { db })

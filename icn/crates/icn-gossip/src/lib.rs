@@ -1,4 +1,5 @@
 //! ICN Gossip - Topic-based gossip protocol with ACLs
+#![warn(missing_docs)]
 //!
 //! This crate implements a distributed synchronization system using:
 //!

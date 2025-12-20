@@ -1,4 +1,5 @@
 //! ICN Core - Actor runtime, supervisor, and shared infrastructure
+#![warn(missing_docs)]
 
 pub mod anti_entropy;
 pub mod config;

@@ -29,9 +29,13 @@ const STATUS_INDEX_PREFIX: &[u8] = b"personhood/status/";
 /// Store trait (simplified from icn-store for this module)
 /// In production, this would use icn_store::Store
 pub trait PersonhoodStore: Send + Sync {
+    /// Get a value by key
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>>;
+    /// Store a key-value pair
     fn put(&self, key: &[u8], value: &[u8]) -> Result<()>;
+    /// Delete a key
     fn delete(&self, key: &[u8]) -> Result<()>;
+    /// Scan all keys with given prefix
     fn scan(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>>;
 }
 
@@ -43,6 +47,7 @@ pub struct InMemoryPersonhoodStore {
 }
 
 impl InMemoryPersonhoodStore {
+    /// Create a new empty in-memory store
     pub fn new() -> Self {
         Self::default()
     }

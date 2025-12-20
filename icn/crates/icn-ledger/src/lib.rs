@@ -1,4 +1,5 @@
 //! ICN Ledger - Double-entry mutual credit ledger with Merkle-DAG
+#![warn(missing_docs)]
 //!
 //! This crate implements a double-entry bookkeeping system for mutual credit accounting,
 //! structured as a Merkle-DAG for content-addressable, tamper-evident storage.
