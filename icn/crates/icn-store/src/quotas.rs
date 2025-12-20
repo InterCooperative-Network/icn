@@ -88,10 +88,15 @@ impl StorageQuota {
 /// Tracked storage item for eviction
 #[derive(Debug, Clone)]
 pub struct StorageItem {
+    /// Storage key
     pub key: Vec<u8>,
+    /// Size in bytes
     pub size: u64,
+    /// Priority level for eviction
     pub priority: QuotaPriority,
+    /// Owner DID
     pub did: Did,
+    /// Creation timestamp
     pub created_at: SystemTime,
 }
 
@@ -363,12 +368,19 @@ impl StorageQuotaManager {
 /// Statistics about quota usage
 #[derive(Debug, Clone)]
 pub struct QuotaStats {
+    /// Total number of quotas configured
     pub total_quotas: usize,
+    /// Number of quotas that are exceeded
     pub exceeded_quotas: usize,
+    /// Total global storage usage in bytes
     pub global_usage: u64,
+    /// Global storage limit in bytes
     pub global_limit: u64,
+    /// Global usage as percentage of limit
     pub global_usage_percentage: f64,
+    /// Storage usage breakdown by priority level
     pub usage_by_priority: HashMap<QuotaPriority, u64>,
+    /// Number of items currently tracked
     pub tracked_items: usize,
 }
 

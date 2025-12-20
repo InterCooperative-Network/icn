@@ -37,10 +37,9 @@ impl IdentityManager {
     /// Create a new identity manager with persistent storage
     pub fn new_with_storage(data_dir: std::path::PathBuf) -> Result<Self> {
         let store_path = data_dir.join("identity_store");
-        let store = Arc::new(
-            icn_store::SledStore::open(&store_path)
-                .map_err(|e| GatewayError::InternalError(format!("Failed to open identity store: {}", e)))?,
-        );
+        let store = Arc::new(icn_store::SledStore::open(&store_path).map_err(|e| {
+            GatewayError::InternalError(format!("Failed to open identity store: {e}"))
+        })?);
 
         Ok(Self {
             store,

@@ -9,11 +9,18 @@
 //! - Fork resolution on partition heal
 //! - Balance invariant (sum=0) verification
 
+#![allow(
+    dead_code,
+    unused_imports,
+    unused_variables,
+    clippy::cloned_ref_to_slice_refs
+)]
+
 use anyhow::Result;
 use icn_identity::{Did, KeyPair};
 use icn_ledger::{
-    entry::JournalEntryBuilder, balance::compute_all_balances, Fork, ForkDetector,
-    ForkResolution, ForkResolutionStrategy, ForkResolver, Ledger,
+    balance::compute_all_balances, entry::JournalEntryBuilder, Fork, ForkDetector, ForkResolution,
+    ForkResolutionStrategy, ForkResolver, Ledger,
 };
 use icn_store::SledStore;
 use icn_trust::TrustGraph;
@@ -90,9 +97,7 @@ fn verify_balance_invariant(entries: &[icn_ledger::JournalEntry]) -> Result<()> 
     for (currency, total) in &currency_totals {
         if *total != 0 {
             return Err(anyhow::anyhow!(
-                "Balance invariant violated for {}: sum = {} (should be 0)",
-                currency,
-                total
+                "Balance invariant violated for {currency}: sum = {total} (should be 0)"
             ));
         }
     }
@@ -131,14 +136,7 @@ async fn test_fork_detection_basic() -> Result<()> {
     let bob = KeyPair::generate()?;
 
     // Create parent entry (genesis)
-    let genesis = create_test_entry(
-        &alice,
-        alice.did(),
-        bob.did(),
-        "hours",
-        10,
-        vec![],
-    )?;
+    let genesis = create_test_entry(&alice, alice.did(), bob.did(), "hours", 10, vec![])?;
     let genesis_hash = genesis.id.clone().unwrap();
 
     // Create two conflicting entries that reference the same parent
@@ -233,9 +231,7 @@ async fn test_fork_resolution_maintains_ledger_invariants() -> Result<()> {
     info!("=== Test: Fork Resolution Maintains Ledger Invariants ===");
 
     // Set up 4 nodes (simulating partition scenario)
-    let _nodes: Vec<TestLedgerNode> = (0..4)
-        .map(|_| TestLedgerNode::new().unwrap())
-        .collect();
+    let _nodes: Vec<TestLedgerNode> = (0..4).map(|_| TestLedgerNode::new().unwrap()).collect();
 
     // Create identities for participants
     let alice = KeyPair::generate()?;
@@ -244,17 +240,10 @@ async fn test_fork_resolution_maintains_ledger_invariants() -> Result<()> {
     let diana = KeyPair::generate()?;
 
     // Create genesis entry (shared by all nodes)
-    let genesis = create_test_entry(
-        &alice,
-        alice.did(),
-        bob.did(),
-        "hours",
-        100,
-        vec![],
-    )?;
+    let genesis = create_test_entry(&alice, alice.did(), bob.did(), "hours", 100, vec![])?;
     let genesis_hash = genesis.id.clone().unwrap();
 
-    info!("Genesis entry created: {:?}", hex::encode(&genesis_hash.0));
+    info!("Genesis entry created: {:?}", hex::encode(genesis_hash.0));
 
     // Verify genesis balance invariant
     verify_balance_invariant(&[genesis.clone()])?;
@@ -332,7 +321,7 @@ async fn test_fork_resolution_maintains_ledger_invariants() -> Result<()> {
         ForkResolution::KeepFirst => partition_a_entry.clone(),
         ForkResolution::KeepSecond => partition_b_entry.clone(),
         ForkResolution::RequiresManual { reason } => {
-            return Err(anyhow::anyhow!("Fork requires manual resolution: {}", reason));
+            return Err(anyhow::anyhow!("Fork requires manual resolution: {reason}"));
         }
     };
 
@@ -356,19 +345,17 @@ async fn test_nway_fork_resolution_with_invariants() -> Result<()> {
     let diana = KeyPair::generate()?;
 
     // Create genesis
-    let genesis = create_test_entry(
-        &alice,
-        alice.did(),
-        bob.did(),
-        "hours",
-        100,
-        vec![],
-    )?;
+    let genesis = create_test_entry(&alice, alice.did(), bob.did(), "hours", 100, vec![])?;
     let genesis_hash = genesis.id.clone().unwrap();
 
     // Create 4-way fork: 4 entries all referencing genesis
     let mut entries = vec![];
-    let participants = [(&alice, &bob), (&bob, &charlie), (&charlie, &diana), (&diana, &alice)];
+    let participants = [
+        (&alice, &bob),
+        (&bob, &charlie),
+        (&charlie, &diana),
+        (&diana, &alice),
+    ];
 
     for (i, (from_kp, to_did)) in participants.iter().enumerate() {
         let mut entry = create_test_entry(
@@ -418,7 +405,10 @@ async fn test_nway_fork_resolution_with_invariants() -> Result<()> {
         };
     }
 
-    info!("Tournament winner: entry with timestamp {}", winner.timestamp);
+    info!(
+        "Tournament winner: entry with timestamp {}",
+        winner.timestamp
+    );
 
     // Verify balance invariant with genesis + winner
     verify_balance_invariant(&[genesis, winner])?;
@@ -482,7 +472,10 @@ async fn test_fork_resolution_trust_weighted() -> Result<()> {
 
     // With equal trust (both 0.0 by default), falls back to timestamp
     assert!(
-        matches!(resolution, ForkResolution::KeepFirst | ForkResolution::KeepSecond),
+        matches!(
+            resolution,
+            ForkResolution::KeepFirst | ForkResolution::KeepSecond
+        ),
         "Should resolve deterministically"
     );
 
@@ -510,14 +503,7 @@ async fn test_complex_fork_chain_invariants() -> Result<()> {
     // Genesis -> Entry1 -> [Fork: Entry2a | Entry2b] -> Entry3
 
     // Genesis
-    let genesis = create_test_entry(
-        &alice,
-        alice.did(),
-        bob.did(),
-        "hours",
-        100,
-        vec![],
-    )?;
+    let genesis = create_test_entry(&alice, alice.did(), bob.did(), "hours", 100, vec![])?;
     let genesis_hash = genesis.id.clone().unwrap();
 
     // Entry 1 (builds on genesis)
@@ -558,7 +544,10 @@ async fn test_complex_fork_chain_invariants() -> Result<()> {
     fork_detector.index_entry(&entry2a);
     fork_detector.index_entry(&entry2b);
 
-    assert!(fork_detector.has_fork(&entry1_hash), "Should detect fork at entry1");
+    assert!(
+        fork_detector.has_fork(&entry1_hash),
+        "Should detect fork at entry1"
+    );
 
     let resolver = ForkResolver::new(ForkResolutionStrategy::TimestampPreference);
     let fork = Fork {
@@ -569,7 +558,11 @@ async fn test_complex_fork_chain_invariants() -> Result<()> {
     };
 
     let resolution = resolver.resolve_fork(&fork)?;
-    assert_eq!(resolution, ForkResolution::KeepFirst, "Earlier entry2a should win");
+    assert_eq!(
+        resolution,
+        ForkResolution::KeepFirst,
+        "Earlier entry2a should win"
+    );
 
     // Verify full chain invariant
     let final_chain = vec![genesis, entry1, entry2a];

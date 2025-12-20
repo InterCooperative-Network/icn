@@ -5,6 +5,7 @@ use anyhow::Result;
 use icn_identity::Did;
 use std::collections::HashMap;
 use std::sync::Arc;
+use tracing::warn;
 
 /// Trait for governance storage operations
 pub trait GovernanceStore: Send + Sync {
@@ -69,34 +70,52 @@ impl Default for InMemoryGovernanceStore {
 
 impl GovernanceStore for InMemoryGovernanceStore {
     fn store_domain(&self, domain: &GovernanceDomain) -> Result<()> {
-        let mut domains = self.domains.write().unwrap();
+        let mut domains = self.domains.write().unwrap_or_else(|poisoned| {
+            warn!("Domains lock poisoned, recovering");
+            poisoned.into_inner()
+        });
         domains.insert(domain.id.0.clone(), domain.clone());
         Ok(())
     }
 
     fn get_domain(&self, id: &GovernanceDomainId) -> Result<Option<GovernanceDomain>> {
-        let domains = self.domains.read().unwrap();
+        let domains = self.domains.read().unwrap_or_else(|poisoned| {
+            warn!("Domains lock poisoned, recovering");
+            poisoned.into_inner()
+        });
         Ok(domains.get(&id.0).cloned())
     }
 
     fn list_domains(&self) -> Result<Vec<GovernanceDomain>> {
-        let domains = self.domains.read().unwrap();
+        let domains = self.domains.read().unwrap_or_else(|poisoned| {
+            warn!("Domains lock poisoned, recovering");
+            poisoned.into_inner()
+        });
         Ok(domains.values().cloned().collect())
     }
 
     fn store_proposal(&self, proposal: &Proposal) -> Result<()> {
-        let mut proposals = self.proposals.write().unwrap();
+        let mut proposals = self.proposals.write().unwrap_or_else(|poisoned| {
+            warn!("Proposals lock poisoned, recovering");
+            poisoned.into_inner()
+        });
         proposals.insert(proposal.id.0.clone(), proposal.clone());
         Ok(())
     }
 
     fn get_proposal(&self, id: &ProposalId) -> Result<Option<Proposal>> {
-        let proposals = self.proposals.read().unwrap();
+        let proposals = self.proposals.read().unwrap_or_else(|poisoned| {
+            warn!("Proposals lock poisoned, recovering");
+            poisoned.into_inner()
+        });
         Ok(proposals.get(&id.0).cloned())
     }
 
     fn list_proposals(&self, domain_id: &GovernanceDomainId) -> Result<Vec<Proposal>> {
-        let proposals = self.proposals.read().unwrap();
+        let proposals = self.proposals.read().unwrap_or_else(|poisoned| {
+            warn!("Proposals lock poisoned, recovering");
+            poisoned.into_inner()
+        });
         Ok(proposals
             .values()
             .filter(|p| p.domain_id == *domain_id)
@@ -105,7 +124,10 @@ impl GovernanceStore for InMemoryGovernanceStore {
     }
 
     fn store_vote(&self, vote: &Vote) -> Result<()> {
-        let mut votes = self.votes.write().unwrap();
+        let mut votes = self.votes.write().unwrap_or_else(|poisoned| {
+            warn!("Votes lock poisoned, recovering");
+            poisoned.into_inner()
+        });
         let proposal_votes = votes.entry(vote.proposal_id.0.clone()).or_default();
 
         // Replace existing vote from same voter (allow vote changes)
@@ -116,14 +138,20 @@ impl GovernanceStore for InMemoryGovernanceStore {
     }
 
     fn get_vote(&self, proposal_id: &ProposalId, voter: &Did) -> Result<Option<Vote>> {
-        let votes = self.votes.read().unwrap();
+        let votes = self.votes.read().unwrap_or_else(|poisoned| {
+            warn!("Votes lock poisoned, recovering");
+            poisoned.into_inner()
+        });
         Ok(votes
             .get(&proposal_id.0)
             .and_then(|v| v.iter().find(|vote| vote.voter == *voter).cloned()))
     }
 
     fn list_votes(&self, proposal_id: &ProposalId) -> Result<Vec<Vote>> {
-        let votes = self.votes.read().unwrap();
+        let votes = self.votes.read().unwrap_or_else(|poisoned| {
+            warn!("Votes lock poisoned, recovering");
+            poisoned.into_inner()
+        });
         Ok(votes.get(&proposal_id.0).cloned().unwrap_or_default())
     }
 

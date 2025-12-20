@@ -8,10 +8,20 @@
 //!
 //! Validates that the system maintains consistency when partitions heal.
 
+#![allow(
+    dead_code,
+    unused_imports,
+    unused_variables,
+    clippy::needless_range_loop
+)]
+
 use anyhow::Result;
-use icn_gossip::{AccessControl, GossipActor, PartitionConfig, PartitionDetector, PartitionHealer, Topic, VectorClock};
+use icn_gossip::{
+    AccessControl, GossipActor, PartitionConfig, PartitionDetector, PartitionHealer, Topic,
+    VectorClock,
+};
 use icn_identity::{Did, KeyPair};
-use icn_ledger::{entry::JournalEntryBuilder, balance::compute_all_balances, Ledger};
+use icn_ledger::{balance::compute_all_balances, entry::JournalEntryBuilder, Ledger};
 use icn_store::SledStore;
 use icn_trust::{TrustEdge, TrustGraph};
 use std::collections::{HashMap, HashSet};
@@ -174,9 +184,7 @@ fn verify_balance_invariant(entries: &[icn_ledger::JournalEntry]) -> Result<()> 
     for (currency, total) in &currency_totals {
         if *total != 0 {
             return Err(anyhow::anyhow!(
-                "Balance invariant violated for {}: sum = {}",
-                currency,
-                total
+                "Balance invariant violated for {currency}: sum = {total}"
             ));
         }
     }
@@ -189,9 +197,8 @@ async fn test_partition_detection_multi_node() -> Result<()> {
     info!("=== Test: Partition Detection Multi-Node ===");
 
     // Create 5 nodes
-    let nodes: Vec<MultiStateNode> = futures::future::try_join_all(
-        (0..5).map(|_| MultiStateNode::new())
-    ).await?;
+    let nodes: Vec<MultiStateNode> =
+        futures::future::try_join_all((0..5).map(|_| MultiStateNode::new())).await?;
 
     // All nodes record contact with each other initially
     for i in 0..5 {
@@ -207,8 +214,7 @@ async fn test_partition_detection_multi_node() -> Result<()> {
         let partitioned = nodes[i].get_partitioned_peers().await;
         assert!(
             partitioned.is_empty(),
-            "Node {} should have no partitioned peers initially",
-            i
+            "Node {i} should have no partitioned peers initially"
         );
     }
 
@@ -221,8 +227,7 @@ async fn test_partition_detection_multi_node() -> Result<()> {
         assert_eq!(
             partitioned.len(),
             4,
-            "Node {} should see 4 partitioned peers",
-            i
+            "Node {i} should see 4 partitioned peers"
         );
     }
 
@@ -237,9 +242,8 @@ async fn test_partition_groups_ledger_sync() -> Result<()> {
     // Create 5 separate nodes - they'll sync via direct entry transfer
     // Group A: nodes 0, 1 (partition A)
     // Group B: nodes 2, 3, 4 (partition B)
-    let nodes: Vec<MultiStateNode> = futures::future::try_join_all(
-        (0..5).map(|_| MultiStateNode::new())
-    ).await?;
+    let nodes: Vec<MultiStateNode> =
+        futures::future::try_join_all((0..5).map(|_| MultiStateNode::new())).await?;
 
     // Create participant identities
     let alice = KeyPair::generate()?;
@@ -302,9 +306,9 @@ async fn test_partition_groups_ledger_sync() -> Result<()> {
         );
 
         // Expected: Alice=50, Bob=-50+30=-20, Charlie=-30
-        assert_eq!(alice_balance, 50, "Node {} Alice balance mismatch", i);
-        assert_eq!(bob_balance, -20, "Node {} Bob balance mismatch", i);
-        assert_eq!(charlie_balance, -30, "Node {} Charlie balance mismatch", i);
+        assert_eq!(alice_balance, 50, "Node {i} Alice balance mismatch");
+        assert_eq!(bob_balance, -20, "Node {i} Bob balance mismatch");
+        assert_eq!(charlie_balance, -30, "Node {i} Charlie balance mismatch");
     }
 
     // Verify balance invariant
@@ -320,9 +324,8 @@ async fn test_trust_edge_consistency_after_heal() -> Result<()> {
     info!("=== Test: Trust Edge Consistency After Heal ===");
 
     // Create 5 nodes
-    let nodes: Vec<MultiStateNode> = futures::future::try_join_all(
-        (0..5).map(|_| MultiStateNode::new())
-    ).await?;
+    let nodes: Vec<MultiStateNode> =
+        futures::future::try_join_all((0..5).map(|_| MultiStateNode::new())).await?;
 
     // === PARTITION PHASE ===
     // Group A (0, 1) sets trust for each other
@@ -377,10 +380,7 @@ async fn test_trust_edge_consistency_after_heal() -> Result<()> {
     let node0_trusts_node2 = edges_0_after
         .iter()
         .any(|(from, to, _)| from == &nodes[0].did && to == &nodes[2].did);
-    assert!(
-        node0_trusts_node2,
-        "Node 0 should trust Node 2 after heal"
-    );
+    assert!(node0_trusts_node2, "Node 0 should trust Node 2 after heal");
 
     info!("Trust edge consistency after heal test passed");
     Ok(())
@@ -391,9 +391,8 @@ async fn test_no_balance_corruption_on_heal() -> Result<()> {
     info!("=== Test: No Balance Corruption on Heal ===");
 
     // Create 5 nodes
-    let nodes: Vec<MultiStateNode> = futures::future::try_join_all(
-        (0..5).map(|_| MultiStateNode::new())
-    ).await?;
+    let nodes: Vec<MultiStateNode> =
+        futures::future::try_join_all((0..5).map(|_| MultiStateNode::new())).await?;
 
     let alice = KeyPair::generate()?;
     let bob = KeyPair::generate()?;
@@ -461,9 +460,9 @@ async fn test_no_balance_corruption_on_heal() -> Result<()> {
             i, alice_balance, bob_balance, charlie_balance
         );
 
-        assert_eq!(alice_balance, 120, "Node {} Alice corruption check", i);
-        assert_eq!(bob_balance, -70, "Node {} Bob corruption check", i);
-        assert_eq!(charlie_balance, -50, "Node {} Charlie corruption check", i);
+        assert_eq!(alice_balance, 120, "Node {i} Alice corruption check");
+        assert_eq!(bob_balance, -70, "Node {i} Bob corruption check");
+        assert_eq!(charlie_balance, -50, "Node {i} Charlie corruption check");
     }
 
     // Final invariant check
@@ -479,9 +478,8 @@ async fn test_concurrent_partition_operations() -> Result<()> {
     info!("=== Test: Concurrent Partition Operations ===");
 
     // Create 5 nodes
-    let nodes: Vec<MultiStateNode> = futures::future::try_join_all(
-        (0..5).map(|_| MultiStateNode::new())
-    ).await?;
+    let nodes: Vec<MultiStateNode> =
+        futures::future::try_join_all((0..5).map(|_| MultiStateNode::new())).await?;
 
     let alice = KeyPair::generate()?;
     let bob = KeyPair::generate()?;
@@ -530,8 +528,8 @@ async fn test_concurrent_partition_operations() -> Result<()> {
         let alice_balance = node.get_balance(alice.did(), "hours").await;
         let bob_balance = node.get_balance(bob.did(), "hours").await;
 
-        assert_eq!(alice_balance, 5, "Node {} Alice balance", i);
-        assert_eq!(bob_balance, -5, "Node {} Bob balance", i);
+        assert_eq!(alice_balance, 5, "Node {i} Alice balance");
+        assert_eq!(bob_balance, -5, "Node {i} Bob balance");
     }
 
     // Invariant check

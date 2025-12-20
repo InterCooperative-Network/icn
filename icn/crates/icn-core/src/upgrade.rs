@@ -11,7 +11,8 @@ use icn_identity::Did;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use tracing::warn;
 
 /// Current protocol version (updated with each release)
 pub const CURRENT_VERSION: (u32, u32, u32) = (0, 1, 0);
@@ -120,7 +121,7 @@ impl UpgradeCoordinator {
         // Validate deadline is in the future
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or(Duration::from_secs(0))
             .as_secs();
 
         if upgrade.deadline <= now {
@@ -140,7 +141,7 @@ impl UpgradeCoordinator {
 
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or(Duration::from_secs(0))
             .as_secs();
 
         let min_version = self
@@ -190,7 +191,7 @@ impl UpgradeCoordinator {
 
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or(Duration::from_secs(0))
             .as_secs();
 
         let mut enforced = Vec::new();
@@ -200,7 +201,13 @@ impl UpgradeCoordinator {
             if upgrade.deadline <= now {
                 // Deadline reached - enforce minimum version
                 if let Some(ref min_version) = upgrade.min_required_version {
-                    let mut min_req = self.min_required_version.write().unwrap();
+                    let mut min_req =
+                        self.min_required_version
+                            .write()
+                            .unwrap_or_else(|poisoned| {
+                                warn!("Min required version lock poisoned, recovering");
+                                poisoned.into_inner()
+                            });
 
                     // Update minimum required version if higher
                     if min_req.as_ref().is_none_or(|v| min_version > v) {
@@ -219,9 +226,19 @@ impl UpgradeCoordinator {
 
         // Update peer deprecation status
         if !enforced.is_empty() {
-            let min_version = self.min_required_version.read().unwrap().clone();
+            let min_version = self
+                .min_required_version
+                .read()
+                .unwrap_or_else(|poisoned| {
+                    warn!("Min required version lock poisoned, recovering");
+                    poisoned.into_inner()
+                })
+                .clone();
             if let Some(min) = min_version {
-                let mut versions = self.peer_versions.write().unwrap();
+                let mut versions = self.peer_versions.write().unwrap_or_else(|poisoned| {
+                    warn!("Peer versions lock poisoned, recovering");
+                    poisoned.into_inner()
+                });
                 for info in versions.values_mut() {
                     info.is_deprecated = info.version < min;
                 }
@@ -278,7 +295,7 @@ impl UpgradeCoordinator {
 
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or(Duration::from_secs(0))
             .as_secs();
 
         let days_until_deadline = if upgrade.deadline > now {
