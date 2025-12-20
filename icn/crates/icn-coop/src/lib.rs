@@ -1,8 +1,17 @@
+//! ICN Coop - Cooperative management and lifecycle
+#![warn(missing_docs)]
+
+/// Cooperative actor for handling coop operations
 pub mod actor;
+/// Handle for interacting with the coop actor
 pub mod handle;
+/// Lifecycle events and state transitions
 pub mod lifecycle;
+/// Membership management
 pub mod membership;
+/// Persistent storage for cooperatives
 pub mod store;
+/// Cooperative types and data structures
 pub mod types;
 
 pub use actor::{CoopActor, CoopMessage, GossipHandle, COOP_TOPIC};

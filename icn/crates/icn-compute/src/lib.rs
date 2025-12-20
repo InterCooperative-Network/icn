@@ -1,4 +1,5 @@
 //! ICN Distributed Compute Layer
+#![warn(missing_docs)]
 //!
 //! Trust-gated task distribution and execution for cooperative networks.
 //!

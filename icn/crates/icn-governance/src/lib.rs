@@ -1,4 +1,5 @@
 //! ICN Governance - Substrate for community decision-making
+#![warn(missing_docs)]
 //!
 //! This crate provides governance primitives for decentralized decision-making
 //! in cooperative networks. It is designed as a substrate: democratic by default,
