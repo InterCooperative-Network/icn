@@ -41,3 +41,6 @@ hex = "0.4"
 [dev-dependencies]
 tempfile = "3"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "test-util"] }
+
+[lints]
+workspace = true

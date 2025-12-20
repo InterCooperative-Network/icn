@@ -24,3 +24,6 @@ tempfile = "3.8"
 [[bench]]
 name = "trust_bench"
 harness = false
+
+[lints]
+workspace = true

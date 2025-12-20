@@ -30,3 +30,6 @@ rand = "0.8"
 [[bench]]
 name = "ledger_bench"
 harness = false
+
+[lints]
+workspace = true

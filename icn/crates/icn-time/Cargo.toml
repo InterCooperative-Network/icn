@@ -16,3 +16,6 @@ rand.workspace = true
 rand_core.workspace = true
 
 [dev-dependencies]
+
+[lints]
+workspace = true

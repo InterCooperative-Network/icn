@@ -57,3 +57,6 @@ default = []
 threshold = []
 # Enable blind signatures
 blind = []
+
+[lints]
+workspace = true

@@ -12,3 +12,6 @@ anyhow.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 bytes.workspace = true
+
+[lints]
+workspace = true

@@ -31,3 +31,6 @@ bincode = { version = "2.0", features = ["serde"] }
 [[bench]]
 name = "gossip_bench"
 harness = false
+
+[lints]
+workspace = true

@@ -45,3 +45,6 @@ rpassword = "7"
 
 # Secure memory
 zeroize = { version = "1", features = ["derive"] }
+
+[lints]
+workspace = true

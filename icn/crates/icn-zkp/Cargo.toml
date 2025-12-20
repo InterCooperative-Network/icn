@@ -61,3 +61,6 @@ stark = ["winterfell", "winter-air", "winter-math", "winter-utils"]
 # [[bench]]
 # name = "proof_bench"
 # harness = false
+
+[lints]
+workspace = true

@@ -42,3 +42,6 @@ bitflags = "2.4"
 icn-store.workspace = true
 tracing-subscriber.workspace = true
 rand_core.workspace = true
+
+[lints]
+workspace = true

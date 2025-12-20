@@ -5,9 +5,6 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 
-[lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("governance_sled"))'] }
-
 [dependencies]
 anyhow.workspace = true
 async-trait = "0.1"
@@ -25,3 +22,6 @@ tracing.workspace = true
 
 [dev-dependencies]
 icn-store = { path = "../icn-store" }
+
+[lints]
+workspace = true

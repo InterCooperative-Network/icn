@@ -113,3 +113,10 @@ icn-federation = { path = "crates/icn-federation" }
 icn-crypto-pq = { path = "crates/icn-crypto-pq" }
 icn-steward = { path = "crates/icn-steward" }
 icn-zkp = { path = "crates/icn-zkp" }
+
+[workspace.lints.clippy]
+# Error handling - warn for now, will be upgraded to deny after cleanup
+unwrap_used = "warn"
+expect_used = "warn"
+# Allow in tests
+unwrap_in_result = "allow"

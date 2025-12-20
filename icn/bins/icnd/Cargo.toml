@@ -27,3 +27,6 @@ icn-ccl.workspace = true
 icn-store.workspace = true
 icn-rpc.workspace = true
 icn-obs.workspace = true
+
+[lints]
+workspace = true

@@ -10,3 +10,6 @@ icn-identity.workspace = true
 icn-net.workspace = true
 anyhow.workspace = true
 tracing.workspace = true
+
+[lints]
+workspace = true

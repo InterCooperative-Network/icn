@@ -51,3 +51,6 @@ wat = "1.219"
 [features]
 default = []
 wasm = ["wasmtime"]
+
+[lints]
+workspace = true

@@ -98,3 +98,6 @@ prometheus = "0.14"
 [[bench]]
 name = "commons_bench"
 harness = false
+
+[lints]
+workspace = true
