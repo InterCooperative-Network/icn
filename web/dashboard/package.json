@@ -1,0 +1,19 @@
+{
+  "name": "icn-node-dashboard",
+  "version": "1.0.0",
+  "description": "ICN Node Administration Dashboard - Monitor and manage your ICN node",
+  "scripts": {
+    "start": "python3 -m http.server 8080",
+    "dev": "python3 -m http.server 8080",
+    "test": "echo 'No tests yet'",
+    "deploy": "./deploy.sh"
+  },
+  "keywords": [
+    "icn",
+    "dashboard",
+    "monitoring",
+    "admin"
+  ],
+  "author": "ICN Project",
+  "license": "MIT"
+}

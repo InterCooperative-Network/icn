@@ -1,9 +1,15 @@
 //! ICN Store - Persistent key-value storage abstraction
+#![allow(missing_docs)]
 
+/// Budget management for ledger accounts
 pub mod budgets;
+/// Escrow functionality for conditional payments
 pub mod escrow;
+/// Notification storage and management
 pub mod notifications;
+/// Storage quota management
 pub mod quotas;
+/// Recurring payment scheduling
 pub mod recurring_payments;
 
 use anyhow::{Context, Result};
@@ -112,11 +118,48 @@ impl ReplicaMetadata {
 
 /// Storage trait for pluggable backends
 pub trait Store: Send + Sync {
-    // Core KV operations
+    /// Get a value by key
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>>;
+    /// Store a key-value pair
     fn put(&self, key: &[u8], value: &[u8]) -> Result<()>;
+    /// Delete a key
     fn delete(&self, key: &[u8]) -> Result<()>;
+    /// Scan all key-value pairs with the given prefix
     fn scan(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>>;
+
+    /// Count entries with a given prefix without loading values
+    ///
+    /// More efficient than `scan().len()` as it doesn't deserialize values.
+    fn scan_count(&self, prefix: &[u8]) -> Result<usize> {
+        // Default implementation uses scan - backends can override for efficiency
+        Ok(self.scan(prefix)?.len())
+    }
+
+    /// Scan entries with pagination support
+    ///
+    /// Returns entries starting at `offset` with a maximum of `limit` entries.
+    /// More memory-efficient than loading all entries for large datasets.
+    ///
+    /// # Arguments
+    /// * `prefix` - Key prefix to scan
+    /// * `offset` - Number of entries to skip
+    /// * `limit` - Maximum number of entries to return
+    ///
+    /// # Returns
+    /// Tuple of (entries, total_count) where total_count is the total matching entries
+    #[allow(clippy::type_complexity)]
+    fn scan_paginated(
+        &self,
+        prefix: &[u8],
+        offset: usize,
+        limit: usize,
+    ) -> Result<(Vec<(Vec<u8>, Vec<u8>)>, usize)> {
+        // Default implementation - backends can override for efficiency
+        let all = self.scan(prefix)?;
+        let total = all.len();
+        let paginated = all.into_iter().skip(offset).take(limit).collect();
+        Ok((paginated, total))
+    }
 
     // Replica tracking operations (Phase 17)
     /// Get replica metadata for a content hash
@@ -171,14 +214,24 @@ pub struct SledStore {
 }
 
 impl SledStore {
+    /// Open a Sled database at the given path
     pub fn open(path: impl AsRef<std::path::Path>) -> Result<Self> {
         let db = sled::open(path)?;
         Ok(SledStore { db })
     }
 
+    /// Create a temporary in-memory Sled database
     pub fn temporary() -> Result<Self> {
         let db = sled::Config::new().temporary(true).open()?;
         Ok(SledStore { db })
+    }
+
+    /// Get direct access to underlying Sled database
+    ///
+    /// This is useful for components that need raw Sled access
+    /// rather than the Store trait abstraction.
+    pub fn db(&self) -> &sled::Db {
+        &self.db
     }
 }
 
@@ -206,6 +259,31 @@ impl Store for SledStore {
         }
 
         Ok(results)
+    }
+
+    fn scan_count(&self, prefix: &[u8]) -> Result<usize> {
+        // Efficient count using iterator - doesn't materialize values
+        let count = self.db.scan_prefix(prefix).count();
+        Ok(count)
+    }
+
+    fn scan_paginated(
+        &self,
+        prefix: &[u8],
+        offset: usize,
+        limit: usize,
+    ) -> Result<(Vec<(Vec<u8>, Vec<u8>)>, usize)> {
+        // First get total count efficiently
+        let total = self.db.scan_prefix(prefix).count();
+
+        // Then get paginated results
+        let mut results = Vec::with_capacity(limit.min(total.saturating_sub(offset)));
+        for item in self.db.scan_prefix(prefix).skip(offset).take(limit) {
+            let (k, v) = item?;
+            results.push((k.to_vec(), v.to_vec()));
+        }
+
+        Ok((results, total))
     }
 
     // Replica tracking implementation

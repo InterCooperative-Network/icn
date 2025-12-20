@@ -146,7 +146,10 @@ impl FederatedDidResolver {
     pub async fn resolve(&self, did_str: &str) -> Result<CachedDidResolution> {
         // Check cache first
         {
-            let mut cache = self.cache.write().unwrap();
+            let mut cache = self.cache.write().unwrap_or_else(|poisoned| {
+                warn!("DID cache lock poisoned, recovering");
+                poisoned.into_inner()
+            });
             if let Some(cached) = cache.get(did_str) {
                 if !cached.is_expired(self.cache_ttl) {
                     metrics::did_resolution::cache_hits_inc();
@@ -168,7 +171,10 @@ impl FederatedDidResolver {
 
         // Cache the result
         {
-            let mut cache = self.cache.write().unwrap();
+            let mut cache = self.cache.write().unwrap_or_else(|poisoned| {
+                warn!("DID cache lock poisoned, recovering");
+                poisoned.into_inner()
+            });
             cache.put(did_str.to_string(), resolution.clone());
         }
 
@@ -316,17 +322,32 @@ impl FederatedDidResolver {
 
     /// Clear the resolution cache
     pub fn clear_cache(&self) {
-        self.cache.write().unwrap().clear();
+        self.cache
+            .write()
+            .unwrap_or_else(|poisoned| {
+                warn!("DID cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .clear();
     }
 
     /// Get the current cache size
     pub fn cache_size(&self) -> usize {
-        self.cache.read().unwrap().len()
+        self.cache
+            .read()
+            .unwrap_or_else(|poisoned| {
+                warn!("DID cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .len()
     }
 
     /// Remove expired entries from cache
     pub fn evict_expired(&self) -> usize {
-        let mut cache = self.cache.write().unwrap();
+        let mut cache = self.cache.write().unwrap_or_else(|poisoned| {
+            warn!("DID cache lock poisoned, recovering");
+            poisoned.into_inner()
+        });
         let ttl = self.cache_ttl;
 
         // Collect keys to remove (can't modify while iterating)

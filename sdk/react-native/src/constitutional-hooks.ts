@@ -698,3 +698,204 @@ export function useAppealAdmin(client: ICNMobileClient) {
     error,
   };
 }
+
+// ============================================================================
+// Amendment Voting Hooks (for Mobile App)
+// ============================================================================
+
+/**
+ * Vote choice for amendments
+ */
+export type AmendmentVoteChoice = 'approve' | 'reject' | 'abstain';
+
+/**
+ * Amendment vote record
+ */
+export interface AmendmentVote {
+  amendment_id: string;
+  voter_did: string;
+  vote: AmendmentVoteChoice;
+  comment?: string;
+  voted_at: number;
+}
+
+/**
+ * Amendment voting results
+ */
+export interface AmendmentResults {
+  amendment_id: string;
+  status: AmendmentStatus;
+  approve_count: number;
+  reject_count: number;
+  abstain_count: number;
+  total_votes: number;
+  eligible_voters: number;
+  has_quorum: boolean;
+  quorum_threshold: number;
+  approval_threshold: number;
+  is_approved: boolean;
+}
+
+/**
+ * Hook for voting on an amendment
+ *
+ * @example
+ * ```tsx
+ * function AmendmentVoting({ amendmentId }: { amendmentId: string }) {
+ *   const { vote, loading, myVote, error } = useAmendmentVoting(client, amendmentId);
+ *
+ *   if (myVote) {
+ *     return <Text>You voted: {myVote.vote}</Text>;
+ *   }
+ *
+ *   return (
+ *     <View>
+ *       <Button
+ *         onPress={() => vote('approve', 'I support this')}
+ *         disabled={loading}
+ *         title="Approve"
+ *       />
+ *       <Button
+ *         onPress={() => vote('reject', 'I disagree')}
+ *         disabled={loading}
+ *         title="Reject"
+ *       />
+ *     </View>
+ *   );
+ * }
+ * ```
+ */
+export function useAmendmentVoting(client: ICNMobileClient, amendmentId: string) {
+  const [myVote, setMyVote] = useState<AmendmentVote | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch user's vote on mount
+  useEffect(() => {
+    if (!amendmentId || !client.authState.isAuthenticated) return;
+
+    const fetchMyVote = async () => {
+      try {
+        const vote = await client.getMyAmendmentVote(amendmentId);
+        setMyVote(vote);
+      } catch (err) {
+        // No vote cast yet is not an error
+        if (!(err as Error).message.includes('not found')) {
+          setError((err as Error).message);
+        }
+      }
+    };
+
+    fetchMyVote();
+  }, [client, amendmentId, client.authState.isAuthenticated]);
+
+  const vote = useCallback(
+    async (choice: AmendmentVoteChoice, comment?: string) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const result = await client.voteOnAmendment(amendmentId, choice, comment);
+        setMyVote(result);
+        return result;
+      } catch (err) {
+        setError((err as Error).message);
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [client, amendmentId]
+  );
+
+  return {
+    /** Cast a vote */
+    vote,
+    /** Whether vote submission is in progress */
+    loading,
+    /** User's current vote (null if not voted) */
+    myVote,
+    /** Error message if any */
+    error,
+  };
+}
+
+/**
+ * Hook for fetching amendment voting results
+ *
+ * @example
+ * ```tsx
+ * function AmendmentResults({ amendmentId }: { amendmentId: string }) {
+ *   const { results, loading, error, refresh } = useAmendmentResults(client, amendmentId);
+ *
+ *   if (loading) return <ActivityIndicator />;
+ *   if (error) return <Text>Error: {error}</Text>;
+ *   if (!results) return null;
+ *
+ *   return (
+ *     <View>
+ *       <Text>Status: {results.status}</Text>
+ *       <Text>Approve: {results.approve_count}</Text>
+ *       <Text>Reject: {results.reject_count}</Text>
+ *       <Text>Quorum: {results.has_quorum ? 'Met' : 'Not Met'}</Text>
+ *       <ProgressBar
+ *         progress={results.total_votes / results.eligible_voters}
+ *       />
+ *     </View>
+ *   );
+ * }
+ * ```
+ */
+export function useAmendmentResults(client: ICNMobileClient, amendmentId: string) {
+  const [results, setResults] = useState<AmendmentResults | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchResults = useCallback(async () => {
+    if (!amendmentId) {
+      setResults(null);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await client.getAmendmentResults(amendmentId);
+      setResults(data);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }, [client, amendmentId]);
+
+  const fetchRef = useRef(fetchResults);
+  fetchRef.current = fetchResults;
+
+  useEffect(() => {
+    fetchRef.current();
+  }, [client, amendmentId]);
+
+  // Auto-refresh when votes are cast
+  useEffect(() => {
+    if (!client.authState.isAuthenticated) return;
+
+    // Listen for vote events
+    const unsubscribe = client.onEvent?.('AmendmentVoteCast', () => {
+      fetchRef.current();
+    });
+
+    return unsubscribe;
+  }, [client, client.authState.isAuthenticated]);
+
+  return {
+    /** Voting results */
+    results,
+    /** Whether results are loading */
+    loading,
+    /** Error message if any */
+    error,
+    /** Refresh results */
+    refresh: fetchResults,
+  };
+}

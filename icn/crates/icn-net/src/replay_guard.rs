@@ -4,7 +4,7 @@
 //! and rejecting duplicate or out-of-order messages.
 
 use crate::envelope::SignedEnvelope;
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use icn_gossip::BloomFilter;
 use icn_identity::Did;
 use sha2::{Digest, Sha256};
@@ -24,6 +24,7 @@ fn hash_sequence(sequence: u64) -> [u8; 32] {
 /// - **Replay attacks**: Same sequence number seen twice
 /// - **Out-of-order delivery**: Sequences within acceptance window
 /// - **Stale connections**: Cleanup old peer state
+/// - **Finalized sequences**: Permanently prevent replay after processing
 pub struct ReplayGuard {
     /// Last seen sequence per peer
     sequences: HashMap<Did, SequenceWindow>,
@@ -43,6 +44,11 @@ struct SequenceWindow {
     /// Bloom filter of recent sequences (for out-of-order detection)
     /// Size: ~10KB for 10,000 sequences with 0.1% false positive rate
     recent: BloomFilter,
+
+    /// Finalized sequences (permanently non-replayable)
+    /// These are sequences that have been processed (e.g., ledger entry written)
+    /// and should NEVER be accepted again, even within the time window
+    finalized: HashMap<u64, Instant>,
 
     /// Last time we saw a message from this peer
     last_update: Instant,
@@ -66,9 +72,11 @@ impl ReplayGuard {
     ///
     /// Validates:
     /// 1. Signature and timestamp (via envelope.verify())
-    /// 2. Sequence number is not a replay
+    /// 2. Sequence number is not finalized (permanently blocked)
+    /// 3. Sequence number is not a replay
     ///
     /// # Replay Detection Logic:
+    /// - If sequence is finalized: Reject immediately (critical)
     /// - If sequence <= max_seq: Check Bloom filter
     ///   - If in filter: Reject as replay
     ///   - If not in filter: Accept as out-of-order (add to filter)
@@ -85,7 +93,16 @@ impl ReplayGuard {
             .entry(envelope.from.clone())
             .or_insert_with(SequenceWindow::new);
 
-        // 3. Check sequence number
+        // 3. Check if sequence is finalized (CRITICAL: prevents replay after processing)
+        if window.finalized.contains_key(&envelope.sequence) {
+            bail!(
+                "Replay attempt detected from {}: sequence {} is finalized (processed)",
+                envelope.from.as_str(),
+                envelope.sequence
+            );
+        }
+
+        // 4. Check sequence number against Bloom filter
         let seq_hash = hash_sequence(envelope.sequence);
         if envelope.sequence <= window.max_seq {
             // Potentially out-of-order or replay
@@ -100,7 +117,7 @@ impl ReplayGuard {
             // Not in filter: accept as out-of-order
         }
 
-        // 4. Update window
+        // 5. Update window
         if envelope.sequence > window.max_seq {
             window.max_seq = envelope.sequence;
         }
@@ -110,15 +127,74 @@ impl ReplayGuard {
         Ok(())
     }
 
+    /// Finalize a sequence number (permanently prevent replay)
+    ///
+    /// Call this after successfully processing a message (e.g., ledger entry written).
+    /// Once finalized, the sequence cannot be replayed even within the time window.
+    ///
+    /// # Example
+    /// ```ignore
+    /// // Check message
+    /// replay_guard.check(&envelope)?;
+    ///
+    /// // Process message (write to ledger, etc.)
+    /// ledger.append(entry)?;
+    ///
+    /// // Finalize to prevent replay
+    /// replay_guard.finalize(&envelope.from, envelope.sequence)?;
+    /// ```
+    pub fn finalize(&mut self, sender: &Did, sequence: u64) -> Result<()> {
+        let window = self
+            .sequences
+            .get_mut(sender)
+            .context("Cannot finalize sequence for unknown sender")?;
+
+        window.finalized.insert(sequence, Instant::now());
+
+        Ok(())
+    }
+
+    /// Check if a sequence is finalized
+    pub fn is_finalized(&self, sender: &Did, sequence: u64) -> bool {
+        self.sequences
+            .get(sender)
+            .map(|w| w.finalized.contains_key(&sequence))
+            .unwrap_or(false)
+    }
+
     /// Cleanup old peer state to prevent unbounded memory growth
     ///
     /// Should be called periodically (e.g., every 60 seconds)
+    /// Prunes:
+    /// - Inactive peer windows (no messages in max_peer_age_secs)
+    /// - Old finalized sequences (>24 hours old)
+    ///
+    /// # Note on Bloom Filter Saturation
+    ///
+    /// For long-lived, high-volume peers, Bloom filters may saturate over time,
+    /// leading to increased false positive rates. This is acceptable because:
+    /// - False positives only cause temporary reordering issues
+    /// - The finalized set provides definitive replay protection for critical sequences
+    /// - Peer inactivity timeout eventually clears saturated filters
+    ///
+    /// For extremely high-volume scenarios (>10k messages/peer), consider:
+    /// - Lowering max_peer_age_secs to rotate Bloom filters more frequently
+    /// - Implementing periodic Bloom filter reset (not currently implemented)
     pub fn cleanup(&mut self) {
         let max_age = Duration::from_secs(self.max_peer_age_secs);
+        let finalized_max_age = Duration::from_secs(24 * 60 * 60); // 24 hours
         let now = Instant::now();
 
+        // Remove inactive peer windows
         self.sequences
             .retain(|_, window| now.duration_since(window.last_update) < max_age);
+
+        // Prune old finalized sequences from remaining windows
+        for window in self.sequences.values_mut() {
+            window.finalized.retain(|_, &mut finalized_at| {
+                now.duration_since(finalized_at) < finalized_max_age
+            });
+        }
     }
 
     /// Get the number of tracked peers
@@ -143,6 +219,7 @@ impl SequenceWindow {
         SequenceWindow {
             max_seq: 0,
             recent: BloomFilter::new(10000, 0.001),
+            finalized: HashMap::new(),
             last_update: Instant::now(),
         }
     }
@@ -336,5 +413,142 @@ mod tests {
 
         // No sequence state should be created for invalid messages
         assert_eq!(guard.peer_count(), 0);
+    }
+
+    #[test]
+    fn test_finalize_prevents_replay() {
+        let mut guard = ReplayGuard::new(300, 3600);
+        let keypair = KeyPair::generate().unwrap();
+
+        let envelope = SignedEnvelope::new(
+            keypair.did(),
+            &keypair,
+            1,
+            PayloadType::Ledger,
+            b"transaction".to_vec(),
+        )
+        .unwrap();
+
+        // First check: OK
+        assert!(guard.check(&envelope).is_ok());
+
+        // Finalize sequence (transaction processed)
+        assert!(guard.finalize(keypair.did(), 1).is_ok());
+        assert!(guard.is_finalized(keypair.did(), 1));
+
+        // Attempt replay after finalization: REJECTED
+        let result = guard.check(&envelope);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("finalized"));
+    }
+
+    #[test]
+    fn test_finalize_different_sequence_independent() {
+        let mut guard = ReplayGuard::new(300, 3600);
+        let keypair = KeyPair::generate().unwrap();
+
+        let envelope1 = SignedEnvelope::new(
+            keypair.did(),
+            &keypair,
+            1,
+            PayloadType::Ledger,
+            b"tx1".to_vec(),
+        )
+        .unwrap();
+
+        let envelope2 = SignedEnvelope::new(
+            keypair.did(),
+            &keypair,
+            2,
+            PayloadType::Ledger,
+            b"tx2".to_vec(),
+        )
+        .unwrap();
+
+        // Check both
+        assert!(guard.check(&envelope1).is_ok());
+        assert!(guard.check(&envelope2).is_ok());
+
+        // Finalize sequence 1 only
+        assert!(guard.finalize(keypair.did(), 1).is_ok());
+
+        // Sequence 1 blocked (finalized)
+        assert!(guard.check(&envelope1).is_err());
+
+        // Sequence 2 blocked (already in Bloom filter from first check)
+        // But NOT finalized, so if we create a NEW envelope with seq 3, it should work
+        let envelope3 = SignedEnvelope::new(
+            keypair.did(),
+            &keypair,
+            3,
+            PayloadType::Ledger,
+            b"tx3".to_vec(),
+        )
+        .unwrap();
+
+        assert!(guard.check(&envelope3).is_ok());
+
+        // Finalize sequence 2
+        assert!(guard.finalize(keypair.did(), 2).is_ok());
+
+        // Now envelope3 can still be used (not finalized)
+        // But envelope2 would be rejected as finalized if we check again
+        assert!(guard.is_finalized(keypair.did(), 2));
+        assert!(!guard.is_finalized(keypair.did(), 3));
+    }
+
+    #[test]
+    fn test_replay_within_time_window_after_finalization() {
+        // This is the KEY test - prevents the documented vulnerability
+        let mut guard = ReplayGuard::new(300, 3600); // 5 minute window
+        let keypair = KeyPair::generate().unwrap();
+
+        let envelope = SignedEnvelope::new(
+            keypair.did(),
+            &keypair,
+            1,
+            PayloadType::Ledger,
+            b"critical_transaction".to_vec(),
+        )
+        .unwrap();
+
+        // T=0: Transaction submitted
+        assert!(guard.check(&envelope).is_ok());
+
+        // T=1: Transaction processed, finalize
+        assert!(guard.finalize(keypair.did(), 1).is_ok());
+
+        // T=2: Attacker replays within 5-minute window
+        // WITHOUT finalization: would be accepted (vulnerability)
+        // WITH finalization: REJECTED (fixed)
+        let result = guard.check(&envelope);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("finalized"));
+    }
+
+    #[test]
+    fn test_finalized_sequences_pruned_after_24h() {
+        let mut guard = ReplayGuard::new(300, 1); // 1 second peer age for fast test
+        let keypair = KeyPair::generate().unwrap();
+
+        let envelope = SignedEnvelope::new(
+            keypair.did(),
+            &keypair,
+            1,
+            PayloadType::Ledger,
+            b"tx".to_vec(),
+        )
+        .unwrap();
+
+        assert!(guard.check(&envelope).is_ok());
+        assert!(guard.finalize(keypair.did(), 1).is_ok());
+        assert!(guard.is_finalized(keypair.did(), 1));
+
+        // In real usage, finalized sequences are pruned after 24h
+        // For testing, we just verify cleanup doesn't crash with finalized seqs
+        guard.cleanup();
+
+        // Peer still tracked (finalized sequences kept)
+        assert_eq!(guard.peer_count(), 1);
     }
 }

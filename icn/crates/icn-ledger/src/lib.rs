@@ -1,4 +1,5 @@
 //! ICN Ledger - Double-entry mutual credit ledger with Merkle-DAG
+#![allow(missing_docs)]
 //!
 //! This crate implements a double-entry bookkeeping system for mutual credit accounting,
 //! structured as a Merkle-DAG for content-addressable, tamper-evident storage.
@@ -46,18 +47,23 @@ pub mod balance;
 pub mod credit_policy;
 pub mod dispute;
 pub mod entry;
+#[allow(missing_docs)]
+pub mod error;
 pub mod events;
+#[allow(missing_docs)]
 pub mod fork_resolution;
 pub mod freeze;
 pub mod hash;
 pub mod ledger;
 pub mod merge;
 pub mod quarantine;
+#[allow(missing_docs)]
 pub mod sync;
 pub mod types;
 
 pub use credit_policy::{CreditPolicy, CreditPolicyManager, NewMemberPolicy};
 pub use dispute::DisputeManager;
+pub use error::{LedgerError, Result};
 pub use fork_resolution::{
     Fork, ForkDetector, ForkResolution, ForkResolutionStrategy, ForkResolver,
 };

@@ -8,14 +8,16 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::info;
+use tracing::{info, warn};
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
 
 use crate::api;
 use crate::auth::AuthManager;
 use crate::commons_mgr::CommonsManager;
 use crate::compute_mgr::ComputeManager;
 use crate::coop::CoopManager;
-use crate::error::Result;
+use crate::error::{GatewayError, Result};
 use crate::events::EventBroadcaster;
 use crate::federation_mgr::FederationManager;
 use crate::governance_mgr::GovernanceManager;
@@ -39,6 +41,7 @@ pub struct GatewayServer {
     security_config: SecurityConfig,
     rate_limit_config: Option<RateLimitConfig>,
     compute_handle: Option<ComputeHandle>,
+    coop_handle: Option<icn_coop::CoopHandle>,
 }
 
 impl GatewayServer {
@@ -52,6 +55,7 @@ impl GatewayServer {
             security_config: SecurityConfig::development(), // Permissive for tests
             rate_limit_config: None,
             compute_handle: None,
+            coop_handle: None,
         }
     }
 
@@ -69,6 +73,7 @@ impl GatewayServer {
             security_config: SecurityConfig::production(), // Strict for production
             rate_limit_config: None,
             compute_handle: None,
+            coop_handle: None,
         }
     }
 
@@ -87,6 +92,7 @@ impl GatewayServer {
             security_config: SecurityConfig::production(),
             rate_limit_config: None,
             compute_handle: None,
+            coop_handle: None,
         }
     }
 
@@ -102,6 +108,12 @@ impl GatewayServer {
         self
     }
 
+    /// Set cooperative handle for daemon integration
+    pub fn with_coop_handle(mut self, handle: icn_coop::CoopHandle) -> Self {
+        self.coop_handle = Some(handle);
+        self
+    }
+
     /// Set custom rate limiting configuration
     pub fn with_rate_limit_config(mut self, config: RateLimitConfig) -> Self {
         self.rate_limit_config = Some(config);
@@ -112,11 +124,40 @@ impl GatewayServer {
     pub async fn run(self) -> Result<()> {
         info!("Starting ICN Gateway on {}", self.bind_addr);
 
+        // SECURITY: Validate JWT secret is configured
+        if self.jwt_secret.is_empty() {
+            return Err(GatewayError::InternalError(
+                "SECURITY: Gateway cannot start with empty JWT secret. \
+                 Set ICN_GATEWAY_JWT_secret environment variable or provide --gateway-jwt-secret flag. \
+                 The secret should be at least 32 cryptographically random bytes.".to_string()
+            ));
+        }
+
+        // SECURITY: Warn if JWT secret is too short
+        if self.jwt_secret.len() < 32 {
+            warn!(
+                "SECURITY WARNING: JWT secret is only {} bytes. \
+                 Recommended minimum is 32 bytes for HS256. \
+                 Tokens may be vulnerable to brute-force attacks.",
+                self.jwt_secret.len()
+            );
+        }
+
         // Create shared managers
         let auth_manager = Arc::new(AuthManager::new(self.jwt_secret));
-        let coop_manager = Arc::new(CoopManager::new());
+
+        // Create cooperative manager (uses actor if handle available, otherwise in-memory)
+        let coop_manager: Arc<CoopManager> = if let Some(handle) = self.coop_handle {
+            info!("Cooperative manager connected to daemon (using CoopActor)");
+            Arc::new(CoopManager::with_handle(handle))
+        } else {
+            info!("Cooperative manager running standalone (in-memory only)");
+            Arc::new(CoopManager::new())
+        };
+
         let governance_manager = Arc::new(GovernanceManager::new());
         let invite_manager = Arc::new(crate::invite::InviteManager::new());
+        let session_manager = Arc::new(crate::session::SessionManager::new());
         let trust_manager = Arc::new(TrustManager::new());
         let compute_manager = if let Some(handle) = self.compute_handle {
             info!("Compute manager connected to daemon");
@@ -182,7 +223,7 @@ impl GatewayServer {
 
         // Create identity manager for multi-device support
         let identity_manager = if let Some(ref data_dir) = self.data_dir {
-            Arc::new(IdentityManager::new_with_storage(data_dir.clone()))
+            Arc::new(IdentityManager::new_with_storage(data_dir.clone())?)
         } else {
             Arc::new(IdentityManager::new())
         };
@@ -321,6 +362,9 @@ impl GatewayServer {
             .build()
             .unwrap();
 
+        // Generate OpenAPI spec
+        let openapi = crate::openapi::ApiDoc::openapi();
+
         let server = HttpServer::new(move || {
             // Create JWT authentication middleware
             let auth = HttpAuthentication::bearer(crate::middleware::jwt_auth);
@@ -330,11 +374,17 @@ impl GatewayServer {
             let cors = configure_cors(&security_config);
 
             App::new()
+                // Swagger UI for API documentation
+                .service(
+                    SwaggerUi::new("/swagger-ui/{_:.*}")
+                        .url("/api-docs/openapi.json", openapi.clone()),
+                )
                 // Shared state
                 .app_data(web::Data::new(auth_manager.clone()))
                 .app_data(web::Data::new(coop_manager.clone()))
                 .app_data(web::Data::new(governance_manager.clone()))
                 .app_data(web::Data::new(invite_manager.clone()))
+                .app_data(web::Data::new(session_manager.clone()))
                 .app_data(web::Data::new(trust_manager.clone()))
                 .app_data(web::Data::new(compute_manager.clone()))
                 .app_data(web::Data::new(federation_manager.clone()))
@@ -380,6 +430,21 @@ impl GatewayServer {
                         .service(api::auth::challenge)
                         .service(api::auth::verify)
                         .service(api::websocket::websocket)
+                        // QR login session endpoints
+                        // Note: create_session and get_session_status are public
+                        // approve_session requires auth (wrapped with auth middleware)
+                        .service(
+                            web::scope("/sessions")
+                                .service(api::sessions::create_session)
+                                .service(api::sessions::get_session_status)
+                                .service(
+                                    web::resource("/{session_id}/approve")
+                                        .route(
+                                            web::post().to(api::sessions::approve_session_handler),
+                                        )
+                                        .wrap(auth.clone()),
+                                ),
+                        )
                         // Public identity resolution (for federation)
                         .service(
                             web::scope("/identity")

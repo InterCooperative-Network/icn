@@ -11,7 +11,7 @@ use lru::LruCache;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
 use std::sync::RwLock;
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 /// Storage key prefix
 const ATTESTATION_PREFIX: &[u8] = b"federation/attestations/";
@@ -55,7 +55,13 @@ impl AttestationStore {
         self.store.put(&key, &value)?;
 
         // Invalidate cache entry
-        self.cache.write().unwrap().pop(&att.member_did);
+        self.cache
+            .write()
+            .unwrap_or_else(|poisoned| {
+                warn!("Attestation cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .pop(&att.member_did);
 
         // Update metrics
         metrics::attestation::stored_inc(&att.source_coop_id, att.trust_context.as_str());
@@ -70,7 +76,15 @@ impl AttestationStore {
     /// Get all attestations for a member
     pub fn get_attestations_for(&self, member: &Did) -> Result<Vec<FederatedTrustAttestation>> {
         // Check cache first
-        if let Some(cached) = self.cache.write().unwrap().get(member) {
+        if let Some(cached) = self
+            .cache
+            .write()
+            .unwrap_or_else(|poisoned| {
+                warn!("Attestation cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .get(member)
+        {
             return Ok(cached.clone());
         }
 
@@ -89,7 +103,10 @@ impl AttestationStore {
         if !attestations.is_empty() {
             self.cache
                 .write()
-                .unwrap()
+                .unwrap_or_else(|poisoned| {
+                    warn!("Attestation cache lock poisoned, recovering");
+                    poisoned.into_inner()
+                })
                 .put(member.clone(), attestations.clone());
         }
 
@@ -121,7 +138,13 @@ impl AttestationStore {
             if let Ok(att) = serde_json::from_slice::<FederatedTrustAttestation>(&value) {
                 if att.is_expired() {
                     self.store.delete(&key)?;
-                    self.cache.write().unwrap().pop(&att.member_did);
+                    self.cache
+                        .write()
+                        .unwrap_or_else(|poisoned| {
+                            warn!("Attestation cache lock poisoned, recovering");
+                            poisoned.into_inner()
+                        })
+                        .pop(&att.member_did);
                     removed += 1;
                     metrics::attestation::expired_inc();
                 }
@@ -151,7 +174,13 @@ impl AttestationStore {
     pub fn remove_attestation(&self, member: &Did, source_coop_id: &str) -> Result<()> {
         let key = Self::attestation_key(member, source_coop_id);
         self.store.delete(&key)?;
-        self.cache.write().unwrap().pop(member);
+        self.cache
+            .write()
+            .unwrap_or_else(|poisoned| {
+                warn!("Attestation cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .pop(member);
         Ok(())
     }
 

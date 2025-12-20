@@ -1,0 +1,1522 @@
+openapi: 3.1.0
+info:
+  title: ICN Gateway API
+  description: |
+    REST and WebSocket API for the Intercooperative Network (ICN) Gateway.
+
+    ## Authentication
+
+    The Gateway uses DID-based challenge-response authentication with JWT tokens:
+
+    1. Request a challenge for your DID via `POST /v1/auth/challenge`
+    2. Sign the challenge with your Ed25519 private key
+    3. Submit signature via `POST /v1/auth/verify` to receive a JWT token
+    4. Include the token in subsequent requests: `Authorization: Bearer <token>`
+
+    ## Rate Limiting
+
+    All authenticated endpoints are rate-limited per DID using a token bucket algorithm:
+    - Burst capacity: 100 requests
+    - Refill rate: 10 tokens/second
+
+    When rate limited, the API returns HTTP 429 Too Many Requests.
+
+    ## Authorization Scopes
+
+    JWT tokens include scopes that control access to endpoints:
+    - `ledger:read` - View balances and transaction history
+    - `ledger:write` - Create payments
+    - `coop:read` - View cooperative information
+    - `coop:write` - Update cooperative settings
+    - `coop:admin` - Manage members and roles
+    - `gov:read` - View governance domains, proposals, votes
+    - `gov:write` - Create proposals, cast votes
+    - `compute:read` - View compute task status
+    - `compute:write` - Submit compute tasks
+
+  version: 1.0.0
+  license:
+    name: MIT OR Apache-2.0
+    url: https://github.com/InterCooperative-Network/icn
+  contact:
+    name: ICN Project
+    url: https://github.com/InterCooperative-Network/icn
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+  - url: https://api.example.com
+    description: Production server (replace with your domain)
+
+tags:
+  - name: Health
+    description: Service health checks
+  - name: Authentication
+    description: DID-based authentication and JWT token management
+  - name: Cooperatives
+    description: Cooperative namespace management
+  - name: Ledger
+    description: Mutual credit ledger operations
+  - name: Governance
+    description: Democratic governance for cooperatives
+  - name: Compute
+    description: Distributed compute task submission and monitoring
+  - name: WebSocket
+    description: Real-time event streaming
+
+paths:
+  /v1/health:
+    get:
+      tags: [Health]
+      summary: Health check
+      description: Returns the current health status of the Gateway API.
+      operationId: getHealth
+      security: []  # Public endpoint
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: healthy
+                version: "1.0.0"
+        '503':
+          description: Service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /v1/auth/challenge:
+    post:
+      tags: [Authentication]
+      summary: Request authentication challenge
+      description: |
+        Request a challenge nonce for DID-based authentication.
+        The challenge must be signed with the DID's private key and
+        submitted to `/v1/auth/verify` within 5 minutes.
+      operationId: requestChallenge
+      security: []  # Public endpoint
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChallengeRequest'
+            example:
+              did: "did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK"
+      responses:
+        '200':
+          description: Challenge created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChallengeResponse'
+              example:
+                challenge: "a1b2c3d4e5f6..."
+                expires_at: "2025-01-15T12:05:00Z"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /v1/auth/verify:
+    post:
+      tags: [Authentication]
+      summary: Verify signature and get JWT token
+      description: |
+        Submit the signed challenge to receive a JWT token.
+        The signature must be created using the Ed25519 private key
+        corresponding to the DID's public key.
+      operationId: verifyChallenge
+      security: []  # Public endpoint
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyRequest'
+            example:
+              did: "did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK"
+              signature: "base64-encoded-signature..."
+              coop_id: "my-coop"
+              scopes:
+                - "ledger:read"
+                - "ledger:write"
+                - "gov:read"
+                - "gov:write"
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+              example:
+                token: "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
+                expires_at: "2025-01-16T12:00:00Z"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/coops:
+    get:
+      tags: [Cooperatives]
+      summary: List cooperatives
+      operationId: listCoops
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of cooperatives
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Cooperative'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+    post:
+      tags: [Cooperatives]
+      summary: Create a cooperative
+      operationId: createCoop
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCoopRequest'
+      responses:
+        '201':
+          description: Cooperative created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cooperative'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Cooperative ID already exists
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /v1/coops/{coop_id}:
+    get:
+      tags: [Cooperatives]
+      summary: Get cooperative details
+      operationId: getCoop
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CoopId'
+      responses:
+        '200':
+          description: Cooperative details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cooperative'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+    put:
+      tags: [Cooperatives]
+      summary: Update cooperative
+      operationId: updateCoop
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CoopId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCoopRequest'
+      responses:
+        '200':
+          description: Cooperative updated
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+    delete:
+      tags: [Cooperatives]
+      summary: Delete cooperative
+      operationId: deleteCoop
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CoopId'
+      responses:
+        '204':
+          description: Cooperative deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /v1/coops/{coop_id}/members:
+    get:
+      tags: [Cooperatives]
+      summary: List members
+      operationId: listMembers
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CoopId'
+      responses:
+        '200':
+          description: List of members
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Member'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+    post:
+      tags: [Cooperatives]
+      summary: Add member
+      operationId: addMember
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CoopId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddMemberRequest'
+      responses:
+        '201':
+          description: Member added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Member'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Member already exists
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /v1/coops/{coop_id}/members/{did}:
+    put:
+      tags: [Cooperatives]
+      summary: Update member role
+      operationId: updateMember
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CoopId'
+        - $ref: '#/components/parameters/Did'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateMemberRequest'
+      responses:
+        '200':
+          description: Member updated
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+    delete:
+      tags: [Cooperatives]
+      summary: Remove member
+      operationId: removeMember
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CoopId'
+        - $ref: '#/components/parameters/Did'
+      responses:
+        '204':
+          description: Member removed
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /v1/ledger/{coop_id}/balance/{did}:
+    get:
+      tags: [Ledger]
+      summary: Get balance
+      operationId: getBalance
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CoopId'
+        - $ref: '#/components/parameters/Did'
+      responses:
+        '200':
+          description: Balance retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Balance'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /v1/ledger/{coop_id}/payment:
+    post:
+      tags: [Ledger]
+      summary: Create payment
+      description: Create a mutual credit payment from the authenticated user to another member.
+      operationId: createPayment
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CoopId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentRequest'
+      responses:
+        '201':
+          description: Payment created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          description: Insufficient balance or credit limit exceeded
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /v1/ledger/{coop_id}/history:
+    get:
+      tags: [Ledger]
+      summary: Get transaction history
+      operationId: getHistory
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CoopId'
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Transaction history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Transaction'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /v1/gov/domains:
+    get:
+      tags: [Governance]
+      summary: List governance domains
+      operationId: listDomains
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of domains
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GovernanceDomain'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+    post:
+      tags: [Governance]
+      summary: Create governance domain
+      operationId: createDomain
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDomainRequest'
+      responses:
+        '201':
+          description: Domain created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GovernanceDomain'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Domain ID already exists
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /v1/gov/domains/{domain_id}:
+    get:
+      tags: [Governance]
+      summary: Get governance domain
+      operationId: getDomain
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DomainId'
+      responses:
+        '200':
+          description: Domain details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GovernanceDomain'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /v1/gov/proposals:
+    get:
+      tags: [Governance]
+      summary: List proposals
+      operationId: listProposals
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: domain_id
+          in: query
+          schema:
+            type: string
+          description: Filter by domain ID
+        - name: state
+          in: query
+          schema:
+            type: string
+            enum: [draft, open, closed]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: List of proposals with pagination
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Proposal'
+                  pagination:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                      offset:
+                        type: integer
+                      limit:
+                        type: integer
+                      returned:
+                        type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+    post:
+      tags: [Governance]
+      summary: Create proposal
+      operationId: createProposal
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProposalRequest'
+      responses:
+        '201':
+          description: Proposal created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Proposal'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Domain not found
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /v1/gov/proposals/{proposal_id}:
+    get:
+      tags: [Governance]
+      summary: Get proposal
+      operationId: getProposal
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProposalId'
+      responses:
+        '200':
+          description: Proposal details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Proposal'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /v1/gov/proposals/{proposal_id}/open:
+    post:
+      tags: [Governance]
+      summary: Open proposal for voting
+      operationId: openProposal
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProposalId'
+      responses:
+        '200':
+          description: Proposal opened
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Proposal'
+        '400':
+          description: Proposal is not in Draft state
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /v1/gov/proposals/{proposal_id}/close:
+    post:
+      tags: [Governance]
+      summary: Close proposal and calculate outcome
+      operationId: closeProposal
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProposalId'
+      responses:
+        '200':
+          description: Proposal closed with outcome
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Proposal'
+        '400':
+          description: Proposal is not in Open state
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /v1/gov/proposals/{proposal_id}/vote:
+    post:
+      tags: [Governance]
+      summary: Cast vote
+      operationId: castVote
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProposalId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CastVoteRequest'
+      responses:
+        '200':
+          description: Vote cast
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vote'
+        '400':
+          description: Proposal is not open for voting
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /v1/gov/proposals/{proposal_id}/votes:
+    get:
+      tags: [Governance]
+      summary: Get vote tally
+      operationId: getVoteTally
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProposalId'
+      responses:
+        '200':
+          description: Vote tally
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VoteTally'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  # ============================================
+  # Compute Endpoints
+  # ============================================
+
+  /v1/compute/submit:
+    post:
+      tags: [Compute]
+      summary: Submit a compute task
+      description: |
+        Submit a compute task for distributed execution. Supports two code types:
+
+        - **CCL** (default): Submit a CCL (Cooperative Contract Language) contract as JSON
+        - **WASM**: Submit a WebAssembly module as base64-encoded bytes
+
+        The task is broadcast to the network where trusted executors can claim and run it.
+        Payment is automatically settled based on fuel consumed.
+
+        **Priority levels**: low, normal (default), high, critical
+      operationId: submitComputeTask
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitTaskRequest'
+            examples:
+              ccl:
+                summary: CCL contract submission
+                value:
+                  code_type: ccl
+                  code: '{"name":"SimpleReturn","participants":["did:icn:alice"],"rules":[{"name":"run","body":[{"Return":{"value":{"Literal":{"Int":42}}}}]}]}'
+                  fuel_limit: 10000
+                  priority: normal
+              wasm:
+                summary: WASM module submission
+                value:
+                  code_type: wasm
+                  wasm_bytes: AGFzbQEAAAABBAFgAAF/AwIBAAcHAQNydW4AAAoGAQQAQSoL
+                  fuel_limit: 10000
+                  priority: high
+      responses:
+        '200':
+          description: Task submitted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmitTaskResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /v1/compute/status/{task_hash}:
+    get:
+      tags: [Compute]
+      summary: Get task status
+      description: |
+        Retrieve the current status of a compute task by its hash.
+
+        Status values: pending, claimed, completed, failed
+      operationId: getComputeTaskStatus
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: task_hash
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-f0-9]{64}$'
+          description: Task hash (64 hex characters)
+      responses:
+        '200':
+          description: Task status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComputeTaskStatus'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /v1/compute/cancel/{task_hash}:
+    post:
+      tags: [Compute]
+      summary: Cancel a compute task
+      description: |
+        Cancel a pending or claimed compute task. Only the original submitter
+        can cancel their own tasks.
+
+        Tasks can only be cancelled if they are in `pending` or `claimed` status.
+        Completed or failed tasks cannot be cancelled.
+      operationId: cancelComputeTask
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: task_hash
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-f0-9]{64}$'
+          description: Task hash (64 hex characters)
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CancelTaskRequest'
+            example:
+              reason: "No longer needed"
+      responses:
+        '200':
+          description: Task cancelled successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CancelTaskResponse'
+        '400':
+          description: Task cannot be cancelled (already completed or failed)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Not authorized to cancel this task (not the submitter)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  # ============================================
+  # WebSocket Endpoint
+  # ============================================
+
+  /v1/ws/{coop_id}:
+    get:
+      tags: [WebSocket]
+      summary: WebSocket event stream
+      description: |
+        Connect for real-time event streaming.
+
+        After connecting, send: `{"type": "Auth", "token": "..."}`
+
+        The server responds with: `{"type": "AuthOk", "did": "...", "current_seq": N}`
+
+        To request missed events after reconnection: `{"type": "Backfill", "after_seq": N}`
+
+        Events include: PaymentCreated, MemberAdded, MemberRemoved,
+        RoleUpdated, SettingsUpdated, GovernanceDomainCreated,
+        GovernanceProposalCreated, GovernanceProposalOpened,
+        GovernanceProposalClosed, GovernanceVoteCast,
+        ComputeTaskSubmitted, ComputeTaskClaimed, ComputeTaskCompleted
+      operationId: websocketConnect
+      security: []  # Auth handled via WebSocket message
+      parameters:
+        - $ref: '#/components/parameters/CoopId'
+      responses:
+        '101':
+          description: Switching to WebSocket protocol
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    CoopId:
+      name: coop_id
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^[a-z0-9][a-z0-9-]*[a-z0-9]$'
+
+    Did:
+      name: did
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^did:icn:[a-zA-Z0-9]+$'
+
+    DomainId:
+      name: domain_id
+      in: path
+      required: true
+      schema:
+        type: string
+
+    ProposalId:
+      name: proposal_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    BadRequest:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Unauthorized:
+      description: Missing or invalid authentication
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    RateLimited:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    Error:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+        version:
+          type: string
+
+    ChallengeRequest:
+      type: object
+      required: [did]
+      properties:
+        did:
+          type: string
+          pattern: '^did:icn:[a-zA-Z0-9]+$'
+
+    ChallengeResponse:
+      type: object
+      properties:
+        challenge:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+
+    VerifyRequest:
+      type: object
+      required: [did, signature, coop_id, scopes]
+      properties:
+        did:
+          type: string
+        signature:
+          type: string
+        coop_id:
+          type: string
+        scopes:
+          type: array
+          items:
+            type: string
+
+    TokenResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+
+    Cooperative:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        owner:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    CreateCoopRequest:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+
+    UpdateCoopRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+
+    Member:
+      type: object
+      properties:
+        did:
+          type: string
+        role:
+          type: string
+          enum: [owner, admin, member]
+        joined_at:
+          type: string
+          format: date-time
+
+    AddMemberRequest:
+      type: object
+      required: [did, role]
+      properties:
+        did:
+          type: string
+        role:
+          type: string
+          enum: [admin, member]
+
+    UpdateMemberRequest:
+      type: object
+      required: [role]
+      properties:
+        role:
+          type: string
+
+    Balance:
+      type: object
+      properties:
+        did:
+          type: string
+        balance:
+          type: integer
+        currency:
+          type: string
+
+    PaymentRequest:
+      type: object
+      required: [to, amount, currency]
+      properties:
+        to:
+          type: string
+        amount:
+          type: integer
+          minimum: 1
+        currency:
+          type: string
+        memo:
+          type: string
+
+    Payment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        from:
+          type: string
+        to:
+          type: string
+        amount:
+          type: integer
+        currency:
+          type: string
+        memo:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    Transaction:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [sent, received]
+        amount:
+          type: integer
+        currency:
+          type: string
+        counterparty:
+          type: string
+        memo:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    GovernanceDomain:
+      type: object
+      properties:
+        domain_id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        members:
+          type: array
+          items:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+
+    CreateDomainRequest:
+      type: object
+      required: [domain_id, name, members]
+      properties:
+        domain_id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        members:
+          type: array
+          items:
+            type: string
+
+    Proposal:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        domain_id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        kind:
+          type: string
+          enum: [text, budget, membership, config_change]
+        state:
+          type: string
+          enum: [draft, open, closed]
+        author:
+          type: string
+        outcome:
+          type: string
+          enum: [accepted, rejected, no_quorum]
+        created_at:
+          type: string
+          format: date-time
+
+    CreateProposalRequest:
+      type: object
+      required: [domain_id, title, description, payload]
+      properties:
+        domain_id:
+          type: string
+          description: The governance domain this proposal belongs to
+        title:
+          type: string
+        description:
+          type: string
+        payload:
+          $ref: '#/components/schemas/ProposalPayload'
+
+    ProposalPayload:
+      oneOf:
+        - $ref: '#/components/schemas/TextPayload'
+        - $ref: '#/components/schemas/BudgetPayload'
+        - $ref: '#/components/schemas/MembershipPayload'
+        - $ref: '#/components/schemas/ConfigChangePayload'
+      discriminator:
+        propertyName: type
+        mapping:
+          text: '#/components/schemas/TextPayload'
+          budget: '#/components/schemas/BudgetPayload'
+          membership: '#/components/schemas/MembershipPayload'
+          config_change: '#/components/schemas/ConfigChangePayload'
+
+    TextPayload:
+      type: object
+      required: [type, body]
+      properties:
+        type:
+          type: string
+          enum: [text]
+        body:
+          type: string
+
+    BudgetPayload:
+      type: object
+      required: [type, amount, recipient, currency, purpose]
+      properties:
+        type:
+          type: string
+          enum: [budget]
+        amount:
+          type: integer
+        recipient:
+          type: string
+          description: DID of the recipient
+        currency:
+          type: string
+        purpose:
+          type: string
+
+    MembershipPayload:
+      type: object
+      required: [type, action, did]
+      properties:
+        type:
+          type: string
+          enum: [membership]
+        action:
+          type: string
+          enum: [add, remove]
+        did:
+          type: string
+
+    ConfigChangePayload:
+      type: object
+      required: [type, key, value]
+      properties:
+        type:
+          type: string
+          enum: [config_change]
+        key:
+          type: string
+        value:
+          type: string
+
+    CastVoteRequest:
+      type: object
+      required: [choice]
+      properties:
+        choice:
+          type: string
+          enum: [for, against, abstain]
+
+    Vote:
+      type: object
+      properties:
+        proposal_id:
+          type: string
+          format: uuid
+        voter:
+          type: string
+        choice:
+          type: string
+          enum: [for, against, abstain]
+        cast_at:
+          type: string
+          format: date-time
+
+    VoteTally:
+      type: object
+      properties:
+        proposal_id:
+          type: string
+          format: uuid
+        votes_for:
+          type: integer
+        votes_against:
+          type: integer
+        votes_abstain:
+          type: integer
+        total_votes:
+          type: integer
+        quorum_reached:
+          type: boolean
+
+    # ============================================
+    # Compute Schemas
+    # ============================================
+
+    # Base properties shared by all task submissions
+    SubmitTaskRequestBase:
+      type: object
+      properties:
+        task_id:
+          type: string
+          description: Optional task ID (auto-generated if not provided)
+        inputs:
+          type: object
+          description: Input arguments (JSON)
+        fuel_limit:
+          type: integer
+          description: Maximum fuel for execution (default 10000)
+          default: 10000
+        priority:
+          type: string
+          enum: [low, normal, high, critical]
+          description: Task priority (default normal)
+          default: normal
+        deadline_ms:
+          type: integer
+          description: Deadline in milliseconds from now (optional)
+        payment_rate:
+          type: integer
+          description: Payment rate per 1000 fuel (optional)
+        payment_currency:
+          type: string
+          description: Payment currency (default credits)
+
+    # CCL task submission (code_type: ccl or omitted)
+    # Note: Server accepts requests without code_type, defaulting to "ccl"
+    CclTaskRequest:
+      allOf:
+        - $ref: '#/components/schemas/SubmitTaskRequestBase'
+        - type: object
+          required: [code]
+          properties:
+            code_type:
+              type: string
+              enum: [ccl]
+              default: ccl
+              description: Code type (optional, defaults to "ccl" if omitted)
+            code:
+              type: string
+              description: CCL contract JSON
+
+    # WASM task submission (code_type: wasm)
+    WasmTaskRequest:
+      allOf:
+        - $ref: '#/components/schemas/SubmitTaskRequestBase'
+        - type: object
+          required: [code_type, wasm_bytes]
+          properties:
+            code_type:
+              type: string
+              enum: [wasm]
+            wasm_bytes:
+              type: string
+              format: byte
+              description: Base64-encoded WASM bytecode
+
+    # Union type: either CCL or WASM task
+    # Discrimination logic:
+    # - If code_type is "wasm" → WasmTaskRequest (wasm_bytes required)
+    # - If code_type is "ccl" or omitted → CclTaskRequest (code required)
+    SubmitTaskRequest:
+      description: |
+        Submit a compute task. Two types are supported:
+        - CCL (default): Provide `code` field with CCL contract JSON
+        - WASM: Set `code_type: wasm` and provide `wasm_bytes` with base64-encoded WASM
+
+        For backward compatibility, requests without `code_type` are treated as CCL.
+      oneOf:
+        - $ref: '#/components/schemas/CclTaskRequest'
+        - $ref: '#/components/schemas/WasmTaskRequest'
+      discriminator:
+        propertyName: code_type
+        mapping:
+          ccl: '#/components/schemas/CclTaskRequest'
+          wasm: '#/components/schemas/WasmTaskRequest'
+
+    SubmitTaskResponse:
+      type: object
+      properties:
+        task_id:
+          type: string
+        task_hash:
+          type: string
+          description: 64-character hex hash
+
+    ComputeTaskStatus:
+      type: object
+      properties:
+        task_hash:
+          type: string
+        status:
+          type: string
+          enum: [pending, claimed, completed, failed, cancelled]
+        executor:
+          type: string
+          description: DID of the executor (if claimed)
+        result:
+          $ref: '#/components/schemas/ComputeResult'
+        cancelled_reason:
+          type: string
+          description: Cancellation reason (if cancelled)
+
+    CancelTaskRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          description: Optional reason for cancellation
+          maxLength: 500
+
+    CancelTaskResponse:
+      type: object
+      properties:
+        task_hash:
+          type: string
+          description: Hash of the cancelled task
+        status:
+          type: string
+          enum: [cancelled]
+        message:
+          type: string
+          example: "Task cancelled successfully"
+
+    ComputeResult:
+      type: object
+      properties:
+        outcome:
+          type: string
+          enum: [success, failed, out_of_fuel, timeout]
+        output:
+          type: object
+          description: Execution output (JSON)
+        error:
+          type: string
+          description: Error message (if failed)
+        fuel_used:
+          type: integer
+        duration_ms:
+          type: integer

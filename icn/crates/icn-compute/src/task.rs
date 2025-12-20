@@ -74,7 +74,7 @@ impl TaskManager {
             TaskStatus::Pending => {
                 let now = SystemTime::now()
                     .duration_since(UNIX_EPOCH)
-                    .unwrap()
+                    .unwrap_or(std::time::Duration::ZERO)
                     .as_millis() as u64;
                 self.status.insert(
                     *hash,
@@ -145,7 +145,7 @@ impl TaskManager {
             TaskStatus::Pending | TaskStatus::Claimed { .. } => {
                 let now = SystemTime::now()
                     .duration_since(UNIX_EPOCH)
-                    .unwrap()
+                    .unwrap_or(std::time::Duration::ZERO)
                     .as_millis() as u64;
                 self.status.insert(
                     *hash,
@@ -232,7 +232,7 @@ impl TaskManager {
     pub fn cleanup(&mut self, max_age_ms: u64) {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or(std::time::Duration::ZERO)
             .as_millis() as u64;
 
         let to_remove: Vec<_> = self

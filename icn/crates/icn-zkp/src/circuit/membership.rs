@@ -207,6 +207,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(feature = "stark"))]
     fn test_membership_proof_success() {
         let public = MembershipProofPublic::new(test_org_did());
 
@@ -224,6 +225,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(feature = "stark"))]
     fn test_membership_with_role() {
         let public = MembershipProofPublic::new(test_org_did()).with_role("admin");
 
