@@ -201,10 +201,13 @@ impl UpgradeCoordinator {
             if upgrade.deadline <= now {
                 // Deadline reached - enforce minimum version
                 if let Some(ref min_version) = upgrade.min_required_version {
-                    let mut min_req = self.min_required_version.write().unwrap_or_else(|poisoned| {
-                        warn!("Min required version lock poisoned, recovering");
-                        poisoned.into_inner()
-                    });
+                    let mut min_req =
+                        self.min_required_version
+                            .write()
+                            .unwrap_or_else(|poisoned| {
+                                warn!("Min required version lock poisoned, recovering");
+                                poisoned.into_inner()
+                            });
 
                     // Update minimum required version if higher
                     if min_req.as_ref().is_none_or(|v| min_version > v) {

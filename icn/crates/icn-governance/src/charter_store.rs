@@ -47,10 +47,15 @@ impl InMemoryCharterStore {
 
 impl CharterStoreBackend for InMemoryCharterStore {
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
-        Ok(self.data.read().unwrap_or_else(|poisoned| {
-            warn!("Data lock poisoned, recovering");
-            poisoned.into_inner()
-        }).get(key).cloned())
+        Ok(self
+            .data
+            .read()
+            .unwrap_or_else(|poisoned| {
+                warn!("Data lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .get(key)
+            .cloned())
     }
 
     fn put(&self, key: &[u8], value: &[u8]) -> Result<()> {
@@ -65,10 +70,13 @@ impl CharterStoreBackend for InMemoryCharterStore {
     }
 
     fn delete(&self, key: &[u8]) -> Result<()> {
-        self.data.write().unwrap_or_else(|poisoned| {
-            warn!("Data lock poisoned, recovering");
-            poisoned.into_inner()
-        }).remove(key);
+        self.data
+            .write()
+            .unwrap_or_else(|poisoned| {
+                warn!("Data lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .remove(key);
         Ok(())
     }
 
@@ -218,10 +226,15 @@ impl<S: CharterStoreBackend> CharterStore<S> {
     /// Get a Charter by ID
     pub fn get(&self, charter_id: &CharterId) -> Result<Option<Charter>> {
         // Check cache first
-        if let Some(cached) = self.cache.write().unwrap_or_else(|poisoned| {
-            warn!("Cache lock poisoned, recovering");
-            poisoned.into_inner()
-        }).get(charter_id.as_bytes()) {
+        if let Some(cached) = self
+            .cache
+            .write()
+            .unwrap_or_else(|poisoned| {
+                warn!("Cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .get(charter_id.as_bytes())
+        {
             return Ok(Some(cached.clone()));
         }
 
@@ -280,10 +293,13 @@ impl<S: CharterStoreBackend> CharterStore<S> {
             self.store.delete(&status_key)?;
 
             // Remove from cache
-            self.cache.write().unwrap_or_else(|poisoned| {
-                warn!("Cache lock poisoned, recovering");
-                poisoned.into_inner()
-            }).pop(charter_id.as_bytes());
+            self.cache
+                .write()
+                .unwrap_or_else(|poisoned| {
+                    warn!("Cache lock poisoned, recovering");
+                    poisoned.into_inner()
+                })
+                .pop(charter_id.as_bytes());
 
             debug!("Deleted Charter: {}", charter_id);
             return Ok(true);
@@ -479,10 +495,13 @@ impl<S: CharterStoreBackend> CharterStore<S> {
 
     /// Clear the cache
     pub fn clear_cache(&self) {
-        self.cache.write().unwrap_or_else(|poisoned| {
-            warn!("Cache lock poisoned, recovering");
-            poisoned.into_inner()
-        }).clear();
+        self.cache
+            .write()
+            .unwrap_or_else(|poisoned| {
+                warn!("Cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .clear();
     }
 }
 

@@ -1508,7 +1508,10 @@ impl DisputeActor {
                         .add_mediator_with_expertise(mediator, expertise_tags);
                 }
                 DisputeActorMsg::GetOffenderRecord { did, reply } => {
-                    if reply.send(self.system.get_offender_record(&did).cloned()).is_err() {
+                    if reply
+                        .send(self.system.get_offender_record(&did).cloned())
+                        .is_err()
+                    {
                         warn!("DisputeActor: reply channel closed for get_offender_record");
                     }
                 }

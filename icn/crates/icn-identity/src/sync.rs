@@ -345,18 +345,24 @@ impl DidDocumentCache {
 
     /// Get the number of cached documents
     pub fn len(&self) -> usize {
-        self.inner.read().unwrap_or_else(|poisoned| {
-            warn!("DID cache lock poisoned, recovering");
-            poisoned.into_inner()
-        }).len()
+        self.inner
+            .read()
+            .unwrap_or_else(|poisoned| {
+                warn!("DID cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .len()
     }
 
     /// Check if the cache is empty
     pub fn is_empty(&self) -> bool {
-        self.inner.read().unwrap_or_else(|poisoned| {
-            warn!("DID cache lock poisoned, recovering");
-            poisoned.into_inner()
-        }).is_empty()
+        self.inner
+            .read()
+            .unwrap_or_else(|poisoned| {
+                warn!("DID cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .is_empty()
     }
 }
 

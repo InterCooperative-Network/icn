@@ -55,10 +55,15 @@ impl InMemoryPersonhoodStore {
 
 impl PersonhoodStore for InMemoryPersonhoodStore {
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
-        Ok(self.data.read().unwrap_or_else(|poisoned| {
-            warn!("Data lock poisoned, recovering");
-            poisoned.into_inner()
-        }).get(key).cloned())
+        Ok(self
+            .data
+            .read()
+            .unwrap_or_else(|poisoned| {
+                warn!("Data lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .get(key)
+            .cloned())
     }
 
     fn put(&self, key: &[u8], value: &[u8]) -> Result<()> {
@@ -73,10 +78,13 @@ impl PersonhoodStore for InMemoryPersonhoodStore {
     }
 
     fn delete(&self, key: &[u8]) -> Result<()> {
-        self.data.write().unwrap_or_else(|poisoned| {
-            warn!("Data lock poisoned, recovering");
-            poisoned.into_inner()
-        }).remove(key);
+        self.data
+            .write()
+            .unwrap_or_else(|poisoned| {
+                warn!("Data lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .remove(key);
         Ok(())
     }
 
@@ -192,10 +200,13 @@ impl<S: PersonhoodStore> PersonhoodAnchorStore<S> {
         self.store.put(&status_key, &timestamp)?;
 
         // Update cache
-        self.cache.write().unwrap_or_else(|poisoned| {
-            warn!("Cache lock poisoned, recovering");
-            poisoned.into_inner()
-        }).put(*anchor_id, anchor.clone());
+        self.cache
+            .write()
+            .unwrap_or_else(|poisoned| {
+                warn!("Cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .put(*anchor_id, anchor.clone());
 
         debug!("Stored PersonhoodAnchor: {}", hex::encode(anchor_id));
         Ok(())
@@ -204,10 +215,15 @@ impl<S: PersonhoodStore> PersonhoodAnchorStore<S> {
     /// Get a PersonhoodAnchor by ID
     pub fn get(&self, anchor_id: &[u8; 32]) -> Result<Option<PersonhoodAnchor>> {
         // Check cache first
-        if let Some(cached) = self.cache.write().unwrap_or_else(|poisoned| {
-            warn!("Cache lock poisoned, recovering");
-            poisoned.into_inner()
-        }).get(anchor_id) {
+        if let Some(cached) = self
+            .cache
+            .write()
+            .unwrap_or_else(|poisoned| {
+                warn!("Cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .get(anchor_id)
+        {
             return Ok(Some(cached.clone()));
         }
 
@@ -218,10 +234,13 @@ impl<S: PersonhoodStore> PersonhoodAnchorStore<S> {
                 serde_json::from_slice(&value).context("Failed to deserialize PersonhoodAnchor")?;
 
             // Update cache
-            self.cache.write().unwrap_or_else(|poisoned| {
-                warn!("Cache lock poisoned, recovering");
-                poisoned.into_inner()
-            }).put(*anchor_id, anchor.clone());
+            self.cache
+                .write()
+                .unwrap_or_else(|poisoned| {
+                    warn!("Cache lock poisoned, recovering");
+                    poisoned.into_inner()
+                })
+                .put(*anchor_id, anchor.clone());
 
             return Ok(Some(anchor));
         }
@@ -284,10 +303,13 @@ impl<S: PersonhoodStore> PersonhoodAnchorStore<S> {
             self.store.delete(&status_key)?;
 
             // Remove from cache
-            self.cache.write().unwrap_or_else(|poisoned| {
-                warn!("Cache lock poisoned, recovering");
-                poisoned.into_inner()
-            }).pop(anchor_id);
+            self.cache
+                .write()
+                .unwrap_or_else(|poisoned| {
+                    warn!("Cache lock poisoned, recovering");
+                    poisoned.into_inner()
+                })
+                .pop(anchor_id);
 
             debug!("Deleted PersonhoodAnchor: {}", hex::encode(anchor_id));
             return Ok(true);
@@ -506,10 +528,13 @@ impl<S: PersonhoodStore> PersonhoodAnchorStore<S> {
 
     /// Clear the cache
     pub fn clear_cache(&self) {
-        self.cache.write().unwrap_or_else(|poisoned| {
-            warn!("Cache lock poisoned, recovering");
-            poisoned.into_inner()
-        }).clear();
+        self.cache
+            .write()
+            .unwrap_or_else(|poisoned| {
+                warn!("Cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .clear();
     }
 }
 

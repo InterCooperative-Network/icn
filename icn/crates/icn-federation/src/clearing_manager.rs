@@ -68,10 +68,14 @@ impl ClearingManager {
         }
         drop(positions);
 
-        let count = self.agreements.read().unwrap_or_else(|poisoned| {
-            warn!("Agreements lock poisoned, recovering");
-            poisoned.into_inner()
-        }).len();
+        let count = self
+            .agreements
+            .read()
+            .unwrap_or_else(|poisoned| {
+                warn!("Agreements lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .len();
         metrics::clearing::agreements_active_set(count);
         info!("Loaded {} clearing agreements", count);
         Ok(())
@@ -100,10 +104,15 @@ impl ClearingManager {
         let agreement_id = agreement.agreement_id.clone();
 
         // Check if agreement already exists
-        if self.agreements.read().unwrap_or_else(|poisoned| {
-            warn!("Agreements lock poisoned, recovering");
-            poisoned.into_inner()
-        }).contains_key(&agreement_id) {
+        if self
+            .agreements
+            .read()
+            .unwrap_or_else(|poisoned| {
+                warn!("Agreements lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .contains_key(&agreement_id)
+        {
             return Err(FederationError::ClearingAgreementExists(
                 agreement.coop_a.clone(),
                 agreement.coop_b.clone(),
@@ -139,10 +148,14 @@ impl ClearingManager {
 
         // Metrics
         metrics::clearing::agreements_created_inc(&agreement.coop_a, &agreement.coop_b);
-        let count = self.agreements.read().unwrap_or_else(|poisoned| {
-            warn!("Agreements lock poisoned, recovering");
-            poisoned.into_inner()
-        }).len();
+        let count = self
+            .agreements
+            .read()
+            .unwrap_or_else(|poisoned| {
+                warn!("Agreements lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .len();
         metrics::clearing::agreements_active_set(count);
 
         info!("Created clearing agreement: {}", agreement_id);
@@ -178,18 +191,28 @@ impl ClearingManager {
 
     /// Get an agreement by ID
     pub fn get_agreement(&self, agreement_id: &str) -> Result<Option<BilateralClearingAgreement>> {
-        Ok(self.agreements.read().unwrap_or_else(|poisoned| {
-            warn!("Agreements lock poisoned, recovering");
-            poisoned.into_inner()
-        }).get(agreement_id).cloned())
+        Ok(self
+            .agreements
+            .read()
+            .unwrap_or_else(|poisoned| {
+                warn!("Agreements lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .get(agreement_id)
+            .cloned())
     }
 
     /// List all agreements
     pub fn list_agreements(&self) -> Vec<BilateralClearingAgreement> {
-        self.agreements.read().unwrap_or_else(|poisoned| {
-            warn!("Agreements lock poisoned, recovering");
-            poisoned.into_inner()
-        }).values().cloned().collect()
+        self.agreements
+            .read()
+            .unwrap_or_else(|poisoned| {
+                warn!("Agreements lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .values()
+            .cloned()
+            .collect()
     }
 
     /// Propose a cross-cooperative transfer

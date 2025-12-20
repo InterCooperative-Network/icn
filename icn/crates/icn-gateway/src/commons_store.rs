@@ -89,35 +89,49 @@ impl InMemoryCommonsStore {
 
     /// Get total entry count
     pub fn len(&self) -> usize {
-        self.data.read().unwrap_or_else(|poisoned| {
-            warn!("Data lock poisoned, recovering");
-            poisoned.into_inner()
-        }).len()
+        self.data
+            .read()
+            .unwrap_or_else(|poisoned| {
+                warn!("Data lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .len()
     }
 
     /// Check if empty
     pub fn is_empty(&self) -> bool {
-        self.data.read().unwrap_or_else(|poisoned| {
-            warn!("Data lock poisoned, recovering");
-            poisoned.into_inner()
-        }).is_empty()
+        self.data
+            .read()
+            .unwrap_or_else(|poisoned| {
+                warn!("Data lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .is_empty()
     }
 
     /// Clear all data
     pub fn clear(&self) {
-        self.data.write().unwrap_or_else(|poisoned| {
-            warn!("Data lock poisoned, recovering");
-            poisoned.into_inner()
-        }).clear();
+        self.data
+            .write()
+            .unwrap_or_else(|poisoned| {
+                warn!("Data lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .clear();
     }
 }
 
 impl CommonsStoreBackend for InMemoryCommonsStore {
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
-        Ok(self.data.read().unwrap_or_else(|poisoned| {
-            warn!("Data lock poisoned, recovering");
-            poisoned.into_inner()
-        }).get(key).cloned())
+        Ok(self
+            .data
+            .read()
+            .unwrap_or_else(|poisoned| {
+                warn!("Data lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .get(key)
+            .cloned())
     }
 
     fn put(&self, key: &[u8], value: &[u8]) -> Result<()> {
@@ -132,10 +146,13 @@ impl CommonsStoreBackend for InMemoryCommonsStore {
     }
 
     fn delete(&self, key: &[u8]) -> Result<()> {
-        self.data.write().unwrap_or_else(|poisoned| {
-            warn!("Data lock poisoned, recovering");
-            poisoned.into_inner()
-        }).remove(key);
+        self.data
+            .write()
+            .unwrap_or_else(|poisoned| {
+                warn!("Data lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .remove(key);
         Ok(())
     }
 
@@ -357,10 +374,15 @@ impl<S: CommonsStoreBackend> CommonsStore<S> {
     /// Get a PersonhoodAnchor by ID
     pub fn get_anchor(&self, id: &str) -> Result<Option<PersonhoodAnchor>> {
         // Check cache
-        if let Some(cached) = self.anchor_cache.write().unwrap_or_else(|poisoned| {
-            warn!("Anchor cache lock poisoned, recovering");
-            poisoned.into_inner()
-        }).get(id) {
+        if let Some(cached) = self
+            .anchor_cache
+            .write()
+            .unwrap_or_else(|poisoned| {
+                warn!("Anchor cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .get(id)
+        {
             return Ok(Some(cached.clone()));
         }
 
@@ -414,10 +436,13 @@ impl<S: CommonsStoreBackend> CommonsStore<S> {
             self.store.delete(&did_key)?;
 
             // Remove from cache
-            self.anchor_cache.write().unwrap_or_else(|poisoned| {
-                warn!("Anchor cache lock poisoned, recovering");
-                poisoned.into_inner()
-            }).pop(id);
+            self.anchor_cache
+                .write()
+                .unwrap_or_else(|poisoned| {
+                    warn!("Anchor cache lock poisoned, recovering");
+                    poisoned.into_inner()
+                })
+                .pop(id);
 
             debug!("Deleted anchor: {}", id);
             return Ok(true);
@@ -481,10 +506,15 @@ impl<S: CommonsStoreBackend> CommonsStore<S> {
     /// Get a CommonsHolderRecord by ID
     pub fn get_holder(&self, id: &str) -> Result<Option<CommonsHolderRecord>> {
         // Check cache
-        if let Some(cached) = self.holder_cache.write().unwrap_or_else(|poisoned| {
-            warn!("Holder cache lock poisoned, recovering");
-            poisoned.into_inner()
-        }).get(id) {
+        if let Some(cached) = self
+            .holder_cache
+            .write()
+            .unwrap_or_else(|poisoned| {
+                warn!("Holder cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .get(id)
+        {
             return Ok(Some(cached.clone()));
         }
 
@@ -543,10 +573,13 @@ impl<S: CommonsStoreBackend> CommonsStore<S> {
             self.store.delete(&anchor_key)?;
 
             // Remove from cache
-            self.holder_cache.write().unwrap_or_else(|poisoned| {
-                warn!("Holder cache lock poisoned, recovering");
-                poisoned.into_inner()
-            }).pop(id);
+            self.holder_cache
+                .write()
+                .unwrap_or_else(|poisoned| {
+                    warn!("Holder cache lock poisoned, recovering");
+                    poisoned.into_inner()
+                })
+                .pop(id);
 
             debug!("Deleted holder: {}", id);
             return Ok(true);
@@ -607,10 +640,15 @@ impl<S: CommonsStoreBackend> CommonsStore<S> {
     /// Get a Charter by ID
     pub fn get_charter(&self, id: &str) -> Result<Option<Charter>> {
         // Check cache
-        if let Some(cached) = self.charter_cache.write().unwrap_or_else(|poisoned| {
-            warn!("Charter cache lock poisoned, recovering");
-            poisoned.into_inner()
-        }).get(id) {
+        if let Some(cached) = self
+            .charter_cache
+            .write()
+            .unwrap_or_else(|poisoned| {
+                warn!("Charter cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .get(id)
+        {
             return Ok(Some(cached.clone()));
         }
 
@@ -692,10 +730,15 @@ impl<S: CommonsStoreBackend> CommonsStore<S> {
     /// Get a StewardRecord by ID
     pub fn get_steward(&self, id: &str) -> Result<Option<StewardRecord>> {
         // Check cache
-        if let Some(cached) = self.steward_cache.write().unwrap_or_else(|poisoned| {
-            warn!("Steward cache lock poisoned, recovering");
-            poisoned.into_inner()
-        }).get(id) {
+        if let Some(cached) = self
+            .steward_cache
+            .write()
+            .unwrap_or_else(|poisoned| {
+                warn!("Steward cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .get(id)
+        {
             return Ok(Some(cached.clone()));
         }
 
@@ -769,10 +812,15 @@ impl<S: CommonsStoreBackend> CommonsStore<S> {
 
     /// Get an Amendment by ID
     pub fn get_amendment(&self, id: &str) -> Result<Option<Amendment>> {
-        if let Some(cached) = self.amendment_cache.write().unwrap_or_else(|poisoned| {
-            warn!("Amendment cache lock poisoned, recovering");
-            poisoned.into_inner()
-        }).get(id) {
+        if let Some(cached) = self
+            .amendment_cache
+            .write()
+            .unwrap_or_else(|poisoned| {
+                warn!("Amendment cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .get(id)
+        {
             return Ok(Some(cached.clone()));
         }
 
@@ -832,10 +880,15 @@ impl<S: CommonsStoreBackend> CommonsStore<S> {
 
     /// Get an Appeal by ID
     pub fn get_appeal(&self, id: &str) -> Result<Option<Appeal>> {
-        if let Some(cached) = self.appeal_cache.write().unwrap_or_else(|poisoned| {
-            warn!("Appeal cache lock poisoned, recovering");
-            poisoned.into_inner()
-        }).get(id) {
+        if let Some(cached) = self
+            .appeal_cache
+            .write()
+            .unwrap_or_else(|poisoned| {
+                warn!("Appeal cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .get(id)
+        {
             return Ok(Some(cached.clone()));
         }
 
@@ -915,38 +968,62 @@ impl<S: CommonsStoreBackend> CommonsStore<S> {
 
     /// Clear all caches
     pub fn clear_caches(&self) {
-        self.anchor_cache.write().unwrap_or_else(|poisoned| {
-            warn!("Anchor cache lock poisoned, recovering");
-            poisoned.into_inner()
-        }).clear();
-        self.holder_cache.write().unwrap_or_else(|poisoned| {
-            warn!("Holder cache lock poisoned, recovering");
-            poisoned.into_inner()
-        }).clear();
-        self.charter_cache.write().unwrap_or_else(|poisoned| {
-            warn!("Charter cache lock poisoned, recovering");
-            poisoned.into_inner()
-        }).clear();
-        self.steward_cache.write().unwrap_or_else(|poisoned| {
-            warn!("Steward cache lock poisoned, recovering");
-            poisoned.into_inner()
-        }).clear();
-        self.amendment_cache.write().unwrap_or_else(|poisoned| {
-            warn!("Amendment cache lock poisoned, recovering");
-            poisoned.into_inner()
-        }).clear();
-        self.appeal_cache.write().unwrap_or_else(|poisoned| {
-            warn!("Appeal cache lock poisoned, recovering");
-            poisoned.into_inner()
-        }).clear();
-        self.ceremony_cache.write().unwrap_or_else(|poisoned| {
-            warn!("Ceremony cache lock poisoned, recovering");
-            poisoned.into_inner()
-        }).clear();
-        self.enrollment_session_cache.write().unwrap_or_else(|poisoned| {
-            warn!("Enrollment session cache lock poisoned, recovering");
-            poisoned.into_inner()
-        }).clear();
+        self.anchor_cache
+            .write()
+            .unwrap_or_else(|poisoned| {
+                warn!("Anchor cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .clear();
+        self.holder_cache
+            .write()
+            .unwrap_or_else(|poisoned| {
+                warn!("Holder cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .clear();
+        self.charter_cache
+            .write()
+            .unwrap_or_else(|poisoned| {
+                warn!("Charter cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .clear();
+        self.steward_cache
+            .write()
+            .unwrap_or_else(|poisoned| {
+                warn!("Steward cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .clear();
+        self.amendment_cache
+            .write()
+            .unwrap_or_else(|poisoned| {
+                warn!("Amendment cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .clear();
+        self.appeal_cache
+            .write()
+            .unwrap_or_else(|poisoned| {
+                warn!("Appeal cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .clear();
+        self.ceremony_cache
+            .write()
+            .unwrap_or_else(|poisoned| {
+                warn!("Ceremony cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .clear();
+        self.enrollment_session_cache
+            .write()
+            .unwrap_or_else(|poisoned| {
+                warn!("Enrollment session cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .clear();
     }
 
     // ========================================================================
@@ -980,10 +1057,15 @@ impl<S: CommonsStoreBackend> CommonsStore<S> {
         &self,
         id: &str,
     ) -> Result<Option<crate::api::sdis::enrollment::EnrollmentCeremony>> {
-        if let Some(cached) = self.ceremony_cache.write().unwrap_or_else(|poisoned| {
-            warn!("Ceremony cache lock poisoned, recovering");
-            poisoned.into_inner()
-        }).get(id) {
+        if let Some(cached) = self
+            .ceremony_cache
+            .write()
+            .unwrap_or_else(|poisoned| {
+                warn!("Ceremony cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .get(id)
+        {
             return Ok(Some(cached.clone()));
         }
 
@@ -1018,10 +1100,13 @@ impl<S: CommonsStoreBackend> CommonsStore<S> {
         let key = Self::make_key(CEREMONY_PREFIX, id);
         if self.store.exists(&key)? {
             self.store.delete(&key)?;
-            self.ceremony_cache.write().unwrap_or_else(|poisoned| {
-                warn!("Ceremony cache lock poisoned, recovering");
-                poisoned.into_inner()
-            }).pop(id);
+            self.ceremony_cache
+                .write()
+                .unwrap_or_else(|poisoned| {
+                    warn!("Ceremony cache lock poisoned, recovering");
+                    poisoned.into_inner()
+                })
+                .pop(id);
             debug!("Deleted ceremony: {}", id);
             return Ok(true);
         }
@@ -1081,10 +1166,15 @@ impl<S: CommonsStoreBackend> CommonsStore<S> {
         &self,
         id: &str,
     ) -> Result<Option<crate::api::sdis::simple_enrollment::EnrollmentSession>> {
-        if let Some(cached) = self.enrollment_session_cache.write().unwrap_or_else(|poisoned| {
-            warn!("Enrollment session cache lock poisoned, recovering");
-            poisoned.into_inner()
-        }).get(id) {
+        if let Some(cached) = self
+            .enrollment_session_cache
+            .write()
+            .unwrap_or_else(|poisoned| {
+                warn!("Enrollment session cache lock poisoned, recovering");
+                poisoned.into_inner()
+            })
+            .get(id)
+        {
             return Ok(Some(cached.clone()));
         }
 
@@ -1119,10 +1209,13 @@ impl<S: CommonsStoreBackend> CommonsStore<S> {
         let key = Self::make_key(ENROLLMENT_SESSION_PREFIX, id);
         if self.store.exists(&key)? {
             self.store.delete(&key)?;
-            self.enrollment_session_cache.write().unwrap_or_else(|poisoned| {
-                warn!("Enrollment session cache lock poisoned, recovering");
-                poisoned.into_inner()
-            }).pop(id);
+            self.enrollment_session_cache
+                .write()
+                .unwrap_or_else(|poisoned| {
+                    warn!("Enrollment session cache lock poisoned, recovering");
+                    poisoned.into_inner()
+                })
+                .pop(id);
             debug!("Deleted enrollment session: {}", id);
             return Ok(true);
         }
