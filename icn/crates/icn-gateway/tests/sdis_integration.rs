@@ -397,7 +397,7 @@ async fn test_level2_verification_api() {
     let qr_data = encode_for_qr(&proof).unwrap();
     let qr_b64 = base64::engine::general_purpose::STANDARD.encode(&qr_data);
 
-    let binding_bytes = bincode::serialize(&binding).unwrap();
+    let binding_bytes = bincode::serde::encode_to_vec(&binding, bincode::config::legacy()).unwrap();
     let binding_b64 = base64::engine::general_purpose::STANDARD.encode(&binding_bytes);
 
     let req = actix_web::test::TestRequest::post()
@@ -585,8 +585,10 @@ fn test_binding_serialization() {
     );
 
     // Serialize and deserialize
-    let serialized = bincode::serialize(&binding).unwrap();
-    let deserialized: EphemeralBinding = bincode::deserialize(&serialized).unwrap();
+    let serialized = bincode::serde::encode_to_vec(&binding, bincode::config::legacy()).unwrap();
+    let deserialized: EphemeralBinding = bincode::serde::decode_from_slice(&serialized, bincode::config::legacy())
+        .map(|(v, _)| v)
+        .unwrap();
 
     // Should still match the proof
     assert!(deserialized.matches_proof(&proof));

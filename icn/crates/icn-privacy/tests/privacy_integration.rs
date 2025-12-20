@@ -501,7 +501,7 @@ fn test_combined_topic_encryption_with_obfuscation() {
     let encrypted_topic = encryptor.encrypt(topic).unwrap();
 
     // Serialize encrypted topic for transmission
-    let serialized = bincode::serialize(&encrypted_topic).unwrap();
+    let serialized = bincode::serde::encode_to_vec(&encrypted_topic, bincode::config::legacy()).unwrap();
 
     // Pad the serialized data
     let padded = obfuscator.pad_message(&serialized).unwrap();
@@ -515,7 +515,9 @@ fn test_combined_topic_encryption_with_obfuscation() {
     let unpadded = obfuscator.unpad_message(&padded).unwrap();
 
     // Deserialize
-    let received_encrypted: icn_privacy::EncryptedTopic = bincode::deserialize(&unpadded).unwrap();
+    let received_encrypted: icn_privacy::EncryptedTopic = bincode::serde::decode_from_slice(&unpadded, bincode::config::legacy())
+        .map(|(v, _)| v)
+        .unwrap();
 
     // Decrypt
     let decrypted = encryptor.decrypt(&received_encrypted).unwrap();

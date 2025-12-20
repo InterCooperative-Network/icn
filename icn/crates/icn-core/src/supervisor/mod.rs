@@ -1270,7 +1270,8 @@ impl Supervisor {
                                 }
                             };
 
-                            match bincode::deserialize::<icn_snapshot::SnapshotMessage>(&entry_data)
+                            match bincode::serde::decode_from_slice::<icn_snapshot::SnapshotMessage, _>(&entry_data, bincode::config::legacy())
+                                .map(|(v, _)| v)
                             {
                                 Ok(snapshot_msg) => {
                                     let coordinator =
@@ -1289,8 +1290,9 @@ impl Supervisor {
                                             Ok(response_msgs) => {
                                                 // Broadcast any response messages
                                                 for response_msg in response_msgs {
-                                                    let response_bytes = match bincode::serialize(
+                                                    let response_bytes = match bincode::serde::encode_to_vec(
                                                         &response_msg,
+                                                        bincode::config::legacy(),
                                                     ) {
                                                         Ok(bytes) => bytes,
                                                         Err(e) => {
@@ -1340,7 +1342,8 @@ impl Supervisor {
                                 }
                             };
 
-                            match bincode::deserialize::<icn_compute::ComputeMessage>(&entry_data) {
+                            match bincode::serde::decode_from_slice::<icn_compute::ComputeMessage, _>(&entry_data, bincode::config::legacy())
+                                .map(|(v, _)| v) {
                                 Ok(compute_msg) => {
                                     let compute_holder = compute_handle_for_notifications.clone();
                                     tokio::spawn(async move {
@@ -1367,7 +1370,8 @@ impl Supervisor {
                                 }
                             };
 
-                            match bincode::deserialize::<icn_ccl::DisputeMessage>(&entry_data) {
+                            match bincode::serde::decode_from_slice::<icn_ccl::DisputeMessage, _>(&entry_data, bincode::config::legacy())
+                                .map(|(v, _)| v) {
                                 Ok(dispute_msg) => {
                                     let dispute_holder = dispute_handle_for_notifications.clone();
                                     tokio::spawn(async move {
@@ -1531,7 +1535,8 @@ impl Supervisor {
 
                             tokio::spawn(async move {
                                 // Deserialize cooperative from gossip
-                                match bincode::deserialize::<icn_coop::Cooperative>(&entry_data) {
+                                match bincode::serde::decode_from_slice::<icn_coop::Cooperative, _>(&entry_data, bincode::config::legacy())
+                                    .map(|(v, _)| v) {
                                     Ok(coop) => {
                                         // Check if we already have this coop (avoid overwriting local changes)
                                         let existing = coop_store.get_cooperative(&coop.id);
@@ -2620,79 +2625,79 @@ impl Supervisor {
                 tokio::spawn(async move {
                     let (topic, data) = match &compute_msg {
                         icn_compute::ComputeMessage::TaskSubmitted(_) => {
-                            (icn_compute::TOPIC_SUBMIT, bincode::serialize(&compute_msg))
+                            (icn_compute::TOPIC_SUBMIT, bincode::serde::encode_to_vec(&compute_msg, bincode::config::legacy()))
                         }
                         icn_compute::ComputeMessage::TaskClaimed { .. } => {
-                            (icn_compute::TOPIC_CLAIM, bincode::serialize(&compute_msg))
+                            (icn_compute::TOPIC_CLAIM, bincode::serde::encode_to_vec(&compute_msg, bincode::config::legacy()))
                         }
                         icn_compute::ComputeMessage::TaskResult(_) => {
-                            (icn_compute::TOPIC_RESULT, bincode::serialize(&compute_msg))
+                            (icn_compute::TOPIC_RESULT, bincode::serde::encode_to_vec(&compute_msg, bincode::config::legacy()))
                         }
                         icn_compute::ComputeMessage::TaskCancelled { .. } => {
-                            (icn_compute::TOPIC_CANCEL, bincode::serialize(&compute_msg))
+                            (icn_compute::TOPIC_CANCEL, bincode::serde::encode_to_vec(&compute_msg, bincode::config::legacy()))
                         }
                         icn_compute::ComputeMessage::ExecutorAnnounce { .. } => {
-                            (icn_compute::TOPIC_SUBMIT, bincode::serialize(&compute_msg))
+                            (icn_compute::TOPIC_SUBMIT, bincode::serde::encode_to_vec(&compute_msg, bincode::config::legacy()))
                         }
                         icn_compute::ComputeMessage::PlacementRequest { .. } => {
                             // Phase 16B: Broadcast placement requests for executor bidding
-                            (icn_compute::TOPIC_SUBMIT, bincode::serialize(&compute_msg))
+                            (icn_compute::TOPIC_SUBMIT, bincode::serde::encode_to_vec(&compute_msg, bincode::config::legacy()))
                         }
                         icn_compute::ComputeMessage::PlacementOffer { .. } => {
                             // Phase 16B: Broadcast placement offers (executor bids)
-                            (icn_compute::TOPIC_CLAIM, bincode::serialize(&compute_msg))
+                            (icn_compute::TOPIC_CLAIM, bincode::serde::encode_to_vec(&compute_msg, bincode::config::legacy()))
                         }
                         icn_compute::ComputeMessage::NodeCapacityAnnounce { .. } => {
                             // Phase 16B: Broadcast capacity updates
-                            (icn_compute::TOPIC_SUBMIT, bincode::serialize(&compute_msg))
+                            (icn_compute::TOPIC_SUBMIT, bincode::serde::encode_to_vec(&compute_msg, bincode::config::legacy()))
                         }
                         icn_compute::ComputeMessage::CheckpointQuery { .. } => {
                             // Phase 16D: Checkpoint query for migration
                             (
                                 icn_compute::TOPIC_CHECKPOINT,
-                                bincode::serialize(&compute_msg),
+                                bincode::serde::encode_to_vec(&compute_msg, bincode::config::legacy()),
                             )
                         }
                         icn_compute::ComputeMessage::CheckpointResponse { .. } => {
                             // Phase 16D: Checkpoint response for migration
                             (
                                 icn_compute::TOPIC_CHECKPOINT,
-                                bincode::serialize(&compute_msg),
+                                bincode::serde::encode_to_vec(&compute_msg, bincode::config::legacy()),
                             )
                         }
                         icn_compute::ComputeMessage::MigrationRequest { .. } => {
                             // Phase 16D: Migration request
                             (
                                 icn_compute::TOPIC_MIGRATION,
-                                bincode::serialize(&compute_msg),
+                                bincode::serde::encode_to_vec(&compute_msg, bincode::config::legacy()),
                             )
                         }
                         icn_compute::ComputeMessage::MigrationAccept { .. } => {
                             // Phase 16D: Migration acceptance
                             (
                                 icn_compute::TOPIC_MIGRATION,
-                                bincode::serialize(&compute_msg),
+                                bincode::serde::encode_to_vec(&compute_msg, bincode::config::legacy()),
                             )
                         }
                         icn_compute::ComputeMessage::CheckpointAnnounce { .. } => {
                             // Phase 16D: Checkpoint announcement
                             (
                                 icn_compute::TOPIC_CHECKPOINT,
-                                bincode::serialize(&compute_msg),
+                                bincode::serde::encode_to_vec(&compute_msg, bincode::config::legacy()),
                             )
                         }
                         icn_compute::ComputeMessage::MigrationReject { .. } => {
                             // Phase 16D: Migration rejection
                             (
                                 icn_compute::TOPIC_MIGRATION,
-                                bincode::serialize(&compute_msg),
+                                bincode::serde::encode_to_vec(&compute_msg, bincode::config::legacy()),
                             )
                         }
                         icn_compute::ComputeMessage::MigrationComplete { .. } => {
                             // Phase 16D: Migration completion
                             (
                                 icn_compute::TOPIC_MIGRATION,
-                                bincode::serialize(&compute_msg),
+                                bincode::serde::encode_to_vec(&compute_msg, bincode::config::legacy()),
                             )
                         }
                     };
@@ -3110,7 +3115,7 @@ impl Supervisor {
                             };
 
                             // Serialize message
-                            let data = match bincode::serialize(&steward_msg) {
+                            let data = match bincode::serde::encode_to_vec(&steward_msg, bincode::config::legacy()) {
                                 Ok(d) => d,
                                 Err(e) => {
                                     warn!("Failed to serialize steward message: {}", e);
@@ -3184,9 +3189,10 @@ impl Supervisor {
                                         }
 
                                         // Parse steward message
-                                        match bincode::deserialize::<icn_steward::StewardMessage>(
+                                        match bincode::serde::decode_from_slice::<icn_steward::StewardMessage, _>(
                                             &data,
-                                        ) {
+                                            bincode::config::legacy(),
+                                        ).map(|(v, _)| v) {
                                             Ok(msg) => {
                                                 debug!(
                                                     "Received steward message on topic {}: {:?}",

@@ -299,7 +299,8 @@ impl CheckpointBackend for SledCheckpointBackend {
     fn store(&self, checkpoint: &ActorCheckpoint) -> Result<(), String> {
         let key = checkpoint.actor_id;
         let value =
-            bincode::serialize(checkpoint).map_err(|e| format!("Serialization error: {e}"))?;
+            bincode::serde::encode_to_vec(checkpoint, bincode::config::legacy())
+                .map_err(|e| format!("Serialization error: {e}"))?;
 
         self.db
             .insert(key, value)
@@ -320,7 +321,9 @@ impl CheckpointBackend for SledCheckpointBackend {
 
         if let Some(bytes) = value {
             let checkpoint: ActorCheckpoint =
-                bincode::deserialize(&bytes).map_err(|e| format!("Deserialization error: {e}"))?;
+                bincode::serde::decode_from_slice(&bytes, bincode::config::legacy())
+                    .map(|(v, _)| v)
+                    .map_err(|e| format!("Deserialization error: {e}"))?;
             Ok(Some(checkpoint))
         } else {
             Ok(None)

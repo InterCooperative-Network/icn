@@ -497,7 +497,8 @@ impl SnapshotCoordinator {
         let snapshot = StateSnapshot::new();
 
         // Serialize to bytes
-        bincode::serialize(&snapshot).context("Failed to serialize state snapshot")
+        bincode::serde::encode_to_vec(&snapshot, bincode::config::legacy())
+            .context("Failed to serialize state snapshot")
     }
 
     /// Hash state bytes

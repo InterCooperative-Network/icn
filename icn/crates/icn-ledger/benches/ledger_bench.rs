@@ -45,13 +45,13 @@ fn bench_entry_serialization(c: &mut Criterion) {
     };
 
     group.bench_function("serialize", |b| {
-        b.iter(|| bincode::serialize(black_box(&entry)).unwrap());
+        b.iter(|| bincode::serde::encode_to_vec(black_box(&entry), bincode::config::legacy()).unwrap());
     });
 
-    let serialized = bincode::serialize(&entry).unwrap();
+    let serialized = bincode::serde::encode_to_vec(&entry, bincode::config::legacy()).unwrap();
 
     group.bench_function("deserialize", |b| {
-        b.iter(|| bincode::deserialize::<Entry>(black_box(&serialized)).unwrap());
+        b.iter(|| bincode::serde::decode_from_slice::<Entry, _>(black_box(&serialized), bincode::config::legacy()).unwrap());
     });
 
     group.finish();

@@ -160,7 +160,9 @@ impl SignedEnvelope {
 
     /// Deserialize payload as the specified type
     pub fn decode_payload<T: serde::de::DeserializeOwned>(&self) -> Result<T> {
-        bincode::deserialize(&self.payload).context("Failed to deserialize payload")
+        bincode::serde::decode_from_slice(&self.payload, bincode::config::legacy())
+            .map(|(v, _)| v)
+            .context("Failed to deserialize payload")
     }
 
     /// Serialize and create envelope for a typed payload
@@ -171,7 +173,8 @@ impl SignedEnvelope {
         payload_type: PayloadType,
         payload: &T,
     ) -> Result<Self> {
-        let payload_bytes = bincode::serialize(payload).context("Failed to serialize payload")?;
+        let payload_bytes = bincode::serde::encode_to_vec(payload, bincode::config::legacy())
+            .context("Failed to serialize payload")?;
         Self::new(from, keypair, sequence, payload_type, payload_bytes)
     }
 }

@@ -100,12 +100,15 @@ impl HybridSignatureOrClassical {
 
     /// Convert to bytes for serialization
     pub fn to_bytes(&self) -> Vec<u8> {
-        bincode::serialize(self).expect("Failed to serialize signature")
+        bincode::serde::encode_to_vec(self, bincode::config::legacy())
+            .expect("Failed to serialize signature")
     }
 
     /// Parse from bytes
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        bincode::deserialize(bytes).map_err(|e| anyhow::anyhow!("Failed to parse signature: {e}"))
+        bincode::serde::decode_from_slice(bytes, bincode::config::legacy())
+            .map(|(v, _)| v)
+            .map_err(|e| anyhow::anyhow!("Failed to parse signature: {e}"))
     }
 }
 

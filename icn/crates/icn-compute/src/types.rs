@@ -88,7 +88,7 @@ pub struct ComputeTask {
 impl ComputeTask {
     /// Compute the task hash
     pub fn hash(&self) -> TaskHash {
-        let bytes = bincode::serialize(self).unwrap_or_default();
+        let bytes = bincode::serde::encode_to_vec(self, bincode::config::legacy()).unwrap_or_default();
         *blake3::hash(&bytes).as_bytes()
     }
 
@@ -483,8 +483,10 @@ mod tests {
             task_hash: [0u8; 32],
             executor: "did:icn:bob".into(),
         };
-        let bytes = bincode::serialize(&msg).unwrap();
-        let decoded: ComputeMessage = bincode::deserialize(&bytes).unwrap();
+        let bytes = bincode::serde::encode_to_vec(&msg, bincode::config::legacy()).unwrap();
+        let decoded: ComputeMessage = bincode::serde::decode_from_slice(&bytes, bincode::config::legacy())
+            .map(|(v, _)| v)
+            .unwrap();
 
         // Verify correct variant and executor
         assert!(

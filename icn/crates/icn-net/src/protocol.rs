@@ -352,7 +352,8 @@ impl NetworkMessage {
 
     /// Serialize to bytes using bincode
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
-        let bytes = bincode::serialize(self).context("Failed to serialize network message")?;
+        let bytes = bincode::serde::encode_to_vec(self, bincode::config::legacy())
+            .context("Failed to serialize network message")?;
 
         if bytes.len() > MAX_MESSAGE_SIZE {
             anyhow::bail!(
@@ -376,7 +377,9 @@ impl NetworkMessage {
         }
 
         let msg: NetworkMessage =
-            bincode::deserialize(bytes).context("Failed to deserialize network message")?;
+            bincode::serde::decode_from_slice(bytes, bincode::config::legacy())
+                .map(|(v, _)| v)
+                .context("Failed to deserialize network message")?;
 
         // Validate protocol version
         Self::validate_version(msg.version)?;
@@ -679,7 +682,7 @@ mod tests {
         msg.version = MAX_SUPPORTED_VERSION + 1;
 
         // Serialize it
-        let bytes = bincode::serialize(&msg).unwrap();
+        let bytes = bincode::serde::encode_to_vec(&msg, bincode::config::legacy()).unwrap();
 
         // Deserialization should fail due to version check
         let result = NetworkMessage::from_bytes(&bytes);

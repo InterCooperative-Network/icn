@@ -32,7 +32,7 @@ rand_core = "0.6"
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
-bincode = "1.3"
+bincode = { version = "2.0", features = ["serde"] }
 
 # Security
 zeroize = { version = "1.7", features = ["derive"] }

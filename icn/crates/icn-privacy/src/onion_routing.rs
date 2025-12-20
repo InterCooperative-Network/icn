@@ -169,7 +169,7 @@ impl OnionRouter {
         let final_content = LayerContent::Final {
             payload: payload.to_vec(),
         };
-        let final_bytes = bincode::serialize(&final_content)
+        let final_bytes = bincode::serde::encode_to_vec(&final_content, bincode::config::legacy())
             .map_err(|e| PrivacyError::OnionRoutingError(format!("Serialization failed: {e}")))?;
 
         // Get recipient's public key
@@ -197,7 +197,7 @@ impl OnionRouter {
                 inner_layer: Box::new(current_layer),
             };
 
-            let relay_bytes = bincode::serialize(&relay_content).map_err(|e| {
+            let relay_bytes = bincode::serde::encode_to_vec(&relay_content, bincode::config::legacy()).map_err(|e| {
                 PrivacyError::OnionRoutingError(format!("Serialization failed: {e}"))
             })?;
 
@@ -238,7 +238,8 @@ impl OnionRouter {
         let decrypted = self.decrypt_layer(current_layer)?;
 
         // Deserialize to determine if relay or final
-        let content: LayerContent = bincode::deserialize(&decrypted)
+        let content: LayerContent = bincode::serde::decode_from_slice(&decrypted, bincode::config::legacy())
+            .map(|(v, _)| v)
             .map_err(|e| PrivacyError::OnionRoutingError(format!("Deserialization failed: {e}")))?;
 
         icn_obs::metrics::privacy::onion_hops_forwarded_inc();
@@ -272,7 +273,8 @@ impl OnionRouter {
         let current_layer = &onion.layers[0];
         let decrypted = self.decrypt_layer(current_layer)?;
 
-        let content: LayerContent = bincode::deserialize(&decrypted)
+        let content: LayerContent = bincode::serde::decode_from_slice(&decrypted, bincode::config::legacy())
+            .map(|(v, _)| v)
             .map_err(|e| PrivacyError::OnionRoutingError(format!("Deserialization failed: {e}")))?;
 
         match content {

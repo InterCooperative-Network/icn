@@ -44,7 +44,7 @@ pub enum CoopError {
     Storage(#[from] sled::Error),
 
     #[error("Serialization error: {0}")]
-    Serialization(#[from] bincode::Error),
+    Serialization(String),
 
     #[error("Governance error: {0}")]
     Governance(String),
@@ -54,3 +54,15 @@ pub enum CoopError {
 }
 
 pub type Result<T> = std::result::Result<T, CoopError>;
+
+impl From<bincode::error::EncodeError> for CoopError {
+    fn from(e: bincode::error::EncodeError) -> Self {
+        CoopError::Serialization(e.to_string())
+    }
+}
+
+impl From<bincode::error::DecodeError> for CoopError {
+    fn from(e: bincode::error::DecodeError) -> Self {
+        CoopError::Serialization(e.to_string())
+    }
+}

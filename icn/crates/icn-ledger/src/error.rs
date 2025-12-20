@@ -80,8 +80,14 @@ impl From<serde_json::Error> for LedgerError {
     }
 }
 
-impl From<bincode::Error> for LedgerError {
-    fn from(e: bincode::Error) -> Self {
+impl From<bincode::error::EncodeError> for LedgerError {
+    fn from(e: bincode::error::EncodeError) -> Self {
+        LedgerError::Serialization(e.to_string())
+    }
+}
+
+impl From<bincode::error::DecodeError> for LedgerError {
+    fn from(e: bincode::error::DecodeError) -> Self {
         LedgerError::Serialization(e.to_string())
     }
 }

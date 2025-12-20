@@ -17,7 +17,7 @@ dirs = "5.0"
 ed25519-dalek.workspace = true
 async-trait = "0.1"
 hex = "0.4"
-bincode = "1.3"
+bincode = { version = "2.0", features = ["serde"] }
 
 # ICN crates
 icn-identity.workspace = true

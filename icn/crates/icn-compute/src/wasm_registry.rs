@@ -233,7 +233,7 @@ impl WasmRegistry {
                 .map_err(|e| WasmRegistryError::StorageError(e.to_string()))?;
 
             let meta_key = format!("wasm_meta:{hash_hex}");
-            let meta_bytes = bincode::serialize(&metadata)
+            let meta_bytes = bincode::serde::encode_to_vec(&metadata, bincode::config::legacy())
                 .map_err(|e| WasmRegistryError::SerializationError(e.to_string()))?;
             store
                 .insert(meta_key.as_bytes(), meta_bytes)
@@ -340,7 +340,8 @@ impl WasmRegistry {
                 .get(key.as_bytes())
                 .map_err(|e| WasmRegistryError::StorageError(e.to_string()))?
             {
-                let meta: WasmMetadata = bincode::deserialize(&bytes)
+                let meta: WasmMetadata = bincode::serde::decode_from_slice(&bytes, bincode::config::legacy())
+                    .map(|(v, _)| v)
                     .map_err(|e| WasmRegistryError::SerializationError(e.to_string()))?;
 
                 // Populate cache
@@ -470,7 +471,7 @@ impl WasmRegistry {
                         // Also load metadata
                         let meta_key = format!("wasm_meta:{hash_hex}");
                         if let Ok(Some(meta_bytes)) = store.get(meta_key.as_bytes()) {
-                            if let Ok(meta) = bincode::deserialize::<WasmMetadata>(&meta_bytes) {
+                            if let Ok((meta, _)) = bincode::serde::decode_from_slice::<WasmMetadata, _>(&meta_bytes, bincode::config::legacy()) {
                                 let mut metadata = self.metadata.write().map_err(|e| {
                                     WasmRegistryError::StorageError(format!("Lock poisoned: {e}"))
                                 })?;

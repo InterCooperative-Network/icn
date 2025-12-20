@@ -81,8 +81,14 @@ pub enum ComputeError {
     LockError,
 }
 
-impl From<bincode::Error> for ComputeError {
-    fn from(e: bincode::Error) -> Self {
+impl From<bincode::error::EncodeError> for ComputeError {
+    fn from(e: bincode::error::EncodeError) -> Self {
+        ComputeError::Serialization(e.to_string())
+    }
+}
+
+impl From<bincode::error::DecodeError> for ComputeError {
+    fn from(e: bincode::error::DecodeError) -> Self {
         ComputeError::Serialization(e.to_string())
     }
 }
