@@ -4,6 +4,7 @@ pub mod background_tasks;
 pub mod init_compute;
 pub mod init_coop;
 pub mod init_gossip;
+pub mod init_governance;
 pub mod init_ledger;
 pub mod init_network;
 pub mod init_notifications;
@@ -15,7 +16,7 @@ pub mod shutdown;
 pub mod version_tracker;
 
 use anyhow::{bail, Context, Result};
-use icn_identity::{Did, IdentityBundle, IDENTITY_RECOVERY_TOPIC};
+use icn_identity::{Did, IdentityBundle};
 use icn_rpc::RpcServer;
 use icn_store::SledStore;
 use serde_json;
@@ -26,11 +27,8 @@ use tokio::task::JoinSet;
 use tracing::{debug, error, info, warn};
 
 use crate::config::Config;
-use crate::dead_letter::{DeadLetterQueue, FailedOperation, FailureType};
+use crate::dead_letter::{FailedOperation, FailureType};
 use crate::runtime::ShutdownTx;
-
-/// Gossip topic for NAT traversal connection candidate announcements
-const NETWORK_CANDIDATES_TOPIC: &str = "network:candidates";
 
 /// Parse bootstrap peer URL in format: icn://did:icn:PUBKEY@IP:PORT
 /// Returns (DID, SocketAddr) on success
@@ -566,71 +564,15 @@ impl Supervisor {
 
                 gossip.set_peer_sampling(peer_sampling_callback);
 
-                // Subscribe to trust attestations topic
-                if let Err(e) = gossip.subscribe(
-                    crate::trust_propagation::TRUST_ATTESTATIONS_TOPIC,
-                    did.clone(),
-                ) {
-                    warn!("Failed to subscribe to trust attestations topic: {}", e);
-                } else {
-                    info!("Subscribed to trust:attestations topic");
-                }
+                // Subscribe to standard gossip topics
+                init_gossip::subscribe_standard_topics(
+                    &mut gossip,
+                    &did,
+                    init_gossip::TopicSubscriptionConfig { federation_enabled },
+                );
 
-                // Subscribe to contracts:deploy topic with trust-gated access (min trust 0.4)
-                if let Err(e) = gossip.subscribe("contracts:deploy", did.clone()) {
-                    warn!("Failed to subscribe to contracts:deploy topic: {}", e);
-                } else {
-                    info!("Subscribed to contracts:deploy topic");
-                }
-
-                // Subscribe to identity:recovery topic for social recovery events
-                if let Err(e) = gossip.subscribe(IDENTITY_RECOVERY_TOPIC, did.clone()) {
-                    warn!("Failed to subscribe to identity:recovery topic: {}", e);
-                } else {
-                    info!("Subscribed to identity:recovery topic");
-                }
-
-                // Subscribe to network:candidates topic for NAT traversal peer discovery
-                if let Err(e) = gossip.subscribe(NETWORK_CANDIDATES_TOPIC, did.clone()) {
-                    warn!("Failed to subscribe to network:candidates topic: {}", e);
-                } else {
-                    info!("Subscribed to network:candidates topic");
-                }
-
-                // Subscribe to snapshot:coordinate topic for distributed snapshots
-                const SNAPSHOT_COORDINATE_TOPIC: &str = "snapshot:coordinate";
-                if let Err(e) = gossip.subscribe(SNAPSHOT_COORDINATE_TOPIC, did.clone()) {
-                    warn!("Failed to subscribe to snapshot:coordinate topic: {}", e);
-                } else {
-                    info!("Subscribed to snapshot:coordinate topic");
-                }
-
-                // Subscribe to federation topics if federation is enabled
+                // Spawn periodic federation announcement task (every 5 minutes) if enabled
                 if federation_enabled {
-                    if let Err(e) =
-                        gossip.subscribe(icn_federation::TOPIC_FEDERATION_REGISTRY, did.clone())
-                    {
-                        warn!("Failed to subscribe to federation:registry topic: {}", e);
-                    } else {
-                        info!("Subscribed to federation:registry topic");
-                    }
-
-                    if let Err(e) =
-                        gossip.subscribe(icn_federation::TOPIC_FEDERATION_TRUST, did.clone())
-                    {
-                        warn!("Failed to subscribe to federation:trust topic: {}", e);
-                    } else {
-                        info!("Subscribed to federation:trust topic");
-                    }
-
-                    if let Err(e) =
-                        gossip.subscribe(icn_federation::TOPIC_FEDERATION_CLEARING, did.clone())
-                    {
-                        warn!("Failed to subscribe to federation:clearing topic: {}", e);
-                    } else {
-                        info!("Subscribed to federation:clearing topic");
-                    }
-
                     // Spawn periodic federation announcement task (every 5 minutes)
                     if let Some(ref handler) = federation_handler_for_announce {
                         let handler_clone = handler.clone();
@@ -789,7 +731,7 @@ impl Supervisor {
                         match serde_json::to_vec(&candidate) {
                             Ok(candidate_bytes) => {
                                 let mut gossip = gossip_handle.write().await;
-                                match gossip.publish(NETWORK_CANDIDATES_TOPIC, candidate_bytes) {
+                                match gossip.publish(init_gossip::NETWORK_CANDIDATES_TOPIC, candidate_bytes) {
                                     Ok(_) => info!("✓ Published connection candidate to gossip"),
                                     Err(e) => {
                                         warn!("Failed to publish connection candidate: {}", e)
@@ -838,67 +780,23 @@ impl Supervisor {
             let event_bus = Arc::new(crate::events::EventBus::new());
             info!("Event bus created");
 
-            // Spawn Governance actor
-            let gov_store_path = self.config.store_path().join("governance");
-            let gov_store: Arc<dyn icn_store::Store> = Arc::new(SledStore::open(&gov_store_path)?);
-            let gov_resolver: Arc<dyn icn_governance::MembershipResolver + Send + Sync> =
-                Arc::new(icn_governance::StaticMembershipResolver::new());
-
-            // Create governance topic before spawning GovernanceActor
-            // (subscribe does not auto-create topics like publish does)
-            {
-                let mut gossip = gossip_handle.write().await;
-                gossip.create_topic(icn_gossip::Topic::new(
-                    "governance:proposal".to_string(),
-                    icn_gossip::AccessControl::Public,
-                ));
-            }
-
-            let governance_handle = crate::governance::GovernanceActor::spawn(
+            // Initialize governance services (governance actor, upgrade actor, dead-letter queue)
+            let governance_services = init_governance::init_governance_services(
+                &self.config,
                 did.clone(),
-                gov_store.clone(),
-                gossip_handle.clone(),
-                gov_resolver,
-                Some(event_bus.clone()),
+                init_governance::GovernanceDeps {
+                    gossip_handle: gossip_handle.clone(),
+                    event_bus: event_bus.clone(),
+                    shutdown_rx: self.shutdown_tx.subscribe(),
+                },
             )
             .await?;
 
-            info!("✓ Governance actor spawned at {}", gov_store_path.display());
-
-            // Spawn UpgradeActor for network-wide upgrade coordination
-            let current_version = icn_governance::proposal::Version::new(
-                crate::upgrade::CURRENT_VERSION.0,
-                crate::upgrade::CURRENT_VERSION.1,
-                crate::upgrade::CURRENT_VERSION.2,
-            );
-            let version_tracker = Arc::new(tokio::sync::RwLock::new(
-                crate::supervisor::version_tracker::VersionTracker::new(current_version.clone()),
-            ));
-            let version_string = format!(
-                "{}.{}.{}",
-                current_version.major, current_version.minor, current_version.patch
-            );
-            let _upgrade_handle = crate::upgrade_actor::UpgradeActor::spawn(
-                did.clone(),
-                version_string.clone(),
-                version_tracker.clone(),
-                gossip_handle.clone(),
-                self.shutdown_tx.subscribe(),
-            );
-            info!(
-                "✓ Upgrade coordinator spawned (version: {})",
-                version_string
-            );
-            icn_obs::metrics::supervisor::actor_spawned_inc("upgrade");
-
-            // Create dead-letter queue for failed operations recovery
-            let dlq_store_path = self.config.store_path().join("dead_letter");
-            let dlq_store = Arc::new(SledStore::open(&dlq_store_path)?);
-            let dead_letter_queue = Arc::new(DeadLetterQueue::new(dlq_store));
-            info!(
-                "✓ Dead-letter queue initialized at {}",
-                dlq_store_path.display()
-            );
+            let governance_handle = governance_services.governance_handle;
+            let _upgrade_handle = governance_services.upgrade_handle;
+            let _version_tracker = governance_services.version_tracker;
+            let dead_letter_queue = governance_services.dead_letter_queue;
+            let gov_store = governance_services.governance_store;
 
             // Subscribe to governance events for ledger execution
             // CRITICAL: Must store handle to keep subscription alive for daemon lifetime

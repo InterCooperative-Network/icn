@@ -160,6 +160,95 @@ pub async fn init_gossip_services(
     })
 }
 
+/// Gossip topic for NAT traversal connection candidate announcements
+pub const NETWORK_CANDIDATES_TOPIC: &str = "network:candidates";
+
+/// Gossip topic for distributed snapshot coordination
+pub const SNAPSHOT_COORDINATE_TOPIC: &str = "snapshot:coordinate";
+
+/// Standard topic subscription configuration
+pub struct TopicSubscriptionConfig {
+    /// Whether federation features are enabled
+    pub federation_enabled: bool,
+}
+
+/// Subscribe to standard gossip topics
+///
+/// Subscribes to core topics required for ICN operation:
+/// - trust:attestations - Trust graph updates
+/// - contracts:deploy - Contract deployment messages
+/// - identity:recovery - Social recovery requests
+/// - network:candidates - NAT traversal peer discovery
+/// - snapshot:coordinate - Distributed snapshot coordination
+/// - Federation topics (if enabled):
+///   - federation:registry
+///   - federation:trust
+///   - federation:clearing
+pub fn subscribe_standard_topics(
+    gossip: &mut GossipActor,
+    did: &Did,
+    config: TopicSubscriptionConfig,
+) {
+    // Subscribe to trust attestations topic
+    if let Err(e) = gossip.subscribe(
+        crate::trust_propagation::TRUST_ATTESTATIONS_TOPIC,
+        did.clone(),
+    ) {
+        warn!("Failed to subscribe to trust attestations topic: {}", e);
+    } else {
+        info!("Subscribed to trust:attestations topic");
+    }
+
+    // Subscribe to contracts:deploy topic with trust-gated access (min trust 0.4)
+    if let Err(e) = gossip.subscribe("contracts:deploy", did.clone()) {
+        warn!("Failed to subscribe to contracts:deploy topic: {}", e);
+    } else {
+        info!("Subscribed to contracts:deploy topic");
+    }
+
+    // Subscribe to identity:recovery topic for social recovery events
+    if let Err(e) = gossip.subscribe(icn_identity::IDENTITY_RECOVERY_TOPIC, did.clone()) {
+        warn!("Failed to subscribe to identity:recovery topic: {}", e);
+    } else {
+        info!("Subscribed to identity:recovery topic");
+    }
+
+    // Subscribe to network:candidates topic for NAT traversal peer discovery
+    if let Err(e) = gossip.subscribe(NETWORK_CANDIDATES_TOPIC, did.clone()) {
+        warn!("Failed to subscribe to network:candidates topic: {}", e);
+    } else {
+        info!("Subscribed to network:candidates topic");
+    }
+
+    // Subscribe to snapshot:coordinate topic for distributed snapshots
+    if let Err(e) = gossip.subscribe(SNAPSHOT_COORDINATE_TOPIC, did.clone()) {
+        warn!("Failed to subscribe to snapshot:coordinate topic: {}", e);
+    } else {
+        info!("Subscribed to snapshot:coordinate topic");
+    }
+
+    // Subscribe to federation topics if federation is enabled
+    if config.federation_enabled {
+        if let Err(e) = gossip.subscribe(icn_federation::TOPIC_FEDERATION_REGISTRY, did.clone()) {
+            warn!("Failed to subscribe to federation:registry topic: {}", e);
+        } else {
+            info!("Subscribed to federation:registry topic");
+        }
+
+        if let Err(e) = gossip.subscribe(icn_federation::TOPIC_FEDERATION_TRUST, did.clone()) {
+            warn!("Failed to subscribe to federation:trust topic: {}", e);
+        } else {
+            info!("Subscribed to federation:trust topic");
+        }
+
+        if let Err(e) = gossip.subscribe(icn_federation::TOPIC_FEDERATION_CLEARING, did.clone()) {
+            warn!("Failed to subscribe to federation:clearing topic: {}", e);
+        } else {
+            info!("Subscribed to federation:clearing topic");
+        }
+    }
+}
+
 /// Restore gossip state from snapshot if available
 async fn restore_gossip_snapshot(
     config: &Config,

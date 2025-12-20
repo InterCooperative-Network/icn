@@ -4,6 +4,7 @@
 //! providing a cleaner separation of concerns for gossip message routing.
 
 use crate::supervisor::init_coop;
+use crate::supervisor::init_gossip::NETWORK_CANDIDATES_TOPIC;
 use anyhow::Result;
 use icn_gossip::GossipEntry;
 use icn_identity::{Did, RecoveryMessage, IDENTITY_RECOVERY_TOPIC};
@@ -11,9 +12,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
-
-/// Gossip topic for NAT traversal connection candidate announcements
-pub const NETWORK_CANDIDATES_TOPIC: &str = "network:candidates";
 
 /// Type aliases for common handle types
 pub type TrustGraphHandle = Arc<RwLock<icn_trust::TrustGraph>>;
