@@ -21,7 +21,7 @@ uuid = { version = "1.7", features = ["v4", "serde"] }
 jsonwebtoken = "9"
 ed25519-dalek = { version = "2", features = ["std"] }
 rand = "0.8"
-metrics = "0.23"
+metrics = "0.24"
 
 # ICN crates
 icn-identity.workspace = true

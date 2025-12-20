@@ -38,7 +38,7 @@ bincode = { version = "2.0", features = ["serde"] }
 zeroize = { version = "1.7", features = ["derive"] }
 
 # Error handling
-thiserror = "1.0"
+thiserror = "2.0"
 anyhow = "1.0"
 
 [dev-dependencies]
