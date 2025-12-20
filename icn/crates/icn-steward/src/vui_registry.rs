@@ -86,7 +86,8 @@ impl VuiRegistry {
         let bloom = Bloom::new_for_fp_rate(
             config.bloom_expected_items,
             config.bloom_false_positive_rate,
-        );
+        )
+        .expect("Failed to create bloom filter with given parameters");
 
         Self {
             bloom,

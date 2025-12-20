@@ -35,7 +35,7 @@ thiserror = "1"
 tracing = "0.1"
 
 # Data structures
-bloomfilter = "1"
+bloomfilter = "3"
 hex = "0.4"
 
 [dev-dependencies]
