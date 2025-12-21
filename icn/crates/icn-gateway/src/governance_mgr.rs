@@ -4,32 +4,83 @@
 //! This is a simplified interface that can be backed by:
 //! 1. In-memory storage (for standalone gateway)
 //! 2. GovernanceActor handle (when integrated with daemon)
+//!
+//! ## Actor-Backed Mode
+//!
+//! When created with `with_handle()`, the GovernanceManager delegates all operations
+//! to the daemon's GovernanceActor, ensuring:
+//! - Single source of truth for governance data
+//! - Persistence across restarts
+//! - Gossip synchronization of proposals and votes
+//!
+//! When created with `new()`, it uses in-memory storage (suitable for testing only).
 
 use anyhow::Result;
 use icn_governance::{
-    GovernanceConfig, GovernanceDomain, GovernanceDomainId, GovernanceParams, GovernanceProfileId,
-    MembershipConfig, MembershipSource, Proposal, ProposalId, ProposalPayload, ProposalState, Vote,
-    VoteChoice, VoteTally,
+    GovernanceConfig, GovernanceDomain, GovernanceDomainId, GovernanceOps, GovernanceParams,
+    GovernanceProfileId, MembershipConfig, MembershipSource, Proposal, ProposalId, ProposalPayload,
+    ProposalState, Vote, VoteChoice, VoteTally,
 };
 use icn_identity::Did;
 use std::collections::HashMap;
-use std::sync::RwLock;
+use std::sync::{Arc, RwLock};
+use tracing::debug;
+
+/// Handle type for actor-backed governance
+///
+/// This uses the `GovernanceOps` trait to avoid direct dependency on `icn-core`.
+/// Any type implementing `GovernanceOps` can be used (e.g., icn-core's GovernanceHandle).
+pub type GovernanceHandle = Arc<dyn GovernanceOps + Send + Sync>;
 
 /// Governance manager for gateway API
+///
+/// Supports two modes:
+/// - **Standalone mode** (`new()`): In-memory storage, for testing only
+/// - **Actor-backed mode** (`with_handle()`): Delegates to daemon's GovernanceActor
 pub struct GovernanceManager {
+    /// In-memory storage - used in standalone mode
     domains: RwLock<HashMap<GovernanceDomainId, GovernanceDomain>>,
     proposals: RwLock<HashMap<ProposalId, Proposal>>,
     votes: RwLock<HashMap<ProposalId, Vec<Vote>>>,
+    /// Optional handle to daemon's GovernanceActor (actor-backed mode)
+    governance_handle: Option<GovernanceHandle>,
 }
 
 impl GovernanceManager {
     /// Create a new governance manager with in-memory storage
+    ///
+    /// **Warning**: This mode is for testing only. State is lost on restart
+    /// and not synchronized via gossip.
     pub fn new() -> Self {
+        debug!("GovernanceManager created in standalone mode (in-memory only)");
         GovernanceManager {
             domains: RwLock::new(HashMap::new()),
             proposals: RwLock::new(HashMap::new()),
             votes: RwLock::new(HashMap::new()),
+            governance_handle: None,
         }
+    }
+
+    /// Create a governance manager backed by the daemon's GovernanceActor
+    ///
+    /// This is the recommended mode for production. All operations delegate
+    /// to the daemon's GovernanceActor, ensuring:
+    /// - Persistence across restarts
+    /// - Gossip synchronization
+    /// - Single source of truth
+    pub fn with_handle(handle: GovernanceHandle) -> Self {
+        debug!("GovernanceManager created with daemon GovernanceActor handle");
+        GovernanceManager {
+            domains: RwLock::new(HashMap::new()), // Not used in actor-backed mode
+            proposals: RwLock::new(HashMap::new()),
+            votes: RwLock::new(HashMap::new()),
+            governance_handle: Some(handle),
+        }
+    }
+
+    /// Check if running in actor-backed mode
+    pub fn is_actor_backed(&self) -> bool {
+        self.governance_handle.is_some()
     }
 
     /// Create a new governance domain
@@ -41,6 +92,14 @@ impl GovernanceManager {
         params: GovernanceParams,
         membership: MembershipConfig,
     ) -> Result<()> {
+        if let Some(ref handle) = self.governance_handle {
+            // Actor-backed mode: delegate to GovernanceActor
+            return handle
+                .create_domain(domain_id, name, profile, params, membership)
+                .await;
+        }
+
+        // Standalone mode: in-memory storage
         // Create profile ID based on the profile string
         // - "contract:did:..." -> Contract-based profile
         // - Anything else -> Built-in profile name
@@ -75,6 +134,12 @@ impl GovernanceManager {
         &self,
         domain_id: &GovernanceDomainId,
     ) -> Result<Option<GovernanceDomain>> {
+        if let Some(ref handle) = self.governance_handle {
+            // Actor-backed mode: delegate to GovernanceActor
+            return handle.get_domain(domain_id).await;
+        }
+
+        // Standalone mode: in-memory storage
         let domains = self
             .domains
             .read()
@@ -84,6 +149,12 @@ impl GovernanceManager {
 
     /// List all governance domains
     pub async fn list_domains(&self) -> Result<Vec<GovernanceDomain>> {
+        if let Some(ref handle) = self.governance_handle {
+            // Actor-backed mode: delegate to GovernanceActor
+            return handle.list_domains().await;
+        }
+
+        // Standalone mode: in-memory storage
         let domains = self
             .domains
             .read()
@@ -92,6 +163,9 @@ impl GovernanceManager {
     }
 
     /// Create a new proposal
+    ///
+    /// Note: In actor-backed mode, the `proposal_id` is ignored (actor generates it)
+    /// and `proposer` is ignored (actor uses its own DID).
     pub async fn create_proposal(
         &self,
         proposal_id: ProposalId,
@@ -101,6 +175,16 @@ impl GovernanceManager {
         description: String,
         payload: ProposalPayload,
     ) -> Result<()> {
+        if let Some(ref handle) = self.governance_handle {
+            // Actor-backed mode: delegate to GovernanceActor
+            // Note: proposal_id and proposer are ignored - actor generates ID and uses own DID
+            let _generated_id = handle
+                .create_proposal(domain_id, title, description, payload)
+                .await?;
+            return Ok(());
+        }
+
+        // Standalone mode: in-memory storage
         // Validate domain exists
         let domains = self
             .domains
@@ -132,6 +216,12 @@ impl GovernanceManager {
 
     /// Get a specific proposal
     pub async fn get_proposal(&self, proposal_id: &ProposalId) -> Result<Option<Proposal>> {
+        if let Some(ref handle) = self.governance_handle {
+            // Actor-backed mode: delegate to GovernanceActor
+            return handle.get_proposal(proposal_id).await;
+        }
+
+        // Standalone mode: in-memory storage
         let proposals = self
             .proposals
             .read()
@@ -141,6 +231,12 @@ impl GovernanceManager {
 
     /// List all proposals
     pub async fn list_proposals(&self) -> Result<Vec<Proposal>> {
+        if let Some(ref handle) = self.governance_handle {
+            // Actor-backed mode: delegate to GovernanceActor
+            return handle.list_proposals().await;
+        }
+
+        // Standalone mode: in-memory storage
         let proposals = self
             .proposals
             .read()
@@ -154,6 +250,12 @@ impl GovernanceManager {
         proposal_id: ProposalId,
         voting_period_seconds: u64,
     ) -> Result<()> {
+        if let Some(ref handle) = self.governance_handle {
+            // Actor-backed mode: delegate to GovernanceActor
+            return handle.open_proposal(proposal_id, voting_period_seconds).await;
+        }
+
+        // Standalone mode: in-memory storage
         let mut proposals = self
             .proposals
             .write()
@@ -169,6 +271,12 @@ impl GovernanceManager {
 
     /// Close a proposal and finalize voting
     pub async fn close_proposal(&self, proposal_id: ProposalId) -> Result<()> {
+        if let Some(ref handle) = self.governance_handle {
+            // Actor-backed mode: delegate to GovernanceActor
+            return handle.close_proposal(proposal_id).await;
+        }
+
+        // Standalone mode: in-memory storage
         let mut proposals = self
             .proposals
             .write()
@@ -247,7 +355,20 @@ impl GovernanceManager {
     }
 
     /// Get vote tally for a proposal
+    ///
+    /// Note: Not available in actor-backed mode (returns empty tally).
+    /// TODO: Add get_vote_tally to GovernanceOps trait.
     pub async fn get_vote_tally(&self, proposal_id: &ProposalId) -> Result<VoteTally> {
+        if self.governance_handle.is_some() {
+            // Actor-backed mode: vote tally not exposed via GovernanceOps
+            debug!(
+                proposal_id = %proposal_id.0,
+                "get_vote_tally not available in actor-backed mode"
+            );
+            return Ok(VoteTally::empty());
+        }
+
+        // Standalone mode: in-memory storage
         let votes = self
             .votes
             .read()
@@ -257,7 +378,20 @@ impl GovernanceManager {
     }
 
     /// Get list of voter DIDs for a proposal (for notifications)
+    ///
+    /// Note: Not available in actor-backed mode (returns empty list).
+    /// TODO: Add get_voter_dids to GovernanceOps trait.
     pub async fn get_voter_dids(&self, proposal_id: &ProposalId) -> Result<Vec<Did>> {
+        if self.governance_handle.is_some() {
+            // Actor-backed mode: voter DIDs not exposed via GovernanceOps
+            debug!(
+                proposal_id = %proposal_id.0,
+                "get_voter_dids not available in actor-backed mode"
+            );
+            return Ok(Vec::new());
+        }
+
+        // Standalone mode: in-memory storage
         let votes = self
             .votes
             .read()
@@ -270,6 +404,9 @@ impl GovernanceManager {
     }
 
     /// Cast a vote on a proposal
+    ///
+    /// Note: In actor-backed mode, the `voter` parameter is ignored - the actor
+    /// uses its own DID.
     pub async fn cast_vote(
         &self,
         proposal_id: ProposalId,
@@ -277,6 +414,13 @@ impl GovernanceManager {
         choice: VoteChoice,
         comment: Option<String>,
     ) -> Result<()> {
+        if let Some(ref handle) = self.governance_handle {
+            // Actor-backed mode: delegate to GovernanceActor
+            // Note: voter is ignored - actor uses its own DID
+            return handle.cast_vote(proposal_id, choice, comment).await;
+        }
+
+        // Standalone mode: in-memory storage
         // Validate proposal exists and is open for voting
         let proposals = self
             .proposals

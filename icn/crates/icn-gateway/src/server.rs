@@ -29,6 +29,7 @@ use crate::notification_triggers::{GovernanceNotificationTrigger, LedgerNotifica
 use crate::notifications::NotificationService;
 use crate::rate_limit::{IpRateLimiter, RateLimitConfig, RateLimiter};
 use crate::security::{configure_cors, SecurityConfig, SecurityHeaders};
+use crate::governance_mgr::GovernanceHandle;
 use crate::trust_mgr::{TrustGraphHandle, TrustManager};
 use icn_compute::ComputeHandle;
 
@@ -44,6 +45,8 @@ pub struct GatewayServer {
     coop_handle: Option<icn_coop::CoopHandle>,
     /// Optional handle to daemon's TrustGraph (for actor-backed mode)
     trust_graph_handle: Option<TrustGraphHandle>,
+    /// Optional handle to daemon's GovernanceActor (for actor-backed mode)
+    governance_handle: Option<GovernanceHandle>,
 }
 
 impl GatewayServer {
@@ -59,6 +62,7 @@ impl GatewayServer {
             compute_handle: None,
             coop_handle: None,
             trust_graph_handle: None,
+            governance_handle: None,
         }
     }
 
@@ -78,6 +82,7 @@ impl GatewayServer {
             compute_handle: None,
             coop_handle: None,
             trust_graph_handle: None,
+            governance_handle: None,
         }
     }
 
@@ -98,6 +103,7 @@ impl GatewayServer {
             compute_handle: None,
             coop_handle: None,
             trust_graph_handle: None,
+            governance_handle: None,
         }
     }
 
@@ -125,6 +131,15 @@ impl GatewayServer {
     /// TrustGraph actor, ensuring persistence and gossip synchronization.
     pub fn with_trust_handle(mut self, handle: TrustGraphHandle) -> Self {
         self.trust_graph_handle = Some(handle);
+        self
+    }
+
+    /// Set governance handle for daemon integration
+    ///
+    /// When set, the GovernanceManager will delegate all operations to the daemon's
+    /// GovernanceActor, ensuring persistence and gossip synchronization.
+    pub fn with_governance_handle(mut self, handle: GovernanceHandle) -> Self {
+        self.governance_handle = Some(handle);
         self
     }
 
@@ -169,7 +184,15 @@ impl GatewayServer {
             Arc::new(CoopManager::new())
         };
 
-        let governance_manager = Arc::new(GovernanceManager::new());
+        // Create governance manager (uses actor if handle available, otherwise in-memory)
+        let governance_manager: Arc<GovernanceManager> = if let Some(handle) = self.governance_handle
+        {
+            info!("Governance manager connected to daemon (using GovernanceActor)");
+            Arc::new(GovernanceManager::with_handle(handle))
+        } else {
+            info!("Governance manager running standalone (in-memory only)");
+            Arc::new(GovernanceManager::new())
+        };
         let invite_manager = Arc::new(crate::invite::InviteManager::new());
         let session_manager = Arc::new(crate::session::SessionManager::new());
 
