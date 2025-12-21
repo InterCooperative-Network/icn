@@ -538,8 +538,16 @@ mod tests {
     use super::*;
     use crate::personhood::{POPMethod, PersonhoodAnchor};
 
+    /// Valid test DID for issuer/authority (proper multibase-encoded Ed25519 public key)
+    /// Generated from deterministic seed [4u8; 32]
+    const TEST_ISSUER_DID: &str = "did:icn:zEdmxWPmx2WH6WgFfTdu9xfkYf3k1g5wD1zccTVySEEh1";
+
     fn test_key() -> [u8; 32] {
         [42u8; 32]
+    }
+
+    fn test_issuer() -> Did {
+        TEST_ISSUER_DID.parse().expect("valid test DID")
     }
 
     fn create_test_store() -> PersonhoodAnchorStore<InMemoryPersonhoodStore> {
@@ -612,7 +620,7 @@ mod tests {
 
         // Create and suspend another anchor
         let mut anchor2 = PersonhoodAnchor::genesis("test2", [2u8; 32]);
-        let authority = Did::from_anchor_id(&[99u8; 32]);
+        let authority = test_issuer();
         anchor2.suspend("test suspension".to_string(), authority, None);
         store.store(&anchor2).unwrap();
 
@@ -635,7 +643,7 @@ mod tests {
         assert_eq!(store.count_by_status("suspended").unwrap(), 0);
 
         // Suspend
-        let authority = Did::from_anchor_id(&[99u8; 32]);
+        let authority = test_issuer();
         let new_status = AnchorStatus::Suspended {
             reason: "test".to_string(),
             suspended_at: 12345,
@@ -660,7 +668,7 @@ mod tests {
 
         store.store(&anchor).unwrap();
 
-        let issuer = Did::from_anchor_id(&[99u8; 32]);
+        let issuer = test_issuer();
         let attestation = POPAttestation::new(
             &anchor_id,
             issuer,
@@ -713,7 +721,7 @@ mod tests {
 
         // Create anchor and add Strong attestation
         let mut anchor2 = PersonhoodAnchor::genesis("test2", [2u8; 32]);
-        let issuer = Did::from_anchor_id(&[99u8; 32]);
+        let issuer = test_issuer();
         let attestation = POPAttestation::new(
             anchor2.id(),
             issuer,
@@ -783,7 +791,7 @@ mod tests {
     fn test_auto_reinstate() {
         let store = create_test_store();
         let mut anchor = PersonhoodAnchor::genesis("test", test_key());
-        let authority = Did::from_anchor_id(&[99u8; 32]);
+        let authority = test_issuer();
 
         // Suspend with expiry in the past
         anchor.status = AnchorStatus::Suspended {

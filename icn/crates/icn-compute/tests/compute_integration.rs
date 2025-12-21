@@ -14,27 +14,33 @@ use icn_compute::{
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+/// Valid test DID (proper multibase-encoded Ed25519 public key)
+/// Generated from deterministic seed [1u8; 32]
+const TEST_ALICE_DID: &str = "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9";
+
 /// Helper to create a test CCL task.
 fn create_test_task(id: &str, submitter: &str) -> ComputeTask {
-    let ccl_source = r#"{
+    let ccl_source = format!(
+        r#"{{
         "name": "TestContract",
-        "participants": ["did:icn:alice"],
+        "participants": ["{TEST_ALICE_DID}"],
         "currency": null,
         "state_vars": [],
-        "rules": [{
+        "rules": [{{
             "name": "run",
             "params": [],
             "requires": [],
-            "body": [{ "Return": { "value": { "Literal": { "Int": 42 } } } }]
-        }],
+            "body": [{{ "Return": {{ "value": {{ "Literal": {{ "Int": 42 }} }} }} }}]
+        }}],
         "triggers": []
-    }"#;
+    }}"#
+    );
 
     ComputeTask {
         id: id.to_string(),
         submitter: submitter.to_string(),
         coop_id: None,
-        code: TaskCode::Ccl(ccl_source.to_string()),
+        code: TaskCode::Ccl(ccl_source),
         inputs: vec![],
         fuel_limit: FuelLimit(10_000),
         required_capabilities: vec![ExecutorCapability::Ccl],
@@ -61,14 +67,10 @@ fn test_signing_key() -> [u8; 32] {
 #[test]
 fn test_local_executor_ccl_execution() {
     let executor = LocalExecutor::new();
-    let task = create_test_task("task-1", "did:icn:alice");
+    let task = create_test_task("task-1", TEST_ALICE_DID);
 
     let result = executor
-        .execute_task(
-            &task,
-            "did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK",
-            &test_signing_key(),
-        )
+        .execute_task(&task, TEST_ALICE_DID, &test_signing_key())
         .expect("Task should execute successfully");
 
     assert!(matches!(result.outcome, ExecutionOutcome::Success(_)));
@@ -80,7 +82,7 @@ fn test_local_executor_ccl_execution() {
 #[test]
 fn test_local_executor_capability_check() {
     let executor = LocalExecutor::new();
-    let mut task = create_test_task("task-wasm", "did:icn:alice");
+    let mut task = create_test_task("task-wasm", TEST_ALICE_DID);
     task.required_capabilities = vec![ExecutorCapability::Wasm];
     task.code = TaskCode::WasmRef([0u8; 32]);
 
@@ -92,40 +94,38 @@ fn test_local_executor_capability_check() {
 fn test_local_executor_ccl_with_calculator() {
     let executor = LocalExecutor::new();
 
-    let ccl_source = r#"{
+    let ccl_source = format!(
+        r#"{{
         "name": "Calculator",
-        "participants": ["did:icn:alice"],
+        "participants": ["{TEST_ALICE_DID}"],
         "currency": null,
         "state_vars": [],
-        "rules": [{
+        "rules": [{{
             "name": "add",
-            "params": [{ "name": "a" }, { "name": "b" }],
+            "params": [{{"name": "a"}}, {{"name": "b"}}],
             "requires": [],
-            "body": [{
-                "Return": {
-                    "value": {
-                        "BinOp": {
+            "body": [{{
+                "Return": {{
+                    "value": {{
+                        "BinOp": {{
                             "op": "Add",
-                            "left": { "Var": "a" },
-                            "right": { "Var": "b" }
-                        }
-                    }
-                }
-            }]
-        }],
+                            "left": {{"Var": "a"}},
+                            "right": {{"Var": "b"}}
+                        }}
+                    }}
+                }}
+            }}]
+        }}],
         "triggers": []
-    }"#;
+    }}"#
+    );
 
-    let mut task = create_test_task("calc-task", "did:icn:alice");
-    task.code = TaskCode::Ccl(ccl_source.to_string());
+    let mut task = create_test_task("calc-task", TEST_ALICE_DID);
+    task.code = TaskCode::Ccl(ccl_source);
     task.inputs = r#"{"a": {"Int": 5}, "b": {"Int": 3}}"#.as_bytes().to_vec();
 
     let result = executor
-        .execute_task(
-            &task,
-            "did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK",
-            &test_signing_key(),
-        )
+        .execute_task(&task, TEST_ALICE_DID, &test_signing_key())
         .expect("Task should execute successfully");
 
     assert!(

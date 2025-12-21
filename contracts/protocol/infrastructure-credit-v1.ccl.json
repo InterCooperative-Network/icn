@@ -1,7 +1,7 @@
 {
   "name": "InfrastructureCreditProtocol",
   "participants": [
-    "did:icn:z6MknetworkInfrastructureTreasury000000000000"
+    "did:icn:z8SFqwqnq4whPhs8icwHA2hQg3hUoN1qrCLK1SBx3WKwe"
   ],
   "currency": "hours",
   "state_vars": [
@@ -23,7 +23,7 @@
     },
     {
       "name": "network_treasury",
-      "initial_value": { "Did": "did:icn:z6MknetworkInfrastructureTreasury000000000000" }
+      "initial_value": { "Did": "did:icn:z8SFqwqnq4whPhs8icwHA2hQg3hUoN1qrCLK1SBx3WKwe" }
     }
   ],
   "rules": [

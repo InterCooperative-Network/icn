@@ -1,7 +1,7 @@
 {
   "name": "FuelAllocationProtocol",
   "participants": [
-    "did:icn:z6MknetworkFuelGovernance0000000000000000000"
+    "did:icn:zAKkzLhjhyFtM9j7WAhbaqYpFe49cXeJBg2kzLRC2PnNa"
   ],
   "currency": "fuel",
   "state_vars": [

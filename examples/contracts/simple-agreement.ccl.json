@@ -1,7 +1,7 @@
 {
   "name": "SimpleAgreement",
   "participants": [
-    "did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK"
+    "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9"
   ],
   "currency": null,
   "state_vars": [],

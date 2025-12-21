@@ -12,22 +12,28 @@ use icn_compute::{
 use icn_gateway::{create_forwarding_callback, EventBroadcaster, GatewayEvent};
 use std::sync::Arc;
 
+/// Valid test DIDs (proper multibase-encoded Ed25519 public keys)
+/// Generated from deterministic seeds: alice=[1u8;32], executor=[2u8;32]
+const TEST_EXECUTOR_DID: &str = "did:icn:z9hSR6S7WPtxmTojgo6GG3k4yDPecgJY292j7xrsUGWBu";
+const TEST_ALICE_DID: &str = "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9";
+
 /// Simple CCL contract that returns a constant
 fn simple_ccl() -> String {
-    r#"{
+    format!(
+        r#"{{
         "name": "SimpleReturn",
-        "participants": ["did:icn:alice"],
+        "participants": ["{TEST_ALICE_DID}"],
         "currency": null,
         "state_vars": [],
-        "rules": [{
+        "rules": [{{
             "name": "run",
             "params": [],
             "requires": [],
-            "body": [{ "Return": { "value": { "Literal": { "Int": 42 } } } }]
-        }],
+            "body": [{{ "Return": {{ "value": {{ "Literal": {{ "Int": 42 }} }} }} }}]
+        }}],
         "triggers": []
-    }"#
-    .to_string()
+    }}"#
+    )
 }
 
 #[tokio::test]
@@ -43,7 +49,7 @@ async fn test_compute_events_to_websocket() {
 
     // 3. Create compute actor with event forwarding callback
     let trust_cb: TrustCallback = Arc::new(|_| 0.8); // High trust
-    let mut compute_actor = ComputeActor::new("did:icn:executor".to_string(), trust_cb);
+    let mut compute_actor = ComputeActor::new(TEST_EXECUTOR_DID.to_string(), trust_cb);
 
     // Set up dummy send callback (required for actor to function)
     let send_callback: icn_compute::SendCallback = Arc::new(|_msg| {
@@ -65,7 +71,7 @@ async fn test_compute_events_to_websocket() {
     // 4. Submit a task (this will trigger claim + completion events)
     let task = ComputeTask {
         id: "test-task".to_string(),
-        submitter: "did:icn:alice".to_string(),
+        submitter: TEST_ALICE_DID.to_string(),
         coop_id: None,
         code: TaskCode::Ccl(simple_ccl()),
         inputs: vec![],
@@ -109,7 +115,7 @@ async fn test_compute_events_to_websocket() {
             executor,
         } => {
             assert_eq!(task_hash, expected_hash, "Task hash should match");
-            assert_eq!(executor, "did:icn:executor", "Executor should match");
+            assert_eq!(executor, TEST_EXECUTOR_DID, "Executor should match");
         }
         other => panic!("Expected ComputeTaskClaimed, got {other:?}"),
     }
@@ -129,7 +135,7 @@ async fn test_compute_events_to_websocket() {
             ..
         } => {
             assert_eq!(task_hash, expected_hash, "Task hash should match");
-            assert_eq!(executor, "did:icn:executor", "Executor should match");
+            assert_eq!(executor, TEST_EXECUTOR_DID, "Executor should match");
             assert_eq!(outcome, "success", "Outcome should be success");
         }
         other => panic!("Expected ComputeTaskCompleted, got {other:?}"),
@@ -159,7 +165,7 @@ async fn test_multiple_subscribers_receive_events() {
 
     // Create compute actor with forwarding
     let trust_cb: TrustCallback = Arc::new(|_| 0.8);
-    let mut compute_actor = ComputeActor::new("did:icn:executor".to_string(), trust_cb);
+    let mut compute_actor = ComputeActor::new(TEST_EXECUTOR_DID.to_string(), trust_cb);
 
     // Set dummy send callback
     let send_callback: icn_compute::SendCallback = Arc::new(|_msg| {});
@@ -173,7 +179,7 @@ async fn test_multiple_subscribers_receive_events() {
     // Submit task
     let task = ComputeTask {
         id: "broadcast-test".to_string(),
-        submitter: "did:icn:alice".to_string(),
+        submitter: TEST_ALICE_DID.to_string(),
         coop_id: None,
         code: TaskCode::Ccl(simple_ccl()),
         inputs: vec![],
@@ -243,7 +249,7 @@ async fn test_direct_event_forwarding() {
     // Create and forward event directly
     let event = icn_compute::ComputeEvent::TaskClaimed {
         task_hash: "test123".to_string(),
-        executor: "did:icn:test".to_string(),
+        executor: TEST_EXECUTOR_DID.to_string(),
     };
 
     icn_gateway::forward_compute_event(&broadcaster, event).await;
@@ -271,7 +277,7 @@ async fn test_events_have_sequence_numbers() {
         .expect("Should subscribe");
 
     let trust_cb: TrustCallback = Arc::new(|_| 0.8);
-    let mut compute_actor = ComputeActor::new("did:icn:executor".to_string(), trust_cb);
+    let mut compute_actor = ComputeActor::new(TEST_EXECUTOR_DID.to_string(), trust_cb);
 
     // Set dummy send callback
     let send_callback: icn_compute::SendCallback = Arc::new(|_msg| {});
@@ -285,7 +291,7 @@ async fn test_events_have_sequence_numbers() {
     // Submit task
     let task = ComputeTask {
         id: "seq-test".to_string(),
-        submitter: "did:icn:alice".to_string(),
+        submitter: TEST_ALICE_DID.to_string(),
         coop_id: None,
         code: TaskCode::Ccl(simple_ccl()),
         inputs: vec![],

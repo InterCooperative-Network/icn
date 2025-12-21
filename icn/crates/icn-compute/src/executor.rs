@@ -233,56 +233,62 @@ mod tests {
     use super::*;
     use crate::types::FuelLimit;
 
+    /// Valid test DID (proper multibase-encoded Ed25519 public key)
+    /// Generated from deterministic seed [1u8; 32]
+    const TEST_ALICE_DID: &str = "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9";
+
     /// Simple CCL contract that returns a constant
     fn simple_contract() -> String {
-        r#"{
+        format!(
+            r#"{{
             "name": "SimpleReturn",
-            "participants": ["did:icn:alice"],
+            "participants": ["{TEST_ALICE_DID}"],
             "currency": null,
             "state_vars": [],
-            "rules": [{
+            "rules": [{{
                 "name": "run",
                 "params": [],
                 "requires": [],
-                "body": [{ "Return": { "value": { "Literal": { "Int": 42 } } } }]
-            }],
+                "body": [{{ "Return": {{ "value": {{ "Literal": {{ "Int": 42 }} }} }} }}]
+            }}],
             "triggers": []
-        }"#
-        .to_string()
+        }}"#
+        )
     }
 
     /// CCL contract with addition
     fn calculator_contract() -> String {
-        r#"{
+        format!(
+            r#"{{
             "name": "Calculator",
-            "participants": ["did:icn:alice"],
+            "participants": ["{TEST_ALICE_DID}"],
             "currency": null,
             "state_vars": [],
-            "rules": [{
+            "rules": [{{
                 "name": "add",
-                "params": [{ "name": "a" }, { "name": "b" }],
+                "params": [{{"name": "a"}}, {{"name": "b"}}],
                 "requires": [],
-                "body": [{
-                    "Return": {
-                        "value": {
-                            "BinOp": {
+                "body": [{{
+                    "Return": {{
+                        "value": {{
+                            "BinOp": {{
                                 "op": "Add",
-                                "left": { "Var": "a" },
-                                "right": { "Var": "b" }
-                            }
-                        }
-                    }
-                }]
-            }],
+                                "left": {{ "Var": "a" }},
+                                "right": {{ "Var": "b" }}
+                            }}
+                        }}
+                    }}
+                }}]
+            }}],
             "triggers": []
-        }"#
-        .to_string()
+        }}"#
+        )
     }
 
     fn make_task(code: &str, fuel: u64) -> ComputeTask {
         ComputeTask {
             id: "test".into(),
-            submitter: "did:icn:alice".into(),
+            submitter: TEST_ALICE_DID.into(),
             coop_id: None,
             code: TaskCode::Ccl(code.into()),
             inputs: vec![],
@@ -310,11 +316,7 @@ mod tests {
         let task = make_task(&simple_contract(), 10_000);
 
         let result = executor
-            .execute_task(
-                &task,
-                "did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK",
-                &test_signing_key(),
-            )
+            .execute_task(&task, TEST_ALICE_DID, &test_signing_key())
             .unwrap();
 
         // Verify execution succeeded
@@ -338,11 +340,7 @@ mod tests {
         task.inputs = r#"{"a": {"Int": 5}, "b": {"Int": 3}}"#.as_bytes().to_vec();
 
         let result = executor
-            .execute_task(
-                &task,
-                "did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK",
-                &test_signing_key(),
-            )
+            .execute_task(&task, TEST_ALICE_DID, &test_signing_key())
             .unwrap();
 
         // Verify execution succeeded with arguments

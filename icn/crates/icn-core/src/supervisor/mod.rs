@@ -1209,40 +1209,38 @@ impl Supervisor {
 mod tests {
     use super::*;
 
+    /// Valid test DID (proper multibase-encoded Ed25519 public key)
+    /// Generated from deterministic seed [1u8; 32]
+    const TEST_ALICE_DID: &str = "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9";
+    /// Generated from deterministic seed [3u8; 32]
+    const TEST_BOB_DID: &str = "did:icn:zGyGKxMyg1p9SsHfm15MkNUu1u9TN2JtTspcdmrtGUdse";
+
     #[test]
     fn test_parse_bootstrap_peer_valid() {
-        let url =
-            "icn://did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK@203.0.113.50:7777";
-        let result = parse_bootstrap_peer(url);
+        let url = format!("icn://{TEST_ALICE_DID}@203.0.113.50:7777");
+        let result = parse_bootstrap_peer(&url);
         assert!(result.is_ok());
 
         let (did, addr) = result.unwrap();
-        assert_eq!(
-            did.as_str(),
-            "did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK"
-        );
+        assert_eq!(did.as_str(), TEST_ALICE_DID);
         assert_eq!(addr.to_string(), "203.0.113.50:7777");
     }
 
     #[test]
     fn test_parse_bootstrap_peer_ipv4() {
-        let url =
-            "icn://did:icn:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH@192.168.1.100:7777";
-        let result = parse_bootstrap_peer(url);
+        let url = format!("icn://{TEST_BOB_DID}@192.168.1.100:7777");
+        let result = parse_bootstrap_peer(&url);
         assert!(result.is_ok());
 
         let (did, addr) = result.unwrap();
-        assert_eq!(
-            did.as_str(),
-            "did:icn:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH"
-        );
+        assert_eq!(did.as_str(), TEST_BOB_DID);
         assert_eq!(addr.to_string(), "192.168.1.100:7777");
     }
 
     #[test]
     fn test_parse_bootstrap_peer_missing_prefix() {
-        let url = "did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK@203.0.113.50:7777";
-        let result = parse_bootstrap_peer(url);
+        let url = format!("{TEST_ALICE_DID}@203.0.113.50:7777");
+        let result = parse_bootstrap_peer(&url);
         assert!(result.is_err());
         assert!(result
             .unwrap_err()
@@ -1252,9 +1250,8 @@ mod tests {
 
     #[test]
     fn test_parse_bootstrap_peer_missing_at() {
-        let url =
-            "icn://did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK_203.0.113.50:7777";
-        let result = parse_bootstrap_peer(url);
+        let url = format!("icn://{TEST_ALICE_DID}_203.0.113.50:7777");
+        let result = parse_bootstrap_peer(&url);
         assert!(result.is_err());
         assert!(result
             .unwrap_err()
@@ -1264,9 +1261,8 @@ mod tests {
 
     #[test]
     fn test_parse_bootstrap_peer_invalid_port() {
-        let url =
-            "icn://did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK@203.0.113.50:invalid";
-        let result = parse_bootstrap_peer(url);
+        let url = format!("icn://{TEST_ALICE_DID}@203.0.113.50:invalid");
+        let result = parse_bootstrap_peer(&url);
         assert!(result.is_err());
         assert!(result
             .unwrap_err()

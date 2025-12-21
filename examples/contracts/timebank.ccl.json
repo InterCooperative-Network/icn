@@ -1,8 +1,8 @@
 {
   "name": "TimeBank",
   "participants": [
-    "did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK",
-    "did:icn:z6MkrJVnaZkeFzdQyMZdkPGe6mAgPoMXD7h5nv8R3yrMvp4w"
+    "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9",
+    "did:icn:zGyGKxMyg1p9SsHfm15MkNUu1u9TN2JtTspcdmrtGUdse"
   ],
   "currency": "hours",
   "state_vars": [],

@@ -409,6 +409,10 @@ mod tests {
     use super::*;
     use crate::types::FuelLimit;
 
+    /// Valid test DID (proper multibase-encoded Ed25519 public key)
+    /// Generated from deterministic seed [1u8; 32]
+    const TEST_ALICE_DID: &str = "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9";
+
     #[test]
     fn test_wasm_executor_creation() {
         let executor = WasmExecutor::new().unwrap();
@@ -424,25 +428,27 @@ mod tests {
     fn test_wasm_executor_ccl_fallback() {
         let executor = WasmExecutor::new().unwrap();
 
-        let contract = r#"{
+        let contract = format!(
+            r#"{{
             "name": "SimpleReturn",
-            "participants": ["did:icn:alice"],
+            "participants": ["{TEST_ALICE_DID}"],
             "currency": null,
             "state_vars": [],
-            "rules": [{
+            "rules": [{{
                 "name": "run",
                 "params": [],
                 "requires": [],
-                "body": [{ "Return": { "value": { "Literal": { "Int": 42 } } } }]
-            }],
+                "body": [{{ "Return": {{ "value": {{ "Literal": {{ "Int": 42 }} }} }} }}]
+            }}],
             "triggers": []
-        }"#;
+        }}"#
+        );
 
         let task = ComputeTask {
             id: "test".into(),
-            submitter: "did:icn:alice".into(),
+            submitter: TEST_ALICE_DID.into(),
             coop_id: None,
-            code: TaskCode::Ccl(contract.into()),
+            code: TaskCode::Ccl(contract),
             inputs: vec![],
             fuel_limit: FuelLimit(10_000),
             required_capabilities: vec![ExecutorCapability::Ccl],
@@ -457,7 +463,7 @@ mod tests {
         };
 
         let mut ctx = ExecutionContext {
-            executor_did: "did:icn:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK".into(),
+            executor_did: TEST_ALICE_DID.into(),
             fuel_remaining: 10_000,
         };
 
@@ -484,7 +490,7 @@ mod tests {
         let executor = WasmExecutor::new().unwrap();
         let task = ComputeTask {
             id: "wasm-test".into(),
-            submitter: "did:icn:alice".into(),
+            submitter: TEST_ALICE_DID.into(),
             coop_id: None,
             code: TaskCode::WasmInline(wasm_bytes),
             inputs: vec![],
@@ -546,7 +552,7 @@ mod tests {
         let executor = WasmExecutor::new().unwrap();
         let task = ComputeTask {
             id: "host-fn-test".into(),
-            submitter: "did:icn:alice".into(),
+            submitter: TEST_ALICE_DID.into(),
             coop_id: None,
             code: TaskCode::WasmInline(wasm_bytes),
             inputs: vec![],
@@ -608,7 +614,7 @@ mod tests {
         let executor = WasmExecutor::new().unwrap();
         let task = ComputeTask {
             id: "input-test".into(),
-            submitter: "did:icn:alice".into(),
+            submitter: TEST_ALICE_DID.into(),
             coop_id: None,
             code: TaskCode::WasmInline(wasm_bytes),
             inputs: vec![1, 2, 3, 4, 5], // Sum = 15
@@ -645,7 +651,7 @@ mod tests {
         let executor = WasmExecutor::new().unwrap();
         let task = ComputeTask {
             id: "wasm-test".into(),
-            submitter: "did:icn:alice".into(),
+            submitter: TEST_ALICE_DID.into(),
             coop_id: None,
             code: TaskCode::WasmInline(vec![0x00, 0x61, 0x73, 0x6d]),
             inputs: vec![],
@@ -680,7 +686,7 @@ mod tests {
         let executor = WasmExecutor::new().unwrap();
         let task = ComputeTask {
             id: "wasm-ref-test".into(),
-            submitter: "did:icn:alice".into(),
+            submitter: TEST_ALICE_DID.into(),
             coop_id: None,
             code: TaskCode::WasmRef([0xAA; 32]),
             inputs: vec![],
@@ -718,7 +724,7 @@ mod tests {
         let fake_hash = [0xBB; 32];
         let task = ComputeTask {
             id: "wasm-ref-missing".into(),
-            submitter: "did:icn:alice".into(),
+            submitter: TEST_ALICE_DID.into(),
             coop_id: None,
             code: TaskCode::WasmRef(fake_hash),
             inputs: vec![],
@@ -771,7 +777,7 @@ mod tests {
 
         let task = ComputeTask {
             id: "wasm-ref-valid".into(),
-            submitter: "did:icn:alice".into(),
+            submitter: TEST_ALICE_DID.into(),
             coop_id: None,
             code: TaskCode::WasmRef(hash),
             inputs: vec![],

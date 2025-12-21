@@ -447,12 +447,18 @@ impl fmt::Display for DisputeOutcome {
 mod tests {
     use super::*;
 
+    /// Valid test DID (proper multibase-encoded Ed25519 public key)
+    /// Generated from deterministic seed [1u8; 32]
+    const TEST_ALICE_DID: &str = "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9";
+    /// Generated from deterministic seed [3u8; 32]
+    const TEST_BOB_DID: &str = "did:icn:zGyGKxMyg1p9SsHfm15MkNUu1u9TN2JtTspcdmrtGUdse";
+
     fn test_did() -> Did {
-        Did::from_anchor_id(&[42u8; 32])
+        TEST_ALICE_DID.parse().expect("valid test DID")
     }
 
     fn test_holder_did() -> Did {
-        Did::from_anchor_id(&[43u8; 32])
+        TEST_BOB_DID.parse().expect("valid test DID")
     }
 
     fn create_test_steward() -> StewardRecord {

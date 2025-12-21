@@ -519,12 +519,21 @@ fn status_to_key(status: &StewardStatus) -> &'static str {
 mod tests {
     use super::*;
 
+    /// Valid test DIDs (proper multibase-encoded Ed25519 public keys)
+    /// Generated from deterministic seeds
+    const TEST_DID_1: &str = "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9"; // seed [1u8; 32]
+    const TEST_DID_2: &str = "did:icn:z9hSR6S7WPtxmTojgo6GG3k4yDPecgJY292j7xrsUGWBu"; // seed [2u8; 32]
+    const TEST_DID_3: &str = "did:icn:zGyGKxMyg1p9SsHfm15MkNUu1u9TN2JtTspcdmrtGUdse"; // seed [3u8; 32]
+    const TEST_DID_4: &str = "did:icn:zEdmxWPmx2WH6WgFfTdu9xfkYf3k1g5wD1zccTVySEEh1"; // seed [4u8; 32]
+    const TEST_DID_5: &str = "did:icn:z8SFqwqnq4whPhs8icwHA2hQg3hUoN1qrCLK1SBx3WKwe"; // seed [5u8; 32]
+    const TEST_DID_6: &str = "did:icn:zAKkzLhjhyFtM9j7WAhbaqYpFe49cXeJBg2kzLRC2PnNa"; // seed [6u8; 32]
+
     fn test_did() -> Did {
-        Did::from_anchor_id(&[42u8; 32])
+        TEST_DID_1.parse().expect("valid test DID")
     }
 
     fn test_holder_did() -> Did {
-        Did::from_anchor_id(&[43u8; 32])
+        TEST_DID_2.parse().expect("valid test DID")
     }
 
     fn create_test_record() -> StewardRecord {
@@ -744,16 +753,16 @@ mod tests {
 
         let record1 = create_test_record();
         let record2 = StewardRecord::new(
-            Did::from_anchor_id(&[44u8; 32]),
-            Did::from_anchor_id(&[45u8; 32]),
+            TEST_DID_3.parse().expect("valid test DID"),
+            TEST_DID_4.parse().expect("valid test DID"),
             1000,
             2000,
             500,
             "proposal-002".to_string(),
         );
         let record3 = StewardRecord::new(
-            Did::from_anchor_id(&[46u8; 32]),
-            Did::from_anchor_id(&[47u8; 32]),
+            TEST_DID_5.parse().expect("valid test DID"),
+            TEST_DID_6.parse().expect("valid test DID"),
             1000,
             2000,
             500,

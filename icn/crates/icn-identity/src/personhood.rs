@@ -365,14 +365,21 @@ impl PersonhoodAnchor {
         }
     }
 
+    /// Well-known genesis issuer DID (valid Ed25519 public key from seed [0u8; 32])
+    /// This is used as the issuer for genesis attestations.
+    pub const GENESIS_ISSUER_DID: &'static str =
+        "did:icn:z3b5C8qPPH1U8t8jxS7UB2A1mvz5Z5dNLEcEtW3VQ8Zba";
+
     /// Create a genesis PersonhoodAnchor (for bootstrap/testing)
     pub fn genesis(reason: &str, current_key: [u8; 32]) -> Self {
         let anchor = Anchor::genesis(reason);
         let now = icn_time::current_timestamp_secs();
 
-        // Create a genesis attestation
-        let attestation =
-            POPAttestation::genesis(&anchor.id, Did::from_anchor_id(&anchor.id), reason);
+        // Create a genesis attestation using well-known genesis issuer
+        let genesis_issuer: Did = Self::GENESIS_ISSUER_DID
+            .parse()
+            .expect("Genesis issuer DID is valid");
+        let attestation = POPAttestation::genesis(&anchor.id, genesis_issuer, reason);
 
         Self {
             anchor,

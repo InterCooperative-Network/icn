@@ -558,12 +558,19 @@ mod tests {
     use crate::commons::Affiliation;
     use crate::personhood_store::InMemoryPersonhoodStore;
 
+    /// Valid test DIDs (proper multibase-encoded Ed25519 public keys)
+    /// Generated from deterministic seeds
+    const TEST_DID_1: &str = "did:icn:zAKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9"; // seed [1u8; 32]
+    const TEST_DID_2: &str = "did:icn:z9hSR6S7WPtxmTojgo6GG3k4yDPecgJY292j7xrsUGWBu"; // seed [2u8; 32]
+    #[allow(dead_code)] // Keep for future test expansion
+    const TEST_DID_3: &str = "did:icn:zGyGKxMyg1p9SsHfm15MkNUu1u9TN2JtTspcdmrtGUdse"; // seed [3u8; 32]
+
     fn test_anchor_id() -> [u8; 32] {
         [42u8; 32]
     }
 
     fn test_did() -> Did {
-        Did::from_anchor_id(&test_anchor_id())
+        TEST_DID_1.parse().expect("valid test DID")
     }
 
     fn create_test_store() -> CommonsHolderStore<InMemoryPersonhoodStore> {
@@ -638,7 +645,7 @@ mod tests {
 
         // Create and suspend another holder
         let mut holder2 =
-            CommonsHolderRecord::new([2u8; 32], Did::from_anchor_id(&[2u8; 32]), POPLevel::Strong);
+            CommonsHolderRecord::new([2u8; 32], TEST_DID_2.parse().expect("valid DID"), POPLevel::Strong);
         holder2.suspend("test".to_string(), 9999999999);
         store.store(&holder2).unwrap();
 
@@ -725,13 +732,19 @@ mod tests {
         let store = create_test_store();
 
         // Create holder with Weak level
-        let holder1 =
-            CommonsHolderRecord::new([1u8; 32], Did::from_anchor_id(&[1u8; 32]), POPLevel::Weak);
+        let holder1 = CommonsHolderRecord::new(
+            [1u8; 32],
+            TEST_DID_1.parse().expect("valid DID"),
+            POPLevel::Weak,
+        );
         store.store(&holder1).unwrap();
 
         // Create holder with Strong level
-        let holder2 =
-            CommonsHolderRecord::new([2u8; 32], Did::from_anchor_id(&[2u8; 32]), POPLevel::Strong);
+        let holder2 = CommonsHolderRecord::new(
+            [2u8; 32],
+            TEST_DID_2.parse().expect("valid DID"),
+            POPLevel::Strong,
+        );
         store.store(&holder2).unwrap();
 
         let weak_or_above = store.list_by_min_pop_level(POPLevel::Weak).unwrap();
@@ -752,7 +765,7 @@ mod tests {
         store.store(&create_test_holder()).unwrap();
 
         let holder2 =
-            CommonsHolderRecord::new([2u8; 32], Did::from_anchor_id(&[2u8; 32]), POPLevel::Strong);
+            CommonsHolderRecord::new([2u8; 32], TEST_DID_2.parse().expect("valid DID"), POPLevel::Strong);
         store.store(&holder2).unwrap();
 
         assert_eq!(store.count().unwrap(), 2);
