@@ -27,7 +27,7 @@ pub struct MemberProfile {
     pub balance: f64,
     /// Total number of transactions
     pub transaction_count: usize,
-    /// Trust score (placeholder for future integration)
+    /// Trust score from requester's perspective (None if unauthenticated or unavailable)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub trust_score: Option<f64>,
 }

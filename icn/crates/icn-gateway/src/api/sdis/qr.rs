@@ -146,17 +146,25 @@ fn proof_type_to_byte(pt: &ProofType) -> u8 {
 }
 
 /// Convert byte to proof type
+///
+/// NOTE: Some proof types (Citizenship, Membership, Custom) require extended data
+/// that cannot be encoded in a single byte. These use placeholder values and
+/// require protocol extension to properly support in ephemeral QR codes.
+/// See: https://github.com/InterCooperative-Network/icn/issues/133
 fn byte_to_proof_type(byte: u8) -> Result<ProofType, EphemeralError> {
     match byte {
         0x00..=0x7F => Ok(ProofType::AgeAtLeast { threshold: byte }),
         0x80 => Ok(ProofType::Citizenship {
-            country_code: [b'?', b'?'], // Would need extended data
+            // Extended QR format needed to encode country code
+            country_code: [b'?', b'?'],
         }),
         0x81 => Ok(ProofType::Membership {
-            org_did: icn_identity::Did::from_anchor_id(&[0u8; 32]), // Placeholder
+            // Extended QR format needed to encode org DID
+            org_did: icn_identity::Did::from_anchor_id(&[0u8; 32]),
         }),
         0x82 => Ok(ProofType::NonRevocation),
         0xFF => Ok(ProofType::Custom {
+            // Extended QR format needed to encode circuit ID
             circuit_id: [0u8; 32],
         }),
         _ => Err(EphemeralError::InvalidFormat(format!(

@@ -145,22 +145,36 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
             )
         };
 
+        // SECURITY NOTE: Gateway cannot sign attestations (no private key access).
+        // This creates an UNSIGNED attestation suitable for development/testing only.
+        // Production requires client-side signing before submission.
+        // See: https://github.com/InterCooperative-Network/icn/issues/133
         let attestation = POPAttestation::new(
             &anchor_id_bytes,
             issuer,
             pop_method,
             pop_level,
-            vec![], // Signature placeholder
-            None,   // No expiry
+            Vec::new(), // UNSIGNED - gateway lacks signing capability
+            None,       // No expiry
+        );
+        warn!(
+            "Created UNSIGNED attestation for anchor {} - requires client-side signing for production",
+            hex::encode(&anchor_id_bytes)
         );
 
-        // Derive a current key from the DID (hash of DID as placeholder)
+        // DEVELOPMENT ONLY: Derive a placeholder key from the DID.
+        // Production anchors must provide their actual Ed25519 public key.
+        // See: https://github.com/InterCooperative-Network/icn/issues/133
         let mut key_hasher = Sha256::new();
-        key_hasher.update(b"gateway-current-key:");
+        key_hasher.update(b"gateway-dev-placeholder-key:");
         key_hasher.update(did.as_str().as_bytes());
         let key_result = key_hasher.finalize();
         let mut current_key = [0u8; 32];
         current_key.copy_from_slice(&key_result);
+        warn!(
+            "Using PLACEHOLDER key for anchor {} - production requires real public key",
+            hex::encode(&anchor_id_bytes)
+        );
 
         // Create PersonhoodAnchor
         let anchor = PersonhoodAnchor::new(sdis_anchor, attestation, current_key);

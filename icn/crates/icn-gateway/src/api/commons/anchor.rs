@@ -8,6 +8,7 @@
 use actix_web::{get, post, put, web, HttpRequest, HttpResponse};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use tracing::warn;
 
 use crate::commons_mgr::CommonsManager;
 use crate::error::{GatewayError, Result};
@@ -238,14 +239,22 @@ pub async fn add_attestation(
         .expiry_seconds
         .map(|secs| icn_time::current_timestamp_secs() + secs);
 
-    // Create attestation
+    // SECURITY NOTE: Gateway cannot sign attestations (no private key access).
+    // This creates an UNSIGNED attestation suitable for development/testing only.
+    // Production requires client-side signing before submission.
+    // See: https://github.com/InterCooperative-Network/icn/issues/133
     let attestation = POPAttestation::new(
         anchor.id(),
-        steward_did,
+        steward_did.clone(),
         method,
         level,
-        vec![], // Signature placeholder
+        Vec::new(), // UNSIGNED - gateway lacks signing capability
         expiry,
+    );
+    warn!(
+        anchor_id = anchor_id,
+        steward = %steward_did,
+        "Created UNSIGNED attestation - requires client-side signing for production"
     );
 
     // Add attestation to anchor

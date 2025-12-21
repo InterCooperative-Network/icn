@@ -327,10 +327,16 @@ impl CoopManager {
         if let Some(ref handle) = self.coop_handle {
             match handle.list_cooperatives().await {
                 Ok(actor_coops) => {
-                    return Ok(actor_coops
-                        .into_iter()
-                        .map(convert_actor_coop_to_gateway)
-                        .collect());
+                    let mut result = Vec::with_capacity(actor_coops.len());
+                    for actor_coop in actor_coops {
+                        // Fetch members for each cooperative
+                        let members = handle
+                            .list_members(actor_coop.id.clone())
+                            .await
+                            .unwrap_or_default();
+                        result.push(convert_actor_coop_to_gateway(actor_coop, members));
+                    }
+                    return Ok(result);
                 }
                 Err(_) => {
                     // Fall through to local cache
@@ -479,21 +485,25 @@ impl CoopManager {
 }
 
 /// Convert icn_coop::Cooperative to gateway::Coop
-fn convert_actor_coop_to_gateway(actor_coop: icn_coop::Cooperative) -> Coop {
-    // TODO: Query members separately for accurate member list
-    // For now, create placeholder with founder
-    // SAFETY: This is a valid JSON string literal for a DID
-    #[allow(clippy::unwrap_used)]
-    let placeholder_did: Did = serde_json::from_str("\"did:icn:placeholder\"").unwrap();
+///
+/// Takes the cooperative and its members list to avoid placeholder data.
+fn convert_actor_coop_to_gateway(
+    actor_coop: icn_coop::Cooperative,
+    members: Vec<icn_coop::Member>,
+) -> Coop {
+    let gateway_members: Vec<CoopMember> = members
+        .into_iter()
+        .map(|m| CoopMember {
+            did: m.did,
+            role: convert_actor_role_to_gateway(&m.role),
+            joined_at: m.joined_at.timestamp() as u64,
+        })
+        .collect();
 
     Coop {
         id: actor_coop.id,
         name: actor_coop.name,
-        members: vec![CoopMember {
-            did: placeholder_did,
-            role: MemberRole::Steward,
-            joined_at: actor_coop.created_at.timestamp() as u64,
-        }],
+        members: gateway_members,
         settings: CoopSettings::default(),
         created_at: actor_coop.created_at.timestamp() as u64,
     }
