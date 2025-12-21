@@ -36,6 +36,21 @@ pub type TrustLookup = Arc<dyn Fn(&Did) -> Option<TrustClass> + Send + Sync>;
 /// Maximum subscribers per topic to prevent unbounded memory growth
 const MAX_SUBSCRIBERS_PER_TOPIC: usize = 10_000;
 
+/// Maximum topics per peer (base limit) to prevent subscription spam
+/// This can be increased for higher-trust peers via trust-weighted multipliers
+const MAX_TOPICS_PER_PEER_BASE: usize = 100;
+
+/// Trust multipliers for per-peer topic limits
+/// Higher trust classes get higher subscription limits
+fn topics_per_peer_limit(trust_class: Option<TrustClass>) -> usize {
+    match trust_class {
+        Some(TrustClass::Federated) => MAX_TOPICS_PER_PEER_BASE * 4, // 400 topics
+        Some(TrustClass::Partner) => MAX_TOPICS_PER_PEER_BASE * 2,   // 200 topics
+        Some(TrustClass::Known) => MAX_TOPICS_PER_PEER_BASE,          // 100 topics
+        Some(TrustClass::Isolated) | None => MAX_TOPICS_PER_PEER_BASE / 2, // 50 topics
+    }
+}
+
 /// Gossip actor manages topics and entry synchronization
 pub struct GossipActor {
     /// This node's DID
@@ -709,11 +724,55 @@ impl GossipActor {
             bail!("Not authorized to subscribe to topic: {topic}");
         }
 
+        // Check per-peer subscription limit (trust-weighted)
+        // This prevents a single peer from subscribing to too many topics
+        let peer_topics = self.get_subscriptions(&subscriber);
+        let peer_limit = topics_per_peer_limit(trust_class);
+        if peer_topics.len() >= peer_limit {
+            // Record misbehavior violation
+            if let Some(ref detector) = self.misbehavior_detector {
+                use sha2::{Digest, Sha256};
+                let mut hasher = Sha256::new();
+                hasher.update(subscriber.as_str().as_bytes());
+                hasher.update(b"peer_subscription_limit");
+                let evidence = hasher.finalize().to_vec();
+
+                let violation = icn_security::Violation::ExcessiveResourceUse {
+                    metric: "peer_subscriptions".to_string(),
+                    observed: (peer_topics.len() + 1) as u64,
+                    limit: peer_limit as u64,
+                };
+
+                tokio::task::block_in_place(|| {
+                    let rt = tokio::runtime::Handle::current();
+                    rt.block_on(async {
+                        detector
+                            .write()
+                            .await
+                            .record_violation(&subscriber, violation, evidence);
+                    })
+                });
+            }
+
+            warn!(
+                "Per-peer subscription limit reached: {} has {} subscriptions (max {})",
+                subscriber,
+                peer_topics.len(),
+                peer_limit
+            );
+            icn_obs::metrics::gossip::subscriptions_rejected_inc(topic, 0.0);
+            bail!(
+                "Peer subscription limit reached: {} subscriptions (max {})",
+                peer_topics.len(),
+                peer_limit
+            );
+        }
+
         // Add subscriber
         let subscribers = self.subscriptions.entry(topic.to_string()).or_default();
 
         if !subscribers.contains(&subscriber) {
-            // Check subscriber limit to prevent unbounded growth
+            // Check per-topic subscriber limit to prevent unbounded growth
             if subscribers.len() >= MAX_SUBSCRIBERS_PER_TOPIC {
                 // Record misbehavior violation (Phase 18 Week 1-2)
                 if let Some(ref detector) = self.misbehavior_detector {
@@ -1919,6 +1978,79 @@ mod tests {
 
         // The limit logic is validated in the ignored test above
         // This test just confirms normal operation works
+    }
+
+    #[test]
+    fn test_per_peer_subscription_limit() {
+        // Test that a single peer cannot subscribe to too many topics
+        let owner = KeyPair::generate().unwrap().did().clone();
+
+        // Use a trust lookup that returns None (Isolated class) for unknown peers
+        // Isolated limit is 50 topics
+        let isolated_lookup: TrustLookup = Arc::new(|_did: &Did| None);
+        let mut gossip = GossipActor::new(owner.clone(), isolated_lookup);
+
+        // Create many topics
+        let peer = KeyPair::generate().unwrap().did().clone();
+
+        // For Isolated trust class (None), limit is 50 topics
+        for i in 0..50 {
+            let topic_name = format!("test:topic_{i}");
+            gossip.create_topic(Topic::new(topic_name.clone(), AccessControl::Public));
+            let result = gossip.subscribe(&topic_name, peer.clone());
+            assert!(result.is_ok(), "Subscribe to topic {i} should succeed");
+        }
+
+        // Verify peer has 50 subscriptions
+        let subs = gossip.get_subscriptions(&peer);
+        assert_eq!(subs.len(), 50, "Should have 50 subscriptions");
+
+        // 51st subscription should fail
+        gossip.create_topic(Topic::new("test:topic_50".to_string(), AccessControl::Public));
+        let result = gossip.subscribe("test:topic_50", peer.clone());
+        assert!(result.is_err(), "51st subscription should fail");
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("subscription limit"),
+            "Error should mention subscription limit"
+        );
+    }
+
+    #[test]
+    fn test_per_peer_subscription_limit_trust_weighted() {
+        // Test that higher trust classes get higher limits
+        let owner = KeyPair::generate().unwrap().did().clone();
+
+        // Create a trust lookup that returns Federated for the test peer
+        let peer = KeyPair::generate().unwrap().did().clone();
+        let peer_clone = peer.clone();
+        let federated_lookup: TrustLookup = Arc::new(move |did: &Did| {
+            if did == &peer_clone {
+                Some(TrustClass::Federated)
+            } else {
+                None
+            }
+        });
+
+        let mut gossip = GossipActor::new(owner.clone(), federated_lookup);
+
+        // For Federated trust class, limit is 400 topics
+        // Create 100 topics (less than limit) - should all succeed
+        for i in 0..100 {
+            let topic_name = format!("test:fed_topic_{i}");
+            gossip.create_topic(Topic::new(topic_name.clone(), AccessControl::Public));
+            let result = gossip.subscribe(&topic_name, peer.clone());
+            assert!(
+                result.is_ok(),
+                "Federated peer subscribe to topic {i} should succeed"
+            );
+        }
+
+        // Verify peer has 100 subscriptions (well under 400 limit)
+        let subs = gossip.get_subscriptions(&peer);
+        assert_eq!(subs.len(), 100, "Federated peer should have 100 subscriptions");
     }
 
     #[test]
