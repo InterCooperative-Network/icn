@@ -7,7 +7,7 @@ use crate::error::{FederationError, Result};
 use crate::metrics;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::RwLock;
+use std::sync::{Arc, RwLock};
 use tracing::{debug, warn};
 
 /// Scope for gossip message routing
@@ -52,8 +52,8 @@ impl GossipScope {
 
 /// Router for federated gossip messages
 pub struct FederatedGossipRouter {
-    /// Active channels to federated cooperatives
-    channels: RwLock<HashMap<String, FederationChannel>>,
+    /// Active channels to federated cooperatives (Arc-wrapped for lock-free forwarding)
+    channels: RwLock<HashMap<String, Arc<FederationChannel>>>,
 
     /// Our cooperative ID
     own_coop_id: String,
@@ -83,7 +83,7 @@ impl FederatedGossipRouter {
             return Err(FederationError::MaxChannelsExceeded(self.max_channels));
         }
 
-        channels.insert(coop_id.clone(), channel);
+        channels.insert(coop_id.clone(), Arc::new(channel));
         metrics::channel::active_set(channels.len());
 
         debug!("Added federation channel to {}", coop_id);
@@ -129,28 +129,40 @@ impl FederatedGossipRouter {
     }
 
     /// Publish a message with the given scope
-    #[allow(clippy::await_holding_lock)]
+    ///
+    /// This method collects channel handles under the lock, then drops the lock
+    /// before awaiting network operations to avoid blocking writers.
     pub async fn publish(&self, topic: &str, data: Vec<u8>, scope: GossipScope) -> Result<usize> {
         if !scope.is_federated() {
             return Ok(0);
         }
 
-        let channels = self.channels.read().unwrap_or_else(|poisoned| {
-            warn!("Channels lock poisoned, recovering");
-            poisoned.into_inner()
-        });
+        // Collect channels to forward to while holding the lock briefly
+        let channels_to_forward: Vec<(String, Arc<FederationChannel>)> = {
+            let channels = self.channels.read().unwrap_or_else(|poisoned| {
+                warn!("Channels lock poisoned, recovering");
+                poisoned.into_inner()
+            });
+
+            channels
+                .iter()
+                .filter(|(coop_id, channel)| {
+                    if !scope.allows(coop_id) {
+                        return false;
+                    }
+                    if !channel.is_connected() {
+                        warn!("Channel to {} not connected, skipping", coop_id);
+                        return false;
+                    }
+                    true
+                })
+                .map(|(coop_id, channel)| (coop_id.clone(), Arc::clone(channel)))
+                .collect()
+        };
+        // Lock is now dropped - safe to await
+
         let mut sent_count = 0;
-
-        for (coop_id, channel) in channels.iter() {
-            if !scope.allows(coop_id) {
-                continue;
-            }
-
-            if !channel.is_connected() {
-                warn!("Channel to {} not connected, skipping", coop_id);
-                continue;
-            }
-
+        for (coop_id, channel) in channels_to_forward {
             match channel.forward(topic, data.clone()).await {
                 Ok(()) => {
                     sent_count += 1;
@@ -284,5 +296,68 @@ mod tests {
             .add_channel("coop-overflow".to_string(), channel)
             .await;
         assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_concurrent_publish_and_add_remove() {
+        use std::sync::Arc;
+        use tokio::time::{sleep, Duration};
+
+        let router = Arc::new(FederatedGossipRouter::new("test-coop".to_string(), 100));
+
+        // Add initial channels
+        for i in 0..5 {
+            let mut channel = FederationChannel::new(
+                format!("coop-{i}"),
+                test_did(),
+                format!("https://coop-{i}.example.com:8080"),
+            );
+            channel.connect().await.unwrap();
+            router
+                .add_channel(format!("coop-{i}"), channel)
+                .await
+                .unwrap();
+        }
+
+        // Spawn concurrent tasks: publish, add, and remove channels
+        let router_publish = Arc::clone(&router);
+        let publish_task = tokio::spawn(async move {
+            for _ in 0..10 {
+                let _ = router_publish
+                    .publish("test-topic", vec![1, 2, 3], GossipScope::Public)
+                    .await;
+                sleep(Duration::from_millis(1)).await;
+            }
+        });
+
+        let router_add = Arc::clone(&router);
+        let add_task = tokio::spawn(async move {
+            for i in 10..15 {
+                let mut channel = FederationChannel::new(
+                    format!("coop-{i}"),
+                    test_did(),
+                    format!("https://coop-{i}.example.com:8080"),
+                );
+                channel.connect().await.unwrap();
+                let _ = router_add.add_channel(format!("coop-{i}"), channel).await;
+                sleep(Duration::from_millis(2)).await;
+            }
+        });
+
+        let router_remove = Arc::clone(&router);
+        let remove_task = tokio::spawn(async move {
+            for i in 0..3 {
+                let _ = router_remove.remove_channel(&format!("coop-{i}")).await;
+                sleep(Duration::from_millis(3)).await;
+            }
+        });
+
+        // All tasks should complete without deadlock or panic
+        let (publish_result, add_result, remove_result) =
+            tokio::join!(publish_task, add_task, remove_task);
+
+        assert!(publish_result.is_ok(), "Publish task should not panic");
+        assert!(add_result.is_ok(), "Add task should not panic");
+        assert!(remove_result.is_ok(), "Remove task should not panic");
     }
 }
