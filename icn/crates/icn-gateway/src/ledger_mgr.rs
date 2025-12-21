@@ -217,11 +217,9 @@ impl LedgerManager {
     /// Get transaction history for a cooperative with pagination
     ///
     /// Security: This method enforces pagination to prevent OOM attacks.
-    /// - Loads ALL entries into memory (limitation of current ledger API)
-    /// - Applies filtering and pagination AFTER loading
+    /// - Uses efficient cursor-based pagination from ledger's timestamp index
+    /// - When filtering by DID, loads all entries for filtering (still needed)
     /// - Returns up to `limit` entries starting from `offset`
-    ///
-    /// TODO: Update icn-ledger to support cursor-based pagination for efficiency
     pub fn get_history(
         &self,
         coop_id: &CoopId,
@@ -234,15 +232,21 @@ impl LedgerManager {
             .read()
             .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
-        // SECURITY: We still load all entries here because the underlying ledger
-        // API doesn't support pagination. This is a known limitation.
-        // The pagination happens AFTER loading to at least limit what's returned.
-        // A full fix would require updating icn-ledger to support cursor-based queries.
+        // If no DID filter, use efficient cursor-based pagination
+        if filter_did.is_none() {
+            let (entries, _total) = ledger
+                .get_entries_paginated_asc(offset, limit)
+                .map_err(GatewayError::SubstrateError)?;
+            return Ok(entries);
+        }
+
+        // When filtering by DID, we need to load all entries for filtering
+        // (the timestamp index doesn't support DID-based queries)
         let mut entries = ledger
             .get_all_entries()
             .map_err(GatewayError::SubstrateError)?;
 
-        // Filter by DID if requested
+        // Filter by DID
         if let Some(did) = filter_did {
             entries.retain(|entry| entry.accounts.iter().any(|delta| &delta.account_id == did));
         }

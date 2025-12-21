@@ -26,6 +26,11 @@ pub type ValidationHook = Box<dyn Fn(&JournalEntry) -> Result<()> + Send + Sync>
 /// Key prefix for journal entries in storage
 const JOURNAL_PREFIX: &str = "ledger:journal:";
 
+/// Key prefix for timestamp-ordered index (for efficient pagination)
+/// Format: ledger:journal_ts:{timestamp:020}:{hash}
+/// The timestamp is zero-padded to 20 digits for proper lexicographic ordering
+const JOURNAL_TS_PREFIX: &str = "ledger:journal_ts:";
+
 /// Statistics about forks in the ledger
 #[derive(Debug, Clone)]
 pub struct ForkStats {
@@ -151,6 +156,9 @@ impl Ledger {
 
         // Load cleared volume index from storage
         ledger.load_cleared_volume_index()?;
+
+        // Ensure timestamp index exists (migrates existing ledgers)
+        ledger.ensure_timestamp_index()?;
 
         // Index existing entries for fork detection
         ledger.rebuild_fork_index()?;
@@ -365,6 +373,12 @@ impl Ledger {
         let key = format!("{}{}", JOURNAL_PREFIX, hash.to_hex());
         let value = serde_json::to_vec(&entry)?;
         self.store.put(key.as_bytes(), &value)?;
+
+        // Add to timestamp index for efficient pagination
+        // Key format: ledger:journal_ts:{timestamp:020}:{hash}
+        // Zero-padding ensures lexicographic order = chronological order
+        let ts_key = format!("{}{:020}:{}", JOURNAL_TS_PREFIX, entry.timestamp, hash.to_hex());
+        self.store.put(ts_key.as_bytes(), hash.as_bytes())?;
 
         debug!(
             entry_hash = %hash,
@@ -761,51 +775,61 @@ impl Ledger {
     /// Returns entries in reverse chronological order (most recent first),
     /// which is the typical use case for displaying transaction history.
     ///
+    /// Uses a timestamp-based secondary index for O(1) count and O(limit)
+    /// entry retrieval, making this efficient for large ledgers.
+    ///
     /// # Arguments
     /// * `offset` - Number of entries to skip (0-based)
     /// * `limit` - Maximum number of entries to return
     ///
     /// # Returns
     /// Tuple of (entries, total_count)
-    ///
-    /// # Performance Note
-    /// Currently loads and sorts all entries in memory before paginating.
-    /// For very large ledgers (100K+ entries), consider implementing a
-    /// secondary timestamp index for O(log n) access. See issue #111.
     pub fn get_entries_paginated(
         &self,
         offset: usize,
         limit: usize,
     ) -> Result<(Vec<JournalEntry>, usize)> {
-        let prefix = JOURNAL_PREFIX.as_bytes();
-        let pairs = self.store.scan(prefix)?;
-        let total = pairs.len();
+        // Use timestamp index for efficient pagination (entries sorted by timestamp)
+        let ts_prefix = JOURNAL_TS_PREFIX.as_bytes();
+        let total = self.store.scan_count(ts_prefix)?;
 
         // Early return if offset is beyond total
         if offset >= total {
             return Ok((Vec::new(), total));
         }
 
-        // Deserialize and sort entries
-        let mut entries = Vec::with_capacity(pairs.len());
-        for (_key, value) in pairs {
-            let entry: JournalEntry = serde_json::from_slice(&value)?;
-            entries.push(entry);
+        // For descending order (newest first), we need to read from the end
+        // Calculate the starting position from the ascending index
+        let items_from_end = offset + limit;
+        let skip_from_start = total.saturating_sub(items_from_end);
+        let take_count = limit.min(total.saturating_sub(offset));
+
+        // Scan the timestamp index with calculated offset
+        let (ts_pairs, _) = self.store.scan_paginated(ts_prefix, skip_from_start, take_count)?;
+
+        // Look up entries by hash (values in timestamp index are hashes)
+        let mut entries = Vec::with_capacity(ts_pairs.len());
+        for (_key, hash_bytes) in ts_pairs {
+            let entry_key = format!("{}{}", JOURNAL_PREFIX, hex::encode(&hash_bytes));
+            if let Some(entry_data) = self.store.get(entry_key.as_bytes())? {
+                let entry: JournalEntry = serde_json::from_slice(&entry_data)?;
+                entries.push(entry);
+            }
         }
 
-        // Sort by timestamp descending (newest first)
-        entries.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+        // Reverse to get descending order (newest first)
+        entries.reverse();
 
-        // Apply pagination
-        let paginated: Vec<JournalEntry> = entries.into_iter().skip(offset).take(limit).collect();
-
-        Ok((paginated, total))
+        Ok((entries, total))
     }
 
     /// Get journal entries with pagination (oldest first)
     ///
     /// Returns entries in chronological order (oldest first).
     /// Useful for auditing and sequential processing.
+    ///
+    /// Uses a timestamp-based secondary index for O(1) count and O(limit)
+    /// entry retrieval, making this efficient for large ledgers.
     ///
     /// # Arguments
     /// * `offset` - Number of entries to skip (0-based)
@@ -818,29 +842,28 @@ impl Ledger {
         offset: usize,
         limit: usize,
     ) -> Result<(Vec<JournalEntry>, usize)> {
-        let prefix = JOURNAL_PREFIX.as_bytes();
-        let pairs = self.store.scan(prefix)?;
-        let total = pairs.len();
+        // Use timestamp index for efficient pagination (already sorted by timestamp ASC)
+        let ts_prefix = JOURNAL_TS_PREFIX.as_bytes();
+
+        // Scan with pagination - this efficiently skips and takes from the sorted index
+        let (ts_pairs, total) = self.store.scan_paginated(ts_prefix, offset, limit)?;
 
         // Early return if offset is beyond total
         if offset >= total {
             return Ok((Vec::new(), total));
         }
 
-        // Deserialize and sort entries
-        let mut entries = Vec::with_capacity(pairs.len());
-        for (_key, value) in pairs {
-            let entry: JournalEntry = serde_json::from_slice(&value)?;
-            entries.push(entry);
+        // Look up entries by hash (values in timestamp index are hashes)
+        let mut entries = Vec::with_capacity(ts_pairs.len());
+        for (_key, hash_bytes) in ts_pairs {
+            let entry_key = format!("{}{}", JOURNAL_PREFIX, hex::encode(&hash_bytes));
+            if let Some(entry_data) = self.store.get(entry_key.as_bytes())? {
+                let entry: JournalEntry = serde_json::from_slice(&entry_data)?;
+                entries.push(entry);
+            }
         }
 
-        // Sort by timestamp ascending (oldest first)
-        entries.sort_by_key(|e| e.timestamp);
-
-        // Apply pagination
-        let paginated: Vec<JournalEntry> = entries.into_iter().skip(offset).take(limit).collect();
-
-        Ok((paginated, total))
+        Ok((entries, total))
     }
 
     // === Phase 18 Week 5: Fork Detection and Resolution ===
@@ -856,6 +879,51 @@ impl Ledger {
 
         info!(entry_count = entry_count, "Rebuilt fork detection index");
 
+        Ok(())
+    }
+
+    /// Ensure timestamp index exists for efficient pagination
+    ///
+    /// This migrates existing ledgers that were created before the timestamp
+    /// index was introduced. Only runs if the index is empty but entries exist.
+    fn ensure_timestamp_index(&self) -> Result<()> {
+        let ts_prefix = JOURNAL_TS_PREFIX.as_bytes();
+        let ts_count = self.store.scan_count(ts_prefix)?;
+
+        // If timestamp index already has entries, no migration needed
+        if ts_count > 0 {
+            return Ok(());
+        }
+
+        // Check if we have journal entries that need indexing
+        let journal_prefix = JOURNAL_PREFIX.as_bytes();
+        let pairs = self.store.scan(journal_prefix)?;
+
+        if pairs.is_empty() {
+            return Ok(());
+        }
+
+        info!(
+            entry_count = pairs.len(),
+            "Migrating ledger: building timestamp index"
+        );
+
+        for (key, value) in pairs {
+            // Extract hash from key (after prefix)
+            let key_str = String::from_utf8_lossy(&key);
+            let hash_hex = key_str.trim_start_matches(JOURNAL_PREFIX);
+
+            // Deserialize entry to get timestamp
+            let entry: JournalEntry = serde_json::from_slice(&value)?;
+
+            // Write to timestamp index
+            let ts_key = format!("{}{:020}:{}", JOURNAL_TS_PREFIX, entry.timestamp, hash_hex);
+            if let Ok(hash_bytes) = hex::decode(hash_hex) {
+                self.store.put(ts_key.as_bytes(), &hash_bytes)?;
+            }
+        }
+
+        info!("Timestamp index migration complete");
         Ok(())
     }
 
@@ -1025,6 +1093,10 @@ impl Ledger {
         // Remove from main store
         let key = format!("{}{}", JOURNAL_PREFIX, hash.to_hex());
         self.store.delete(key.as_bytes())?;
+
+        // Remove from timestamp index
+        let ts_key = format!("{}{:020}:{}", JOURNAL_TS_PREFIX, entry.timestamp, hash.to_hex());
+        self.store.delete(ts_key.as_bytes())?;
 
         // Add to quarantine
         let item = QuarantineItem::new(
@@ -1714,7 +1786,8 @@ impl Ledger {
         }
 
         // Step 3: Archive entries to separate namespace
-        let mut archived_hashes = Vec::with_capacity(archived_count);
+        // Track (hash, timestamp) pairs for deletion from both main store and timestamp index
+        let mut archived_entries: Vec<(ContentHash, u64)> = Vec::with_capacity(archived_count);
         let archive_timestamp = icn_time::current_timestamp_secs();
 
         for entry in &entries_to_archive {
@@ -1729,18 +1802,27 @@ impl Ledger {
                 })?;
 
                 self.store.put(archive_key.as_bytes(), &archive_data)?;
-                archived_hashes.push(hash.clone());
+                archived_entries.push((hash.clone(), entry.timestamp));
 
                 debug!("Archived entry {} to {}", hash, archive_key);
             }
         }
 
-        // Step 4: Remove entries from active ledger
-        for hash in &archived_hashes {
+        // Step 4: Remove entries from active ledger and timestamp index
+        for (hash, entry_timestamp) in &archived_entries {
+            // Remove from main store
             let journal_key = format!("{}{}", JOURNAL_PREFIX, hash.to_hex());
             self.store.delete(journal_key.as_bytes())?;
+
+            // Remove from timestamp index
+            let ts_key = format!("{}{:020}:{}", JOURNAL_TS_PREFIX, entry_timestamp, hash.to_hex());
+            self.store.delete(ts_key.as_bytes())?;
+
             debug!("Removed entry {} from active ledger", hash);
         }
+
+        // Extract just the hashes for return value and notification
+        let archived_hashes: Vec<ContentHash> = archived_entries.iter().map(|(h, _)| h.clone()).collect();
 
         // Step 5: Rebuild fork index with remaining entries
         self.fork_detector = ForkDetector::new();
