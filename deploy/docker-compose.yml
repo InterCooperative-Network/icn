@@ -32,7 +32,9 @@ services:
       - icn-data:/root/.icn
       - ./config/icn.toml:/root/.icn/icn.toml:ro
     environment:
-      - ICN_GATEWAY_JWT_SECRET=${JWT_SECRET:-change-me-in-production}
+      # REQUIRED: Set JWT_SECRET in .env file or environment
+      # Generate with: openssl rand -base64 32
+      - ICN_GATEWAY_JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set - see .env.example}
       - RUST_LOG=info
     restart: unless-stopped
     healthcheck:
@@ -69,7 +71,8 @@ services:
       - ../monitoring/grafana-dashboard.json:/var/lib/grafana/dashboards/icn.json:ro
       - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      # REQUIRED: Set GRAFANA_PASSWORD in .env file or environment
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:?GRAFANA_PASSWORD must be set}
       - GF_USERS_ALLOW_SIGN_UP=false
     restart: unless-stopped
     depends_on:

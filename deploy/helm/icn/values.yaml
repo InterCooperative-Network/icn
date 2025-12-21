@@ -1,4 +1,11 @@
 # ICN Helm Chart Values
+#
+# IMPORTANT: Before deploying to production, override ALL secrets!
+# Use --set or a separate values-secrets.yaml file (not committed to git)
+#
+# Example:
+#   helm install icn . --set icn.secrets.jwtSecret="$(openssl rand -base64 32)"
+#   helm install icn . -f values.yaml -f values-secrets.yaml
 
 global:
   domain: "example.com"
@@ -9,7 +16,7 @@ icn:
     repository: icn/icnd
     tag: "latest"
     pullPolicy: IfNotPresent
-  
+
   service:
     gateway:
       port: 8000
@@ -18,14 +25,14 @@ icn:
       port: 3000
     metrics:
       port: 9090
-  
+
   ingress:
     enabled: true
     className: "nginx"
     annotations:
       cert-manager.io/cluster-issuer: "letsencrypt-prod"
     host: "api.example.com"
-  
+
   resources:
     requests:
       memory: "512Mi"
@@ -33,17 +40,20 @@ icn:
     limits:
       memory: "2Gi"
       cpu: "2000m"
-  
+
   persistence:
     enabled: true
     size: 10Gi
-  
+
   env:
     LOG_LEVEL: "info"
     RUST_LOG: "icn=info"
-  
+
+  # SECRETS - MUST be overridden in production!
+  # Generate with: openssl rand -base64 32
   secrets:
-    jwtSecret: "change-me-in-production"
+    # WARNING: This is a placeholder. Override with --set or values-secrets.yaml
+    jwtSecret: ""
 
 prometheus:
   enabled: true
@@ -53,7 +63,9 @@ prometheus:
 
 grafana:
   enabled: true
-  adminPassword: "admin"
+  # WARNING: Change this password in production!
+  # Override with: --set grafana.adminPassword="$(openssl rand -base64 16)"
+  adminPassword: ""
   persistence:
     size: 5Gi
 

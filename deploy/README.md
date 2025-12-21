@@ -6,6 +6,84 @@ Tools and configuration for deploying ICN (Intercooperative Network) pilots.
 
 - **Native/Bare-metal**: Direct installation with systemd (recommended for production)
 - **Docker Compose**: Containerized stack with monitoring
+- **Kubernetes**: Production-ready K8s manifests (see `k8s/`)
+- **Helm**: Helm chart for flexible K8s deployment (see `helm/`)
+
+---
+
+## Security: Secret Provisioning
+
+**IMPORTANT**: All deployment methods require you to provide secure secrets. Never use placeholder values in production!
+
+### Required Secrets
+
+| Secret | Description | How to Generate |
+|--------|-------------|-----------------|
+| `JWT_SECRET` | Signs authentication tokens | `openssl rand -base64 32` |
+| `GRAFANA_PASSWORD` | Grafana admin password | `openssl rand -base64 16` |
+| Keystore passphrase | Encrypts identity keys | Strong memorable password |
+
+### Generating Secrets
+
+```bash
+# Generate a secure JWT secret (256-bit)
+openssl rand -base64 32
+
+# Generate a secure password (128-bit)
+openssl rand -base64 16
+
+# Generate a hex secret (256-bit)
+openssl rand -hex 32
+```
+
+### Secret Files
+
+This repository includes `.example` template files that must be copied and configured:
+
+| Template | Target | Notes |
+|----------|--------|-------|
+| `.env.example` | `.env` | Docker Compose secrets |
+| `k8s/secret.yaml.example` | `k8s/secret.yaml` | Kubernetes secrets (gitignored) |
+| `kubernetes/secret.yaml.example` | `kubernetes/secret.yaml` | Kubernetes secrets (gitignored) |
+
+**Never commit actual secrets to git.** All `secret.yaml` files are gitignored.
+
+### Kubernetes Secret Setup
+
+```bash
+# Option 1: From template file
+cp k8s/secret.yaml.example k8s/secret.yaml
+# Edit k8s/secret.yaml with real values
+kubectl apply -f k8s/secret.yaml
+
+# Option 2: Create directly with kubectl
+kubectl create secret generic icn-secrets \
+  --from-literal=JWT_SECRET="$(openssl rand -base64 32)" \
+  --from-literal=passphrase="your-secure-passphrase" \
+  -n icn
+```
+
+### Helm Secret Setup
+
+When using Helm, override secrets via `--set` or a separate values file:
+
+```bash
+# Option 1: Inline (secrets visible in shell history)
+helm install icn ./helm/icn \
+  --set icn.secrets.jwtSecret="$(openssl rand -base64 32)" \
+  --set grafana.adminPassword="$(openssl rand -base64 16)"
+
+# Option 2: Values file (recommended)
+cat > values-secrets.yaml << EOF
+icn:
+  secrets:
+    jwtSecret: "$(openssl rand -base64 32)"
+grafana:
+  adminPassword: "$(openssl rand -base64 16)"
+EOF
+helm install icn ./helm/icn -f values-secrets.yaml
+# Add values-secrets.yaml to .gitignore!
+```
 
 ---
 

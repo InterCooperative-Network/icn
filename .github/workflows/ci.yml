@@ -11,6 +11,47 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
+  secrets-check:
+    name: Secrets Placeholder Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Check for placeholder secrets in deployable manifests
+        run: |
+          echo "Checking for placeholder secrets in deployment files..."
+
+          # Define patterns that indicate placeholder secrets (in value positions)
+          # These patterns look for actual secret values, not comments
+          PLACEHOLDERS='change-me-in-production|changeme|your-secret-here'
+
+          FAILED=false
+
+          # Check Kubernetes manifests (excluding .example files and comments)
+          for file in $(find deploy -name "*.yaml" -o -name "*.yml" | grep -v '\.example'); do
+            # Only check lines that aren't comments (don't start with #) and contain key: value patterns
+            if grep -v '^\s*#' "$file" 2>/dev/null | grep -qiE "$PLACEHOLDERS"; then
+              echo "ERROR: Placeholder secret found in $file"
+              grep -v '^\s*#' "$file" | grep -niE "$PLACEHOLDERS" || true
+              FAILED=true
+            fi
+          done
+
+          # Check for non-example secret.yaml files that shouldn't exist
+          for file in $(find deploy -name "secret.yaml" -o -name "secrets.yaml" 2>/dev/null); do
+            echo "ERROR: Secret file found that should be .example: $file"
+            FAILED=true
+          done
+
+          if [ "$FAILED" = "true" ]; then
+            echo ""
+            echo "FAILURE: Found placeholder secrets or non-example secret files."
+            echo "See https://github.com/InterCooperative-Network/icn/blob/main/deploy/README.md for safe secret provisioning."
+            exit 1
+          fi
+
+          echo "All deployment files pass secret checks."
+
   fmt:
     name: Format Check
     runs-on: ubuntu-latest
