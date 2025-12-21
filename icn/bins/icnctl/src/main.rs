@@ -1,4 +1,5 @@
 //! icnctl - CLI for managing ICNd
+#![deny(clippy::unwrap_used, clippy::expect_used)]
 
 use anyhow::{bail, Context, Result};
 use clap::{CommandFactory, Parser, Subcommand};

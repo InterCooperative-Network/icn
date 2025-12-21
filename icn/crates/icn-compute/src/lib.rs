@@ -1,5 +1,6 @@
 //! ICN Distributed Compute Layer
 #![allow(missing_docs)]
+#![deny(clippy::unwrap_used, clippy::expect_used)]
 //!
 //! Trust-gated task distribution and execution for cooperative networks.
 //!

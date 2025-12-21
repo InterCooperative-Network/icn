@@ -1,5 +1,6 @@
 //! ICN CCL - Cooperative Contract Language runtime
 #![allow(missing_docs)]
+#![deny(clippy::unwrap_used, clippy::expect_used)]
 //!
 //! This crate implements a domain-specific language (DSL) for expressing cooperative
 //! agreements with built-in safety features:
