@@ -1,7 +1,11 @@
 //! CCL Contract Integration Tests
 //!
 //! These tests validate the full contract lifecycle:
-#![allow(clippy::unwrap_used, clippy::expect_used)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::cloned_ref_to_slice_refs
+)]
 //! 1. Contract creation and validation
 //! 2. Contract deployment to registry
 //! 3. Contract execution with rule invocation
