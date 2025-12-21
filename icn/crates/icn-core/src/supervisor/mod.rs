@@ -441,6 +441,11 @@ impl Supervisor {
                 let profile_cache_for_notifications = profile_cache.clone();
                 let node_profile_for_notifications = node_profile_handle.clone();
 
+                // Create rate limiter for trust attestation anti-flood protection
+                let attestation_rate_limiter = Arc::new(
+                    crate::trust_propagation::AttestationRateLimiter::new(),
+                );
+
                 // Create FederationGossipHandler if federation is enabled
                 let federation_handler_for_notifications: Option<
                     Arc<icn_federation::FederationGossipHandler>,
@@ -552,6 +557,7 @@ impl Supervisor {
                         profile_cache: profile_cache_for_notifications,
                         coop_store: coop_store_for_notifications,
                         federation_handler: federation_handler_for_notifications,
+                        attestation_rate_limiter,
                     },
                 );
 

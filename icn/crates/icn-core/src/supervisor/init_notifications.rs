@@ -25,6 +25,7 @@ pub type NodeProfileHandle = Arc<RwLock<crate::node::NodeProfile>>;
 pub type ProfileCache = Arc<RwLock<HashMap<Did, crate::node::NodeProfile>>>;
 pub type CandidateCache = Arc<icn_net::CandidateCache>;
 pub type FederationGossipHandle = Arc<icn_federation::FederationGossipHandler>;
+pub type AttestationRateLimiterHandle = Arc<crate::trust_propagation::AttestationRateLimiter>;
 
 /// Dependencies required for notification callback handlers
 #[derive(Clone)]
@@ -59,6 +60,8 @@ pub struct NotificationDeps {
     pub coop_store: Arc<icn_coop::CoopStore>,
     /// Optional federation handler
     pub federation_handler: Option<FederationGossipHandle>,
+    /// Rate limiter for trust attestations
+    pub attestation_rate_limiter: AttestationRateLimiterHandle,
 }
 
 /// Handle trust attestation entries
@@ -66,10 +69,11 @@ pub async fn handle_trust_attestation(
     entry: &GossipEntry,
     trust_graph: &TrustGraphHandle,
     own_did: &Did,
+    rate_limiter: &AttestationRateLimiterHandle,
 ) {
     if let Err(e) = crate::trust_propagation::handle_trust_attestation_entry(
         entry, trust_graph, own_did,
-        None, // TODO: Add rate limiter in Phase 8A+
+        Some(rate_limiter.as_ref()),
     )
     .await
     {
@@ -701,8 +705,9 @@ pub fn create_notification_callback(deps: NotificationDeps) -> icn_gossip::Entry
         if topic == crate::trust_propagation::TRUST_ATTESTATIONS_TOPIC {
             let trust_graph = deps.trust_graph.clone();
             let own_did = deps.own_did.clone();
+            let rate_limiter = deps.attestation_rate_limiter.clone();
             tokio::spawn(async move {
-                handle_trust_attestation(&entry, &trust_graph, &own_did).await;
+                handle_trust_attestation(&entry, &trust_graph, &own_did, &rate_limiter).await;
             });
         } else if topic == "contracts:deploy" {
             if let Some(data) = entry_data {
