@@ -300,7 +300,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(feature = "stark"))]
+    #[cfg(feature = "simulated")]
     fn test_prove_age() {
         let prover = ZkProver::new();
         let context = ProofContext::new(None);
@@ -318,7 +318,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(feature = "stark"))]
+    #[cfg(feature = "simulated")]
     fn test_prove_non_revocation() {
         let prover = ZkProver::new();
         let context = ProofContext::new(None);

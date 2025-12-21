@@ -15,16 +15,45 @@ pub struct StarkProof {
     pub public_inputs_hash: [u8; 32],
     /// Proof system version
     pub version: u8,
+    /// Whether this is a simulated proof (NO cryptographic security!)
+    /// Simulated proofs should only be used in testing.
+    #[serde(default)]
+    pub simulated: bool,
 }
 
 impl StarkProof {
-    /// Create a new STARK proof
+    /// Create a new STARK proof (cryptographically secure)
     pub fn new(proof_bytes: Vec<u8>, public_inputs_hash: [u8; 32]) -> Self {
         Self {
             proof_bytes,
             public_inputs_hash,
             version: 1,
+            simulated: false,
         }
+    }
+
+    /// Create a simulated proof (NO cryptographic security - testing only!)
+    ///
+    /// # Warning
+    ///
+    /// Simulated proofs provide **NO cryptographic guarantees**. They should
+    /// only be used in testing environments. Use [`proof_capability()`](crate::proof_capability)
+    /// to check build capabilities.
+    pub fn new_simulated(proof_bytes: Vec<u8>, public_inputs_hash: [u8; 32]) -> Self {
+        Self {
+            proof_bytes,
+            public_inputs_hash,
+            version: 1,
+            simulated: true,
+        }
+    }
+
+    /// Check if this is a simulated proof
+    ///
+    /// Simulated proofs provide NO cryptographic security and should only
+    /// be used in testing.
+    pub fn is_simulated(&self) -> bool {
+        self.simulated
     }
 
     /// Get proof size in bytes

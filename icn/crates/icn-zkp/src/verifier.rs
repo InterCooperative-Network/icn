@@ -307,9 +307,9 @@ impl ZkVerifier {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[cfg(not(feature = "stark"))]
+    #[cfg(feature = "simulated")]
     use crate::prover::ZkProver;
-    #[cfg(not(feature = "stark"))]
+    #[cfg(feature = "simulated")]
     use crate::types::AgeAttestation;
 
     #[test]
@@ -320,7 +320,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(feature = "stark"))]
+    #[cfg(feature = "simulated")]
     fn test_age_proof_verification() {
         let prover = ZkProver::new();
         let mut verifier = ZkVerifier::new();
@@ -348,7 +348,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(feature = "stark"))]
+    #[cfg(feature = "simulated")]
     fn test_nonce_replay_protection() {
         let prover = ZkProver::new();
         let mut verifier = ZkVerifier::new();
@@ -378,7 +378,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(feature = "stark"))]
+    #[cfg(feature = "simulated")]
     fn test_untrusted_issuer() {
         let prover = ZkProver::new();
         let mut verifier = ZkVerifier::new();

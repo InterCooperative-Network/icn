@@ -140,11 +140,25 @@ impl Circuit for MembershipProofCircuit {
             }
         }
 
-        #[cfg(not(feature = "stark"))]
+        // Build the proof based on enabled features
+        let public_hash = compute_public_inputs_hash(public);
+
+        #[cfg(feature = "stark")]
         {
+            // TODO: Actual STARK proof generation with winterfell
+            let _ = public_hash;
+            unimplemented!("Full STARK proofs require 'stark' feature implementation");
+        }
+
+        #[cfg(all(not(feature = "stark"), feature = "simulated"))]
+        {
+            // SIMULATED proof for testing ONLY
+            // WARNING: This provides NO cryptographic security!
             use sha3::{Digest, Sha3_256};
 
-            let public_hash = compute_public_inputs_hash(public);
+            tracing::warn!(
+                "Creating SIMULATED membership proof - NO CRYPTOGRAPHIC SECURITY"
+            );
 
             let mut hasher = Sha3_256::new();
             hasher.update(private.member_did.as_str().as_bytes());
@@ -158,13 +172,17 @@ impl Circuit for MembershipProofCircuit {
             proof_data.extend_from_slice(&public_hash);
             proof_data.extend_from_slice(&[0u8; 960]);
 
-            Ok(StarkProof::new(proof_data, public_hash))
+            Ok(StarkProof::new_simulated(proof_data, public_hash))
         }
 
-        #[cfg(feature = "stark")]
+        #[cfg(all(not(feature = "stark"), not(feature = "simulated")))]
         {
-            let _public_hash = compute_public_inputs_hash(public);
-            unimplemented!("Full STARK proofs require 'stark' feature");
+            // No proof capability - return error
+            let _ = public_hash;
+            Err(CircuitError::ProofGenerationFailed(
+                "ZKP proving not available. Enable 'stark' feature for production, \
+                 or 'simulated' feature for testing only.".into()
+            ))
         }
     }
 
@@ -176,20 +194,39 @@ impl Circuit for MembershipProofCircuit {
             return Ok(false);
         }
 
-        #[cfg(not(feature = "stark"))]
+        #[cfg(feature = "stark")]
         {
+            // TODO: Actual STARK verification with winterfell
+            unimplemented!("Full STARK verification requires 'stark' feature implementation");
+        }
+
+        #[cfg(all(not(feature = "stark"), feature = "simulated"))]
+        {
+            // SIMULATED verification for testing ONLY
+            if proof.is_simulated() {
+                tracing::warn!("Verifying SIMULATED proof - NO CRYPTOGRAPHIC SECURITY");
+            }
+
+            // Check proof structure
             if proof.proof_bytes.len() < 64 {
                 return Ok(false);
             }
+
+            // Verify the proof contains the expected public hash
             if proof.proof_bytes[32..64] != expected_hash[..] {
                 return Ok(false);
             }
+
             Ok(true)
         }
 
-        #[cfg(feature = "stark")]
+        #[cfg(all(not(feature = "stark"), not(feature = "simulated")))]
         {
-            unimplemented!("Full STARK verification requires 'stark' feature");
+            let _ = expected_hash;
+            Err(CircuitError::VerificationFailed(
+                "ZKP verification not available. Enable 'stark' feature for production, \
+                 or 'simulated' feature for testing only.".into()
+            ))
         }
     }
 }
@@ -207,7 +244,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(feature = "stark"))]
+    #[cfg(feature = "simulated")]
     fn test_membership_proof_success() {
         let public = MembershipProofPublic::new(test_org_did());
 
@@ -225,7 +262,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(feature = "stark"))]
+    #[cfg(feature = "simulated")]
     fn test_membership_with_role() {
         let public = MembershipProofPublic::new(test_org_did()).with_role("admin");
 

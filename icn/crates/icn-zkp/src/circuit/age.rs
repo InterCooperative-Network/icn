@@ -152,24 +152,25 @@ impl Circuit for AgeProofCircuit {
             return Err(CircuitError::SignatureInvalid);
         }
 
-        // Build the proof
-        // In production, this would invoke winterfell STARK prover
-        // For now, we create a simulated proof structure
+        // Build the proof based on enabled features
+        let public_hash = compute_public_inputs_hash(public);
 
         #[cfg(feature = "stark")]
         {
             // TODO: Actual STARK proof generation with winterfell
-            let _public_hash = compute_public_inputs_hash(public);
-            unimplemented!("Full STARK proofs require 'stark' feature");
+            let _ = public_hash;
+            unimplemented!("Full STARK proofs require 'stark' feature implementation");
         }
 
-        #[cfg(not(feature = "stark"))]
+        #[cfg(all(not(feature = "stark"), feature = "simulated"))]
         {
-            // Simulated proof for testing
-            // Contains: commitment to private data, public hash, simulated proof data
+            // SIMULATED proof for testing ONLY
+            // WARNING: This provides NO cryptographic security!
             use sha3::{Digest, Sha3_256};
 
-            let public_hash = compute_public_inputs_hash(public);
+            tracing::warn!(
+                "Creating SIMULATED age proof - NO CRYPTOGRAPHIC SECURITY"
+            );
 
             let mut hasher = Sha3_256::new();
             hasher.update(private.birthdate_days.to_le_bytes());
@@ -183,7 +184,17 @@ impl Circuit for AgeProofCircuit {
             proof_data.extend_from_slice(&public_hash);
             proof_data.extend_from_slice(&[0u8; 960]); // Padding to realistic size
 
-            Ok(StarkProof::new(proof_data, public_hash))
+            Ok(StarkProof::new_simulated(proof_data, public_hash))
+        }
+
+        #[cfg(all(not(feature = "stark"), not(feature = "simulated")))]
+        {
+            // No proof capability - return error
+            let _ = public_hash;
+            Err(CircuitError::ProofGenerationFailed(
+                "ZKP proving not available. Enable 'stark' feature for production, \
+                 or 'simulated' feature for testing only.".into()
+            ))
         }
     }
 
@@ -201,12 +212,16 @@ impl Circuit for AgeProofCircuit {
         #[cfg(feature = "stark")]
         {
             // TODO: Actual STARK verification with winterfell
-            unimplemented!("Full STARK verification requires 'stark' feature");
+            unimplemented!("Full STARK verification requires 'stark' feature implementation");
         }
 
-        #[cfg(not(feature = "stark"))]
+        #[cfg(all(not(feature = "stark"), feature = "simulated"))]
         {
-            // Simulated verification for testing
+            // SIMULATED verification for testing ONLY
+            if proof.is_simulated() {
+                tracing::warn!("Verifying SIMULATED proof - NO CRYPTOGRAPHIC SECURITY");
+            }
+
             // Check proof structure
             if proof.proof_bytes.len() < 64 {
                 return Ok(false);
@@ -218,6 +233,15 @@ impl Circuit for AgeProofCircuit {
             }
 
             Ok(true)
+        }
+
+        #[cfg(all(not(feature = "stark"), not(feature = "simulated")))]
+        {
+            let _ = expected_hash;
+            Err(CircuitError::VerificationFailed(
+                "ZKP verification not available. Enable 'stark' feature for production, \
+                 or 'simulated' feature for testing only.".into()
+            ))
         }
     }
 }
@@ -248,7 +272,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(feature = "stark"))]
+    #[cfg(feature = "simulated")]
     fn test_age_proof_success() {
         let issuer_pk = [1u8; 32];
         let public = AgeProofPublic::new(18, issuer_pk);

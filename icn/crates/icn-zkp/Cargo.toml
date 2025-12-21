@@ -56,6 +56,10 @@ tokio = { version = "1", features = ["full", "test-util"] }
 default = []
 # Enable full STARK proving (adds ~10MB to binary)
 stark = ["winterfell", "winter-air", "winter-math", "winter-utils"]
+# Enable simulated proofs for testing/development ONLY
+# WARNING: Simulated proofs provide NO cryptographic security!
+# This feature is disabled in release builds by default.
+simulated = []
 
 # Uncomment when benchmarks are implemented
 # [[bench]]

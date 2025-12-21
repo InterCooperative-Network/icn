@@ -51,6 +51,12 @@
 //! ```rust,ignore
 //! use icn_zkp::{ZkProver, ZkVerifier, ProofContext, AgeAttestation};
 //!
+//! // Check proof capability first
+//! let capability = icn_zkp::proof_capability();
+//! if !capability.can_prove() {
+//!     panic!("ZKP proving not available in this build");
+//! }
+//!
 //! // Prover side
 //! let prover = ZkProver::new();
 //! let context = ProofContext::new(None);
@@ -70,8 +76,16 @@
 //! # Features
 //!
 //! - `stark` - Enable full STARK proving with winterfell (adds ~10MB binary size)
+//! - `simulated` - Enable simulated proofs for testing (NO cryptographic security!)
 //!
-//! Without the `stark` feature, proofs are simulated for testing purposes.
+//! ## Security Warning
+//!
+//! **Default builds (no features) will return errors when attempting to generate proofs.**
+//!
+//! - For production: Enable the `stark` feature for real cryptographic proofs
+//! - For testing only: Enable the `simulated` feature (NEVER in production!)
+//!
+//! Use [`proof_capability()`] to check what this build supports.
 
 pub mod accumulator;
 pub mod circuit;
@@ -93,6 +107,106 @@ pub use types::{
     CompoundProof, MembershipAttestation, ProofContext, ProofType, StarkProof, VerificationResult,
 };
 pub use verifier::{VerifierError, ZkVerifier};
+
+// ============================================================================
+// Proof Capability Checking
+// ============================================================================
+
+/// Describes the proof capabilities of this build
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProofCapability {
+    /// Full STARK proofs available (production-ready)
+    Stark,
+    /// Simulated proofs only (NO cryptographic security - testing only!)
+    Simulated,
+    /// No proof capability (default build)
+    None,
+}
+
+impl ProofCapability {
+    /// Check if this build can generate proofs
+    pub fn can_prove(&self) -> bool {
+        matches!(self, ProofCapability::Stark | ProofCapability::Simulated)
+    }
+
+    /// Check if proofs from this build are cryptographically secure
+    pub fn is_secure(&self) -> bool {
+        matches!(self, ProofCapability::Stark)
+    }
+
+    /// Get a human-readable description
+    pub fn description(&self) -> &'static str {
+        match self {
+            ProofCapability::Stark => "STARK proofs (cryptographically secure)",
+            ProofCapability::Simulated => {
+                "SIMULATED proofs (NO SECURITY - testing only!)"
+            }
+            ProofCapability::None => {
+                "No proof capability (enable 'stark' or 'simulated' feature)"
+            }
+        }
+    }
+}
+
+/// Get the proof capability of this build
+///
+/// Use this to check what kind of proofs this build can generate before
+/// attempting to create proofs.
+///
+/// # Example
+///
+/// ```rust,no_run
+/// use icn_zkp::{proof_capability, ProofCapability};
+///
+/// let cap = proof_capability();
+/// match cap {
+///     ProofCapability::Stark => println!("Production-ready STARK proofs"),
+///     ProofCapability::Simulated => eprintln!("WARNING: Using simulated proofs!"),
+///     ProofCapability::None => panic!("No proof capability in this build"),
+/// }
+/// ```
+#[must_use]
+pub const fn proof_capability() -> ProofCapability {
+    #[cfg(feature = "stark")]
+    {
+        ProofCapability::Stark
+    }
+    #[cfg(all(not(feature = "stark"), feature = "simulated"))]
+    {
+        ProofCapability::Simulated
+    }
+    #[cfg(all(not(feature = "stark"), not(feature = "simulated")))]
+    {
+        ProofCapability::None
+    }
+}
+
+/// Check if simulated proofs are being used
+///
+/// This is a compile-time check that can be used to prevent accidental
+/// use of simulated proofs in release builds.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// #[cfg(not(debug_assertions))]
+/// compile_error!("Simulated proofs detected in release build!");
+/// ```
+#[must_use]
+pub const fn is_simulated() -> bool {
+    #[cfg(all(not(feature = "stark"), feature = "simulated"))]
+    {
+        true
+    }
+    #[cfg(any(feature = "stark", not(feature = "simulated")))]
+    {
+        false
+    }
+}
+
+// ============================================================================
+// Compound Proof API
+// ============================================================================
 
 /// Generate a compound proof combining attribute proof with non-revocation
 ///
@@ -130,7 +244,7 @@ mod tests {
     use super::*;
 
     #[test]
-    #[cfg(not(feature = "stark"))]
+    #[cfg(feature = "simulated")]
     fn test_full_age_proof_flow() {
         // Setup
         let prover = ZkProver::new();
@@ -184,7 +298,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(feature = "stark"))]
+    #[cfg(feature = "simulated")]
     fn test_non_revocation_flow() {
         let prover = ZkProver::new();
         let mut verifier = ZkVerifier::new();
