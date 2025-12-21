@@ -1,5 +1,8 @@
 //! ICN Trust - Trust graph management and policy enforcement
 #![allow(missing_docs)]
+// Prevent panics in production code paths
+#![deny(clippy::unwrap_used)]
+#![deny(clippy::expect_used)]
 //!
 //! This crate provides trust graph infrastructure for ICN with three orthogonal
 //! trust dimensions:

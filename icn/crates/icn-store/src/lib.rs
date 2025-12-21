@@ -1,5 +1,8 @@
 //! ICN Store - Persistent key-value storage abstraction
 #![allow(missing_docs)]
+// Prevent panics in production code paths
+#![deny(clippy::unwrap_used)]
+#![deny(clippy::expect_used)]
 
 /// Budget management for ledger accounts
 pub mod budgets;

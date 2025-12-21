@@ -1,6 +1,9 @@
 // Allow unused_assignments from Zeroize derive macro generated code
 #![allow(unused_assignments)]
 #![allow(missing_docs)]
+// Prevent panics in production code paths
+#![deny(clippy::unwrap_used)]
+#![deny(clippy::expect_used)]
 
 //! ICN Identity - DID management, key generation, and cryptographic operations
 //!
@@ -100,8 +103,11 @@ impl HybridSignatureOrClassical {
 
     /// Convert to bytes for serialization
     pub fn to_bytes(&self) -> Vec<u8> {
+        // SAFETY: HybridSignature is a simple struct with byte arrays that always serializes
+        // successfully. Bincode encoding cannot fail for well-formed data.
+        #[allow(clippy::expect_used)]
         bincode::serde::encode_to_vec(self, bincode::config::legacy())
-            .expect("Failed to serialize signature")
+            .expect("HybridSignature serialization is infallible")
     }
 
     /// Parse from bytes

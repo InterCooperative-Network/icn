@@ -1,5 +1,8 @@
 //! ICN RPC - JSON-RPC API for daemon communication
 #![allow(missing_docs)]
+// Prevent panics in production code paths
+#![deny(clippy::unwrap_used)]
+#![deny(clippy::expect_used)]
 //!
 //! Provides a simple HTTP-based JSON-RPC server for icnctl <-> icnd communication.
 //! The RPC server exposes NetworkActor operations for CLI access.
