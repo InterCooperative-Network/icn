@@ -223,9 +223,18 @@ impl HybridKeypair {
 
     /// Create from seed bytes (deterministic generation)
     ///
+    /// Both Ed25519 and ML-DSA keypairs are derived deterministically from the seed
+    /// using HKDF. The same seed will always produce identical keypairs, enabling
+    /// key recovery from a master seed.
+    ///
     /// The seed must be at least 64 bytes:
-    /// - First 32 bytes: Ed25519 seed
-    /// - Remaining bytes: Used for ML-DSA derivation
+    /// - First 32 bytes: Ed25519 seed (used directly)
+    /// - Bytes 32-64: ML-DSA seed (passed to HKDF-based derivation)
+    ///
+    /// # Security
+    ///
+    /// The seed should be cryptographically random and stored securely.
+    /// Anyone with the seed can regenerate all keypairs.
     pub fn from_seed(seed: &[u8]) -> Result<Self> {
         if seed.len() < 64 {
             return Err(CryptoError::InvalidKey(
@@ -233,17 +242,16 @@ impl HybridKeypair {
             ));
         }
 
-        // Ed25519 from first 32 bytes
+        // Ed25519 from first 32 bytes (direct derivation)
         // SAFETY: We verified seed.len() >= 64 above
         let classical_seed: [u8; 32] = seed[..32]
             .try_into()
             .map_err(|_| CryptoError::InvalidKey("Seed slice conversion failed".to_string()))?;
         let classical_signing = SigningKey::from_bytes(&classical_seed);
 
-        // For ML-DSA, we can't do deterministic generation with the current library
-        // In production, we'd use a KDF to derive the ML-DSA key from the seed
-        // For now, generate fresh (TODO: implement deterministic ML-DSA keygen)
-        let pq_keypair = MlDsaKeypair::generate()?;
+        // ML-DSA from bytes 32-64 (deterministic via HKDF + ChaCha20Rng)
+        let pq_seed = &seed[32..64];
+        let pq_keypair = MlDsaKeypair::from_seed(pq_seed)?;
 
         Ok(Self {
             classical_signing,
@@ -459,5 +467,112 @@ mod tests {
         // Test individual verification methods
         assert!(signature.verify_classical(message, &public_key.classical));
         assert!(signature.verify_pq(message, &public_key.pq));
+    }
+
+    #[test]
+    fn test_hybrid_from_seed_deterministic() {
+        let seed = [42u8; 64];
+
+        // Generate two keypairs from the same seed
+        let keypair1 = HybridKeypair::from_seed(&seed).unwrap();
+        let keypair2 = HybridKeypair::from_seed(&seed).unwrap();
+
+        // Both classical and PQ public keys must be identical
+        let pk1 = keypair1.public_key();
+        let pk2 = keypair2.public_key();
+
+        assert_eq!(
+            pk1.classical, pk2.classical,
+            "Same seed should produce identical Ed25519 public keys"
+        );
+        assert_eq!(
+            pk1.pq.as_bytes(),
+            pk2.pq.as_bytes(),
+            "Same seed should produce identical ML-DSA public keys"
+        );
+    }
+
+    #[test]
+    fn test_hybrid_from_seed_different_seeds() {
+        let seed1 = [1u8; 64];
+        let seed2 = [2u8; 64];
+
+        let keypair1 = HybridKeypair::from_seed(&seed1).unwrap();
+        let keypair2 = HybridKeypair::from_seed(&seed2).unwrap();
+
+        let pk1 = keypair1.public_key();
+        let pk2 = keypair2.public_key();
+
+        // Different seeds should produce different keys
+        assert_ne!(pk1.classical, pk2.classical);
+        assert_ne!(pk1.pq.as_bytes(), pk2.pq.as_bytes());
+    }
+
+    #[test]
+    fn test_hybrid_from_seed_sign_verify() {
+        let seed = [99u8; 64];
+        let keypair = HybridKeypair::from_seed(&seed).unwrap();
+        let message = b"test message for seed-derived hybrid keypair";
+
+        // Sign and verify
+        let signature = keypair.sign(message).unwrap();
+        let public_key = keypair.public_key();
+
+        assert!(
+            signature.verify(message, &public_key),
+            "Hybrid signature from seed-derived keypair should verify"
+        );
+    }
+
+    #[test]
+    fn test_hybrid_seed_recovery() {
+        // Simulate full key recovery scenario
+        let seed = [123u8; 64];
+
+        // Original keypair signs a document
+        let original = HybridKeypair::from_seed(&seed).unwrap();
+        let document = b"important legal document";
+        let original_signature = original.sign(document).unwrap();
+        let original_public_key = original.public_key();
+
+        // User loses access to keys...
+        drop(original);
+
+        // Later, recover the keypair from stored seed
+        let recovered = HybridKeypair::from_seed(&seed).unwrap();
+        let recovered_public_key = recovered.public_key();
+
+        // Public keys should be identical
+        assert_eq!(
+            original_public_key.classical, recovered_public_key.classical,
+            "Recovered Ed25519 key should match original"
+        );
+        assert_eq!(
+            original_public_key.pq.as_bytes(),
+            recovered_public_key.pq.as_bytes(),
+            "Recovered ML-DSA key should match original"
+        );
+
+        // Should be able to verify original signatures
+        assert!(
+            original_signature.verify(document, &recovered_public_key),
+            "Recovered keypair should verify original signatures"
+        );
+
+        // Should be able to create new valid signatures
+        let new_document = b"new document after recovery";
+        let new_signature = recovered.sign(new_document).unwrap();
+        assert!(
+            new_signature.verify(new_document, &original_public_key),
+            "New signatures should verify with original public key"
+        );
+    }
+
+    #[test]
+    fn test_hybrid_seed_too_short() {
+        let short_seed = [0u8; 32]; // Only 32 bytes, need at least 64
+        let result = HybridKeypair::from_seed(&short_seed);
+
+        assert!(result.is_err(), "Should fail with seed < 64 bytes");
     }
 }

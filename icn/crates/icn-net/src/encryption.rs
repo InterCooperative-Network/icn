@@ -120,7 +120,7 @@ impl EncryptedEnvelope {
 
         // Derive encryption key from shared secret
         let key_bytes = Zeroizing::new(derive_encryption_key(shared_secret.as_bytes()));
-        let cipher = ChaCha20Poly1305::new(key_bytes.as_ref().into());
+        let cipher = ChaCha20Poly1305::new((&*key_bytes).into());
 
         // Derive nonce from sequence number and DIDs
         let nonce = derive_nonce(sequence, from, to)?;
@@ -174,7 +174,7 @@ impl EncryptedEnvelope {
 
         // Derive encryption key from shared secret
         let key_bytes = Zeroizing::new(derive_encryption_key(shared_secret.as_bytes()));
-        let cipher = ChaCha20Poly1305::new(key_bytes.as_ref().into());
+        let cipher = ChaCha20Poly1305::new((&*key_bytes).into());
 
         // Derive nonce from sequence number and DIDs
         let nonce = derive_nonce(self.sequence, &self.from, &self.to)?;

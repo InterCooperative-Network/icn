@@ -13,9 +13,12 @@ curve25519-dalek = "4.1"
 
 # Post-quantum cryptography (NIST FIPS standards)
 # Note: Using pqcrypto crate which wraps reference implementations
-pqcrypto-dilithium = "0.5"  # ML-DSA (FIPS 204)
+pqcrypto-dilithium = "0.5"  # ML-DSA (FIPS 204) - legacy, used for existing keys
 pqcrypto-kyber = "0.8"       # ML-KEM (FIPS 203)
 pqcrypto-traits = "0.3"
+
+# Pure Rust ML-DSA for deterministic key generation (accepts custom RNG)
+ml-dsa = "0.0.4"
 
 # Threshold cryptography
 # vsss-rs = "4.0"            # Verifiable secret sharing (add when needed)
@@ -29,6 +32,7 @@ hmac = "0.12"
 # Randomness
 rand = "0.8"
 rand_core = "0.6"
+rand_chacha = "0.3"  # Seeded RNG for deterministic key generation
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }

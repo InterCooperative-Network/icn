@@ -8,15 +8,39 @@
 //! - Public key: 1952 bytes
 //! - Signature: 3309 bytes
 //! - Secret key: 4032 bytes
+//!
+//! ## Deterministic Key Generation
+//!
+//! This module supports deterministic key generation from a seed using HKDF
+//! and a seeded ChaCha20Rng. This enables key recovery from a master seed.
+//!
+//! ```rust,ignore
+//! use icn_crypto_pq::ml_dsa::MlDsaKeypair;
+//!
+//! let seed = [0u8; 32];
+//! let keypair1 = MlDsaKeypair::from_seed(&seed)?;
+//! let keypair2 = MlDsaKeypair::from_seed(&seed)?;
+//!
+//! // Same seed always produces identical keypairs
+//! assert_eq!(keypair1.public_key().as_bytes(), keypair2.public_key().as_bytes());
+//! ```
 
+use hkdf::Hkdf;
+use ml_dsa::{KeyGen, MlDsa65};
 use pqcrypto_dilithium::dilithium3::{
     detached_sign, keypair, verify_detached_signature, DetachedSignature, PublicKey, SecretKey,
 };
 use pqcrypto_traits::sign::{DetachedSignature as _, PublicKey as _, SecretKey as _};
+use rand_chacha::ChaCha20Rng;
+use rand_core::SeedableRng;
 use serde::{Deserialize, Serialize};
+use sha3::Sha3_256;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::{CryptoError, Result};
+
+/// Domain separator for ML-DSA key derivation
+const ML_DSA_KEY_DERIVATION_DOMAIN: &[u8] = b"icn-ml-dsa-key-v1";
 
 /// ML-DSA public key (Dilithium3)
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -102,7 +126,7 @@ impl MlDsaKeypair {
     /// Secret key size in bytes
     pub const SECRET_KEY_SIZE: usize = 4032;
 
-    /// Generate a new keypair
+    /// Generate a new keypair with random keys
     pub fn generate() -> Result<Self> {
         let (pk, sk) = keypair();
 
@@ -111,6 +135,54 @@ impl MlDsaKeypair {
                 bytes: pk.as_bytes().to_vec(),
             },
             secret_key_bytes: sk.as_bytes().to_vec(),
+        })
+    }
+
+    /// Generate a keypair deterministically from a seed
+    ///
+    /// This uses HKDF-SHA3-256 to derive a 32-byte RNG seed, then uses a
+    /// seeded ChaCha20Rng with the pure-Rust ml-dsa crate for key generation.
+    /// The same seed will always produce the same keypair.
+    ///
+    /// # Arguments
+    ///
+    /// * `seed` - At least 32 bytes of entropy (typically from a master seed)
+    ///
+    /// # Security
+    ///
+    /// The seed should be cryptographically random and kept secret.
+    /// Recovery of the seed allows regeneration of the keypair.
+    pub fn from_seed(seed: &[u8]) -> Result<Self> {
+        if seed.len() < 32 {
+            return Err(CryptoError::InvalidKey(
+                "ML-DSA seed must be at least 32 bytes".to_string(),
+            ));
+        }
+
+        // Use HKDF to derive a 32-byte seed for the RNG
+        let hk = Hkdf::<Sha3_256>::new(Some(ML_DSA_KEY_DERIVATION_DOMAIN), seed);
+        let mut rng_seed = [0u8; 32];
+        hk.expand(b"ml-dsa-65-keygen", &mut rng_seed)
+            .map_err(|_| CryptoError::KeyDerivation("HKDF expansion failed".to_string()))?;
+
+        // Create a deterministically seeded RNG
+        let mut rng = ChaCha20Rng::from_seed(rng_seed);
+
+        // Generate keypair using the pure-Rust ml-dsa crate
+        let kp = MlDsa65::key_gen(&mut rng);
+
+        // Extract key bytes using encode() methods
+        let signing_key = kp.signing_key();
+        let verifying_key = kp.verifying_key();
+
+        let sk_encoded = signing_key.encode();
+        let pk_encoded = verifying_key.encode();
+
+        Ok(Self {
+            public_key: MlDsaPublicKey {
+                bytes: pk_encoded.as_slice().to_vec(),
+            },
+            secret_key_bytes: sk_encoded.as_slice().to_vec(),
         })
     }
 
@@ -251,5 +323,114 @@ mod tests {
 
         // Should still verify
         assert!(MlDsaKeypair::verify(&pk_restored, message, &sig_restored));
+    }
+
+    #[test]
+    fn test_ml_dsa_from_seed_deterministic() {
+        let seed = [42u8; 32];
+
+        // Generate two keypairs from the same seed
+        let keypair1 = MlDsaKeypair::from_seed(&seed).unwrap();
+        let keypair2 = MlDsaKeypair::from_seed(&seed).unwrap();
+
+        // Public keys must be identical
+        assert_eq!(
+            keypair1.public_key().as_bytes(),
+            keypair2.public_key().as_bytes(),
+            "Same seed should produce identical public keys"
+        );
+
+        // Secret keys must be identical
+        assert_eq!(
+            keypair1.secret_key_bytes(),
+            keypair2.secret_key_bytes(),
+            "Same seed should produce identical secret keys"
+        );
+    }
+
+    #[test]
+    fn test_ml_dsa_from_seed_different_seeds() {
+        let seed1 = [1u8; 32];
+        let seed2 = [2u8; 32];
+
+        let keypair1 = MlDsaKeypair::from_seed(&seed1).unwrap();
+        let keypair2 = MlDsaKeypair::from_seed(&seed2).unwrap();
+
+        // Different seeds should produce different keys
+        assert_ne!(
+            keypair1.public_key().as_bytes(),
+            keypair2.public_key().as_bytes(),
+            "Different seeds should produce different keys"
+        );
+    }
+
+    #[test]
+    fn test_ml_dsa_from_seed_key_sizes() {
+        let seed = [0u8; 32];
+        let keypair = MlDsaKeypair::from_seed(&seed).unwrap();
+
+        // Verify key sizes match expected FIPS 204 ML-DSA-65 sizes
+        assert_eq!(
+            keypair.public_key().as_bytes().len(),
+            MlDsaPublicKey::SIZE,
+            "Public key size should match ML-DSA-65 spec"
+        );
+        assert_eq!(
+            keypair.secret_key_bytes().len(),
+            MlDsaKeypair::SECRET_KEY_SIZE,
+            "Secret key size should match ML-DSA-65 spec"
+        );
+    }
+
+    #[test]
+    fn test_ml_dsa_from_seed_sign_verify() {
+        let seed = [99u8; 32];
+        let keypair = MlDsaKeypair::from_seed(&seed).unwrap();
+        let message = b"test message for seed-derived keypair";
+
+        // Sign with the seed-derived keypair
+        let signature = keypair.sign(message).unwrap();
+
+        // Verify the signature
+        assert!(
+            MlDsaKeypair::verify(keypair.public_key(), message, &signature),
+            "Signature from seed-derived keypair should verify"
+        );
+    }
+
+    #[test]
+    fn test_ml_dsa_seed_recovery() {
+        // Simulate key recovery from seed
+        let seed = [123u8; 32];
+
+        // Original keypair
+        let original = MlDsaKeypair::from_seed(&seed).unwrap();
+        let message = b"important document";
+        let original_signature = original.sign(message).unwrap();
+
+        // Later, recover the keypair from the same seed
+        let recovered = MlDsaKeypair::from_seed(&seed).unwrap();
+
+        // The recovered keypair should be able to:
+        // 1. Verify signatures made by the original
+        assert!(
+            MlDsaKeypair::verify(recovered.public_key(), message, &original_signature),
+            "Recovered keypair should verify original signatures"
+        );
+
+        // 2. Create signatures that verify with the original public key
+        let new_signature = recovered.sign(b"new message").unwrap();
+        assert!(
+            MlDsaKeypair::verify(original.public_key(), b"new message", &new_signature),
+            "Original public key should verify recovered keypair signatures"
+        );
+    }
+
+    #[test]
+    fn test_ml_dsa_seed_too_short() {
+        let short_seed = [0u8; 16]; // Only 16 bytes, need at least 32
+        let result = MlDsaKeypair::from_seed(&short_seed);
+
+        assert!(result.is_err(), "Should fail with seed < 32 bytes");
     }
 }

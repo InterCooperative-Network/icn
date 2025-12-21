@@ -65,6 +65,9 @@ pub enum CryptoError {
     #[error("Key generation failed: {0}")]
     KeyGeneration(String),
 
+    #[error("Key derivation failed: {0}")]
+    KeyDerivation(String),
+
     #[error("Signing failed: {0}")]
     Signing(String),
 
