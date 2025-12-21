@@ -115,6 +115,9 @@ impl Supervisor {
         // Cooperative handle for gateway integration
         let coop_handle_for_gateway: Option<icn_coop::CoopHandle>;
 
+        // Trust graph handle for gateway integration
+        let trust_graph_handle_for_gateway: Option<Arc<tokio::sync::RwLock<icn_trust::TrustGraph>>>;
+
         // Governance event subscription handles - MUST persist for daemon lifetime
         // Stored at function scope to prevent premature Drop (which would unsubscribe)
         let governance_event_subscription: Option<crate::events::SubscriptionHandle>;
@@ -201,8 +204,9 @@ impl Supervisor {
             let coop_handle = coop_services.coop_handle.clone();
             let coop_store = coop_services.coop_store.clone(); // Used for gossip sync
 
-            // Store for gateway integration (outside of identity_bundle scope)
+            // Store handles for gateway integration (outside of identity_bundle scope)
             coop_handle_for_gateway = Some(coop_handle);
+            trust_graph_handle_for_gateway = Some(trust_graph_handle.clone());
 
             // Spawn Identity actor (provides signing and trust graph access)
             let identity_handle = crate::identity::IdentityActor::spawn(
@@ -1024,10 +1028,11 @@ impl Supervisor {
 
             info!("Metrics update task spawned (system metrics only)");
 
-            // No event broadcaster or compute handle without identity
+            // No event broadcaster or compute/trust handles without identity
             event_broadcaster = None;
             compute_handle_for_gateway = None;
             coop_handle_for_gateway = None;
+            trust_graph_handle_for_gateway = None;
 
             (None, None, None)
         };
@@ -1085,6 +1090,11 @@ impl Supervisor {
                         // Connect cooperative handle if available
                         if let Some(handle) = coop_handle_for_gateway {
                             gateway_server = gateway_server.with_coop_handle(handle);
+                        }
+
+                        // Connect trust graph handle if available
+                        if let Some(handle) = trust_graph_handle_for_gateway {
+                            gateway_server = gateway_server.with_trust_handle(handle);
                         }
 
                         if let Err(e) = gateway_server.run().await {

@@ -29,7 +29,7 @@ use crate::notification_triggers::{GovernanceNotificationTrigger, LedgerNotifica
 use crate::notifications::NotificationService;
 use crate::rate_limit::{IpRateLimiter, RateLimitConfig, RateLimiter};
 use crate::security::{configure_cors, SecurityConfig, SecurityHeaders};
-use crate::trust_mgr::TrustManager;
+use crate::trust_mgr::{TrustGraphHandle, TrustManager};
 use icn_compute::ComputeHandle;
 
 /// Gateway server configuration
@@ -42,6 +42,8 @@ pub struct GatewayServer {
     rate_limit_config: Option<RateLimitConfig>,
     compute_handle: Option<ComputeHandle>,
     coop_handle: Option<icn_coop::CoopHandle>,
+    /// Optional handle to daemon's TrustGraph (for actor-backed mode)
+    trust_graph_handle: Option<TrustGraphHandle>,
 }
 
 impl GatewayServer {
@@ -56,6 +58,7 @@ impl GatewayServer {
             rate_limit_config: None,
             compute_handle: None,
             coop_handle: None,
+            trust_graph_handle: None,
         }
     }
 
@@ -74,6 +77,7 @@ impl GatewayServer {
             rate_limit_config: None,
             compute_handle: None,
             coop_handle: None,
+            trust_graph_handle: None,
         }
     }
 
@@ -93,6 +97,7 @@ impl GatewayServer {
             rate_limit_config: None,
             compute_handle: None,
             coop_handle: None,
+            trust_graph_handle: None,
         }
     }
 
@@ -111,6 +116,15 @@ impl GatewayServer {
     /// Set cooperative handle for daemon integration
     pub fn with_coop_handle(mut self, handle: icn_coop::CoopHandle) -> Self {
         self.coop_handle = Some(handle);
+        self
+    }
+
+    /// Set trust graph handle for daemon integration
+    ///
+    /// When set, the TrustManager will delegate all operations to the daemon's
+    /// TrustGraph actor, ensuring persistence and gossip synchronization.
+    pub fn with_trust_handle(mut self, handle: TrustGraphHandle) -> Self {
+        self.trust_graph_handle = Some(handle);
         self
     }
 
@@ -158,7 +172,16 @@ impl GatewayServer {
         let governance_manager = Arc::new(GovernanceManager::new());
         let invite_manager = Arc::new(crate::invite::InviteManager::new());
         let session_manager = Arc::new(crate::session::SessionManager::new());
-        let trust_manager = Arc::new(TrustManager::new());
+
+        // Create trust manager (uses TrustGraph actor if handle available, otherwise in-memory)
+        let trust_manager: Arc<TrustManager> = if let Some(handle) = self.trust_graph_handle {
+            info!("Trust manager connected to daemon (using TrustGraph actor)");
+            Arc::new(TrustManager::with_handle(handle))
+        } else {
+            info!("Trust manager running standalone (in-memory only)");
+            Arc::new(TrustManager::new())
+        };
+
         let compute_manager = if let Some(handle) = self.compute_handle {
             info!("Compute manager connected to daemon");
             Arc::new(ComputeManager::with_handle(handle))

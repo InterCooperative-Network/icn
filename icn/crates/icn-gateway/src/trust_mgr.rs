@@ -1,12 +1,24 @@
 //! Trust Manager for Gateway
 //!
 //! Manages trust graph operations and provides API access to trust scores and edges.
+//!
+//! ## Actor-Backed Mode
+//!
+//! When created with `with_handle()`, the TrustManager delegates all operations to
+//! the daemon's TrustGraph actor, ensuring:
+//! - Single source of truth for trust data
+//! - Persistence across restarts
+//! - Gossip synchronization of trust edges
+//!
+//! When created with `new()`, it uses in-memory storage (suitable for testing only).
 
 use dashmap::DashMap;
 use icn_identity::Did;
-use icn_trust::TrustEdge;
+use icn_trust::{TrustEdge, TrustGraph};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use tokio::sync::RwLock;
+use tracing::debug;
 
 /// Trust edge for API responses
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -34,24 +46,58 @@ pub struct TrustNetwork {
     pub edges: Vec<TrustEdgeResponse>,
 }
 
+/// Handle type for actor-backed trust graph
+pub type TrustGraphHandle = Arc<RwLock<TrustGraph>>;
+
 /// Trust Manager for gateway
 ///
 /// Provides a simplified interface to the trust graph for API endpoints.
-/// Uses in-memory storage for now (could be backed by Sled in production).
+///
+/// Supports two modes:
+/// - **Standalone mode** (`new()`): In-memory storage, for testing only
+/// - **Actor-backed mode** (`with_handle()`): Delegates to daemon's TrustGraph
 pub struct TrustManager {
-    /// In-memory trust edges (source:target -> edge)
+    /// In-memory trust edges (source:target -> edge) - used in standalone mode
     edges: Arc<DashMap<String, TrustEdge>>,
     /// Own DID (for trust computation perspective)
     own_did: Option<Did>,
+    /// Optional handle to daemon's TrustGraph (actor-backed mode)
+    trust_graph: Option<TrustGraphHandle>,
 }
 
 impl TrustManager {
-    /// Create a new trust manager
+    /// Create a new trust manager in standalone mode (in-memory only)
+    ///
+    /// **Warning**: This mode is for testing only. State is lost on restart
+    /// and not synchronized via gossip.
     pub fn new() -> Self {
+        debug!("TrustManager created in standalone mode (in-memory only)");
         Self {
             edges: Arc::new(DashMap::new()),
             own_did: None,
+            trust_graph: None,
         }
+    }
+
+    /// Create a trust manager backed by the daemon's TrustGraph
+    ///
+    /// This is the recommended mode for production. All operations delegate
+    /// to the daemon's TrustGraph actor, ensuring:
+    /// - Persistence across restarts
+    /// - Gossip synchronization
+    /// - Single source of truth
+    pub fn with_handle(handle: TrustGraphHandle) -> Self {
+        debug!("TrustManager created with daemon TrustGraph handle");
+        Self {
+            edges: Arc::new(DashMap::new()), // Not used in actor-backed mode
+            own_did: None,
+            trust_graph: Some(handle),
+        }
+    }
+
+    /// Check if running in actor-backed mode
+    pub fn is_actor_backed(&self) -> bool {
+        self.trust_graph.is_some()
     }
 
     /// Set the perspective DID for trust computation
@@ -60,54 +106,151 @@ impl TrustManager {
     }
 
     /// Add or update a trust edge
+    ///
+    /// In actor-backed mode, this requires acquiring a write lock on the TrustGraph.
+    /// Use the async version `add_edge_async` for non-blocking operation.
     pub fn add_edge(&self, edge: TrustEdge) -> Result<(), String> {
-        let key = format!("{}:{}", edge.source.as_str(), edge.target.as_str());
-        self.edges.insert(key, edge);
-        Ok(())
+        if let Some(ref handle) = self.trust_graph {
+            // Actor-backed mode: delegate to TrustGraph
+            // Note: This blocks on the write lock. For async contexts, use add_edge_async
+            let mut graph = handle.blocking_write();
+            graph
+                .add_edge(edge)
+                .map_err(|e| format!("TrustGraph error: {e}"))
+        } else {
+            // Standalone mode: in-memory storage
+            let key = format!("{}:{}", edge.source.as_str(), edge.target.as_str());
+            self.edges.insert(key, edge);
+            Ok(())
+        }
+    }
+
+    /// Add or update a trust edge (async version)
+    pub async fn add_edge_async(&self, edge: TrustEdge) -> Result<(), String> {
+        if let Some(ref handle) = self.trust_graph {
+            let mut graph = handle.write().await;
+            graph
+                .add_edge(edge)
+                .map_err(|e| format!("TrustGraph error: {e}"))
+        } else {
+            let key = format!("{}:{}", edge.source.as_str(), edge.target.as_str());
+            self.edges.insert(key, edge);
+            Ok(())
+        }
     }
 
     /// Get a trust edge
     pub fn get_edge(&self, from: &Did, to: &Did) -> Option<TrustEdge> {
-        let key = format!("{}:{}", from.as_str(), to.as_str());
-        self.edges.get(&key).map(|e| e.clone())
+        if let Some(ref handle) = self.trust_graph {
+            // Actor-backed mode: delegate to TrustGraph
+            let graph = handle.blocking_read();
+            graph.get_edge(from, to).ok().flatten()
+        } else {
+            // Standalone mode: in-memory storage
+            let key = format!("{}:{}", from.as_str(), to.as_str());
+            self.edges.get(&key).map(|e| e.clone())
+        }
+    }
+
+    /// Get a trust edge (async version)
+    pub async fn get_edge_async(&self, from: &Did, to: &Did) -> Option<TrustEdge> {
+        if let Some(ref handle) = self.trust_graph {
+            let graph = handle.read().await;
+            graph.get_edge(from, to).ok().flatten()
+        } else {
+            let key = format!("{}:{}", from.as_str(), to.as_str());
+            self.edges.get(&key).map(|e| e.clone())
+        }
     }
 
     /// Remove a trust edge
     pub fn remove_edge(&self, from: &Did, to: &Did) -> Result<(), String> {
-        let key = format!("{}:{}", from.as_str(), to.as_str());
-        if self.edges.remove(&key).is_some() {
-            Ok(())
+        if let Some(ref handle) = self.trust_graph {
+            // Actor-backed mode: delegate to TrustGraph
+            let mut graph = handle.blocking_write();
+            graph
+                .remove_edge(from, to)
+                .map_err(|e| format!("TrustGraph error: {e}"))
         } else {
-            Err("Trust edge not found".to_string())
+            // Standalone mode: in-memory storage
+            let key = format!("{}:{}", from.as_str(), to.as_str());
+            if self.edges.remove(&key).is_some() {
+                Ok(())
+            } else {
+                Err("Trust edge not found".to_string())
+            }
         }
     }
 
     /// Get all edges from a DID
     pub fn get_outgoing_edges(&self, from: &Did) -> Vec<TrustEdge> {
-        let prefix = format!("{}:", from.as_str());
-        self.edges
-            .iter()
-            .filter(|entry| entry.key().starts_with(&prefix))
-            .map(|entry| entry.value().clone())
-            .collect()
+        if let Some(ref handle) = self.trust_graph {
+            // Actor-backed mode: delegate to TrustGraph
+            let graph = handle.blocking_read();
+            graph.get_outgoing_edges(from).unwrap_or_default()
+        } else {
+            // Standalone mode: in-memory storage
+            let prefix = format!("{}:", from.as_str());
+            self.edges
+                .iter()
+                .filter(|entry| entry.key().starts_with(&prefix))
+                .map(|entry| entry.value().clone())
+                .collect()
+        }
     }
 
     /// Get all edges to a DID
+    ///
+    /// Note: TrustGraph doesn't support incoming edge queries directly.
+    /// In actor-backed mode, this operation is not supported and returns empty vec.
+    /// Use get_outgoing_edges() which is the primary query pattern for trust graphs.
+    ///
+    /// TODO: Add incoming edge index to TrustGraph if this is needed for production.
     pub fn get_incoming_edges(&self, to: &Did) -> Vec<TrustEdge> {
-        let to_str = to.as_str();
-        self.edges
-            .iter()
-            .filter(|entry| entry.value().target.as_str() == to_str)
-            .map(|entry| entry.value().clone())
-            .collect()
+        if self.trust_graph.is_some() {
+            // Actor-backed mode: TrustGraph doesn't support incoming edge queries
+            // This would require scanning all edges which is O(n) - not recommended
+            debug!("get_incoming_edges not supported in actor-backed mode");
+            Vec::new()
+        } else {
+            // Standalone mode: in-memory storage supports this efficiently
+            let to_str = to.as_str();
+            self.edges
+                .iter()
+                .filter(|entry| entry.value().target.as_str() == to_str)
+                .map(|entry| entry.value().clone())
+                .collect()
+        }
     }
 
     /// Compute trust score for a DID
     ///
-    /// Uses a simplified PageRank-like algorithm:
+    /// In actor-backed mode, delegates to TrustGraph's optimized computation
+    /// which includes caching, bloom filters, and priority queue pathfinding.
+    ///
+    /// In standalone mode, uses a simplified PageRank-like algorithm:
     /// - 70% direct trust
     /// - 30% transitive trust (average of weighted paths)
     pub fn compute_trust_score(&self, from: &Did, to: &Did) -> f64 {
+        if let Some(ref handle) = self.trust_graph {
+            // Actor-backed mode: delegate to TrustGraph
+            // Note: TrustGraph computes from its own_did perspective
+            // We need to check if from matches own_did
+            let graph = handle.blocking_read();
+            if graph.own_did() == from {
+                graph.compute_trust_score(to).unwrap_or(0.0)
+            } else {
+                // For non-own perspective, fall back to local computation
+                self.compute_trust_score_local(from, to)
+            }
+        } else {
+            // Standalone mode: local computation
+            self.compute_trust_score_local(from, to)
+        }
+    }
+
+    /// Compute trust score using local (in-memory or fallback) algorithm
+    fn compute_trust_score_local(&self, from: &Did, to: &Did) -> f64 {
         // Direct trust
         let direct_score = self.get_edge(from, to).map(|e| e.score).unwrap_or(0.0);
 
