@@ -1404,8 +1404,7 @@ mod tests {
     // ========================================================================
     // Sled Backend Tests (feature-gated)
     // ========================================================================
-    // TODO: Re-enable when sled-storage feature is added to Cargo.toml
-    /*
+    // Enable with: cargo test -p icn-gateway --features sled-storage
     #[cfg(feature = "sled-storage")]
     mod sled_tests {
         use super::*;
@@ -1588,5 +1587,4 @@ mod tests {
             assert!(size > 0, "Database should have non-zero size after writes");
         }
     }
-    */
 }
