@@ -37,12 +37,14 @@ This document tracks code quality improvements for the ICN project.
 - Use `Result<T>` return types throughout
 
 ### Progress Tracking
-- [ ] icn-net actors (network message handling)
-- [ ] icn-rpc handlers
-- [ ] icn-gateway API endpoints
+- [x] icn-core - clippy::unwrap_used/expect_used denied (2025-12-21)
+- [x] icn-net - clippy::unwrap_used/expect_used denied (2025-12-21)
+- [x] icn-gateway - clippy::unwrap_used/expect_used denied (2025-12-21)
+- [x] icn-gossip - clippy::unwrap_used/expect_used denied (2025-12-21)
+- [x] icn-ledger - clippy::unwrap_used/expect_used denied (2025-12-21)
+- [x] icnd (binary) - clippy::unwrap_used/expect_used denied (2025-12-21)
 - [ ] icnctl commands
-- [ ] icn-gossip protocol
-- [ ] icn-ledger operations
+- [ ] icn-rpc handlers
 - [ ] icn-trust computations
 - [ ] icn-identity keystore
 - [ ] icn-compute task execution

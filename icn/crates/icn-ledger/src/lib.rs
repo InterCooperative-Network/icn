@@ -1,5 +1,10 @@
 //! ICN Ledger - Double-entry mutual credit ledger with Merkle-DAG
+//!
+//! # Safety
+//! This crate denies panicking on unwrap/expect to prevent runtime crashes.
 #![allow(missing_docs)]
+#![deny(clippy::unwrap_used)]
+#![deny(clippy::expect_used)]
 //!
 //! This crate implements a double-entry bookkeeping system for mutual credit accounting,
 //! structured as a Merkle-DAG for content-addressable, tamper-evident storage.

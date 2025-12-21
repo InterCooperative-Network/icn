@@ -1,5 +1,10 @@
 //! ICN Core - Actor runtime, supervisor, and shared infrastructure
+//!
+//! # Safety
+//! This crate denies panicking on unwrap/expect to prevent runtime crashes.
 #![allow(missing_docs)]
+#![deny(clippy::unwrap_used)]
+#![deny(clippy::expect_used)]
 
 pub mod anti_entropy;
 pub mod config;

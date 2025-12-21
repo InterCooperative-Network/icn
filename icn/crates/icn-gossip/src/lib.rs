@@ -1,5 +1,10 @@
 //! ICN Gossip - Topic-based gossip protocol with ACLs
+//!
+//! # Safety
+//! This crate denies panicking on unwrap/expect to prevent runtime crashes.
 #![allow(missing_docs)]
+#![deny(clippy::unwrap_used)]
+#![deny(clippy::expect_used)]
 //!
 //! This crate implements a distributed synchronization system using:
 //!

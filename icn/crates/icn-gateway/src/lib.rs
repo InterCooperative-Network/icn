@@ -1,5 +1,10 @@
 //! ICN Gateway - REST + WebSocket API for cooperative applications
+//!
+//! # Safety
+//! This crate denies panicking on unwrap/expect to prevent runtime crashes.
 #![allow(missing_docs)]
+#![deny(clippy::unwrap_used)]
+#![deny(clippy::expect_used)]
 //!
 //! This crate provides a developer-facing HTTP API layer on top of the ICN substrate.
 //! Co-ops build apps (web/mobile) that talk to this gateway, which handles:

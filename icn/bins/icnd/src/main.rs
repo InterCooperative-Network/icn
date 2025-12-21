@@ -1,4 +1,9 @@
 //! ICNd - The ICN substrate daemon
+//!
+//! # Safety
+//! This binary denies panicking on unwrap/expect to prevent runtime crashes.
+#![deny(clippy::unwrap_used)]
+#![deny(clippy::expect_used)]
 
 use anyhow::Context;
 use anyhow::Result;

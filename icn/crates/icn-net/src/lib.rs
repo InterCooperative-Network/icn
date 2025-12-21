@@ -1,5 +1,10 @@
 //! ICN Net - Network transport, discovery, and session management
+//!
+//! # Safety
+//! This crate denies panicking on unwrap/expect to prevent runtime crashes.
 #![allow(missing_docs)]
+#![deny(clippy::unwrap_used)]
+#![deny(clippy::expect_used)]
 
 pub mod actor;
 mod handlers;
