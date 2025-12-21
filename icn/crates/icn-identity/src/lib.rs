@@ -121,8 +121,25 @@ impl HybridSignatureOrClassical {
 }
 
 /// A decentralized identifier for an ICN node
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// DIDs are validated on construction/deserialization to ensure:
+/// - They start with "did:icn:" prefix
+/// - The identifier part is valid multibase (base58btc)
+/// - The decoded bytes are exactly 32 bytes (Ed25519 public key size)
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
 pub struct Did(String);
+
+// Custom deserializer that validates DIDs on deserialization
+// This prevents malformed DIDs from bypassing validation when received over the network
+impl<'de> Deserialize<'de> for Did {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Did::from_str(&s).map_err(serde::de::Error::custom)
+    }
+}
 
 impl Did {
     /// Create a DID from an ed25519 public key
@@ -189,8 +206,15 @@ impl Did {
     /// This decodes the DID's multibase-encoded public key and returns
     /// the VerifyingKey for signature verification.
     pub fn to_verifying_key(&self) -> Result<VerifyingKey> {
-        // Extract multibase-encoded part
-        let encoded_part = &self.0[8..]; // Skip "did:icn:"
+        // Defensive bounds check (should not fail for validated DIDs)
+        let encoded_part = self
+            .0
+            .get(8..)
+            .ok_or_else(|| anyhow::anyhow!("Invalid DID format: too short"))?;
+
+        if encoded_part.is_empty() {
+            anyhow::bail!("Invalid DID format: empty identifier after prefix");
+        }
 
         // Decode multibase
         let (_base, decoded_bytes) = multibase::decode(encoded_part)
@@ -511,5 +535,68 @@ mod tests {
         let verifying_key = did.to_verifying_key().unwrap();
 
         assert!(verifying_key.verify(message, &signature).is_ok());
+    }
+
+    // Regression tests for malformed DID handling (Issue #149)
+    #[test]
+    fn test_did_parsing_empty_string() {
+        let result = Did::from_str("");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_did_parsing_very_short_string() {
+        let result = Did::from_str("abc");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_did_parsing_prefix_only() {
+        let result = Did::from_str("did:icn");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_did_deserialization_validates() {
+        // Valid DID should deserialize successfully
+        let kp = KeyPair::generate().unwrap();
+        let json = format!(r#""{}""#, kp.did().as_str());
+        let did: Result<Did, _> = serde_json::from_str(&json);
+        assert!(did.is_ok());
+    }
+
+    #[test]
+    fn test_did_deserialization_rejects_invalid_prefix() {
+        // Invalid prefix should be rejected during deserialization
+        let json = r#""invalid:prefix:abc123""#;
+        let result: Result<Did, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("did:icn:") || err_msg.contains("Invalid"));
+    }
+
+    #[test]
+    fn test_did_deserialization_rejects_empty() {
+        let json = r#""""#;
+        let result: Result<Did, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_did_deserialization_rejects_short_string() {
+        let json = r#""abc""#;
+        let result: Result<Did, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_did_deserialization_rejects_wrong_key_size() {
+        // Create a multibase-encoded string with wrong size (16 bytes instead of 32)
+        let short_bytes = vec![0u8; 16];
+        let encoded = multibase::encode(multibase::Base::Base58Btc, &short_bytes);
+        let json = format!(r#""did:icn:{encoded}""#);
+
+        let result: Result<Did, _> = serde_json::from_str(&json);
+        assert!(result.is_err());
     }
 }
