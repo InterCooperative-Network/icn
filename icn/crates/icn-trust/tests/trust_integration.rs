@@ -1,4 +1,5 @@
 //! Integration tests for the ICN trust layer.
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //!
 //! These tests verify the trust graph functionality including:
 //! - Multi-graph trust management (Social, Economic, Technical)

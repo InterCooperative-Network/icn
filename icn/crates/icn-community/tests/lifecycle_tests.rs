@@ -1,4 +1,5 @@
 //! Comprehensive lifecycle tests for communities
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use icn_community::types::MemberType;
 use icn_community::*;

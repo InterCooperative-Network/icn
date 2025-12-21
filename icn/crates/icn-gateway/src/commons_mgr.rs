@@ -159,7 +159,7 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
         );
         warn!(
             "Created UNSIGNED attestation for anchor {} - requires client-side signing for production",
-            hex::encode(&anchor_id_bytes)
+            hex::encode(anchor_id_bytes)
         );
 
         // DEVELOPMENT ONLY: Derive a placeholder key from the DID.
@@ -173,7 +173,7 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
         current_key.copy_from_slice(&key_result);
         warn!(
             "Using PLACEHOLDER key for anchor {} - production requires real public key",
-            hex::encode(&anchor_id_bytes)
+            hex::encode(anchor_id_bytes)
         );
 
         // Create PersonhoodAnchor

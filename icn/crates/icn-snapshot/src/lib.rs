@@ -1,4 +1,6 @@
 //! State snapshot for graceful restarts and distributed snapshots
+// Allow unwrap/expect in test code - panics are acceptable for tests
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 //!
 //! This crate provides:
 //! - Local state serialization for daemon restarts
@@ -279,13 +281,12 @@ pub fn verify_timestamped_snapshot(
     let checksum_path = data_dir.join(format!("{snapshot_filename}.sha256"));
 
     if !snapshot_path.exists() {
-        return Err(anyhow!("Snapshot '{}' does not exist", snapshot_filename));
+        return Err(anyhow!("Snapshot '{snapshot_filename}' does not exist"));
     }
 
     if !checksum_path.exists() {
         return Err(anyhow!(
-            "Checksum file for '{}' does not exist (legacy snapshot?)",
-            snapshot_filename
+            "Checksum file for '{snapshot_filename}' does not exist (legacy snapshot?)"
         ));
     }
 
@@ -319,7 +320,7 @@ pub fn load_timestamped_snapshot(
     let checksum_path = data_dir.join(format!("{snapshot_filename}.sha256"));
 
     if !snapshot_path.exists() {
-        return Err(anyhow!("Snapshot '{}' does not exist", snapshot_filename));
+        return Err(anyhow!("Snapshot '{snapshot_filename}' does not exist"));
     }
 
     let json = std::fs::read(&snapshot_path).context("Failed to read snapshot")?;
@@ -776,7 +777,10 @@ mod tests {
         std::fs::write(&snapshot_path, b"corrupted").unwrap();
         let result = verify_timestamped_snapshot(&temp, &filename);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("checksum mismatch"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("checksum mismatch"));
 
         std::fs::remove_dir_all(&temp).unwrap();
     }

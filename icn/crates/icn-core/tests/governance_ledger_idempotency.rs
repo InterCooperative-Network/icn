@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! Test verifying idempotency in governance→ledger integration
 //!
 //! **CRITICAL FIX**: If a ProposalAccepted event is processed twice, the ledger

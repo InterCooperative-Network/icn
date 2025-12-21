@@ -1,4 +1,5 @@
 //! Multi-node ledger synchronization example
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //!
 //! This example demonstrates how multiple nodes synchronize ledger entries
 //! via the gossip protocol. It simulates a small cooperative where members

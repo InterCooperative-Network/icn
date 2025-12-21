@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
 use icn_gateway::error::GatewayError;
 use icn_gateway::ledger_mgr::LedgerManager;
 use icn_identity::IdentityBundle;

@@ -3,6 +3,8 @@
 // Prevent panics in production code paths
 #![deny(clippy::unwrap_used)]
 #![deny(clippy::expect_used)]
+// Allow unwrap/expect in test code - panics are acceptable for tests
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
 /// Budget management for ledger accounts
 pub mod budgets;

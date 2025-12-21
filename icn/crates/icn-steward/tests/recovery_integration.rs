@@ -1,4 +1,5 @@
 //! Integration tests for the recovery flow
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //!
 //! Tests multi-steward recovery scenarios including:
 //! - Evidence verification and attestation collection

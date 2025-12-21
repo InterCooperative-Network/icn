@@ -1,4 +1,5 @@
 //! Integration test for NAT traversal candidate exchange
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //!
 //! This test validates the connection candidate flow:
 //! 1. Node creates ConnectionCandidate with STUN-discovered address

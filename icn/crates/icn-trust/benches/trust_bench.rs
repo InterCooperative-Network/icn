@@ -1,4 +1,5 @@
 //! Trust Graph Scalability Benchmarks
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //!
 //! Tests trust computation performance at various network sizes to validate
 //! the Phase 22 optimizations (bloom filter, priority queue, caching).

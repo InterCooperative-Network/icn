@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! Multi-node SDIS Integration Tests
 //!
 //! Tests the SDIS (Sovereign Digital Identity System) infrastructure:

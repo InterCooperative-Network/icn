@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! Partition Detection and Healing Integration Tests
 //!
 //! Phase 18 Week 3: Tests for network partition detection, vector clock merging,

@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! Integration test for Governance → Compute Policy execution flow
 //!
 //! This test validates that accepted SchedulingPolicy proposals automatically update compute policies:

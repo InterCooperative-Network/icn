@@ -1,4 +1,5 @@
 //! Performance benchmarks for icn-compute
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //!
 //! Covers:
 //! - Scheduler decision making
@@ -57,7 +58,7 @@ fn bench_resource_profile_operations(c: &mut Criterion) {
     let mut group = c.benchmark_group("resource_profile");
 
     group.bench_function("create_minimal", |b| {
-        b.iter(|| ResourceProfile::minimal());
+        b.iter(ResourceProfile::minimal);
     });
 
     group.bench_function("create_compute_heavy", |b| {
@@ -87,7 +88,7 @@ fn bench_task_operations(c: &mut Criterion) {
     });
 
     group.bench_function("task_id_generation", |b| {
-        b.iter(|| TaskId::new());
+        b.iter(TaskId::new);
     });
 
     // Benchmark task hash computation
@@ -133,7 +134,7 @@ fn bench_placement_scoring(c: &mut Criterion) {
     fn create_node_states(count: usize) -> HashMap<String, NodeState> {
         (0..count)
             .map(|i| {
-                let did = format!("did:icn:node{}", i);
+                let did = format!("did:icn:node{i}");
                 let state = NodeState {
                     did: did.clone(),
                     capacity: NodeCapacity {
@@ -207,7 +208,7 @@ fn bench_offer_evaluation(c: &mut Criterion) {
             |b, &count| {
                 let offers: Vec<PlacementOffer> = (0..count)
                     .map(|i| PlacementOffer {
-                        executor: format!("did:icn:executor{}", i),
+                        executor: format!("did:icn:executor{i}"),
                         score: 0.5 + (i as f64 * 0.02),
                         cost: 100 + i as u64,
                         estimated_start: 1700000000000,

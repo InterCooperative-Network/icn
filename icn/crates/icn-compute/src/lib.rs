@@ -1,6 +1,8 @@
 //! ICN Distributed Compute Layer
 #![allow(missing_docs)]
 #![deny(clippy::unwrap_used, clippy::expect_used)]
+// Allow unwrap/expect in test code - panics are acceptable for tests
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 //!
 //! Trust-gated task distribution and execution for cooperative networks.
 //!

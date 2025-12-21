@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! Byzantine Fault Detection Integration Tests
 //!
 //! Phase 18: Pre-Pilot Hardening

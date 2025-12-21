@@ -59,12 +59,11 @@ pub fn create_trust_callback(trust_graph: TrustGraphHandle) -> icn_compute::Trus
         let did_string = did_str.to_string();
         tokio::task::block_in_place(|| {
             tokio::runtime::Handle::current().block_on(async {
-                let did: Did = match serde_json::from_value(
-                    serde_json::Value::String(did_string.clone()),
-                ) {
-                    Ok(d) => d,
-                    Err(_) => return 0.0,
-                };
+                let did: Did =
+                    match serde_json::from_value(serde_json::Value::String(did_string.clone())) {
+                        Ok(d) => d,
+                        Err(_) => return 0.0,
+                    };
                 let graph = graph.read().await;
                 graph.compute_trust_score(&did).unwrap_or(0.0)
             })
@@ -260,15 +259,14 @@ pub fn create_locality_callback(
 ) -> icn_compute::LocalityCallback {
     Arc::new(move |submitter_did: &str| {
         // Parse DID and get RTT if available
-        let submitter_rtt_ms: Option<u64> = serde_json::from_value::<Did>(
-            serde_json::Value::String(submitter_did.to_string()),
-        )
-        .ok()
-        .and_then(|did| {
-            let peer = icn_net::PeerId(did);
-            let sets = neighbor_sets.blocking_read();
-            sets.get_rtt(&peer)
-        });
+        let submitter_rtt_ms: Option<u64> =
+            serde_json::from_value::<Did>(serde_json::Value::String(submitter_did.to_string()))
+                .ok()
+                .and_then(|did| {
+                    let peer = icn_net::PeerId(did);
+                    let sets = neighbor_sets.blocking_read();
+                    sets.get_rtt(&peer)
+                });
 
         icn_compute::LocalityContext {
             submitter_rtt_ms,
@@ -313,9 +311,7 @@ pub async fn subscribe_compute_topics(gossip: &mut icn_gossip::GossipActor, did:
 /// - Locality callback for network topology
 ///
 /// Returns the compute handle, dispute handle, event broadcaster, and policy manager.
-pub async fn init_compute_services(
-    deps: ComputeDeps,
-) -> anyhow::Result<ComputeServices> {
+pub async fn init_compute_services(deps: ComputeDeps) -> anyhow::Result<ComputeServices> {
     // Create trust callback
     let trust_callback = create_trust_callback(deps.trust_graph.clone());
 

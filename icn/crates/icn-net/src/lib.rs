@@ -3,11 +3,11 @@
 //! # Safety
 //! This crate denies panicking on unwrap/expect to prevent runtime crashes.
 #![allow(missing_docs)]
-#![deny(clippy::unwrap_used)]
-#![deny(clippy::expect_used)]
+#![deny(clippy::unwrap_used, clippy::expect_used)]
+// Allow unwrap/expect in test code - panics are acceptable for tests
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
 pub mod actor;
-mod handlers;
 pub mod blob_registry;
 pub mod candidate;
 pub mod candidate_cache;
@@ -16,6 +16,7 @@ pub mod encryption;
 pub mod envelope;
 pub mod error;
 pub mod global_rate_limit;
+mod handlers;
 pub mod protocol;
 pub mod rate_limit;
 pub mod replay_guard;

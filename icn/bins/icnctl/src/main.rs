@@ -5548,7 +5548,7 @@ fn handle_snapshot_command(cmd: SnapshotCommands, data_dir: &Path) -> Result<()>
 
                     // Load and display info
                     let load_result = if snapshot_name == "state.snapshot" {
-                        icn_snapshot::load_snapshot(&store_dir).map(|opt| opt)
+                        icn_snapshot::load_snapshot(&store_dir)
                     } else {
                         icn_snapshot::load_timestamped_snapshot(&store_dir, &snapshot_name)
                             .map(Some)

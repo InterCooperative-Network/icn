@@ -1,5 +1,8 @@
 //! ICN Coop - Cooperative management and lifecycle
 #![allow(missing_docs)]
+#![deny(clippy::unwrap_used, clippy::expect_used)]
+// Allow unwrap/expect in test code - panics are acceptable for tests
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
 /// Cooperative actor for handling coop operations
 pub mod actor;

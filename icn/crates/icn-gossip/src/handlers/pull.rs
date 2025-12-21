@@ -85,8 +85,7 @@ impl GossipActor {
         debug!("Detected we're behind - sending PullRequest for all entries");
 
         // Get trust class and limits
-        let trust_class =
-            (self.trust_lookup)(&peer_did).unwrap_or(icn_trust::TrustClass::Isolated);
+        let trust_class = (self.trust_lookup)(&peer_did).unwrap_or(icn_trust::TrustClass::Isolated);
         let limits = TrustResourceLimits::for_trust_class(trust_class);
         let max_bytes = limits.max_pull_bytes;
 

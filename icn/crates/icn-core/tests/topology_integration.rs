@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! Topology-aware networking integration tests
 //!
 //! Tests multi-node scenarios with regional topology configuration:

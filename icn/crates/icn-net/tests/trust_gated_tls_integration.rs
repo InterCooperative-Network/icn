@@ -1,4 +1,5 @@
 //! Integration tests for trust-gated TLS verification
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //!
 //! This test validates that the TLS certificate verifier enforces trust-based
 //! access control by rejecting connections from peers with insufficient trust.

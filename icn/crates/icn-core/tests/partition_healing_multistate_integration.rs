@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! Network Partition Healing with Multi-State Sync Integration Tests (Issue #110)
 //!
 //! Tests partition detection, healing, and multi-state synchronization:

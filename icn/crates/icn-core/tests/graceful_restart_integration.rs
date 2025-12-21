@@ -1,4 +1,5 @@
 //! Integration test for graceful restart with state snapshot
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //!
 //! This test validates that gossip and network state can be persisted and restored
 //! across daemon restarts, maintaining vector clocks, subscriptions, and X25519 keys.

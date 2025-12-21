@@ -40,10 +40,7 @@ impl ConnectionContext {
             };
 
             let trust_score = if let Some(ref tg) = self.trust_graph {
-                tg.read()
-                    .await
-                    .compute_trust_score(from)
-                    .unwrap_or(0.0) as f32
+                tg.read().await.compute_trust_score(from).unwrap_or(0.0) as f32
             } else {
                 0.5
             };
@@ -103,10 +100,7 @@ impl ConnectionContext {
                     };
 
                     if let Err(e) = write_message(&mut new_send, &response_msg).await {
-                        warn!(
-                            "Failed to send handshake response to {}: {}",
-                            from_did, e
-                        );
+                        warn!("Failed to send handshake response to {}: {}", from_did, e);
                     } else if let Err(e) = new_send.finish() {
                         warn!(
                             "Failed to finish handshake response stream to {}: {}",
@@ -140,10 +134,7 @@ impl ConnectionContext {
         from: &Did,
         sent_at: u64,
     ) {
-        info!(
-            "Received Ping from {} (sent_at={}ms)",
-            from, sent_at
-        );
+        info!("Received Ping from {} (sent_at={}ms)", from, sent_at);
 
         // Send Pong response
         let pong_msg = NetworkMessage::pong(self.own_did.clone(), from.clone(), sent_at);
@@ -186,9 +177,7 @@ impl ConnectionContext {
 
         // Record RTT in neighbor sets if available
         if let Some(ref sets) = self.neighbor_sets {
-            sets.write()
-                .await
-                .record_rtt(&PeerId(from.clone()), rtt_ms);
+            sets.write().await.record_rtt(&PeerId(from.clone()), rtt_ms);
 
             icn_obs::metrics::topology::rtt_observe(rtt_ms as f64);
         }

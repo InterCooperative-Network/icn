@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
 use icn_gateway::api::recurring_payments::{
     execute_due_payments, PaymentFrequency, RecurringPayment, RecurringPaymentStore,
     RecurringStatus,

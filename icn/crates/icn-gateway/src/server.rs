@@ -20,6 +20,7 @@ use crate::coop::CoopManager;
 use crate::error::{GatewayError, Result};
 use crate::events::EventBroadcaster;
 use crate::federation_mgr::FederationManager;
+use crate::governance_mgr::GovernanceHandle;
 use crate::governance_mgr::GovernanceManager;
 use crate::identity_mgr::IdentityManager;
 use crate::ledger_mgr::LedgerManager;
@@ -29,7 +30,6 @@ use crate::notification_triggers::{GovernanceNotificationTrigger, LedgerNotifica
 use crate::notifications::NotificationService;
 use crate::rate_limit::{IpRateLimiter, RateLimitConfig, RateLimiter};
 use crate::security::{configure_cors, SecurityConfig, SecurityHeaders};
-use crate::governance_mgr::GovernanceHandle;
 use crate::trust_mgr::{TrustGraphHandle, TrustManager};
 use icn_compute::ComputeHandle;
 
@@ -185,14 +185,14 @@ impl GatewayServer {
         };
 
         // Create governance manager (uses actor if handle available, otherwise in-memory)
-        let governance_manager: Arc<GovernanceManager> = if let Some(handle) = self.governance_handle
-        {
-            info!("Governance manager connected to daemon (using GovernanceActor)");
-            Arc::new(GovernanceManager::with_handle(handle))
-        } else {
-            info!("Governance manager running standalone (in-memory only)");
-            Arc::new(GovernanceManager::new())
-        };
+        let governance_manager: Arc<GovernanceManager> =
+            if let Some(handle) = self.governance_handle {
+                info!("Governance manager connected to daemon (using GovernanceActor)");
+                Arc::new(GovernanceManager::with_handle(handle))
+            } else {
+                info!("Governance manager running standalone (in-memory only)");
+                Arc::new(GovernanceManager::new())
+            };
         let invite_manager = Arc::new(crate::invite::InviteManager::new());
         let session_manager = Arc::new(crate::session::SessionManager::new());
 

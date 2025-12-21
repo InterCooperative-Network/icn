@@ -147,10 +147,7 @@ where
     F: FnMut(&Did),
 {
     let hot_dids = precomputer.get_hot_dids();
-    tracing::debug!(
-        "Precomputing trust scores for {} hot DIDs",
-        hot_dids.len()
-    );
+    tracing::debug!("Precomputing trust scores for {} hot DIDs", hot_dids.len());
 
     for did in hot_dids {
         compute_fn(&did);

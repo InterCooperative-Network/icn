@@ -1,4 +1,5 @@
 //! Performance benchmarks for icn-net
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //!
 //! Covers:
 //! - Message serialization/deserialization
@@ -123,7 +124,7 @@ fn bench_rate_limiter(c: &mut Criterion) {
 
                 b.iter(|| {
                     for did in &dids {
-                        let _ = limiter.check_rate_limit(black_box(did));
+                        drop(limiter.check_rate_limit(black_box(did)));
                     }
                 });
             },
@@ -145,7 +146,7 @@ fn bench_trust_gated_rate_limiter(c: &mut Criterion) {
     ];
 
     for (trust_class, name) in trust_classes.iter() {
-        group.bench_function(format!("check_{}", name), |b| {
+        group.bench_function(format!("check_{name}"), |b| {
             let config = TrustGatedRateLimitConfig::default();
             let limit_config = config.for_class(*trust_class);
             let limiter = RateLimiter::new(limit_config.clone());
@@ -208,7 +209,7 @@ fn bench_message_sizes(c: &mut Criterion) {
             from: test_did(1),
             to: None,
             payload: MessagePayload::Subscribe {
-                topics: (0..10).map(|i| format!("topic:category{}", i)).collect(),
+                topics: (0..10).map(|i| format!("topic:category{i}")).collect(),
             },
         };
         b.iter(|| {

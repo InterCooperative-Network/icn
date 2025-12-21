@@ -1,4 +1,5 @@
 //! Integration test for ledger synchronization via gossip
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use icn_gossip::GossipActor;
 use icn_identity::KeyPair;

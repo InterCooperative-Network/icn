@@ -3,8 +3,9 @@
 //! # Safety
 //! This crate denies panicking on unwrap/expect to prevent runtime crashes.
 #![allow(missing_docs)]
-#![deny(clippy::unwrap_used)]
-#![deny(clippy::expect_used)]
+#![deny(clippy::unwrap_used, clippy::expect_used)]
+// Allow unwrap/expect in test code - panics are acceptable for tests
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
 pub mod anti_entropy;
 pub mod config;

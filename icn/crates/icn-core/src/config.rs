@@ -792,9 +792,8 @@ impl Config {
                 ));
             }
             if self.steward.vui_threshold < 2 {
-                warnings.push(
-                    "steward.vui_threshold < 2 provides no threshold security".to_string(),
-                );
+                warnings
+                    .push("steward.vui_threshold < 2 provides no threshold security".to_string());
             }
         }
 
@@ -820,12 +819,12 @@ impl Config {
         match self.validate() {
             Ok(warnings) => {
                 for warning in warnings {
-                    eprintln!("\x1b[33mWarning:\x1b[0m {}", warning);
+                    eprintln!("\x1b[33mWarning:\x1b[0m {warning}");
                 }
             }
             Err(errors) => {
                 for error in &errors {
-                    eprintln!("\x1b[31mError:\x1b[0m {}", error);
+                    eprintln!("\x1b[31mError:\x1b[0m {error}");
                 }
                 eprintln!(
                     "\n\x1b[31mConfiguration has {} error(s). Fix them before starting.\x1b[0m",
@@ -1401,6 +1400,8 @@ log_level = "info"
         let result = config.validate();
         assert!(result.is_ok());
         let warnings = result.unwrap();
-        assert!(warnings.iter().any(|w| w.contains("trust-gated TLS is disabled")));
+        assert!(warnings
+            .iter()
+            .any(|w| w.contains("trust-gated TLS is disabled")));
     }
 }

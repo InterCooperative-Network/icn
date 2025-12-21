@@ -3,8 +3,9 @@
 //! # Safety
 //! This crate denies panicking on unwrap/expect to prevent runtime crashes.
 #![allow(missing_docs)]
-#![deny(clippy::unwrap_used)]
-#![deny(clippy::expect_used)]
+#![deny(clippy::unwrap_used, clippy::expect_used)]
+// Allow unwrap/expect in test code - panics are acceptable for tests
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 //!
 //! This crate provides a developer-facing HTTP API layer on top of the ICN substrate.
 //! Co-ops build apps (web/mobile) that talk to this gateway, which handles:

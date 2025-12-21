@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! Integration tests for Phase 17 Storage Hardening & Replication
 //!
 //! Tests the full replication flow across multiple nodes:

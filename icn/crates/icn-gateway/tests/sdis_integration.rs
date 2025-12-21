@@ -1,4 +1,5 @@
 //! SDIS Integration Tests
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //!
 //! Tests for the Sovereign Digital Identity System credential presentation flow.
 

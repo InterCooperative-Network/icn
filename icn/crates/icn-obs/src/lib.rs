@@ -1,5 +1,7 @@
 //! ICN Obs - Observability (logging, metrics, tracing)
 #![allow(missing_docs)]
+// Allow unwrap/expect in test code - panics are acceptable for tests
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
 /// Contribution attestation system
 pub mod attestation;

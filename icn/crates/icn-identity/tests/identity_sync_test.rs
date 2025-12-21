@@ -1,4 +1,5 @@
 //! Integration test for identity synchronization protocol
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use icn_identity::{
     AgeKeyStore, Capability, DidDocumentCache, IdentityUpdateMessage, KeyPair, KeyStore, KeyType,

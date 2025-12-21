@@ -1,4 +1,6 @@
 //! ICN Privacy - Privacy primitives for metadata protection (Phase 20)
+// Allow unwrap/expect in test code - panics are acceptable for tests
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 //!
 //! Addresses ARCHITECTURE.md Gap 12.9 (Privacy & Metadata Leakage) by providing:
 //!

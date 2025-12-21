@@ -1,4 +1,5 @@
 //! Integration test for compute event → WebSocket delivery
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //!
 //! This test demonstrates the complete flow:
 //! 1. Compute actor emits events via callback

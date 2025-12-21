@@ -1,5 +1,8 @@
 //! ICN Time - Clock Synchronization (Phase 19 Week 3-4)
 //!
+// Allow unwrap/expect in test code - panics are acceptable for tests
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
+//!
 //! Provides cooperative-wide clock sync using Rough Time Protocol (RFC 8915) for:
 //! - Distributed timestamp validation
 //! - Protection against replay attacks

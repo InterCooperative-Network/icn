@@ -117,7 +117,7 @@ async fn main() -> Result<()> {
                     println!("\x1b[32m✓ Configuration is valid\x1b[0m\n");
                     println!("Warnings:");
                     for warning in &warnings {
-                        println!("  \x1b[33m⚠\x1b[0m {}", warning);
+                        println!("  \x1b[33m⚠\x1b[0m {warning}");
                     }
                 }
                 std::process::exit(0);
@@ -125,7 +125,7 @@ async fn main() -> Result<()> {
             Err(errors) => {
                 println!("\x1b[31m✗ Configuration has errors:\x1b[0m\n");
                 for error in &errors {
-                    println!("  \x1b[31m✗\x1b[0m {}", error);
+                    println!("  \x1b[31m✗\x1b[0m {error}");
                 }
                 std::process::exit(1);
             }

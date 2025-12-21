@@ -1,5 +1,7 @@
 // Allow unused_assignments from Zeroize derive macro generated code
 #![allow(unused_assignments)]
+// Allow unwrap in test code - panics are acceptable for tests
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
 //! ICN Post-Quantum Cryptography
 //!

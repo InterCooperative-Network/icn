@@ -1,4 +1,5 @@
 //! Integration tests for the ICN compute layer.
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //!
 //! These tests verify the distributed compute functionality including:
 //! - Task submission and execution

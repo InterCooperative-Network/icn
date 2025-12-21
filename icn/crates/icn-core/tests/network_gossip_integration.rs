@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! Integration test for network-gossip bridge
 //!
 //! This test validates end-to-end gossip message flow over QUIC connections.

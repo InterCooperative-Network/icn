@@ -1,4 +1,5 @@
 //! Integration tests for gateway scope validation security fixes
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //!
 //! These tests validate that the scope allowlist properly prevents
 //! privilege escalation via arbitrary scope requests.

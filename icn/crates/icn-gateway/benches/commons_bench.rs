@@ -1,4 +1,5 @@
 //! Performance benchmarks for CommonsManager operations
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //!
 //! Run with: cargo bench -p icn-gateway
 //!

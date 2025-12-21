@@ -1,4 +1,5 @@
 //! Integration tests for DID-TLS binding verification
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //!
 //! Tests that verify the cryptographic binding between DIDs and TLS certificates:
 //! - Successful Hello message exchange with valid bindings

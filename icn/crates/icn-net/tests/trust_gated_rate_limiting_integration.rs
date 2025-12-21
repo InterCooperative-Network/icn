@@ -1,4 +1,5 @@
 //! Integration test demonstrating trust-gated rate limiting in action
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //!
 //! This test validates the complete trust-gated rate limiting feature:
 //! 1. Different rate limits for different trust classes

@@ -129,9 +129,7 @@ impl Circuit for CitizenshipProofCircuit {
             // WARNING: This provides NO cryptographic security!
             use sha3::{Digest, Sha3_256};
 
-            tracing::warn!(
-                "Creating SIMULATED citizenship proof - NO CRYPTOGRAPHIC SECURITY"
-            );
+            tracing::warn!("Creating SIMULATED citizenship proof - NO CRYPTOGRAPHIC SECURITY");
 
             let mut hasher = Sha3_256::new();
             hasher.update(private.actual_country);
@@ -155,7 +153,8 @@ impl Circuit for CitizenshipProofCircuit {
             let _ = public_hash;
             Err(CircuitError::ProofGenerationFailed(
                 "ZKP proving not available. Enable 'stark' feature for production, \
-                 or 'simulated' feature for testing only.".into()
+                 or 'simulated' feature for testing only."
+                    .into(),
             ))
         }
     }
@@ -199,7 +198,8 @@ impl Circuit for CitizenshipProofCircuit {
             let _ = expected_hash;
             Err(CircuitError::VerificationFailed(
                 "ZKP verification not available. Enable 'stark' feature for production, \
-                 or 'simulated' feature for testing only.".into()
+                 or 'simulated' feature for testing only."
+                    .into(),
             ))
         }
     }

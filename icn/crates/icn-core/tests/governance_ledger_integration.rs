@@ -1,4 +1,5 @@
 //! Integration test for Governance → Ledger execution flow
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //!
 //! This test validates that accepted budget proposals automatically trigger ledger transactions:
 //! 1. Create governance domain and budget proposal

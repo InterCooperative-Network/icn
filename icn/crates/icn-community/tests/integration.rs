@@ -1,4 +1,5 @@
 //! Integration tests for community management
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use icn_community::types::*;
 use icn_community::*;

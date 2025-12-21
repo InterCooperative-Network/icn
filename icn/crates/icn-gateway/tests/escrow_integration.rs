@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
 use icn_gateway::api::escrow::{
     check_conditions, Escrow, EscrowCondition, EscrowStatus, EscrowStore,
 };

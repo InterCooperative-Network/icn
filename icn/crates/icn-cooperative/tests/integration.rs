@@ -1,4 +1,5 @@
 //! Integration tests for cooperative lifecycle and membership
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use icn_cooperative::*;
 use icn_store::{SledStore, Store};

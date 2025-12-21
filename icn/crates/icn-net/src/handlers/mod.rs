@@ -9,10 +9,10 @@ pub mod onion;
 pub mod peer_exchange;
 pub mod signed;
 
-use crate::protocol::{NetworkMessage, write_message};
+use crate::actor::PeerConnectionInfo;
+use crate::protocol::{write_message, NetworkMessage};
 use crate::replay_guard::ReplayGuard;
 use crate::topology::{NeighborSets, TopologyConfig};
-use crate::actor::PeerConnectionInfo;
 use crate::{BlobLocationRegistry, RateLimiter, SessionManager};
 use icn_identity::{Did, IdentityBundle};
 use icn_security::MisbehaviorDetector;
@@ -23,6 +23,7 @@ use tokio::sync::RwLock;
 ///
 /// This struct holds all the shared state needed by message handlers,
 /// avoiding the need to pass many parameters through the call chain.
+#[allow(dead_code)] // API fields that may be used in future handlers
 pub struct ConnectionContext {
     pub handler: crate::IncomingMessageHandler,
     pub rate_limiter: Arc<RateLimiter>,
@@ -77,6 +78,7 @@ impl ConnectionContext {
     }
 
     /// Send a message on a connection
+    #[allow(dead_code)] // API method that may be used in future handlers
     pub async fn send_response(
         connection: &quinn::Connection,
         message: &NetworkMessage,

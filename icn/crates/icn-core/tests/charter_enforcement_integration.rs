@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! Integration test for charter enforcement
 //!
 //! Tests that charter rules are enforced during ledger transactions.

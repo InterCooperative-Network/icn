@@ -1,4 +1,5 @@
 //! Integration tests for Commons Evolution flow
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //!
 //! Tests the complete enrollment → PersonhoodAnchor → CommonsHolderRecord flow.
 

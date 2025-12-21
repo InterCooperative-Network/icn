@@ -1,5 +1,7 @@
 // Allow unused_assignments from Zeroize derive macro generated code
 #![allow(unused_assignments)]
+// Allow unwrap/expect in test code - panics are acceptable for tests
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
 //! ICN Zero-Knowledge Proofs
 //!
@@ -138,12 +140,8 @@ impl ProofCapability {
     pub fn description(&self) -> &'static str {
         match self {
             ProofCapability::Stark => "STARK proofs (cryptographically secure)",
-            ProofCapability::Simulated => {
-                "SIMULATED proofs (NO SECURITY - testing only!)"
-            }
-            ProofCapability::None => {
-                "No proof capability (enable 'stark' or 'simulated' feature)"
-            }
+            ProofCapability::Simulated => "SIMULATED proofs (NO SECURITY - testing only!)",
+            ProofCapability::None => "No proof capability (enable 'stark' or 'simulated' feature)",
         }
     }
 }

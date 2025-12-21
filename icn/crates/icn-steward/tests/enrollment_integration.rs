@@ -1,4 +1,5 @@
 //! Integration tests for the enrollment flow
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //!
 //! Tests multi-steward enrollment scenarios including:
 //! - Threshold PRF computation across multiple stewards

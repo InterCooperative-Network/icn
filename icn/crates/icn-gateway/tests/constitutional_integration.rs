@@ -1,4 +1,5 @@
 //! Integration tests for Constitutional Governance flows
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //!
 //! Tests end-to-end workflows for:
 //! - Amendment lifecycle (create → submit → vote → ratify)

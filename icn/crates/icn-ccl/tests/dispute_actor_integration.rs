@@ -1,4 +1,5 @@
 //! Integration tests for DisputeActor
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use icn_ccl::{
     BinOp, Contract, DisputeActor, DisputeConfig, DisputeEvidence, DisputeReason, Expr, Rule, Stmt,

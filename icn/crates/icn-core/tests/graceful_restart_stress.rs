@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! Stress tests for graceful restart under high load
 //!
 //! These tests validate that graceful restart works correctly with:

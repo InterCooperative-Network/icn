@@ -2,6 +2,10 @@
 //!
 //! This crate provides comprehensive lifecycle management for cooperatives,
 //! including formation, membership, governance, and dissolution.
+#![allow(missing_docs)]
+#![deny(clippy::unwrap_used, clippy::expect_used)]
+// Allow unwrap/expect in test code - panics are acceptable for tests
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
 pub mod error;
 pub mod lifecycle;

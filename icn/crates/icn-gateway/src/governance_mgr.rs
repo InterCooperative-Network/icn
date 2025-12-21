@@ -252,7 +252,9 @@ impl GovernanceManager {
     ) -> Result<()> {
         if let Some(ref handle) = self.governance_handle {
             // Actor-backed mode: delegate to GovernanceActor
-            return handle.open_proposal(proposal_id, voting_period_seconds).await;
+            return handle
+                .open_proposal(proposal_id, voting_period_seconds)
+                .await;
         }
 
         // Standalone mode: in-memory storage

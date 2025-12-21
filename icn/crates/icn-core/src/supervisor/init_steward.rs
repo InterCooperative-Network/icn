@@ -179,7 +179,10 @@ pub async fn init_steward_services(
             // Set up notification callback for steward messages
             {
                 let mut gossip = deps.gossip_handle.write().await;
-                setup_steward_notification_callback(&mut gossip, deps.steward_handle_holder.clone());
+                setup_steward_notification_callback(
+                    &mut gossip,
+                    deps.steward_handle_holder.clone(),
+                );
             }
 
             info!(

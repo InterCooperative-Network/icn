@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! Identity Rotation Integration Test (Issue #121)
 //!
 //! Tests proactive identity key rotation and its effects on:

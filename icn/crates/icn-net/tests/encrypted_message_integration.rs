@@ -1,4 +1,5 @@
 //! Integration test for end-to-end encrypted messages
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //!
 //! Tests the complete flow:
 //! 1. Alice encrypts a message for Bob using X25519

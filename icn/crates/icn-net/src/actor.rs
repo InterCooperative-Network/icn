@@ -1524,8 +1524,13 @@ impl NetworkActor {
                                     ctx.handle_handshake_ack(&message.from);
                                 }
                                 MessagePayload::Ping { sent_at } => {
-                                    ctx.handle_ping(&connection, message.clone(), &message.from, *sent_at)
-                                        .await;
+                                    ctx.handle_ping(
+                                        &connection,
+                                        message.clone(),
+                                        &message.from,
+                                        *sent_at,
+                                    )
+                                    .await;
                                 }
                                 MessagePayload::Pong {
                                     ping_sent_at,

@@ -1,4 +1,5 @@
 //! Integration tests for client certificate verification security fixes
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //!
 //! These tests validate that the security vulnerabilities have been properly fixed:
 //! 1. Inbound QUIC connections require client certificate verification

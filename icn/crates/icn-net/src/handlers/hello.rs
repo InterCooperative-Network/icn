@@ -7,9 +7,9 @@
 //! - X25519 key exchange for E2E encryption
 
 use super::ConnectionContext;
+use crate::actor::PeerConnectionInfo;
 use crate::protocol::NetworkMessage;
 use crate::topology::{NeighborLimitsConfig, PeerId, TopologyInfo};
-use crate::actor::PeerConnectionInfo;
 use anyhow::Result;
 use icn_identity::Did;
 use std::collections::hash_map::Entry;
@@ -85,7 +85,11 @@ impl ConnectionContext {
                     "Received Hello from legacy node (no version_info), treating as protocol v1"
                 );
                 icn_obs::metrics::network::version_negotiation_success_inc(1);
-                (1, crate::CapabilityFlags::empty(), "legacy-node".to_string())
+                (
+                    1,
+                    crate::CapabilityFlags::empty(),
+                    "legacy-node".to_string(),
+                )
             }
         };
 
@@ -193,8 +197,7 @@ impl ConnectionContext {
     async fn send_hello_response(&self, connection: &quinn::Connection, to: &Did) {
         let binding_info = self.identity_bundle.binding_info();
         let x25519_public = *self.identity_bundle.x25519_public_bytes();
-        let version_info =
-            crate::VersionInfo::new(format!("icnd-{}", env!("CARGO_PKG_VERSION")));
+        let version_info = crate::VersionInfo::new(format!("icnd-{}", env!("CARGO_PKG_VERSION")));
         let topology_info = self.topology_config.as_ref().map(|topo_cfg| TopologyInfo {
             region: topo_cfg.region.clone(),
             cluster_id: topo_cfg.cluster_id.clone(),
@@ -214,8 +217,7 @@ impl ConnectionContext {
         tokio::spawn(async move {
             match connection_clone.open_bi().await {
                 Ok((mut send, _recv)) => {
-                    if let Err(e) =
-                        crate::protocol::write_message(&mut send, &hello_response).await
+                    if let Err(e) = crate::protocol::write_message(&mut send, &hello_response).await
                     {
                         warn!("Failed to write Hello response: {}", e);
                     } else {

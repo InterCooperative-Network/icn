@@ -2,9 +2,7 @@
 
 use crate::bloom::BloomFilter;
 use crate::sync::PeerSyncManager;
-use crate::types::{
-    AccessControl, ContentHash, GossipEntry, GossipMessage, Subscription, Topic,
-};
+use crate::types::{AccessControl, ContentHash, GossipEntry, GossipMessage, Subscription, Topic};
 use crate::vector_clock::VectorClock;
 use anyhow::{bail, Context as _, Result};
 use icn_identity::{Did, KeyPair};
@@ -1006,24 +1004,25 @@ impl GossipActor {
                 requesting_peer,
                 vector_clock,
                 last_contact_ms,
-            } => {
-                self.handle_partition_heal_request(sender, requesting_peer, vector_clock, last_contact_ms)
-            }
+            } => self.handle_partition_heal_request(
+                sender,
+                requesting_peer,
+                vector_clock,
+                last_contact_ms,
+            ),
 
             GossipMessage::PartitionHealResponse {
                 responding_peer,
                 vector_clock,
                 diverged_topics,
                 entries_behind,
-            } => {
-                self.handle_partition_heal_response(
-                    sender,
-                    responding_peer,
-                    vector_clock,
-                    diverged_topics,
-                    entries_behind,
-                )
-            }
+            } => self.handle_partition_heal_response(
+                sender,
+                responding_peer,
+                vector_clock,
+                diverged_topics,
+                entries_behind,
+            ),
         }
     }
 

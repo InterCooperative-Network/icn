@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! Ledger+Gossip+Trust End-to-End Integration Tests (Issue #109)
 //!
 //! Tests the interaction between the ledger, gossip, and trust systems:

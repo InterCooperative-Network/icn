@@ -251,6 +251,9 @@ impl WasmExecutor {
 #[cfg(feature = "wasm")]
 impl Default for WasmExecutor {
     fn default() -> Self {
+        // SAFETY: WasmExecutor::new() with wasm feature only fails if wasmtime
+        // engine initialization fails, which is a catastrophic configuration error.
+        #[allow(clippy::expect_used)]
         Self::new().expect("Failed to create default WasmExecutor")
     }
 }

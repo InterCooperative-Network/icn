@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! Gossip Pull Protocol Integration Tests
 //!
 //! This test validates the complete pull protocol flow:

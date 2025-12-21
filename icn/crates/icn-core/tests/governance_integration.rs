@@ -1,4 +1,5 @@
 //! Integration test for governance over gossip protocol
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //!
 //! This test validates end-to-end governance flow:
 //! 1. Multi-node governance domain setup

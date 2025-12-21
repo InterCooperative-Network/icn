@@ -1,4 +1,5 @@
 //! Integration test for trust attestation propagation
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //!
 //! This test validates end-to-end trust propagation over the gossip network:
 //! - Alice creates a trust edge for Bob

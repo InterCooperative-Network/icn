@@ -72,7 +72,9 @@ pub async fn handle_trust_attestation(
     rate_limiter: &AttestationRateLimiterHandle,
 ) {
     if let Err(e) = crate::trust_propagation::handle_trust_attestation_entry(
-        entry, trust_graph, own_did,
+        entry,
+        trust_graph,
+        own_did,
         Some(rate_limiter.as_ref()),
     )
     .await
@@ -123,7 +125,8 @@ pub async fn handle_identity_recovery(
             info!("Received recovery message: {}", recovery_msg.summary());
 
             // Handle different recovery message types
-            let result: Result<bool> = handle_recovery_message(&recovery_msg, recovery_store.as_ref());
+            let result: Result<bool> =
+                handle_recovery_message(&recovery_msg, recovery_store.as_ref());
 
             match result {
                 Err(ref e) => {
@@ -132,17 +135,14 @@ pub async fn handle_identity_recovery(
                 Ok(true) => {
                     // Recovery was successfully finalized - update trust graph and ledger
                     if let RecoveryMessage::Finalized {
-                        id, old_did, new_did, ..
+                        id,
+                        old_did,
+                        new_did,
+                        ..
                     } = &recovery_msg
                     {
-                        apply_recovery_finalization(
-                            id,
-                            old_did,
-                            new_did,
-                            &trust_graph,
-                            &ledger,
-                        )
-                        .await;
+                        apply_recovery_finalization(id, old_did, new_did, &trust_graph, &ledger)
+                            .await;
                     }
                 }
                 Ok(false) => {
@@ -176,8 +176,8 @@ fn handle_recovery_message(
                 RecoveryEvent::new(old_did.clone(), new_did.clone(), *threshold, *delay_period);
 
             let key = format!("recovery:{id}");
-            let value =
-                serde_json::to_vec(&recovery).map_err(|e| anyhow::anyhow!("Serialization error: {e}"))?;
+            let value = serde_json::to_vec(&recovery)
+                .map_err(|e| anyhow::anyhow!("Serialization error: {e}"))?;
             recovery_store.put(key.as_bytes(), &value)?;
 
             info!("Stored new recovery: {} ({} -> {})", id, old_did, new_did);
@@ -224,10 +224,7 @@ fn handle_recovery_message(
                     }
                 }
                 None => {
-                    warn!(
-                        "Received attestation for unknown recovery: {}",
-                        recovery_id
-                    );
+                    warn!("Received attestation for unknown recovery: {}", recovery_id);
                     Ok(false)
                 }
             }
@@ -319,10 +316,7 @@ async fn apply_recovery_finalization(
             );
         }
         Err(e) => {
-            warn!(
-                "Failed to migrate trust graph for recovery {}: {}",
-                id, e
-            );
+            warn!("Failed to migrate trust graph for recovery {}: {}", id, e);
         }
     }
     drop(trust);
@@ -672,10 +666,7 @@ pub async fn handle_federation_message(
     federation_handler: FederationGossipHandle,
 ) {
     if let Err(e) = federation_handler.handle_message(topic, &entry_data) {
-        warn!(
-            "Failed to handle federation message on {}: {}",
-            topic, e
-        );
+        warn!("Failed to handle federation message on {}: {}", topic, e);
     }
 }
 
@@ -683,7 +674,9 @@ pub async fn handle_federation_message(
 ///
 /// This returns a callback that can be set on the GossipActor to receive
 /// notifications when new entries are received on subscribed topics.
-pub fn create_notification_callback(deps: NotificationDeps) -> icn_gossip::EntryNotificationCallback {
+pub fn create_notification_callback(
+    deps: NotificationDeps,
+) -> icn_gossip::EntryNotificationCallback {
     Arc::new(move |topic, entry, _subscriber_did| {
         // Clone dependencies for the async task
         let deps = deps.clone();

@@ -1,4 +1,5 @@
 //! Privacy Crate Integration Tests
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //!
 //! These tests validate the full privacy stack:
 //! 1. Topic encryption with Bloom filter discovery

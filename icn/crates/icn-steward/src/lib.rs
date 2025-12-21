@@ -1,4 +1,6 @@
 //! ICN Steward Network
+// Allow unwrap/expect in test code - panics are acceptable for tests
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 //!
 //! The steward network provides essential services for SDIS (Sovereign Digital Identity System):
 //!

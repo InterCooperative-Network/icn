@@ -126,9 +126,7 @@ impl Circuit for NonRevocationCircuit {
             // WARNING: This provides NO cryptographic security!
             use sha3::{Digest, Sha3_256};
 
-            tracing::warn!(
-                "Creating SIMULATED non-revocation proof - NO CRYPTOGRAPHIC SECURITY"
-            );
+            tracing::warn!("Creating SIMULATED non-revocation proof - NO CRYPTOGRAPHIC SECURITY");
 
             let mut hasher = Sha3_256::new();
             hasher.update(private.credential_id);
@@ -151,7 +149,8 @@ impl Circuit for NonRevocationCircuit {
             let _ = public_hash;
             Err(CircuitError::ProofGenerationFailed(
                 "ZKP proving not available. Enable 'stark' feature for production, \
-                 or 'simulated' feature for testing only.".into()
+                 or 'simulated' feature for testing only."
+                    .into(),
             ))
         }
     }
@@ -195,7 +194,8 @@ impl Circuit for NonRevocationCircuit {
             let _ = expected_hash;
             Err(CircuitError::VerificationFailed(
                 "ZKP verification not available. Enable 'stark' feature for production, \
-                 or 'simulated' feature for testing only.".into()
+                 or 'simulated' feature for testing only."
+                    .into(),
             ))
         }
     }

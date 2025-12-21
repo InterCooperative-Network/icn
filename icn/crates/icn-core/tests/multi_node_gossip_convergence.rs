@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! Multi-node gossip convergence integration test
 //!
 //! This test validates that:

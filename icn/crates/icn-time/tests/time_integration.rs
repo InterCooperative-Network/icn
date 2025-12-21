@@ -2,6 +2,7 @@
 //!
 //! Tests for the icn-time crate covering clock synchronization,
 //! timestamp validation, and freshness checking.
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use icn_time::{ClockSync, RoughTimeServer, TimeError, MAX_CLOCK_SKEW};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};

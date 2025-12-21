@@ -1,4 +1,5 @@
 //! Integration tests for pilot-ready features
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //!
 //! Tests notifications, governance UI, and economic features.
 

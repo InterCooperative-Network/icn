@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! Federation Crate Integration Tests
 //!
 //! These tests validate the full federation stack:

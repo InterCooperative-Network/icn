@@ -2,6 +2,7 @@
 //!
 //! These tests verify the complete governance flow including
 //! domain management, proposal lifecycle, voting, and tallying.
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use icn_governance::{
     GovernanceConfig, GovernanceDomain, GovernanceDomainId, GovernanceStore,

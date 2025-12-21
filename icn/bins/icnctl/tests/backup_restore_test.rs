@@ -1,4 +1,6 @@
-/// Integration tests for backup and restore functionality
+//! Integration tests for backup and restore functionality
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
 use anyhow::Result;
 use std::fs;
 use std::path::PathBuf;

@@ -211,9 +211,7 @@ pub fn create_incoming_handler(deps: MessageHandlerDeps) -> icn_net::IncomingMes
 
             icn_net::MessagePayload::Onion(_) => {
                 // Onion messages are handled directly by NetworkActor
-                debug!(
-                    "Received Onion message in supervisor handler - this should not happen"
-                );
+                debug!("Received Onion message in supervisor handler - this should not happen");
             }
         }
     })
@@ -299,10 +297,7 @@ fn handle_peer_exchange(
                         tokio::spawn(async move {
                             if let Some(net_handle) = network_handle_holder.read().await.as_ref() {
                                 if let Ok(peer_did) = icn_identity::Did::from_str(&peer_did_str) {
-                                    info!(
-                                        "Auto-dialing announced peer {} at {}",
-                                        peer_did, addr
-                                    );
+                                    info!("Auto-dialing announced peer {} at {}", peer_did, addr);
                                     match net_handle.dial(addr, peer_did.clone()).await {
                                         Ok(_) => {
                                             icn_obs::metrics::peer_exchange::peers_dialed_inc();

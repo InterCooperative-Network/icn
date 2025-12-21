@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! Integration test for distributed snapshot coordination
 //!
 //! Tests the Chandy-Lamport distributed snapshot protocol across multiple nodes.

@@ -116,10 +116,14 @@ impl Supervisor {
         let coop_handle_for_gateway: Option<icn_coop::CoopHandle>;
 
         // Trust graph handle for gateway integration
-        let trust_graph_handle_for_gateway: Option<Arc<tokio::sync::RwLock<icn_trust::TrustGraph>>>;
+        let trust_graph_handle_for_gateway: Option<
+            Arc<tokio::sync::RwLock<icn_trust::TrustGraph>>,
+        >;
 
         // Governance handle for gateway integration
-        let governance_handle_for_gateway: Option<Arc<dyn icn_governance::GovernanceOps + Send + Sync>>;
+        let governance_handle_for_gateway: Option<
+            Arc<dyn icn_governance::GovernanceOps + Send + Sync>,
+        >;
 
         // Governance event subscription handles - MUST persist for daemon lifetime
         // Stored at function scope to prevent premature Drop (which would unsubscribe)
@@ -228,14 +232,13 @@ impl Supervisor {
             let network_handle_for_handler =
                 Arc::new(tokio::sync::RwLock::new(None::<icn_net::NetworkHandle>));
 
-            let incoming_handler = init_network::create_incoming_handler(
-                init_network::MessageHandlerDeps {
+            let incoming_handler =
+                init_network::create_incoming_handler(init_network::MessageHandlerDeps {
                     gossip_handle: gossip_handle.clone(),
                     network_handle_holder: network_handle_for_handler.clone(),
                     own_did: did.clone(),
                     federation_enabled,
-                },
-            );
+                });
 
             // Prepare rate limiting configuration
             let (trust_graph_for_rate_limit, trust_gated_config, fallback_config) =
@@ -442,9 +445,8 @@ impl Supervisor {
                 let node_profile_for_notifications = node_profile_handle.clone();
 
                 // Create rate limiter for trust attestation anti-flood protection
-                let attestation_rate_limiter = Arc::new(
-                    crate::trust_propagation::AttestationRateLimiter::new(),
-                );
+                let attestation_rate_limiter =
+                    Arc::new(crate::trust_propagation::AttestationRateLimiter::new());
 
                 // Create FederationGossipHandler if federation is enabled
                 let federation_handler_for_notifications: Option<
@@ -745,7 +747,9 @@ impl Supervisor {
                         match serde_json::to_vec(&candidate) {
                             Ok(candidate_bytes) => {
                                 let mut gossip = gossip_handle.write().await;
-                                match gossip.publish(init_gossip::NETWORK_CANDIDATES_TOPIC, candidate_bytes) {
+                                match gossip
+                                    .publish(init_gossip::NETWORK_CANDIDATES_TOPIC, candidate_bytes)
+                                {
                                     Ok(_) => info!("✓ Published connection candidate to gossip"),
                                     Err(e) => {
                                         warn!("Failed to publish connection candidate: {}", e)
@@ -849,20 +853,18 @@ impl Supervisor {
             info!("✓ Governance event handlers registered");
 
             // Initialize compute actor using extracted module
-            let compute_services = init_compute::init_compute_services(
-                init_compute::ComputeDeps {
-                    trust_graph: trust_graph_handle.clone(),
-                    ledger: ledger_handle.clone(),
-                    gossip_handle: gossip_handle.clone(),
-                    own_did: did.clone(),
-                    compute_handle_holder: compute_handle_holder.clone(),
-                    dispute_handle_holder: dispute_handle_holder.clone(),
-                    network_handle: network_handle.clone(),
-                    misbehavior_detector: misbehavior_detector.clone(),
-                    identity_bundle: identity_bundle.clone(),
-                    store_path: self.config.store_path(),
-                },
-            )
+            let compute_services = init_compute::init_compute_services(init_compute::ComputeDeps {
+                trust_graph: trust_graph_handle.clone(),
+                ledger: ledger_handle.clone(),
+                gossip_handle: gossip_handle.clone(),
+                own_did: did.clone(),
+                compute_handle_holder: compute_handle_holder.clone(),
+                dispute_handle_holder: dispute_handle_holder.clone(),
+                network_handle: network_handle.clone(),
+                misbehavior_detector: misbehavior_detector.clone(),
+                identity_bundle: identity_bundle.clone(),
+                store_path: self.config.store_path(),
+            })
             .await?;
 
             let compute_handle = compute_services.compute_handle;
@@ -877,7 +879,9 @@ impl Supervisor {
                     gov_store.clone(),
                 );
                 event_bus
-                    .subscribe(governance_handlers::create_policy_subscription(policy_handler))
+                    .subscribe(governance_handlers::create_policy_subscription(
+                        policy_handler,
+                    ))
                     .await
             });
 

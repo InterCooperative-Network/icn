@@ -7,6 +7,7 @@
 //! 4. Error handling and response formats
 
 #![allow(clippy::uninlined_format_args)]
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use anyhow::Result;
 use icn_identity::KeyPair;

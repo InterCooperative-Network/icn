@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! Integration tests for contract deployment and execution across nodes
 
 use icn_ccl::{

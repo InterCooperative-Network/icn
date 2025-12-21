@@ -377,7 +377,12 @@ impl Ledger {
         // Add to timestamp index for efficient pagination
         // Key format: ledger:journal_ts:{timestamp:020}:{hash}
         // Zero-padding ensures lexicographic order = chronological order
-        let ts_key = format!("{}{:020}:{}", JOURNAL_TS_PREFIX, entry.timestamp, hash.to_hex());
+        let ts_key = format!(
+            "{}{:020}:{}",
+            JOURNAL_TS_PREFIX,
+            entry.timestamp,
+            hash.to_hex()
+        );
         self.store.put(ts_key.as_bytes(), hash.as_bytes())?;
 
         debug!(
@@ -805,7 +810,9 @@ impl Ledger {
         let take_count = limit.min(total.saturating_sub(offset));
 
         // Scan the timestamp index with calculated offset
-        let (ts_pairs, _) = self.store.scan_paginated(ts_prefix, skip_from_start, take_count)?;
+        let (ts_pairs, _) = self
+            .store
+            .scan_paginated(ts_prefix, skip_from_start, take_count)?;
 
         // Look up entries by hash (values in timestamp index are hashes)
         let mut entries = Vec::with_capacity(ts_pairs.len());
@@ -1095,7 +1102,12 @@ impl Ledger {
         self.store.delete(key.as_bytes())?;
 
         // Remove from timestamp index
-        let ts_key = format!("{}{:020}:{}", JOURNAL_TS_PREFIX, entry.timestamp, hash.to_hex());
+        let ts_key = format!(
+            "{}{:020}:{}",
+            JOURNAL_TS_PREFIX,
+            entry.timestamp,
+            hash.to_hex()
+        );
         self.store.delete(ts_key.as_bytes())?;
 
         // Add to quarantine
@@ -1749,8 +1761,6 @@ impl Ledger {
         reason: &str,
         broadcast: bool,
     ) -> Result<Vec<ContentHash>> {
-        
-
         info!(
             "🚨 ROLLBACK: Beginning rollback to entry {} (reason: {})",
             target_hash, reason
@@ -1815,14 +1825,20 @@ impl Ledger {
             self.store.delete(journal_key.as_bytes())?;
 
             // Remove from timestamp index
-            let ts_key = format!("{}{:020}:{}", JOURNAL_TS_PREFIX, entry_timestamp, hash.to_hex());
+            let ts_key = format!(
+                "{}{:020}:{}",
+                JOURNAL_TS_PREFIX,
+                entry_timestamp,
+                hash.to_hex()
+            );
             self.store.delete(ts_key.as_bytes())?;
 
             debug!("Removed entry {} from active ledger", hash);
         }
 
         // Extract just the hashes for return value and notification
-        let archived_hashes: Vec<ContentHash> = archived_entries.iter().map(|(h, _)| h.clone()).collect();
+        let archived_hashes: Vec<ContentHash> =
+            archived_entries.iter().map(|(h, _)| h.clone()).collect();
 
         // Step 5: Rebuild fork index with remaining entries
         self.fork_detector = ForkDetector::new();

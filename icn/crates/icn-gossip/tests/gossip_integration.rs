@@ -5,6 +5,7 @@
 //! - Bloom filter anti-entropy
 //! - Topic configuration
 //! - Message serialization
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use icn_gossip::{AccessControl, BloomFilter, GossipEntry, GossipMessage, Topic, VectorClock};
 use icn_identity::KeyPair;

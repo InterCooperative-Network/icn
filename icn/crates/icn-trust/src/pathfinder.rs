@@ -126,10 +126,9 @@ impl TrustPathfinder {
         let transitive_score = self.compute_transitive_score(graph, target)?;
 
         // Combine scores using weights
-        let final_score =
-            (direct_score * self.config.weights.direct
-                + transitive_score * self.config.weights.transitive)
-                .min(1.0);
+        let final_score = (direct_score * self.config.weights.direct
+            + transitive_score * self.config.weights.transitive)
+            .min(1.0);
 
         Ok(final_score)
     }
@@ -374,7 +373,7 @@ mod tests {
 
         // Should not infinite loop
         let score = pathfinder.find_score(&graph, &carol).unwrap();
-        assert!(score >= 0.0 && score <= 1.0);
+        assert!((0.0..=1.0).contains(&score));
     }
 
     #[test]

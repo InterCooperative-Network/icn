@@ -86,14 +86,14 @@ impl GovernanceEventHandler {
             ProposalPayload::ConfigChange { new_config } => {
                 self.handle_config_change(proposal_id, new_config, domain_id);
             }
-            ProposalPayload::Membership {
-                action,
-                member,
-            } => {
+            ProposalPayload::Membership { action, member } => {
                 self.handle_membership_change(proposal_id, action, member, domain_id);
             }
             ProposalPayload::Text { .. } => {
-                info!("📝 Text proposal {} accepted (no action required)", proposal_id.0);
+                info!(
+                    "📝 Text proposal {} accepted (no action required)",
+                    proposal_id.0
+                );
             }
             ProposalPayload::SchedulingPolicy { coop_id, .. } => {
                 // Handled by separate subscription after compute actor spawns
@@ -107,7 +107,12 @@ impl GovernanceEventHandler {
                 reason,
                 duration_seconds,
             } => {
-                self.handle_freeze_member(proposal_id, member, reason, duration_seconds.unwrap_or(0));
+                self.handle_freeze_member(
+                    proposal_id,
+                    member,
+                    reason,
+                    duration_seconds.unwrap_or(0),
+                );
             }
             ProposalPayload::UnfreezeMember { member, reason } => {
                 self.handle_unfreeze_member(proposal_id, member, reason);
@@ -681,12 +686,13 @@ impl GovernanceEventHandler {
             let ledger_outcome = match &proposed_outcome {
                 icn_governance::DisputeResolutionOutcome::Uphold => DisputeOutcome::Reversed,
                 icn_governance::DisputeResolutionOutcome::Reject => DisputeOutcome::Upheld,
-                icn_governance::DisputeResolutionOutcome::Partial { adjustment, currency } => {
-                    DisputeOutcome::Settlement {
-                        terms: format!("Partial adjustment: {adjustment} {currency}"),
-                        replacement_entry: None,
-                    }
-                }
+                icn_governance::DisputeResolutionOutcome::Partial {
+                    adjustment,
+                    currency,
+                } => DisputeOutcome::Settlement {
+                    terms: format!("Partial adjustment: {adjustment} {currency}"),
+                    replacement_entry: None,
+                },
                 icn_governance::DisputeResolutionOutcome::VoidTransaction => {
                     DisputeOutcome::Reversed
                 }
@@ -718,10 +724,7 @@ impl GovernanceEventHandler {
                     icn_obs::metrics::governance::proposals_executed_inc("dispute_resolution");
                 }
                 Err(e) => {
-                    error!(
-                        "❌ Failed to resolve dispute {}: {}",
-                        dispute_entry_hash, e
-                    );
+                    error!("❌ Failed to resolve dispute {}: {}", dispute_entry_hash, e);
                     icn_obs::metrics::governance::execution_failures_inc(
                         "dispute_resolution_failed",
                     );
@@ -731,8 +734,15 @@ impl GovernanceEventHandler {
     }
 
     /// Handle an SDIS proposal
-    fn handle_sdis_proposal(&self, proposal_id: ProposalId, proposal: icn_governance::SdisProposal) {
-        info!("🆔 SDIS proposal {} accepted: {:?}", proposal_id.0, proposal);
+    fn handle_sdis_proposal(
+        &self,
+        proposal_id: ProposalId,
+        proposal: icn_governance::SdisProposal,
+    ) {
+        info!(
+            "🆔 SDIS proposal {} accepted: {:?}",
+            proposal_id.0, proposal
+        );
 
         match proposal {
             icn_governance::SdisProposal::AppointSteward { candidate, .. } => {
@@ -952,7 +962,11 @@ pub fn create_policy_subscription(
 
         if let SystemEvent::ProposalAccepted {
             proposal_id,
-            payload: ProposalPayload::SchedulingPolicy { coop_id, policy_json },
+            payload:
+                ProposalPayload::SchedulingPolicy {
+                    coop_id,
+                    policy_json,
+                },
             decided_at,
             ..
         } = &event

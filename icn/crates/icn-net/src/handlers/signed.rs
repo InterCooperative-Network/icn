@@ -35,10 +35,7 @@ impl ConnectionContext {
                 let message_hash = compute_message_hash(envelope);
 
                 let violation = icn_security::Violation::InvalidSignature {
-                    message_hash: message_hash
-                        .clone()
-                        .try_into()
-                        .unwrap_or([0u8; 32]),
+                    message_hash: message_hash.clone().try_into().unwrap_or([0u8; 32]),
                 };
 
                 detector
@@ -61,27 +58,22 @@ impl ConnectionContext {
                 self.forward_to_handler(message);
             }
             Err(e) => {
-                warn!(
-                    "Replay attack detected from {}: {}",
-                    envelope.from, e
-                );
+                warn!("Replay attack detected from {}: {}", envelope.from, e);
 
                 // Record ReplayAttack violation
                 if let Some(ref detector) = self.misbehavior_detector {
                     let message_hash = compute_message_hash(envelope);
 
                     let violation = icn_security::Violation::ReplayAttack {
-                        message_hash: message_hash
-                            .clone()
-                            .try_into()
-                            .unwrap_or([0u8; 32]),
+                        message_hash: message_hash.clone().try_into().unwrap_or([0u8; 32]),
                         sequence: envelope.sequence,
                     };
 
-                    detector
-                        .write()
-                        .await
-                        .record_violation(&envelope.from, violation, message_hash);
+                    detector.write().await.record_violation(
+                        &envelope.from,
+                        violation,
+                        message_hash,
+                    );
                 }
                 // Drop message (don't forward to handler)
             }

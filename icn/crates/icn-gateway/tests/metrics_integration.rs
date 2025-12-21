@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
 use actix_web::App;
 use actix_web_prom::PrometheusMetricsBuilder;
 use icn_gateway::api;

@@ -219,8 +219,7 @@ mod tests {
         // Allow up to 50 for test stability
         assert!(
             false_positives < 50,
-            "Too many false positives: {}",
-            false_positives
+            "Too many false positives: {false_positives}"
         );
     }
 }

@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! Integration test for topic subscriptions over the network
 //!
 //! This test validates that:

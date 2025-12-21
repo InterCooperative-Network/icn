@@ -1,4 +1,5 @@
 //! Integration tests for Commons Evolution governance flows
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //!
 //! Tests end-to-end flows for:
 //! - Enrollment with auto-affiliation

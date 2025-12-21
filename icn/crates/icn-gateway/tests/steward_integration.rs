@@ -1,4 +1,5 @@
 //! Integration tests for Steward management
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //!
 //! Tests the complete steward lifecycle including registration, status changes,
 //! attestation tracking, and bond management.
