@@ -5,6 +5,7 @@
 //! the Phase 22 optimizations (bloom filter, priority queue, caching).
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use ed25519_dalek::SigningKey;
 use icn_identity::Did;
 use icn_store::SledStore;
 use icn_trust::{TrustEdge, TrustGraph};
@@ -12,22 +13,33 @@ use rand::Rng;
 use std::sync::Arc;
 use tempfile::TempDir;
 
+/// Generate a valid DID from a deterministic seed
+fn did_from_seed(seed: u32) -> Did {
+    let mut seed_bytes = [0u8; 32];
+    seed_bytes[0..4].copy_from_slice(&seed.to_le_bytes());
+    // Use a simple expansion to fill the rest of the seed
+    for i in 4..32 {
+        seed_bytes[i] = seed_bytes[i - 4]
+            .wrapping_add(seed_bytes[i - 1])
+            .wrapping_mul(17)
+            .wrapping_add(i as u8);
+    }
+    // Create a valid Ed25519 keypair from the seed
+    let signing_key = SigningKey::from_bytes(&seed_bytes);
+    let verifying_key = signing_key.verifying_key();
+    Did::from_public_key(&verifying_key)
+}
+
 /// Create a test graph with specified number of nodes
 /// Each node trusts ~5-10 other nodes randomly
 fn create_test_graph(size: usize) -> (TrustGraph, Vec<Did>, TempDir) {
     let temp_dir = TempDir::new().unwrap();
     let store = Arc::new(SledStore::open(temp_dir.path()).unwrap());
-    let own_did = Did::from_anchor_id(&[0u8; 32]);
+    let own_did = did_from_seed(0);
     let mut graph = TrustGraph::new(store, own_did.clone());
 
-    // Create DIDs
-    let dids: Vec<Did> = (0..size)
-        .map(|i| {
-            let mut bytes = [0u8; 32];
-            bytes[0..4].copy_from_slice(&(i as u32).to_le_bytes());
-            Did::from_anchor_id(&bytes)
-        })
-        .collect();
+    // Create DIDs using valid Ed25519 keys from deterministic seeds
+    let dids: Vec<Did> = (0..size).map(|i| did_from_seed(i as u32)).collect();
 
     let mut rng = rand::thread_rng();
 
@@ -97,12 +109,9 @@ fn bench_negative_lookups(c: &mut Criterion) {
                 let (graph, _dids, _temp_dir) = create_test_graph(network_size);
 
                 // Create DIDs that definitely don't exist in the graph
+                // Use seeds starting at 1_000_000 to ensure no overlap
                 let unreachable_dids: Vec<Did> = (0..100)
-                    .map(|i| {
-                        let mut bytes = [0xFFu8; 32];
-                        bytes[0..4].copy_from_slice(&(i as u32).to_le_bytes());
-                        Did::from_anchor_id(&bytes)
-                    })
+                    .map(|i| did_from_seed(1_000_000 + i as u32))
                     .collect();
 
                 let mut idx = 0;
@@ -184,12 +193,12 @@ fn bench_edge_operations(c: &mut Criterion) {
             || {
                 let temp_dir = TempDir::new().unwrap();
                 let store = Arc::new(SledStore::open(temp_dir.path()).unwrap());
-                let own_did = Did::from_anchor_id(&[0u8; 32]);
+                let own_did = did_from_seed(0);
                 (TrustGraph::new(store, own_did), temp_dir)
             },
             |(mut graph, _temp_dir)| {
-                let from = Did::from_anchor_id(&[1u8; 32]);
-                let to = Did::from_anchor_id(&[2u8; 32]);
+                let from = did_from_seed(1);
+                let to = did_from_seed(2);
                 let edge = TrustEdge::new(from, to, 0.7);
                 graph.add_edge(black_box(edge)).unwrap();
                 graph
@@ -199,14 +208,14 @@ fn bench_edge_operations(c: &mut Criterion) {
     });
 
     group.bench_function("remove_edge", |b| {
-        let from = Did::from_anchor_id(&[1u8; 32]);
-        let to = Did::from_anchor_id(&[2u8; 32]);
+        let from = did_from_seed(1);
+        let to = did_from_seed(2);
 
         b.iter_batched(
             || {
                 let temp_dir = TempDir::new().unwrap();
                 let store = Arc::new(SledStore::open(temp_dir.path()).unwrap());
-                let own_did = Did::from_anchor_id(&[0u8; 32]);
+                let own_did = did_from_seed(0);
                 let mut graph = TrustGraph::new(store, own_did);
                 let edge = TrustEdge::new(from.clone(), to.clone(), 0.7);
                 graph.add_edge(edge).unwrap();
