@@ -1,44 +1,81 @@
+//! Trust Graph Scalability Benchmarks
+//!
+//! Tests trust computation performance at various network sizes to validate
+//! the Phase 22 optimizations (bloom filter, priority queue, caching).
+
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use icn_identity::Did;
 use icn_store::SledStore;
 use icn_trust::{TrustEdge, TrustGraph};
+use rand::Rng;
 use std::sync::Arc;
 use tempfile::TempDir;
 
-fn bench_trust_computation(c: &mut Criterion) {
-    let mut group = c.benchmark_group("trust_graph");
+/// Create a test graph with specified number of nodes
+/// Each node trusts ~5-10 other nodes randomly
+fn create_test_graph(size: usize) -> (TrustGraph, Vec<Did>, TempDir) {
+    let temp_dir = TempDir::new().unwrap();
+    let store = Arc::new(SledStore::open(temp_dir.path()).unwrap());
+    let own_did = Did::from_anchor_id(&[0u8; 32]);
+    let mut graph = TrustGraph::new(store, own_did.clone());
 
-    for network_size in [10, 50, 100].iter() {
+    // Create DIDs
+    let dids: Vec<Did> = (0..size)
+        .map(|i| {
+            let mut bytes = [0u8; 32];
+            bytes[0..4].copy_from_slice(&(i as u32).to_le_bytes());
+            Did::from_anchor_id(&bytes)
+        })
+        .collect();
+
+    let mut rng = rand::thread_rng();
+
+    // Add edges from own_did to ~10% of nodes (direct trust)
+    let direct_count = std::cmp::max(1, size / 10);
+    for _i in 0..direct_count {
+        let target_idx = rng.gen_range(1..size);
+        let score = 0.3 + rng.gen::<f64>() * 0.7; // 0.3 to 1.0
+        let edge = TrustEdge::new(dids[0].clone(), dids[target_idx].clone(), score);
+        graph.add_edge(edge).unwrap();
+    }
+
+    // Add random edges between other nodes (transitive paths)
+    let edge_count = size * 5; // ~5 edges per node
+    for _ in 0..edge_count {
+        let source_idx = rng.gen_range(1..size);
+        let target_idx = rng.gen_range(1..size);
+        if source_idx != target_idx {
+            let score = 0.3 + rng.gen::<f64>() * 0.7;
+            let edge = TrustEdge::new(dids[source_idx].clone(), dids[target_idx].clone(), score);
+            let _ = graph.add_edge(edge); // Ignore errors for duplicates
+        }
+    }
+
+    // Rebuild reachability filter for accurate benchmarks
+    graph.rebuild_reachability_filter().unwrap();
+
+    (graph, dids, temp_dir)
+}
+
+/// Benchmark trust computation at various network sizes
+fn bench_trust_computation(c: &mut Criterion) {
+    let mut group = c.benchmark_group("trust_computation");
+    group.sample_size(50); // Reduce samples for large graphs
+
+    // Test at various network sizes: 100, 1k, 5k, 10k
+    for network_size in [100, 1000, 5000, 10000].iter() {
         group.bench_with_input(
             BenchmarkId::new("compute", network_size),
             network_size,
             |b, &network_size| {
-                let temp_dir = TempDir::new().unwrap();
-                let store = Arc::new(SledStore::open(temp_dir.path()).unwrap());
-                let own_did = Did::from_anchor_id(&[0u8; 32]);
-                let mut graph = TrustGraph::new(store, own_did.clone());
+                let (graph, dids, _temp_dir) = create_test_graph(network_size);
+                let mut rng = rand::thread_rng();
 
-                // Create a network with semi-random trust edges
-                let dids: Vec<Did> = (0..network_size)
-                    .map(|i| Did::from_anchor_id(&[i as u8; 32]))
-                    .collect();
-
-                // Each node trusts ~5 others
-                for i in 0..network_size {
-                    for j in 0..5 {
-                        let target_idx = (i + j + 1) % network_size;
-                        let edge = TrustEdge::new(
-                            dids[i].clone(),
-                            dids[target_idx].clone(),
-                            0.5 + (j as f64 * 0.1),
-                        );
-                        graph.add_edge(edge).unwrap();
-                    }
-                }
-
-                let target = dids[network_size / 2].clone();
-
-                b.iter(|| graph.compute_trust_score(black_box(&target)));
+                b.iter(|| {
+                    // Query a random DID
+                    let target_idx = rng.gen_range(1..network_size);
+                    graph.compute_trust_score(black_box(&dids[target_idx]))
+                });
             },
         );
     }
@@ -46,8 +83,100 @@ fn bench_trust_computation(c: &mut Criterion) {
     group.finish();
 }
 
-fn bench_trust_edge_operations(c: &mut Criterion) {
-    let mut group = c.benchmark_group("trust_operations");
+/// Benchmark negative lookups (DIDs with no trust path)
+fn bench_negative_lookups(c: &mut Criterion) {
+    let mut group = c.benchmark_group("negative_lookups");
+    group.sample_size(100);
+
+    for network_size in [100, 1000, 5000].iter() {
+        group.bench_with_input(
+            BenchmarkId::new("no_path", network_size),
+            network_size,
+            |b, &network_size| {
+                let (graph, _dids, _temp_dir) = create_test_graph(network_size);
+
+                // Create DIDs that definitely don't exist in the graph
+                let unreachable_dids: Vec<Did> = (0..100)
+                    .map(|i| {
+                        let mut bytes = [0xFFu8; 32];
+                        bytes[0..4].copy_from_slice(&(i as u32).to_le_bytes());
+                        Did::from_anchor_id(&bytes)
+                    })
+                    .collect();
+
+                let mut idx = 0;
+                b.iter(|| {
+                    let target = &unreachable_dids[idx % 100];
+                    idx += 1;
+                    graph.compute_trust_score(black_box(target))
+                });
+            },
+        );
+    }
+
+    group.finish();
+}
+
+/// Benchmark threshold-based queries with early termination
+fn bench_threshold_queries(c: &mut Criterion) {
+    let mut group = c.benchmark_group("threshold_queries");
+    group.sample_size(50);
+
+    for network_size in [1000, 5000, 10000].iter() {
+        group.bench_with_input(
+            BenchmarkId::new("with_threshold", network_size),
+            network_size,
+            |b, &network_size| {
+                let (graph, dids, _temp_dir) = create_test_graph(network_size);
+                let mut rng = rand::thread_rng();
+
+                b.iter(|| {
+                    let target_idx = rng.gen_range(1..network_size);
+                    graph.compute_trust_score_with_threshold(
+                        black_box(&dids[target_idx]),
+                        Some(0.3), // Stop when we find trust >= 0.3
+                    )
+                });
+            },
+        );
+    }
+
+    group.finish();
+}
+
+/// Benchmark cached lookups (should be O(1))
+fn bench_cached_lookups(c: &mut Criterion) {
+    let mut group = c.benchmark_group("cached_lookups");
+
+    for network_size in [1000, 5000, 10000].iter() {
+        group.bench_with_input(
+            BenchmarkId::new("cached", network_size),
+            network_size,
+            |b, &network_size| {
+                let (graph, dids, _temp_dir) = create_test_graph(network_size);
+
+                // Pre-warm cache with some lookups
+                let targets: Vec<usize> = (1..std::cmp::min(100, network_size)).collect();
+                for &idx in &targets {
+                    let _ = graph.compute_trust_score(&dids[idx]);
+                }
+
+                let mut idx = 0;
+                b.iter(|| {
+                    let target = &dids[targets[idx % targets.len()]];
+                    idx += 1;
+                    graph.compute_trust_score(black_box(target))
+                });
+            },
+        );
+    }
+
+    group.finish();
+}
+
+/// Benchmark edge operations
+fn bench_edge_operations(c: &mut Criterion) {
+    let mut group = c.benchmark_group("edge_operations");
 
     group.bench_function("add_edge", |b| {
         b.iter_batched(
@@ -90,57 +219,24 @@ fn bench_trust_edge_operations(c: &mut Criterion) {
         );
     });
 
-    group.bench_function("compute_trust_score", |b| {
-        let temp_dir = TempDir::new().unwrap();
-        let store = Arc::new(SledStore::open(temp_dir.path()).unwrap());
-        let own_did = Did::from_anchor_id(&[0u8; 32]);
-        let mut graph = TrustGraph::new(store, own_did.clone());
-        let target = Did::from_anchor_id(&[1u8; 32]);
-
-        // Add 50 edges from own_did to create a trust path
-        for i in 0..50 {
-            let intermediate = Did::from_anchor_id(&[(i + 10) as u8; 32]);
-            let edge1 = TrustEdge::new(
-                own_did.clone(),
-                intermediate.clone(),
-                0.5 + (i as f64 * 0.01),
-            );
-            graph.add_edge(edge1).unwrap();
-
-            let edge2 = TrustEdge::new(intermediate, target.clone(), 0.6);
-            graph.add_edge(edge2).unwrap();
-        }
-
-        b.iter(|| graph.compute_trust_score(black_box(&target)));
-    });
-
     group.finish();
 }
 
-fn bench_transitive_trust(c: &mut Criterion) {
-    let mut group = c.benchmark_group("transitive_trust");
+/// Benchmark bloom filter rebuild
+fn bench_bloom_filter_rebuild(c: &mut Criterion) {
+    let mut group = c.benchmark_group("bloom_filter");
+    group.sample_size(20);
 
-    for depth in [2, 3, 4].iter() {
-        group.bench_with_input(BenchmarkId::from_parameter(depth), depth, |b, &depth| {
-            let temp_dir = TempDir::new().unwrap();
-            let store = Arc::new(SledStore::open(temp_dir.path()).unwrap());
-            let own_did = Did::from_anchor_id(&[0u8; 32]);
-            let mut graph = TrustGraph::new(store, own_did.clone());
+    for network_size in [1000, 5000, 10000].iter() {
+        group.bench_with_input(
+            BenchmarkId::new("rebuild", network_size),
+            network_size,
+            |b, &network_size| {
+                let (graph, _dids, _temp_dir) = create_test_graph(network_size);
 
-            // Create a chain of trust
-            let chain: Vec<Did> = (0..=depth)
-                .map(|i| Did::from_anchor_id(&[i as u8; 32]))
-                .collect();
-
-            for i in 0..depth {
-                let edge = TrustEdge::new(chain[i].clone(), chain[i + 1].clone(), 0.8);
-                graph.add_edge(edge).unwrap();
-            }
-
-            let target = chain[depth].clone();
-
-            b.iter(|| graph.compute_trust_score(black_box(&target)));
-        });
+                b.iter(|| graph.rebuild_reachability_filter());
+            },
+        );
     }
 
     group.finish();
@@ -149,8 +245,11 @@ fn bench_transitive_trust(c: &mut Criterion) {
 criterion_group!(
     benches,
     bench_trust_computation,
-    bench_trust_edge_operations,
-    bench_transitive_trust
+    bench_negative_lookups,
+    bench_threshold_queries,
+    bench_cached_lookups,
+    bench_edge_operations,
+    bench_bloom_filter_rebuild,
 );
 
 criterion_main!(benches);

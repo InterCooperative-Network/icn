@@ -48,6 +48,9 @@ pub mod anomaly;
 pub mod attestation;
 pub mod facade;
 pub mod multi_graph;
+pub mod pathfinder;
+pub mod precompute;
+pub mod reachability;
 pub mod trust_cache;
 pub mod typed_graph;
 pub mod types;
@@ -56,6 +59,9 @@ pub use anomaly::{TrustAnomaly, TrustGraphAnalyzer};
 pub use attestation::TrustAttestation;
 pub use facade::TrustGraphFacade;
 pub use multi_graph::MultiTrustGraph;
+pub use pathfinder::{PathfinderConfig, TrustPathfinder};
+pub use precompute::TrustPrecomputer;
+pub use reachability::ReachabilityFilter;
 pub use trust_cache::TrustCache;
 pub use typed_graph::TypedTrustGraph;
 pub use types::{ScoringWeights, TrustGraphType};
@@ -184,6 +190,12 @@ impl TrustEdge {
 /// Manages trust edges and computes trust scores from this node's perspective.
 /// Each graph can optionally use a storage prefix for namespace isolation
 /// when running multiple trust graphs (Social, Economic, Technical).
+///
+/// # Performance Optimizations (Phase 22)
+///
+/// - **LRU Cache**: O(1) lookups for recently computed scores (5 min TTL)
+/// - **Reachability Filter**: Bloom filter for O(1) "definitely not reachable" queries
+/// - **Priority Queue**: Optional pathfinder for early termination when threshold met
 pub struct TrustGraph {
     store: Arc<dyn Store>,
     own_did: Did,
@@ -191,6 +203,8 @@ pub struct TrustGraph {
     cache: TrustCache,
     /// Storage key prefix for namespace isolation (e.g., "trust/social")
     storage_prefix: String,
+    /// Bloom filter for fast negative lookups (Phase 22)
+    reachability: ReachabilityFilter,
 }
 
 impl TrustGraph {
@@ -204,6 +218,7 @@ impl TrustGraph {
             own_did,
             cache: TrustCache::new(),
             storage_prefix: Self::DEFAULT_PREFIX.to_string(),
+            reachability: ReachabilityFilter::new(),
         }
     }
 
@@ -217,6 +232,7 @@ impl TrustGraph {
             own_did,
             cache: TrustCache::new(),
             storage_prefix: prefix.to_string(),
+            reachability: ReachabilityFilter::new(),
         }
     }
 
@@ -232,6 +248,7 @@ impl TrustGraph {
             own_did,
             cache: TrustCache::with_config(cache_size, cache_ttl),
             storage_prefix: Self::DEFAULT_PREFIX.to_string(),
+            reachability: ReachabilityFilter::new(),
         }
     }
 
@@ -248,6 +265,7 @@ impl TrustGraph {
             own_did,
             cache: TrustCache::with_config(cache_size, cache_ttl),
             storage_prefix: prefix.to_string(),
+            reachability: ReachabilityFilter::new(),
         }
     }
 
@@ -275,6 +293,18 @@ impl TrustGraph {
 
         // Invalidate cache for target (LRU cache with TTL)
         self.cache.invalidate(&edge.target);
+
+        // Update reachability filter for both direct and transitive paths
+        if edge.source == self.own_did {
+            // Direct edge from us: target is reachable
+            self.reachability.add_reachable(&edge.target);
+        } else {
+            // Check if source is someone we directly trust (transitive reachability)
+            // If we trust the source, then target is also reachable (2-hop)
+            if self.get_edge(&self.own_did, &edge.source)?.is_some() {
+                self.reachability.add_reachable(&edge.target);
+            }
+        }
 
         Ok(())
     }
@@ -359,6 +389,11 @@ impl TrustGraph {
     /// - **Economic**: 80/20 - Your payment history matters most
     /// - **Technical**: 90/10 - Your node's performance is yours
     ///
+    /// # Performance Optimizations (Phase 22)
+    /// 1. LRU cache check (O(1))
+    /// 2. Bloom filter for negative lookups (O(1))
+    /// 3. Two-hop transitive computation
+    ///
     /// # Arguments
     /// * `target` - The DID to compute trust for
     /// * `weights` - Custom direct/transitive weighting
@@ -379,6 +414,14 @@ impl TrustGraph {
         if let Some(score) = self.cache.get(target) {
             icn_obs::metrics::trust::cache_hits_inc();
             return Ok(score);
+        }
+
+        // Fast path: bloom filter check for unreachable DIDs (Phase 22)
+        // If the filter says the DID is definitely NOT reachable, return 0 immediately
+        if !self.reachability.is_empty() && !self.reachability.may_be_reachable(target) {
+            debug!("Bloom filter: {} is definitely not reachable", target);
+            self.cache.put(target.clone(), 0.0);
+            return Ok(0.0);
         }
 
         icn_obs::metrics::trust::cache_misses_inc();
@@ -436,6 +479,85 @@ impl TrustGraph {
         icn_obs::metrics::trust::score_distribution_record(final_score);
 
         Ok(final_score)
+    }
+
+    /// Compute trust score with early termination when threshold is met
+    ///
+    /// This is an optimized version that uses a priority queue for path finding
+    /// and can terminate early when the minimum threshold is reached.
+    ///
+    /// # Arguments
+    /// * `target` - The DID to compute trust for
+    /// * `min_threshold` - Optional minimum score threshold for early termination
+    ///
+    /// # Returns
+    /// Trust score in range [0.0, 1.0]
+    pub fn compute_trust_score_with_threshold(
+        &self,
+        target: &Did,
+        min_threshold: Option<f64>,
+    ) -> Result<f64> {
+        // Record lookup
+        icn_obs::metrics::trust::lookups_inc();
+
+        // Check cache first
+        if let Some(score) = self.cache.get(target) {
+            icn_obs::metrics::trust::cache_hits_inc();
+            return Ok(score);
+        }
+
+        // Fast path: bloom filter check
+        if !self.reachability.is_empty() && !self.reachability.may_be_reachable(target) {
+            self.cache.put(target.clone(), 0.0);
+            return Ok(0.0);
+        }
+
+        icn_obs::metrics::trust::cache_misses_inc();
+
+        // Use pathfinder for optimized computation
+        let config = if let Some(threshold) = min_threshold {
+            PathfinderConfig::default().with_threshold(threshold)
+        } else {
+            PathfinderConfig::default()
+        };
+
+        let pathfinder = TrustPathfinder::with_config(config);
+        let score = pathfinder.find_score(self, target)?;
+
+        // Cache result
+        self.cache.put(target.clone(), score);
+
+        Ok(score)
+    }
+
+    /// Rebuild the reachability filter from current trust graph
+    ///
+    /// This should be called periodically or after bulk edge operations
+    /// to ensure the bloom filter accurately reflects reachable DIDs.
+    pub fn rebuild_reachability_filter(&self) -> Result<()> {
+        // Get all DIDs reachable from our node within 2 hops
+        let mut reachable = Vec::new();
+
+        // Direct edges (1 hop)
+        let direct_edges = self.get_outgoing_edges(&self.own_did)?;
+        for edge in &direct_edges {
+            reachable.push(edge.target.clone());
+
+            // Transitive edges (2 hops)
+            if let Ok(indirect_edges) = self.get_outgoing_edges(&edge.target) {
+                for indirect in indirect_edges {
+                    reachable.push(indirect.target.clone());
+                }
+            }
+        }
+
+        self.reachability.rebuild(reachable);
+        Ok(())
+    }
+
+    /// Get a reference to the reachability filter
+    pub fn reachability_filter(&self) -> &ReachabilityFilter {
+        &self.reachability
     }
 
     /// Get the trust class for a DID
