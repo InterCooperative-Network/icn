@@ -264,6 +264,88 @@ pub fn verify_snapshot(data_dir: impl AsRef<Path>) -> Result<()> {
     Ok(())
 }
 
+/// Verify a specific timestamped snapshot's checksum
+///
+/// Takes the snapshot filename (e.g., "state.snapshot.1703169600") and verifies
+/// that its contents match the stored checksum.
+///
+/// Returns Ok(()) if checksum is valid, Err if corrupted or checksum missing
+pub fn verify_timestamped_snapshot(
+    data_dir: impl AsRef<Path>,
+    snapshot_filename: &str,
+) -> Result<()> {
+    let data_dir = data_dir.as_ref();
+    let snapshot_path = data_dir.join(snapshot_filename);
+    let checksum_path = data_dir.join(format!("{snapshot_filename}.sha256"));
+
+    if !snapshot_path.exists() {
+        return Err(anyhow!("Snapshot '{}' does not exist", snapshot_filename));
+    }
+
+    if !checksum_path.exists() {
+        return Err(anyhow!(
+            "Checksum file for '{}' does not exist (legacy snapshot?)",
+            snapshot_filename
+        ));
+    }
+
+    let json = std::fs::read(&snapshot_path).context("Failed to read snapshot")?;
+    let expected_checksum =
+        std::fs::read_to_string(&checksum_path).context("Failed to read checksum")?;
+    let actual_checksum = compute_checksum(&json);
+
+    if expected_checksum.trim() != actual_checksum {
+        return Err(anyhow!(
+            "Snapshot '{}' checksum mismatch! Expected: {}, Actual: {}",
+            snapshot_filename,
+            expected_checksum.trim(),
+            actual_checksum
+        ));
+    }
+
+    Ok(())
+}
+
+/// Load a specific timestamped snapshot by filename
+///
+/// Takes the snapshot filename (e.g., "state.snapshot.1703169600") and loads it.
+/// This also verifies the checksum before returning the snapshot.
+pub fn load_timestamped_snapshot(
+    data_dir: impl AsRef<Path>,
+    snapshot_filename: &str,
+) -> Result<StateSnapshot> {
+    let data_dir = data_dir.as_ref();
+    let snapshot_path = data_dir.join(snapshot_filename);
+    let checksum_path = data_dir.join(format!("{snapshot_filename}.sha256"));
+
+    if !snapshot_path.exists() {
+        return Err(anyhow!("Snapshot '{}' does not exist", snapshot_filename));
+    }
+
+    let json = std::fs::read(&snapshot_path).context("Failed to read snapshot")?;
+
+    // Verify checksum if available
+    if checksum_path.exists() {
+        let expected_checksum =
+            std::fs::read_to_string(&checksum_path).context("Failed to read checksum")?;
+        let actual_checksum = compute_checksum(&json);
+
+        if expected_checksum.trim() != actual_checksum {
+            return Err(anyhow!(
+                "Snapshot '{}' checksum mismatch! Expected: {}, Actual: {}",
+                snapshot_filename,
+                expected_checksum.trim(),
+                actual_checksum
+            ));
+        }
+    }
+
+    let snapshot: StateSnapshot =
+        serde_json::from_slice(&json).context("Failed to deserialize snapshot")?;
+
+    Ok(snapshot)
+}
+
 /// List all timestamped snapshots in data directory
 ///
 /// Returns (filename, timestamp, size_bytes) sorted by timestamp (newest first)
@@ -667,6 +749,46 @@ mod tests {
         assert_eq!(snapshots.len(), 1);
         assert_eq!(snapshots[0].0, expected_filename);
         assert_eq!(snapshots[0].1, timestamp);
+
+        std::fs::remove_dir_all(&temp).unwrap();
+    }
+
+    #[test]
+    fn test_verify_timestamped_snapshot() {
+        let temp = std::env::temp_dir().join("icn-snapshot-verify-ts");
+        std::fs::create_dir_all(&temp).unwrap();
+
+        let snapshot = StateSnapshot::new();
+        let timestamp = snapshot.created_at;
+        let filename = format!("state.snapshot.{timestamp}");
+
+        save_timestamped_snapshot(&snapshot, &temp).unwrap();
+
+        // Verify should succeed
+        verify_timestamped_snapshot(&temp, &filename).unwrap();
+
+        // Load should also succeed and return correct data
+        let loaded = load_timestamped_snapshot(&temp, &filename).unwrap();
+        assert_eq!(loaded.created_at, timestamp);
+
+        // Corrupt the snapshot and verify should fail
+        let snapshot_path = temp.join(&filename);
+        std::fs::write(&snapshot_path, b"corrupted").unwrap();
+        let result = verify_timestamped_snapshot(&temp, &filename);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("checksum mismatch"));
+
+        std::fs::remove_dir_all(&temp).unwrap();
+    }
+
+    #[test]
+    fn test_verify_nonexistent_timestamped_snapshot() {
+        let temp = std::env::temp_dir().join("icn-snapshot-verify-missing");
+        std::fs::create_dir_all(&temp).unwrap();
+
+        let result = verify_timestamped_snapshot(&temp, "state.snapshot.999999");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("does not exist"));
 
         std::fs::remove_dir_all(&temp).unwrap();
     }

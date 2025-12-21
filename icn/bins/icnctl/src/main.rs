@@ -5535,20 +5535,26 @@ fn handle_snapshot_command(cmd: SnapshotCommands, data_dir: &Path) -> Result<()>
             let snapshot_name = snapshot.unwrap_or_else(|| "state.snapshot".to_string());
             println!("Verifying snapshot: {snapshot_name}");
 
-            // If a specific snapshot was given, we need to temporarily copy it
-            if snapshot_name != "state.snapshot" {
-                // TODO: Implement verification for timestamped snapshots
-                // For now, just verify the main snapshot
-                println!("⚠ Verifying timestamped snapshots not yet implemented.");
-                println!("  Verifying main snapshot instead...");
-            }
+            // Verify the snapshot (main or timestamped)
+            let verify_result = if snapshot_name == "state.snapshot" {
+                icn_snapshot::verify_snapshot(&store_dir)
+            } else {
+                icn_snapshot::verify_timestamped_snapshot(&store_dir, &snapshot_name)
+            };
 
-            match icn_snapshot::verify_snapshot(&store_dir) {
+            match verify_result {
                 Ok(()) => {
                     println!("✓ Snapshot checksum verified successfully");
 
-                    // Also load and display info
-                    if let Ok(Some(snapshot)) = icn_snapshot::load_snapshot(&store_dir) {
+                    // Load and display info
+                    let load_result = if snapshot_name == "state.snapshot" {
+                        icn_snapshot::load_snapshot(&store_dir).map(|opt| opt)
+                    } else {
+                        icn_snapshot::load_timestamped_snapshot(&store_dir, &snapshot_name)
+                            .map(Some)
+                    };
+
+                    if let Ok(Some(snapshot)) = load_result {
                         println!();
                         println!("Snapshot details:");
                         println!("  Created: {}", snapshot.created_at);
