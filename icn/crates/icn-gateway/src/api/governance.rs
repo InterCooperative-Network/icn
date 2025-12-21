@@ -337,13 +337,15 @@ pub async fn create_proposal(
         }
     };
 
-    // Create proposal via governance actor
+    // Create proposal via governance manager
+    // In actor-backed mode, the actor generates the proposal ID
+    // In standalone mode, we provide one (but it may be overridden)
     let domain_id = GovernanceDomainId(req.domain_id.clone());
-    let proposal_id = ProposalId(format!("prop-{}", uuid::Uuid::new_v4()));
+    let suggested_id = ProposalId(format!("prop-{}", uuid::Uuid::new_v4()));
 
-    gov_mgr
+    let proposal_id = gov_mgr
         .create_proposal(
-            proposal_id.clone(),
+            suggested_id,
             domain_id,
             proposer_did.clone(),
             req.title.clone(),

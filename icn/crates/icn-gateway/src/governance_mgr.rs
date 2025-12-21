@@ -164,8 +164,12 @@ impl GovernanceManager {
 
     /// Create a new proposal
     ///
-    /// Note: In actor-backed mode, the `proposal_id` is ignored (actor generates it)
-    /// and `proposer` is ignored (actor uses its own DID).
+    /// Returns the `ProposalId` of the created proposal. In actor-backed mode,
+    /// the actor generates the ID (the `proposal_id` parameter is ignored).
+    /// In standalone mode, the provided `proposal_id` is used.
+    ///
+    /// In actor-backed mode, the `proposer` parameter is ignored - the actor
+    /// uses its authenticated identity as the proposer.
     pub async fn create_proposal(
         &self,
         proposal_id: ProposalId,
@@ -174,14 +178,14 @@ impl GovernanceManager {
         title: String,
         description: String,
         payload: ProposalPayload,
-    ) -> Result<()> {
+    ) -> Result<ProposalId> {
         if let Some(ref handle) = self.governance_handle {
             // Actor-backed mode: delegate to GovernanceActor
             // Note: proposal_id and proposer are ignored - actor generates ID and uses own DID
-            let _generated_id = handle
+            let generated_id = handle
                 .create_proposal(domain_id, title, description, payload)
                 .await?;
-            return Ok(());
+            return Ok(generated_id);
         }
 
         // Standalone mode: in-memory storage
@@ -209,9 +213,9 @@ impl GovernanceManager {
             anyhow::bail!("Proposal already exists: {}", proposal_id.0);
         }
 
-        proposals.insert(proposal_id, proposal);
+        proposals.insert(proposal_id.clone(), proposal);
 
-        Ok(())
+        Ok(proposal_id)
     }
 
     /// Get a specific proposal
@@ -407,8 +411,12 @@ impl GovernanceManager {
 
     /// Cast a vote on a proposal
     ///
-    /// Note: In actor-backed mode, the `voter` parameter is ignored - the actor
-    /// uses its own DID.
+    /// In actor-backed mode, the `voter` parameter is ignored - the actor
+    /// uses its authenticated identity as the voter. The caller should use
+    /// the authenticated user's DID for event logging purposes.
+    ///
+    /// In standalone mode, the `voter` parameter is used to record the vote
+    /// and validate domain membership.
     pub async fn cast_vote(
         &self,
         proposal_id: ProposalId,
