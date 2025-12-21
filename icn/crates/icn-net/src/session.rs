@@ -7,12 +7,12 @@
 //! - DID-based peer authentication
 
 use anyhow::{Context, Result};
-use quinn::{ClientConfig, Endpoint, ServerConfig};
+use quinn::{ClientConfig, Endpoint, EndpointConfig, ServerConfig};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 use crate::tls;
 
@@ -163,38 +163,67 @@ impl SessionManager {
         ));
         client_config.transport_config(transport_config);
 
-        // Create endpoint
-        let mut endpoint = Endpoint::server(server_config, listen_addr)?;
+        // Create UDP socket FIRST (before Quinn takes ownership)
+        // This allows us to use the same socket for STUN discovery before creating the QUIC endpoint
+        let std_socket = std::net::UdpSocket::bind(listen_addr)
+            .context("Failed to bind UDP socket for QUIC endpoint")?;
+        std_socket
+            .set_nonblocking(true)
+            .context("Failed to set socket to non-blocking mode")?;
+
+        debug!("UDP socket bound to {}", listen_addr);
+
+        // Convert to tokio socket for async STUN discovery
+        let tokio_socket = tokio::net::UdpSocket::from_std(std_socket)
+            .context("Failed to convert socket to tokio")?;
+
+        // Perform STUN discovery BEFORE creating the QUIC endpoint
+        // This uses the same socket that will later be used for QUIC
+        if let Some(servers) = stun_servers {
+            debug!("Performing STUN discovery with {} servers", servers.len());
+            let stun_client = crate::stun::StunClient::new(servers);
+
+            match stun_client.discover_public_endpoint(&tokio_socket).await {
+                Ok(public_addr) => {
+                    info!(
+                        "✅ Discovered public endpoint: {} (local: {})",
+                        public_addr, listen_addr
+                    );
+                    *self.public_endpoint.write().await = Some(public_addr);
+                    icn_obs::metrics::nat::stun_discovery_inc("success");
+                }
+                Err(e) => {
+                    warn!(
+                        "Failed to discover public endpoint via STUN: {}. \
+                         Node will only be reachable on local network.",
+                        e
+                    );
+                    icn_obs::metrics::nat::stun_discovery_inc("failed");
+                }
+            }
+        }
+
+        // Convert back to std socket for Quinn
+        let std_socket = tokio_socket
+            .into_std()
+            .context("Failed to convert tokio socket back to std")?;
+
+        // Create QUIC endpoint from the existing socket
+        // This avoids the double-bind issue since we reuse the already-bound socket
+        let runtime = quinn::default_runtime()
+            .ok_or_else(|| anyhow::anyhow!("No async runtime found for Quinn"))?;
+
+        let mut endpoint = Endpoint::new(
+            EndpointConfig::default(),
+            Some(server_config),
+            std_socket,
+            runtime,
+        )
+        .context("Failed to create QUIC endpoint")?;
+
         endpoint.set_default_client_config(client_config);
 
         info!("QUIC endpoint listening on {}", endpoint.local_addr()?);
-
-        // Perform STUN discovery if enabled (NAT traversal)
-        // TEMPORARY FIX: Disabled due to double-bind bug
-        // TODO: Fix by either reusing endpoint's socket or binding before endpoint creation
-        if let Some(_servers) = stun_servers {
-            tracing::warn!("STUN discovery temporarily disabled due to socket reuse issue");
-            tracing::warn!("Node will only be reachable on local network until fixed");
-            // let stun_client = crate::stun::StunClient::new(servers);
-            //
-            // // BUG: This tries to bind to the same address as the QUIC endpoint above
-            // // causing "Address already in use" error
-            // let local_addr = endpoint.local_addr()?;
-            // let socket = tokio::net::UdpSocket::bind(local_addr).await?;
-            //
-            // match stun_client.discover_public_endpoint(&socket).await {
-            //     Ok(public_addr) => {
-            //         info!(
-            //             "✅ Discovered public endpoint: {} (local: {})",
-            //             public_addr, local_addr
-            //         );
-            //         *self.public_endpoint.write().await = Some(public_addr);
-            //     }
-            //     Err(e) => {
-            //         tracing::warn!("Failed to discover public endpoint via STUN: {}. Node will only be reachable on local network.", e);
-            //     }
-            // }
-        }
 
         // Initialize TURN relay if configured (NAT traversal fallback)
         if let Some(config) = turn_config {

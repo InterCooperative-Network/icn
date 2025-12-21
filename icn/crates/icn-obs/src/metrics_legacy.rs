@@ -2517,6 +2517,13 @@ pub mod nat_traversal {
         .increment(1);
     }
 
+    /// Records the outcome of a STUN discovery attempt (success/failed)
+    pub fn stun_discovery_inc(result: &str) {
+        counter!("icn_stun_discovery_total",
+                 "result" => result.to_string())
+        .increment(1);
+    }
+
     pub fn stun_discovery_duration_record(duration_secs: f64) {
         histogram!("icn_stun_discovery_duration_seconds").record(duration_secs);
     }
