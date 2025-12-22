@@ -9,6 +9,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::{info, warn};
+use tracing_actix_web::TracingLogger;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
@@ -467,7 +468,7 @@ impl GatewayServer {
                 .wrap(prometheus.clone())
                 .wrap(cors)
                 .wrap(SecurityHeaders::new(security_config.clone()))
-                .wrap(middleware::Logger::default())
+                .wrap(TracingLogger::default())
                 .wrap(middleware::Compress::default())
                 // API v1 - single scope with public and protected routes
                 .service(

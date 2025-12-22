@@ -211,6 +211,66 @@ pub struct ObservabilityConfig {
 
     /// Log level (trace, debug, info, warn, error)
     pub log_level: String,
+
+    /// Distributed tracing configuration
+    #[serde(default)]
+    pub tracing: TracingConfig,
+}
+
+/// Distributed tracing configuration with OpenTelemetry
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TracingConfig {
+    /// Enable distributed tracing export
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// OTLP endpoint for trace export (e.g., "http://localhost:4317")
+    #[serde(default = "default_otlp_endpoint")]
+    pub otlp_endpoint: String,
+
+    /// Sampling rate (0.0 to 1.0). Default is 0.1 (10%) for production.
+    #[serde(default = "default_sampling_rate")]
+    pub sampling_rate: f64,
+
+    /// Service name for traces
+    #[serde(default = "default_service_name")]
+    pub service_name: String,
+}
+
+fn default_otlp_endpoint() -> String {
+    "http://localhost:4317".to_string()
+}
+
+fn default_sampling_rate() -> f64 {
+    0.1 // 10% sampling for production
+}
+
+fn default_service_name() -> String {
+    "icnd".to_string()
+}
+
+impl Default for TracingConfig {
+    fn default() -> Self {
+        TracingConfig {
+            enabled: false,
+            otlp_endpoint: default_otlp_endpoint(),
+            sampling_rate: default_sampling_rate(),
+            service_name: default_service_name(),
+        }
+    }
+}
+
+impl TracingConfig {
+    /// Convert to icn_obs TracingConfig
+    pub fn to_obs_config(&self, node_did: Option<String>) -> icn_obs::TracingConfig {
+        icn_obs::TracingConfig {
+            enabled: self.enabled,
+            otlp_endpoint: self.otlp_endpoint.clone(),
+            sampling_rate: self.sampling_rate,
+            service_name: self.service_name.clone(),
+            node_did,
+        }
+    }
 }
 
 /// Rate limiting configuration for trust-gated message throttling
@@ -610,6 +670,7 @@ impl Default for Config {
                 metrics_port: 9100,
                 health_port: 8080,
                 log_level: "info".to_string(),
+                tracing: TracingConfig::default(),
             },
             rate_limiting: RateLimitingConfig::default(),
             topology: TopologyConfig::default(),

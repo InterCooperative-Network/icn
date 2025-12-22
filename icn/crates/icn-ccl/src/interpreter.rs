@@ -6,7 +6,7 @@ use crate::types::{
     Capability, ContractState, ExecutionContext, ExecutionResult, LedgerOperation, Value,
 };
 use std::collections::{HashMap, HashSet};
-use tracing::{debug, trace};
+use tracing::{debug, instrument, trace};
 
 /// Fuel cost constants
 const FUEL_STMT: u64 = 1;
@@ -46,6 +46,7 @@ impl Interpreter {
     }
 
     /// Execute a rule with given arguments
+    #[instrument(skip(self, args), fields(rule = %rule_name, fuel_limit = self.context.fuel))]
     pub fn execute_rule(
         mut self,
         rule_name: &str,

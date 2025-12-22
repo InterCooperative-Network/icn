@@ -92,7 +92,7 @@ impl LocalExecutor {
 
         // Check that the rule exists
         if contract.get_rule(&rule).is_none() {
-            return ExecutionOutcome::Failed(format!("Rule '{}' not found in contract", rule));
+            return ExecutionOutcome::Failed(format!("Rule '{rule}' not found in contract"));
         }
 
         // Parse caller DID

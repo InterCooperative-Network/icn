@@ -46,6 +46,9 @@ impl TryFrom<u8> for CompressionFormat {
     }
 }
 
+/// Re-export TraceContext from icn-obs for distributed tracing propagation
+pub use icn_obs::TraceContext;
+
 /// Wire-format message envelope
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkMessage {
@@ -60,6 +63,17 @@ pub struct NetworkMessage {
 
     /// Message payload
     pub payload: MessagePayload,
+
+    /// Trace context for distributed tracing (optional for backward compatibility).
+    ///
+    /// `#[serde(default)]` ensures that **new** code can deserialize **old** messages
+    /// that don't have this field (it will simply be `None`). We deliberately do
+    /// **not** use `skip_serializing_if` here because bincode uses positional
+    /// encoding: if **new** code were to skip serializing this field, **old**
+    /// deserializers expecting a value in this position would fail to decode.
+    /// Always serializing the field (even when `None`) preserves compatibility.
+    #[serde(default)]
+    pub trace_context: Option<TraceContext>,
 }
 
 /// Message payload types
@@ -215,7 +229,30 @@ impl NetworkMessage {
             from,
             to,
             payload,
+            trace_context: None,
         }
+    }
+
+    /// Create a new network message with trace context
+    pub fn new_with_trace(
+        from: Did,
+        to: Option<Did>,
+        payload: MessagePayload,
+        trace_context: Option<TraceContext>,
+    ) -> Self {
+        NetworkMessage {
+            version: PROTOCOL_VERSION,
+            from,
+            to,
+            payload,
+            trace_context,
+        }
+    }
+
+    /// Attach trace context from the current span
+    pub fn with_current_trace_context(mut self) -> Self {
+        self.trace_context = Some(TraceContext::from_current());
+        self
     }
 
     /// Create a gossip message

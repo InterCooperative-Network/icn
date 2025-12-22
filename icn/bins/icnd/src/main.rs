@@ -49,6 +49,18 @@ struct Args {
     /// Validate configuration and exit (useful for CI/CD)
     #[arg(long)]
     validate_config: bool,
+
+    /// Enable distributed tracing with OpenTelemetry
+    #[arg(long)]
+    tracing_enable: bool,
+
+    /// OTLP endpoint for trace export (e.g., "http://tempo:4317")
+    #[arg(long)]
+    tracing_otlp_endpoint: Option<String>,
+
+    /// Tracing sampling rate (0.0 to 1.0, default: 0.1)
+    #[arg(long)]
+    tracing_sampling_rate: Option<f64>,
 }
 
 #[tokio::main]
@@ -60,16 +72,37 @@ async fn main() -> Result<()> {
         .install_default()
         .map_err(|_| anyhow::anyhow!("Failed to install default crypto provider"))?;
 
-    // Initialize observability
-    icn_obs::init()?;
-    tracing::info!("ICNd starting");
-
-    // Load or create config
-    let mut config = if let Some(config_path) = args.config {
-        Config::from_file(config_path)?
+    // Load or create config (before tracing init so we can use tracing config)
+    let mut config = if let Some(config_path) = &args.config {
+        Config::from_file(config_path).context("Failed to load config file")?
     } else {
         Config::default()
     };
+
+    // Apply tracing CLI args before initialization
+    if args.tracing_enable {
+        config.observability.tracing.enabled = true;
+    }
+    if let Some(endpoint) = args.tracing_otlp_endpoint {
+        config.observability.tracing.otlp_endpoint = endpoint;
+    }
+    if let Some(rate) = args.tracing_sampling_rate {
+        config.observability.tracing.sampling_rate = rate;
+    }
+
+    // Check for OTEL environment variables (standard OpenTelemetry config)
+    if let Ok(endpoint) = std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT") {
+        config.observability.tracing.otlp_endpoint = endpoint;
+        config.observability.tracing.enabled = true;
+    }
+    if let Ok(service_name) = std::env::var("OTEL_SERVICE_NAME") {
+        config.observability.tracing.service_name = service_name;
+    }
+
+    // Initialize observability with distributed tracing support
+    let tracing_config = config.observability.tracing.to_obs_config(None);
+    icn_obs::init_tracing(&tracing_config)?;
+    tracing::info!("ICNd starting");
 
     // Override with CLI args
     if let Some(data_dir) = args.data_dir {
@@ -241,6 +274,10 @@ async fn main() -> Result<()> {
     }
 
     tracing::info!("ICNd stopped");
+
+    // Flush any pending traces before exit
+    icn_obs::shutdown_tracing();
+
     Ok(())
 }
 
