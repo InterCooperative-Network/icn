@@ -168,9 +168,28 @@ impl MultiTrustGraph {
     /// **Note**: New code should prefer typed access via `graph()` for
     /// domain-appropriate scoring.
     pub fn compute_combined_trust_score(&self, target: &Did) -> Result<f64> {
-        let social = self.social.compute_trust_score(target).unwrap_or(0.0);
-        let economic = self.economic.compute_trust_score(target).unwrap_or(0.0);
-        let technical = self.technical.compute_trust_score(target).unwrap_or(0.0);
+        // Issue #181: Track computation errors while still providing fallback scores
+        let social = match self.social.compute_trust_score(target) {
+            Ok(score) => score,
+            Err(_) => {
+                icn_obs::metrics::trust::computation_errors_inc();
+                0.0
+            }
+        };
+        let economic = match self.economic.compute_trust_score(target) {
+            Ok(score) => score,
+            Err(_) => {
+                icn_obs::metrics::trust::computation_errors_inc();
+                0.0
+            }
+        };
+        let technical = match self.technical.compute_trust_score(target) {
+            Ok(score) => score,
+            Err(_) => {
+                icn_obs::metrics::trust::computation_errors_inc();
+                0.0
+            }
+        };
 
         let (sw, ew, tw) = Self::COMBINED_WEIGHTS;
         Ok((social * sw + economic * ew + technical * tw).min(1.0))

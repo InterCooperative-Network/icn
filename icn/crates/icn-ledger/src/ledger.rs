@@ -615,8 +615,17 @@ impl Ledger {
         LedgerSyncMessage::RollbackNotification { .. } => "RollbackNotification",
     }))]
     pub fn handle_sync_message(&mut self, msg: LedgerSyncMessage) -> Result<()> {
+        // Issue #181: Track sync lag (time since entry was created)
+        let observe_sync_lag = |entry_timestamp: u64| {
+            let now_ms = icn_time::current_timestamp_millis();
+            let lag_secs = (now_ms.saturating_sub(entry_timestamp) as f64) / 1000.0;
+            icn_obs::metrics::ledger::sync_lag_seconds_set(lag_secs);
+        };
+
         match msg {
             LedgerSyncMessage::NewEntry { hash, mut entry } => {
+                observe_sync_lag(entry.timestamp);
+
                 // Check if we already have this entry
                 if self.get_entry(&hash)?.is_some() {
                     debug!(
@@ -691,6 +700,7 @@ impl Ledger {
             LedgerSyncMessage::EntryResponse { hash, entry } => {
                 // Handle response with entry
                 if let Some(e) = entry {
+                    observe_sync_lag(e.timestamp);
                     debug!("Received entry {} response", hash);
                     // Use append_entry_from_sync to avoid re-broadcasting entries we received
                     let result = self.append_entry_from_sync(e);
