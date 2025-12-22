@@ -141,6 +141,7 @@ impl GossipActor {
                             want_ids: vec![],
                             max_bytes: 1_000_000, // 1MB max
                             nonce,
+                            cursor: None, // Initial request, no cursor
                         },
                     );
                 }

@@ -37,7 +37,9 @@ pub use envelope::{PayloadType, SignedEnvelope};
 pub use error::{NetError, Result};
 pub use global_rate_limit::GlobalRateLimiter;
 pub use protocol::{
-    read_message, write_message, KnownPeer, MessagePayload, NetworkMessage, PeerExchangeMessage,
+    read_message, read_message_compressed, write_message, write_message_compressed,
+    CompressionFormat, KnownPeer, MessagePayload, NetworkMessage, PeerExchangeMessage,
+    COMPRESSION_THRESHOLD,
 };
 pub use rate_limit::{RateLimitConfig, RateLimiter, TrustGatedRateLimitConfig};
 pub use replay_guard::ReplayGuard;

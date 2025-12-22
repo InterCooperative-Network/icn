@@ -1028,14 +1028,16 @@ impl GossipActor {
                 want_ids,
                 max_bytes,
                 nonce,
-            } => self.handle_pull_request(sender, topic, want_ids, max_bytes, nonce),
+                cursor,
+            } => self.handle_pull_request(sender, topic, want_ids, max_bytes, nonce, cursor),
 
             GossipMessage::PullResponse {
                 topic,
                 entries,
                 truncated,
                 nonce,
-            } => self.handle_pull_response(sender, topic, entries, truncated, nonce),
+                next_cursor,
+            } => self.handle_pull_response(sender, topic, entries, truncated, nonce, next_cursor),
 
             GossipMessage::BlobAnnounce {
                 blob_hash,

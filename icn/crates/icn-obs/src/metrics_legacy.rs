@@ -1823,6 +1823,32 @@ pub mod gossip {
     pub fn messages_rejected_low_trust_inc() {
         counter!("icn_gossip_messages_rejected_low_trust_total").increment(1);
     }
+
+    // Issue #123: Message compression metrics
+    /// Track bytes before compression
+    pub fn bytes_before_compression_add(bytes: u64) {
+        counter!("icn_gossip_bytes_before_compression_total").increment(bytes);
+    }
+
+    /// Track bytes after compression
+    pub fn bytes_after_compression_add(bytes: u64) {
+        counter!("icn_gossip_bytes_after_compression_total").increment(bytes);
+    }
+
+    /// Record compression ratio (uncompressed/compressed)
+    pub fn compression_ratio_record(ratio: f64) {
+        histogram!("icn_gossip_compression_ratio").record(ratio);
+    }
+
+    /// Track pull continuations sent for paginated sync
+    pub fn pull_continuation_sent_inc() {
+        counter!("icn_gossip_pull_continuation_sent_total").increment(1);
+    }
+
+    /// Track pull continuations received for paginated sync
+    pub fn pull_continuation_received_inc() {
+        counter!("icn_gossip_pull_continuation_received_total").increment(1);
+    }
 }
 
 /// Scalability metrics (Phase 19)

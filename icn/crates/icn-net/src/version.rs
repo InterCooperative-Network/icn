@@ -74,6 +74,9 @@ bitflags::bitflags! {
         /// Supports economic safety rails (Phase 12)
         const ECONOMIC_SAFETY = 0b10000000;
 
+        /// Supports message-level compression (Issue #123)
+        const MESSAGE_COMPRESSION = 0b100000000;
+
         // Future capabilities can be added here
         // Reserve high bits for future use
     }
@@ -110,6 +113,7 @@ impl CapabilityFlags {
             | Self::GOSSIP_PULL
             | Self::MULTI_DEVICE
             | Self::ECONOMIC_SAFETY
+            | Self::MESSAGE_COMPRESSION
     }
 
     /// Get a human-readable list of capabilities
@@ -138,6 +142,9 @@ impl CapabilityFlags {
         }
         if self.contains(Self::ECONOMIC_SAFETY) {
             features.push("economic_safety");
+        }
+        if self.contains(Self::MESSAGE_COMPRESSION) {
+            features.push("message_compression");
         }
         features
     }
@@ -398,5 +405,6 @@ mod tests {
         assert!(caps.contains(CapabilityFlags::GOSSIP_PULL));
         assert!(caps.contains(CapabilityFlags::MULTI_DEVICE));
         assert!(caps.contains(CapabilityFlags::ECONOMIC_SAFETY));
+        assert!(caps.contains(CapabilityFlags::MESSAGE_COMPRESSION));
     }
 }

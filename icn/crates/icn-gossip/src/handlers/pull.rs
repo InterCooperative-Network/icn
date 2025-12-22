@@ -6,11 +6,11 @@
 
 use crate::bloom::BloomFilter;
 use crate::gossip::GossipActor;
-use crate::types::{BloomFilterData, ContentHash, GossipEntry, GossipMessage, TrustResourceLimits};
+use crate::types::{BloomFilterData, ContentHash, GossipEntry, GossipMessage, SyncCursor, TrustResourceLimits};
 use crate::vector_clock::VectorClock;
 use anyhow::Result;
 use icn_identity::Did;
-use tracing::debug;
+use tracing::{debug, warn};
 
 impl GossipActor {
     /// Handle a Digest message - anti-entropy synchronization
@@ -138,6 +138,7 @@ impl GossipActor {
                 want_ids,
                 max_bytes,
                 nonce: request_nonce,
+                cursor: None, // Initial request, no cursor
             },
         );
 
@@ -148,10 +149,11 @@ impl GossipActor {
         Ok(())
     }
 
-    /// Handle a PullRequest message - request for entries
+    /// Handle a PullRequest message - request for entries with pagination support
     ///
     /// Collects requested entries (or all entries if want_ids is empty)
     /// up to max_bytes and sends them in a PullResponse.
+    /// If a cursor is provided, resumes from that position.
     pub(crate) fn handle_pull_request(
         &mut self,
         _sender: &Did,
@@ -159,15 +161,26 @@ impl GossipActor {
         want_ids: Vec<ContentHash>,
         max_bytes: u32,
         nonce: u64,
+        cursor: Option<SyncCursor>,
     ) -> Result<()> {
         icn_obs::metrics::gossip::pull_requests_received_inc();
         debug!(
-            "Received PullRequest: topic={}, want_ids={}, max_bytes={}, nonce={}",
+            "Received PullRequest: topic={}, want_ids={}, max_bytes={}, nonce={}, cursor={:?}",
             topic,
             want_ids.len(),
             max_bytes,
-            nonce
+            nonce,
+            cursor.is_some()
         );
+
+        // Validate cursor if provided
+        if let Some(ref c) = cursor {
+            if c.is_expired() {
+                warn!("Received expired cursor for topic {}, ignoring cursor", topic);
+            } else if c.topic != topic {
+                warn!("Cursor topic mismatch: {} vs {}, ignoring cursor", c.topic, topic);
+            }
+        }
 
         // Get entries for the topic
         let topic_entries = match self.entries.get(&topic) {
@@ -178,50 +191,85 @@ impl GossipActor {
             }
         };
 
-        // Collect requested entries
-        let mut response_entries = Vec::new();
-        let mut total_bytes = 0u32;
-        let mut truncated = false;
+        // Sort entries deterministically for pagination (by timestamp, then hash)
+        let mut sorted_entries: Vec<_> = topic_entries.values().cloned().collect();
+        sorted_entries.sort_by(|a, b| {
+            a.timestamp.cmp(&b.timestamp).then_with(|| a.hash.cmp(&b.hash))
+        });
 
-        // If want_ids is empty, interpret as "send all entries" (up to max_bytes)
-        let hashes_to_send: Vec<ContentHash> = if want_ids.is_empty() {
-            debug!("Empty want_ids - sending all entries for topic (up to max_bytes)");
-            topic_entries.keys().copied().collect()
+        // Find starting position from cursor
+        let start_index = if let Some(ref c) = cursor {
+            if c.is_valid_for_topic(&topic) {
+                // Find entry after cursor position
+                sorted_entries
+                    .iter()
+                    .position(|e| e.hash == c.last_hash)
+                    .map(|i| i + 1)
+                    .unwrap_or(0) // If hash not found, start from beginning
+            } else {
+                0
+            }
         } else {
-            want_ids.clone()
+            0
         };
 
-        for hash in hashes_to_send {
-            if let Some(entry) = topic_entries.get(&hash) {
-                // Estimate entry size (rough approximation)
-                let entry_bytes = entry.data.len() as u32 + 256; // Data + overhead
+        // Collect entries with pagination
+        let mut response_entries = Vec::new();
+        let mut total_bytes = 0u32;
+        let mut last_entry_index = start_index;
 
-                if total_bytes + entry_bytes > max_bytes {
-                    truncated = true;
-                    icn_obs::metrics::gossip::pull_truncated_inc();
-                    break;
-                }
-
-                response_entries.push(entry.clone());
-                total_bytes += entry_bytes;
-            }
+        // If want_ids is empty, interpret as "send all entries" (up to max_bytes)
+        let want_all = want_ids.is_empty();
+        if want_all {
+            debug!("Empty want_ids - sending all entries for topic (up to max_bytes)");
         }
 
+        for (idx, entry) in sorted_entries.iter().enumerate().skip(start_index) {
+            // Filter by want_ids if provided (unless empty = all)
+            if !want_all && !want_ids.contains(&entry.hash) {
+                continue;
+            }
+
+            // Estimate entry size (rough approximation)
+            let entry_bytes = entry.data.len() as u32 + 256; // Data + overhead
+
+            if total_bytes + entry_bytes > max_bytes {
+                icn_obs::metrics::gossip::pull_truncated_inc();
+                break;
+            }
+
+            response_entries.push(entry.clone());
+            total_bytes += entry_bytes;
+            last_entry_index = idx;
+        }
+
+        // Determine if there are more entries and create cursor
+        let has_more = last_entry_index + 1 < sorted_entries.len() && !response_entries.is_empty();
+        let next_cursor = if has_more {
+            sorted_entries.get(last_entry_index).map(|e| {
+                SyncCursor::new(last_entry_index as u64, e.hash, topic.clone())
+            })
+        } else {
+            None
+        };
+
         debug!(
-            "Sending PullResponse: {} entries, {} bytes, truncated={}",
+            "Sending PullResponse: {} entries, {} bytes, truncated={}, has_cursor={}",
             response_entries.len(),
             total_bytes,
-            truncated
+            has_more,
+            next_cursor.is_some()
         );
 
-        // Send pull response
+        // Send pull response with cursor
         self.send_message(
             None,
             GossipMessage::PullResponse {
                 topic: topic.clone(),
                 entries: response_entries,
-                truncated,
+                truncated: has_more,
                 nonce,
+                next_cursor,
             },
         );
 
@@ -231,23 +279,26 @@ impl GossipActor {
         Ok(())
     }
 
-    /// Handle a PullResponse message - batch of entries
+    /// Handle a PullResponse message - batch of entries with auto-continuation
     ///
-    /// Stores all received entries and updates peer sync state.
+    /// Stores all received entries, updates peer sync state, and automatically
+    /// continues pagination if a cursor is provided.
     pub(crate) fn handle_pull_response(
         &mut self,
-        _sender: &Did,
-        _topic: String,
+        sender: &Did,
+        topic: String,
         entries: Vec<GossipEntry>,
         truncated: bool,
         nonce: u64,
+        next_cursor: Option<SyncCursor>,
     ) -> Result<()> {
         icn_obs::metrics::gossip::pull_responses_received_inc();
         debug!(
-            "Received PullResponse: entries={}, truncated={}, nonce={}",
+            "Received PullResponse: entries={}, truncated={}, nonce={}, has_cursor={}",
             entries.len(),
             truncated,
-            nonce
+            nonce,
+            next_cursor.is_some()
         );
 
         // Calculate total bytes received and extract peer DID from first entry
@@ -270,26 +321,80 @@ impl GossipActor {
         }
 
         // Update peer sync state if we can identify the peer
-        if let Some(did) = peer_did {
-            if let Some(peer_state) = self.peer_sync.get_mut(&did) {
-                peer_state.record_response(total_bytes);
+        let peer_for_continuation = peer_did.clone().unwrap_or_else(|| sender.clone());
+        if let Some(peer_state) = self.peer_sync.get_mut(&peer_for_continuation) {
+            peer_state.record_response(total_bytes);
 
-                debug!(
-                    "Updated peer {} sync state: deficit={}, outstanding={}",
-                    did, peer_state.deficit_bytes, peer_state.outstanding_requests
-                );
+            debug!(
+                "Updated peer {} sync state: deficit={}, outstanding={}",
+                peer_for_continuation, peer_state.deficit_bytes, peer_state.outstanding_requests
+            );
 
-                // Track peer deficit metric
-                icn_obs::metrics::gossip::peer_deficit_bytes_set(
-                    did.as_str(),
-                    peer_state.deficit_bytes,
-                );
-            }
+            // Track peer deficit metric
+            icn_obs::metrics::gossip::peer_deficit_bytes_set(
+                peer_for_continuation.as_str(),
+                peer_state.deficit_bytes,
+            );
         }
 
         icn_obs::metrics::gossip::bytes_pulled_add(total_bytes as u64);
         icn_obs::metrics::gossip::entries_received_inc();
         self.update_gauge_metrics();
+
+        // Auto-continue if truncated and cursor provided (Issue #123)
+        if truncated {
+            if let Some(cursor) = next_cursor {
+                icn_obs::metrics::gossip::pull_continuation_received_inc();
+
+                // Get trust-based limits for continuation
+                let trust_class = (self.trust_lookup)(&peer_for_continuation)
+                    .unwrap_or(icn_trust::TrustClass::Isolated);
+                let limits = TrustResourceLimits::for_trust_class(trust_class);
+
+                // Check backpressure before continuing
+                let can_continue = self
+                    .peer_sync
+                    .get(&peer_for_continuation)
+                    .map(|ps| ps.can_send(limits.max_outstanding_reqs, 10000))
+                    .unwrap_or(false);
+
+                if can_continue {
+                    // Generate nonce for continuation request
+                    let new_nonce = self
+                        .peer_sync
+                        .get_mut(&peer_for_continuation)
+                        .map(|ps| {
+                            ps.record_request();
+                            ps.next_nonce()
+                        })
+                        .unwrap_or(0);
+
+                    debug!(
+                        "Auto-continuing paginated sync with cursor, new_nonce={}",
+                        new_nonce
+                    );
+
+                    self.send_message(
+                        Some(peer_for_continuation.clone()),
+                        GossipMessage::PullRequest {
+                            topic,
+                            want_ids: Vec::new(), // Continue all entries
+                            max_bytes: limits.max_pull_bytes,
+                            nonce: new_nonce,
+                            cursor: Some(cursor),
+                        },
+                    );
+
+                    icn_obs::metrics::gossip::pull_continuation_sent_inc();
+                    icn_obs::metrics::gossip::pull_requests_sent_inc();
+                } else {
+                    debug!(
+                        "Cannot auto-continue - peer {} backpressured",
+                        peer_for_continuation
+                    );
+                }
+            }
+        }
 
         debug!(
             "PullResponse processed: {} bytes received, truncated={}",

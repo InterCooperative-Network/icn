@@ -21,6 +21,31 @@ pub const MAX_SUPPORTED_VERSION: u32 = 1;
 /// Maximum message size (10MB)
 pub const MAX_MESSAGE_SIZE: usize = 10 * 1024 * 1024;
 
+/// Compression threshold in bytes (1KB) - messages below this are not compressed
+pub const COMPRESSION_THRESHOLD: usize = 1024;
+
+/// Compression format marker bytes
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum CompressionFormat {
+    /// No compression - raw bincode follows
+    None = 0,
+    /// Zstd compression - compressed bincode follows
+    Zstd = 1,
+}
+
+impl TryFrom<u8> for CompressionFormat {
+    type Error = anyhow::Error;
+
+    fn try_from(value: u8) -> Result<Self> {
+        match value {
+            0 => Ok(CompressionFormat::None),
+            1 => Ok(CompressionFormat::Zstd),
+            _ => anyhow::bail!("Unknown compression format: {}", value),
+        }
+    }
+}
+
 /// Wire-format message envelope
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkMessage {
@@ -344,7 +369,7 @@ impl NetworkMessage {
         )
     }
 
-    /// Serialize to bytes using bincode
+    /// Serialize to bytes using bincode (legacy format, no compression header)
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         let bytes = bincode::serde::encode_to_vec(self, bincode::config::legacy())
             .context("Failed to serialize network message")?;
@@ -360,7 +385,71 @@ impl NetworkMessage {
         Ok(bytes)
     }
 
-    /// Deserialize from bytes using bincode
+    /// Serialize to bytes with compression header
+    ///
+    /// Wire format: [compression_format: 1 byte][payload: variable]
+    /// - If compression enabled and message >= threshold: compresses with zstd
+    /// - Otherwise: includes uncompressed payload with None marker
+    ///
+    /// Use this for peers that support MESSAGE_COMPRESSION capability.
+    pub fn to_bytes_compressed(&self, enable_compression: bool) -> Result<Vec<u8>> {
+        let raw_bytes = bincode::serde::encode_to_vec(self, bincode::config::legacy())
+            .context("Failed to serialize network message")?;
+
+        // Track bytes before compression for metrics
+        let bytes_before = raw_bytes.len();
+
+        // Only compress if enabled, above threshold, and would reduce size
+        if enable_compression && raw_bytes.len() >= COMPRESSION_THRESHOLD {
+            let compressed = zstd::encode_all(raw_bytes.as_slice(), 3)
+                .context("Failed to compress message")?;
+
+            // Only use compression if it actually reduces size
+            if compressed.len() < raw_bytes.len() {
+                let mut result = Vec::with_capacity(1 + compressed.len());
+                result.push(CompressionFormat::Zstd as u8);
+                result.extend(compressed);
+
+                if result.len() > MAX_MESSAGE_SIZE {
+                    anyhow::bail!(
+                        "Compressed message too large: {} bytes (max {})",
+                        result.len(),
+                        MAX_MESSAGE_SIZE
+                    );
+                }
+
+                // Record compression metrics
+                icn_obs::metrics::gossip::bytes_before_compression_add(bytes_before as u64);
+                icn_obs::metrics::gossip::bytes_after_compression_add(result.len() as u64);
+                icn_obs::metrics::gossip::compression_ratio_record(
+                    bytes_before as f64 / result.len() as f64,
+                );
+
+                return Ok(result);
+            }
+        }
+
+        // No compression - use None marker
+        let mut result = Vec::with_capacity(1 + raw_bytes.len());
+        result.push(CompressionFormat::None as u8);
+        result.extend(raw_bytes);
+
+        if result.len() > MAX_MESSAGE_SIZE {
+            anyhow::bail!(
+                "Message too large: {} bytes (max {})",
+                result.len(),
+                MAX_MESSAGE_SIZE
+            );
+        }
+
+        // Track uncompressed messages too
+        icn_obs::metrics::gossip::bytes_before_compression_add(bytes_before as u64);
+        icn_obs::metrics::gossip::bytes_after_compression_add(result.len() as u64);
+
+        Ok(result)
+    }
+
+    /// Deserialize from bytes using bincode (legacy format, no compression header)
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() > MAX_MESSAGE_SIZE {
             anyhow::bail!(
@@ -378,6 +467,44 @@ impl NetworkMessage {
         // Validate protocol version
         Self::validate_version(msg.version)?;
 
+        Ok(msg)
+    }
+
+    /// Deserialize from bytes with compression header
+    ///
+    /// Expects wire format: [compression_format: 1 byte][payload: variable]
+    /// Automatically decompresses if zstd format is indicated.
+    ///
+    /// Use this for peers that support MESSAGE_COMPRESSION capability.
+    pub fn from_bytes_compressed(bytes: &[u8]) -> Result<Self> {
+        if bytes.is_empty() {
+            anyhow::bail!("Empty message");
+        }
+
+        if bytes.len() > MAX_MESSAGE_SIZE {
+            anyhow::bail!(
+                "Message too large: {} bytes (max {})",
+                bytes.len(),
+                MAX_MESSAGE_SIZE
+            );
+        }
+
+        let compression_format = CompressionFormat::try_from(bytes[0])?;
+        let payload = &bytes[1..];
+
+        let decompressed = match compression_format {
+            CompressionFormat::None => payload.to_vec(),
+            CompressionFormat::Zstd => {
+                zstd::decode_all(payload).context("Failed to decompress message")?
+            }
+        };
+
+        let msg: NetworkMessage =
+            bincode::serde::decode_from_slice(&decompressed, bincode::config::legacy())
+                .map(|(v, _)| v)
+                .context("Failed to deserialize network message")?;
+
+        Self::validate_version(msg.version)?;
         Ok(msg)
     }
 
@@ -439,7 +566,7 @@ impl NetworkMessage {
     }
 }
 
-/// Helper for reading length-prefixed messages from QUIC streams
+/// Helper for reading length-prefixed messages from QUIC streams (legacy format)
 /// Read a length-prefixed message from a QUIC stream
 /// Returns the message and the number of bytes read (including 4-byte length prefix)
 pub async fn read_message(recv: &mut quinn::RecvStream) -> Result<(NetworkMessage, usize)> {
@@ -472,12 +599,74 @@ pub async fn read_message(recv: &mut quinn::RecvStream) -> Result<(NetworkMessag
     Ok((msg, 4 + len))
 }
 
-/// Helper for writing length-prefixed messages to QUIC streams
+/// Helper for reading length-prefixed messages with compression support
+/// Use this for peers that support MESSAGE_COMPRESSION capability.
+/// Returns the message and the number of bytes read (including 4-byte length prefix)
+pub async fn read_message_compressed(recv: &mut quinn::RecvStream) -> Result<(NetworkMessage, usize)> {
+    // Read 4-byte length prefix (big-endian)
+    let mut len_buf = [0u8; 4];
+    recv.read_exact(&mut len_buf)
+        .await
+        .context("Failed to read message length")?;
+    let len_u32 = u32::from_be_bytes(len_buf);
+
+    // Validate message size BEFORE casting to usize to prevent overflow on 32-bit systems
+    if len_u32 == 0 {
+        anyhow::bail!("Invalid message: zero length");
+    }
+    if len_u32 > MAX_MESSAGE_SIZE as u32 {
+        anyhow::bail!("Message too large: {len_u32} bytes (max {MAX_MESSAGE_SIZE})");
+    }
+
+    // Safe to cast after validation
+    let len = len_u32 as usize;
+
+    // Allocate buffer (size is now validated)
+    let mut buf = vec![0u8; len];
+    recv.read_exact(&mut buf)
+        .await
+        .context("Failed to read message body")?;
+
+    let msg = NetworkMessage::from_bytes_compressed(&buf)?;
+    // Return total bytes: 4 (length prefix) + message body
+    Ok((msg, 4 + len))
+}
+
+/// Helper for writing length-prefixed messages to QUIC streams (legacy format)
 /// Returns the number of bytes written (including 4-byte length prefix)
 pub async fn write_message(send: &mut quinn::SendStream, msg: &NetworkMessage) -> Result<usize> {
     use tokio::io::AsyncWriteExt;
 
     let bytes = msg.to_bytes()?;
+    let len = bytes.len() as u32;
+
+    // Write 4-byte length prefix (big-endian)
+    send.write_all(&len.to_be_bytes())
+        .await
+        .context("Failed to write message length")?;
+
+    // Write message bytes
+    send.write_all(&bytes)
+        .await
+        .context("Failed to write message body")?;
+
+    send.flush().await.context("Failed to flush stream")?;
+
+    // Return total bytes: 4 (length prefix) + message body
+    Ok(4 + bytes.len())
+}
+
+/// Helper for writing length-prefixed messages with compression support
+/// Use this for peers that support MESSAGE_COMPRESSION capability.
+/// Returns the number of bytes written (including 4-byte length prefix)
+pub async fn write_message_compressed(
+    send: &mut quinn::SendStream,
+    msg: &NetworkMessage,
+    enable_compression: bool,
+) -> Result<usize> {
+    use tokio::io::AsyncWriteExt;
+
+    let bytes = msg.to_bytes_compressed(enable_compression)?;
     let len = bytes.len() as u32;
 
     // Write 4-byte length prefix (big-endian)
@@ -815,5 +1004,111 @@ mod tests {
         } else {
             panic!("Expected PeerExchange::Unannounce payload");
         }
+    }
+
+    // Issue #123: Compression tests
+
+    #[test]
+    fn test_compression_format_conversion() {
+        assert_eq!(CompressionFormat::try_from(0).unwrap(), CompressionFormat::None);
+        assert_eq!(CompressionFormat::try_from(1).unwrap(), CompressionFormat::Zstd);
+        assert!(CompressionFormat::try_from(2).is_err());
+        assert!(CompressionFormat::try_from(255).is_err());
+    }
+
+    #[test]
+    fn test_compressed_roundtrip_small_message() {
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        // Small message - should NOT be compressed
+        let msg = NetworkMessage::ping(alice, bob);
+
+        let bytes = msg.to_bytes_compressed(true).unwrap();
+
+        // First byte should be 0 (no compression) for small messages
+        assert_eq!(bytes[0], 0);
+
+        let decoded = NetworkMessage::from_bytes_compressed(&bytes).unwrap();
+        assert!(matches!(decoded.payload, MessagePayload::Ping { .. }));
+    }
+
+    #[test]
+    fn test_compressed_roundtrip_large_message() {
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        // Create a large, compressible gossip message
+        let mut clock = VectorClock::new();
+        clock.increment(&alice);
+
+        // Create a large entry with repetitive data (compresses well)
+        let large_data = vec![42u8; 4096]; // 4KB of same byte
+        let gossip_msg = GossipMessage::Response {
+            entry: icn_gossip::types::GossipEntry {
+                hash: [1u8; 32],
+                author: alice.clone(),
+                clock,
+                topic: "test".to_string(),
+                data: large_data,
+                compressed: false,
+                timestamp: 0,
+                replica_offered: None,
+            },
+        };
+
+        let msg = NetworkMessage::gossip(alice, Some(bob), gossip_msg);
+
+        // With compression enabled, should compress
+        let bytes = msg.to_bytes_compressed(true).unwrap();
+
+        // First byte should be 1 (zstd) for large compressible messages
+        assert_eq!(bytes[0], 1);
+
+        // Compressed should be smaller than uncompressed
+        let uncompressed = msg.to_bytes_compressed(false).unwrap();
+        assert!(bytes.len() < uncompressed.len());
+
+        let decoded = NetworkMessage::from_bytes_compressed(&bytes).unwrap();
+        assert!(matches!(decoded.payload, MessagePayload::Gossip(_)));
+    }
+
+    #[test]
+    fn test_compressed_with_compression_disabled() {
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        let msg = NetworkMessage::ping(alice, bob);
+
+        // Even with compression disabled, should use new format with header
+        let bytes = msg.to_bytes_compressed(false).unwrap();
+
+        // First byte should be 0 (no compression)
+        assert_eq!(bytes[0], 0);
+
+        let decoded = NetworkMessage::from_bytes_compressed(&bytes).unwrap();
+        assert!(matches!(decoded.payload, MessagePayload::Ping { .. }));
+    }
+
+    #[test]
+    fn test_legacy_format_still_works() {
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        let msg = NetworkMessage::ping(alice.clone(), bob.clone());
+
+        // Legacy format (no compression header)
+        let bytes = msg.to_bytes().unwrap();
+        let decoded = NetworkMessage::from_bytes(&bytes).unwrap();
+
+        assert_eq!(decoded.from, alice);
+        assert_eq!(decoded.to, Some(bob));
+        assert!(matches!(decoded.payload, MessagePayload::Ping { .. }));
+    }
+
+    #[test]
+    fn test_compression_threshold() {
+        // Verify the threshold constant
+        assert_eq!(COMPRESSION_THRESHOLD, 1024);
     }
 }

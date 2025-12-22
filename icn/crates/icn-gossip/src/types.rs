@@ -12,6 +12,65 @@ pub type ContentHash = [u8; 32];
 /// Minimum size (in bytes) for compression to be worthwhile
 const COMPRESSION_THRESHOLD: usize = 1024; // 1 KB
 
+/// Cursor expiry in milliseconds (5 minutes)
+const CURSOR_EXPIRY_MS: u64 = 5 * 60 * 1000;
+
+/// Opaque cursor for pagination in pull protocol (Issue #123)
+///
+/// Enables resumable sync by tracking position within a paginated response.
+/// Cursors are stateless on the server side - all state is encoded in the cursor.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SyncCursor {
+    /// Index of the last sent entry (for ordered iteration)
+    pub last_index: u64,
+
+    /// Hash of the last sent entry (for verification)
+    pub last_hash: ContentHash,
+
+    /// Topic being synced
+    pub topic: String,
+
+    /// Timestamp of cursor creation (Unix ms, for expiry)
+    pub created_at: u64,
+}
+
+impl SyncCursor {
+    /// Create a new sync cursor
+    pub fn new(last_index: u64, last_hash: ContentHash, topic: String) -> Self {
+        let created_at = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
+
+        Self {
+            last_index,
+            last_hash,
+            topic,
+            created_at,
+        }
+    }
+
+    /// Check if cursor is expired (default: 5 minutes)
+    pub fn is_expired(&self) -> bool {
+        self.is_expired_with_ttl(CURSOR_EXPIRY_MS)
+    }
+
+    /// Check if cursor is expired with custom TTL
+    pub fn is_expired_with_ttl(&self, max_age_ms: u64) -> bool {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
+
+        now.saturating_sub(self.created_at) > max_age_ms
+    }
+
+    /// Validate cursor against expected topic
+    pub fn is_valid_for_topic(&self, topic: &str) -> bool {
+        self.topic == topic && !self.is_expired()
+    }
+}
+
 /// Gossip scope for targeted message propagation
 ///
 /// Determines how far gossip messages should propagate based on
@@ -164,6 +223,9 @@ pub enum GossipMessage {
         want_ids: Vec<ContentHash>,
         max_bytes: u32,
         nonce: u64,
+        /// Optional cursor for resuming from previous response (Issue #123)
+        #[serde(default)]
+        cursor: Option<SyncCursor>,
     },
 
     /// Response with multiple entries (may be truncated)
@@ -172,6 +234,9 @@ pub enum GossipMessage {
         entries: Vec<GossipEntry>,
         truncated: bool,
         nonce: u64,
+        /// Cursor for fetching next page, None if complete (Issue #123)
+        #[serde(default)]
+        next_cursor: Option<SyncCursor>,
     },
 
     /// Announce blob availability (Phase 16C - data locality)
@@ -596,5 +661,54 @@ mod tests {
             entry.data, compressed_once,
             "Double compression should be no-op"
         );
+    }
+
+    // Issue #123: SyncCursor tests
+
+    #[test]
+    fn test_sync_cursor_creation() {
+        let hash: ContentHash = [1u8; 32];
+        let cursor = SyncCursor::new(42, hash, "test-topic".to_string());
+
+        assert_eq!(cursor.last_index, 42);
+        assert_eq!(cursor.last_hash, hash);
+        assert_eq!(cursor.topic, "test-topic");
+        assert!(cursor.created_at > 0);
+    }
+
+    #[test]
+    fn test_sync_cursor_not_expired() {
+        let cursor = SyncCursor::new(0, [0u8; 32], "topic".to_string());
+
+        // Should not be expired immediately after creation
+        assert!(!cursor.is_expired());
+        assert!(!cursor.is_expired_with_ttl(60_000)); // 1 minute
+    }
+
+    #[test]
+    fn test_sync_cursor_expired_with_zero_ttl() {
+        let mut cursor = SyncCursor::new(0, [0u8; 32], "topic".to_string());
+
+        // Simulate old cursor
+        cursor.created_at = 0;
+
+        assert!(cursor.is_expired_with_ttl(1)); // 1ms TTL
+    }
+
+    #[test]
+    fn test_sync_cursor_valid_for_topic() {
+        let cursor = SyncCursor::new(0, [0u8; 32], "my-topic".to_string());
+
+        assert!(cursor.is_valid_for_topic("my-topic"));
+        assert!(!cursor.is_valid_for_topic("other-topic"));
+    }
+
+    #[test]
+    fn test_sync_cursor_invalid_for_topic_when_expired() {
+        let mut cursor = SyncCursor::new(0, [0u8; 32], "my-topic".to_string());
+        cursor.created_at = 0; // Make it expired
+
+        // Even with matching topic, expired cursor is invalid
+        assert!(!cursor.is_valid_for_topic("my-topic"));
     }
 }
