@@ -46,6 +46,9 @@ impl TryFrom<u8> for CompressionFormat {
     }
 }
 
+/// Re-export TraceContext from icn-obs for distributed tracing propagation
+pub use icn_obs::TraceContext;
+
 /// Wire-format message envelope
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkMessage {
@@ -61,35 +64,16 @@ pub struct NetworkMessage {
     /// Message payload
     pub payload: MessagePayload,
 
-    /// Trace context for distributed tracing (optional for backward compatibility)
-    /// Note: We use `default` for deserialization but NOT `skip_serializing_if`
-    /// because bincode uses positional encoding and skipping fields breaks deserialization.
+    /// Trace context for distributed tracing (optional for backward compatibility).
+    ///
+    /// `#[serde(default)]` ensures that **new** code can deserialize **old** messages
+    /// that don't have this field (it will simply be `None`). We deliberately do
+    /// **not** use `skip_serializing_if` here because bincode uses positional
+    /// encoding: if **new** code were to skip serializing this field, **old**
+    /// deserializers expecting a value in this position would fail to decode.
+    /// Always serializing the field (even when `None`) preserves compatibility.
     #[serde(default)]
     pub trace_context: Option<TraceContext>,
-}
-
-/// W3C Trace Context for distributed tracing propagation
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct TraceContext {
-    /// W3C traceparent header value (e.g., "00-trace_id-span_id-flags")
-    pub traceparent: Option<String>,
-    /// W3C tracestate header value for vendor-specific data
-    pub tracestate: Option<String>,
-}
-
-impl TraceContext {
-    /// Create a trace context from the current span (if OpenTelemetry is active)
-    pub fn from_current() -> Self {
-        // This is a placeholder - actual implementation requires OpenTelemetry context
-        // When icn-obs::init_tracing is called with tracing enabled,
-        // tracing-opentelemetry will provide context propagation
-        Self::default()
-    }
-
-    /// Check if this trace context is valid
-    pub fn is_valid(&self) -> bool {
-        self.traceparent.is_some()
-    }
 }
 
 /// Message payload types
