@@ -770,6 +770,14 @@ pub fn init_descriptions() {
         "Total number of requests rejected due to rate limiting"
     );
     describe_counter!(
+        "icn_gateway_velocity_limit_exceeded_total",
+        "Total number of transactions rejected due to velocity limiting"
+    );
+    describe_counter!(
+        "icn_gateway_ip_rate_limit_exceeded_total",
+        "Total number of requests rejected due to IP-based rate limiting"
+    );
+    describe_counter!(
         "icn_gateway_authorization_failures_total",
         "Total number of authorization failures by required scope"
     );
@@ -2469,6 +2477,13 @@ pub mod gateway {
     /// Increment counter when transaction velocity limit is exceeded (Issue #164)
     pub fn velocity_limit_exceeded_inc() {
         counter!("icn_gateway_velocity_limit_exceeded_total").increment(1);
+    }
+
+    /// Increment counter when IP-based rate limit is exceeded
+    pub fn ip_rate_limit_exceeded_inc(ip: &str) {
+        counter!("icn_gateway_ip_rate_limit_exceeded_total",
+                 "ip" => ip.to_string())
+        .increment(1);
     }
 
     pub fn authorization_failures_inc(required_scope: &str) {
