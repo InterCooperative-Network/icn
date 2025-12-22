@@ -1,10 +1,10 @@
 //! CCL interpreter with capability checking and fuel metering
 
 use crate::ast::{BinOp, Contract, Expr, Stmt, UnOp};
+use crate::error::{CclError, Result, Span};
 use crate::types::{
     Capability, ContractState, ExecutionContext, ExecutionResult, LedgerOperation, Value,
 };
-use anyhow::{bail, Context, Result};
 use std::collections::{HashMap, HashSet};
 use tracing::{debug, trace};
 
@@ -57,7 +57,9 @@ impl Interpreter {
         let rule = self
             .contract
             .get_rule(rule_name)
-            .context("Rule not found")?
+            .ok_or_else(|| CclError::RuleNotFound {
+                name: rule_name.to_string(),
+            })?
             .clone();
 
         debug!("Executing rule: {}", rule_name);
@@ -72,7 +74,10 @@ impl Interpreter {
             trace!("Checking require condition {}", i);
             let value = self.eval_expr(require)?;
             if !value.is_truthy() {
-                bail!("Precondition failed: require #{i}");
+                return Err(CclError::PreconditionFailed {
+                    span: Span::unknown(),
+                    index: i,
+                });
             }
         }
 
@@ -134,24 +139,44 @@ impl Interpreter {
                 // Check WriteLedger capability
                 self.check_write_ledger_capability()?;
 
-                let from_did = self
-                    .eval_expr(from)?
+                let from_val = self.eval_expr(from)?;
+                let from_did = from_val
                     .as_did()
-                    .context("Transfer 'from' must be a DID")?
+                    .ok_or_else(|| CclError::TypeMismatch {
+                        span: Span::unknown(),
+                        expected: "DID",
+                        actual: from_val.type_name().to_string(),
+                    })?
                     .clone();
-                let to_did = self
-                    .eval_expr(to)?
+
+                let to_val = self.eval_expr(to)?;
+                let to_did = to_val
                     .as_did()
-                    .context("Transfer 'to' must be a DID")?
+                    .ok_or_else(|| CclError::TypeMismatch {
+                        span: Span::unknown(),
+                        expected: "DID",
+                        actual: to_val.type_name().to_string(),
+                    })?
                     .clone();
-                let amount_val = self
-                    .eval_expr(amount)?
-                    .as_int()
-                    .context("Transfer amount must be an integer")?;
-                let currency_str = self
-                    .eval_expr(currency)?
+
+                let amount_val_expr = self.eval_expr(amount)?;
+                let amount_val =
+                    amount_val_expr
+                        .as_int()
+                        .ok_or_else(|| CclError::TypeMismatch {
+                            span: Span::unknown(),
+                            expected: "integer",
+                            actual: amount_val_expr.type_name().to_string(),
+                        })?;
+
+                let currency_val = self.eval_expr(currency)?;
+                let currency_str = currency_val
                     .as_string()
-                    .context("Currency must be a string")?
+                    .ok_or_else(|| CclError::TypeMismatch {
+                        span: Span::unknown(),
+                        expected: "string",
+                        actual: currency_val.type_name().to_string(),
+                    })?
                     .to_string();
 
                 self.ledger_ops.push(LedgerOperation::Transfer {
@@ -172,20 +197,34 @@ impl Interpreter {
                 // Check WriteLedger capability
                 self.check_write_ledger_capability()?;
 
-                let account_did = self
-                    .eval_expr(account)?
+                let account_val = self.eval_expr(account)?;
+                let account_did = account_val
                     .as_did()
-                    .context("Account must be a DID")?
+                    .ok_or_else(|| CclError::TypeMismatch {
+                        span: Span::unknown(),
+                        expected: "DID",
+                        actual: account_val.type_name().to_string(),
+                    })?
                     .clone();
-                let currency_str = self
-                    .eval_expr(currency)?
+
+                let currency_val = self.eval_expr(currency)?;
+                let currency_str = currency_val
                     .as_string()
-                    .context("Currency must be a string")?
+                    .ok_or_else(|| CclError::TypeMismatch {
+                        span: Span::unknown(),
+                        expected: "string",
+                        actual: currency_val.type_name().to_string(),
+                    })?
                     .to_string();
-                let limit_val = self
-                    .eval_expr(limit)?
+
+                let limit_val_expr = self.eval_expr(limit)?;
+                let limit_val = limit_val_expr
                     .as_int()
-                    .context("Limit must be an integer")?;
+                    .ok_or_else(|| CclError::TypeMismatch {
+                        span: Span::unknown(),
+                        expected: "integer",
+                        actual: limit_val_expr.type_name().to_string(),
+                    })?;
 
                 self.ledger_ops.push(LedgerOperation::SetCreditLimit {
                     account: account_did,
@@ -224,19 +263,24 @@ impl Interpreter {
                 body,
             } => {
                 let collection = self.eval_expr(iterable)?;
-                let items = match collection {
-                    Value::List(ref list) => list.clone(),
-                    Value::Set(ref set) => set.iter().cloned().collect(),
-                    _ => bail!("For loop requires list or set"),
+                let items = match &collection {
+                    Value::List(list) => list.clone(),
+                    Value::Set(set) => set.iter().cloned().collect(),
+                    _ => {
+                        return Err(CclError::NotIterable {
+                            span: Span::unknown(),
+                            actual: collection.type_name().to_string(),
+                        });
+                    }
                 };
 
                 // Limit iterations
                 if items.len() > MAX_LOOP_ITERATIONS {
-                    bail!(
-                        "For loop exceeds max iterations: {} > {}",
-                        items.len(),
-                        MAX_LOOP_ITERATIONS
-                    );
+                    return Err(CclError::LoopLimitExceeded {
+                        span: Span::unknown(),
+                        count: items.len(),
+                        max: MAX_LOOP_ITERATIONS,
+                    });
                 }
 
                 for item in items {
@@ -291,18 +335,29 @@ impl Interpreter {
                     // Special variable: caller
                     Ok(Value::Did(self.context.caller.clone()))
                 } else {
-                    bail!("Undefined variable: {name}")
+                    Err(CclError::UndefinedVariable {
+                        span: Span::unknown(),
+                        name: name.clone(),
+                    })
                 }
             }
 
             Expr::FieldAccess { object, field } => {
                 let obj = self.eval_expr(object)?;
-                match obj {
-                    Value::Map(ref map) => map
-                        .get(field)
-                        .cloned()
-                        .ok_or_else(|| anyhow::anyhow!("Field not found: {field}")),
-                    _ => bail!("Cannot access field on non-map value"),
+                match &obj {
+                    Value::Map(map) => {
+                        map.get(field)
+                            .cloned()
+                            .ok_or_else(|| CclError::FieldNotFound {
+                                span: Span::unknown(),
+                                field: field.clone(),
+                            })
+                    }
+                    _ => Err(CclError::NotAMap {
+                        span: Span::unknown(),
+                        field: field.clone(),
+                        actual: obj.type_name().to_string(),
+                    }),
                 }
             }
 
@@ -348,10 +403,15 @@ impl Interpreter {
                 let elem_val = self.eval_expr(elem)?;
                 let coll_val = self.eval_expr(collection)?;
 
-                let result = match coll_val {
-                    Value::List(ref list) => list.contains(&elem_val),
-                    Value::Set(ref set) => set.contains(&elem_val),
-                    _ => bail!("'in' requires list or set"),
+                let result = match &coll_val {
+                    Value::List(list) => list.contains(&elem_val),
+                    Value::Set(set) => set.contains(&elem_val),
+                    _ => {
+                        return Err(CclError::InvalidInOperator {
+                            span: Span::unknown(),
+                            actual: coll_val.type_name().to_string(),
+                        });
+                    }
                 };
 
                 Ok(Value::Bool(result))
@@ -371,7 +431,9 @@ impl Interpreter {
             (Mul, Int(a), Int(b)) => Ok(Int(a * b)),
             (Div, Int(a), Int(b)) => {
                 if *b == 0 {
-                    bail!("Division by zero")
+                    return Err(CclError::DivisionByZero {
+                        span: Span::unknown(),
+                    });
                 }
                 Ok(Int(a / b))
             }
@@ -392,16 +454,25 @@ impl Interpreter {
             (And, a, b) => Ok(Bool(a.is_truthy() && b.is_truthy())),
             (Or, a, b) => Ok(Bool(a.is_truthy() || b.is_truthy())),
 
-            _ => bail!("Invalid binary operation: {left:?} {op:?} {right:?}"),
+            _ => Err(CclError::InvalidBinaryOp {
+                span: Span::unknown(),
+                op: format!("{op:?}"),
+                left_type: left.type_name().to_string(),
+                right_type: right.type_name().to_string(),
+            }),
         }
     }
 
     /// Evaluate unary operation
     fn eval_unop(&self, op: UnOp, val: Value) -> Result<Value> {
-        match (op, val) {
+        match (op, &val) {
             (UnOp::Not, v) => Ok(Value::Bool(!v.is_truthy())),
             (UnOp::Neg, Value::Int(i)) => Ok(Value::Int(-i)),
-            _ => bail!("Invalid unary operation"),
+            _ => Err(CclError::InvalidUnaryOp {
+                span: Span::unknown(),
+                op: format!("{op:?}"),
+                operand_type: val.type_name().to_string(),
+            }),
         }
     }
 
@@ -410,27 +481,50 @@ impl Interpreter {
         match name {
             "len" => {
                 if args.len() != 1 {
-                    bail!("len() takes exactly 1 argument");
+                    return Err(CclError::ArgumentCount {
+                        span: Span::unknown(),
+                        name: "len".to_string(),
+                        expected: 1,
+                        actual: args.len(),
+                    });
                 }
                 match &args[0] {
                     Value::List(list) => Ok(Value::Int(list.len() as i64)),
                     Value::Set(set) => Ok(Value::Int(set.len() as i64)),
                     Value::String(s) => Ok(Value::Int(s.len() as i64)),
-                    _ => bail!("len() requires list, set, or string"),
+                    _ => Err(CclError::ArgumentType {
+                        span: Span::unknown(),
+                        name: "len".to_string(),
+                        expected: "list, set, or string",
+                        actual: args[0].type_name().to_string(),
+                    }),
                 }
             }
 
             "abs" => {
                 if args.len() != 1 {
-                    bail!("abs() takes exactly 1 argument");
+                    return Err(CclError::ArgumentCount {
+                        span: Span::unknown(),
+                        name: "abs".to_string(),
+                        expected: 1,
+                        actual: args.len(),
+                    });
                 }
-                match args[0] {
+                match &args[0] {
                     Value::Int(i) => Ok(Value::Int(i.abs())),
-                    _ => bail!("abs() requires integer"),
+                    _ => Err(CclError::ArgumentType {
+                        span: Span::unknown(),
+                        name: "abs".to_string(),
+                        expected: "integer",
+                        actual: args[0].type_name().to_string(),
+                    }),
                 }
             }
 
-            _ => bail!("Unknown function: {name}"),
+            _ => Err(CclError::UnknownFunction {
+                span: Span::unknown(),
+                name: name.to_string(),
+            }),
         }
     }
 
@@ -441,7 +535,9 @@ impl Interpreter {
                 return Ok(());
             }
         }
-        bail!("WriteLedger capability required")
+        Err(CclError::MissingCapability {
+            capability: "WriteLedger".to_string(),
+        })
     }
 
     /// Check WriteState capability for a specific key
@@ -454,7 +550,9 @@ impl Interpreter {
                 }
             }
         }
-        bail!("WriteState capability required for key '{key}'")
+        Err(CclError::MissingCapability {
+            capability: format!("WriteState for key '{key}'"),
+        })
     }
 }
 
@@ -521,6 +619,7 @@ mod tests {
         let keypair = KeyPair::generate().unwrap();
         let mut context = create_test_context(keypair.did().clone());
         context.fuel = 5; // Very low fuel
+        context.fuel_limit = 5;
 
         let mut interp = Interpreter::new(contract, state, context);
 
@@ -541,6 +640,10 @@ mod tests {
 
         let result = interp.eval_expr(&expr);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("fuel"));
+        let err = result.unwrap_err();
+        assert!(
+            matches!(err, crate::error::CclError::FuelExhausted { .. }),
+            "Expected FuelExhausted error, got: {err}"
+        );
     }
 }

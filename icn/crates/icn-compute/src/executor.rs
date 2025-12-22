@@ -109,6 +109,7 @@ impl LocalExecutor {
             caller: caller_did.clone(),
             timestamp,
             fuel: ctx.fuel_remaining,
+            fuel_limit: ctx.fuel_remaining,
             capabilities: vec![],
             participants: vec![caller_did],
         };
@@ -255,6 +256,7 @@ impl Executor for LocalExecutor {
                     caller: caller_did.clone(),
                     timestamp,
                     fuel: ctx.fuel_remaining,
+                    fuel_limit: ctx.fuel_remaining,
                     capabilities: vec![],
                     participants: vec![caller_did],
                 };

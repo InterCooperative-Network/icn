@@ -538,6 +538,7 @@ impl DisputeResolutionSystem {
             caller: challenger.clone(),
             timestamp: icn_time::current_timestamp_secs(),
             fuel: 10000, // Sufficient fuel for re-execution
+            fuel_limit: 10000,
             capabilities: vec![],
             participants: vec![executor.clone(), challenger.clone()],
         };
