@@ -101,10 +101,17 @@ pub struct ContractListItem {
     pub rules: Vec<String>,
     /// Whether the contract is revoked
     pub revoked: bool,
+    /// Contract lifecycle status: "active", "deprecated", or "revoked"
+    pub status: String,
 }
 
 impl From<ContractSummary> for ContractListItem {
     fn from(summary: ContractSummary) -> Self {
+        let status = match &summary.status {
+            ContractStatus::Active => "active".to_string(),
+            ContractStatus::Deprecated { .. } => "deprecated".to_string(),
+            ContractStatus::Revoked { .. } => "revoked".to_string(),
+        };
         Self {
             hash: hex::encode(summary.hash),
             name: summary.name,
@@ -113,6 +120,7 @@ impl From<ContractSummary> for ContractListItem {
             deployed_at: summary.deployed_at,
             rules: summary.rules,
             revoked: summary.revoked,
+            status,
         }
     }
 }
