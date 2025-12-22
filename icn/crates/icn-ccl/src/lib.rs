@@ -49,6 +49,7 @@ pub mod ast;
 pub mod charter_rules;
 pub mod charter_validator;
 pub mod disputes;
+pub mod error;
 pub mod interpreter;
 pub mod messages;
 pub mod registry;
@@ -68,6 +69,7 @@ pub use disputes::{
     OffenderRecord, PenaltyConfig, TrustCallback, TrustPenaltyCallback, TOPIC_DISPUTES_FILE,
     TOPIC_DISPUTES_RESOLVED,
 };
+pub use error::{CclError, Span};
 pub use interpreter::Interpreter;
 pub use messages::{
     ContractDeploymentMessage, ContractExecutionRequest, ContractExecutionResponse,

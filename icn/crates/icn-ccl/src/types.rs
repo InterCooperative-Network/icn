@@ -176,6 +176,20 @@ impl Value {
             _ => None,
         }
     }
+
+    /// Get the type name of this value for error messages
+    pub fn type_name(&self) -> &'static str {
+        match self {
+            Value::Int(_) => "integer",
+            Value::String(_) => "string",
+            Value::Bool(_) => "boolean",
+            Value::List(_) => "list",
+            Value::Set(_) => "set",
+            Value::Map(_) => "map",
+            Value::None => "none",
+            Value::Did(_) => "DID",
+        }
+    }
 }
 
 // Implement Hash for Value to use in Sets
@@ -241,6 +255,9 @@ pub struct ExecutionContext {
     /// Available fuel for execution
     pub fuel: u64,
 
+    /// Initial fuel limit (for error reporting)
+    pub fuel_limit: u64,
+
     /// Contract capabilities
     pub capabilities: Vec<Capability>,
 
@@ -261,15 +278,19 @@ impl ExecutionContext {
             caller,
             timestamp,
             fuel,
+            fuel_limit: fuel,
             capabilities,
             participants,
         }
     }
 
     /// Consume fuel, return error if depleted
-    pub fn consume_fuel(&mut self, amount: u64) -> anyhow::Result<()> {
+    pub fn consume_fuel(&mut self, amount: u64) -> crate::error::Result<()> {
         if self.fuel < amount {
-            anyhow::bail!("Out of fuel");
+            return Err(crate::error::CclError::FuelExhausted {
+                used: self.fuel_limit - self.fuel,
+                limit: self.fuel_limit,
+            });
         }
         self.fuel -= amount;
         Ok(())

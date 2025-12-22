@@ -307,6 +307,7 @@ impl Executor for WasmExecutor {
                     caller: caller_did.clone(),
                     timestamp,
                     fuel: ctx.fuel_remaining,
+                    fuel_limit: ctx.fuel_remaining,
                     capabilities: vec![],
                     participants: vec![caller_did],
                 };
