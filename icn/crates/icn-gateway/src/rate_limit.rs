@@ -400,6 +400,7 @@ impl IpRateLimiter {
                 "IP rate limit exceeded for: {} (available: {:.2}, needed: {:.2})",
                 ip, available, self.config.cost_per_request
             );
+            gateway::ip_rate_limit_exceeded_inc();
             Err(GatewayError::RateLimitExceeded(format!("IP: {ip}")))
         }
     }
