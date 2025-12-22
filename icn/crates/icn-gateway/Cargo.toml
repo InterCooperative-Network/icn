@@ -78,7 +78,7 @@ icn-cooperative = { path = "../icn-cooperative" }
 icn-community = { path = "../icn-community" }
 
 # Caching
-lru = "0.12"
+lru = "0.16"
 dashmap = "6.0"
 
 # Metrics
