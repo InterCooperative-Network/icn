@@ -190,6 +190,8 @@ impl LocalExecutor {
         let signing_key_bytes: [u8; 32] = signing_key
             .try_into()
             .map_err(|_| ComputeError::InvalidSignature("Invalid signing key length".into()))?;
+        // SAFETY: SigningKey::from_bytes is infallible for any 32-byte array.
+        // Length is already validated by try_into() above.
         let ed25519_key = ed25519_dalek::SigningKey::from_bytes(&signing_key_bytes);
 
         let mut result = ComputeResult {
