@@ -90,7 +90,7 @@ anyhow = "1.0"
 thiserror = "2.0"
 
 # Utilities
-bytes = "1.5"
+bytes = "1.11"
 futures = "0.3"
 lru = "0.12"
 
