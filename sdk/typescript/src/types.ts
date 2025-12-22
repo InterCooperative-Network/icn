@@ -683,6 +683,72 @@ export interface AmendmentListResponse {
 }
 
 // ============================================================================
+// Commons Evolution: Amendment Voting (UI-friendly)
+// ============================================================================
+
+/** Vote choice for amendments */
+export type AmendmentVoteChoice = 'approve' | 'reject' | 'abstain';
+
+/** Request to cast a vote on an amendment */
+export interface CastAmendmentVoteRequest {
+  vote: AmendmentVoteChoice;
+  comment?: string;
+  weight?: number;
+}
+
+/** Individual vote response */
+export interface AmendmentVoteResponse {
+  voter: string;
+  vote: string;
+  weight?: number;
+  comment?: string;
+  timestamp: number;
+  voted_at: string;
+}
+
+/** Vote results for an amendment */
+export interface AmendmentVoteResults {
+  amendment_id: string;
+  title: string;
+  status: string;
+  total_votes: number;
+  approve_count: number;
+  reject_count: number;
+  abstain_count: number;
+  approval_percentage: number;
+  quorum_required: number;
+  quorum_achieved: boolean;
+  approval_threshold: number;
+  has_passed: boolean;
+  voting_ends_at?: number;
+  time_remaining_secs?: number;
+  votes?: AmendmentVoteResponse[];
+}
+
+/** User's vote status on an amendment */
+export interface MyAmendmentVoteResponse {
+  amendment_id: string;
+  has_voted: boolean;
+  vote?: AmendmentVoteResponse;
+  can_vote: boolean;
+  reason?: string;
+}
+
+/** List of votes on an amendment */
+export interface ListAmendmentVotesResponse {
+  amendment_id: string;
+  total_votes: number;
+  votes: AmendmentVoteResponse[];
+}
+
+/** Response from casting a vote */
+export interface CastAmendmentVoteResponse {
+  success: boolean;
+  vote: string;
+  total_votes: number;
+}
+
+// ============================================================================
 // Commons Evolution: Appeals
 // ============================================================================
 

@@ -1570,3 +1570,163 @@ describe('edge cases', () => {
     await expect(client.health()).rejects.toThrow('Internal Server Error');
   });
 });
+
+describe('amendment voting', () => {
+  it('should cast a vote on an amendment', async () => {
+    const mockResponse = {
+      success: true,
+      vote: 'approve',
+      total_votes: 5,
+    };
+
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockResponse,
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      token: 'test-token',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    const result = await client.castAmendmentVote('abc123def456', {
+      vote: 'approve',
+      comment: 'I support this amendment',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.vote).toBe('approve');
+    expect(result.total_votes).toBe(5);
+    const [url, options] = mockFetch.mock.calls[0];
+    expect(url).toBe('http://localhost:8080/v1/constitutional/amendments/abc123def456/votes');
+    expect(options.method).toBe('POST');
+    const body = JSON.parse(options.body);
+    expect(body.vote).toBe('approve');
+    expect(body.comment).toBe('I support this amendment');
+  });
+
+  it('should list votes on an amendment', async () => {
+    const mockResponse = {
+      amendment_id: 'abc123def456',
+      total_votes: 3,
+      votes: [
+        { voter: 'did:icn:alice', vote: 'approve', timestamp: 1700000000, voted_at: '2024-11-14 22:13 UTC' },
+        { voter: 'did:icn:bob', vote: 'reject', timestamp: 1700000100, voted_at: '2024-11-14 22:15 UTC' },
+      ],
+    };
+
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockResponse,
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      token: 'test-token',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    const result = await client.listAmendmentVotes('abc123def456');
+
+    expect(result.total_votes).toBe(3);
+    expect(result.votes).toHaveLength(2);
+    const [url] = mockFetch.mock.calls[0];
+    expect(url).toBe('http://localhost:8080/v1/constitutional/amendments/abc123def456/votes');
+  });
+
+  it('should get amendment results', async () => {
+    const mockResponse = {
+      amendment_id: 'abc123def456',
+      title: 'Test Amendment',
+      status: 'voting',
+      total_votes: 10,
+      approve_count: 7,
+      reject_count: 2,
+      abstain_count: 1,
+      approval_percentage: 77.78,
+      quorum_required: 50,
+      quorum_achieved: true,
+      approval_threshold: 67,
+      has_passed: true,
+      voting_ends_at: 1700086400,
+      time_remaining_secs: 3600,
+    };
+
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockResponse,
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      token: 'test-token',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    const result = await client.getAmendmentResults('abc123def456');
+
+    expect(result.has_passed).toBe(true);
+    expect(result.approval_percentage).toBe(77.78);
+    expect(result.quorum_achieved).toBe(true);
+    const [url] = mockFetch.mock.calls[0];
+    expect(url).toBe('http://localhost:8080/v1/constitutional/amendments/abc123def456/results');
+  });
+
+  it('should get amendment results with votes included', async () => {
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ amendment_id: 'abc123', votes: [] }),
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      token: 'test-token',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    await client.getAmendmentResults('abc123def456', true);
+
+    const [url] = mockFetch.mock.calls[0];
+    expect(url).toBe('http://localhost:8080/v1/constitutional/amendments/abc123def456/results?include_votes=true');
+  });
+
+  it('should get my vote on an amendment', async () => {
+    const mockResponse = {
+      amendment_id: 'abc123def456',
+      has_voted: true,
+      vote: {
+        voter: 'did:icn:alice',
+        vote: 'approve',
+        timestamp: 1700000000,
+        voted_at: '2024-11-14 22:13 UTC',
+      },
+      can_vote: false,
+      reason: 'Already voted',
+    };
+
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockResponse,
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      token: 'test-token',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    const result = await client.getMyAmendmentVote('abc123def456');
+
+    expect(result.has_voted).toBe(true);
+    expect(result.can_vote).toBe(false);
+    expect(result.vote?.vote).toBe('approve');
+    const [url] = mockFetch.mock.calls[0];
+    expect(url).toBe('http://localhost:8080/v1/constitutional/amendments/abc123def456/my-vote');
+  });
+});

@@ -83,6 +83,12 @@ import {
   CreateAmendmentRequest,
   AddAmendmentChangeRequest,
   RatifyAmendmentRequest,
+  // Amendment voting types
+  CastAmendmentVoteRequest,
+  CastAmendmentVoteResponse,
+  AmendmentVoteResults,
+  MyAmendmentVoteResponse,
+  ListAmendmentVotesResponse,
   Appeal,
   AppealListResponse,
   FileAppealRequest,
@@ -1072,6 +1078,60 @@ export class ICNClient {
    */
   async withdrawAmendment(amendmentId: string, reason?: string): Promise<Amendment> {
     return this.post<Amendment>(`/constitutional/amendments/${amendmentId}/withdraw`, { reason });
+  }
+
+  // ===========================================================================
+  // Amendment Voting (UI-friendly)
+  // ===========================================================================
+
+  /**
+   * Cast a vote on an amendment
+   * @param amendmentId - The amendment ID (hex string)
+   * @param req - Vote request with choice and optional comment
+   */
+  async castAmendmentVote(
+    amendmentId: string,
+    req: CastAmendmentVoteRequest
+  ): Promise<CastAmendmentVoteResponse> {
+    return this.post<CastAmendmentVoteResponse>(
+      `/constitutional/amendments/${amendmentId}/votes`,
+      req
+    );
+  }
+
+  /**
+   * List all votes on an amendment
+   * @param amendmentId - The amendment ID (hex string)
+   */
+  async listAmendmentVotes(amendmentId: string): Promise<ListAmendmentVotesResponse> {
+    return this.get<ListAmendmentVotesResponse>(
+      `/constitutional/amendments/${amendmentId}/votes`
+    );
+  }
+
+  /**
+   * Get voting results for an amendment
+   * @param amendmentId - The amendment ID (hex string)
+   * @param includeVotes - Whether to include individual votes in response
+   */
+  async getAmendmentResults(
+    amendmentId: string,
+    includeVotes?: boolean
+  ): Promise<AmendmentVoteResults> {
+    const query = includeVotes ? '?include_votes=true' : '';
+    return this.get<AmendmentVoteResults>(
+      `/constitutional/amendments/${amendmentId}/results${query}`
+    );
+  }
+
+  /**
+   * Get the current user's vote on an amendment
+   * @param amendmentId - The amendment ID (hex string)
+   */
+  async getMyAmendmentVote(amendmentId: string): Promise<MyAmendmentVoteResponse> {
+    return this.get<MyAmendmentVoteResponse>(
+      `/constitutional/amendments/${amendmentId}/my-vote`
+    );
   }
 
   // ===========================================================================
