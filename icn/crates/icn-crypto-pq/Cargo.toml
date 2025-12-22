@@ -32,7 +32,7 @@ hmac = "0.12"
 # Randomness
 rand = "0.8"
 rand_core = "0.6"
-rand_chacha = "0.3"  # Seeded RNG for deterministic key generation
+rand_chacha = "0.9"  # Seeded RNG for deterministic key generation
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
