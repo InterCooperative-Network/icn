@@ -95,6 +95,15 @@ import {
   AddEvidenceRequest,
   AddResponseRequest,
   ResolveAppealRequest,
+  // Identity and device types
+  DidResolutionResponse,
+  IdentityHealthResponse,
+  DeviceInfo,
+  RegisterDeviceRequest,
+  RegisterDeviceResponse,
+  ListDevicesResponse,
+  RevokeDeviceRequest,
+  RevokeDeviceResponse,
 } from './types';
 
 export * from './types';
@@ -332,8 +341,8 @@ export class ICNClient {
     return this.request<T>('PUT', path, body, requireAuth);
   }
 
-  private delete<T>(path: string, requireAuth = true): Promise<T> {
-    return this.request<T>('DELETE', path, undefined, requireAuth);
+  private delete<T>(path: string, body?: unknown, requireAuth = true): Promise<T> {
+    return this.request<T>('DELETE', path, body, requireAuth);
   }
 
   // ===========================================================================
@@ -1212,6 +1221,142 @@ export class ICNClient {
    */
   async withdrawAppeal(appealId: string, reason?: string): Promise<Appeal> {
     return this.post<Appeal>(`/constitutional/appeals/${appealId}/withdraw`, { reason });
+  }
+
+  // ===========================================================================
+  // Identity Resolution
+  // ===========================================================================
+
+  /**
+   * Resolve a DID and check if it's valid
+   *
+   * This is a PUBLIC endpoint that allows verification of DIDs.
+   *
+   * @param did - The DID to resolve
+   * @param includeAttestations - Whether to include attestation details
+   * @returns DID resolution response with validity and attestation info
+   *
+   * @example
+   * ```typescript
+   * const result = await client.resolveDid('did:icn:abc123');
+   * if (result.valid) {
+   *   console.log('DID is valid, belongs to coop:', result.coop_id);
+   * }
+   * ```
+   */
+  async resolveDid(did: string, includeAttestations?: boolean): Promise<DidResolutionResponse> {
+    const query = includeAttestations ? '?include_attestations=true' : '';
+    return this.get<DidResolutionResponse>(`/identity/resolve/${encodeURIComponent(did)}${query}`, false);
+  }
+
+  /**
+   * Check identity service health
+   *
+   * @returns Health status of the identity service
+   */
+  async identityHealth(): Promise<IdentityHealthResponse> {
+    return this.get<IdentityHealthResponse>('/identity/health', false);
+  }
+
+  // ===========================================================================
+  // Device Management
+  // ===========================================================================
+
+  /**
+   * Register a new device for a DID
+   *
+   * Adds a new device to the authenticated user's DID document.
+   * The request must be signed by an existing device with AddDevice capability.
+   *
+   * @param did - The DID to register the device for (must match authenticated user)
+   * @param req - Device registration request
+   * @returns The registered device info
+   *
+   * @example
+   * ```typescript
+   * const result = await client.registerDevice('did:icn:alice', {
+   *   device_id: 'phone-2',
+   *   label: 'My iPhone',
+   *   public_key: '...hex-encoded Ed25519 public key...',
+   *   capabilities: ['sign', 'encrypt'],
+   *   signing_device_id: 'device-1',
+   *   signature: '...hex-encoded signature...',
+   * });
+   * console.log('Registered device:', result.device.id);
+   * ```
+   */
+  async registerDevice(did: string, req: RegisterDeviceRequest): Promise<RegisterDeviceResponse> {
+    return this.post<RegisterDeviceResponse>(`/devices/${encodeURIComponent(did)}`, req);
+  }
+
+  /**
+   * List all devices for a DID
+   *
+   * Returns all devices registered for the authenticated user's DID.
+   *
+   * @param did - The DID to list devices for (must match authenticated user)
+   * @returns List of devices with total count
+   *
+   * @example
+   * ```typescript
+   * const result = await client.listDevices('did:icn:alice');
+   * console.log(`${result.total} devices registered`);
+   * for (const device of result.devices) {
+   *   console.log(`- ${device.id}: ${device.label} (revoked: ${device.revoked})`);
+   * }
+   * ```
+   */
+  async listDevices(did: string): Promise<ListDevicesResponse> {
+    return this.get<ListDevicesResponse>(`/devices/${encodeURIComponent(did)}`);
+  }
+
+  /**
+   * Get a specific device by ID
+   *
+   * @param did - The DID the device belongs to (must match authenticated user)
+   * @param deviceId - The device ID to retrieve
+   * @returns Device information
+   *
+   * @example
+   * ```typescript
+   * const device = await client.getDevice('did:icn:alice', 'phone-1');
+   * console.log(`Device ${device.id} has capabilities:`, device.capabilities);
+   * ```
+   */
+  async getDevice(did: string, deviceId: string): Promise<DeviceInfo> {
+    return this.get<DeviceInfo>(`/devices/${encodeURIComponent(did)}/${encodeURIComponent(deviceId)}`);
+  }
+
+  /**
+   * Revoke a device
+   *
+   * Revokes a device from the authenticated user's DID document.
+   * The request must be signed by a device with RevokeDevice capability.
+   * Cannot revoke the last device with management capabilities.
+   *
+   * @param did - The DID the device belongs to (must match authenticated user)
+   * @param deviceId - The device ID to revoke
+   * @param req - Revocation request with signing device and signature
+   * @returns Revocation response
+   *
+   * @example
+   * ```typescript
+   * const result = await client.revokeDevice('did:icn:alice', 'phone-old', {
+   *   signing_device_id: 'device-1',
+   *   signature: '...hex-encoded signature...',
+   * });
+   * console.log('Revoked device:', result.device_id);
+   * ```
+   */
+  async revokeDevice(
+    did: string,
+    deviceId: string,
+    req: RevokeDeviceRequest
+  ): Promise<RevokeDeviceResponse> {
+    return this.delete<RevokeDeviceResponse>(
+      `/devices/${encodeURIComponent(did)}/${encodeURIComponent(deviceId)}`,
+      req
+    );
   }
 
   // ===========================================================================

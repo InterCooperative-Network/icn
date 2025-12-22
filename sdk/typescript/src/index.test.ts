@@ -1730,3 +1730,285 @@ describe('amendment voting', () => {
     expect(url).toBe('http://localhost:8080/v1/constitutional/amendments/abc123def456/my-vote');
   });
 });
+
+describe('identity resolution', () => {
+  it('should resolve a DID without attestations', async () => {
+    const mockResponse = {
+      did: 'did:icn:abc123',
+      valid: true,
+      coop_id: 'my-coop',
+      has_attestations: false,
+    };
+
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockResponse,
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    const result = await client.resolveDid('did:icn:abc123');
+
+    expect(result.valid).toBe(true);
+    expect(result.did).toBe('did:icn:abc123');
+    expect(result.coop_id).toBe('my-coop');
+    const [url, options] = mockFetch.mock.calls[0];
+    expect(url).toBe('http://localhost:8080/v1/identity/resolve/did%3Aicn%3Aabc123');
+    expect(options.headers['Authorization']).toBeUndefined(); // Public endpoint
+  });
+
+  it('should resolve a DID with attestations included', async () => {
+    const mockResponse = {
+      did: 'did:icn:abc123',
+      valid: true,
+      coop_id: 'my-coop',
+      has_attestations: true,
+      attestation_count: 3,
+    };
+
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockResponse,
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    const result = await client.resolveDid('did:icn:abc123', true);
+
+    expect(result.has_attestations).toBe(true);
+    expect(result.attestation_count).toBe(3);
+    const [url] = mockFetch.mock.calls[0];
+    expect(url).toBe('http://localhost:8080/v1/identity/resolve/did%3Aicn%3Aabc123?include_attestations=true');
+  });
+
+  it('should check identity service health', async () => {
+    const mockResponse = {
+      status: 'ok',
+      service: 'identity',
+    };
+
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockResponse,
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    const result = await client.identityHealth();
+
+    expect(result.status).toBe('ok');
+    expect(result.service).toBe('identity');
+    const [url, options] = mockFetch.mock.calls[0];
+    expect(url).toBe('http://localhost:8080/v1/identity/health');
+    expect(options.headers['Authorization']).toBeUndefined(); // Public endpoint
+  });
+});
+
+describe('device management', () => {
+  it('should register a new device', async () => {
+    const mockResponse = {
+      device: {
+        id: 'phone-2',
+        label: 'My iPhone',
+        key_type: 'Ed25519',
+        capabilities: ['sign', 'encrypt'],
+        added_at: 1700000000,
+        revoked: false,
+      },
+      message: 'Device registered successfully',
+    };
+
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 201,
+      json: async () => mockResponse,
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      token: 'test-token',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    const result = await client.registerDevice('did:icn:alice', {
+      device_id: 'phone-2',
+      label: 'My iPhone',
+      public_key: 'deadbeef...',
+      capabilities: ['sign', 'encrypt'],
+      signing_device_id: 'device-1',
+      signature: 'cafebabe...',
+    });
+
+    expect(result.device.id).toBe('phone-2');
+    expect(result.device.capabilities).toContain('sign');
+    expect(result.message).toBe('Device registered successfully');
+    const [url, options] = mockFetch.mock.calls[0];
+    expect(url).toBe('http://localhost:8080/v1/devices/did%3Aicn%3Aalice');
+    expect(options.method).toBe('POST');
+    expect(options.headers['Authorization']).toBe('Bearer test-token');
+    const body = JSON.parse(options.body);
+    expect(body.device_id).toBe('phone-2');
+    expect(body.signing_device_id).toBe('device-1');
+  });
+
+  it('should list all devices for a DID', async () => {
+    const mockResponse = {
+      devices: [
+        {
+          id: 'device-1',
+          label: 'Primary Device',
+          key_type: 'Ed25519',
+          capabilities: ['sign', 'add_device', 'revoke_device'],
+          added_at: 1699000000,
+          revoked: false,
+        },
+        {
+          id: 'phone-1',
+          label: 'Mobile Phone',
+          key_type: 'Ed25519',
+          capabilities: ['sign'],
+          added_at: 1700000000,
+          revoked: false,
+        },
+      ],
+      total: 2,
+    };
+
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockResponse,
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      token: 'test-token',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    const result = await client.listDevices('did:icn:alice');
+
+    expect(result.total).toBe(2);
+    expect(result.devices).toHaveLength(2);
+    expect(result.devices[0].id).toBe('device-1');
+    expect(result.devices[1].id).toBe('phone-1');
+    const [url] = mockFetch.mock.calls[0];
+    expect(url).toBe('http://localhost:8080/v1/devices/did%3Aicn%3Aalice');
+  });
+
+  it('should get a specific device by ID', async () => {
+    const mockResponse = {
+      id: 'phone-1',
+      label: 'Mobile Phone',
+      key_type: 'Ed25519',
+      capabilities: ['sign', 'encrypt'],
+      added_at: 1700000000,
+      revoked: false,
+    };
+
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockResponse,
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      token: 'test-token',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    const result = await client.getDevice('did:icn:alice', 'phone-1');
+
+    expect(result.id).toBe('phone-1');
+    expect(result.capabilities).toContain('sign');
+    const [url] = mockFetch.mock.calls[0];
+    expect(url).toBe('http://localhost:8080/v1/devices/did%3Aicn%3Aalice/phone-1');
+  });
+
+  it('should revoke a device', async () => {
+    const mockResponse = {
+      message: 'Device revoked successfully',
+      device_id: 'phone-old',
+    };
+
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockResponse,
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      token: 'test-token',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    const result = await client.revokeDevice('did:icn:alice', 'phone-old', {
+      signing_device_id: 'device-1',
+      signature: 'cafebabe...',
+    });
+
+    expect(result.message).toBe('Device revoked successfully');
+    expect(result.device_id).toBe('phone-old');
+    const [url, options] = mockFetch.mock.calls[0];
+    expect(url).toBe('http://localhost:8080/v1/devices/did%3Aicn%3Aalice/phone-old');
+    expect(options.method).toBe('DELETE');
+    const body = JSON.parse(options.body);
+    expect(body.signing_device_id).toBe('device-1');
+    expect(body.signature).toBe('cafebabe...');
+  });
+
+  it('should handle device registration with encryption key', async () => {
+    const mockResponse = {
+      device: {
+        id: 'phone-3',
+        label: 'Encrypted Device',
+        key_type: 'Ed25519',
+        capabilities: ['sign', 'encrypt'],
+        added_at: 1700000000,
+        revoked: false,
+      },
+      message: 'Device registered successfully',
+    };
+
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 201,
+      json: async () => mockResponse,
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      token: 'test-token',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    const result = await client.registerDevice('did:icn:alice', {
+      device_id: 'phone-3',
+      label: 'Encrypted Device',
+      public_key: 'deadbeef...',
+      encryption_public_key: 'cafebabe...',
+      capabilities: ['sign', 'encrypt'],
+      signing_device_id: 'device-1',
+      signature: 'signature...',
+    });
+
+    expect(result.device.id).toBe('phone-3');
+    const [, options] = mockFetch.mock.calls[0];
+    const body = JSON.parse(options.body);
+    expect(body.encryption_public_key).toBe('cafebabe...');
+  });
+});
