@@ -3,6 +3,7 @@
 pub mod background_tasks;
 pub mod governance_handlers;
 pub mod init_compute;
+pub mod init_contract_registry;
 pub mod init_coop;
 pub mod init_gossip;
 pub mod init_governance;
@@ -852,6 +853,18 @@ impl Supervisor {
 
             info!("✓ Governance event handlers registered");
 
+            // Initialize contract registry services
+            let contract_registry_services = init_contract_registry::init_contract_registry_services(
+                &self.config,
+                did.clone(),
+                init_contract_registry::ContractRegistryDeps {
+                    gossip_handle: gossip_handle.clone(),
+                    shutdown_rx: self.shutdown_tx.subscribe(),
+                },
+            )
+            .await?;
+            let contract_registry_handle = contract_registry_services.registry_handle;
+
             // Initialize compute actor using extracted module
             let compute_services = init_compute::init_compute_services(init_compute::ComputeDeps {
                 trust_graph: trust_graph_handle.clone(),
@@ -864,6 +877,7 @@ impl Supervisor {
                 misbehavior_detector: misbehavior_detector.clone(),
                 identity_bundle: identity_bundle.clone(),
                 store_path: self.config.store_path(),
+                contract_registry: Some(contract_registry_handle.clone()),
             })
             .await?;
 

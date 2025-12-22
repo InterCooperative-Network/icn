@@ -61,7 +61,7 @@ pub use dispute::{
     DisputeStatus, Evidence, EvidenceType, VerificationMode,
 };
 pub use error::ComputeError;
-pub use executor::{ExecutionContext, Executor, LocalExecutor};
+pub use executor::{ContractResolverCallback, ExecutionContext, Executor, LocalExecutor};
 pub use migration_manager::{ActorMigrationManager, MigrationSender};
 pub use migration_policy::{
     DefaultMigrationPolicy, ExecutorInfo, LocalityFirstPolicy, MigrationPolicy, NetworkState,

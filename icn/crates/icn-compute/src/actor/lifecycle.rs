@@ -342,25 +342,30 @@ impl ComputeActor {
         }
 
         // Check if we have required capabilities
-        if !self.executor.can_execute(&task) {
-            tracing::debug!(
-                task_id = %task.id,
-                "Skipping task: missing required capabilities"
-            );
-            return Ok(()); // Can't execute this task
+        {
+            let executor = self.executor.read().await;
+            if !executor.can_execute(&task) {
+                tracing::debug!(
+                    task_id = %task.id,
+                    "Skipping task: missing required capabilities"
+                );
+                return Ok(()); // Can't execute this task
+            }
         }
 
         // Store task
         let _hash = self.task_manager.lock().await.submit(task.clone())?;
 
         // Find highest-priority pending task we can execute
-        let mgr = self.task_manager.lock().await;
-        let pending = mgr.pending_by_priority();
-        let highest_priority_task = pending
-            .into_iter()
-            .find(|(_, t)| self.executor.can_execute(t))
-            .map(|(h, _)| h);
-        drop(mgr);
+        let highest_priority_task = {
+            let mgr = self.task_manager.lock().await;
+            let pending = mgr.pending_by_priority();
+            let executor = self.executor.read().await;
+            pending
+                .into_iter()
+                .find(|(_, t)| executor.can_execute(t))
+                .map(|(h, _)| h)
+        };
 
         // Claim highest-priority task if available
         let (hash, claimed_task) = if let Some(h) = highest_priority_task {
@@ -444,9 +449,10 @@ impl ComputeActor {
 
         // Execute
         let start = std::time::Instant::now();
-        let result = self
-            .executor
-            .execute_task(&claimed_task, &self.own_did, &self.signing_key)?;
+        let result = {
+            let executor = self.executor.read().await;
+            executor.execute_task(&claimed_task, &self.own_did, &self.signing_key)?
+        };
         let duration = start.elapsed().as_secs_f64();
 
         // Record metrics

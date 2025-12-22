@@ -52,6 +52,7 @@ pub mod disputes;
 pub mod interpreter;
 pub mod messages;
 pub mod registry;
+pub mod registry_actor;
 pub mod runtime;
 pub mod types;
 
@@ -73,6 +74,11 @@ pub use messages::{
 };
 pub use registry::{
     compute_hash, ContentHash, ContractMetadata, ContractRegistry, RegistryError, RegistryStats,
+};
+pub use registry_actor::{
+    ContractRegistryActor, ContractRegistryHandle, ContractRegistryMessage, ContractSummary,
+    DeploymentMetadata, Visibility, TOPIC_CONTRACTS, TOPIC_CONTRACTS_DEPLOY,
+    TOPIC_CONTRACTS_REVOKE,
 };
 pub use runtime::{ContractInfo, ContractRuntime};
 pub use types::{
