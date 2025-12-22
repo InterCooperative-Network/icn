@@ -3,7 +3,7 @@
 //! Defines gossip messages, deployment metadata, filters, and events.
 
 use crate::ast::Contract;
-use crate::registry::{ContentHash, ContractMetadata};
+use crate::registry::{ContentHash, ContractMetadata, Visibility};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -118,18 +118,6 @@ impl DeploymentMetadata {
         self.description = Some(description.into());
         self
     }
-}
-
-/// Contract visibility level
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-pub enum Visibility {
-    /// Only visible to owner
-    #[default]
-    Private,
-    /// Visible to cooperative members
-    Coop(String),
-    /// Publicly visible (may require governance approval)
-    Public,
 }
 
 /// Filter for listing contracts

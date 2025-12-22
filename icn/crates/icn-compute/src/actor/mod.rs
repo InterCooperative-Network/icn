@@ -184,11 +184,11 @@ impl ComputeActor {
         // Note: This requires exclusive access before spawning
         if let Some(executor) = Arc::get_mut(&mut self.executor) {
             executor.get_mut().set_contract_resolver(resolver);
+            // Only record the registry if we successfully configured the resolver
+            self.contract_registry = Some(registry);
         } else {
             tracing::warn!("Cannot set contract resolver: executor already shared");
         }
-
-        self.contract_registry = Some(registry);
     }
 
     /// Set maximum concurrent tasks this executor will claim

@@ -866,7 +866,6 @@ impl Supervisor {
                     did.clone(),
                     init_contract_registry::ContractRegistryDeps {
                         gossip_handle: gossip_handle.clone(),
-                        shutdown_rx: self.shutdown_tx.subscribe(),
                     },
                 )
                 .await?;

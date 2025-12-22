@@ -23,8 +23,6 @@ pub type GossipHandle = Arc<RwLock<icn_gossip::GossipActor>>;
 pub struct ContractRegistryDeps {
     /// Handle to the gossip actor for message synchronization
     pub gossip_handle: GossipHandle,
-    /// Shutdown signal receiver
-    pub shutdown_rx: tokio::sync::broadcast::Receiver<()>,
 }
 
 /// Services returned from contract registry initialization

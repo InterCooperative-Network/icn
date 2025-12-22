@@ -74,11 +74,11 @@ pub use messages::{
 };
 pub use registry::{
     compute_hash, ContentHash, ContractMetadata, ContractRegistry, RegistryError, RegistryStats,
+    Visibility,
 };
 pub use registry_actor::{
     ContractRegistryActor, ContractRegistryHandle, ContractRegistryMessage, ContractSummary,
-    DeploymentMetadata, Visibility, TOPIC_CONTRACTS, TOPIC_CONTRACTS_DEPLOY,
-    TOPIC_CONTRACTS_REVOKE,
+    DeploymentMetadata, TOPIC_CONTRACTS, TOPIC_CONTRACTS_DEPLOY, TOPIC_CONTRACTS_REVOKE,
 };
 pub use runtime::{ContractInfo, ContractRuntime};
 pub use types::{

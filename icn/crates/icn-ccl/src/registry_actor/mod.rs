@@ -189,10 +189,15 @@ impl ContractRegistryActor {
             .validate()
             .map_err(|e| RegistryError::InvalidContract(e.to_string()))?;
 
-        // Deploy to registry
+        // Deploy to registry with visibility
         let hash = self
             .registry
-            .deploy(contract.clone(), &metadata.owner, metadata.version)
+            .deploy_with_visibility(
+                contract.clone(),
+                &metadata.owner,
+                metadata.version,
+                metadata.visibility.clone(),
+            )
             .await?;
 
         // Get the created metadata for gossip
@@ -249,6 +254,12 @@ impl ContractRegistryActor {
                 // Filter by name prefix
                 if let Some(ref prefix) = filter.name_prefix {
                     if !meta.name.starts_with(prefix) {
+                        return false;
+                    }
+                }
+                // Filter by visibility
+                if let Some(ref visibility) = filter.visibility {
+                    if &meta.visibility != visibility {
                         return false;
                     }
                 }
