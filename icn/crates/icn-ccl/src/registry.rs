@@ -48,6 +48,18 @@ pub enum RegistryError {
 
 pub type Result<T> = std::result::Result<T, RegistryError>;
 
+/// Contract visibility level
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum Visibility {
+    /// Only visible to owner
+    #[default]
+    Private,
+    /// Visible to cooperative members
+    Coop(String),
+    /// Publicly visible (may require governance approval)
+    Public,
+}
+
 /// Contract metadata stored alongside the contract
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContractMetadata {
@@ -69,6 +81,8 @@ pub struct ContractMetadata {
     pub currency: Option<String>,
     /// Rule names for discovery
     pub rules: Vec<String>,
+    /// Visibility level
+    pub visibility: Visibility,
 }
 
 impl ContractMetadata {
@@ -91,12 +105,19 @@ impl ContractMetadata {
                 .collect(),
             currency: contract.currency.clone(),
             rules: contract.rules.iter().map(|r| r.name.clone()).collect(),
+            visibility: Visibility::default(),
         })
     }
 
     /// Set description
     pub fn with_description(mut self, description: impl Into<String>) -> Self {
         self.description = Some(description.into());
+        self
+    }
+
+    /// Set visibility
+    pub fn with_visibility(mut self, visibility: Visibility) -> Self {
+        self.visibility = visibility;
         self
     }
 }
@@ -160,6 +181,18 @@ impl ContractRegistry {
         owner: &str,
         version: Option<u32>,
     ) -> Result<ContentHash> {
+        self.deploy_with_visibility(contract, owner, version, Visibility::default())
+            .await
+    }
+
+    /// Deploy a contract with explicit visibility
+    pub async fn deploy_with_visibility(
+        &self,
+        contract: Contract,
+        owner: &str,
+        version: Option<u32>,
+        visibility: Visibility,
+    ) -> Result<ContentHash> {
         // Validate contract
         contract
             .validate()
@@ -189,8 +222,9 @@ impl ContractRegistry {
             }
         };
 
-        // Create metadata
-        let metadata = ContractMetadata::from_contract(&contract, owner, version)?;
+        // Create metadata with visibility
+        let metadata =
+            ContractMetadata::from_contract(&contract, owner, version)?.with_visibility(visibility);
 
         // Persist to store if available
         if let Some(store) = &self.store {

@@ -3,6 +3,7 @@
 pub mod background_tasks;
 pub mod governance_handlers;
 pub mod init_compute;
+pub mod init_contract_registry;
 pub mod init_coop;
 pub mod init_gossip;
 pub mod init_governance;
@@ -340,6 +341,11 @@ impl Supervisor {
                 tokio::sync::RwLock<Option<icn_steward::StewardHandle>>,
             > = Arc::new(tokio::sync::RwLock::new(None));
 
+            // Create contract registry handle holder (will be filled after ContractRegistryActor is spawned)
+            let contract_registry_holder: Arc<
+                tokio::sync::RwLock<Option<icn_ccl::ContractRegistryHandle>>,
+            > = Arc::new(tokio::sync::RwLock::new(None));
+
             // Keep a reference to federation registry for RPC server (declared here to be in scope for later use)
             let federation_registry_for_rpc: Option<Arc<icn_federation::CooperativeRegistry>>;
 
@@ -560,6 +566,7 @@ impl Supervisor {
                         coop_store: coop_store_for_notifications,
                         federation_handler: federation_handler_for_notifications,
                         attestation_rate_limiter,
+                        contract_registry: contract_registry_holder.clone(),
                     },
                 );
 
@@ -852,6 +859,22 @@ impl Supervisor {
 
             info!("✓ Governance event handlers registered");
 
+            // Initialize contract registry services
+            let contract_registry_services =
+                init_contract_registry::init_contract_registry_services(
+                    &self.config,
+                    did.clone(),
+                    init_contract_registry::ContractRegistryDeps {
+                        gossip_handle: gossip_handle.clone(),
+                    },
+                )
+                .await?;
+            let contract_registry_handle = contract_registry_services.registry_handle;
+
+            // Fill the contract registry holder for notification routing
+            *contract_registry_holder.write().await = Some(contract_registry_handle.clone());
+            info!("✓ Contract registry handle available for gossip routing");
+
             // Initialize compute actor using extracted module
             let compute_services = init_compute::init_compute_services(init_compute::ComputeDeps {
                 trust_graph: trust_graph_handle.clone(),
@@ -864,6 +887,7 @@ impl Supervisor {
                 misbehavior_detector: misbehavior_detector.clone(),
                 identity_bundle: identity_bundle.clone(),
                 store_path: self.config.store_path(),
+                contract_registry: Some(contract_registry_handle.clone()),
             })
             .await?;
 

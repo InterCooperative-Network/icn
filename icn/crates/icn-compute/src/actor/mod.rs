@@ -24,7 +24,7 @@ use types::{ExecutorInfo, ResultConsensus};
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{mpsc, Mutex, RwLock};
 
 use crate::checkpoint_store::CheckpointStore;
 use crate::error::ComputeError;
@@ -40,7 +40,7 @@ pub struct ComputeActor {
     /// Task manager
     task_manager: Arc<Mutex<TaskManager>>,
     /// Local executor
-    executor: Arc<LocalExecutor>,
+    executor: Arc<RwLock<LocalExecutor>>,
     /// Callback to send gossip messages
     send_callback: Option<SendCallback>,
     /// Callback to lookup trust scores
@@ -76,6 +76,8 @@ pub struct ComputeActor {
     locality_callback: Option<LocalityCallback>,
     /// Node's own region identifier (e.g., "us-west", "eu-central")
     own_region: Option<String>,
+    /// Contract registry handle for CclRef resolution
+    contract_registry: Option<icn_ccl::ContractRegistryHandle>,
 }
 
 impl ComputeActor {
@@ -84,7 +86,7 @@ impl ComputeActor {
         Self {
             own_did,
             task_manager: Arc::new(Mutex::new(TaskManager::default())),
-            executor: Arc::new(LocalExecutor::new()),
+            executor: Arc::new(RwLock::new(LocalExecutor::new())),
             send_callback: None,
             trust_callback,
             payment_callback: None,
@@ -102,6 +104,7 @@ impl ComputeActor {
             misbehavior_detector: None, // Set via set_misbehavior_detector()
             locality_callback: None,    // Phase 16C M5: Set via set_locality_callback()
             own_region: None,           // Set via set_region() or from config
+            contract_registry: None,    // Set via set_contract_registry()
         }
     }
 
@@ -150,6 +153,42 @@ impl ComputeActor {
     /// Region identifiers should follow a consistent naming scheme (e.g., "us-west", "eu-central").
     pub fn set_region(&mut self, region: String) {
         self.own_region = Some(region);
+    }
+
+    /// Set the contract registry handle for CclRef resolution
+    ///
+    /// When set, CclRef task codes can be resolved to their contract definitions
+    /// from the contract registry before execution.
+    pub fn set_contract_registry(&mut self, registry: icn_ccl::ContractRegistryHandle) {
+        // Create a resolver callback that synchronously fetches contracts from the registry
+        let registry_clone = registry.clone();
+        let resolver: crate::executor::ContractResolverCallback =
+            Arc::new(move |hash: [u8; 32]| {
+                let registry = registry_clone.clone();
+                // Use block_in_place to safely call async from sync context
+                tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(async {
+                        match registry.get_contract(&hash).await {
+                            Ok(Some(contract)) => Some(contract),
+                            Ok(None) => None,
+                            Err(e) => {
+                                tracing::warn!("Failed to get contract from registry: {}", e);
+                                None
+                            }
+                        }
+                    })
+                })
+            });
+
+        // Set the resolver on the executor
+        // Note: This requires exclusive access before spawning
+        if let Some(executor) = Arc::get_mut(&mut self.executor) {
+            executor.get_mut().set_contract_resolver(resolver);
+            // Only record the registry if we successfully configured the resolver
+            self.contract_registry = Some(registry);
+        } else {
+            tracing::warn!("Cannot set contract resolver: executor already shared");
+        }
     }
 
     /// Set maximum concurrent tasks this executor will claim

@@ -38,6 +38,8 @@ pub struct ComputeDeps {
     pub identity_bundle: icn_identity::IdentityBundle,
     /// Store path for dispute storage
     pub store_path: std::path::PathBuf,
+    /// Contract registry for CclRef resolution (optional)
+    pub contract_registry: Option<icn_ccl::ContractRegistryHandle>,
 }
 
 /// Services returned from compute initialization
@@ -371,6 +373,12 @@ pub async fn init_compute_services(deps: ComputeDeps) -> anyhow::Result<ComputeS
         let locality_callback = create_locality_callback(neighbor_sets.clone());
         compute_actor.set_locality_callback(locality_callback);
         info!("Locality callback set for compute placement");
+    }
+
+    // Set contract registry for CclRef resolution
+    if let Some(ref registry) = deps.contract_registry {
+        compute_actor.set_contract_registry(registry.clone());
+        info!("Contract registry set for CclRef resolution");
     }
 
     // Spawn the compute actor

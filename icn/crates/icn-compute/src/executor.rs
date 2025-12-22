@@ -1,9 +1,15 @@
 //! Task execution engine.
 
+use std::sync::Arc;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use crate::error::ComputeError;
 use crate::types::{ComputeResult, ComputeTask, ExecutionOutcome, ExecutorCapability, TaskCode};
+
+/// Callback type for resolving contract references from the registry
+/// Takes a contract hash and returns the contract if found
+pub type ContractResolverCallback =
+    Arc<dyn Fn([u8; 32]) -> Option<icn_ccl::Contract> + Send + Sync>;
 
 /// Execution context provided to the executor
 pub struct ExecutionContext {
@@ -47,6 +53,8 @@ pub trait Executor: Send + Sync {
 /// Local CCL executor (placeholder - will integrate with icn-ccl)
 pub struct LocalExecutor {
     capabilities: Vec<ExecutorCapability>,
+    /// Optional contract resolver for CclRef resolution
+    contract_resolver: Option<ContractResolverCallback>,
 }
 
 impl LocalExecutor {
@@ -54,6 +62,86 @@ impl LocalExecutor {
     pub fn new() -> Self {
         Self {
             capabilities: vec![ExecutorCapability::Ccl],
+            contract_resolver: None,
+        }
+    }
+
+    /// Set the contract resolver callback for CclRef resolution
+    pub fn set_contract_resolver(&mut self, resolver: ContractResolverCallback) {
+        self.contract_resolver = Some(resolver);
+    }
+
+    /// Execute a CCL contract with a specific rule
+    ///
+    /// This helper handles the common CCL execution logic for both inline contracts
+    /// and contract references resolved from the registry.
+    fn execute_ccl_inline(
+        &self,
+        contract: &icn_ccl::Contract,
+        rule_name: &str,
+        task: &ComputeTask,
+        ctx: &mut ExecutionContext,
+    ) -> ExecutionOutcome {
+        // Validate contract structure
+        if let Err(e) = contract.validate() {
+            return ExecutionOutcome::Failed(format!("Contract validation failed: {e}"));
+        }
+
+        // Use the specified rule name
+        let rule = rule_name.to_string();
+
+        // Check that the rule exists
+        if contract.get_rule(&rule).is_none() {
+            return ExecutionOutcome::Failed(format!("Rule '{}' not found in contract", rule));
+        }
+
+        // Parse caller DID
+        let caller_did: icn_identity::Did =
+            match serde_json::from_value(serde_json::Value::String(ctx.executor_did.clone())) {
+                Ok(d) => d,
+                Err(e) => return ExecutionOutcome::Failed(format!("Invalid caller DID: {e}")),
+            };
+
+        // Create execution context for CCL
+        let timestamp = icn_time::current_timestamp_secs();
+
+        let ccl_context = icn_ccl::ExecutionContext {
+            caller: caller_did.clone(),
+            timestamp,
+            fuel: ctx.fuel_remaining,
+            capabilities: vec![],
+            participants: vec![caller_did],
+        };
+
+        // Create contract state
+        let state = icn_ccl::ContractState::default();
+
+        // Parse inputs as arguments
+        let args: std::collections::HashMap<String, icn_ccl::Value> = if task.inputs.is_empty() {
+            std::collections::HashMap::new()
+        } else {
+            serde_json::from_slice(&task.inputs).unwrap_or_default()
+        };
+
+        // Execute via interpreter
+        let interpreter = icn_ccl::Interpreter::new(contract.clone(), state, ccl_context);
+        match interpreter.execute_rule(&rule, args) {
+            Ok(result) => {
+                // Update fuel consumed
+                ctx.fuel_remaining = ctx.fuel_remaining.saturating_sub(result.fuel_consumed);
+
+                // Serialize result
+                let output = serde_json::to_vec(&result.value).unwrap_or_else(|_| b"null".to_vec());
+                ExecutionOutcome::Success(output)
+            }
+            Err(e) => {
+                let err_str = e.to_string();
+                if err_str.contains("fuel") || err_str.contains("Fuel") {
+                    ExecutionOutcome::OutOfFuel
+                } else {
+                    ExecutionOutcome::Failed(err_str)
+                }
+            }
         }
     }
 
@@ -204,18 +292,45 @@ impl Executor for LocalExecutor {
                 }
             }
             TaskCode::CclRef { hash, rule } => {
-                // CclRef requires a contract registry to be set up
-                // The registry lookup should be handled at a higher level (ComputeActor)
-                // which resolves CclRef to Ccl before calling the executor
+                // CclRef requires a contract registry to resolve the hash
                 let hash_hex = hex::encode(hash);
-                tracing::warn!(
-                    hash = %hash_hex,
-                    rule = %rule,
-                    "CclRef requires contract registry (not yet integrated)"
-                );
-                ExecutionOutcome::Failed(format!(
-                    "Contract reference {hash_hex} not resolved. Registry integration pending."
-                ))
+
+                match &self.contract_resolver {
+                    Some(resolver) => {
+                        // Resolve the contract from the registry
+                        match resolver(*hash) {
+                            Some(contract) => {
+                                // Execute the resolved contract
+                                tracing::debug!(
+                                    hash = %hash_hex,
+                                    rule = %rule,
+                                    "Resolved CclRef, executing contract"
+                                );
+                                self.execute_ccl_inline(&contract, rule, task, ctx)
+                            }
+                            None => {
+                                tracing::warn!(
+                                    hash = %hash_hex,
+                                    rule = %rule,
+                                    "Contract not found in registry"
+                                );
+                                ExecutionOutcome::Failed(format!(
+                                    "Contract {hash_hex} not found in registry"
+                                ))
+                            }
+                        }
+                    }
+                    None => {
+                        tracing::warn!(
+                            hash = %hash_hex,
+                            rule = %rule,
+                            "CclRef requires contract registry (not configured)"
+                        );
+                        ExecutionOutcome::Failed(format!(
+                            "Contract registry not configured. Cannot resolve {hash_hex}."
+                        ))
+                    }
+                }
             }
             TaskCode::WasmRef(_) | TaskCode::WasmInline(_) => {
                 ExecutionOutcome::Failed("WASM not yet supported".into())
