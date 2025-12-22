@@ -1,6 +1,7 @@
 //! Ledger implementation with storage
 
 use crate::balance::compute_all_balances;
+use crate::credit_policy::CreditPolicyManager;
 use crate::events::{BalanceChanged, SharedEventEmitter, Transfer};
 use crate::fork_resolution::{
     Fork, ForkDetector, ForkResolution, ForkResolutionStrategy, ForkResolver,
@@ -121,6 +122,10 @@ pub struct Ledger {
     /// Called before accepting entries. Returns Ok(()) if entry is valid,
     /// Err with reason if entry should be rejected.
     validation_hook: Option<ValidationHook>,
+
+    /// Credit policy manager for enforcing credit limits
+    /// When set, entries that would exceed credit limits are rejected.
+    credit_policy_manager: Option<CreditPolicyManager>,
 }
 
 impl Ledger {
@@ -146,9 +151,10 @@ impl Ledger {
             trust_graph: None,
             min_trust_for_entry: DEFAULT_MIN_TRUST_FOR_ENTRY,
             journal_version,
-            event_emitter: None,   // Set via set_event_emitter()
-            domain_id: None,       // Set via set_domain_id()
-            validation_hook: None, // Set via set_validation_hook()
+            event_emitter: None,           // Set via set_event_emitter()
+            domain_id: None,               // Set via set_domain_id()
+            validation_hook: None,         // Set via set_validation_hook()
+            credit_policy_manager: None,   // Set via set_credit_policy_manager()
         };
 
         // Load cached balances from storage
@@ -264,6 +270,19 @@ impl Ledger {
         self.validation_hook = Some(Box::new(hook));
     }
 
+    /// Set the credit policy manager for credit limit enforcement
+    ///
+    /// When set, entries are validated against credit limits before acceptance.
+    /// Entries that would cause accounts to exceed their credit limits are rejected.
+    pub fn set_credit_policy_manager(&mut self, manager: CreditPolicyManager) {
+        self.credit_policy_manager = Some(manager);
+    }
+
+    /// Get the credit policy manager (if set)
+    pub fn credit_policy_manager(&self) -> Option<&CreditPolicyManager> {
+        self.credit_policy_manager.as_ref()
+    }
+
     /// Append a journal entry to the ledger
     #[instrument(skip(self, entry), fields(entry_hash = entry.id.as_ref().map(|h| h.to_hex()).unwrap_or_else(|| "none".to_string()), account_count = entry.accounts.len()))]
     pub fn append_entry(&mut self, entry: JournalEntry) -> Result<ContentHash> {
@@ -368,6 +387,9 @@ impl Ledger {
                 "Entry passed validation hook"
             );
         }
+
+        // Validate entry invariants (double-entry, frozen members, credit limits)
+        self.validate_entry(&entry)?;
 
         // Serialize and store
         let key = format!("{}{}", JOURNAL_PREFIX, hash.to_hex());
@@ -1964,6 +1986,72 @@ impl Ledger {
         for (currency, sum) in currency_sums {
             if sum != 0 {
                 anyhow::bail!("Currency {currency} does not balance (sum = {sum})");
+            }
+        }
+
+        // Enforce credit limits (Issue #164)
+        // Check that no account would exceed its credit limit after this entry
+        if let Some(ref policy_manager) = self.credit_policy_manager {
+            for delta in &entry.accounts {
+                // Only check accounts that are going more negative (spending credit)
+                let transaction_delta = delta.net_change();
+                if transaction_delta >= 0 {
+                    // Account is receiving, not spending credit
+                    continue;
+                }
+
+                let account = &delta.account_id;
+                let currency = &delta.currency;
+                let current_balance = self.get_balance(account, currency);
+
+                // Get trust score for the account (or 0.0 if unknown)
+                let trust_score = self
+                    .trust_graph
+                    .as_ref()
+                    .and_then(|tg| tg.compute_trust_score(account).ok())
+                    .unwrap_or(0.0)
+                    .clamp(0.0, 1.0);
+
+                // Get cleared volume for history bonus
+                let cleared_volume = self
+                    .cleared_volume_index
+                    .get(&(account.clone(), currency.clone()))
+                    .copied()
+                    .unwrap_or(0);
+
+                // Calculate credit limit using the policy
+                // For now, we use current_time as member_since (no ramping - gives full limit)
+                // This is conservative: new members get full calculated limit immediately
+                let base_policy = &policy_manager.credit_policy;
+
+                // Calculate: baseline + trust_bonus + history_bonus
+                let trust_bonus =
+                    (base_policy.baseline as f64 * trust_score * base_policy.trust_multiplier)
+                        as i64;
+                let history_bonus = (cleared_volume as f64 * base_policy.history_bonus_rate) as i64;
+                let calculated_limit = base_policy.baseline + trust_bonus + history_bonus;
+
+                // Check if the new balance would exceed the limit
+                let new_balance = current_balance + transaction_delta;
+                if new_balance < -calculated_limit {
+                    warn!(
+                        account = %account,
+                        currency = currency,
+                        current_balance = current_balance,
+                        transaction_delta = transaction_delta,
+                        new_balance = new_balance,
+                        credit_limit = calculated_limit,
+                        "Entry would exceed credit limit"
+                    );
+                    icn_obs::metrics::ledger::entries_rejected_credit_limit_inc();
+                    anyhow::bail!(
+                        "Account {} would exceed credit limit for {}: new balance {} < -{}",
+                        account,
+                        currency,
+                        new_balance,
+                        calculated_limit
+                    );
+                }
             }
         }
 

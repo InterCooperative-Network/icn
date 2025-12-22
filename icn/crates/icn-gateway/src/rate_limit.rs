@@ -506,6 +506,180 @@ pub async fn category_rate_limit_middleware(
     }
 }
 
+// ============================================================================
+// Transaction Velocity Limiter (Issue #164)
+// ============================================================================
+
+/// Configuration for transaction velocity limits per trust class
+#[derive(Debug, Clone)]
+pub struct VelocityLimitConfig {
+    /// Maximum transactions per hour for isolated/unknown DIDs (trust < 0.1)
+    pub isolated_limit: u32,
+    /// Maximum transactions per hour for known DIDs (trust 0.1-0.4)
+    pub known_limit: u32,
+    /// Maximum transactions per hour for partner DIDs (trust 0.4-0.7)
+    pub partner_limit: u32,
+    /// Maximum transactions per hour for federated DIDs (trust > 0.7)
+    pub federated_limit: u32,
+    /// Time window for counting transactions
+    pub window: Duration,
+}
+
+impl Default for VelocityLimitConfig {
+    fn default() -> Self {
+        Self {
+            isolated_limit: 10,    // Very conservative for unknown users
+            known_limit: 50,       // Moderate for known users
+            partner_limit: 100,    // Higher for trusted partners
+            federated_limit: 200,  // Highest for federated nodes
+            window: Duration::from_secs(3600), // 1 hour window
+        }
+    }
+}
+
+impl VelocityLimitConfig {
+    /// Get the transaction limit based on trust score
+    pub fn limit_for_trust(&self, trust_score: f64) -> u32 {
+        if trust_score >= 0.7 {
+            self.federated_limit
+        } else if trust_score >= 0.4 {
+            self.partner_limit
+        } else if trust_score >= 0.1 {
+            self.known_limit
+        } else {
+            self.isolated_limit
+        }
+    }
+}
+
+/// Record of transactions within a time window
+#[derive(Debug, Clone)]
+struct TransactionWindow {
+    /// Transaction timestamps within the window
+    timestamps: Vec<Instant>,
+    /// Last cleanup time
+    last_cleanup: Instant,
+}
+
+impl TransactionWindow {
+    fn new() -> Self {
+        Self {
+            timestamps: Vec::new(),
+            last_cleanup: Instant::now(),
+        }
+    }
+
+    /// Record a new transaction, cleaning up old entries
+    fn record(&mut self, window: Duration) {
+        let now = Instant::now();
+        let cutoff = now - window;
+
+        // Cleanup old timestamps periodically
+        if now.duration_since(self.last_cleanup) > Duration::from_secs(60) {
+            self.timestamps.retain(|t| *t > cutoff);
+            self.last_cleanup = now;
+        }
+
+        self.timestamps.push(now);
+    }
+
+    /// Count transactions within the window
+    fn count(&self, window: Duration) -> u32 {
+        let cutoff = Instant::now() - window;
+        self.timestamps.iter().filter(|t| **t > cutoff).count() as u32
+    }
+}
+
+/// Transaction velocity limiter - limits transactions per DID per time window
+#[derive(Debug, Clone)]
+pub struct VelocityLimiter {
+    config: VelocityLimitConfig,
+    windows: Arc<RwLock<HashMap<String, TransactionWindow>>>,
+}
+
+impl VelocityLimiter {
+    /// Create a new velocity limiter with the given configuration
+    pub fn new(config: VelocityLimitConfig) -> Self {
+        Self {
+            config,
+            windows: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    /// Check if a transaction is allowed, and record it if so
+    ///
+    /// # Arguments
+    /// * `did` - The DID making the transaction
+    /// * `trust_score` - Trust score of the DID (0.0 - 1.0)
+    ///
+    /// # Returns
+    /// * `Ok(())` if transaction is allowed
+    /// * `Err(GatewayError)` if transaction exceeds velocity limit
+    pub fn check_and_record(&self, did: &str, trust_score: f64) -> Result<(), GatewayError> {
+        let limit = self.config.limit_for_trust(trust_score);
+
+        let mut windows = self
+            .windows
+            .write()
+            .map_err(|_| GatewayError::InternalError("Failed to acquire lock".to_string()))?;
+
+        let window = windows
+            .entry(did.to_string())
+            .or_insert_with(TransactionWindow::new);
+
+        let current_count = window.count(self.config.window);
+
+        if current_count >= limit {
+            warn!(
+                did = did,
+                trust_score = trust_score,
+                current_count = current_count,
+                limit = limit,
+                "Transaction velocity limit exceeded"
+            );
+            gateway::velocity_limit_exceeded_inc();
+            return Err(GatewayError::RateLimitExceeded(format!(
+                "Transaction velocity limit exceeded: {} transactions/hour (limit: {})",
+                current_count, limit
+            )));
+        }
+
+        window.record(self.config.window);
+        Ok(())
+    }
+
+    /// Get current transaction count for a DID
+    pub fn current_count(&self, did: &str) -> u32 {
+        let windows = match self.windows.read() {
+            Ok(w) => w,
+            Err(_) => return 0,
+        };
+
+        windows
+            .get(did)
+            .map(|w| w.count(self.config.window))
+            .unwrap_or(0)
+    }
+
+    /// Cleanup inactive DIDs (those with no recent transactions)
+    pub fn cleanup_inactive(&self, max_age: Duration) -> usize {
+        let mut windows = match self.windows.write() {
+            Ok(w) => w,
+            Err(_) => return 0,
+        };
+
+        let before = windows.len();
+        windows.retain(|_, window| window.count(max_age) > 0);
+        before - windows.len()
+    }
+}
+
+impl Default for VelocityLimiter {
+    fn default() -> Self {
+        Self::new(VelocityLimitConfig::default())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -786,5 +960,108 @@ mod tests {
         std::thread::sleep(Duration::from_millis(100));
         let removed = limiter.cleanup_inactive_buckets(Duration::from_millis(50));
         assert_eq!(removed, 2);
+    }
+
+    // ========================================================================
+    // Velocity Limiter Tests (Issue #164)
+    // ========================================================================
+
+    #[test]
+    fn test_velocity_limit_config_defaults() {
+        let config = VelocityLimitConfig::default();
+
+        assert_eq!(config.isolated_limit, 10);
+        assert_eq!(config.known_limit, 50);
+        assert_eq!(config.partner_limit, 100);
+        assert_eq!(config.federated_limit, 200);
+        assert_eq!(config.window.as_secs(), 3600);
+    }
+
+    #[test]
+    fn test_velocity_limit_trust_levels() {
+        let config = VelocityLimitConfig::default();
+
+        // Isolated (trust < 0.1)
+        assert_eq!(config.limit_for_trust(0.0), 10);
+        assert_eq!(config.limit_for_trust(0.05), 10);
+
+        // Known (trust 0.1-0.4)
+        assert_eq!(config.limit_for_trust(0.1), 50);
+        assert_eq!(config.limit_for_trust(0.3), 50);
+
+        // Partner (trust 0.4-0.7)
+        assert_eq!(config.limit_for_trust(0.4), 100);
+        assert_eq!(config.limit_for_trust(0.6), 100);
+
+        // Federated (trust >= 0.7)
+        assert_eq!(config.limit_for_trust(0.7), 200);
+        assert_eq!(config.limit_for_trust(1.0), 200);
+    }
+
+    #[test]
+    fn test_velocity_limiter_basic() {
+        let config = VelocityLimitConfig {
+            isolated_limit: 3,
+            known_limit: 5,
+            partner_limit: 10,
+            federated_limit: 20,
+            window: Duration::from_secs(60),
+        };
+        let limiter = VelocityLimiter::new(config);
+        let did = "did:icn:test";
+
+        // Isolated trust (limit = 3)
+        assert!(limiter.check_and_record(did, 0.0).is_ok());
+        assert!(limiter.check_and_record(did, 0.0).is_ok());
+        assert!(limiter.check_and_record(did, 0.0).is_ok());
+
+        // Fourth should fail (limit reached)
+        assert!(limiter.check_and_record(did, 0.0).is_err());
+
+        // But with higher trust, can continue (limit = 5 for known)
+        assert!(limiter.check_and_record(did, 0.2).is_ok());
+        assert!(limiter.check_and_record(did, 0.2).is_ok());
+
+        // Sixth should fail for known trust (4 + 2 = 6 > 5)
+        assert!(limiter.check_and_record(did, 0.2).is_err());
+    }
+
+    #[test]
+    fn test_velocity_limiter_per_did() {
+        let config = VelocityLimitConfig {
+            isolated_limit: 2,
+            known_limit: 5,
+            partner_limit: 10,
+            federated_limit: 20,
+            window: Duration::from_secs(60),
+        };
+        let limiter = VelocityLimiter::new(config);
+
+        let did1 = "did:icn:alice";
+        let did2 = "did:icn:bob";
+
+        // Each DID has independent limits
+        assert!(limiter.check_and_record(did1, 0.0).is_ok());
+        assert!(limiter.check_and_record(did1, 0.0).is_ok());
+        assert!(limiter.check_and_record(did1, 0.0).is_err()); // Alice exhausted
+
+        // Bob still has capacity
+        assert!(limiter.check_and_record(did2, 0.0).is_ok());
+        assert!(limiter.check_and_record(did2, 0.0).is_ok());
+        assert!(limiter.check_and_record(did2, 0.0).is_err()); // Bob exhausted
+    }
+
+    #[test]
+    fn test_velocity_limiter_current_count() {
+        let limiter = VelocityLimiter::default();
+        let did = "did:icn:counter-test";
+
+        assert_eq!(limiter.current_count(did), 0);
+
+        let _ = limiter.check_and_record(did, 0.5);
+        assert_eq!(limiter.current_count(did), 1);
+
+        let _ = limiter.check_and_record(did, 0.5);
+        assert_eq!(limiter.current_count(did), 2);
     }
 }

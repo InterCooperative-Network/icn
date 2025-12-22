@@ -72,6 +72,6 @@ pub use pagination::{
 };
 pub use rate_limit::{
     category_rate_limit_middleware, CategoryRateLimiter, EndpointCategory, RateLimitConfig,
-    RateLimiter,
+    RateLimiter, VelocityLimitConfig, VelocityLimiter,
 };
 pub use server::GatewayServer;

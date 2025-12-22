@@ -2000,6 +2000,11 @@ pub mod ledger {
         counter!("icn_ledger_entries_rejected_low_trust_total").increment(1);
     }
 
+    /// Increment counter when an entry is rejected due to credit limit violation (Issue #164)
+    pub fn entries_rejected_credit_limit_inc() {
+        counter!("icn_ledger_entries_rejected_credit_limit_total").increment(1);
+    }
+
     /// Increment counter when balance recomputation is aborted due to version mismatch (M7 fix)
     pub fn recompute_aborted_version_mismatch_inc() {
         counter!("icn_ledger_recompute_aborted_version_mismatch_total").increment(1);
@@ -2429,6 +2434,11 @@ pub mod gateway {
         counter!("icn_gateway_rate_limit_exceeded_total",
                  "did" => did.to_string())
         .increment(1);
+    }
+
+    /// Increment counter when transaction velocity limit is exceeded (Issue #164)
+    pub fn velocity_limit_exceeded_inc() {
+        counter!("icn_gateway_velocity_limit_exceeded_total").increment(1);
     }
 
     pub fn authorization_failures_inc(required_scope: &str) {
