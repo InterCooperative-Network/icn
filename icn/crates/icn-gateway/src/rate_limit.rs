@@ -639,8 +639,7 @@ impl VelocityLimiter {
             );
             gateway::velocity_limit_exceeded_inc();
             return Err(GatewayError::RateLimitExceeded(format!(
-                "Transaction velocity limit exceeded: {} transactions/hour (limit: {})",
-                current_count, limit
+                "Transaction velocity limit exceeded: {current_count} transactions/hour (limit: {limit})"
             )));
         }
 

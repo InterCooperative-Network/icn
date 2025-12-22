@@ -8967,7 +8967,7 @@ fn handle_api_command(cmd: ApiCommands) -> Result<()> {
                 "json" => doc
                     .to_json()
                     .context("Failed to serialize OpenAPI spec to JSON")?,
-                "yaml" | _ => doc
+                _ => doc
                     .to_yaml()
                     .context("Failed to serialize OpenAPI spec to YAML")?,
             };

@@ -41,7 +41,7 @@ impl TryFrom<u8> for CompressionFormat {
         match value {
             0 => Ok(CompressionFormat::None),
             1 => Ok(CompressionFormat::Zstd),
-            _ => anyhow::bail!("Unknown compression format: {}", value),
+            _ => anyhow::bail!("Unknown compression format: {value}"),
         }
     }
 }

@@ -2045,11 +2045,7 @@ impl Ledger {
                     );
                     icn_obs::metrics::ledger::entries_rejected_credit_limit_inc();
                     anyhow::bail!(
-                        "Account {} would exceed credit limit for {}: new balance {} < -{}",
-                        account,
-                        currency,
-                        new_balance,
-                        calculated_limit
+                        "Account {account} would exceed credit limit for {currency}: new balance {new_balance} < -{calculated_limit}"
                     );
                 }
             }
