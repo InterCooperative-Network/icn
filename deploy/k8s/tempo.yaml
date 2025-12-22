@@ -143,3 +143,28 @@ spec:
     targetPort: 3200
   selector:
     app: tempo
+---
+# NetworkPolicy to allow ICN daemon to send traces to Tempo
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: tempo-ingress
+  namespace: icn
+spec:
+  podSelector:
+    matchLabels:
+      app: tempo
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: icn
+    ports:
+    - protocol: TCP
+      port: 4317
+    - protocol: TCP
+      port: 4318
+    - protocol: TCP
+      port: 3200

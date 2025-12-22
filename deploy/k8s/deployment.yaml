@@ -54,11 +54,10 @@ spec:
         # - name: ICN_SKIP_CORS
         #   value: "1"
         # OpenTelemetry distributed tracing configuration
-        # Uncomment to enable trace export to Tempo
-        # - name: OTEL_EXPORTER_OTLP_ENDPOINT
-        #   value: "http://tempo:4317"
-        # - name: OTEL_SERVICE_NAME
-        #   value: "icnd"
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: "http://tempo:4317"
+        - name: OTEL_SERVICE_NAME
+          value: "icnd"
         ports:
         - name: quic
           containerPort: 7777
