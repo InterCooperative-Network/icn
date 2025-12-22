@@ -92,7 +92,7 @@ thiserror = "2.0"
 # Utilities
 bytes = "1.11"
 futures = "0.3"
-lru = "0.12"
+lru = "0.16"
 
 # Internal workspace crates
 icn-core = { path = "crates/icn-core" }
