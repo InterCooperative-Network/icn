@@ -188,7 +188,11 @@ impl TraceContext {
         if span_context.is_valid() {
             let trace_id = span_context.trace_id().to_string();
             let span_id = span_context.span_id().to_string();
-            let flags = if span_context.is_sampled() { "01" } else { "00" };
+            let flags = if span_context.is_sampled() {
+                "01"
+            } else {
+                "00"
+            };
 
             Self {
                 traceparent: Some(format!("00-{trace_id}-{span_id}-{flags}")),
