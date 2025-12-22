@@ -18,7 +18,7 @@ multibase = "0.9"
 sha2 = "0.10"
 lru.workspace = true
 bloomfilter = "1.0"
-ordered-float = "4.0"
+ordered-float = "5.1"
 
 [dev-dependencies]
 rand = "0.8"
