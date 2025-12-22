@@ -40,6 +40,7 @@ pub mod voting;
 
 use actix_web::{get, post, web, HttpRequest, HttpResponse};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use std::sync::Arc;
 
 use crate::commons_mgr::CommonsManager;
@@ -58,7 +59,7 @@ use icn_identity::Did;
 // ============================================================================
 
 /// Request to create an amendment
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateAmendmentRequest {
     pub amendment_type: String,
     pub scope_type: String,
@@ -69,7 +70,7 @@ pub struct CreateAmendmentRequest {
     pub changes: Vec<AmendmentChangeRequest>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct AmendmentChangeRequest {
     pub target: String,
     pub change_type: String,
@@ -79,7 +80,7 @@ pub struct AmendmentChangeRequest {
 }
 
 /// Request to add a ratification
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct RatifyRequest {
     pub ratifier_id: String,
     pub ratifier_type: String,
@@ -89,7 +90,7 @@ pub struct RatifyRequest {
 }
 
 /// Request to file an appeal
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct FileAppealRequest {
     pub appeal_type: AppealTypeRequest,
     pub scope_type: String,
@@ -102,7 +103,7 @@ pub struct FileAppealRequest {
     pub original_decision_ref: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct AppealTypeRequest {
     pub category: String,
     pub revocation_id: Option<String>,
@@ -113,14 +114,14 @@ pub struct AppealTypeRequest {
     pub details: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct AppealGroundsRequest {
     pub ground_type: String,
     pub description: String,
 }
 
 /// Request to add evidence
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct AddEvidenceRequest {
     pub evidence_type: String,
     pub description: String,
@@ -129,14 +130,14 @@ pub struct AddEvidenceRequest {
 }
 
 /// Request to add response
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct AddResponseRequest {
     pub response_type: String,
     pub content: String,
 }
 
 /// Request to resolve appeal
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct ResolveAppealRequest {
     pub outcome: String,
     pub reason: String,
@@ -145,7 +146,7 @@ pub struct ResolveAppealRequest {
 }
 
 /// Amendment response
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct AmendmentResponse {
     pub id: String,
     pub amendment_type: String,
@@ -173,7 +174,7 @@ impl Cursored for AmendmentResponse {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct AmendmentChangeResponse {
     pub target: String,
     pub change_type: String,
@@ -183,7 +184,7 @@ pub struct AmendmentChangeResponse {
 }
 
 /// Appeal response
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct AppealResponse2 {
     pub id: String,
     pub appeal_type: String,
@@ -623,7 +624,7 @@ pub async fn create_amendment(
 }
 
 /// Query parameters for listing amendments (with cursor pagination)
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct ListAmendmentsQuery {
     /// Filter by status
     pub status: Option<String>,
@@ -988,7 +989,7 @@ pub async fn file_appeal(
 }
 
 /// Query parameters for listing appeals (with cursor pagination)
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct ListAppealsQuery {
     /// Filter by status
     pub status: Option<String>,

@@ -156,11 +156,29 @@ enum Commands {
     #[command(subcommand)]
     Appeal(AppealCommands),
 
+    /// API schema management
+    #[command(subcommand)]
+    Api(ApiCommands),
+
     /// Generate shell completions
     Completions {
         /// Shell type
         #[arg(value_enum)]
         shell: clap_complete::Shell,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum ApiCommands {
+    /// Export OpenAPI specification to stdout or file
+    ExportOpenapi {
+        /// Output file path (defaults to stdout)
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+
+        /// Output format: yaml or json
+        #[arg(short, long, default_value = "yaml")]
+        format: String,
     },
 }
 
@@ -1894,6 +1912,8 @@ async fn main() -> Result<()> {
         Commands::Appeal(appeal_cmd) => {
             handle_appeal_command(appeal_cmd, &data_dir, &args.endpoint).await?
         }
+
+        Commands::Api(api_cmd) => handle_api_command(api_cmd)?,
 
         Commands::Completions { shell } => {
             let mut cmd = Args::command();
@@ -8931,4 +8951,37 @@ fn print_qr_placeholder(data: &str) {
     println!("│                     │");
     println!("│  Data: {data:.12}...│");
     println!("└─────────────────────┘");
+}
+
+/// Handle API commands
+fn handle_api_command(cmd: ApiCommands) -> Result<()> {
+    use utoipa::OpenApi;
+
+    match cmd {
+        ApiCommands::ExportOpenapi { output, format } => {
+            // Get the OpenAPI document
+            let doc = icn_gateway::openapi::ApiDoc::openapi();
+
+            // Serialize to the requested format
+            let content = match format.to_lowercase().as_str() {
+                "json" => doc
+                    .to_json()
+                    .context("Failed to serialize OpenAPI spec to JSON")?,
+                "yaml" | _ => doc
+                    .to_yaml()
+                    .context("Failed to serialize OpenAPI spec to YAML")?,
+            };
+
+            // Write to file or stdout
+            if let Some(path) = output {
+                std::fs::write(&path, &content)
+                    .with_context(|| format!("Failed to write to {}", path.display()))?;
+                println!("OpenAPI specification written to {}", path.display());
+            } else {
+                print!("{content}");
+            }
+        }
+    }
+
+    Ok(())
 }

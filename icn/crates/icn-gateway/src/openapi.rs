@@ -4,6 +4,44 @@
 
 use utoipa::OpenApi;
 
+// Re-export models for schema registration
+use crate::models::{
+    AccountDeltaResponse, AddMemberRequest, BalanceResponse, CastVoteRequest, ChallengeRequest,
+    ChallengeResponse, ComponentHealth, CreateCoopRequest, CreateDomainRequest, CreateInviteRequest,
+    CreatePaymentRequest, CreateProposalRequest, CreateSessionRequest, CreateSessionResponse,
+    HealthResponse, InviteInfo, InviteListResponse, InviteResponse, JoinRequest, JoinResponse,
+    OpenProposalRequest, PaginationInfo, ProposalPayloadRequest, SessionQrData, SessionStatusResponse,
+    TokenResponse, TransactionHistoryEntry, TransactionHistoryResponse, UpdateRoleRequest,
+    UpdateSettingsRequest, VerifyRequest, VoteChoiceResponse,
+};
+
+// API module types
+use crate::api::membership::{
+    ApplyMembershipRequest, MembershipActionRequest, CapabilityRequest, RoleRequest,
+    BanMemberRequest, RevokeMembershipRequest, MemberResponse,
+};
+use crate::api::charter::{
+    CharterSummaryResponse, CharterDetailResponse, FounderResponse, CreateCharterRequest,
+    SignCharterRequest, UpdateCharterStatusRequest, FounderDetailResponse, FoundersResponse,
+    TimelineEvent, TimelineResponse,
+};
+use crate::api::steward::{
+    StewardSummaryResponse, StewardDetailResponse, RegisterStewardRequest, UpdateStatusRequest,
+    ExtendTermRequest, BondOperationRequest,
+};
+use crate::api::governance_dashboard::{
+    GovernanceDashboard, AmendmentsBreakdown, AppealsBreakdown, ActivityEvent,
+};
+use crate::api::devices::{
+    ApiRegisterDeviceRequest, ApiRevokeDeviceRequest, ApiRegisterDeviceResponse, ApiListDevicesResponse,
+};
+use crate::api::notifications::{
+    RegisterDeviceRequest as NotifRegisterDeviceRequest, RegisterDeviceResponse,
+    ListNotificationsResponse, NotificationCountResponse, MarkReadResponse,
+};
+use crate::identity_mgr::DeviceInfo;
+use icn_store::notifications::{Platform, InAppNotification};
+
 /// OpenAPI documentation for ICN Gateway
 #[derive(OpenApi)]
 #[openapi(
@@ -37,6 +75,46 @@ use utoipa::OpenApi;
             url = "https://opensource.org/licenses/MIT"
         )
     ),
+    components(
+        schemas(
+            // Core models
+            HealthResponse, ComponentHealth,
+            // Auth
+            ChallengeRequest, ChallengeResponse, VerifyRequest, TokenResponse,
+            // Coops
+            CreateCoopRequest, AddMemberRequest, UpdateRoleRequest, UpdateSettingsRequest,
+            // Ledger
+            CreatePaymentRequest, BalanceResponse, AccountDeltaResponse,
+            TransactionHistoryEntry, TransactionHistoryResponse, PaginationInfo,
+            // Governance
+            CreateDomainRequest, CreateProposalRequest, ProposalPayloadRequest,
+            OpenProposalRequest, CastVoteRequest, VoteChoiceResponse,
+            // Sessions
+            CreateSessionRequest, CreateSessionResponse, SessionQrData, SessionStatusResponse,
+            // Invites
+            CreateInviteRequest, InviteResponse, InviteInfo, InviteListResponse,
+            JoinRequest, JoinResponse,
+            // Membership
+            ApplyMembershipRequest, MembershipActionRequest, CapabilityRequest, RoleRequest,
+            BanMemberRequest, RevokeMembershipRequest, MemberResponse,
+            // Charter
+            CharterSummaryResponse, CharterDetailResponse, FounderResponse, CreateCharterRequest,
+            SignCharterRequest, UpdateCharterStatusRequest, FounderDetailResponse, FoundersResponse,
+            TimelineEvent, TimelineResponse,
+            // Steward
+            StewardSummaryResponse, StewardDetailResponse, RegisterStewardRequest, UpdateStatusRequest,
+            ExtendTermRequest, BondOperationRequest,
+            // Governance Dashboard
+            GovernanceDashboard, AmendmentsBreakdown, AppealsBreakdown, ActivityEvent,
+            // Devices
+            ApiRegisterDeviceRequest, ApiRevokeDeviceRequest, ApiRegisterDeviceResponse, ApiListDevicesResponse,
+            // Notifications
+            NotifRegisterDeviceRequest, RegisterDeviceResponse,
+            ListNotificationsResponse, NotificationCountResponse, MarkReadResponse,
+            // Shared types
+            DeviceInfo, Platform, InAppNotification,
+        )
+    ),
     tags(
         (name = "health", description = "Health check and readiness endpoints"),
         (name = "auth", description = "Authentication and authorization"),
@@ -49,6 +127,10 @@ use utoipa::OpenApi;
         (name = "federation", description = "Cross-federation routing"),
         (name = "notifications", description = "Push notifications and alerts"),
         (name = "websocket", description = "Real-time event streaming"),
+        (name = "membership", description = "Commons membership management"),
+        (name = "charter", description = "Charter creation and management"),
+        (name = "steward", description = "Steward management and attestations"),
+        (name = "devices", description = "Multi-device management"),
     )
 )]
 pub struct ApiDoc;

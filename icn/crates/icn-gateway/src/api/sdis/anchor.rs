@@ -13,6 +13,7 @@
 
 use actix_web::{get, post, web, HttpResponse};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -24,7 +25,7 @@ use crate::error::{GatewayError, Result};
 // ============================================================================
 
 /// Response for anchor details
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct AnchorDetailsResponse {
     /// Anchor ID (permanent)
     pub anchor_id: String,
@@ -43,7 +44,7 @@ pub struct AnchorDetailsResponse {
 }
 
 /// Device information
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct DeviceInfo {
     /// Device ID
     pub device_id: String,
@@ -58,7 +59,7 @@ pub struct DeviceInfo {
 }
 
 /// Request to rotate keys
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct RotateKeysRequest {
     /// Anchor ID
     pub anchor_id: String,
@@ -71,7 +72,7 @@ pub struct RotateKeysRequest {
 }
 
 /// Response after key rotation
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct RotateKeysResponse {
     /// Anchor ID (unchanged)
     pub anchor_id: String,
@@ -84,7 +85,7 @@ pub struct RotateKeysResponse {
 }
 
 /// Key rotation history entry
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct RotationHistoryEntry {
     /// When rotation occurred
     pub rotated_at: u64,
@@ -101,7 +102,7 @@ pub struct RotationHistoryEntry {
 }
 
 /// Response for rotation history
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct RotationHistoryResponse {
     /// Anchor ID
     pub anchor_id: String,
@@ -112,7 +113,7 @@ pub struct RotationHistoryResponse {
 }
 
 /// Request to add a device
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct AddDeviceRequest {
     /// Anchor ID
     pub anchor_id: String,
@@ -123,7 +124,7 @@ pub struct AddDeviceRequest {
 }
 
 /// Response after adding device
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct AddDeviceResponse {
     /// Generated device ID
     pub device_id: String,

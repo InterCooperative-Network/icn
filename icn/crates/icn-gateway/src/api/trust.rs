@@ -2,6 +2,7 @@
 
 use actix_web::{get, post, web, HttpResponse};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use std::sync::Arc;
 
 use crate::error::{GatewayError, Result};
@@ -11,7 +12,7 @@ use icn_identity::Did;
 use icn_trust::TrustEdge;
 
 /// Trust score response
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct TrustScoreResponse {
     pub did: String,
     pub trust_score: f64,
@@ -19,7 +20,7 @@ pub struct TrustScoreResponse {
 }
 
 /// Create trust edge request
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateTrustEdgeRequest {
     /// Target DID to attest
     pub to: String,
@@ -168,14 +169,14 @@ pub async fn get_trust_network(
 }
 
 /// Query parameters for trust network
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct NetworkQuery {
     /// Maximum distance (hops) to explore
     depth: Option<u32>,
 }
 
 /// Revoke trust edge request
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct RevokeTrustEdgeRequest {
     /// Target DID to revoke attestation for
     pub to: String,

@@ -11,6 +11,7 @@
 use actix_web::{get, post, web, HttpRequest, HttpResponse};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use utoipa::ToSchema;
 
 use crate::commons_mgr::CommonsManager;
 use crate::error::{GatewayError, Result};
@@ -25,7 +26,7 @@ use icn_identity::{
 // ============================================================================
 
 /// Apply for membership request
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct ApplyMembershipRequest {
     pub jurisdiction_id: String,
     #[serde(default)]
@@ -33,14 +34,14 @@ pub struct ApplyMembershipRequest {
 }
 
 /// Membership action request (approve, promote, suspend, etc.)
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct MembershipActionRequest {
     pub holder_id: String,
     pub jurisdiction_id: String,
 }
 
 /// Grant/revoke capability request
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct CapabilityRequest {
     pub holder_id: String,
     pub jurisdiction_id: String,
@@ -48,7 +49,7 @@ pub struct CapabilityRequest {
 }
 
 /// Role request
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct RoleRequest {
     pub holder_id: String,
     pub jurisdiction_id: String,
@@ -56,7 +57,7 @@ pub struct RoleRequest {
 }
 
 /// Ban member request
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct BanMemberRequest {
     pub holder_id: String,
     pub jurisdiction_id: String,
@@ -66,7 +67,7 @@ pub struct BanMemberRequest {
 }
 
 /// Revoke membership request (with appeal window)
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct RevokeMembershipRequest {
     pub holder_id: String,
     pub jurisdiction_id: String,
@@ -82,7 +83,7 @@ fn default_appeal_days() -> u64 {
 }
 
 /// Member response
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct MemberResponse {
     pub holder_id: String,
     pub holder_did: String,
@@ -659,7 +660,7 @@ pub async fn list_members(
 }
 
 /// Query parameters for listing members (with cursor pagination)
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct ListMembersQuery {
     /// Filter by membership status
     pub status: Option<String>,

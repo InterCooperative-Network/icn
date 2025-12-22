@@ -9,6 +9,7 @@
 use actix_web::{get, post, put, web, HttpRequest, HttpResponse};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use utoipa::ToSchema;
 
 use crate::commons_mgr::CommonsManager;
 use crate::error::{GatewayError, Result};
@@ -21,7 +22,7 @@ use icn_identity::Did;
 // ============================================================================
 
 /// Steward summary response (for list endpoints)
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct StewardSummaryResponse {
     pub steward_id: String,
     pub steward_did: String,
@@ -35,7 +36,7 @@ pub struct StewardSummaryResponse {
 }
 
 /// Steward detail response
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct StewardDetailResponse {
     pub steward_id: String,
     pub steward_did: String,
@@ -59,7 +60,7 @@ pub struct StewardDetailResponse {
 }
 
 /// Register steward request
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct RegisterStewardRequest {
     /// Operational DID for the steward (can be same as holder DID)
     pub steward_did: Option<String>,
@@ -77,7 +78,7 @@ pub struct RegisterStewardRequest {
 }
 
 /// Update steward status request
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct UpdateStatusRequest {
     pub status: String,
     pub reason: Option<String>,
@@ -86,14 +87,14 @@ pub struct UpdateStatusRequest {
 }
 
 /// Extend term request
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct ExtendTermRequest {
     /// Additional days to extend
     pub additional_days: u64,
 }
 
 /// Bond operation request
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct BondOperationRequest {
     pub amount: u64,
 }
@@ -266,7 +267,7 @@ pub async fn list_stewards(
     Ok(HttpResponse::Ok().json(response))
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct ListStewardsQuery {
     pub active: Option<bool>,
     pub jurisdiction: Option<String>,

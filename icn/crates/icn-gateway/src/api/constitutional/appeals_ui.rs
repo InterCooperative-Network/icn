@@ -6,6 +6,7 @@ use actix_web::{get, post, web, HttpRequest, HttpResponse};
 use icn_governance::{Appeal, AppealId, AppealStatus};
 use icn_identity::Did;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use std::sync::Arc;
 
 use crate::commons_mgr::CommonsManager;
@@ -13,7 +14,7 @@ use crate::error::{GatewayError, Result};
 use crate::middleware::{get_claims, require_scope};
 
 /// Timeline event for appeal history
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct AppealTimelineEvent {
     /// Event type
     pub event_type: String,
@@ -26,7 +27,7 @@ pub struct AppealTimelineEvent {
 }
 
 /// Detailed appeal status with next steps
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct AppealStatusDetail {
     /// Current status
     pub status: String,
@@ -43,7 +44,7 @@ pub struct AppealStatusDetail {
 }
 
 /// Deadline information
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct AppealDeadline {
     /// Deadline type
     pub deadline_type: String,
@@ -56,14 +57,14 @@ pub struct AppealDeadline {
 }
 
 /// Request to assign reviewer
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct AssignReviewerRequest {
     /// Reviewer DID
     pub reviewer_did: String,
 }
 
 /// Dashboard data for appeals
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct AppealsDashboard {
     /// Total appeals count
     pub total_appeals: usize,
@@ -88,7 +89,7 @@ pub struct AppealsDashboard {
 }
 
 /// Recent appeal summary
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct RecentAppeal {
     /// Appeal ID
     pub id: String,

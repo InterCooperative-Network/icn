@@ -9,6 +9,7 @@
 use actix_web::{get, post, put, web, HttpRequest, HttpResponse};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use utoipa::ToSchema;
 
 use crate::commons_mgr::CommonsManager;
 use crate::error::{GatewayError, Result};
@@ -24,7 +25,7 @@ use icn_identity::Did;
 // ============================================================================
 
 /// Charter summary response (for list endpoints)
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct CharterSummaryResponse {
     pub charter_id: String,
     pub domain_id: String,
@@ -36,7 +37,7 @@ pub struct CharterSummaryResponse {
 }
 
 /// Charter detail response
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct CharterDetailResponse {
     pub charter_id: String,
     pub domain_id: String,
@@ -50,7 +51,7 @@ pub struct CharterDetailResponse {
 }
 
 /// Founder signature response
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct FounderResponse {
     pub did: String,
     pub role: Option<String>,
@@ -58,7 +59,7 @@ pub struct FounderResponse {
 }
 
 /// Create charter request
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct CreateCharterRequest {
     pub domain_id: String,
     pub name: String,
@@ -69,14 +70,14 @@ pub struct CreateCharterRequest {
 }
 
 /// Sign charter request
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct SignCharterRequest {
     pub role: Option<String>,
     pub signature: String,
 }
 
 /// Update status request
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct UpdateCharterStatusRequest {
     pub status: String,
     pub reason: Option<String>,
@@ -252,7 +253,7 @@ pub async fn list_charters(
     Ok(HttpResponse::Ok().json(response))
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct ListChartersQuery {
     pub org_type: Option<String>,
     pub status: Option<String>,
@@ -381,7 +382,7 @@ pub async fn update_charter_status(
 // ============================================================================
 
 /// Detailed founder response
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct FounderDetailResponse {
     pub did: String,
     pub role: Option<String>,
@@ -395,7 +396,7 @@ pub struct FounderDetailResponse {
 }
 
 /// Founders list response
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct FoundersResponse {
     pub charter_id: String,
     pub total_founders: usize,
@@ -406,7 +407,7 @@ pub struct FoundersResponse {
 }
 
 /// Timeline event
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct TimelineEvent {
     /// Event type
     pub event_type: String,
@@ -423,7 +424,7 @@ pub struct TimelineEvent {
 }
 
 /// Timeline response
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct TimelineResponse {
     pub charter_id: String,
     pub charter_name: String,

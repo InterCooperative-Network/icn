@@ -6,6 +6,7 @@ use actix_web::{get, post, web, HttpRequest, HttpResponse};
 use icn_identity::Did;
 pub use icn_store::escrow::{Escrow, EscrowCondition, EscrowStatus, EscrowStore};
 use serde::Deserialize;
+use utoipa::ToSchema;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{info, warn};
@@ -15,7 +16,7 @@ use crate::ledger_mgr::LedgerManager;
 use crate::middleware::{get_claims, require_scope};
 
 /// Request to create escrow
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateEscrowRequest {
     /// Cooperative ID (ledger namespace)
     pub coop_id: String,
@@ -29,7 +30,7 @@ pub struct CreateEscrowRequest {
 }
 
 /// Request to approve/release escrow
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct ApproveEscrowRequest {
     pub proof: Option<String>,
 }

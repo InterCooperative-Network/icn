@@ -1,9 +1,10 @@
 //! API request/response models
 
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 /// Health check response
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct HealthResponse {
     pub status: String,
     pub version: String,
@@ -12,7 +13,7 @@ pub struct HealthResponse {
 }
 
 /// Health status of an individual component
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ComponentHealth {
     pub status: String, // "ok", "degraded", "error"
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -22,20 +23,20 @@ pub struct ComponentHealth {
 // === Authentication ===
 
 /// Request a challenge for DID-based authentication
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ChallengeRequest {
     pub did: String,
 }
 
 /// Challenge response containing nonce to sign
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ChallengeResponse {
     pub nonce: String,
     pub expires_in: u64, // seconds
 }
 
 /// Verify signed challenge and get capability token
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct VerifyRequest {
     pub did: String,
     pub signature: String, // Hex-encoded signature
@@ -44,7 +45,7 @@ pub struct VerifyRequest {
 }
 
 /// Token response with JWT capability token
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct TokenResponse {
     pub token: String,
     pub expires_in: u64, // seconds
@@ -53,14 +54,14 @@ pub struct TokenResponse {
 // === Cooperative Management ===
 
 /// Create a new cooperative
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct CreateCoopRequest {
     pub id: String,
     pub name: String,
 }
 
 /// Add a member to a cooperative
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct AddMemberRequest {
     pub did: String,
     /// Role for the new member: "steward", "facilitator", or "participant"
@@ -69,7 +70,7 @@ pub struct AddMemberRequest {
 }
 
 /// Update member role
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct UpdateRoleRequest {
     /// New role: "steward", "facilitator", or "participant"
     /// Legacy names "owner", "admin", "member" are also accepted
@@ -77,7 +78,7 @@ pub struct UpdateRoleRequest {
 }
 
 /// Update cooperative settings
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct UpdateSettingsRequest {
     pub governance_model: Option<String>,
     pub credit_policy: Option<String>,
@@ -87,7 +88,7 @@ pub struct UpdateSettingsRequest {
 // === Ledger Operations ===
 
 /// Create a payment/transaction
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct CreatePaymentRequest {
     pub from: String, // DID
     pub to: String,   // DID
@@ -97,14 +98,14 @@ pub struct CreatePaymentRequest {
 }
 
 /// Balance response
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct BalanceResponse {
     pub did: String,
     pub balances: std::collections::HashMap<String, i64>, // currency -> balance
 }
 
 /// Transaction history entry
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct TransactionHistoryEntry {
     pub id: String, // Entry hash
     pub timestamp: u64,
@@ -113,7 +114,7 @@ pub struct TransactionHistoryEntry {
 }
 
 /// Account delta for transaction history
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct AccountDeltaResponse {
     pub account_id: String, // DID
     pub currency: String,
@@ -122,7 +123,7 @@ pub struct AccountDeltaResponse {
 }
 
 /// Paginated transaction history response
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct TransactionHistoryResponse {
     /// The transactions on this page
     pub transactions: Vec<TransactionHistoryEntry>,
@@ -132,7 +133,7 @@ pub struct TransactionHistoryResponse {
 }
 
 /// Generic pagination metadata for list responses
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct PaginationInfo {
     /// Total number of items (if known/available)
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -198,7 +199,7 @@ impl PaginationInfo {
 // === Governance Operations ===
 
 /// Create a new governance domain
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct CreateDomainRequest {
     pub id: String,              // Domain ID (e.g., "coop:food-coop")
     pub name: String,            // Human-readable name
@@ -210,7 +211,7 @@ pub struct CreateDomainRequest {
 }
 
 /// Create a new proposal
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct CreateProposalRequest {
     pub domain_id: String,   // Domain this proposal belongs to
     pub title: String,       // Short title
@@ -219,7 +220,7 @@ pub struct CreateProposalRequest {
 }
 
 /// Proposal payload types (matches icn_governance::ProposalPayload)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ProposalPayloadRequest {
     Text {
@@ -242,20 +243,20 @@ pub enum ProposalPayloadRequest {
 }
 
 /// Open a proposal for voting
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct OpenProposalRequest {
     pub voting_period_seconds: Option<u64>, // Optional override of domain default
 }
 
 /// Cast a vote on a proposal
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct CastVoteRequest {
     pub choice: String, // "for", "against", or "abstain"
     pub comment: Option<String>,
 }
 
 /// Vote choice response (simpler for API consumers)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum VoteChoiceResponse {
     For,
@@ -266,7 +267,7 @@ pub enum VoteChoiceResponse {
 // === Invite System ===
 
 /// Create an invite for someone to join the coop
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct CreateInviteRequest {
     pub coop_id: String,
     /// Role for the invitee: "member", "admin", "participant", "facilitator"
@@ -276,14 +277,14 @@ pub struct CreateInviteRequest {
 }
 
 /// Join via invite code - request
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct JoinRequest {
     pub invite_code: String,
     pub did: String, // Client provides their own DID
 }
 
 /// Invite response with generated code
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct InviteResponse {
     pub code: String,
     pub coop_id: String,
@@ -294,13 +295,13 @@ pub struct InviteResponse {
 }
 
 /// List of invites
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct InviteListResponse {
     pub invites: Vec<InviteInfo>,
 }
 
 /// Individual invite info (for listing)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct InviteInfo {
     pub code: String,
     pub role: String,
@@ -311,7 +312,7 @@ pub struct InviteInfo {
 }
 
 /// Join via invite - creates identity and returns credentials
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct JoinResponse {
     pub did: String,
     pub token: String,
@@ -324,13 +325,13 @@ pub struct JoinResponse {
 // === QR Login Sessions ===
 
 /// Create a new login session for QR-based authentication
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct CreateSessionRequest {
     pub coop_id: String,
 }
 
 /// Data to encode in the QR code (shown to mobile wallet)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct SessionQrData {
     pub session_id: String,
     pub gateway_url: String,
@@ -339,7 +340,7 @@ pub struct SessionQrData {
 }
 
 /// Session creation response
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct CreateSessionResponse {
     pub session_id: String,
     pub expires_at: u64,
@@ -347,7 +348,7 @@ pub struct CreateSessionResponse {
 }
 
 /// Session status check response (polling endpoint)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct SessionStatusResponse {
     pub session_id: String,
     pub status: String, // "pending", "approved", "expired", "consumed"

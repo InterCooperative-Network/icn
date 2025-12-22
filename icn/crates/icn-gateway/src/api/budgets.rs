@@ -6,13 +6,14 @@ use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
 use icn_identity::Did;
 pub use icn_store::budgets::{Budget, BudgetPeriod, BudgetStatus, BudgetStore};
 use serde::Deserialize;
+use utoipa::ToSchema;
 use std::collections::HashMap;
 
 use crate::error::{GatewayError, Result};
 use crate::middleware::{get_claims, require_scope};
 
 /// Request to create budget
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateBudgetRequest {
     pub account: String,
     pub currency: String,
@@ -23,7 +24,7 @@ pub struct CreateBudgetRequest {
 }
 
 /// Request to update budget
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct UpdateBudgetRequest {
     pub limit: Option<i64>,
     pub status: Option<BudgetStatus>,

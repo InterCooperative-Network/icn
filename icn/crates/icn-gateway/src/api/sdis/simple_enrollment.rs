@@ -11,6 +11,7 @@ use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use icn_identity::commons::{JurisdictionId, MembershipCapability};
 use icn_identity::Did;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use uuid::Uuid;
@@ -119,7 +120,7 @@ impl Default for EnrollmentStore {
 }
 
 /// Enrollment session state
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct EnrollmentSession {
     pub enrollment_id: String,
     pub identity_name: String,
@@ -143,14 +144,14 @@ pub struct EnrollmentSession {
 // ============================================================================
 
 /// Start enrollment request
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct StartEnrollmentRequest {
     pub identity_name: String,
     pub coop_id: String,
 }
 
 /// Start enrollment response
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct StartEnrollmentResponse {
     pub enrollment_id: String,
     pub verification_code: String,
@@ -159,7 +160,7 @@ pub struct StartEnrollmentResponse {
 }
 
 /// Level 1 verification request
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct VerifyLevel1Request {
     pub enrollment_id: String,
     /// Device proof containing ephemeral DID and signature
@@ -167,7 +168,7 @@ pub struct VerifyLevel1Request {
 }
 
 /// Device proof for Level 1 verification
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct DeviceProof {
     /// Ephemeral DID generated on the device
     pub ephemeral_did: String,
@@ -176,14 +177,14 @@ pub struct DeviceProof {
 }
 
 /// Level 2 verification request
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct VerifyLevel2Request {
     pub enrollment_id: String,
     pub vouch_statement: String,
 }
 
 /// Complete enrollment request
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct CompleteEnrollmentRequest {
     pub enrollment_id: String,
     pub ephemeral_did: String,
@@ -191,7 +192,7 @@ pub struct CompleteEnrollmentRequest {
     pub device_info: DeviceInfo,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct DeviceInfo {
     pub device_type: String,
     pub os: String,
@@ -199,7 +200,7 @@ pub struct DeviceInfo {
 }
 
 /// Complete enrollment response
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct CompleteEnrollmentResponse {
     pub did: String,
     pub anchor_id: Option<String>,
@@ -714,7 +715,7 @@ pub async fn steward_vouch(
 }
 
 /// Steward vouch request
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct StewardVouchRequest {
     pub vouch_statement: String,
     #[serde(default)]
@@ -806,7 +807,7 @@ pub async fn reject_enrollment(
 }
 
 /// Reject enrollment request
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct RejectRequest {
     pub reason: String,
     #[serde(default)]
@@ -955,7 +956,7 @@ pub async fn get_vouch_history(
 }
 
 /// History query parameters
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct HistoryQuery {
     pub limit: Option<usize>,
     pub offset: Option<usize>,

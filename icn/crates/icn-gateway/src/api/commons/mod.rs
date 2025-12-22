@@ -9,6 +9,7 @@ pub mod anchor;
 
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use std::sync::Arc;
 
 use crate::commons_mgr::CommonsManager;
@@ -23,7 +24,7 @@ use icn_identity::{
 // ============================================================================
 
 /// Commons status response
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct CommonsStatusResponse {
     /// Whether the user has a commons identity
     pub enrolled: bool,
@@ -42,7 +43,7 @@ pub struct CommonsStatusResponse {
 }
 
 /// Holder detail response
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct HolderDetailResponse {
     pub holder_id: String,
     pub anchor_id: String,
@@ -55,7 +56,7 @@ pub struct HolderDetailResponse {
 }
 
 /// Affiliation response
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct AffiliationResponse {
     pub jurisdiction_id: String,
     pub membership_status: String,
@@ -77,7 +78,7 @@ impl From<&Affiliation> for AffiliationResponse {
 }
 
 /// Join jurisdiction request
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct JoinJurisdictionRequest {
     pub jurisdiction_id: String,
     #[serde(default)]
@@ -85,7 +86,7 @@ pub struct JoinJurisdictionRequest {
 }
 
 /// Update affiliation status request
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct UpdateAffiliationRequest {
     pub status: String,
 }

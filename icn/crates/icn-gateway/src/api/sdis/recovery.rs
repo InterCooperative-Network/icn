@@ -13,6 +13,7 @@
 
 use actix_web::{get, post, web, HttpResponse};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -24,7 +25,7 @@ use crate::error::{GatewayError, Result};
 // ============================================================================
 
 /// Request to start a recovery ceremony
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct StartRecoveryRequest {
     /// Anchor ID (if known)
     pub anchor_id: Option<String>,
@@ -37,7 +38,7 @@ pub struct StartRecoveryRequest {
 }
 
 /// Response after starting recovery
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct StartRecoveryResponse {
     /// Unique recovery ceremony ID
     pub recovery_id: String,
@@ -48,7 +49,7 @@ pub struct StartRecoveryResponse {
 }
 
 /// Recovery ceremony status
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum RecoveryStatus {
     PendingStewardVerification,
@@ -59,7 +60,7 @@ pub enum RecoveryStatus {
 }
 
 /// Response for recovery status query
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct RecoveryStatusResponse {
     /// Recovery ID
     pub recovery_id: String,
@@ -74,14 +75,14 @@ pub struct RecoveryStatusResponse {
 }
 
 /// Request to complete recovery
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct CompleteRecoveryRequest {
     /// Optional: Recovery share from trusted contacts
     pub recovery_share: Option<String>,
 }
 
 /// Response after completing recovery
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct CompleteRecoveryResponse {
     /// Original anchor ID (unchanged)
     pub anchor_id: String,

@@ -48,6 +48,10 @@ icn-snapshot.workspace = true
 icn-governance.workspace = true
 icn-federation.workspace = true
 icn-steward.workspace = true
+icn-gateway.workspace = true
+
+# OpenAPI
+utoipa = { version = "4", features = ["yaml"] }
 
 [dev-dependencies]
 tempfile = "3.8"

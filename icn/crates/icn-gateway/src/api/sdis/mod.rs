@@ -46,6 +46,7 @@ pub mod verify;
 
 use actix_web::{get, post, web, HttpResponse};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use std::sync::Arc;
 
 use crate::error::{GatewayError, Result};
@@ -58,7 +59,7 @@ pub use verify::EphemeralVerifier;
 // ============================================================================
 
 /// Request to generate an ephemeral proof
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct GenerateEphemeralRequest {
     /// Type of proof to generate
     pub proof_type: String,
@@ -78,7 +79,7 @@ fn default_validity() -> u64 {
 }
 
 /// Response for ephemeral proof generation
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct GenerateEphemeralResponse {
     /// Base64-encoded QR data
     pub qr_data: String,
@@ -91,7 +92,7 @@ pub struct GenerateEphemeralResponse {
 }
 
 /// QR estimate in response
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct QrEstimateResponse {
     pub data_size: usize,
     pub qr_version: u8,
@@ -109,14 +110,14 @@ impl From<QrEstimate> for QrEstimateResponse {
 }
 
 /// Request for Level 1 verification
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct VerifyLevel1Request {
     /// Base64-encoded QR data
     pub qr_data: String,
 }
 
 /// Request for Level 2 verification
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct VerifyLevel2Request {
     /// Base64-encoded QR data
     pub qr_data: String,
@@ -126,7 +127,7 @@ pub struct VerifyLevel2Request {
 }
 
 /// Verification response
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct VerifyResponse {
     pub valid: bool,
     pub level: u8,
@@ -242,7 +243,7 @@ pub async fn verify_level2(
 // ============================================================================
 
 /// Request to generate an ephemeral proof
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct GenerateProofRequest {
     /// Type of proof to generate
     pub proof_type: ProofTypeRequest,
@@ -288,7 +289,7 @@ impl From<ProofTypeRequest> for icn_zkp::ProofType {
 }
 
 /// Response for ephemeral proof generation
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct GenerateProofResponse {
     /// Base64-encoded QR data
     pub qr_data: String,

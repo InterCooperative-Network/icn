@@ -291,7 +291,7 @@ pub async fn update_member_role(
 }
 
 /// Public statistics response for a cooperative
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, utoipa::ToSchema)]
 pub struct CoopStatsResponse {
     /// Cooperative ID
     pub coop_id: String,

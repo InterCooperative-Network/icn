@@ -13,6 +13,7 @@ use icn_identity::KeyBundle;
 use icn_zkp::ProofType;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use std::time::Duration;
 use thiserror::Error;
 
@@ -51,7 +52,7 @@ pub enum EphemeralError {
 }
 
 /// Available upgrade channels for Level 2+ verification
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 #[repr(u8)]
 pub enum Channel {
     /// Near-Field Communication
@@ -97,7 +98,7 @@ impl Channel {
 ///
 /// Small enough to fit in a QR code (~135 bytes base encoding).
 /// Valid for a short time, verified with classical Ed25519.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct EphemeralProof {
     /// Version byte
     pub v: u8,
@@ -238,7 +239,7 @@ impl EphemeralProof {
 ///
 /// This proves the ephemeral key is authorized by the identity's anchor.
 /// It's larger (~2.5KB with hybrid signature) and sent via NFC/BLE.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct EphemeralBinding {
     /// Full anchor hash
     pub anchor: [u8; 32],
@@ -311,7 +312,7 @@ impl EphemeralBinding {
 }
 
 /// Result of ephemeral proof verification
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct VerifyResult {
     /// Whether verification passed
     pub valid: bool,

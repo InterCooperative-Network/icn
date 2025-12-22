@@ -5,6 +5,7 @@
 
 use actix_web::{get, web, HttpResponse};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use std::sync::Arc;
 
 use crate::error::{GatewayError, Result};
@@ -16,7 +17,7 @@ use icn_identity::Did;
 // ============================================================================
 
 /// Response for DID resolution
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct DidResolutionResponse {
     /// The resolved DID string
     pub did: String,
@@ -37,7 +38,7 @@ pub struct DidResolutionResponse {
 }
 
 /// Query parameters for DID resolution
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct ResolveQuery {
     /// Include attestation details (requires additional lookup)
     #[serde(default)]

@@ -6,13 +6,14 @@ use actix_web::{get, web, HttpRequest, HttpResponse};
 use icn_governance::{Amendment, AmendmentStatus, Appeal, AppealStatus};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use utoipa::ToSchema;
 
 use crate::commons_mgr::CommonsManager;
 use crate::error::Result;
 use crate::middleware::require_scope;
 
 /// Governance dashboard data
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct GovernanceDashboard {
     /// Charter ID (hex)
     pub charter_id: Option<String>,
@@ -29,7 +30,7 @@ pub struct GovernanceDashboard {
 }
 
 /// Amendments breakdown by status
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct AmendmentsBreakdown {
     pub draft: usize,
     pub submitted: usize,
@@ -40,7 +41,7 @@ pub struct AmendmentsBreakdown {
 }
 
 /// Appeals breakdown by status
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct AppealsBreakdown {
     pub filed: usize,
     pub under_review: usize,
@@ -51,7 +52,7 @@ pub struct AppealsBreakdown {
 }
 
 /// Recent activity event
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ActivityEvent {
     /// Event type
     pub event_type: String,

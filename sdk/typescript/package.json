@@ -8,14 +8,15 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "npm run generate-types && tsc",
     "dev": "tsc --watch",
     "test": "jest",
     "lint": "eslint src --ext .ts",
     "clean": "rm -rf dist",
     "prepublishOnly": "npm run build",
     "seed": "ts-node examples/seed-demo-data.ts",
-    "generate-types": "openapi-typescript ../../docs/api/openapi.yaml -o src/api-types.ts"
+    "generate-types": "openapi-typescript ../../docs/api/openapi.generated.yaml -o src/generated/api-types.ts",
+    "check-types": "git diff --exit-code src/generated/"
   },
   "keywords": [
     "icn",

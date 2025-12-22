@@ -4,6 +4,7 @@
 
 use actix_web::{get, post, web, HttpRequest, HttpResponse};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use std::sync::Arc;
 
 use crate::error::{GatewayError, Result};
@@ -19,14 +20,14 @@ use icn_identity::Did;
 // Request/Response Models
 // ============================================================================
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct InitFederationRequest {
     pub coop_id: String,
     pub name: String,
     pub gateway_endpoint: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct RegisterCoopRequest {
     pub coop_id: String,
     pub name: String,
@@ -36,14 +37,14 @@ pub struct RegisterCoopRequest {
     pub capabilities: Vec<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct VouchRequest {
     pub target_coop_id: String,
     pub trust_score: f64,
     pub expires_in_days: Option<u64>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct AttestationRequest {
     pub member_did: String,
     pub trust_score: f64,
@@ -51,7 +52,7 @@ pub struct AttestationRequest {
     pub validity_days: u64,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateAgreementRequest {
     pub agreement_id: String,
     pub partner_coop_id: String,
@@ -60,7 +61,7 @@ pub struct CreateAgreementRequest {
     pub settlement: String, // daily, weekly, monthly, manual
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct FederationStatusResponse {
     pub initialized: bool,
     pub own_coop_id: Option<String>,

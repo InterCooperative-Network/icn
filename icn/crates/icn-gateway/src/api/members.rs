@@ -2,6 +2,7 @@
 
 use actix_web::{get, web, HttpRequest, HttpResponse};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use std::sync::Arc;
 
 use crate::commons_mgr::CommonsManager;
@@ -13,7 +14,7 @@ use crate::trust_mgr::TrustManager;
 use icn_identity::Did;
 
 /// Member profile response
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct MemberProfile {
     /// Member DID
     pub did: String,

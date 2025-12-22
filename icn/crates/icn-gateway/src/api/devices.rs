@@ -6,6 +6,7 @@
 use actix_web::{delete, get, post, web, HttpMessage, HttpRequest, HttpResponse};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use utoipa::ToSchema;
 
 use crate::auth::TokenClaims;
 use crate::error::{GatewayError, Result};
@@ -16,7 +17,7 @@ use crate::identity_mgr::{DeviceInfo, IdentityManager, RegisterDeviceRequest};
 // ============================================================================
 
 /// Request to register a new device
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ApiRegisterDeviceRequest {
     /// Unique device identifier (e.g., "phone-1", "laptop-work")
     pub device_id: String,
@@ -42,7 +43,7 @@ pub struct ApiRegisterDeviceRequest {
 }
 
 /// Request to revoke a device
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ApiRevokeDeviceRequest {
     /// Device ID of the device signing this request (must have RevokeDevice capability)
     pub signing_device_id: String,
@@ -52,14 +53,14 @@ pub struct ApiRevokeDeviceRequest {
 }
 
 /// Response for device registration
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ApiRegisterDeviceResponse {
     pub device: DeviceInfo,
     pub message: String,
 }
 
 /// Response for device list
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ApiListDevicesResponse {
     pub devices: Vec<DeviceInfo>,
     pub total: usize,

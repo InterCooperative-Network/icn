@@ -84,7 +84,7 @@ fn default_fuel_limit() -> u64 {
 }
 
 /// Response from submitting a task
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
 pub struct SubmitTaskResponse {
     pub task_id: String,
     pub task_hash: String,
@@ -296,7 +296,7 @@ pub async fn cancel_task(
         )
         .await;
 
-    #[derive(serde::Serialize)]
+    #[derive(serde::Serialize, utoipa::ToSchema)]
     struct CancelResponse {
         task_hash: String,
         status: String,

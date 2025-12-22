@@ -8,6 +8,7 @@ pub use icn_store::recurring_payments::{
     PaymentFrequency, RecurringPayment, RecurringPaymentStore, RecurringStatus,
 };
 use serde::Deserialize;
+use utoipa::ToSchema;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
@@ -17,7 +18,7 @@ use crate::ledger_mgr::LedgerManager;
 use crate::middleware::{get_claims, require_scope};
 
 /// Request to create recurring payment
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateRecurringPaymentRequest {
     /// Cooperative ID (ledger namespace)
     pub coop_id: String,
@@ -31,7 +32,7 @@ pub struct CreateRecurringPaymentRequest {
 }
 
 /// Request to update recurring payment
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct UpdateRecurringPaymentRequest {
     pub amount: Option<i64>,
     pub frequency: Option<PaymentFrequency>,

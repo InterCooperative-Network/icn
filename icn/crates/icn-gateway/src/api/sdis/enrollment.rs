@@ -13,6 +13,7 @@
 
 use actix_web::{get, post, web, HttpResponse};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -23,7 +24,7 @@ use crate::error::{GatewayError, Result};
 // ============================================================================
 
 /// Request to start an enrollment ceremony
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct StartEnrollmentRequest {
     /// How the person will be verified
     pub pathway: EnrollmentPathwayDto,
@@ -34,7 +35,7 @@ pub struct StartEnrollmentRequest {
 }
 
 /// Enrollment pathway DTO
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum EnrollmentPathwayDto {
     GovernmentId {
@@ -58,7 +59,7 @@ pub enum EnrollmentPathwayDto {
 }
 
 /// KeyBundle DTO (public keys only)
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
 pub struct KeyBundleDto {
     /// Ed25519 public key (base58)
     pub ed25519_pub: String,
@@ -69,7 +70,7 @@ pub struct KeyBundleDto {
 }
 
 /// Response after starting enrollment
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct StartEnrollmentResponse {
     /// Unique ceremony ID
     pub ceremony_id: String,
@@ -82,7 +83,7 @@ pub struct StartEnrollmentResponse {
 }
 
 /// Ceremony status
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum CeremonyStatus {
     PendingStewardVerification,
@@ -92,7 +93,7 @@ pub enum CeremonyStatus {
 }
 
 /// Response for ceremony status query
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct EnrollmentStatusResponse {
     /// Ceremony ID
     pub ceremony_id: String,
@@ -109,7 +110,7 @@ pub struct EnrollmentStatusResponse {
 }
 
 /// Anchor DTO
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct AnchorDto {
     /// Anchor ID (32 bytes, hex-encoded)
     pub anchor_id: String,
@@ -120,14 +121,14 @@ pub struct AnchorDto {
 }
 
 /// Request to finalize enrollment
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct FinalizeEnrollmentRequest {
     /// VUI commitment (if applicable)
     pub vui_commitment: Option<String>,
 }
 
 /// Response after finalizing enrollment
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct FinalizeEnrollmentResponse {
     /// Permanent anchor ID
     pub anchor_id: String,
@@ -196,7 +197,7 @@ impl EnrollmentStore {
 }
 
 /// Enrollment ceremony state
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct EnrollmentCeremony {
     pub pathway: EnrollmentPathwayDto,
     pub proof_data: serde_json::Value,

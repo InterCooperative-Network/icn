@@ -6,6 +6,7 @@
 
 use actix_web::{get, post, web, HttpRequest, HttpResponse};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use std::sync::Arc;
 
 use crate::commons_mgr::CommonsManager;
@@ -19,7 +20,7 @@ use icn_identity::Did;
 // ============================================================================
 
 /// Vote choice
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum VoteChoice {
     /// Approve the amendment
@@ -37,7 +38,7 @@ impl VoteChoice {
 }
 
 /// Request to cast a vote
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct CastVoteRequest {
     /// Vote choice: approve, reject, or abstain
     pub vote: VoteChoice,
@@ -48,7 +49,7 @@ pub struct CastVoteRequest {
 }
 
 /// Individual vote response
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct VoteResponse {
     /// Voter DID
     pub voter: String,
@@ -65,7 +66,7 @@ pub struct VoteResponse {
 }
 
 /// Vote results response
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct VoteResultsResponse {
     /// Amendment ID
     pub amendment_id: String,
@@ -100,7 +101,7 @@ pub struct VoteResultsResponse {
 }
 
 /// List votes response
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct ListVotesResponse {
     pub amendment_id: String,
     pub total_votes: usize,
@@ -108,7 +109,7 @@ pub struct ListVotesResponse {
 }
 
 /// User's vote status response
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct MyVoteResponse {
     pub amendment_id: String,
     /// Whether user has voted
@@ -408,7 +409,7 @@ pub async fn get_results(
     }))
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct ResultsQuery {
     /// Include individual votes in response
     pub include_votes: Option<bool>,

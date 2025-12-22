@@ -61,7 +61,7 @@ sha2 = "0.10"
 icn-identity = { path = "../icn-identity" }
 icn-time = { path = "../icn-time" }
 icn-ledger = { path = "../icn-ledger" }
-icn-store = { path = "../icn-store" }
+icn-store = { path = "../icn-store", features = ["openapi"] }
 icn-rpc = { path = "../icn-rpc" }
 icn-obs = { path = "../icn-obs" }
 icn-governance = { path = "../icn-governance" }

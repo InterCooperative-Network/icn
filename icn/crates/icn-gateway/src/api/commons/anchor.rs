@@ -7,6 +7,7 @@
 
 use actix_web::{get, post, put, web, HttpRequest, HttpResponse};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use std::sync::Arc;
 use tracing::warn;
 
@@ -20,7 +21,7 @@ use icn_identity::{AnchorStatus, Did, POPAttestation, POPLevel, POPMethod, Perso
 // ============================================================================
 
 /// Anchor detail response
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct AnchorDetailResponse {
     pub anchor_id: String,
     pub did: String,
@@ -33,7 +34,7 @@ pub struct AnchorDetailResponse {
 }
 
 /// POP attestation response
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct AttestationResponse {
     pub attestation_id: String,
     pub issuer_did: String,
@@ -45,14 +46,14 @@ pub struct AttestationResponse {
 }
 
 /// Update anchor status request
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct UpdateAnchorStatusRequest {
     pub status: String,
     pub reason: Option<String>,
 }
 
 /// Add attestation request
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct AddAttestationRequest {
     pub method: String,
     pub level: String,

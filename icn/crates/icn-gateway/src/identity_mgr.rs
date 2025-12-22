@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, info};
+use utoipa::ToSchema;
 
 use crate::error::{GatewayError, Result};
 
@@ -419,7 +420,7 @@ impl Default for IdentityManager {
 // ============================================================================
 
 /// Request to register a new device
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct RegisterDeviceRequest {
     /// Unique device identifier (e.g., "phone-1", "laptop-work")
     pub device_id: String,
@@ -439,7 +440,7 @@ pub struct RegisterDeviceRequest {
 }
 
 /// Device information in responses
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct DeviceInfo {
     pub id: String,
     pub label: String,
@@ -450,7 +451,7 @@ pub struct DeviceInfo {
 }
 
 /// Request to revoke a device
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct RevokeDeviceRequest {
     /// Device ID of the device performing the revocation
     pub signing_device_id: String,
@@ -460,7 +461,7 @@ pub struct RevokeDeviceRequest {
 }
 
 /// Response for device registration
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct RegisterDeviceResponse {
     pub device: DeviceInfo,
     pub document_version: u64,

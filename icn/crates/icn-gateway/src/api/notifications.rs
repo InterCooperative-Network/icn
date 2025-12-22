@@ -6,6 +6,7 @@
 use actix_web::{delete, get, post, web, HttpResponse};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use utoipa::ToSchema;
 
 use crate::error::Result;
 use crate::notification_processor::NotificationProcessor;
@@ -13,7 +14,7 @@ use crate::notifications::{InAppNotification, NotificationService, Platform};
 use icn_identity::Did;
 
 /// Register device request
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct RegisterDeviceRequest {
     /// Device FCM token
     pub device_token: String,
@@ -22,7 +23,7 @@ pub struct RegisterDeviceRequest {
 }
 
 /// Register device response
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct RegisterDeviceResponse {
     pub success: bool,
     pub message: String,
@@ -71,7 +72,7 @@ pub async fn unregister_device(
 // ============================================================================
 
 /// Query parameters for listing notifications
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct ListNotificationsQuery {
     /// Only return unread notifications
     #[serde(default)]
@@ -85,7 +86,7 @@ pub struct ListNotificationsQuery {
 }
 
 /// Response for listing notifications
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct ListNotificationsResponse {
     /// List of notifications
     pub notifications: Vec<InAppNotification>,
@@ -96,7 +97,7 @@ pub struct ListNotificationsResponse {
 }
 
 /// Response for notification count
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct NotificationCountResponse {
     /// Total notification count
     pub total: usize,
@@ -105,7 +106,7 @@ pub struct NotificationCountResponse {
 }
 
 /// Response for marking notification as read
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct MarkReadResponse {
     pub success: bool,
     pub message: String,
