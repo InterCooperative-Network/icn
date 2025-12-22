@@ -2480,10 +2480,11 @@ pub mod gateway {
     }
 
     /// Increment counter when IP-based rate limit is exceeded
-    pub fn ip_rate_limit_exceeded_inc(ip: &str) {
-        counter!("icn_gateway_ip_rate_limit_exceeded_total",
-                 "ip" => ip.to_string())
-        .increment(1);
+    ///
+    /// Note: IP address is intentionally not included as a label to avoid
+    /// unbounded metric cardinality from public internet traffic.
+    pub fn ip_rate_limit_exceeded_inc() {
+        counter!("icn_gateway_ip_rate_limit_exceeded_total").increment(1);
     }
 
     pub fn authorization_failures_inc(required_scope: &str) {
