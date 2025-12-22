@@ -144,7 +144,7 @@ spec:
   selector:
     app: tempo
 ---
-# NetworkPolicy to allow ICN daemon to send traces to Tempo
+# NetworkPolicy to allow ICN daemon to send traces and Grafana to query
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -157,6 +157,7 @@ spec:
   policyTypes:
   - Ingress
   ingress:
+  # Allow ICN daemon to send traces
   - from:
     - podSelector:
         matchLabels:
@@ -166,5 +167,13 @@ spec:
       port: 4317
     - protocol: TCP
       port: 4318
+    - protocol: TCP
+      port: 3200
+  # Allow Grafana from monitoring namespace to query traces
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: monitoring
+    ports:
     - protocol: TCP
       port: 3200
