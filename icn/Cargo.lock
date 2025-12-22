@@ -2916,6 +2916,7 @@ dependencies = [
  "ed25519-dalek",
  "futures-util",
  "hex",
+ "icn-ccl",
  "icn-community",
  "icn-compute",
  "icn-coop",

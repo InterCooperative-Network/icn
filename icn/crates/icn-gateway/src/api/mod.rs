@@ -6,6 +6,7 @@ pub mod charter;
 pub mod commons;
 pub mod compute;
 pub mod constitutional;
+pub mod contracts;
 pub mod coops;
 pub mod devices;
 pub mod escrow;

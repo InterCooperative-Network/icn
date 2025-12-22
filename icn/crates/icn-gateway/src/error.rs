@@ -32,6 +32,9 @@ pub enum GatewayError {
     #[error("Internal server error: {0}")]
     InternalError(String),
 
+    #[error("Service unavailable: {0}")]
+    ServiceUnavailable(String),
+
     #[error("ICN substrate error: {0}")]
     SubstrateError(#[from] anyhow::Error),
 
@@ -50,6 +53,7 @@ impl ResponseError for GatewayError {
             GatewayError::RateLimitExceeded(_) => StatusCode::TOO_MANY_REQUESTS,
             GatewayError::BudgetExceeded(_) => StatusCode::FORBIDDEN,
             GatewayError::InternalError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            GatewayError::ServiceUnavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
             GatewayError::SubstrateError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             GatewayError::IoError(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
@@ -67,6 +71,7 @@ impl ResponseError for GatewayError {
             GatewayError::BadRequest(msg) => msg.clone(),
             GatewayError::RateLimitExceeded(msg) => format!("Rate limit exceeded for DID: {msg}"),
             GatewayError::BudgetExceeded(msg) => msg.clone(),
+            GatewayError::ServiceUnavailable(msg) => msg.clone(),
 
             // Internal errors - sanitize to prevent information leakage
             // Log the full error for debugging but return generic message to client

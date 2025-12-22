@@ -61,8 +61,8 @@ pub struct ContractRegistryActor {
     /// Pending governance approvals (hash -> proposal_id)
     pending_approvals: Arc<RwLock<HashMap<ContentHash, String>>>,
 
-    /// Revoked contracts (tracked in memory, persisted via metadata)
-    revoked_contracts: Arc<RwLock<HashMap<ContentHash, String>>>,
+    /// Contract status tracking (Active, Deprecated, Revoked)
+    contract_status: Arc<RwLock<HashMap<ContentHash, ContractStatus>>>,
 }
 
 impl ContractRegistryActor {
@@ -78,7 +78,7 @@ impl ContractRegistryActor {
             send_callback: None,
             event_callback: None,
             pending_approvals: Arc::new(RwLock::new(HashMap::new())),
-            revoked_contracts: Arc::new(RwLock::new(HashMap::new())),
+            contract_status: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -153,6 +153,26 @@ impl ContractRegistryActor {
             } => {
                 let result = self.handle_revoke(&hash, &requester, reason).await;
                 let _ = resp.send(result);
+            }
+            ContractRegistryCommand::Deprecate {
+                hash,
+                requester,
+                successor,
+                reason,
+                resp,
+            } => {
+                let result = self
+                    .handle_deprecate(&hash, &requester, successor, reason)
+                    .await;
+                let _ = resp.send(result);
+            }
+            ContractRegistryCommand::GetStatus { hash, resp } => {
+                let status = self.get_status(&hash).await;
+                let _ = resp.send(status);
+            }
+            ContractRegistryCommand::GetVersionHistory { name, resp } => {
+                let versions = self.registry.get_versions(&name).await.unwrap_or_default();
+                let _ = resp.send(versions);
             }
             ContractRegistryCommand::GossipMessage(msg) => {
                 if let Err(e) = self.handle_gossip_message(msg).await {
@@ -240,7 +260,7 @@ impl ContractRegistryActor {
             Err(_) => return vec![],
         };
 
-        let revoked = self.revoked_contracts.read().await;
+        let statuses = self.contract_status.read().await;
 
         let mut results: Vec<ContractSummary> = all_metadata
             .iter()
@@ -267,7 +287,10 @@ impl ContractRegistryActor {
             })
             .map(|meta| {
                 let mut summary = ContractSummary::from(meta);
-                summary.revoked = revoked.contains_key(&meta.code_hash);
+                if let Some(status) = statuses.get(&meta.code_hash) {
+                    summary.status = status.clone();
+                    summary.revoked = status.is_revoked();
+                }
                 summary
             })
             .collect();
@@ -302,10 +325,18 @@ impl ContractRegistryActor {
             )));
         }
 
+        let revoked_at = icn_time::current_timestamp_millis();
+
         // Mark as revoked
         {
-            let mut revoked = self.revoked_contracts.write().await;
-            revoked.insert(*hash, reason.clone());
+            let mut statuses = self.contract_status.write().await;
+            statuses.insert(
+                *hash,
+                ContractStatus::Revoked {
+                    reason: reason.clone(),
+                    revoked_at,
+                },
+            );
         }
 
         // Broadcast revocation
@@ -314,7 +345,7 @@ impl ContractRegistryActor {
                 hash: *hash,
                 owner: requester.to_string(),
                 reason: reason.clone(),
-                revoked_at: icn_time::current_timestamp_millis(),
+                revoked_at,
             };
             send_cb(msg);
         }
@@ -335,6 +366,102 @@ impl ContractRegistryActor {
         );
 
         Ok(())
+    }
+
+    /// Handle contract deprecation
+    async fn handle_deprecate(
+        &self,
+        hash: &ContentHash,
+        requester: &str,
+        successor: Option<ContentHash>,
+        reason: String,
+    ) -> Result<(), RegistryError> {
+        // Get metadata to check ownership
+        let metadata = self
+            .registry
+            .get_metadata(hash)
+            .await?
+            .ok_or_else(|| RegistryError::NotFound(hex::encode(hash)))?;
+
+        // Verify requester is owner
+        if metadata.owner != requester {
+            return Err(RegistryError::AuthorizationError(format!(
+                "Only owner {} can deprecate contract",
+                metadata.owner
+            )));
+        }
+
+        // Verify successor exists if specified
+        if let Some(ref succ) = successor {
+            if !self.registry.exists(succ).await {
+                return Err(RegistryError::NotFound(format!(
+                    "Successor contract {} not found",
+                    hex::encode(succ)
+                )));
+            }
+        }
+
+        let deprecated_at = icn_time::current_timestamp_millis();
+
+        // Mark as deprecated
+        {
+            let mut statuses = self.contract_status.write().await;
+            statuses.insert(
+                *hash,
+                ContractStatus::Deprecated {
+                    successor,
+                    reason: reason.clone(),
+                    deprecated_at,
+                },
+            );
+        }
+
+        // Broadcast deprecation
+        if let Some(ref send_cb) = self.send_callback {
+            let msg = ContractRegistryMessage::Deprecated {
+                hash: *hash,
+                owner: requester.to_string(),
+                successor,
+                reason: reason.clone(),
+                deprecated_at,
+            };
+            send_cb(msg);
+        }
+
+        // Emit event
+        if let Some(ref event_cb) = self.event_callback {
+            event_cb(ContractRegistryEvent::Deprecated {
+                hash: *hash,
+                successor,
+                reason: reason.clone(),
+            });
+        }
+
+        info!(
+            hash = %hex::encode(hash),
+            owner = %requester,
+            successor = ?successor.map(hex::encode),
+            reason = %reason,
+            "Contract deprecated"
+        );
+
+        Ok(())
+    }
+
+    /// Get status for a contract
+    async fn get_status(&self, hash: &ContentHash) -> Option<ContractStatus> {
+        // First check if contract exists
+        if !self.registry.exists(hash).await {
+            return None;
+        }
+
+        let statuses = self.contract_status.read().await;
+        Some(
+            statuses
+                .get(hash)
+                .cloned()
+                .unwrap_or(ContractStatus::Active),
+        )
     }
 
     /// Handle incoming gossip message
@@ -392,13 +519,19 @@ impl ContractRegistryActor {
                 hash,
                 owner,
                 reason,
-                ..
+                revoked_at,
             } => {
                 // Verify the revocation is from the owner
                 if let Ok(Some(metadata)) = self.registry.get_metadata(&hash).await {
                     if metadata.owner == owner {
-                        let mut revoked = self.revoked_contracts.write().await;
-                        revoked.insert(hash, reason.clone());
+                        let mut statuses = self.contract_status.write().await;
+                        statuses.insert(
+                            hash,
+                            ContractStatus::Revoked {
+                                reason: reason.clone(),
+                                revoked_at,
+                            },
+                        );
                         info!(hash = %hex::encode(hash), "Contract revocation synced from gossip");
                     } else {
                         warn!(
@@ -406,6 +539,37 @@ impl ContractRegistryActor {
                             claimed_owner = %owner,
                             actual_owner = %metadata.owner,
                             "Invalid revocation: owner mismatch"
+                        );
+                    }
+                }
+            }
+
+            ContractRegistryMessage::Deprecated {
+                hash,
+                owner,
+                successor,
+                reason,
+                deprecated_at,
+            } => {
+                // Verify the deprecation is from the owner
+                if let Ok(Some(metadata)) = self.registry.get_metadata(&hash).await {
+                    if metadata.owner == owner {
+                        let mut statuses = self.contract_status.write().await;
+                        statuses.insert(
+                            hash,
+                            ContractStatus::Deprecated {
+                                successor,
+                                reason: reason.clone(),
+                                deprecated_at,
+                            },
+                        );
+                        info!(hash = %hex::encode(hash), "Contract deprecation synced from gossip");
+                    } else {
+                        warn!(
+                            hash = %hex::encode(hash),
+                            claimed_owner = %owner,
+                            actual_owner = %metadata.owner,
+                            "Invalid deprecation: owner mismatch"
                         );
                     }
                 }

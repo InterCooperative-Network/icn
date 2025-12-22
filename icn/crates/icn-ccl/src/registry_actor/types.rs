@@ -34,6 +34,15 @@ pub enum ContractRegistryMessage {
         revoked_at: u64,
     },
 
+    /// A contract has been deprecated
+    Deprecated {
+        hash: ContentHash,
+        owner: String,
+        successor: Option<ContentHash>,
+        reason: String,
+        deprecated_at: u64,
+    },
+
     /// Request for a specific contract (anti-entropy)
     Request {
         hash: ContentHash,
@@ -70,6 +79,7 @@ impl ContractRegistryMessage {
         match self {
             Self::Deployed { .. } => "Deployed",
             Self::Revoked { .. } => "Revoked",
+            Self::Deprecated { .. } => "Deprecated",
             Self::Request { .. } => "Request",
             Self::Response { .. } => "Response",
             Self::Digest { .. } => "Digest",
@@ -164,6 +174,55 @@ impl ContractFilter {
     }
 }
 
+/// Contract lifecycle status
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub enum ContractStatus {
+    /// Contract is active and can be executed
+    #[default]
+    Active,
+    /// Contract is deprecated, with optional successor
+    Deprecated {
+        /// Hash of the replacement contract (if any)
+        successor: Option<ContentHash>,
+        /// Reason for deprecation
+        reason: String,
+        /// When the contract was deprecated (Unix millis)
+        deprecated_at: u64,
+    },
+    /// Contract has been revoked and cannot be executed
+    Revoked {
+        /// Reason for revocation
+        reason: String,
+        /// When the contract was revoked (Unix millis)
+        revoked_at: u64,
+    },
+}
+
+impl ContractStatus {
+    /// Check if the contract is active
+    pub fn is_active(&self) -> bool {
+        matches!(self, Self::Active)
+    }
+
+    /// Check if the contract is deprecated
+    pub fn is_deprecated(&self) -> bool {
+        matches!(self, Self::Deprecated { .. })
+    }
+
+    /// Check if the contract is revoked
+    pub fn is_revoked(&self) -> bool {
+        matches!(self, Self::Revoked { .. })
+    }
+
+    /// Get the successor hash if deprecated
+    pub fn successor(&self) -> Option<ContentHash> {
+        match self {
+            Self::Deprecated { successor, .. } => *successor,
+            _ => None,
+        }
+    }
+}
+
 /// Summary of a contract for listing
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContractSummary {
@@ -181,6 +240,8 @@ pub struct ContractSummary {
     pub rules: Vec<String>,
     /// Whether the contract is revoked
     pub revoked: bool,
+    /// Contract lifecycle status
+    pub status: ContractStatus,
 }
 
 impl From<&ContractMetadata> for ContractSummary {
@@ -193,6 +254,7 @@ impl From<&ContractMetadata> for ContractSummary {
             deployed_at: meta.deployed_at,
             rules: meta.rules.clone(),
             revoked: false,
+            status: ContractStatus::Active,
         }
     }
 }
@@ -202,6 +264,12 @@ impl From<&ContractMetadata> for ContractSummary {
 pub enum ContractRegistryEvent {
     /// Contract was deployed
     Deployed { hash: ContentHash, name: String },
+    /// Contract was deprecated
+    Deprecated {
+        hash: ContentHash,
+        successor: Option<ContentHash>,
+        reason: String,
+    },
     /// Contract was revoked
     Revoked { hash: ContentHash, reason: String },
     /// Governance approval is required for a public contract

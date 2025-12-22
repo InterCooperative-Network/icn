@@ -7,7 +7,8 @@ use crate::registry::{ContentHash, ContractMetadata, RegistryError, RegistryStat
 use tokio::sync::oneshot;
 
 use super::types::{
-    ApprovalStatus, ContractFilter, ContractRegistryMessage, ContractSummary, DeploymentMetadata,
+    ApprovalStatus, ContractFilter, ContractRegistryMessage, ContractStatus, ContractSummary,
+    DeploymentMetadata,
 };
 
 /// Commands sent to the ContractRegistryActor
@@ -50,6 +51,27 @@ pub(crate) enum ContractRegistryCommand {
         requester: String,
         reason: String,
         resp: oneshot::Sender<Result<(), RegistryError>>,
+    },
+
+    /// Deprecate a contract with optional successor (owner only)
+    Deprecate {
+        hash: ContentHash,
+        requester: String,
+        successor: Option<ContentHash>,
+        reason: String,
+        resp: oneshot::Sender<Result<(), RegistryError>>,
+    },
+
+    /// Get contract lifecycle status
+    GetStatus {
+        hash: ContentHash,
+        resp: oneshot::Sender<Option<ContractStatus>>,
+    },
+
+    /// Get version history for a contract by name
+    GetVersionHistory {
+        name: String,
+        resp: oneshot::Sender<Vec<(u32, ContentHash)>>,
     },
 
     /// Handle incoming gossip message
@@ -105,6 +127,25 @@ impl std::fmt::Debug for ContractRegistryCommand {
                 .debug_struct("Revoke")
                 .field("hash", &hex::encode(hash))
                 .field("requester", requester)
+                .finish(),
+            Self::Deprecate {
+                hash,
+                requester,
+                successor,
+                ..
+            } => f
+                .debug_struct("Deprecate")
+                .field("hash", &hex::encode(hash))
+                .field("requester", requester)
+                .field("successor", &successor.map(hex::encode))
+                .finish(),
+            Self::GetStatus { hash, .. } => f
+                .debug_struct("GetStatus")
+                .field("hash", &hex::encode(hash))
+                .finish(),
+            Self::GetVersionHistory { name, .. } => f
+                .debug_struct("GetVersionHistory")
+                .field("name", name)
                 .finish(),
             Self::GossipMessage(msg) => f
                 .debug_struct("GossipMessage")

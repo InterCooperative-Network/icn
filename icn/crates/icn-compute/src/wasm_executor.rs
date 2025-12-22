@@ -33,6 +33,11 @@ impl WasmState {
     }
 }
 
+/// Callback type for resolving contract references from the registry
+/// Takes a contract hash and returns the contract if found
+pub type ContractResolverCallback =
+    Arc<dyn Fn([u8; 32]) -> Option<icn_ccl::Contract> + Send + Sync>;
+
 /// WASM executor using Wasmtime
 pub struct WasmExecutor {
     capabilities: Vec<ExecutorCapability>,
@@ -42,6 +47,8 @@ pub struct WasmExecutor {
     max_memory: usize,
     /// Optional WASM registry for WasmRef resolution
     registry: Option<Arc<WasmRegistry>>,
+    /// Optional contract resolver for CclRef resolution
+    contract_resolver: Option<ContractResolverCallback>,
 }
 
 impl WasmExecutor {
@@ -56,6 +63,7 @@ impl WasmExecutor {
             engine,
             max_memory: 64 * 1024 * 1024, // 64MB default
             registry: None,
+            contract_resolver: None,
         })
     }
 
@@ -66,6 +74,7 @@ impl WasmExecutor {
             capabilities: vec![ExecutorCapability::Ccl],
             max_memory: 64 * 1024 * 1024,
             registry: None,
+            contract_resolver: None,
         })
     }
 
@@ -89,6 +98,22 @@ impl WasmExecutor {
     /// Get the WASM registry if set
     pub fn registry(&self) -> Option<&Arc<WasmRegistry>> {
         self.registry.as_ref()
+    }
+
+    /// Set the contract resolver callback for CclRef resolution (builder pattern)
+    pub fn with_contract_resolver(mut self, resolver: ContractResolverCallback) -> Self {
+        self.contract_resolver = Some(resolver);
+        self
+    }
+
+    /// Set the contract resolver callback for CclRef resolution (mutable reference version)
+    pub fn set_contract_resolver(&mut self, resolver: ContractResolverCallback) {
+        self.contract_resolver = Some(resolver);
+    }
+
+    /// Get the contract resolver if set
+    pub fn contract_resolver(&self) -> Option<&ContractResolverCallback> {
+        self.contract_resolver.as_ref()
     }
 
     /// Execute a WASM module
@@ -342,14 +367,112 @@ impl Executor for WasmExecutor {
             TaskCode::CclRef { hash, rule } => {
                 // CclRef requires a contract registry to be set up
                 let hash_hex = hex::encode(hash);
-                tracing::warn!(
-                    hash = %hash_hex,
-                    rule = %rule,
-                    "CclRef requires contract registry (not yet integrated)"
-                );
-                ExecutionOutcome::Failed(format!(
-                    "Contract reference {hash_hex} not resolved. Registry integration pending."
-                ))
+
+                match &self.contract_resolver {
+                    Some(resolver) => {
+                        // Resolve the contract from the registry
+                        match resolver(*hash) {
+                            Some(contract) => {
+                                tracing::debug!(
+                                    hash = %hash_hex,
+                                    rule = %rule,
+                                    "Resolved CclRef, executing contract"
+                                );
+
+                                // Validate contract structure
+                                if let Err(e) = contract.validate() {
+                                    return ExecutionOutcome::Failed(format!(
+                                        "Contract validation failed: {e}"
+                                    ));
+                                }
+
+                                // Check that the rule exists
+                                if contract.get_rule(rule).is_none() {
+                                    return ExecutionOutcome::Failed(format!(
+                                        "Rule '{rule}' not found in contract"
+                                    ));
+                                }
+
+                                // Parse caller DID
+                                let caller_did: icn_identity::Did = match serde_json::from_value(
+                                    serde_json::Value::String(ctx.executor_did.clone()),
+                                ) {
+                                    Ok(d) => d,
+                                    Err(e) => {
+                                        return ExecutionOutcome::Failed(format!(
+                                            "Invalid caller DID: {e}"
+                                        ))
+                                    }
+                                };
+
+                                let timestamp = std::time::SystemTime::now()
+                                    .duration_since(std::time::UNIX_EPOCH)
+                                    .unwrap_or_else(|e| {
+                                        tracing::warn!("System clock before UNIX epoch: {:?}", e);
+                                        std::time::Duration::ZERO
+                                    })
+                                    .as_secs();
+
+                                let ccl_context = icn_ccl::ExecutionContext {
+                                    caller: caller_did.clone(),
+                                    timestamp,
+                                    fuel: ctx.fuel_remaining,
+                                    fuel_limit: ctx.fuel_remaining,
+                                    capabilities: vec![],
+                                    participants: vec![caller_did],
+                                };
+
+                                let state = icn_ccl::ContractState::default();
+                                let args: std::collections::HashMap<String, icn_ccl::Value> =
+                                    if task.inputs.is_empty() {
+                                        std::collections::HashMap::new()
+                                    } else {
+                                        serde_json::from_slice(&task.inputs).unwrap_or_default()
+                                    };
+
+                                let interpreter =
+                                    icn_ccl::Interpreter::new(contract, state, ccl_context);
+                                match interpreter.execute_rule(rule, args) {
+                                    Ok(result) => {
+                                        ctx.fuel_remaining =
+                                            ctx.fuel_remaining.saturating_sub(result.fuel_consumed);
+                                        let output = serde_json::to_vec(&result.value)
+                                            .unwrap_or_else(|_| b"null".to_vec());
+                                        ExecutionOutcome::Success(output)
+                                    }
+                                    Err(e) => {
+                                        let err_str = e.to_string();
+                                        if err_str.contains("fuel") || err_str.contains("Fuel") {
+                                            ExecutionOutcome::OutOfFuel
+                                        } else {
+                                            ExecutionOutcome::Failed(err_str)
+                                        }
+                                    }
+                                }
+                            }
+                            None => {
+                                tracing::warn!(
+                                    hash = %hash_hex,
+                                    rule = %rule,
+                                    "Contract not found in registry"
+                                );
+                                ExecutionOutcome::Failed(format!(
+                                    "Contract {hash_hex} not found in registry"
+                                ))
+                            }
+                        }
+                    }
+                    None => {
+                        tracing::warn!(
+                            hash = %hash_hex,
+                            rule = %rule,
+                            "CclRef requires contract registry (not configured)"
+                        );
+                        ExecutionOutcome::Failed(format!(
+                            "Contract registry not configured. Cannot resolve {hash_hex}."
+                        ))
+                    }
+                }
             }
             TaskCode::WasmInline(bytes) => self.execute_wasm(bytes, &task.inputs, ctx),
             TaskCode::WasmRef(hash) => {
@@ -824,6 +947,236 @@ mod tests {
                 );
             }
             other => panic!("Expected function error, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_cclref_without_resolver() {
+        let executor = WasmExecutor::new().unwrap();
+        let task = ComputeTask {
+            id: "cclref-test".into(),
+            submitter: TEST_ALICE_DID.into(),
+            coop_id: None,
+            code: TaskCode::CclRef {
+                hash: [0xCC; 32],
+                rule: "run".into(),
+            },
+            inputs: vec![],
+            fuel_limit: FuelLimit(10_000),
+            required_capabilities: vec![ExecutorCapability::Ccl],
+            priority: crate::types::TaskPriority::Normal,
+            created_at: 1000,
+            deadline: None,
+            payment_rate: None,
+            payment_currency: None,
+            resource_profile: None,
+            actor_mode: None,
+            placement_constraints: None,
+        };
+
+        let mut ctx = ExecutionContext {
+            executor_did: TEST_ALICE_DID.into(),
+            fuel_remaining: 10_000,
+        };
+
+        let result = executor.execute(&task, &mut ctx);
+        match result {
+            ExecutionOutcome::Failed(msg) => {
+                assert!(
+                    msg.contains("registry not configured"),
+                    "Expected 'registry not configured', got: {msg}"
+                );
+            }
+            other => panic!("Expected 'registry not configured' error, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_cclref_not_found() {
+        // Create a resolver that always returns None
+        let resolver: ContractResolverCallback = Arc::new(|_hash| None);
+        let executor = WasmExecutor::new()
+            .unwrap()
+            .with_contract_resolver(resolver);
+
+        let task = ComputeTask {
+            id: "cclref-missing".into(),
+            submitter: TEST_ALICE_DID.into(),
+            coop_id: None,
+            code: TaskCode::CclRef {
+                hash: [0xDD; 32],
+                rule: "run".into(),
+            },
+            inputs: vec![],
+            fuel_limit: FuelLimit(10_000),
+            required_capabilities: vec![ExecutorCapability::Ccl],
+            priority: crate::types::TaskPriority::Normal,
+            created_at: 1000,
+            deadline: None,
+            payment_rate: None,
+            payment_currency: None,
+            resource_profile: None,
+            actor_mode: None,
+            placement_constraints: None,
+        };
+
+        let mut ctx = ExecutionContext {
+            executor_did: TEST_ALICE_DID.into(),
+            fuel_remaining: 10_000,
+        };
+
+        let result = executor.execute(&task, &mut ctx);
+        match result {
+            ExecutionOutcome::Failed(msg) => {
+                assert!(
+                    msg.contains("not found"),
+                    "Expected 'not found', got: {msg}"
+                );
+            }
+            other => panic!("Expected 'not found' error, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_cclref_with_resolver() {
+        // Create a test contract
+        let contract_json = format!(
+            r#"{{
+            "name": "TestContract",
+            "participants": ["{TEST_ALICE_DID}"],
+            "currency": null,
+            "state_vars": [],
+            "rules": [{{
+                "name": "compute",
+                "params": [],
+                "requires": [],
+                "body": [{{ "Return": {{ "value": {{ "Literal": {{ "Int": 100 }} }} }} }}]
+            }}],
+            "triggers": []
+        }}"#
+        );
+
+        let contract: icn_ccl::Contract =
+            serde_json::from_str(&contract_json).expect("parse contract");
+        let expected_hash = [0xEE; 32];
+
+        // Create a resolver that returns our contract for the expected hash
+        let resolver: ContractResolverCallback = Arc::new(move |hash| {
+            if hash == expected_hash {
+                Some(contract.clone())
+            } else {
+                None
+            }
+        });
+
+        let executor = WasmExecutor::new()
+            .unwrap()
+            .with_contract_resolver(resolver);
+
+        let task = ComputeTask {
+            id: "cclref-valid".into(),
+            submitter: TEST_ALICE_DID.into(),
+            coop_id: None,
+            code: TaskCode::CclRef {
+                hash: expected_hash,
+                rule: "compute".into(),
+            },
+            inputs: vec![],
+            fuel_limit: FuelLimit(10_000),
+            required_capabilities: vec![ExecutorCapability::Ccl],
+            priority: crate::types::TaskPriority::Normal,
+            created_at: 1000,
+            deadline: None,
+            payment_rate: None,
+            payment_currency: None,
+            resource_profile: None,
+            actor_mode: None,
+            placement_constraints: None,
+        };
+
+        let mut ctx = ExecutionContext {
+            executor_did: TEST_ALICE_DID.into(),
+            fuel_remaining: 10_000,
+        };
+
+        let result = executor.execute(&task, &mut ctx);
+        assert!(
+            matches!(result, ExecutionOutcome::Success(_)),
+            "Expected success, got: {result:?}"
+        );
+    }
+
+    #[test]
+    fn test_cclref_rule_not_found() {
+        // Create a test contract with a "run" rule
+        let contract_json = format!(
+            r#"{{
+            "name": "TestContract",
+            "participants": ["{TEST_ALICE_DID}"],
+            "currency": null,
+            "state_vars": [],
+            "rules": [{{
+                "name": "run",
+                "params": [],
+                "requires": [],
+                "body": [{{ "Return": {{ "value": {{ "Literal": {{ "Int": 1 }} }} }} }}]
+            }}],
+            "triggers": []
+        }}"#
+        );
+
+        let contract: icn_ccl::Contract =
+            serde_json::from_str(&contract_json).expect("parse contract");
+        let expected_hash = [0xFF; 32];
+
+        let resolver: ContractResolverCallback = Arc::new(move |hash| {
+            if hash == expected_hash {
+                Some(contract.clone())
+            } else {
+                None
+            }
+        });
+
+        let executor = WasmExecutor::new()
+            .unwrap()
+            .with_contract_resolver(resolver);
+
+        // Try to execute a rule that doesn't exist
+        let task = ComputeTask {
+            id: "cclref-bad-rule".into(),
+            submitter: TEST_ALICE_DID.into(),
+            coop_id: None,
+            code: TaskCode::CclRef {
+                hash: expected_hash,
+                rule: "nonexistent_rule".into(),
+            },
+            inputs: vec![],
+            fuel_limit: FuelLimit(10_000),
+            required_capabilities: vec![ExecutorCapability::Ccl],
+            priority: crate::types::TaskPriority::Normal,
+            created_at: 1000,
+            deadline: None,
+            payment_rate: None,
+            payment_currency: None,
+            resource_profile: None,
+            actor_mode: None,
+            placement_constraints: None,
+        };
+
+        let mut ctx = ExecutionContext {
+            executor_did: TEST_ALICE_DID.into(),
+            fuel_remaining: 10_000,
+        };
+
+        let result = executor.execute(&task, &mut ctx);
+        match result {
+            ExecutionOutcome::Failed(msg) => {
+                assert!(
+                    msg.contains("not found") && msg.contains("nonexistent_rule"),
+                    "Expected rule not found error, got: {msg}"
+                );
+            }
+            other => panic!("Expected rule not found error, got: {other:?}"),
         }
     }
 }
