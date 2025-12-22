@@ -376,6 +376,8 @@ impl PersonhoodAnchor {
         let now = icn_time::current_timestamp_secs();
 
         // Create a genesis attestation using well-known genesis issuer
+        // SAFETY: GENESIS_ISSUER_DID is a compile-time constant that is always valid
+        #[allow(clippy::expect_used)]
         let genesis_issuer: Did = Self::GENESIS_ISSUER_DID
             .parse()
             .expect("Genesis issuer DID is valid");

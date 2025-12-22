@@ -7,40 +7,42 @@ use utoipa::OpenApi;
 // Re-export models for schema registration
 use crate::models::{
     AccountDeltaResponse, AddMemberRequest, BalanceResponse, CastVoteRequest, ChallengeRequest,
-    ChallengeResponse, ComponentHealth, CreateCoopRequest, CreateDomainRequest, CreateInviteRequest,
-    CreatePaymentRequest, CreateProposalRequest, CreateSessionRequest, CreateSessionResponse,
-    HealthResponse, InviteInfo, InviteListResponse, InviteResponse, JoinRequest, JoinResponse,
-    OpenProposalRequest, PaginationInfo, ProposalPayloadRequest, SessionQrData, SessionStatusResponse,
-    TokenResponse, TransactionHistoryEntry, TransactionHistoryResponse, UpdateRoleRequest,
-    UpdateSettingsRequest, VerifyRequest, VoteChoiceResponse,
+    ChallengeResponse, ComponentHealth, CreateCoopRequest, CreateDomainRequest,
+    CreateInviteRequest, CreatePaymentRequest, CreateProposalRequest, CreateSessionRequest,
+    CreateSessionResponse, HealthResponse, InviteInfo, InviteListResponse, InviteResponse,
+    JoinRequest, JoinResponse, OpenProposalRequest, PaginationInfo, ProposalPayloadRequest,
+    SessionQrData, SessionStatusResponse, TokenResponse, TransactionHistoryEntry,
+    TransactionHistoryResponse, UpdateRoleRequest, UpdateSettingsRequest, VerifyRequest,
+    VoteChoiceResponse,
 };
 
 // API module types
-use crate::api::membership::{
-    ApplyMembershipRequest, MembershipActionRequest, CapabilityRequest, RoleRequest,
-    BanMemberRequest, RevokeMembershipRequest, MemberResponse,
-};
 use crate::api::charter::{
-    CharterSummaryResponse, CharterDetailResponse, FounderResponse, CreateCharterRequest,
-    SignCharterRequest, UpdateCharterStatusRequest, FounderDetailResponse, FoundersResponse,
-    TimelineEvent, TimelineResponse,
-};
-use crate::api::steward::{
-    StewardSummaryResponse, StewardDetailResponse, RegisterStewardRequest, UpdateStatusRequest,
-    ExtendTermRequest, BondOperationRequest,
-};
-use crate::api::governance_dashboard::{
-    GovernanceDashboard, AmendmentsBreakdown, AppealsBreakdown, ActivityEvent,
+    CharterDetailResponse, CharterSummaryResponse, CreateCharterRequest, FounderDetailResponse,
+    FounderResponse, FoundersResponse, SignCharterRequest, TimelineEvent, TimelineResponse,
+    UpdateCharterStatusRequest,
 };
 use crate::api::devices::{
-    ApiRegisterDeviceRequest, ApiRevokeDeviceRequest, ApiRegisterDeviceResponse, ApiListDevicesResponse,
+    ApiListDevicesResponse, ApiRegisterDeviceRequest, ApiRegisterDeviceResponse,
+    ApiRevokeDeviceRequest,
+};
+use crate::api::governance_dashboard::{
+    ActivityEvent, AmendmentsBreakdown, AppealsBreakdown, GovernanceDashboard,
+};
+use crate::api::membership::{
+    ApplyMembershipRequest, BanMemberRequest, CapabilityRequest, MemberResponse,
+    MembershipActionRequest, RevokeMembershipRequest, RoleRequest,
 };
 use crate::api::notifications::{
+    ListNotificationsResponse, MarkReadResponse, NotificationCountResponse,
     RegisterDeviceRequest as NotifRegisterDeviceRequest, RegisterDeviceResponse,
-    ListNotificationsResponse, NotificationCountResponse, MarkReadResponse,
+};
+use crate::api::steward::{
+    BondOperationRequest, ExtendTermRequest, RegisterStewardRequest, StewardDetailResponse,
+    StewardSummaryResponse, UpdateStatusRequest,
 };
 use crate::identity_mgr::DeviceInfo;
-use icn_store::notifications::{Platform, InAppNotification};
+use icn_store::notifications::{InAppNotification, Platform};
 
 /// OpenAPI documentation for ICN Gateway
 #[derive(OpenApi)]

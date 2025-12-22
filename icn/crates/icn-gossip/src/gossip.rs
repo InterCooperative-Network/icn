@@ -46,7 +46,7 @@ fn topics_per_peer_limit(trust_class: Option<TrustClass>) -> usize {
     match trust_class {
         Some(TrustClass::Federated) => MAX_TOPICS_PER_PEER_BASE * 4, // 400 topics
         Some(TrustClass::Partner) => MAX_TOPICS_PER_PEER_BASE * 2,   // 200 topics
-        Some(TrustClass::Known) => MAX_TOPICS_PER_PEER_BASE,          // 100 topics
+        Some(TrustClass::Known) => MAX_TOPICS_PER_PEER_BASE,         // 100 topics
         Some(TrustClass::Isolated) | None => MAX_TOPICS_PER_PEER_BASE / 2, // 50 topics
     }
 }
@@ -2008,7 +2008,10 @@ mod tests {
         assert_eq!(subs.len(), 50, "Should have 50 subscriptions");
 
         // 51st subscription should fail
-        gossip.create_topic(Topic::new("test:topic_50".to_string(), AccessControl::Public));
+        gossip.create_topic(Topic::new(
+            "test:topic_50".to_string(),
+            AccessControl::Public,
+        ));
         let result = gossip.subscribe("test:topic_50", peer.clone());
         assert!(result.is_err(), "51st subscription should fail");
         assert!(
@@ -2052,7 +2055,11 @@ mod tests {
 
         // Verify peer has 100 subscriptions (well under 400 limit)
         let subs = gossip.get_subscriptions(&peer);
-        assert_eq!(subs.len(), 100, "Federated peer should have 100 subscriptions");
+        assert_eq!(
+            subs.len(),
+            100,
+            "Federated peer should have 100 subscriptions"
+        );
     }
 
     #[test]

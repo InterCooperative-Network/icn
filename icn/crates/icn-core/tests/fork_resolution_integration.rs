@@ -10,12 +10,7 @@
 //! - Fork resolution on partition heal
 //! - Balance invariant (sum=0) verification
 
-#![allow(
-    dead_code,
-    unused_imports,
-    unused_variables,
-    clippy::cloned_ref_to_slice_refs
-)]
+#![allow(dead_code, unused_imports, unused_variables)]
 
 use anyhow::Result;
 use icn_identity::{Did, KeyPair};
@@ -247,7 +242,7 @@ async fn test_fork_resolution_maintains_ledger_invariants() -> Result<()> {
     info!("Genesis entry created: {:?}", hex::encode(genesis_hash.0));
 
     // Verify genesis balance invariant
-    verify_balance_invariant(&[genesis.clone()])?;
+    verify_balance_invariant(std::slice::from_ref(&genesis))?;
 
     // Simulate partition: Partition A (nodes 0,1) and Partition B (nodes 2,3)
 
@@ -596,8 +591,8 @@ async fn test_multicurrency_fork_invariants() -> Result<()> {
         .build()?;
 
     // Both entries together should maintain invariant
-    verify_balance_invariant(&[entry_hours.clone()])?;
-    verify_balance_invariant(&[entry_usd.clone()])?;
+    verify_balance_invariant(std::slice::from_ref(&entry_hours))?;
+    verify_balance_invariant(std::slice::from_ref(&entry_usd))?;
 
     // Even if both are accepted (no actual fork - different currencies)
     verify_balance_invariant(&[entry_hours, entry_usd])?;

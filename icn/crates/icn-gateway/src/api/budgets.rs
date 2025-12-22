@@ -6,8 +6,8 @@ use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
 use icn_identity::Did;
 pub use icn_store::budgets::{Budget, BudgetPeriod, BudgetStatus, BudgetStore};
 use serde::Deserialize;
-use utoipa::ToSchema;
 use std::collections::HashMap;
+use utoipa::ToSchema;
 
 use crate::error::{GatewayError, Result};
 use crate::middleware::{get_claims, require_scope};

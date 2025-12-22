@@ -862,3 +862,106 @@ export interface AppealListResponse {
   appeals: Appeal[];
   count: number;
 }
+
+// ============================================================================
+// Identity Resolution
+// ============================================================================
+
+/** Response from DID resolution */
+export interface DidResolutionResponse {
+  /** The resolved DID string */
+  did: string;
+  /** Whether the DID is valid and parseable */
+  valid: boolean;
+  /** The cooperative ID this DID belongs to (if known) */
+  coop_id?: string;
+  /** Whether the DID has attestations in this cooperative */
+  has_attestations: boolean;
+  /** Number of valid attestations (if include_attestations was requested) */
+  attestation_count?: number;
+}
+
+/** Identity service health check response */
+export interface IdentityHealthResponse {
+  status: string;
+  service: string;
+}
+
+// ============================================================================
+// Device Management
+// ============================================================================
+
+/** Device capability types */
+export type DeviceCapability =
+  | 'sign'
+  | 'add_device'
+  | 'revoke_device'
+  | 'rotate_key'
+  | 'recover'
+  | 'encrypt';
+
+/** Device information */
+export interface DeviceInfo {
+  /** Unique device identifier */
+  id: string;
+  /** Human-readable label */
+  label: string;
+  /** Key type (e.g., "Ed25519") */
+  key_type: string;
+  /** Capabilities granted to this device */
+  capabilities: string[];
+  /** Timestamp when device was added */
+  added_at: number;
+  /** Whether the device has been revoked */
+  revoked: boolean;
+}
+
+/** Request to register a new device */
+export interface RegisterDeviceRequest {
+  /** Unique device identifier (e.g., "phone-1", "laptop-work") */
+  device_id: string;
+  /** Human-readable label */
+  label: string;
+  /** Ed25519 public key (hex-encoded) */
+  public_key: string;
+  /** Optional X25519 encryption public key (hex-encoded) */
+  encryption_public_key?: string;
+  /** Capabilities to grant: "sign", "add_device", "revoke_device", "rotate_key", "encrypt" */
+  capabilities: string[];
+  /** Device ID of the device signing this request (must have AddDevice capability) */
+  signing_device_id: string;
+  /** Hex-encoded signature of the registration request */
+  signature: string;
+}
+
+/** Response from device registration */
+export interface RegisterDeviceResponse {
+  /** The registered device info */
+  device: DeviceInfo;
+  /** Success message */
+  message: string;
+}
+
+/** Response from listing devices */
+export interface ListDevicesResponse {
+  /** List of devices */
+  devices: DeviceInfo[];
+  /** Total count */
+  total: number;
+}
+
+/** Request to revoke a device */
+export interface RevokeDeviceRequest {
+  /** Device ID of the device signing this request (must have RevokeDevice capability) */
+  signing_device_id: string;
+  /** Hex-encoded signature */
+  signature: string;
+}
+
+/** Response from device revocation */
+export interface RevokeDeviceResponse {
+  /** Success message */
+  message: string;
+  /** The revoked device ID */
+  device_id: string;
+}

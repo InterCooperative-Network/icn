@@ -151,10 +151,10 @@ impl Ledger {
             trust_graph: None,
             min_trust_for_entry: DEFAULT_MIN_TRUST_FOR_ENTRY,
             journal_version,
-            event_emitter: None,           // Set via set_event_emitter()
-            domain_id: None,               // Set via set_domain_id()
-            validation_hook: None,         // Set via set_validation_hook()
-            credit_policy_manager: None,   // Set via set_credit_policy_manager()
+            event_emitter: None,         // Set via set_event_emitter()
+            domain_id: None,             // Set via set_domain_id()
+            validation_hook: None,       // Set via set_validation_hook()
+            credit_policy_manager: None, // Set via set_credit_policy_manager()
         };
 
         // Load cached balances from storage
@@ -2025,9 +2025,9 @@ impl Ledger {
                 let base_policy = &policy_manager.credit_policy;
 
                 // Calculate: baseline + trust_bonus + history_bonus
-                let trust_bonus =
-                    (base_policy.baseline as f64 * trust_score * base_policy.trust_multiplier)
-                        as i64;
+                let trust_bonus = (base_policy.baseline as f64
+                    * trust_score
+                    * base_policy.trust_multiplier) as i64;
                 let history_bonus = (cleared_volume as f64 * base_policy.history_bonus_rate) as i64;
                 let calculated_limit = base_policy.baseline + trust_bonus + history_bonus;
 
@@ -2045,11 +2045,7 @@ impl Ledger {
                     );
                     icn_obs::metrics::ledger::entries_rejected_credit_limit_inc();
                     anyhow::bail!(
-                        "Account {} would exceed credit limit for {}: new balance {} < -{}",
-                        account,
-                        currency,
-                        new_balance,
-                        calculated_limit
+                        "Account {account} would exceed credit limit for {currency}: new balance {new_balance} < -{calculated_limit}"
                     );
                 }
             }

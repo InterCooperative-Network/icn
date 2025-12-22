@@ -41,7 +41,7 @@ impl TryFrom<u8> for CompressionFormat {
         match value {
             0 => Ok(CompressionFormat::None),
             1 => Ok(CompressionFormat::Zstd),
-            _ => anyhow::bail!("Unknown compression format: {}", value),
+            _ => anyhow::bail!("Unknown compression format: {value}"),
         }
     }
 }
@@ -401,8 +401,8 @@ impl NetworkMessage {
 
         // Only compress if enabled, above threshold, and would reduce size
         if enable_compression && raw_bytes.len() >= COMPRESSION_THRESHOLD {
-            let compressed = zstd::encode_all(raw_bytes.as_slice(), 3)
-                .context("Failed to compress message")?;
+            let compressed =
+                zstd::encode_all(raw_bytes.as_slice(), 3).context("Failed to compress message")?;
 
             // Only use compression if it actually reduces size
             if compressed.len() < raw_bytes.len() {
@@ -602,7 +602,9 @@ pub async fn read_message(recv: &mut quinn::RecvStream) -> Result<(NetworkMessag
 /// Helper for reading length-prefixed messages with compression support
 /// Use this for peers that support MESSAGE_COMPRESSION capability.
 /// Returns the message and the number of bytes read (including 4-byte length prefix)
-pub async fn read_message_compressed(recv: &mut quinn::RecvStream) -> Result<(NetworkMessage, usize)> {
+pub async fn read_message_compressed(
+    recv: &mut quinn::RecvStream,
+) -> Result<(NetworkMessage, usize)> {
     // Read 4-byte length prefix (big-endian)
     let mut len_buf = [0u8; 4];
     recv.read_exact(&mut len_buf)
@@ -1010,8 +1012,14 @@ mod tests {
 
     #[test]
     fn test_compression_format_conversion() {
-        assert_eq!(CompressionFormat::try_from(0).unwrap(), CompressionFormat::None);
-        assert_eq!(CompressionFormat::try_from(1).unwrap(), CompressionFormat::Zstd);
+        assert_eq!(
+            CompressionFormat::try_from(0).unwrap(),
+            CompressionFormat::None
+        );
+        assert_eq!(
+            CompressionFormat::try_from(1).unwrap(),
+            CompressionFormat::Zstd
+        );
         assert!(CompressionFormat::try_from(2).is_err());
         assert!(CompressionFormat::try_from(255).is_err());
     }
