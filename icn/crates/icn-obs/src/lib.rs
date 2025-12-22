@@ -11,6 +11,8 @@ pub mod contribution;
 pub mod health;
 /// Prometheus metrics collection
 pub mod metrics;
+/// Distributed tracing with OpenTelemetry
+pub mod otel;
 
 use anyhow::{Context, Result};
 use metrics_exporter_prometheus::PrometheusBuilder;
@@ -28,6 +30,7 @@ pub use attestation::{
 };
 pub use contribution::{AggregatedMetrics, ResourceMetrics, ResourceType};
 pub use health::{start_monitoring_server, HealthService, HealthState, HealthStatus};
+pub use otel::{init_tracing, shutdown_tracing, TraceContext, TracingConfig};
 
 /// Initialize observability stack
 pub fn init() -> Result<()> {

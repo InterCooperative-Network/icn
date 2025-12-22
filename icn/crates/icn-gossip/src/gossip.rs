@@ -372,6 +372,7 @@ impl GossipActor {
     }
 
     /// Publish an entry to a topic
+    #[instrument(skip(self, data), fields(topic = %topic, data_size = data.len()))]
     pub fn publish(&mut self, topic: &str, data: Vec<u8>) -> Result<ContentHash> {
         // Auto-create topic if it doesn't exist (as public topic)
         if !self.topics.contains_key(topic) {
@@ -621,6 +622,7 @@ impl GossipActor {
     }
 
     /// Subscribe to a topic
+    #[instrument(skip(self), fields(topic = %topic, subscriber = %subscriber))]
     pub fn subscribe(&mut self, topic: &str, subscriber: Did) -> Result<Subscription> {
         let topic_obj = self.topics.get(topic).context("Topic not found")?;
 

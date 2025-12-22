@@ -60,6 +60,36 @@ pub struct NetworkMessage {
 
     /// Message payload
     pub payload: MessagePayload,
+
+    /// Trace context for distributed tracing (optional for backward compatibility)
+    /// Note: We use `default` for deserialization but NOT `skip_serializing_if`
+    /// because bincode uses positional encoding and skipping fields breaks deserialization.
+    #[serde(default)]
+    pub trace_context: Option<TraceContext>,
+}
+
+/// W3C Trace Context for distributed tracing propagation
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct TraceContext {
+    /// W3C traceparent header value (e.g., "00-trace_id-span_id-flags")
+    pub traceparent: Option<String>,
+    /// W3C tracestate header value for vendor-specific data
+    pub tracestate: Option<String>,
+}
+
+impl TraceContext {
+    /// Create a trace context from the current span (if OpenTelemetry is active)
+    pub fn from_current() -> Self {
+        // This is a placeholder - actual implementation requires OpenTelemetry context
+        // When icn-obs::init_tracing is called with tracing enabled,
+        // tracing-opentelemetry will provide context propagation
+        Self::default()
+    }
+
+    /// Check if this trace context is valid
+    pub fn is_valid(&self) -> bool {
+        self.traceparent.is_some()
+    }
 }
 
 /// Message payload types
@@ -215,7 +245,30 @@ impl NetworkMessage {
             from,
             to,
             payload,
+            trace_context: None,
         }
+    }
+
+    /// Create a new network message with trace context
+    pub fn new_with_trace(
+        from: Did,
+        to: Option<Did>,
+        payload: MessagePayload,
+        trace_context: Option<TraceContext>,
+    ) -> Self {
+        NetworkMessage {
+            version: PROTOCOL_VERSION,
+            from,
+            to,
+            payload,
+            trace_context,
+        }
+    }
+
+    /// Attach trace context from the current span
+    pub fn with_current_trace_context(mut self) -> Self {
+        self.trace_context = Some(TraceContext::from_current());
+        self
     }
 
     /// Create a gossip message

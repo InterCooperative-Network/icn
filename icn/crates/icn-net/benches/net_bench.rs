@@ -27,6 +27,7 @@ fn create_ping_message(from_seed: u8) -> NetworkMessage {
         payload: MessagePayload::Ping {
             sent_at: 1700000000000,
         },
+        trace_context: None,
     }
 }
 
@@ -67,6 +68,7 @@ fn bench_message_serialization(c: &mut Criterion) {
                     "compute:submit".to_string(),
                 ],
             },
+            trace_context: None,
         };
         b.iter(|| {
             let config = bincode::config::standard();
@@ -84,6 +86,7 @@ fn bench_message_serialization(c: &mut Criterion) {
                 ping_sent_at: 1700000000000,
                 pong_sent_at: 1700000000050,
             },
+            trace_context: None,
         };
         b.iter(|| {
             let config = bincode::config::standard();
@@ -211,6 +214,7 @@ fn bench_message_sizes(c: &mut Criterion) {
             payload: MessagePayload::Subscribe {
                 topics: (0..10).map(|i| format!("topic:category{i}")).collect(),
             },
+            trace_context: None,
         };
         b.iter(|| {
             let config = bincode::config::standard();

@@ -15,5 +15,11 @@ serde.workspace = true
 serde_json.workspace = true
 blake3 = "1.5"
 
+# OpenTelemetry distributed tracing
+opentelemetry.workspace = true
+opentelemetry_sdk.workspace = true
+opentelemetry-otlp.workspace = true
+tracing-opentelemetry.workspace = true
+
 [lints]
 workspace = true

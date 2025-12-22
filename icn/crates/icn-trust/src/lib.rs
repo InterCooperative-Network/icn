@@ -76,7 +76,7 @@ use icn_identity::Did;
 use icn_store::Store;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tracing::{debug, info};
+use tracing::{debug, info, instrument};
 
 /// Trust classification for a peer
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -383,6 +383,7 @@ impl TrustGraph {
     /// TrustScore(own -> target) =
     ///     DirectTrust(own -> target) * 0.7 +
     ///     TransitiveTrust(own -> intermediate -> target) * 0.3
+    #[instrument(skip(self), fields(target = %target))]
     pub fn compute_trust_score(&self, target: &Did) -> Result<f64> {
         self.compute_trust_score_weighted(target, ScoringWeights::legacy())
     }

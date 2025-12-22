@@ -980,6 +980,7 @@ impl Ledger {
     ///
     /// Returns a list of resolved forks with their resolutions.
     /// Entries that should be discarded are quarantined.
+    #[instrument(skip(self))]
     pub fn detect_and_resolve_forks(&mut self) -> Result<Vec<(Fork, ForkResolution)>> {
         let forks = self.fork_detector.detect_forks();
 

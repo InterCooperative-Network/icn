@@ -121,6 +121,7 @@ impl NetworkHandle {
     }
 
     /// Send a network message to a specific peer
+    #[instrument(skip(self, message), fields(recipient = %did))]
     pub async fn send_message(&self, did: Did, message: NetworkMessage) -> Result<()> {
         let (tx, rx) = oneshot::channel();
         self.tx
@@ -199,6 +200,7 @@ impl NetworkHandle {
     }
 
     /// Broadcast a message to all connected peers
+    #[instrument(skip(self, message))]
     pub async fn broadcast(&self, message: NetworkMessage) -> Result<()> {
         let (tx, rx) = oneshot::channel();
         self.tx
