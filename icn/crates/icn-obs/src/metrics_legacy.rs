@@ -314,6 +314,11 @@ pub fn init_descriptions() {
         "icn_gossip_pull_truncated_total",
         "Total number of pull responses truncated due to size limits"
     );
+    // Issue #181: Missing alert metrics
+    describe_histogram!(
+        "icn_gossip_message_latency_seconds",
+        "Latency of gossip message processing in seconds"
+    );
 
     // Scalability metrics (Phase 19)
     describe_counter!(
@@ -448,6 +453,11 @@ pub fn init_descriptions() {
         "icn_ledger_quarantine_size",
         "Current number of entries in quarantine"
     );
+    // Issue #181: Missing alert metrics
+    describe_gauge!(
+        "icn_ledger_sync_lag_seconds",
+        "Seconds behind the latest known ledger state"
+    );
 
     // Governance metrics
     describe_counter!(
@@ -524,6 +534,11 @@ pub fn init_descriptions() {
     describe_counter!(
         "icn_trust_attestations_updated_total",
         "Total number of existing trust edges updated from attestations"
+    );
+    // Issue #181: Missing alert metrics
+    describe_counter!(
+        "icn_trust_computation_errors_total",
+        "Total number of errors during trust score computation"
     );
 
     // Multi-graph trust metrics (Phase 21)
@@ -1849,6 +1864,11 @@ pub mod gossip {
     pub fn pull_continuation_received_inc() {
         counter!("icn_gossip_pull_continuation_received_total").increment(1);
     }
+
+    /// Issue #181: Record gossip message processing latency
+    pub fn message_latency_record(latency_secs: f64) {
+        histogram!("icn_gossip_message_latency_seconds").record(latency_secs);
+    }
 }
 
 /// Scalability metrics (Phase 19)
@@ -2009,6 +2029,11 @@ pub mod ledger {
     pub fn recompute_aborted_version_mismatch_inc() {
         counter!("icn_ledger_recompute_aborted_version_mismatch_total").increment(1);
     }
+
+    /// Issue #181: Set ledger sync lag in seconds
+    pub fn sync_lag_seconds_set(lag_secs: f64) {
+        gauge!("icn_ledger_sync_lag_seconds").set(lag_secs);
+    }
 }
 
 /// Governance execution metrics
@@ -2142,6 +2167,11 @@ pub mod trust {
     pub fn score_by_graph_record(graph_type: &str, score: f64) {
         histogram!("icn_trust_score_by_graph", "graph_type" => graph_type.to_string())
             .record(score);
+    }
+
+    /// Issue #181: Increment trust computation errors counter
+    pub fn computation_errors_inc() {
+        counter!("icn_trust_computation_errors_total").increment(1);
     }
 }
 

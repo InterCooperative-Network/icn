@@ -947,6 +947,16 @@ impl GossipActor {
     /// Handle incoming gossip message from network
     #[instrument(skip(self, message), fields(peer_did = %sender, message_type = message.variant_name()))]
     pub fn handle_message(&mut self, sender: &Did, message: GossipMessage) -> Result<()> {
+        // Issue #181: Track message processing latency
+        let start = std::time::Instant::now();
+        let result = self.handle_message_inner(sender, message);
+        let elapsed = start.elapsed().as_secs_f64();
+        icn_obs::metrics::gossip::message_latency_record(elapsed);
+        result
+    }
+
+    /// Inner implementation of handle_message (for latency tracking)
+    fn handle_message_inner(&mut self, sender: &Did, message: GossipMessage) -> Result<()> {
         // H7 fix: Trust-gated message handling
         // Check sender's trust score before processing messages
         const MIN_TRUST_FOR_MESSAGE: f64 = 0.1; // Known trust class minimum

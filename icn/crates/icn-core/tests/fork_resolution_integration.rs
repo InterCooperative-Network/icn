@@ -10,7 +10,13 @@
 //! - Fork resolution on partition heal
 //! - Balance invariant (sum=0) verification
 
-#![allow(dead_code, unused_imports, unused_variables)]
+#![allow(
+    unknown_lints,
+    dead_code,
+    unused_imports,
+    unused_variables,
+    clippy::cloned_ref_to_slice_refs
+)]
 
 use anyhow::Result;
 use icn_identity::{Did, KeyPair};
