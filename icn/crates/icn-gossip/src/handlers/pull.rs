@@ -6,7 +6,9 @@
 
 use crate::bloom::BloomFilter;
 use crate::gossip::GossipActor;
-use crate::types::{BloomFilterData, ContentHash, GossipEntry, GossipMessage, SyncCursor, TrustResourceLimits};
+use crate::types::{
+    BloomFilterData, ContentHash, GossipEntry, GossipMessage, SyncCursor, TrustResourceLimits,
+};
 use crate::vector_clock::VectorClock;
 use anyhow::Result;
 use icn_identity::Did;
@@ -176,9 +178,15 @@ impl GossipActor {
         // Validate cursor if provided
         if let Some(ref c) = cursor {
             if c.is_expired() {
-                warn!("Received expired cursor for topic {}, ignoring cursor", topic);
+                warn!(
+                    "Received expired cursor for topic {}, ignoring cursor",
+                    topic
+                );
             } else if c.topic != topic {
-                warn!("Cursor topic mismatch: {} vs {}, ignoring cursor", c.topic, topic);
+                warn!(
+                    "Cursor topic mismatch: {} vs {}, ignoring cursor",
+                    c.topic, topic
+                );
             }
         }
 
@@ -194,7 +202,9 @@ impl GossipActor {
         // Sort entries deterministically for pagination (by timestamp, then hash)
         let mut sorted_entries: Vec<_> = topic_entries.values().cloned().collect();
         sorted_entries.sort_by(|a, b| {
-            a.timestamp.cmp(&b.timestamp).then_with(|| a.hash.cmp(&b.hash))
+            a.timestamp
+                .cmp(&b.timestamp)
+                .then_with(|| a.hash.cmp(&b.hash))
         });
 
         // Find starting position from cursor
@@ -246,9 +256,9 @@ impl GossipActor {
         // Determine if there are more entries and create cursor
         let has_more = last_entry_index + 1 < sorted_entries.len() && !response_entries.is_empty();
         let next_cursor = if has_more {
-            sorted_entries.get(last_entry_index).map(|e| {
-                SyncCursor::new(last_entry_index as u64, e.hash, topic.clone())
-            })
+            sorted_entries
+                .get(last_entry_index)
+                .map(|e| SyncCursor::new(last_entry_index as u64, e.hash, topic.clone()))
         } else {
             None
         };

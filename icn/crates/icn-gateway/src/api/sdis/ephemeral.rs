@@ -13,9 +13,9 @@ use icn_identity::KeyBundle;
 use icn_zkp::ProofType;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
 use std::time::Duration;
 use thiserror::Error;
+use utoipa::ToSchema;
 
 /// Epoch for relative timestamps (2024-01-01 00:00:00 UTC)
 pub const EPOCH_2024: u64 = 1704067200;

@@ -1245,8 +1245,15 @@ export class ICNClient {
    * ```
    */
   async resolveDid(did: string, includeAttestations?: boolean): Promise<DidResolutionResponse> {
-    const query = includeAttestations ? '?include_attestations=true' : '';
-    return this.get<DidResolutionResponse>(`/identity/resolve/${encodeURIComponent(did)}${query}`, false);
+    const params = new URLSearchParams();
+    if (includeAttestations) {
+      params.set('include_attestations', 'true');
+    }
+    const query = params.toString();
+    return this.get<DidResolutionResponse>(
+      `/identity/resolve/${encodeURIComponent(did)}${query ? `?${query}` : ''}`,
+      false
+    );
   }
 
   /**

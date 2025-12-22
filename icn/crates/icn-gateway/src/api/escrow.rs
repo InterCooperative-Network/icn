@@ -6,10 +6,10 @@ use actix_web::{get, post, web, HttpRequest, HttpResponse};
 use icn_identity::Did;
 pub use icn_store::escrow::{Escrow, EscrowCondition, EscrowStatus, EscrowStore};
 use serde::Deserialize;
-use utoipa::ToSchema;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{info, warn};
+use utoipa::ToSchema;
 
 use crate::error::{GatewayError, Result};
 use crate::ledger_mgr::LedgerManager;

@@ -2,8 +2,8 @@
 
 use actix_web::{get, post, web, HttpResponse};
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
 use std::sync::Arc;
+use utoipa::ToSchema;
 
 use crate::error::{GatewayError, Result};
 use crate::events::{EventBroadcaster, GatewayEvent};

@@ -528,10 +528,10 @@ pub struct VelocityLimitConfig {
 impl Default for VelocityLimitConfig {
     fn default() -> Self {
         Self {
-            isolated_limit: 10,    // Very conservative for unknown users
-            known_limit: 50,       // Moderate for known users
-            partner_limit: 100,    // Higher for trusted partners
-            federated_limit: 200,  // Highest for federated nodes
+            isolated_limit: 10,                // Very conservative for unknown users
+            known_limit: 50,                   // Moderate for known users
+            partner_limit: 100,                // Higher for trusted partners
+            federated_limit: 200,              // Highest for federated nodes
             window: Duration::from_secs(3600), // 1 hour window
         }
     }

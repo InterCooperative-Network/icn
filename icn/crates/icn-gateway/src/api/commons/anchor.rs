@@ -7,9 +7,9 @@
 
 use actix_web::{get, post, put, web, HttpRequest, HttpResponse};
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
 use std::sync::Arc;
 use tracing::warn;
+use utoipa::ToSchema;
 
 use crate::commons_mgr::CommonsManager;
 use crate::error::{GatewayError, Result};

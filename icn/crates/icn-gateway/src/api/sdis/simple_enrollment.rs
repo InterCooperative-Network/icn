@@ -11,9 +11,9 @@ use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use icn_identity::commons::{JurisdictionId, MembershipCapability};
 use icn_identity::Did;
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::auth::AuthManager;

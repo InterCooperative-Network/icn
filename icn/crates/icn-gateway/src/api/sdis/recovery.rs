@@ -13,8 +13,8 @@
 
 use actix_web::{get, post, web, HttpResponse};
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
 use std::sync::Arc;
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use super::enrollment::KeyBundleDto;

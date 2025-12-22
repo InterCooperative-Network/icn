@@ -644,8 +644,11 @@ mod tests {
         store.store(&holder1).unwrap();
 
         // Create and suspend another holder
-        let mut holder2 =
-            CommonsHolderRecord::new([2u8; 32], TEST_DID_2.parse().expect("valid DID"), POPLevel::Strong);
+        let mut holder2 = CommonsHolderRecord::new(
+            [2u8; 32],
+            TEST_DID_2.parse().expect("valid DID"),
+            POPLevel::Strong,
+        );
         holder2.suspend("test".to_string(), 9999999999);
         store.store(&holder2).unwrap();
 
@@ -764,8 +767,11 @@ mod tests {
 
         store.store(&create_test_holder()).unwrap();
 
-        let holder2 =
-            CommonsHolderRecord::new([2u8; 32], TEST_DID_2.parse().expect("valid DID"), POPLevel::Strong);
+        let holder2 = CommonsHolderRecord::new(
+            [2u8; 32],
+            TEST_DID_2.parse().expect("valid DID"),
+            POPLevel::Strong,
+        );
         store.store(&holder2).unwrap();
 
         assert_eq!(store.count().unwrap(), 2);
