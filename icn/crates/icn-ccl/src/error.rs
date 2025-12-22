@@ -103,7 +103,7 @@ pub enum CclError {
     },
 
     /// Invalid argument count for function
-    #[error("Function '{name}' takes {expected} argument(s), got {actual} at {span}")]
+    #[error("Function '{name}' at {span}: takes {expected} argument(s), got {actual}")]
     ArgumentCount {
         span: Span,
         name: String,
@@ -112,7 +112,7 @@ pub enum CclError {
     },
 
     /// Invalid argument type for function
-    #[error("Function '{name}' requires {expected} at {span}, got {actual}")]
+    #[error("Function '{name}' at {span}: requires {expected}, got {actual}")]
     ArgumentType {
         span: Span,
         name: String,
