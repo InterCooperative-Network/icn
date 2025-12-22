@@ -191,6 +191,92 @@ See **[docs/PHASE_HISTORY.md](docs/PHASE_HISTORY.md)** for complete phase histor
 2. Register in `init_metrics()`
 3. Follow naming: `{actor}_{metric}_{unit}`
 
+## Git Workflow
+
+**Goal**: `main` is always releasable. Work happens on short-lived branches, merged via PR.
+
+### Branch Policy
+
+**Protected Branch: `main`**
+- **No direct commits to `main`** - all changes land via Pull Request
+- Only merge when CI passes (or local checks pass)
+
+**Branch Naming**:
+- `feat/<short-slug>` - new capability
+- `fix/<short-slug>` - bug fix
+- `refactor/<short-slug>` - structure change, behavior preserved
+- `docs/<short-slug>` - documentation only
+- `chore/<short-slug>` - build tooling, formatting, deps
+
+Examples: `feat/gossip-compression`, `fix/trust-rate-limit-overflow`, `refactor/actor-message-routing`
+
+### Daily Flow
+
+```bash
+# 1) Start from updated main
+git checkout main
+git pull origin main
+
+# 2) Create a branch
+git checkout -b feat/<slug>
+
+# 3) Work in small commits
+git add -A
+git commit -m "feat(gossip): add message compression header"
+
+# 4) Keep branch synced (if main moved)
+git fetch origin
+git rebase origin/main
+git push --force-with-lease   # Only on YOUR branch
+
+# 5) Push and open PR
+git push -u origin feat/<slug>
+```
+
+### Commit Message Convention
+
+Format: `<type>(<scope>): <summary>`
+
+**Types**: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`
+
+**Scopes**: `gossip`, `net`, `identity`, `trust`, `ledger`, `ccl`, `gateway`, `cli`, `runtime`, `sdk`, `governance`, `compute`
+
+Examples:
+- `feat(ledger): add demurrage scheduler`
+- `fix(trust): prevent negative reputation underflow`
+- `refactor(runtime): isolate actor mailbox logic`
+
+### PR Requirements
+
+**Size**: One coherent change, reviewable in <20 minutes. Split large changes.
+
+**Description must include**:
+- **What**: Summary of changes
+- **Why**: Motivation / issue link
+- **How**: Implementation notes
+- **Risk**: What could break
+- **Test plan**: How you verified
+
+### Required Checks (before merge)
+
+```bash
+# Rust
+cargo fmt --check
+cargo clippy --all-targets --all-features -- -D warnings
+cargo test --all-features
+
+# TypeScript SDK (if changed)
+cd sdk/typescript && npm test && npm run build
+```
+
+### Agent Behavior
+
+The Claude Code agent **must**:
+- Never push directly to `main`
+- Always work on feature branches and open PRs
+- Run required checks before requesting review
+- Explain any skipped checks in the PR description
+
 ## Security & Production Hardening
 
 **Three-Layer Security**:
