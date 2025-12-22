@@ -48,6 +48,8 @@ pub struct GatewayServer {
     trust_graph_handle: Option<TrustGraphHandle>,
     /// Optional handle to daemon's GovernanceActor (for actor-backed mode)
     governance_handle: Option<GovernanceHandle>,
+    /// Optional handle to daemon's ContractRegistryActor (for contract management)
+    contract_registry_handle: Option<icn_ccl::ContractRegistryHandle>,
 }
 
 impl GatewayServer {
@@ -64,6 +66,7 @@ impl GatewayServer {
             coop_handle: None,
             trust_graph_handle: None,
             governance_handle: None,
+            contract_registry_handle: None,
         }
     }
 
@@ -84,6 +87,7 @@ impl GatewayServer {
             coop_handle: None,
             trust_graph_handle: None,
             governance_handle: None,
+            contract_registry_handle: None,
         }
     }
 
@@ -105,6 +109,7 @@ impl GatewayServer {
             coop_handle: None,
             trust_graph_handle: None,
             governance_handle: None,
+            contract_registry_handle: None,
         }
     }
 
@@ -141,6 +146,18 @@ impl GatewayServer {
     /// GovernanceActor, ensuring persistence and gossip synchronization.
     pub fn with_governance_handle(mut self, handle: GovernanceHandle) -> Self {
         self.governance_handle = Some(handle);
+        self
+    }
+
+    /// Set contract registry handle for daemon integration
+    ///
+    /// When set, the contracts API will delegate all operations to the daemon's
+    /// ContractRegistryActor, enabling contract management with gossip sync.
+    pub fn with_contract_registry_handle(
+        mut self,
+        handle: icn_ccl::ContractRegistryHandle,
+    ) -> Self {
+        self.contract_registry_handle = Some(handle);
         self
     }
 
@@ -213,6 +230,17 @@ impl GatewayServer {
             info!("Compute manager running standalone (no daemon connection)");
             Arc::new(ComputeManager::new())
         };
+
+        // Create contract registry handle for contract management API
+        let contract_registry: Option<Arc<icn_ccl::ContractRegistryHandle>> =
+            if let Some(handle) = self.contract_registry_handle {
+                info!("Contract registry connected to daemon (using ContractRegistryActor)");
+                Some(Arc::new(handle))
+            } else {
+                info!("Contract registry not configured (contracts API disabled)");
+                None
+            };
+
         let federation_manager = Arc::new(FederationManager::new());
         let commons_manager = Arc::new(CommonsManager::new());
 
@@ -459,6 +487,8 @@ impl GatewayServer {
                 .app_data(web::Data::new(budget_store.clone()))
                 .app_data(web::Data::new(rate_limiter.clone()))
                 .app_data(web::Data::new(ip_rate_limiter.clone()))
+                // Contract registry (optional - for contract management API)
+                .app_data(web::Data::new(contract_registry.clone()))
                 // JSON payload size limit (256KB - we're not handling file uploads)
                 .app_data(web::JsonConfig::default().limit(262_144))
                 // Middleware (order: last wrapped runs first for REQUEST, first runs last for RESPONSE)
@@ -611,6 +641,16 @@ impl GatewayServer {
                             web::scope("/compute")
                                 .service(api::compute::submit_task)
                                 .service(api::compute::get_status)
+                                .wrap(middleware::from_fn(
+                                    crate::rate_limit::rate_limit_middleware,
+                                ))
+                                .wrap(auth.clone()),
+                        )
+                        // Protected contracts endpoints (auth + rate limiting)
+                        // Only available when ContractRegistryActor is configured
+                        .service(
+                            web::scope("/contracts")
+                                .configure(api::contracts::configure)
                                 .wrap(middleware::from_fn(
                                     crate::rate_limit::rate_limit_middleware,
                                 ))

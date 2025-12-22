@@ -79,8 +79,9 @@ pub use registry::{
     Visibility,
 };
 pub use registry_actor::{
-    ContractRegistryActor, ContractRegistryHandle, ContractRegistryMessage, ContractSummary,
-    DeploymentMetadata, TOPIC_CONTRACTS, TOPIC_CONTRACTS_DEPLOY, TOPIC_CONTRACTS_REVOKE,
+    ContractRegistryActor, ContractRegistryHandle, ContractRegistryMessage, ContractStatus,
+    ContractSummary, DeploymentMetadata, TOPIC_CONTRACTS, TOPIC_CONTRACTS_DEPLOY,
+    TOPIC_CONTRACTS_REVOKE,
 };
 pub use runtime::{ContractInfo, ContractRuntime};
 pub use types::{

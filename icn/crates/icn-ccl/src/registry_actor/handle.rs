@@ -8,8 +8,8 @@ use tokio::sync::{mpsc, oneshot};
 
 use super::command::ContractRegistryCommand;
 use super::types::{
-    ActorError, ApprovalStatus, ContractFilter, ContractRegistryMessage, ContractSummary,
-    DeploymentMetadata,
+    ActorError, ApprovalStatus, ContractFilter, ContractRegistryMessage, ContractStatus,
+    ContractSummary, DeploymentMetadata,
 };
 
 /// Handle for interacting with the ContractRegistryActor
@@ -147,6 +147,71 @@ impl ContractRegistryHandle {
             .await
             .map_err(|_| ActorError::NoResponse)?
             .map_err(ActorError::Registry)
+    }
+
+    /// Deprecate a contract with optional successor (owner only)
+    ///
+    /// # Arguments
+    /// * `hash` - Content hash of the contract to deprecate
+    /// * `requester` - DID of the requester (must be owner)
+    /// * `successor` - Optional hash of the replacement contract
+    /// * `reason` - Reason for deprecation
+    pub async fn deprecate_contract(
+        &self,
+        hash: &ContentHash,
+        requester: &str,
+        successor: Option<ContentHash>,
+        reason: String,
+    ) -> Result<(), ActorError> {
+        let (resp_tx, resp_rx) = oneshot::channel();
+        self.tx
+            .send(ContractRegistryCommand::Deprecate {
+                hash: *hash,
+                requester: requester.to_string(),
+                successor,
+                reason,
+                resp: resp_tx,
+            })
+            .await
+            .map_err(|_| ActorError::ChannelClosed)?;
+        resp_rx
+            .await
+            .map_err(|_| ActorError::NoResponse)?
+            .map_err(ActorError::Registry)
+    }
+
+    /// Get the lifecycle status of a contract
+    pub async fn get_status(
+        &self,
+        hash: &ContentHash,
+    ) -> Result<Option<ContractStatus>, ActorError> {
+        let (resp_tx, resp_rx) = oneshot::channel();
+        self.tx
+            .send(ContractRegistryCommand::GetStatus {
+                hash: *hash,
+                resp: resp_tx,
+            })
+            .await
+            .map_err(|_| ActorError::ChannelClosed)?;
+        resp_rx.await.map_err(|_| ActorError::NoResponse)
+    }
+
+    /// Get version history for a contract by name
+    ///
+    /// Returns a list of (version, hash) pairs for all versions of the contract.
+    pub async fn get_version_history(
+        &self,
+        name: &str,
+    ) -> Result<Vec<(u32, ContentHash)>, ActorError> {
+        let (resp_tx, resp_rx) = oneshot::channel();
+        self.tx
+            .send(ContractRegistryCommand::GetVersionHistory {
+                name: name.to_string(),
+                resp: resp_tx,
+            })
+            .await
+            .map_err(|_| ActorError::ChannelClosed)?;
+        resp_rx.await.map_err(|_| ActorError::NoResponse)
     }
 
     /// Handle an incoming gossip message
