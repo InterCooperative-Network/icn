@@ -48,7 +48,10 @@ pub enum ContractRegistryMessage {
     },
 
     /// Digest of available contracts (for anti-entropy)
-    Digest { hashes: Vec<ContentHash>, sender: String },
+    Digest {
+        hashes: Vec<ContentHash>,
+        sender: String,
+    },
 }
 
 impl ContractRegistryMessage {

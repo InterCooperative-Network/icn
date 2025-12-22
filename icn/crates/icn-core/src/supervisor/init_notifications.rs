@@ -26,6 +26,7 @@ pub type ProfileCache = Arc<RwLock<HashMap<Did, crate::node::NodeProfile>>>;
 pub type CandidateCache = Arc<icn_net::CandidateCache>;
 pub type FederationGossipHandle = Arc<icn_federation::FederationGossipHandler>;
 pub type AttestationRateLimiterHandle = Arc<crate::trust_propagation::AttestationRateLimiter>;
+pub type ContractRegistryHolder = Arc<RwLock<Option<icn_ccl::ContractRegistryHandle>>>;
 
 /// Dependencies required for notification callback handlers
 #[derive(Clone)]
@@ -62,6 +63,8 @@ pub struct NotificationDeps {
     pub federation_handler: Option<FederationGossipHandle>,
     /// Rate limiter for trust attestations
     pub attestation_rate_limiter: AttestationRateLimiterHandle,
+    /// Contract registry handle holder for gossip sync (filled after actor spawns)
+    pub contract_registry: ContractRegistryHolder,
 }
 
 /// Handle trust attestation entries
@@ -109,6 +112,23 @@ pub async fn handle_contract_deployment(entry_data: Vec<u8>, contract_actor: Con
         Err(e) => {
             warn!("Failed to deserialize contract deployment message: {}", e);
             icn_obs::metrics::contract::deployments_rejected_inc("deserialization_error");
+        }
+    }
+}
+
+/// Handle contract registry gossip messages (icn:contracts* topics)
+pub async fn handle_contract_registry_message(
+    entry_data: Vec<u8>,
+    registry_handle: icn_ccl::ContractRegistryHandle,
+) {
+    match icn_ccl::ContractRegistryMessage::from_bytes(&entry_data) {
+        Ok(msg) => {
+            if let Err(e) = registry_handle.handle_gossip(msg).await {
+                warn!("Failed to handle contract registry message: {}", e);
+            }
+        }
+        Err(e) => {
+            warn!("Failed to deserialize contract registry message: {}", e);
         }
     }
 }
@@ -783,6 +803,18 @@ pub fn create_notification_callback(
                         handle_federation_message(&topic, data, handler).await;
                     });
                 }
+            }
+        } else if topic == icn_ccl::TOPIC_CONTRACTS
+            || topic == icn_ccl::TOPIC_CONTRACTS_DEPLOY
+            || topic == icn_ccl::TOPIC_CONTRACTS_REVOKE
+        {
+            let registry_holder = deps.contract_registry.clone();
+            if let Some(data) = entry_data {
+                tokio::spawn(async move {
+                    if let Some(registry) = registry_holder.read().await.as_ref() {
+                        handle_contract_registry_message(data, registry.clone()).await;
+                    }
+                });
             }
         }
     })

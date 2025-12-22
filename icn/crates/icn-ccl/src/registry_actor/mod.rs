@@ -137,7 +137,11 @@ impl ContractRegistryActor {
                 let result = self.handle_list(filter).await;
                 let _ = resp.send(result);
             }
-            ContractRegistryCommand::Resolve { name, version, resp } => {
+            ContractRegistryCommand::Resolve {
+                name,
+                version,
+                resp,
+            } => {
                 let result = self.registry.resolve(&name, version).await.ok().flatten();
                 let _ = resp.send(result);
             }
@@ -632,7 +636,11 @@ mod tests {
             .unwrap();
 
         // Resolve by name
-        let resolved = handle.resolve("NamedContract", None).await.unwrap().unwrap();
+        let resolved = handle
+            .resolve("NamedContract", None)
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(resolved, hash);
 
         // Non-existent name

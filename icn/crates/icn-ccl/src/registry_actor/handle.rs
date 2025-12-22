@@ -152,10 +152,7 @@ impl ContractRegistryHandle {
     /// Handle an incoming gossip message
     ///
     /// Called by the supervisor when a message arrives on contract registry topics.
-    pub async fn handle_gossip(
-        &self,
-        msg: ContractRegistryMessage,
-    ) -> Result<(), ActorError> {
+    pub async fn handle_gossip(&self, msg: ContractRegistryMessage) -> Result<(), ActorError> {
         self.tx
             .send(ContractRegistryCommand::GossipMessage(msg))
             .await

@@ -96,12 +96,11 @@ impl LocalExecutor {
         }
 
         // Parse caller DID
-        let caller_did: icn_identity::Did = match serde_json::from_value(
-            serde_json::Value::String(ctx.executor_did.clone()),
-        ) {
-            Ok(d) => d,
-            Err(e) => return ExecutionOutcome::Failed(format!("Invalid caller DID: {e}")),
-        };
+        let caller_did: icn_identity::Did =
+            match serde_json::from_value(serde_json::Value::String(ctx.executor_did.clone())) {
+                Ok(d) => d,
+                Err(e) => return ExecutionOutcome::Failed(format!("Invalid caller DID: {e}")),
+            };
 
         // Create execution context for CCL
         let timestamp = icn_time::current_timestamp_secs();
@@ -132,8 +131,7 @@ impl LocalExecutor {
                 ctx.fuel_remaining = ctx.fuel_remaining.saturating_sub(result.fuel_consumed);
 
                 // Serialize result
-                let output =
-                    serde_json::to_vec(&result.value).unwrap_or_else(|_| b"null".to_vec());
+                let output = serde_json::to_vec(&result.value).unwrap_or_else(|_| b"null".to_vec());
                 ExecutionOutcome::Success(output)
             }
             Err(e) => {

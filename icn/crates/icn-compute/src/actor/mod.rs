@@ -162,22 +162,23 @@ impl ComputeActor {
     pub fn set_contract_registry(&mut self, registry: icn_ccl::ContractRegistryHandle) {
         // Create a resolver callback that synchronously fetches contracts from the registry
         let registry_clone = registry.clone();
-        let resolver: crate::executor::ContractResolverCallback = Arc::new(move |hash: [u8; 32]| {
-            let registry = registry_clone.clone();
-            // Use block_in_place to safely call async from sync context
-            tokio::task::block_in_place(|| {
-                tokio::runtime::Handle::current().block_on(async {
-                    match registry.get_contract(&hash).await {
-                        Ok(Some(contract)) => Some(contract),
-                        Ok(None) => None,
-                        Err(e) => {
-                            tracing::warn!("Failed to get contract from registry: {}", e);
-                            None
+        let resolver: crate::executor::ContractResolverCallback =
+            Arc::new(move |hash: [u8; 32]| {
+                let registry = registry_clone.clone();
+                // Use block_in_place to safely call async from sync context
+                tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(async {
+                        match registry.get_contract(&hash).await {
+                            Ok(Some(contract)) => Some(contract),
+                            Ok(None) => None,
+                            Err(e) => {
+                                tracing::warn!("Failed to get contract from registry: {}", e);
+                                None
+                            }
                         }
-                    }
+                    })
                 })
-            })
-        });
+            });
 
         // Set the resolver on the executor
         // Note: This requires exclusive access before spawning
