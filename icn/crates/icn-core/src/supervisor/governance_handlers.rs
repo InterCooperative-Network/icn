@@ -358,7 +358,80 @@ impl GovernanceEventHandler {
                 }
             }
 
+            // Validation: Amount must be positive
+            if amount <= 0 {
+                error!(
+                    "❌ Invalid amount for budget proposal {}: {} (must be positive)",
+                    proposal_id.0, amount
+                );
+                let failed_op = FailedOperation::new(
+                    format!("treasury:budget:{}", proposal_id.0),
+                    FailureType::TreasuryOperationFailed,
+                    serde_json::json!({
+                        "proposal_id": proposal_id.0,
+                        "error": "invalid_amount",
+                        "amount": amount,
+                    }),
+                    format!("Amount must be positive, got: {amount}"),
+                );
+                if let Err(dlq_err) = dlq.enqueue(failed_op) {
+                    error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                }
+                icn_obs::metrics::governance::execution_failures_inc("treasury_create_budget");
+                return;
+            }
+
             let mut treasury_guard = treasury_manager.write().await;
+
+            // Validation: Currency must match treasury's configured currency
+            if let Some(treasury) = treasury_guard.get_treasury(&treasury_did) {
+                if treasury.currency != currency {
+                    error!(
+                        "❌ Currency mismatch for budget proposal {}: got '{}', treasury uses '{}'",
+                        proposal_id.0, currency, treasury.currency
+                    );
+                    let failed_op = FailedOperation::new(
+                        format!("treasury:budget:{}", proposal_id.0),
+                        FailureType::TreasuryOperationFailed,
+                        serde_json::json!({
+                            "proposal_id": proposal_id.0,
+                            "error": "currency_mismatch",
+                            "requested_currency": currency,
+                            "treasury_currency": treasury.currency,
+                        }),
+                        format!(
+                            "Currency mismatch: got '{}', expected '{}'",
+                            currency, treasury.currency
+                        ),
+                    );
+                    if let Err(dlq_err) = dlq.enqueue(failed_op) {
+                        error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                    }
+                    icn_obs::metrics::governance::execution_failures_inc("treasury_create_budget");
+                    return;
+                }
+            } else {
+                error!(
+                    "❌ Treasury {} not found for budget proposal {}",
+                    treasury_did, proposal_id.0
+                );
+                let failed_op = FailedOperation::new(
+                    format!("treasury:budget:{}", proposal_id.0),
+                    FailureType::TreasuryOperationFailed,
+                    serde_json::json!({
+                        "proposal_id": proposal_id.0,
+                        "error": "treasury_not_found",
+                        "treasury_did": treasury_did.to_string(),
+                    }),
+                    format!("Treasury {treasury_did} not found"),
+                );
+                if let Err(dlq_err) = dlq.enqueue(failed_op) {
+                    error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                }
+                icn_obs::metrics::governance::execution_failures_inc("treasury_create_budget");
+                return;
+            }
+
             match treasury_guard.create_budget(
                 treasury_did.clone(),
                 purpose.clone(),
@@ -392,6 +465,7 @@ impl GovernanceEventHandler {
                                 "🚨 Failed to store audit trail for budget proposal {}: {}",
                                 proposal_id.0, e
                             );
+                            icn_obs::metrics::governance::audit_failures_inc();
                         }
                     }
 
@@ -544,7 +618,79 @@ impl GovernanceEventHandler {
                 }
             }
 
+            // Validation: Threshold amount must be positive
+            if threshold_amount <= 0 {
+                error!(
+                    "❌ Invalid threshold amount for spending rule proposal {}: {} (must be positive)",
+                    proposal_id.0, threshold_amount
+                );
+                let failed_op = FailedOperation::new(
+                    format!("treasury:rule:{}", proposal_id.0),
+                    FailureType::TreasuryOperationFailed,
+                    serde_json::json!({
+                        "proposal_id": proposal_id.0,
+                        "error": "invalid_threshold_amount",
+                        "threshold_amount": threshold_amount,
+                    }),
+                    format!("Threshold amount must be positive, got: {threshold_amount}"),
+                );
+                if let Err(dlq_err) = dlq.enqueue(failed_op) {
+                    error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                }
+                icn_obs::metrics::governance::execution_failures_inc("treasury_modify_rule");
+                return;
+            }
+
             let mut treasury_guard = treasury_manager.write().await;
+
+            // Validation: Currency must match treasury's configured currency
+            if let Some(treasury) = treasury_guard.get_treasury(&treasury_did) {
+                if treasury.currency != currency {
+                    error!(
+                        "❌ Currency mismatch for spending rule proposal {}: got '{}', treasury uses '{}'",
+                        proposal_id.0, currency, treasury.currency
+                    );
+                    let failed_op = FailedOperation::new(
+                        format!("treasury:rule:{}", proposal_id.0),
+                        FailureType::TreasuryOperationFailed,
+                        serde_json::json!({
+                            "proposal_id": proposal_id.0,
+                            "error": "currency_mismatch",
+                            "requested_currency": currency,
+                            "treasury_currency": treasury.currency,
+                        }),
+                        format!(
+                            "Currency mismatch: got '{}', expected '{}'",
+                            currency, treasury.currency
+                        ),
+                    );
+                    if let Err(dlq_err) = dlq.enqueue(failed_op) {
+                        error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                    }
+                    icn_obs::metrics::governance::execution_failures_inc("treasury_modify_rule");
+                    return;
+                }
+            } else {
+                error!(
+                    "❌ Treasury {} not found for spending rule proposal {}",
+                    treasury_did, proposal_id.0
+                );
+                let failed_op = FailedOperation::new(
+                    format!("treasury:rule:{}", proposal_id.0),
+                    FailureType::TreasuryOperationFailed,
+                    serde_json::json!({
+                        "proposal_id": proposal_id.0,
+                        "error": "treasury_not_found",
+                        "treasury_did": treasury_did.to_string(),
+                    }),
+                    format!("Treasury {treasury_did} not found"),
+                );
+                if let Err(dlq_err) = dlq.enqueue(failed_op) {
+                    error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                }
+                icn_obs::metrics::governance::execution_failures_inc("treasury_modify_rule");
+                return;
+            }
 
             // Convert approval type
             let ledger_approval_type = match approval_type {
@@ -605,6 +751,7 @@ impl GovernanceEventHandler {
                                 "🚨 Failed to store audit trail for spending rule proposal {}: {}",
                                 proposal_id.0, e
                             );
+                            icn_obs::metrics::governance::audit_failures_inc();
                         }
                     }
 
@@ -693,16 +840,62 @@ impl GovernanceEventHandler {
                 }
             }
 
+            // Validation: Amount must be positive
+            if amount <= 0 {
+                error!(
+                    "❌ Invalid transfer amount for proposal {}: {} (must be positive)",
+                    proposal_id.0, amount
+                );
+                let failed_op = FailedOperation::new(
+                    format!("treasury:transfer:{}", proposal_id.0),
+                    FailureType::TreasuryOperationFailed,
+                    serde_json::json!({
+                        "proposal_id": proposal_id.0,
+                        "error": "invalid_amount",
+                        "amount": amount,
+                    }),
+                    format!("Amount must be positive, got: {amount}"),
+                );
+                if let Err(dlq_err) = dlq.enqueue(failed_op) {
+                    error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                }
+                icn_obs::metrics::governance::execution_failures_inc("treasury_transfer");
+                return;
+            }
+
             // ATOMIC OPERATION: Acquire exclusive write lock on treasury_manager.
             // This lock is held for the ENTIRE operation (validation + mutation + persistence)
             // to prevent TOCTOU race conditions. The lock is only released when treasury_guard
             // goes out of scope at the end of this async block.
             let mut treasury_guard = treasury_manager.write().await;
 
-            // Validate source budget exists and has sufficient funds (lock held)
-            let from_remaining = {
+            // Validate source budget exists, is active, and has sufficient funds (lock held)
+            let (from_remaining, from_currency) = {
                 if let Some(budget) = treasury_guard.get_budget(&from_budget) {
-                    budget.remaining()
+                    // Validate budget is active
+                    if budget.status != icn_ledger::treasury::BudgetStatus::Active {
+                        error!(
+                            "❌ Source budget {} is not active (status: {:?}) for transfer proposal {}",
+                            from_budget, budget.status, proposal_id.0
+                        );
+                        let failed_op = FailedOperation::new(
+                            format!("treasury:transfer:{}", proposal_id.0),
+                            FailureType::TreasuryOperationFailed,
+                            serde_json::json!({
+                                "proposal_id": proposal_id.0,
+                                "error": "source_budget_not_active",
+                                "from_budget": from_budget,
+                                "status": format!("{:?}", budget.status),
+                            }),
+                            format!("Source budget {from_budget} is not active"),
+                        );
+                        if let Err(dlq_err) = dlq.enqueue(failed_op) {
+                            error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                        }
+                        icn_obs::metrics::governance::execution_failures_inc("treasury_transfer");
+                        return;
+                    }
+                    (budget.remaining(), budget.currency.clone())
                 } else {
                     error!(
                         "❌ Source budget {} not found for transfer proposal {}",
@@ -750,8 +943,61 @@ impl GovernanceEventHandler {
                 return;
             }
 
-            // Get to_budget and increase its allocated amount
-            if treasury_guard.get_budget(&to_budget).is_none() {
+            // Validate destination budget exists, is active, and has matching currency
+            if let Some(to_budget_data) = treasury_guard.get_budget(&to_budget) {
+                // Validate budget is active
+                if to_budget_data.status != icn_ledger::treasury::BudgetStatus::Active {
+                    error!(
+                        "❌ Destination budget {} is not active (status: {:?}) for transfer proposal {}",
+                        to_budget, to_budget_data.status, proposal_id.0
+                    );
+                    let failed_op = FailedOperation::new(
+                        format!("treasury:transfer:{}", proposal_id.0),
+                        FailureType::TreasuryOperationFailed,
+                        serde_json::json!({
+                            "proposal_id": proposal_id.0,
+                            "error": "destination_budget_not_active",
+                            "to_budget": to_budget,
+                            "status": format!("{:?}", to_budget_data.status),
+                        }),
+                        format!("Destination budget {to_budget} is not active"),
+                    );
+                    if let Err(dlq_err) = dlq.enqueue(failed_op) {
+                        error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                    }
+                    icn_obs::metrics::governance::execution_failures_inc("treasury_transfer");
+                    return;
+                }
+
+                // Validate currencies match
+                if to_budget_data.currency != from_currency {
+                    error!(
+                        "❌ Currency mismatch for transfer proposal {}: source='{}', destination='{}'",
+                        proposal_id.0, from_currency, to_budget_data.currency
+                    );
+                    let failed_op = FailedOperation::new(
+                        format!("treasury:transfer:{}", proposal_id.0),
+                        FailureType::TreasuryOperationFailed,
+                        serde_json::json!({
+                            "proposal_id": proposal_id.0,
+                            "error": "currency_mismatch",
+                            "from_budget": from_budget,
+                            "from_currency": from_currency,
+                            "to_budget": to_budget,
+                            "to_currency": to_budget_data.currency,
+                        }),
+                        format!(
+                            "Currency mismatch: source='{}', destination='{}'",
+                            from_currency, to_budget_data.currency
+                        ),
+                    );
+                    if let Err(dlq_err) = dlq.enqueue(failed_op) {
+                        error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                    }
+                    icn_obs::metrics::governance::execution_failures_inc("treasury_transfer");
+                    return;
+                }
+            } else {
                 error!(
                     "❌ Destination budget {} not found for transfer proposal {}",
                     to_budget, proposal_id.0
@@ -901,6 +1147,7 @@ impl GovernanceEventHandler {
                         "🚨 Failed to store audit trail for transfer proposal {}: {}",
                         proposal_id.0, e
                     );
+                    icn_obs::metrics::governance::audit_failures_inc();
                 }
             }
 
@@ -1088,6 +1335,7 @@ impl GovernanceEventHandler {
                                 "🚨 Failed to store audit trail for cancel budget proposal {}: {}",
                                 proposal_id.0, e
                             );
+                            icn_obs::metrics::governance::audit_failures_inc();
                         }
                     }
 
@@ -1302,6 +1550,7 @@ impl GovernanceEventHandler {
                         "🚨 Failed to store audit trail for reclaim proposal {}: {}",
                         proposal_id.0, e
                     );
+                    icn_obs::metrics::governance::audit_failures_inc();
                 }
             }
 
@@ -2051,6 +2300,7 @@ impl PolicyEventHandler {
                                         "🚨 Failed to store audit trail for policy proposal {}: {}",
                                         proposal_id.0, e
                                     );
+                                    icn_obs::metrics::governance::audit_failures_inc();
                                 } else {
                                     info!(
                                         "📋 Audit trail recorded for policy proposal {}",
