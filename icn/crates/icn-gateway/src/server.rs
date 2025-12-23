@@ -577,6 +577,16 @@ impl GatewayServer {
                                 ))
                                 .wrap(auth.clone()),
                         )
+                        // Protected treasury endpoints (auth + rate limiting)
+                        // Treasury operations for cooperative collective reserves
+                        .service(
+                            web::scope("/treasury")
+                                .configure(api::treasury::configure)
+                                .wrap(middleware::from_fn(
+                                    crate::rate_limit::rate_limit_middleware,
+                                ))
+                                .wrap(auth.clone()),
+                        )
                         // Recurring payments endpoints (auth + rate limiting)
                         .service(
                             web::scope("")

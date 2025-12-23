@@ -24,5 +24,6 @@ pub mod recurring_payments;
 pub mod sdis;
 pub mod sessions;
 pub mod steward;
+pub mod treasury;
 pub mod trust;
 pub mod websocket;

@@ -101,6 +101,22 @@ pub struct EmergencyThresholds {
     /// Emergency voting period in seconds (default: 24 hours)
     /// Shorter than normal to allow rapid response
     pub emergency_voting_period_seconds: u64,
+
+    // === Treasury Thresholds (Issue #246) ===
+    /// Quorum for treasury budget creation (default: 50%)
+    pub treasury_budget_quorum_percentage: u8,
+    /// Approval threshold for treasury budget creation (default: 50%)
+    pub treasury_budget_approval_percentage: u8,
+
+    /// Quorum for large treasury withdrawals (default: 60%)
+    pub treasury_withdrawal_quorum_percentage: u8,
+    /// Approval threshold for large treasury withdrawals (default: 67%)
+    pub treasury_withdrawal_approval_percentage: u8,
+
+    /// Quorum for treasury spending rule modifications (default: 60%)
+    pub treasury_rule_quorum_percentage: u8,
+    /// Approval threshold for treasury spending rule modifications (default: 67%)
+    pub treasury_rule_approval_percentage: u8,
 }
 
 impl Default for EmergencyThresholds {
@@ -124,12 +140,25 @@ impl Default for EmergencyThresholds {
 
             // 24 hour emergency voting period
             emergency_voting_period_seconds: 24 * 60 * 60,
+
+            // Treasury budget creation: 50% quorum, 50% approval (normal)
+            treasury_budget_quorum_percentage: 50,
+            treasury_budget_approval_percentage: 50,
+
+            // Large treasury withdrawals: 60% quorum, 67% approval
+            treasury_withdrawal_quorum_percentage: 60,
+            treasury_withdrawal_approval_percentage: 67,
+
+            // Treasury spending rule modifications: 60% quorum, 67% approval
+            treasury_rule_quorum_percentage: 60,
+            treasury_rule_approval_percentage: 67,
         }
     }
 }
 
 impl EmergencyThresholds {
     /// Create new emergency thresholds with custom values
+    /// Treasury thresholds use defaults; use builder methods to customize
     pub fn new(
         freeze_quorum: u8,
         freeze_approval: u8,
@@ -151,7 +180,35 @@ impl EmergencyThresholds {
             rollback_quorum_percentage: rollback_quorum,
             rollback_approval_percentage: rollback_approval,
             emergency_voting_period_seconds: voting_period_seconds,
+            // Use defaults for treasury thresholds
+            treasury_budget_quorum_percentage: 50,
+            treasury_budget_approval_percentage: 50,
+            treasury_withdrawal_quorum_percentage: 60,
+            treasury_withdrawal_approval_percentage: 67,
+            treasury_rule_quorum_percentage: 60,
+            treasury_rule_approval_percentage: 67,
         }
+    }
+
+    /// Set treasury budget thresholds
+    pub fn with_treasury_budget_thresholds(mut self, quorum: u8, approval: u8) -> Self {
+        self.treasury_budget_quorum_percentage = quorum;
+        self.treasury_budget_approval_percentage = approval;
+        self
+    }
+
+    /// Set treasury withdrawal thresholds
+    pub fn with_treasury_withdrawal_thresholds(mut self, quorum: u8, approval: u8) -> Self {
+        self.treasury_withdrawal_quorum_percentage = quorum;
+        self.treasury_withdrawal_approval_percentage = approval;
+        self
+    }
+
+    /// Set treasury spending rule thresholds
+    pub fn with_treasury_rule_thresholds(mut self, quorum: u8, approval: u8) -> Self {
+        self.treasury_rule_quorum_percentage = quorum;
+        self.treasury_rule_approval_percentage = approval;
+        self
     }
 
     /// Validate thresholds are in valid ranges
@@ -182,6 +239,25 @@ impl EmergencyThresholds {
         }
         if self.emergency_voting_period_seconds == 0 {
             anyhow::bail!("Emergency voting period must be greater than 0");
+        }
+        // Treasury threshold validation
+        if self.treasury_budget_quorum_percentage > 100 {
+            anyhow::bail!("Treasury budget quorum percentage must be 0-100");
+        }
+        if self.treasury_budget_approval_percentage > 100 {
+            anyhow::bail!("Treasury budget approval percentage must be 0-100");
+        }
+        if self.treasury_withdrawal_quorum_percentage > 100 {
+            anyhow::bail!("Treasury withdrawal quorum percentage must be 0-100");
+        }
+        if self.treasury_withdrawal_approval_percentage > 100 {
+            anyhow::bail!("Treasury withdrawal approval percentage must be 0-100");
+        }
+        if self.treasury_rule_quorum_percentage > 100 {
+            anyhow::bail!("Treasury rule quorum percentage must be 0-100");
+        }
+        if self.treasury_rule_approval_percentage > 100 {
+            anyhow::bail!("Treasury rule approval percentage must be 0-100");
         }
         Ok(())
     }

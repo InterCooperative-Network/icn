@@ -65,6 +65,7 @@ pub mod merge;
 pub mod quarantine;
 #[allow(missing_docs)]
 pub mod sync;
+pub mod treasury;
 pub mod types;
 
 pub use credit_policy::{CreditPolicy, CreditPolicyManager, NewMemberPolicy};
@@ -78,6 +79,10 @@ pub use ledger::Ledger;
 pub use merge::{ConflictPair, MergeDecision, QuarantineItem};
 pub use quarantine::QuarantineStore;
 pub use sync::{deserialize_sync_message, ledger_topic, serialize_sync_message, LedgerSyncMessage};
+pub use treasury::{
+    ApprovalType, BudgetStatus, PaginatedAuditTrail, SpendingRule, Treasury, TreasuryAuditRecord,
+    TreasuryBudget, TreasuryManager, TreasuryOperation,
+};
 pub use types::{
     AccountBalances, AccountDelta, ContentHash, CreditLimit, Currency, Dispute, DisputeOutcome,
     DisputeStatus, JournalEntry, QuarantineReason, QuarantinedEntry, Resolution, Signature,

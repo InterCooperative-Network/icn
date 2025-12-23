@@ -265,6 +265,127 @@ pub enum ProposalPayload {
         /// If None, no enforcement (non-breaking upgrade)
         min_required_version: Option<Version>,
     },
+
+    // === Treasury Operations (Issue #246) ===
+    /// Treasury management proposal
+    ///
+    /// Enables governance-controlled treasury operations including:
+    /// - Budget allocation and management
+    /// - Large withdrawals requiring approval
+    /// - Spending rule modifications
+    /// - Budget transfers and cancellations
+    ///
+    /// Approval thresholds vary by operation type.
+    Treasury {
+        /// The treasury operation to execute
+        operation: TreasuryProposalOperation,
+    },
+}
+
+/// Treasury operations that require governance approval
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum TreasuryProposalOperation {
+    /// Create a new budget allocation from treasury
+    CreateBudget {
+        /// Treasury DID
+        treasury_did: Did,
+        /// Purpose of the budget
+        purpose: String,
+        /// Amount to allocate
+        amount: i64,
+        /// Currency
+        currency: String,
+        /// Budget period end (None = indefinite)
+        period_end: Option<u64>,
+    },
+
+    /// Modify spending rules for a treasury
+    ModifySpendingRule {
+        /// Treasury DID
+        treasury_did: Did,
+        /// Rule ID to modify (None = create new)
+        rule_id: Option<String>,
+        /// Rule name
+        name: String,
+        /// Threshold amount
+        threshold_amount: i64,
+        /// Currency
+        currency: String,
+        /// Required approval type
+        approval_type: TreasuryApprovalType,
+        /// Whether the rule is active
+        is_active: bool,
+    },
+
+    /// Withdraw funds from treasury (for amounts requiring governance approval)
+    Withdraw {
+        /// Treasury DID
+        treasury_did: Did,
+        /// Recipient DID
+        recipient: Did,
+        /// Amount to withdraw
+        amount: i64,
+        /// Currency
+        currency: String,
+        /// Purpose of withdrawal
+        purpose: String,
+        /// Optional budget to charge against
+        budget_id: Option<String>,
+    },
+
+    /// Transfer funds between budgets
+    TransferBetweenBudgets {
+        /// Treasury DID
+        treasury_did: Did,
+        /// Source budget ID
+        from_budget: String,
+        /// Destination budget ID
+        to_budget: String,
+        /// Amount to transfer
+        amount: i64,
+        /// Currency
+        currency: String,
+        /// Reason for transfer
+        reason: String,
+    },
+
+    /// Cancel a budget and optionally return funds to treasury
+    CancelBudget {
+        /// Budget ID to cancel
+        budget_id: String,
+        /// Reason for cancellation
+        reason: String,
+        /// Whether to return remaining funds to treasury
+        return_to_treasury: bool,
+    },
+
+    /// Reclaim unspent budget funds back to treasury
+    ReclaimBudget {
+        /// Budget ID
+        budget_id: String,
+        /// Amount to reclaim
+        amount: i64,
+        /// Currency
+        currency: String,
+        /// Reason for reclamation
+        reason: String,
+    },
+}
+
+/// Type of approval required for treasury spending
+/// Mirrors the ledger ApprovalType but defined here for governance independence
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TreasuryApprovalType {
+    /// No approval needed (within threshold)
+    None,
+    /// Simple majority vote (>50%)
+    SimpleMajority,
+    /// Super-majority (>66%)
+    SuperMajority,
+    /// Board/council approval only
+    BoardOnly,
+    /// Emergency threshold (75%+)
+    Emergency,
 }
 
 /// Semantic version for protocol versioning

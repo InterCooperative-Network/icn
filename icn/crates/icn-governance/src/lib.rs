@@ -83,7 +83,7 @@ pub use message::{GovernanceMessage, ProposalOutcome, TallySnapshot};
 pub use profile::{DecisionOutcome, GovernanceProfile, GovernanceProfileId, GovernanceRule};
 pub use proposal::{
     DisputeResolutionOutcome, ForcedOutcome, MembershipAction, Proposal, ProposalId,
-    ProposalPayload, ProposalState,
+    ProposalPayload, ProposalState, TreasuryApprovalType, TreasuryProposalOperation,
 };
 pub use resolver::{MembershipResolver, StaticMembershipResolver};
 pub use sdis::{

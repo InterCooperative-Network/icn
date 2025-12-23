@@ -170,7 +170,181 @@ impl GovernanceEventHandler {
                     min_required_version.map(|v| v.to_string()),
                 );
             }
+            ProposalPayload::Treasury { operation } => {
+                self.handle_treasury_proposal(proposal_id, operation, decided_at);
+            }
         }
+    }
+
+    /// Handle a treasury proposal
+    fn handle_treasury_proposal(
+        &self,
+        proposal_id: ProposalId,
+        operation: icn_governance::TreasuryProposalOperation,
+        decided_at: u64,
+    ) {
+        use icn_governance::TreasuryProposalOperation;
+
+        info!(
+            "🏦 Executing treasury proposal {}: {:?}",
+            proposal_id.0,
+            std::mem::discriminant(&operation)
+        );
+
+        match operation {
+            TreasuryProposalOperation::CreateBudget {
+                treasury_did,
+                purpose,
+                amount,
+                currency,
+                period_end,
+            } => {
+                self.handle_treasury_create_budget(
+                    proposal_id,
+                    treasury_did,
+                    purpose,
+                    amount,
+                    currency,
+                    period_end,
+                );
+            }
+            TreasuryProposalOperation::Withdraw {
+                treasury_did,
+                recipient,
+                amount,
+                currency,
+                purpose,
+                budget_id,
+            } => {
+                self.handle_treasury_withdrawal(
+                    proposal_id,
+                    treasury_did,
+                    recipient,
+                    amount,
+                    currency,
+                    purpose,
+                    budget_id,
+                    decided_at,
+                );
+            }
+            TreasuryProposalOperation::ModifySpendingRule {
+                treasury_did,
+                rule_id,
+                name,
+                threshold_amount,
+                currency,
+                approval_type,
+                is_active,
+            } => {
+                info!(
+                    "📋 Treasury spending rule {} for {}: threshold={}, active={}",
+                    rule_id.as_deref().unwrap_or("new"),
+                    treasury_did,
+                    threshold_amount,
+                    is_active
+                );
+                // PHASE 2: Wire TreasuryManager to modify spending rules.
+                // Requires passing TreasuryManager handle to GovernanceEventHandler.
+                // See: https://github.com/InterCooperative-Network/icn/issues/246
+                warn!("⚠️ ModifySpendingRule execution not yet implemented (Phase 2)");
+                let _ = (name, currency, approval_type);
+            }
+            TreasuryProposalOperation::TransferBetweenBudgets {
+                treasury_did,
+                from_budget,
+                to_budget,
+                amount,
+                currency,
+                reason,
+            } => {
+                info!(
+                    "📋 Treasury budget transfer for {}: {} {} from {} to {} ({})",
+                    treasury_did, amount, currency, from_budget, to_budget, reason
+                );
+                // PHASE 2: Wire TreasuryManager to transfer between budgets.
+                // Requires passing TreasuryManager handle to GovernanceEventHandler.
+                // See: https://github.com/InterCooperative-Network/icn/issues/246
+                warn!("⚠️ TransferBetweenBudgets execution not yet implemented (Phase 2)");
+            }
+            TreasuryProposalOperation::CancelBudget {
+                budget_id,
+                reason,
+                return_to_treasury,
+            } => {
+                info!(
+                    "📋 Treasury budget cancelled: {} (reason: {}, return: {})",
+                    budget_id, reason, return_to_treasury
+                );
+                // PHASE 2: Wire TreasuryManager to cancel budgets.
+                // Requires passing TreasuryManager handle to GovernanceEventHandler.
+                // See: https://github.com/InterCooperative-Network/icn/issues/246
+                warn!("⚠️ CancelBudget execution not yet implemented (Phase 2)");
+            }
+            TreasuryProposalOperation::ReclaimBudget {
+                budget_id,
+                amount,
+                currency,
+                reason,
+            } => {
+                info!(
+                    "📋 Treasury budget reclaim: {} {} from {} ({})",
+                    amount, currency, budget_id, reason
+                );
+                // PHASE 2: Wire TreasuryManager to reclaim budget funds.
+                // Requires passing TreasuryManager handle to GovernanceEventHandler.
+                // See: https://github.com/InterCooperative-Network/icn/issues/246
+                warn!("⚠️ ReclaimBudget execution not yet implemented (Phase 2)");
+            }
+        }
+    }
+
+    /// Handle treasury budget creation
+    fn handle_treasury_create_budget(
+        &self,
+        proposal_id: ProposalId,
+        treasury_did: Did,
+        purpose: String,
+        amount: i64,
+        currency: String,
+        period_end: Option<u64>,
+    ) {
+        info!(
+            "🏦 Creating treasury budget for proposal {}: {} {} for '{}' (treasury: {})",
+            proposal_id.0, amount, currency, purpose, treasury_did
+        );
+
+        // PHASE 2: Wire TreasuryManager to create budgets.
+        // Requires passing TreasuryManager handle to GovernanceEventHandler.
+        // See: https://github.com/InterCooperative-Network/icn/issues/246
+        warn!("⚠️ CreateBudget execution not yet implemented (Phase 2)");
+        let _ = period_end;
+    }
+
+    /// Handle treasury withdrawal
+    fn handle_treasury_withdrawal(
+        &self,
+        proposal_id: ProposalId,
+        treasury_did: Did,
+        recipient: Did,
+        amount: i64,
+        currency: String,
+        purpose: String,
+        budget_id: Option<String>,
+        decided_at: u64,
+    ) {
+        info!(
+            "🏦 Executing treasury withdrawal for proposal {}: {} {} to {} ({})",
+            proposal_id.0, amount, currency, recipient, purpose
+        );
+
+        // Reuse the existing budget proposal logic for the actual ledger transfer
+        // The treasury withdrawal is essentially a budget allocation to a recipient
+        self.handle_budget_proposal(proposal_id.clone(), amount, recipient, currency, decided_at);
+
+        // PHASE 2: Record in TreasuryManager audit trail with budget_id reference.
+        // Requires passing TreasuryManager handle to GovernanceEventHandler.
+        // See: https://github.com/InterCooperative-Network/icn/issues/246
+        let _ = (treasury_did, budget_id);
     }
 
     /// Handle a budget proposal

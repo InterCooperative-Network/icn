@@ -8,7 +8,7 @@ use tracing::info;
 
 use icn_gossip::GossipActor;
 use icn_identity::Did;
-use icn_ledger::{DisputeManager, Ledger};
+use icn_ledger::{DisputeManager, Ledger, TreasuryManager};
 use icn_security::MisbehaviorDetector;
 use icn_store::SledStore;
 use icn_trust::TrustGraph;
@@ -21,6 +21,8 @@ pub struct LedgerServices {
     pub ledger_handle: Arc<RwLock<Ledger>>,
     /// Dispute manager for handling payment disputes
     pub dispute_manager: Arc<RwLock<DisputeManager>>,
+    /// Treasury manager for cooperative treasury operations
+    pub treasury_manager: Arc<RwLock<TreasuryManager>>,
     /// Contract runtime for CCL execution
     pub contract_runtime: Arc<RwLock<icn_ccl::ContractRuntime>>,
     /// Contract actor for contract lifecycle management
@@ -66,6 +68,12 @@ pub async fn init_ledger_services(
 
     info!("Dispute manager initialized");
 
+    // Initialize TreasuryManager (shares store with Ledger)
+    let treasury_manager = TreasuryManager::with_store(store.clone())?;
+    let treasury_manager_handle = Arc::new(RwLock::new(treasury_manager));
+
+    info!("Treasury manager initialized");
+
     // Initialize Contract Runtime
     let contract_runtime = icn_ccl::ContractRuntime::new(ledger_handle.clone());
     let contract_runtime_handle = Arc::new(RwLock::new(contract_runtime));
@@ -79,14 +87,36 @@ pub async fn init_ledger_services(
         domain_id, 500, // Min trust = 0.5 (500 basis points)
     ));
 
-    // Set up validation hook on ledger
+    // Set up combined validation hook on ledger (charter rules + treasury rules)
     {
         let mut ledger = ledger_handle.write().await;
         let validator_clone = charter_validator.clone();
-        ledger.set_validation_hook(move |entry| validator_clone.validate_entry(entry));
+        let treasury_clone = treasury_manager_handle.clone();
+        ledger.set_validation_hook(move |entry| {
+            // First validate charter rules
+            validator_clone.validate_entry(entry)?;
+
+            // Then validate treasury spending rules
+            // SECURITY: Treasury validation is critical - unauthorized withdrawals must be blocked.
+            // If we can't acquire the lock, reject the entry to prevent bypass attacks.
+            match treasury_clone.try_read() {
+                Ok(treasury_mgr) => {
+                    treasury_mgr.validate_entry(entry)?;
+                }
+                Err(_) => {
+                    // Lock contention during validation - reject to prevent bypass
+                    anyhow::bail!(
+                        "Treasury validation temporarily unavailable - please retry. \
+                         This prevents unauthorized withdrawals during high contention."
+                    );
+                }
+            }
+
+            Ok(())
+        });
     }
 
-    info!("Charter validator initialized with validation hook");
+    info!("Charter and treasury validators initialized with validation hook");
 
     // Create ContractActor
     let contract_actor = icn_ccl::ContractActor::new(
@@ -101,6 +131,7 @@ pub async fn init_ledger_services(
     Ok(LedgerServices {
         ledger_handle,
         dispute_manager: dispute_manager_handle,
+        treasury_manager: treasury_manager_handle,
         contract_runtime: contract_runtime_handle,
         contract_actor: contract_actor_handle,
         ledger_store: store,
