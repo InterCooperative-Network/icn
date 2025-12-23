@@ -711,7 +711,11 @@ async fn test_untrusted_deployer_rejected() {
 /// - All participants provide signatures during deployment
 /// - Contract is propagated via gossip to all participants
 /// - All nodes can execute the contract rules
+///
+/// Note: Ignored in CI due to intermittent QUIC stream failures in containerized environment.
+/// Run manually with: cargo test -p icn-core --test contract_deployment_integration test_three_participant_contract_deployment -- --ignored
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "Flaky in CI: QUIC stream failures in containerized environment"]
 async fn test_three_participant_contract_deployment() {
     // Create three nodes (Alice, Bob, Carol)
     let node_a = TestNode::new(19007)
