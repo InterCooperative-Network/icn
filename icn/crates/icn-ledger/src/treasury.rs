@@ -614,8 +614,29 @@ impl TreasuryManager {
         created_by: Did,
         proposal_id: Option<String>,
     ) -> Result<TreasuryBudget> {
+        // Validate inputs
         if !self.treasuries.contains_key(&treasury_did) {
             bail!("Treasury not found: {treasury_did}");
+        }
+
+        if amount <= 0 {
+            bail!("Budget amount must be positive, got: {amount}");
+        }
+
+        if purpose.trim().is_empty() {
+            bail!("Budget purpose cannot be empty");
+        }
+
+        if currency.trim().is_empty() {
+            bail!("Budget currency cannot be empty");
+        }
+
+        // Validate period_end is in the future if provided
+        if let Some(end) = period_end {
+            let now = icn_time::current_timestamp_secs();
+            if end <= now {
+                bail!("Budget period end must be in the future");
+            }
         }
 
         let budget = TreasuryBudget::new(
@@ -677,6 +698,11 @@ impl TreasuryManager {
         amount: i64,
         ledger_entry_hash: ContentHash,
     ) -> Result<Vec<u8>> {
+        // Validate amount is positive
+        if amount <= 0 {
+            bail!("Spending amount must be positive, got: {amount}");
+        }
+
         // First validate without mutable borrow
         {
             let budget = self
@@ -790,7 +816,7 @@ impl TreasuryManager {
 
         for rule_id in rule_ids {
             if let Some(rule) = self.spending_rules.get(rule_id) {
-                if rule.is_active && rule.currency == currency && amount > rule.threshold_amount {
+                if rule.is_active && rule.currency == currency && amount >= rule.threshold_amount {
                     // Return the highest approval type
                     let current = highest_approval.unwrap_or(ApprovalType::None);
                     if approval_type_priority(rule.approval_type) > approval_type_priority(current)
@@ -867,8 +893,24 @@ impl TreasuryManager {
     /// Returns Ok(()) if the entry is valid, or Err if it violates treasury rules.
     /// This method is designed to be used as a ledger validation hook.
     ///
+    /// # Authorization Model
+    ///
     /// Treasury withdrawals (debits from treasury accounts) that exceed spending
-    /// rule thresholds require governance approval via a `contract_ref`.
+    /// rule thresholds require governance approval. The governance system indicates
+    /// approval by setting a `contract_ref` on the journal entry when executing
+    /// an approved treasury proposal.
+    ///
+    /// ## Security Note
+    ///
+    /// Currently, we check for the presence of ANY contract_ref to indicate
+    /// governance authorization. This is secure because:
+    /// 1. Contract execution is controlled by the governance system
+    /// 2. Only approved proposals can execute contracts that create ledger entries
+    /// 3. The contract_ref provides an audit trail back to the proposal
+    ///
+    /// For enhanced security, a future improvement could verify that the
+    /// contract_ref specifically references an approved treasury proposal by
+    /// checking a "treasury:" prefix or looking up the proposal details.
     pub fn validate_entry(&self, entry: &JournalEntry) -> Result<()> {
         for delta in &entry.accounts {
             // Only check treasury accounts
@@ -885,8 +927,12 @@ impl TreasuryManager {
             if let Some(approval_type) =
                 self.requires_approval(&delta.account_id, debit_amount, &delta.currency)
             {
-                // Treasury withdrawals requiring approval must have a governance authorization
-                // indicated by a contract_ref (proposal execution creates entries with contract_ref)
+                // Treasury withdrawals requiring approval must have a governance authorization.
+                // The governance system sets contract_ref when executing approved proposals.
+                //
+                // SECURITY: The presence of contract_ref indicates this entry was created
+                // by contract execution, which requires governance approval for treasury ops.
+                // Direct ledger entries (without contract_ref) are blocked.
                 if entry.contract_ref.is_none() {
                     bail!(
                         "Treasury withdrawal of {debit_amount} {} from {} requires {approval_type:?} approval. \
@@ -1360,8 +1406,14 @@ mod tests {
 
         // Below 500 - no approval
         assert!(manager
-            .requires_approval(&treasury_did, 400, "hours")
+            .requires_approval(&treasury_did, 499, "hours")
             .is_none());
+
+        // Exactly at 500 threshold - simple majority (threshold is inclusive)
+        assert_eq!(
+            manager.requires_approval(&treasury_did, 500, "hours"),
+            Some(ApprovalType::SimpleMajority)
+        );
 
         // Above 500, below 2000 - simple majority
         assert_eq!(
