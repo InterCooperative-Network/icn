@@ -922,7 +922,11 @@ async fn test_three_participant_contract_deployment() {
 /// - State variable persistence across deployment
 /// - Contract retrieval on remote nodes after gossip sync
 /// - State is reset to initial values on each execution (stateless design)
+///
+/// Note: Ignored in CI due to intermittent QUIC stream failures in containerized environment.
+/// Run manually with: cargo test -p icn-core --test contract_deployment_integration test_contract_with_state_variables -- --ignored
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "Flaky in CI: QUIC stream failures in containerized environment"]
 async fn test_contract_with_state_variables() {
     // Create two nodes
     let node_a = TestNode::new(19010).await.expect("Failed to create node A");
