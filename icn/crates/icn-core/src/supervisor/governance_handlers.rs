@@ -11,7 +11,7 @@ use crate::dead_letter::{FailedOperation, FailureType};
 use crate::governance::GovernanceHandle;
 use icn_governance::{GovernanceDomainId, ProposalId, ProposalPayload};
 use icn_identity::Did;
-use icn_ledger::DisputeManager;
+use icn_ledger::{DisputeManager, TreasuryManager};
 use icn_store::SledStore;
 
 /// Type alias for the ledger handle
@@ -25,6 +25,9 @@ pub type AuditStore = Arc<dyn icn_store::Store>;
 
 /// Type alias for the dispute manager handle
 pub type DisputeManagerHandle = Arc<RwLock<DisputeManager>>;
+
+/// Type alias for the treasury manager handle
+pub type TreasuryManagerHandle = Arc<RwLock<TreasuryManager>>;
 
 /// Handler for governance proposal events
 ///
@@ -42,6 +45,8 @@ pub struct GovernanceEventHandler {
     gov_handle: GovernanceHandle,
     /// Dispute manager for dispute resolution
     dispute_manager: DisputeManagerHandle,
+    /// Treasury manager for cooperative treasury operations
+    treasury_manager: TreasuryManagerHandle,
     /// Treasury DID for budget payouts
     treasury_did: Did,
 }
@@ -54,6 +59,7 @@ impl GovernanceEventHandler {
         dlq: DeadLetterQueue,
         gov_handle: GovernanceHandle,
         dispute_manager: DisputeManagerHandle,
+        treasury_manager: TreasuryManagerHandle,
         treasury_did: Did,
     ) -> Self {
         Self {
@@ -62,6 +68,7 @@ impl GovernanceEventHandler {
             dlq,
             gov_handle,
             dispute_manager,
+            treasury_manager,
             treasury_did,
         }
     }
@@ -236,18 +243,16 @@ impl GovernanceEventHandler {
                 approval_type,
                 is_active,
             } => {
-                info!(
-                    "📋 Treasury spending rule {} for {}: threshold={}, active={}",
-                    rule_id.as_deref().unwrap_or("new"),
+                self.handle_treasury_modify_spending_rule(
+                    proposal_id,
                     treasury_did,
+                    rule_id,
+                    name,
                     threshold_amount,
-                    is_active
+                    currency,
+                    approval_type,
+                    is_active,
                 );
-                // PHASE 2: Wire TreasuryManager to modify spending rules.
-                // Requires passing TreasuryManager handle to GovernanceEventHandler.
-                // See: https://github.com/InterCooperative-Network/icn/issues/246
-                warn!("⚠️ ModifySpendingRule execution not yet implemented (Phase 2)");
-                let _ = (name, currency, approval_type);
             }
             TreasuryProposalOperation::TransferBetweenBudgets {
                 treasury_did,
@@ -257,28 +262,27 @@ impl GovernanceEventHandler {
                 currency,
                 reason,
             } => {
-                info!(
-                    "📋 Treasury budget transfer for {}: {} {} from {} to {} ({})",
-                    treasury_did, amount, currency, from_budget, to_budget, reason
+                self.handle_treasury_transfer_between_budgets(
+                    proposal_id,
+                    treasury_did,
+                    from_budget,
+                    to_budget,
+                    amount,
+                    currency,
+                    reason,
                 );
-                // PHASE 2: Wire TreasuryManager to transfer between budgets.
-                // Requires passing TreasuryManager handle to GovernanceEventHandler.
-                // See: https://github.com/InterCooperative-Network/icn/issues/246
-                warn!("⚠️ TransferBetweenBudgets execution not yet implemented (Phase 2)");
             }
             TreasuryProposalOperation::CancelBudget {
                 budget_id,
                 reason,
                 return_to_treasury,
             } => {
-                info!(
-                    "📋 Treasury budget cancelled: {} (reason: {}, return: {})",
-                    budget_id, reason, return_to_treasury
+                self.handle_treasury_cancel_budget(
+                    proposal_id,
+                    budget_id,
+                    reason,
+                    return_to_treasury,
                 );
-                // PHASE 2: Wire TreasuryManager to cancel budgets.
-                // Requires passing TreasuryManager handle to GovernanceEventHandler.
-                // See: https://github.com/InterCooperative-Network/icn/issues/246
-                warn!("⚠️ CancelBudget execution not yet implemented (Phase 2)");
             }
             TreasuryProposalOperation::ReclaimBudget {
                 budget_id,
@@ -286,14 +290,13 @@ impl GovernanceEventHandler {
                 currency,
                 reason,
             } => {
-                info!(
-                    "📋 Treasury budget reclaim: {} {} from {} ({})",
-                    amount, currency, budget_id, reason
+                self.handle_treasury_reclaim_budget(
+                    proposal_id,
+                    budget_id,
+                    amount,
+                    currency,
+                    reason,
                 );
-                // PHASE 2: Wire TreasuryManager to reclaim budget funds.
-                // Requires passing TreasuryManager handle to GovernanceEventHandler.
-                // See: https://github.com/InterCooperative-Network/icn/issues/246
-                warn!("⚠️ ReclaimBudget execution not yet implemented (Phase 2)");
             }
         }
     }
@@ -313,11 +316,105 @@ impl GovernanceEventHandler {
             proposal_id.0, amount, currency, purpose, treasury_did
         );
 
-        // PHASE 2: Wire TreasuryManager to create budgets.
-        // Requires passing TreasuryManager handle to GovernanceEventHandler.
-        // See: https://github.com/InterCooperative-Network/icn/issues/246
-        warn!("⚠️ CreateBudget execution not yet implemented (Phase 2)");
-        let _ = period_end;
+        let treasury_manager = self.treasury_manager.clone();
+        let store = self.audit_store.clone();
+        let created_by = self.treasury_did.clone();
+        let dlq = self.dlq.clone();
+
+        tokio::spawn(async move {
+            let start = std::time::Instant::now();
+
+            // Idempotency check
+            let audit_key = format!("gov:audit:treasury:budget:{}", proposal_id.0);
+            match store.get(audit_key.as_bytes()) {
+                Ok(Some(_)) => {
+                    debug!(
+                        "Treasury budget proposal {} already executed, skipping",
+                        proposal_id.0
+                    );
+                    icn_obs::metrics::governance::idempotent_skips_inc();
+                    return;
+                }
+                Ok(None) => {}
+                Err(e) => {
+                    error!(
+                        "🚨 Failed to check audit trail for treasury budget proposal {}: {}",
+                        proposal_id.0, e
+                    );
+                    return;
+                }
+            }
+
+            let mut treasury_guard = treasury_manager.write().await;
+            match treasury_guard.create_budget(
+                treasury_did.clone(),
+                purpose.clone(),
+                amount,
+                currency.clone(),
+                period_end,
+                created_by,
+                Some(proposal_id.0.clone()),
+            ) {
+                Ok(budget) => {
+                    info!(
+                        "✅ Treasury budget created for proposal {}: budget_id={}, {} {}",
+                        proposal_id.0, budget.id, amount, currency
+                    );
+
+                    // Record audit trail
+                    let audit_record = serde_json::json!({
+                        "proposal_id": proposal_id.0,
+                        "action": "create_budget",
+                        "treasury_did": treasury_did.to_string(),
+                        "budget_id": budget.id,
+                        "amount": amount,
+                        "currency": currency,
+                        "purpose": purpose,
+                        "executed_at": icn_time::current_timestamp_secs(),
+                    });
+
+                    if let Ok(audit_json) = serde_json::to_vec(&audit_record) {
+                        if let Err(e) = store.put(audit_key.as_bytes(), &audit_json) {
+                            error!(
+                                "🚨 Failed to store audit trail for budget proposal {}: {}",
+                                proposal_id.0, e
+                            );
+                        }
+                    }
+
+                    let duration = start.elapsed().as_secs_f64();
+                    icn_obs::metrics::governance::proposals_executed_inc("treasury_create_budget");
+                    icn_obs::metrics::governance::execution_duration_record(
+                        "treasury_create_budget",
+                        duration,
+                    );
+                }
+                Err(e) => {
+                    error!(
+                        "❌ Failed to create treasury budget for proposal {}: {}",
+                        proposal_id.0, e
+                    );
+
+                    let failed_op = FailedOperation::new(
+                        format!("treasury:budget:{}", proposal_id.0),
+                        FailureType::TreasuryOperationFailed,
+                        serde_json::json!({
+                            "proposal_id": proposal_id.0,
+                            "treasury_did": treasury_did.to_string(),
+                            "amount": amount,
+                            "currency": currency,
+                            "purpose": purpose,
+                        }),
+                        e.to_string(),
+                    );
+                    if let Err(dlq_err) = dlq.enqueue(failed_op) {
+                        error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                    }
+
+                    icn_obs::metrics::governance::execution_failures_inc("treasury_create_budget");
+                }
+            }
+        });
     }
 
     /// Handle treasury withdrawal
@@ -337,14 +434,510 @@ impl GovernanceEventHandler {
             proposal_id.0, amount, currency, recipient, purpose
         );
 
-        // Reuse the existing budget proposal logic for the actual ledger transfer
-        // The treasury withdrawal is essentially a budget allocation to a recipient
-        self.handle_budget_proposal(proposal_id.clone(), amount, recipient, currency, decided_at);
+        let treasury_manager = self.treasury_manager.clone();
 
-        // PHASE 2: Record in TreasuryManager audit trail with budget_id reference.
-        // Requires passing TreasuryManager handle to GovernanceEventHandler.
-        // See: https://github.com/InterCooperative-Network/icn/issues/246
-        let _ = (treasury_did, budget_id);
+        // Clone values needed for both the audit spawn and budget proposal
+        let proposal_id_for_audit = proposal_id.clone();
+        let recipient_for_audit = recipient.clone();
+        let currency_for_audit = currency.clone();
+        let purpose_for_audit = purpose.clone();
+        let budget_id_for_audit = budget_id.clone();
+
+        // Record the audit trail for the treasury operation
+        tokio::spawn(async move {
+            use icn_ledger::treasury::TreasuryOperation;
+
+            let mut treasury_guard = treasury_manager.write().await;
+
+            let operation = TreasuryOperation::Withdraw {
+                to: recipient_for_audit.clone(),
+                amount,
+                currency: currency_for_audit.clone(),
+                purpose: purpose_for_audit,
+                budget_id: budget_id_for_audit,
+            };
+
+            if let Err(e) = treasury_guard.record_audit(
+                &treasury_did,
+                operation,
+                treasury_did.clone(), // performed_by (governance system)
+                0,                    // balance_after - will be computed from actual ledger
+                Some(proposal_id_for_audit.0.clone()),
+                None, // ledger_entry_hash - will be set by budget proposal handler
+            ) {
+                error!(
+                    "❌ Failed to record treasury audit for withdrawal proposal {}: {}",
+                    proposal_id_for_audit.0, e
+                );
+            }
+        });
+
+        // Perform the actual ledger transfer
+        self.handle_budget_proposal(proposal_id, amount, recipient, currency, decided_at);
+    }
+
+    /// Handle modify spending rule
+    fn handle_treasury_modify_spending_rule(
+        &self,
+        proposal_id: ProposalId,
+        treasury_did: Did,
+        rule_id: Option<String>,
+        name: String,
+        threshold_amount: i64,
+        currency: String,
+        approval_type: icn_governance::TreasuryApprovalType,
+        is_active: bool,
+    ) {
+        info!(
+            "📋 Treasury spending rule {} for {}: threshold={}, active={}",
+            rule_id.as_deref().unwrap_or("new"),
+            treasury_did,
+            threshold_amount,
+            is_active
+        );
+
+        let treasury_manager = self.treasury_manager.clone();
+        let store = self.audit_store.clone();
+
+        tokio::spawn(async move {
+            use icn_ledger::treasury::ApprovalType;
+
+            let audit_key = format!("gov:audit:treasury:rule:{}", proposal_id.0);
+
+            // Idempotency check
+            match store.get(audit_key.as_bytes()) {
+                Ok(Some(_)) => {
+                    debug!(
+                        "Treasury spending rule proposal {} already executed",
+                        proposal_id.0
+                    );
+                    return;
+                }
+                Ok(None) => {}
+                Err(e) => {
+                    error!(
+                        "🚨 Failed to check audit trail for spending rule proposal {}: {}",
+                        proposal_id.0, e
+                    );
+                    return;
+                }
+            }
+
+            let mut treasury_guard = treasury_manager.write().await;
+
+            // Convert approval type
+            let ledger_approval_type = match approval_type {
+                icn_governance::TreasuryApprovalType::None => ApprovalType::None,
+                icn_governance::TreasuryApprovalType::SimpleMajority => {
+                    ApprovalType::SimpleMajority
+                }
+                icn_governance::TreasuryApprovalType::SuperMajority => ApprovalType::SuperMajority,
+                icn_governance::TreasuryApprovalType::BoardOnly => ApprovalType::BoardOnly,
+                icn_governance::TreasuryApprovalType::Emergency => ApprovalType::Emergency,
+            };
+
+            let result = if let Some(ref existing_rule_id) = rule_id {
+                // Update existing rule
+                treasury_guard.update_spending_rule(
+                    existing_rule_id,
+                    Some(threshold_amount),
+                    Some(ledger_approval_type),
+                    Some(is_active),
+                )
+            } else {
+                // Create new rule
+                use icn_ledger::treasury::SpendingRule;
+
+                let new_rule = SpendingRule::new(
+                    treasury_did.clone(),
+                    name.clone(),
+                    threshold_amount,
+                    currency.clone(),
+                    ledger_approval_type,
+                )
+                .with_proposal(proposal_id.0.clone());
+
+                treasury_guard.add_spending_rule(new_rule)
+            };
+
+            match result {
+                Ok(()) => {
+                    info!(
+                        "✅ Treasury spending rule updated for proposal {}: {}",
+                        proposal_id.0,
+                        rule_id.as_deref().unwrap_or("new rule created")
+                    );
+
+                    let audit_record = serde_json::json!({
+                        "proposal_id": proposal_id.0,
+                        "action": "modify_spending_rule",
+                        "treasury_did": treasury_did.to_string(),
+                        "rule_id": rule_id,
+                        "name": name,
+                        "threshold_amount": threshold_amount,
+                        "executed_at": icn_time::current_timestamp_secs(),
+                    });
+
+                    if let Ok(audit_json) = serde_json::to_vec(&audit_record) {
+                        if let Err(e) = store.put(audit_key.as_bytes(), &audit_json) {
+                            error!(
+                                "🚨 Failed to store audit trail for spending rule proposal {}: {}",
+                                proposal_id.0, e
+                            );
+                        }
+                    }
+
+                    icn_obs::metrics::governance::proposals_executed_inc("treasury_modify_rule");
+                }
+                Err(e) => {
+                    error!(
+                        "❌ Failed to modify spending rule for proposal {}: {}",
+                        proposal_id.0, e
+                    );
+                    icn_obs::metrics::governance::execution_failures_inc("treasury_modify_rule");
+                }
+            }
+        });
+    }
+
+    /// Handle transfer between budgets
+    fn handle_treasury_transfer_between_budgets(
+        &self,
+        proposal_id: ProposalId,
+        treasury_did: Did,
+        from_budget: String,
+        to_budget: String,
+        amount: i64,
+        currency: String,
+        reason: String,
+    ) {
+        info!(
+            "📋 Treasury budget transfer for {}: {} {} from {} to {} ({})",
+            treasury_did, amount, currency, from_budget, to_budget, reason
+        );
+
+        let treasury_manager = self.treasury_manager.clone();
+        let store = self.audit_store.clone();
+
+        tokio::spawn(async move {
+            use icn_ledger::treasury::TreasuryOperation;
+
+            let audit_key = format!("gov:audit:treasury:transfer:{}", proposal_id.0);
+
+            // Idempotency check
+            match store.get(audit_key.as_bytes()) {
+                Ok(Some(_)) => {
+                    debug!(
+                        "Treasury budget transfer proposal {} already executed",
+                        proposal_id.0
+                    );
+                    return;
+                }
+                Ok(None) => {}
+                Err(e) => {
+                    error!(
+                        "🚨 Failed to check audit trail for budget transfer proposal {}: {}",
+                        proposal_id.0, e
+                    );
+                    return;
+                }
+            }
+
+            let mut treasury_guard = treasury_manager.write().await;
+
+            // Get from_budget and reduce its allocated amount
+            let from_remaining = {
+                if let Some(budget) = treasury_guard.get_budget(&from_budget) {
+                    budget.remaining()
+                } else {
+                    error!(
+                        "❌ Source budget {} not found for transfer proposal {}",
+                        from_budget, proposal_id.0
+                    );
+                    icn_obs::metrics::governance::execution_failures_inc("treasury_transfer");
+                    return;
+                }
+            };
+
+            if from_remaining < amount {
+                error!(
+                    "❌ Insufficient funds in source budget {} for transfer proposal {}: {} < {}",
+                    from_budget, proposal_id.0, from_remaining, amount
+                );
+                icn_obs::metrics::governance::execution_failures_inc("treasury_transfer");
+                return;
+            }
+
+            // Get to_budget and increase its allocated amount
+            if treasury_guard.get_budget(&to_budget).is_none() {
+                error!(
+                    "❌ Destination budget {} not found for transfer proposal {}",
+                    to_budget, proposal_id.0
+                );
+                icn_obs::metrics::governance::execution_failures_inc("treasury_transfer");
+                return;
+            }
+
+            // Update from_budget (reduce allocation)
+            if let Some(from) = treasury_guard.get_budget_mut(&from_budget) {
+                from.allocated_amount -= amount;
+            }
+
+            // Update to_budget (increase allocation)
+            if let Some(to) = treasury_guard.get_budget_mut(&to_budget) {
+                to.allocated_amount += amount;
+            }
+
+            // Record audit trail
+            let operation = TreasuryOperation::TransferBetweenBudgets {
+                from_budget: from_budget.clone(),
+                to_budget: to_budget.clone(),
+                amount,
+                currency: currency.clone(),
+                reason: reason.clone(),
+            };
+
+            if let Err(e) = treasury_guard.record_audit(
+                &treasury_did,
+                operation,
+                treasury_did.clone(),
+                0, // balance_after
+                Some(proposal_id.0.clone()),
+                None,
+            ) {
+                warn!(
+                    "⚠️ Failed to record treasury audit for transfer proposal {}: {}",
+                    proposal_id.0, e
+                );
+            }
+
+            info!(
+                "✅ Treasury budget transfer completed for proposal {}: {} {} from {} to {}",
+                proposal_id.0, amount, currency, from_budget, to_budget
+            );
+
+            let gov_audit = serde_json::json!({
+                "proposal_id": proposal_id.0,
+                "action": "transfer_between_budgets",
+                "from_budget": from_budget,
+                "to_budget": to_budget,
+                "amount": amount,
+                "currency": currency,
+                "reason": reason,
+                "executed_at": icn_time::current_timestamp_secs(),
+            });
+
+            if let Ok(audit_json) = serde_json::to_vec(&gov_audit) {
+                if let Err(e) = store.put(audit_key.as_bytes(), &audit_json) {
+                    error!(
+                        "🚨 Failed to store audit trail for transfer proposal {}: {}",
+                        proposal_id.0, e
+                    );
+                }
+            }
+
+            icn_obs::metrics::governance::proposals_executed_inc("treasury_transfer");
+        });
+    }
+
+    /// Handle cancel budget
+    fn handle_treasury_cancel_budget(
+        &self,
+        proposal_id: ProposalId,
+        budget_id: String,
+        reason: String,
+        return_to_treasury: bool,
+    ) {
+        info!(
+            "📋 Treasury budget cancelled: {} (reason: {}, return: {})",
+            budget_id, reason, return_to_treasury
+        );
+
+        let treasury_manager = self.treasury_manager.clone();
+        let store = self.audit_store.clone();
+
+        tokio::spawn(async move {
+            use icn_ledger::treasury::BudgetStatus;
+
+            let audit_key = format!("gov:audit:treasury:cancel:{}", proposal_id.0);
+
+            // Idempotency check
+            match store.get(audit_key.as_bytes()) {
+                Ok(Some(_)) => {
+                    debug!(
+                        "Treasury cancel budget proposal {} already executed",
+                        proposal_id.0
+                    );
+                    return;
+                }
+                Ok(None) => {}
+                Err(e) => {
+                    error!(
+                        "🚨 Failed to check audit trail for cancel budget proposal {}: {}",
+                        proposal_id.0, e
+                    );
+                    return;
+                }
+            }
+
+            let mut treasury_guard = treasury_manager.write().await;
+
+            match treasury_guard.update_budget_status(&budget_id, BudgetStatus::Cancelled) {
+                Ok(()) => {
+                    info!(
+                        "✅ Treasury budget {} cancelled for proposal {}",
+                        budget_id, proposal_id.0
+                    );
+
+                    let audit_record = serde_json::json!({
+                        "proposal_id": proposal_id.0,
+                        "action": "cancel_budget",
+                        "budget_id": budget_id,
+                        "reason": reason,
+                        "return_to_treasury": return_to_treasury,
+                        "executed_at": icn_time::current_timestamp_secs(),
+                    });
+
+                    if let Ok(audit_json) = serde_json::to_vec(&audit_record) {
+                        if let Err(e) = store.put(audit_key.as_bytes(), &audit_json) {
+                            error!(
+                                "🚨 Failed to store audit trail for cancel budget proposal {}: {}",
+                                proposal_id.0, e
+                            );
+                        }
+                    }
+
+                    icn_obs::metrics::governance::proposals_executed_inc("treasury_cancel_budget");
+                }
+                Err(e) => {
+                    error!(
+                        "❌ Failed to cancel budget {} for proposal {}: {}",
+                        budget_id, proposal_id.0, e
+                    );
+                    icn_obs::metrics::governance::execution_failures_inc("treasury_cancel_budget");
+                }
+            }
+        });
+    }
+
+    /// Handle reclaim budget funds
+    fn handle_treasury_reclaim_budget(
+        &self,
+        proposal_id: ProposalId,
+        budget_id: String,
+        amount: i64,
+        currency: String,
+        reason: String,
+    ) {
+        info!(
+            "📋 Treasury budget reclaim: {} {} from {} ({})",
+            amount, currency, budget_id, reason
+        );
+
+        let treasury_manager = self.treasury_manager.clone();
+        let store = self.audit_store.clone();
+
+        tokio::spawn(async move {
+            use icn_ledger::treasury::TreasuryOperation;
+
+            let audit_key = format!("gov:audit:treasury:reclaim:{}", proposal_id.0);
+
+            // Idempotency check
+            match store.get(audit_key.as_bytes()) {
+                Ok(Some(_)) => {
+                    debug!(
+                        "Treasury reclaim budget proposal {} already executed",
+                        proposal_id.0
+                    );
+                    return;
+                }
+                Ok(None) => {}
+                Err(e) => {
+                    error!(
+                        "🚨 Failed to check audit trail for reclaim budget proposal {}: {}",
+                        proposal_id.0, e
+                    );
+                    return;
+                }
+            }
+
+            let mut treasury_guard = treasury_manager.write().await;
+
+            // Get the budget and check remaining funds
+            let (treasury_did, remaining) = {
+                if let Some(budget) = treasury_guard.get_budget(&budget_id) {
+                    (budget.treasury_did.clone(), budget.remaining())
+                } else {
+                    error!(
+                        "❌ Budget {} not found for reclaim proposal {}",
+                        budget_id, proposal_id.0
+                    );
+                    icn_obs::metrics::governance::execution_failures_inc("treasury_reclaim");
+                    return;
+                }
+            };
+
+            if remaining < amount {
+                error!(
+                    "❌ Insufficient funds to reclaim from budget {} for proposal {}: {} < {}",
+                    budget_id, proposal_id.0, remaining, amount
+                );
+                icn_obs::metrics::governance::execution_failures_inc("treasury_reclaim");
+                return;
+            }
+
+            // Reduce the allocated amount
+            if let Some(budget) = treasury_guard.get_budget_mut(&budget_id) {
+                budget.allocated_amount -= amount;
+                info!(
+                    "✅ Reclaimed {} {} from budget {} for proposal {}",
+                    amount, currency, budget_id, proposal_id.0
+                );
+            }
+
+            // Record audit trail
+            let operation = TreasuryOperation::ReclaimBudget {
+                budget_id: budget_id.clone(),
+                amount,
+                currency: currency.clone(),
+                reason: reason.clone(),
+            };
+
+            if let Err(e) = treasury_guard.record_audit(
+                &treasury_did,
+                operation,
+                treasury_did.clone(),
+                0, // balance_after
+                Some(proposal_id.0.clone()),
+                None,
+            ) {
+                warn!(
+                    "⚠️ Failed to record treasury audit for reclaim proposal {}: {}",
+                    proposal_id.0, e
+                );
+            }
+
+            let gov_audit = serde_json::json!({
+                "proposal_id": proposal_id.0,
+                "action": "reclaim_budget",
+                "budget_id": budget_id,
+                "amount": amount,
+                "currency": currency,
+                "reason": reason,
+                "executed_at": icn_time::current_timestamp_secs(),
+            });
+
+            if let Ok(audit_json) = serde_json::to_vec(&gov_audit) {
+                if let Err(e) = store.put(audit_key.as_bytes(), &audit_json) {
+                    error!(
+                        "🚨 Failed to store audit trail for reclaim proposal {}: {}",
+                        proposal_id.0, e
+                    );
+                }
+            }
+
+            icn_obs::metrics::governance::proposals_executed_inc("treasury_reclaim");
+        });
     }
 
     /// Handle a budget proposal

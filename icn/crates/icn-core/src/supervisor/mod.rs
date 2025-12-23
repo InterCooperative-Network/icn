@@ -201,6 +201,7 @@ impl Supervisor {
             icn_obs::metrics::supervisor::actor_spawned_inc("ledger");
             let ledger_handle = ledger_services.ledger_handle.clone();
             let dispute_manager_handle = ledger_services.dispute_manager.clone();
+            let treasury_manager_handle = ledger_services.treasury_manager.clone();
             let contract_runtime_handle = ledger_services.contract_runtime.clone();
             let contract_actor_handle = ledger_services.contract_actor.clone();
 
@@ -849,6 +850,7 @@ impl Supervisor {
                     dead_letter_queue.clone(),
                     governance_handle.clone(),
                     dispute_manager_handle.clone(),
+                    treasury_manager_handle.clone(),
                     treasury_did,
                 );
 
