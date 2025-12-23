@@ -783,6 +783,23 @@ impl TreasuryManager {
         Ok(())
     }
 
+    /// Save budget changes to persistent storage
+    ///
+    /// Call this after making direct mutations to budget fields (e.g., allocated_amount).
+    /// This is a public wrapper around the internal persist_budget method.
+    pub fn save_budget(&self, budget_id: &str) -> Result<()> {
+        let budget = self
+            .budgets
+            .get(budget_id)
+            .ok_or_else(|| anyhow::anyhow!("Budget not found: {budget_id}"))?;
+
+        if let Some(ref store) = self.store {
+            self.persist_budget(budget, store)?;
+        }
+
+        Ok(())
+    }
+
     // === Spending Rules ===
 
     /// Add a spending rule

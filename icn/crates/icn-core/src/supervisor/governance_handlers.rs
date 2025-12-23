@@ -498,10 +498,12 @@ impl GovernanceEventHandler {
 
         let treasury_manager = self.treasury_manager.clone();
         let store = self.audit_store.clone();
+        let dlq = self.dlq.clone();
 
         tokio::spawn(async move {
             use icn_ledger::treasury::ApprovalType;
 
+            let start = std::time::Instant::now();
             let audit_key = format!("gov:audit:treasury:rule:{}", proposal_id.0);
 
             // Idempotency check
@@ -511,6 +513,7 @@ impl GovernanceEventHandler {
                         "Treasury spending rule proposal {} already executed",
                         proposal_id.0
                     );
+                    icn_obs::metrics::governance::idempotent_skips_inc();
                     return;
                 }
                 Ok(None) => {}
@@ -519,6 +522,11 @@ impl GovernanceEventHandler {
                         "🚨 Failed to check audit trail for spending rule proposal {}: {}",
                         proposal_id.0, e
                     );
+                    let failed_op =
+                        FailedOperation::idempotency_check_failure(&proposal_id.0, &e.to_string());
+                    if let Err(dlq_err) = dlq.enqueue(failed_op) {
+                        error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                    }
                     return;
                 }
             }
@@ -587,13 +595,34 @@ impl GovernanceEventHandler {
                         }
                     }
 
+                    let duration = start.elapsed().as_secs_f64();
                     icn_obs::metrics::governance::proposals_executed_inc("treasury_modify_rule");
+                    icn_obs::metrics::governance::execution_duration_record(
+                        "treasury_modify_rule",
+                        duration,
+                    );
                 }
                 Err(e) => {
                     error!(
                         "❌ Failed to modify spending rule for proposal {}: {}",
                         proposal_id.0, e
                     );
+
+                    let failed_op = FailedOperation::new(
+                        format!("treasury:rule:{}", proposal_id.0),
+                        FailureType::TreasuryOperationFailed,
+                        serde_json::json!({
+                            "proposal_id": proposal_id.0,
+                            "treasury_did": treasury_did.to_string(),
+                            "rule_id": rule_id,
+                            "threshold_amount": threshold_amount,
+                        }),
+                        e.to_string(),
+                    );
+                    if let Err(dlq_err) = dlq.enqueue(failed_op) {
+                        error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                    }
+
                     icn_obs::metrics::governance::execution_failures_inc("treasury_modify_rule");
                 }
             }
@@ -618,10 +647,12 @@ impl GovernanceEventHandler {
 
         let treasury_manager = self.treasury_manager.clone();
         let store = self.audit_store.clone();
+        let dlq = self.dlq.clone();
 
         tokio::spawn(async move {
             use icn_ledger::treasury::TreasuryOperation;
 
+            let start = std::time::Instant::now();
             let audit_key = format!("gov:audit:treasury:transfer:{}", proposal_id.0);
 
             // Idempotency check
@@ -631,6 +662,7 @@ impl GovernanceEventHandler {
                         "Treasury budget transfer proposal {} already executed",
                         proposal_id.0
                     );
+                    icn_obs::metrics::governance::idempotent_skips_inc();
                     return;
                 }
                 Ok(None) => {}
@@ -639,6 +671,11 @@ impl GovernanceEventHandler {
                         "🚨 Failed to check audit trail for budget transfer proposal {}: {}",
                         proposal_id.0, e
                     );
+                    let failed_op =
+                        FailedOperation::idempotency_check_failure(&proposal_id.0, &e.to_string());
+                    if let Err(dlq_err) = dlq.enqueue(failed_op) {
+                        error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                    }
                     return;
                 }
             }
@@ -654,6 +691,19 @@ impl GovernanceEventHandler {
                         "❌ Source budget {} not found for transfer proposal {}",
                         from_budget, proposal_id.0
                     );
+                    let failed_op = FailedOperation::new(
+                        format!("treasury:transfer:{}", proposal_id.0),
+                        FailureType::TreasuryOperationFailed,
+                        serde_json::json!({
+                            "proposal_id": proposal_id.0,
+                            "error": "source_budget_not_found",
+                            "from_budget": from_budget,
+                        }),
+                        format!("Source budget {from_budget} not found"),
+                    );
+                    if let Err(dlq_err) = dlq.enqueue(failed_op) {
+                        error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                    }
                     icn_obs::metrics::governance::execution_failures_inc("treasury_transfer");
                     return;
                 }
@@ -664,6 +714,21 @@ impl GovernanceEventHandler {
                     "❌ Insufficient funds in source budget {} for transfer proposal {}: {} < {}",
                     from_budget, proposal_id.0, from_remaining, amount
                 );
+                let failed_op = FailedOperation::new(
+                    format!("treasury:transfer:{}", proposal_id.0),
+                    FailureType::TreasuryOperationFailed,
+                    serde_json::json!({
+                        "proposal_id": proposal_id.0,
+                        "error": "insufficient_funds",
+                        "from_budget": from_budget,
+                        "remaining": from_remaining,
+                        "requested": amount,
+                    }),
+                    format!("Insufficient funds: {from_remaining} remaining, {amount} requested"),
+                );
+                if let Err(dlq_err) = dlq.enqueue(failed_op) {
+                    error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                }
                 icn_obs::metrics::governance::execution_failures_inc("treasury_transfer");
                 return;
             }
@@ -674,6 +739,19 @@ impl GovernanceEventHandler {
                     "❌ Destination budget {} not found for transfer proposal {}",
                     to_budget, proposal_id.0
                 );
+                let failed_op = FailedOperation::new(
+                    format!("treasury:transfer:{}", proposal_id.0),
+                    FailureType::TreasuryOperationFailed,
+                    serde_json::json!({
+                        "proposal_id": proposal_id.0,
+                        "error": "destination_budget_not_found",
+                        "to_budget": to_budget,
+                    }),
+                    format!("Destination budget {to_budget} not found"),
+                );
+                if let Err(dlq_err) = dlq.enqueue(failed_op) {
+                    error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                }
                 icn_obs::metrics::governance::execution_failures_inc("treasury_transfer");
                 return;
             }
@@ -686,6 +764,20 @@ impl GovernanceEventHandler {
             // Update to_budget (increase allocation)
             if let Some(to) = treasury_guard.get_budget_mut(&to_budget) {
                 to.allocated_amount += amount;
+            }
+
+            // Persist budget changes
+            if let Err(e) = treasury_guard.save_budget(&from_budget) {
+                warn!(
+                    "⚠️ Failed to persist from_budget {} after transfer: {}",
+                    from_budget, e
+                );
+            }
+            if let Err(e) = treasury_guard.save_budget(&to_budget) {
+                warn!(
+                    "⚠️ Failed to persist to_budget {} after transfer: {}",
+                    to_budget, e
+                );
             }
 
             // Record audit trail
@@ -736,7 +828,9 @@ impl GovernanceEventHandler {
                 }
             }
 
+            let duration = start.elapsed().as_secs_f64();
             icn_obs::metrics::governance::proposals_executed_inc("treasury_transfer");
+            icn_obs::metrics::governance::execution_duration_record("treasury_transfer", duration);
         });
     }
 
@@ -755,10 +849,12 @@ impl GovernanceEventHandler {
 
         let treasury_manager = self.treasury_manager.clone();
         let store = self.audit_store.clone();
+        let dlq = self.dlq.clone();
 
         tokio::spawn(async move {
-            use icn_ledger::treasury::BudgetStatus;
+            use icn_ledger::treasury::{BudgetStatus, TreasuryOperation};
 
+            let start = std::time::Instant::now();
             let audit_key = format!("gov:audit:treasury:cancel:{}", proposal_id.0);
 
             // Idempotency check
@@ -768,6 +864,7 @@ impl GovernanceEventHandler {
                         "Treasury cancel budget proposal {} already executed",
                         proposal_id.0
                     );
+                    icn_obs::metrics::governance::idempotent_skips_inc();
                     return;
                 }
                 Ok(None) => {}
@@ -776,18 +873,93 @@ impl GovernanceEventHandler {
                         "🚨 Failed to check audit trail for cancel budget proposal {}: {}",
                         proposal_id.0, e
                     );
+                    let failed_op =
+                        FailedOperation::idempotency_check_failure(&proposal_id.0, &e.to_string());
+                    if let Err(dlq_err) = dlq.enqueue(failed_op) {
+                        error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                    }
                     return;
                 }
             }
 
             let mut treasury_guard = treasury_manager.write().await;
 
+            // Get budget info before cancelling (for return_to_treasury logic)
+            let (treasury_did, remaining_amount, currency) = {
+                if let Some(budget) = treasury_guard.get_budget(&budget_id) {
+                    (
+                        budget.treasury_did.clone(),
+                        budget.remaining(),
+                        budget.currency.clone(),
+                    )
+                } else {
+                    error!(
+                        "❌ Budget {} not found for cancel proposal {}",
+                        budget_id, proposal_id.0
+                    );
+                    let failed_op = FailedOperation::new(
+                        format!("treasury:cancel:{}", proposal_id.0),
+                        FailureType::TreasuryOperationFailed,
+                        serde_json::json!({
+                            "proposal_id": proposal_id.0,
+                            "error": "budget_not_found",
+                            "budget_id": budget_id,
+                        }),
+                        format!("Budget {budget_id} not found"),
+                    );
+                    if let Err(dlq_err) = dlq.enqueue(failed_op) {
+                        error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                    }
+                    icn_obs::metrics::governance::execution_failures_inc("treasury_cancel_budget");
+                    return;
+                }
+            };
+
+            // If return_to_treasury is true, reclaim remaining funds
+            let reclaimed_amount = if return_to_treasury && remaining_amount > 0 {
+                // Reduce allocated amount to spent amount (reclaim remaining)
+                if let Some(budget) = treasury_guard.get_budget_mut(&budget_id) {
+                    budget.allocated_amount -= remaining_amount;
+                }
+                remaining_amount
+            } else {
+                0
+            };
+
+            // Cancel the budget
             match treasury_guard.update_budget_status(&budget_id, BudgetStatus::Cancelled) {
                 Ok(()) => {
                     info!(
-                        "✅ Treasury budget {} cancelled for proposal {}",
-                        budget_id, proposal_id.0
+                        "✅ Treasury budget {} cancelled for proposal {}{}",
+                        budget_id,
+                        proposal_id.0,
+                        if reclaimed_amount > 0 {
+                            format!(", reclaimed {reclaimed_amount} {currency}")
+                        } else {
+                            String::new()
+                        }
                     );
+
+                    // Record treasury audit for the cancellation
+                    let operation = TreasuryOperation::CancelBudget {
+                        budget_id: budget_id.clone(),
+                        reason: reason.clone(),
+                        return_to_treasury,
+                    };
+
+                    if let Err(e) = treasury_guard.record_audit(
+                        &treasury_did,
+                        operation,
+                        treasury_did.clone(),
+                        0, // balance_after
+                        Some(proposal_id.0.clone()),
+                        None,
+                    ) {
+                        warn!(
+                            "⚠️ Failed to record treasury audit for cancel proposal {}: {}",
+                            proposal_id.0, e
+                        );
+                    }
 
                     let audit_record = serde_json::json!({
                         "proposal_id": proposal_id.0,
@@ -795,6 +967,7 @@ impl GovernanceEventHandler {
                         "budget_id": budget_id,
                         "reason": reason,
                         "return_to_treasury": return_to_treasury,
+                        "reclaimed_amount": reclaimed_amount,
                         "executed_at": icn_time::current_timestamp_secs(),
                     });
 
@@ -807,13 +980,31 @@ impl GovernanceEventHandler {
                         }
                     }
 
+                    let duration = start.elapsed().as_secs_f64();
                     icn_obs::metrics::governance::proposals_executed_inc("treasury_cancel_budget");
+                    icn_obs::metrics::governance::execution_duration_record(
+                        "treasury_cancel_budget",
+                        duration,
+                    );
                 }
                 Err(e) => {
                     error!(
                         "❌ Failed to cancel budget {} for proposal {}: {}",
                         budget_id, proposal_id.0, e
                     );
+                    let failed_op = FailedOperation::new(
+                        format!("treasury:cancel:{}", proposal_id.0),
+                        FailureType::TreasuryOperationFailed,
+                        serde_json::json!({
+                            "proposal_id": proposal_id.0,
+                            "budget_id": budget_id,
+                            "reason": reason,
+                        }),
+                        e.to_string(),
+                    );
+                    if let Err(dlq_err) = dlq.enqueue(failed_op) {
+                        error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                    }
                     icn_obs::metrics::governance::execution_failures_inc("treasury_cancel_budget");
                 }
             }
@@ -836,10 +1027,12 @@ impl GovernanceEventHandler {
 
         let treasury_manager = self.treasury_manager.clone();
         let store = self.audit_store.clone();
+        let dlq = self.dlq.clone();
 
         tokio::spawn(async move {
             use icn_ledger::treasury::TreasuryOperation;
 
+            let start = std::time::Instant::now();
             let audit_key = format!("gov:audit:treasury:reclaim:{}", proposal_id.0);
 
             // Idempotency check
@@ -849,6 +1042,7 @@ impl GovernanceEventHandler {
                         "Treasury reclaim budget proposal {} already executed",
                         proposal_id.0
                     );
+                    icn_obs::metrics::governance::idempotent_skips_inc();
                     return;
                 }
                 Ok(None) => {}
@@ -857,6 +1051,11 @@ impl GovernanceEventHandler {
                         "🚨 Failed to check audit trail for reclaim budget proposal {}: {}",
                         proposal_id.0, e
                     );
+                    let failed_op =
+                        FailedOperation::idempotency_check_failure(&proposal_id.0, &e.to_string());
+                    if let Err(dlq_err) = dlq.enqueue(failed_op) {
+                        error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                    }
                     return;
                 }
             }
@@ -872,6 +1071,19 @@ impl GovernanceEventHandler {
                         "❌ Budget {} not found for reclaim proposal {}",
                         budget_id, proposal_id.0
                     );
+                    let failed_op = FailedOperation::new(
+                        format!("treasury:reclaim:{}", proposal_id.0),
+                        FailureType::TreasuryOperationFailed,
+                        serde_json::json!({
+                            "proposal_id": proposal_id.0,
+                            "error": "budget_not_found",
+                            "budget_id": budget_id,
+                        }),
+                        format!("Budget {budget_id} not found"),
+                    );
+                    if let Err(dlq_err) = dlq.enqueue(failed_op) {
+                        error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                    }
                     icn_obs::metrics::governance::execution_failures_inc("treasury_reclaim");
                     return;
                 }
@@ -882,6 +1094,21 @@ impl GovernanceEventHandler {
                     "❌ Insufficient funds to reclaim from budget {} for proposal {}: {} < {}",
                     budget_id, proposal_id.0, remaining, amount
                 );
+                let failed_op = FailedOperation::new(
+                    format!("treasury:reclaim:{}", proposal_id.0),
+                    FailureType::TreasuryOperationFailed,
+                    serde_json::json!({
+                        "proposal_id": proposal_id.0,
+                        "error": "insufficient_funds",
+                        "budget_id": budget_id,
+                        "remaining": remaining,
+                        "requested": amount,
+                    }),
+                    format!("Insufficient funds: {remaining} remaining, {amount} requested"),
+                );
+                if let Err(dlq_err) = dlq.enqueue(failed_op) {
+                    error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                }
                 icn_obs::metrics::governance::execution_failures_inc("treasury_reclaim");
                 return;
             }
@@ -892,6 +1119,14 @@ impl GovernanceEventHandler {
                 info!(
                     "✅ Reclaimed {} {} from budget {} for proposal {}",
                     amount, currency, budget_id, proposal_id.0
+                );
+            }
+
+            // Persist budget changes
+            if let Err(e) = treasury_guard.save_budget(&budget_id) {
+                warn!(
+                    "⚠️ Failed to persist budget {} after reclaim: {}",
+                    budget_id, e
                 );
             }
 
@@ -936,7 +1171,9 @@ impl GovernanceEventHandler {
                 }
             }
 
+            let duration = start.elapsed().as_secs_f64();
             icn_obs::metrics::governance::proposals_executed_inc("treasury_reclaim");
+            icn_obs::metrics::governance::execution_duration_record("treasury_reclaim", duration);
         });
     }
 
