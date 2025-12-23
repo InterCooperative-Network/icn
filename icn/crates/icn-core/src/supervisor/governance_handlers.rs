@@ -859,7 +859,7 @@ impl GovernanceEventHandler {
                 if let Err(dlq_err) = dlq.enqueue(failed_op) {
                     error!("   Failed to write to dead-letter queue: {}", dlq_err);
                 }
-                icn_obs::metrics::governance::execution_failures_inc("treasury_transfer");
+                icn_obs::metrics::governance::execution_failures_inc("treasury_transfer_between_budgets");
                 return;
             }
 
@@ -892,7 +892,7 @@ impl GovernanceEventHandler {
                         if let Err(dlq_err) = dlq.enqueue(failed_op) {
                             error!("   Failed to write to dead-letter queue: {}", dlq_err);
                         }
-                        icn_obs::metrics::governance::execution_failures_inc("treasury_transfer");
+                        icn_obs::metrics::governance::execution_failures_inc("treasury_transfer_between_budgets");
                         return;
                     }
                     (budget.remaining(), budget.currency.clone())
@@ -914,7 +914,7 @@ impl GovernanceEventHandler {
                     if let Err(dlq_err) = dlq.enqueue(failed_op) {
                         error!("   Failed to write to dead-letter queue: {}", dlq_err);
                     }
-                    icn_obs::metrics::governance::execution_failures_inc("treasury_transfer");
+                    icn_obs::metrics::governance::execution_failures_inc("treasury_transfer_between_budgets");
                     return;
                 }
             };
@@ -939,7 +939,7 @@ impl GovernanceEventHandler {
                 if let Err(dlq_err) = dlq.enqueue(failed_op) {
                     error!("   Failed to write to dead-letter queue: {}", dlq_err);
                 }
-                icn_obs::metrics::governance::execution_failures_inc("treasury_transfer");
+                icn_obs::metrics::governance::execution_failures_inc("treasury_transfer_between_budgets");
                 return;
             }
 
@@ -965,7 +965,7 @@ impl GovernanceEventHandler {
                     if let Err(dlq_err) = dlq.enqueue(failed_op) {
                         error!("   Failed to write to dead-letter queue: {}", dlq_err);
                     }
-                    icn_obs::metrics::governance::execution_failures_inc("treasury_transfer");
+                    icn_obs::metrics::governance::execution_failures_inc("treasury_transfer_between_budgets");
                     return;
                 }
 
@@ -994,7 +994,7 @@ impl GovernanceEventHandler {
                     if let Err(dlq_err) = dlq.enqueue(failed_op) {
                         error!("   Failed to write to dead-letter queue: {}", dlq_err);
                     }
-                    icn_obs::metrics::governance::execution_failures_inc("treasury_transfer");
+                    icn_obs::metrics::governance::execution_failures_inc("treasury_transfer_between_budgets");
                     return;
                 }
             } else {
@@ -1015,11 +1015,41 @@ impl GovernanceEventHandler {
                 if let Err(dlq_err) = dlq.enqueue(failed_op) {
                     error!("   Failed to write to dead-letter queue: {}", dlq_err);
                 }
-                icn_obs::metrics::governance::execution_failures_inc("treasury_transfer");
+                icn_obs::metrics::governance::execution_failures_inc("treasury_transfer_between_budgets");
                 return;
             }
 
-            // Perform atomic mutation (lock still held)
+            // Perform atomic mutation with checked arithmetic (lock still held)
+            // Pre-validate the addition won't overflow before mutating state
+            let to_current = treasury_guard
+                .get_budget(&to_budget)
+                .map(|b| b.allocated_amount)
+                .unwrap_or(0);
+            if to_current.checked_add(amount).is_none() {
+                error!(
+                    "❌ Budget allocation overflow for transfer proposal {}: {} + {} exceeds i64::MAX",
+                    proposal_id.0, to_current, amount
+                );
+                let failed_op = FailedOperation::new(
+                    format!("treasury:transfer:{}", proposal_id.0),
+                    FailureType::TreasuryOperationFailed,
+                    serde_json::json!({
+                        "proposal_id": proposal_id.0,
+                        "error": "allocation_overflow",
+                        "to_budget": to_budget,
+                        "current_allocation": to_current,
+                        "transfer_amount": amount,
+                    }),
+                    format!("Budget allocation overflow: {to_current} + {amount} exceeds i64::MAX"),
+                );
+                if let Err(dlq_err) = dlq.enqueue(failed_op) {
+                    error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                }
+                icn_obs::metrics::governance::execution_failures_inc("treasury_transfer_between_budgets");
+                return;
+            }
+
+            // Safe to mutate now - arithmetic is validated
             if let Some(from) = treasury_guard.get_budget_mut(&from_budget) {
                 from.allocated_amount -= amount;
             }
@@ -1057,7 +1087,7 @@ impl GovernanceEventHandler {
                 if let Err(dlq_err) = dlq.enqueue(failed_op) {
                     error!("   Failed to write to dead-letter queue: {}", dlq_err);
                 }
-                icn_obs::metrics::governance::execution_failures_inc("treasury_transfer");
+                icn_obs::metrics::governance::execution_failures_inc("treasury_transfer_between_budgets");
                 return;
             }
             if let Err(e) = treasury_guard.save_budget(&to_budget) {
@@ -1095,7 +1125,7 @@ impl GovernanceEventHandler {
                 if let Err(dlq_err) = dlq.enqueue(failed_op) {
                     error!("   Failed to write to dead-letter queue: {}", dlq_err);
                 }
-                icn_obs::metrics::governance::execution_failures_inc("treasury_transfer");
+                icn_obs::metrics::governance::execution_failures_inc("treasury_transfer_between_budgets");
                 return;
             }
 
@@ -1152,8 +1182,8 @@ impl GovernanceEventHandler {
             }
 
             let duration = start.elapsed().as_secs_f64();
-            icn_obs::metrics::governance::proposals_executed_inc("treasury_transfer");
-            icn_obs::metrics::governance::execution_duration_record("treasury_transfer", duration);
+            icn_obs::metrics::governance::proposals_executed_inc("treasury_transfer_between_budgets");
+            icn_obs::metrics::governance::execution_duration_record("treasury_transfer_between_budgets", duration);
         });
     }
 
@@ -1419,14 +1449,64 @@ impl GovernanceEventHandler {
                 }
             }
 
+            // Validation: Amount must be positive (no lock needed)
+            if amount <= 0 {
+                error!(
+                    "❌ Invalid reclaim amount for proposal {}: {} (must be positive)",
+                    proposal_id.0, amount
+                );
+                let failed_op = FailedOperation::new(
+                    format!("treasury:reclaim:{}", proposal_id.0),
+                    FailureType::TreasuryOperationFailed,
+                    serde_json::json!({
+                        "proposal_id": proposal_id.0,
+                        "error": "invalid_amount",
+                        "amount": amount,
+                    }),
+                    format!("Amount must be positive, got: {amount}"),
+                );
+                if let Err(dlq_err) = dlq.enqueue(failed_op) {
+                    error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                }
+                icn_obs::metrics::governance::execution_failures_inc("treasury_reclaim");
+                return;
+            }
+
             // ATOMIC OPERATION: Acquire exclusive write lock on treasury_manager.
             // This lock is held for the ENTIRE operation (validation + mutation + persistence)
             // to prevent TOCTOU race conditions.
             let mut treasury_guard = treasury_manager.write().await;
 
-            // Validate budget exists and has sufficient funds (lock held)
+            // Validate budget exists, has matching currency, and sufficient funds (lock held)
             let (treasury_did, remaining) = {
                 if let Some(budget) = treasury_guard.get_budget(&budget_id) {
+                    // Validate currency matches
+                    if budget.currency != currency {
+                        error!(
+                            "❌ Currency mismatch for reclaim proposal {}: budget has '{}', request has '{}'",
+                            proposal_id.0, budget.currency, currency
+                        );
+                        let failed_op = FailedOperation::new(
+                            format!("treasury:reclaim:{}", proposal_id.0),
+                            FailureType::TreasuryOperationFailed,
+                            serde_json::json!({
+                                "proposal_id": proposal_id.0,
+                                "error": "currency_mismatch",
+                                "budget_id": budget_id,
+                                "budget_currency": budget.currency,
+                                "requested_currency": currency,
+                            }),
+                            format!(
+                                "Currency mismatch: budget has '{}', request has '{}'",
+                                budget.currency, currency
+                            ),
+                        );
+                        if let Err(dlq_err) = dlq.enqueue(failed_op) {
+                            error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                        }
+                        icn_obs::metrics::governance::execution_failures_inc("treasury_reclaim");
+                        return;
+                    }
                     (budget.treasury_did.clone(), budget.remaining())
                 } else {
                     error!(
