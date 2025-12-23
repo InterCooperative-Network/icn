@@ -366,3 +366,41 @@ pub struct SessionStatusResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scopes: Option<Vec<String>>,
 }
+
+// === Vote Delegation ===
+
+/// Create a new vote delegation
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct CreateDelegationRequest {
+    /// DID of the delegate (who receives voting power)
+    pub delegate: String,
+    /// Scope of delegation: "blanket", "domain:<id>", or "proposal:<id>"
+    pub scope: String,
+    /// Optional expiry timestamp (Unix seconds)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expires_at: Option<u64>,
+}
+
+/// Delegation response
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct DelegationResponse {
+    pub id: String,
+    pub delegator: String,
+    pub delegate: String,
+    pub scope: String,
+    pub created_at: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expires_at: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub revoked_at: Option<u64>,
+    pub is_active: bool,
+}
+
+/// List of delegations
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct DelegationListResponse {
+    /// Delegations given by the caller
+    pub given: Vec<DelegationResponse>,
+    /// Delegations received by the caller
+    pub received: Vec<DelegationResponse>,
+}

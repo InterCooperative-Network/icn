@@ -1030,6 +1030,31 @@ enum VoteCommands {
         #[arg(long)]
         proposal_id: String,
     },
+
+    /// Delegate your voting power to another member
+    Delegate {
+        /// DID of the delegate (who will vote on your behalf)
+        #[arg(long)]
+        delegate: String,
+
+        /// Scope of delegation: "blanket", "domain:<id>", or "proposal:<id>"
+        #[arg(long, default_value = "blanket")]
+        scope: String,
+
+        /// Expiry duration (e.g., "7d", "30d", "1y")
+        #[arg(long)]
+        expires: Option<String>,
+    },
+
+    /// List your active delegations
+    Delegations,
+
+    /// Revoke a delegation
+    Revoke {
+        /// Delegation ID to revoke
+        #[arg(long)]
+        delegation_id: String,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -5442,10 +5467,150 @@ async fn handle_gov_command(cmd: GovCommands, data_dir: &Path, endpoint: &str) -
             VoteCommands::Show { proposal_id } => {
                 bail!("Vote show command not yet supported via RPC. Use 'proposal show {proposal_id}' to see the proposal.");
             }
+
+            VoteCommands::Delegate {
+                delegate,
+                scope,
+                expires,
+            } => {
+                // Parse expiry duration to timestamp
+                let expires_at = if let Some(expires_str) = &expires {
+                    let now = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map_err(|e| anyhow::anyhow!("System time error: {e}"))?
+                        .as_secs();
+                    let duration_secs = parse_duration_to_seconds(expires_str)?;
+                    Some(now + duration_secs)
+                } else {
+                    None
+                };
+
+                // Create delegation via RPC
+                let params = serde_json::json!({
+                    "delegate": delegate,
+                    "scope": scope,
+                    "expires_at": expires_at
+                });
+
+                let result = client.call("governance.delegation.create", params).await?;
+
+                println!("✓ Delegation created:");
+                println!("  ID: {}", result["id"].as_str().unwrap_or("unknown"));
+                println!("  Delegate: {delegate}");
+                println!("  Scope: {scope}");
+                if let Some(exp) = expires_at {
+                    println!("  Expires: {exp} (Unix timestamp)");
+                } else {
+                    println!("  Expires: never");
+                }
+            }
+
+            VoteCommands::Delegations => {
+                let result = client
+                    .call("governance.delegation.list", serde_json::json!({}))
+                    .await?;
+
+                let given = result["given"].as_array();
+                let received = result["received"].as_array();
+
+                println!("Delegations Given:");
+                if let Some(given_list) = given {
+                    if given_list.is_empty() {
+                        println!("  (none)");
+                    } else {
+                        for d in given_list {
+                            let active = d["is_active"].as_bool().unwrap_or(false);
+                            let status = if active { "active" } else { "inactive" };
+                            println!(
+                                "  {} → {} [{}] ({})",
+                                d["delegator"].as_str().unwrap_or("?"),
+                                d["delegate"].as_str().unwrap_or("?"),
+                                d["scope"].as_str().unwrap_or("?"),
+                                status
+                            );
+                            println!("    ID: {}", d["id"].as_str().unwrap_or("?"));
+                        }
+                    }
+                } else {
+                    println!("  (none)");
+                }
+
+                println!("\nDelegations Received:");
+                if let Some(received_list) = received {
+                    if received_list.is_empty() {
+                        println!("  (none)");
+                    } else {
+                        for d in received_list {
+                            let active = d["is_active"].as_bool().unwrap_or(false);
+                            let status = if active { "active" } else { "inactive" };
+                            println!(
+                                "  {} → {} [{}] ({})",
+                                d["delegator"].as_str().unwrap_or("?"),
+                                d["delegate"].as_str().unwrap_or("?"),
+                                d["scope"].as_str().unwrap_or("?"),
+                                status
+                            );
+                            println!("    ID: {}", d["id"].as_str().unwrap_or("?"));
+                        }
+                    }
+                } else {
+                    println!("  (none)");
+                }
+            }
+
+            VoteCommands::Revoke { delegation_id } => {
+                let params = serde_json::json!({
+                    "delegation_id": delegation_id
+                });
+
+                client.call("governance.delegation.revoke", params).await?;
+
+                println!("✓ Delegation revoked:");
+                println!("  ID: {delegation_id}");
+            }
         },
     }
 
     Ok(())
+}
+
+/// Parse a duration string (e.g., "7d", "30d", "1y") to seconds
+fn parse_duration_to_seconds(s: &str) -> Result<u64> {
+    let s = s.trim().to_lowercase();
+
+    if let Some(days) = s.strip_suffix('d') {
+        let n: u64 = days
+            .parse()
+            .map_err(|_| anyhow::anyhow!("Invalid duration: {s}"))?;
+        return Ok(n * 86400);
+    }
+
+    if let Some(weeks) = s.strip_suffix('w') {
+        let n: u64 = weeks
+            .parse()
+            .map_err(|_| anyhow::anyhow!("Invalid duration: {s}"))?;
+        return Ok(n * 7 * 86400);
+    }
+
+    if let Some(years) = s.strip_suffix('y') {
+        let n: u64 = years
+            .parse()
+            .map_err(|_| anyhow::anyhow!("Invalid duration: {s}"))?;
+        return Ok(n * 365 * 86400);
+    }
+
+    if let Some(hours) = s.strip_suffix('h') {
+        let n: u64 = hours
+            .parse()
+            .map_err(|_| anyhow::anyhow!("Invalid duration: {s}"))?;
+        return Ok(n * 3600);
+    }
+
+    // Try parsing as seconds
+    let secs: u64 = s
+        .parse()
+        .map_err(|_| anyhow::anyhow!("Invalid duration: {s}. Use format like 7d, 30d, 1y, 24h"))?;
+    Ok(secs)
 }
 
 fn handle_snapshot_command(cmd: SnapshotCommands, data_dir: &Path) -> Result<()> {

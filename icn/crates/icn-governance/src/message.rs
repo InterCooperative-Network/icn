@@ -1,6 +1,6 @@
 //! Governance gossip messages for distributed coordination
 
-use crate::{GovernanceDomain, Proposal, ProposalId, Vote};
+use crate::{Delegation, DelegationId, GovernanceDomain, Proposal, ProposalId, Timestamp, Vote};
 use icn_identity::Did;
 use serde::{Deserialize, Serialize};
 
@@ -75,6 +75,24 @@ pub enum GovernanceMessage {
         /// When it was cancelled
         cancelled_at: u64,
     },
+
+    /// A new vote delegation has been created
+    DelegationCreated {
+        /// The delegation
+        delegation: Delegation,
+    },
+
+    /// A vote delegation has been revoked
+    DelegationRevoked {
+        /// Delegation ID
+        id: DelegationId,
+
+        /// Who revoked it (the delegator)
+        revoked_by: Did,
+
+        /// When it was revoked
+        revoked_at: Timestamp,
+    },
 }
 
 /// Outcome of a closed proposal
@@ -148,6 +166,20 @@ impl GovernanceMessage {
         }
     }
 
+    /// Create a DelegationCreated message
+    pub fn delegation_created(delegation: Delegation) -> Self {
+        Self::DelegationCreated { delegation }
+    }
+
+    /// Create a DelegationRevoked message
+    pub fn delegation_revoked(id: DelegationId, revoked_by: Did, revoked_at: Timestamp) -> Self {
+        Self::DelegationRevoked {
+            id,
+            revoked_by,
+            revoked_at,
+        }
+    }
+
     /// Get a short description of this message type for logging
     pub fn message_type(&self) -> &'static str {
         match self {
@@ -158,6 +190,8 @@ impl GovernanceMessage {
             Self::VoteCast { .. } => "VoteCast",
             Self::ProposalClosed { .. } => "ProposalClosed",
             Self::ProposalCancelled { .. } => "ProposalCancelled",
+            Self::DelegationCreated { .. } => "DelegationCreated",
+            Self::DelegationRevoked { .. } => "DelegationRevoked",
         }
     }
 

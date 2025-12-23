@@ -2,7 +2,7 @@
 //!
 //! RESTful API for managing governance domains, proposals, and votes.
 
-use actix_web::{get, post, web, HttpRequest, HttpResponse};
+use actix_web::{delete, get, post, web, HttpRequest, HttpResponse};
 use std::sync::Arc;
 
 use crate::error::Result;
@@ -10,12 +10,13 @@ use crate::events::{EventBroadcaster, GatewayEvent};
 use crate::governance_mgr::GovernanceManager;
 use crate::middleware::{get_claims, require_scope};
 use crate::models::{
-    CastVoteRequest, CreateDomainRequest, CreateProposalRequest, OpenProposalRequest,
-    ProposalPayloadRequest,
+    CastVoteRequest, CreateDelegationRequest, CreateDomainRequest, CreateProposalRequest,
+    DelegationListResponse, DelegationResponse, OpenProposalRequest, ProposalPayloadRequest,
 };
 use crate::validation;
 use icn_governance::{
-    GovernanceDomainId, GovernanceParams, MembershipConfig, ProposalId, ProposalPayload, VoteChoice,
+    Delegation, DelegationScope, GovernanceDomainId, GovernanceParams, MembershipConfig,
+    ProposalId, ProposalPayload, VoteChoice,
 };
 use icn_identity::Did;
 use icn_obs::metrics::gateway;
@@ -843,6 +844,202 @@ pub async fn cast_vote(
     });
 
     Ok(HttpResponse::Ok().json(proposal))
+}
+
+// ============================================================================
+// Delegation Endpoints
+// ============================================================================
+
+/// Helper to convert a Delegation to DelegationResponse
+fn delegation_to_response(d: &Delegation) -> DelegationResponse {
+    let scope_str = match &d.scope {
+        DelegationScope::Blanket => "blanket".to_string(),
+        DelegationScope::Domain(domain_id) => format!("domain:{}", domain_id.0),
+        DelegationScope::Proposal(proposal_id) => format!("proposal:{}", proposal_id.0),
+    };
+    let now = icn_time::current_timestamp_secs();
+    DelegationResponse {
+        id: d.id.0.clone(),
+        delegator: d.delegator.to_string(),
+        delegate: d.delegate.to_string(),
+        scope: scope_str,
+        created_at: d.created_at,
+        expires_at: d.expires_at,
+        revoked_at: d.revoked_at,
+        is_active: d.is_active(now),
+    }
+}
+
+/// POST /gov/delegations - Create a new vote delegation
+#[post("/delegations")]
+pub async fn create_delegation(
+    http_req: HttpRequest,
+    gov_mgr: web::Data<Arc<GovernanceManager>>,
+    req: web::Json<CreateDelegationRequest>,
+) -> Result<HttpResponse> {
+    // Check authorization
+    require_scope(&http_req, "gov:write")?;
+
+    // Extract authenticated DID from JWT claims
+    let claims = get_claims(&http_req).ok_or_else(|| {
+        crate::error::GatewayError::AuthenticationFailed("No claims found".to_string())
+    })?;
+
+    let delegator_did: Did = claims.sub.parse().map_err(|e| {
+        crate::error::GatewayError::BadRequest(format!("Invalid DID in token: {e}"))
+    })?;
+
+    // Parse delegate DID
+    let delegate_did: Did = req.delegate.parse().map_err(|e| {
+        crate::error::GatewayError::BadRequest(format!("Invalid delegate DID: {e}"))
+    })?;
+
+    // Parse scope
+    let scope = parse_delegation_scope(&req.scope)?;
+
+    // Create the delegation
+    let mut delegation = Delegation::new(delegator_did, delegate_did, scope);
+    if let Some(expires_at) = req.expires_at {
+        delegation = delegation.with_expiry(expires_at);
+    }
+
+    // Store the delegation via governance manager
+    gov_mgr.create_delegation(delegation.clone()).await?;
+
+    Ok(HttpResponse::Created().json(delegation_to_response(&delegation)))
+}
+
+/// GET /gov/delegations - List delegations for the authenticated user
+#[get("/delegations")]
+pub async fn list_delegations(
+    http_req: HttpRequest,
+    gov_mgr: web::Data<Arc<GovernanceManager>>,
+) -> Result<HttpResponse> {
+    // Check authorization
+    require_scope(&http_req, "gov:read")?;
+
+    // Extract authenticated DID from JWT claims
+    let claims = get_claims(&http_req).ok_or_else(|| {
+        crate::error::GatewayError::AuthenticationFailed("No claims found".to_string())
+    })?;
+
+    let caller_did: Did = claims.sub.parse().map_err(|e| {
+        crate::error::GatewayError::BadRequest(format!("Invalid DID in token: {e}"))
+    })?;
+
+    // Get delegations given by and received by this user
+    let given = gov_mgr.get_delegations_from(&caller_did).await?;
+    let received = gov_mgr.get_delegations_to(&caller_did).await?;
+
+    let response = DelegationListResponse {
+        given: given.iter().map(delegation_to_response).collect(),
+        received: received.iter().map(delegation_to_response).collect(),
+    };
+
+    Ok(HttpResponse::Ok().json(response))
+}
+
+/// GET /gov/delegations/{id} - Get a specific delegation
+#[get("/delegations/{id}")]
+pub async fn get_delegation(
+    http_req: HttpRequest,
+    gov_mgr: web::Data<Arc<GovernanceManager>>,
+    id: web::Path<String>,
+) -> Result<HttpResponse> {
+    // Check authorization
+    require_scope(&http_req, "gov:read")?;
+
+    let delegation_id = icn_governance::DelegationId(id.into_inner());
+    let delegation = gov_mgr
+        .get_delegation(&delegation_id)
+        .await?
+        .ok_or_else(|| {
+            crate::error::GatewayError::NotFound(format!(
+                "Delegation not found: {}",
+                delegation_id.0
+            ))
+        })?;
+
+    Ok(HttpResponse::Ok().json(delegation_to_response(&delegation)))
+}
+
+/// DELETE /gov/delegations/{id} - Revoke a delegation
+#[delete("/delegations/{id}")]
+pub async fn revoke_delegation(
+    http_req: HttpRequest,
+    gov_mgr: web::Data<Arc<GovernanceManager>>,
+    id: web::Path<String>,
+) -> Result<HttpResponse> {
+    // Check authorization
+    require_scope(&http_req, "gov:write")?;
+
+    // Extract authenticated DID from JWT claims
+    let claims = get_claims(&http_req).ok_or_else(|| {
+        crate::error::GatewayError::AuthenticationFailed("No claims found".to_string())
+    })?;
+
+    let caller_did: Did = claims.sub.parse().map_err(|e| {
+        crate::error::GatewayError::BadRequest(format!("Invalid DID in token: {e}"))
+    })?;
+
+    let delegation_id = icn_governance::DelegationId(id.into_inner());
+
+    // Verify the delegation exists and belongs to the caller
+    let delegation = gov_mgr
+        .get_delegation(&delegation_id)
+        .await?
+        .ok_or_else(|| {
+            crate::error::GatewayError::NotFound(format!(
+                "Delegation not found: {}",
+                delegation_id.0
+            ))
+        })?;
+
+    // Only the delegator can revoke their delegation
+    if delegation.delegator != caller_did {
+        return Err(crate::error::GatewayError::AuthorizationFailed(
+            "Only the delegator can revoke a delegation".to_string(),
+        ));
+    }
+
+    // Revoke the delegation
+    let now = icn_time::current_timestamp_secs();
+    gov_mgr.revoke_delegation(&delegation_id, now).await?;
+
+    Ok(HttpResponse::NoContent().finish())
+}
+
+/// Parse a delegation scope string (e.g., "blanket", "domain:coop-id", "proposal:prop-id")
+fn parse_delegation_scope(scope: &str) -> Result<DelegationScope> {
+    if scope == "blanket" {
+        return Ok(DelegationScope::Blanket);
+    }
+
+    if let Some(domain_id) = scope.strip_prefix("domain:") {
+        if domain_id.is_empty() {
+            return Err(crate::error::GatewayError::BadRequest(
+                "Domain ID cannot be empty in scope".to_string(),
+            ));
+        }
+        return Ok(DelegationScope::Domain(GovernanceDomainId(
+            domain_id.to_string(),
+        )));
+    }
+
+    if let Some(proposal_id) = scope.strip_prefix("proposal:") {
+        if proposal_id.is_empty() {
+            return Err(crate::error::GatewayError::BadRequest(
+                "Proposal ID cannot be empty in scope".to_string(),
+            ));
+        }
+        return Ok(DelegationScope::Proposal(ProposalId(
+            proposal_id.to_string(),
+        )));
+    }
+
+    Err(crate::error::GatewayError::BadRequest(format!(
+        "Invalid delegation scope: '{scope}'. Must be 'blanket', 'domain:<id>', or 'proposal:<id>'"
+    )))
 }
 
 #[cfg(test)]
