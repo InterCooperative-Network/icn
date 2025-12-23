@@ -251,14 +251,11 @@ pub async fn get_treasury_status(
     // For now, return a placeholder response
     info!(coop_id = %coop_id, "Treasury status requested");
 
-    // Placeholder response - will be replaced with actual data
-    let response = serde_json::json!({
-        "error": "Treasury not yet configured for this cooperative",
-        "coop_id": coop_id,
-        "hint": "Treasury must be registered via governance proposal"
-    });
-
-    Ok(HttpResponse::NotFound().json(response))
+    // Placeholder - will be replaced with actual data when wired to supervisor
+    Err(GatewayError::NotFound(format!(
+        "Treasury not configured for cooperative '{}'. Register via governance proposal.",
+        coop_id
+    )))
 }
 
 /// GET /treasury/{coop_id}/balance - Get treasury balance
@@ -277,12 +274,10 @@ pub async fn get_treasury_balance(
     info!(coop_id = %coop_id, "Treasury balance requested");
 
     // TODO: Wire to actual TreasuryManager from supervisor
-    let response = serde_json::json!({
-        "error": "Treasury not yet configured for this cooperative",
-        "coop_id": coop_id
-    });
-
-    Ok(HttpResponse::NotFound().json(response))
+    Err(GatewayError::NotFound(format!(
+        "Treasury not configured for cooperative '{}'",
+        coop_id
+    )))
 }
 
 /// GET /treasury/{coop_id}/budgets - List budgets
@@ -343,6 +338,38 @@ pub async fn create_budget(
 
     let coop_id = path.into_inner();
     require_coop_access(&req, &coop_id)?;
+
+    // Input validation
+    if body.amount <= 0 {
+        return Err(GatewayError::BadRequest(
+            "Budget amount must be positive".to_string(),
+        ));
+    }
+
+    if body.purpose.trim().is_empty() {
+        return Err(GatewayError::BadRequest(
+            "Budget purpose cannot be empty".to_string(),
+        ));
+    }
+
+    if body.currency.trim().is_empty() {
+        return Err(GatewayError::BadRequest(
+            "Currency cannot be empty".to_string(),
+        ));
+    }
+
+    // Validate period_end is in the future
+    if let Some(period_end) = body.period_end {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        if period_end <= now {
+            return Err(GatewayError::BadRequest(
+                "Period end must be in the future".to_string(),
+            ));
+        }
+    }
 
     info!(
         coop_id = %coop_id,
@@ -447,6 +474,19 @@ pub async fn deposit_to_treasury(
 
     let coop_id = path.into_inner();
     require_coop_access(&req, &coop_id)?;
+
+    // Input validation
+    if body.amount <= 0 {
+        return Err(GatewayError::BadRequest(
+            "Deposit amount must be positive".to_string(),
+        ));
+    }
+
+    if body.currency.trim().is_empty() {
+        return Err(GatewayError::BadRequest(
+            "Currency cannot be empty".to_string(),
+        ));
+    }
 
     info!(
         coop_id = %coop_id,

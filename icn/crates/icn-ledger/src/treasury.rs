@@ -224,8 +224,10 @@ impl TreasuryBudget {
     }
 
     /// Record spending and return any newly triggered thresholds
+    ///
+    /// Uses saturating addition to prevent integer overflow.
     pub fn record_spending(&mut self, amount: i64) -> Vec<u8> {
-        self.spent_amount += amount;
+        self.spent_amount = self.spent_amount.saturating_add(amount);
 
         // Check for exceeded status
         if self.is_exceeded() {
@@ -233,7 +235,8 @@ impl TreasuryBudget {
         }
 
         // Check for threshold notifications
-        let percentage = self.percentage_used() as u8;
+        // Round and clamp to valid u8 range (0-100)
+        let percentage = self.percentage_used().round().min(100.0).max(0.0) as u8;
         let mut triggered = Vec::new();
 
         for threshold in &self.notification_thresholds {

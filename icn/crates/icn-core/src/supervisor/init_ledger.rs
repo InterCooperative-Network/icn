@@ -97,10 +97,19 @@ pub async fn init_ledger_services(
             validator_clone.validate_entry(entry)?;
 
             // Then validate treasury spending rules
-            // Use try_read to avoid blocking; if can't acquire lock, skip validation
-            // (treasury validation is advisory, not critical path)
-            if let Ok(treasury_mgr) = treasury_clone.try_read() {
-                treasury_mgr.validate_entry(entry)?;
+            // SECURITY: Treasury validation is critical - unauthorized withdrawals must be blocked.
+            // If we can't acquire the lock, reject the entry to prevent bypass attacks.
+            match treasury_clone.try_read() {
+                Ok(treasury_mgr) => {
+                    treasury_mgr.validate_entry(entry)?;
+                }
+                Err(_) => {
+                    // Lock contention during validation - reject to prevent bypass
+                    anyhow::bail!(
+                        "Treasury validation temporarily unavailable - please retry. \
+                         This prevents unauthorized withdrawals during high contention."
+                    );
+                }
             }
 
             Ok(())
