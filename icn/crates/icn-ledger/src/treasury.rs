@@ -1064,9 +1064,7 @@ impl TreasuryManager {
         budget_id: &str,
         store: &Arc<dyn Store>,
     ) -> Result<()> {
-        let key = format!(
-            "{TREASURY_IDX_BUDGETS_PREFIX}{treasury_did}:{budget_id}"
-        );
+        let key = format!("{TREASURY_IDX_BUDGETS_PREFIX}{treasury_did}:{budget_id}");
         store.put(key.as_bytes(), budget_id.as_bytes())?;
         Ok(())
     }
