@@ -100,7 +100,7 @@ async fn test_treasury_budget_idempotency() -> Result<()> {
     let (treasury_manager, treasury_did, admin, _store) = setup_treasury().await;
 
     let proposal_id = "test-budget-proposal";
-    let audit_key = format!("gov:audit:treasury:create:{proposal_id}");
+    let audit_key = format!("gov:audit:treasury:budget:{proposal_id}");
 
     // Simulate first execution (create budget)
     {

@@ -341,6 +341,19 @@ impl GovernanceEventHandler {
                         "🚨 Failed to check audit trail for treasury budget proposal {}: {}",
                         proposal_id.0, e
                     );
+                    let failed_op = FailedOperation::new(
+                        format!("treasury:budget:idem:{}", proposal_id.0),
+                        FailureType::IdempotencyCheckFailed,
+                        serde_json::json!({
+                            "proposal_id": proposal_id.0,
+                            "error": "idempotency_check_failed",
+                        }),
+                        format!("Failed to check idempotency: {e}"),
+                    );
+                    if let Err(dlq_err) = dlq.enqueue(failed_op) {
+                        error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                    }
+                    icn_obs::metrics::governance::execution_failures_inc("treasury_create_budget");
                     return;
                 }
             }
@@ -769,12 +782,21 @@ impl GovernanceEventHandler {
             }
 
             // Persist budget changes - CRITICAL: failures here mean in-memory state diverges
-            // from persistent state. We treat this as a failure and enqueue to DLQ for retry.
+            // from persistent state. We use a "best effort rollback" approach:
+            // 1. Save from_budget first
+            // 2. If to_budget save fails, attempt to rollback from_budget
             if let Err(e) = treasury_guard.save_budget(&from_budget) {
                 error!(
                     "🚨 Failed to persist from_budget {} after transfer: {}",
                     from_budget, e
                 );
+                // Rollback in-memory state
+                if let Some(from) = treasury_guard.get_budget_mut(&from_budget) {
+                    from.allocated_amount += amount;
+                }
+                if let Some(to) = treasury_guard.get_budget_mut(&to_budget) {
+                    to.allocated_amount -= amount;
+                }
                 let failed_op = FailedOperation::new(
                     format!("treasury:transfer:persist:{}", proposal_id.0),
                     FailureType::StorageFailure,
@@ -797,15 +819,30 @@ impl GovernanceEventHandler {
                     "🚨 Failed to persist to_budget {} after transfer: {}",
                     to_budget, e
                 );
+                // Attempt compensating rollback: restore from_budget to original state
+                if let Some(from) = treasury_guard.get_budget_mut(&from_budget) {
+                    from.allocated_amount += amount;
+                }
+                if let Err(rollback_err) = treasury_guard.save_budget(&from_budget) {
+                    error!(
+                        "🚨🚨 CRITICAL: Failed to rollback from_budget {} after partial transfer failure: {}",
+                        from_budget, rollback_err
+                    );
+                    // DLQ entry includes rollback failure for manual intervention
+                }
+                // Rollback to_budget in memory
+                if let Some(to) = treasury_guard.get_budget_mut(&to_budget) {
+                    to.allocated_amount -= amount;
+                }
                 let failed_op = FailedOperation::new(
                     format!("treasury:transfer:persist:{}", proposal_id.0),
                     FailureType::StorageFailure,
                     serde_json::json!({
                         "proposal_id": proposal_id.0,
-                        "error": "persistence_failed",
+                        "error": "persistence_failed_with_rollback",
                         "budget_id": to_budget,
                         "operation": "save_to_budget",
-                        "note": "from_budget was persisted successfully",
+                        "note": "from_budget rollback attempted",
                     }),
                     e.to_string(),
                 );
@@ -963,12 +1000,41 @@ impl GovernanceEventHandler {
                 if let Some(budget) = treasury_guard.get_budget_mut(&budget_id) {
                     budget.allocated_amount -= remaining_amount;
                 }
+
+                // CRITICAL: Persist allocation change BEFORE status update to ensure
+                // reclaimed funds are recorded even if status update fails
+                if let Err(e) = treasury_guard.save_budget(&budget_id) {
+                    error!(
+                        "🚨 Failed to persist budget allocation change for cancel proposal {}: {}",
+                        proposal_id.0, e
+                    );
+                    // Rollback in-memory state
+                    if let Some(budget) = treasury_guard.get_budget_mut(&budget_id) {
+                        budget.allocated_amount += remaining_amount;
+                    }
+                    let failed_op = FailedOperation::new(
+                        format!("treasury:cancel:{}", proposal_id.0),
+                        FailureType::TreasuryOperationFailed,
+                        serde_json::json!({
+                            "proposal_id": proposal_id.0,
+                            "error": "allocation_persist_failed",
+                            "budget_id": budget_id,
+                            "reclaimed_amount": remaining_amount,
+                        }),
+                        format!("Failed to persist allocation change: {e}"),
+                    );
+                    if let Err(dlq_err) = dlq.enqueue(failed_op) {
+                        error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                    }
+                    icn_obs::metrics::governance::execution_failures_inc("treasury_cancel_budget");
+                    return;
+                }
                 remaining_amount
             } else {
                 0
             };
 
-            // Cancel the budget
+            // Cancel the budget (status update)
             match treasury_guard.update_budget_status(&budget_id, BudgetStatus::Cancelled) {
                 Ok(()) => {
                     info!(
