@@ -215,7 +215,7 @@ impl TreasuryBudget {
 
     /// Check if budget period has expired
     pub fn is_expired(&self, now: u64) -> bool {
-        self.period_end.map_or(false, |end| now >= end)
+        self.period_end.is_some_and(|end| now >= end)
     }
 
     /// Check if spending is allowed (active and not expired)
@@ -236,7 +236,7 @@ impl TreasuryBudget {
 
         // Check for threshold notifications
         // Round and clamp to valid u8 range (0-100)
-        let percentage = self.percentage_used().round().min(100.0).max(0.0) as u8;
+        let percentage = self.percentage_used().round().clamp(0.0, 100.0) as u8;
         let mut triggered = Vec::new();
 
         for threshold in &self.notification_thresholds {
@@ -541,11 +541,11 @@ impl TreasuryManager {
         description: Option<String>,
     ) -> Result<Treasury> {
         if self.treasuries.contains_key(&treasury_did) {
-            bail!("Treasury already exists for DID: {}", treasury_did);
+            bail!("Treasury already exists for DID: {treasury_did}");
         }
 
         if self.coop_treasuries.contains_key(&coop_id) {
-            bail!("Treasury already exists for cooperative: {}", coop_id);
+            bail!("Treasury already exists for cooperative: {coop_id}");
         }
 
         let treasury = Treasury::new(
@@ -615,7 +615,7 @@ impl TreasuryManager {
         proposal_id: Option<String>,
     ) -> Result<TreasuryBudget> {
         if !self.treasuries.contains_key(&treasury_did) {
-            bail!("Treasury not found: {}", treasury_did);
+            bail!("Treasury not found: {treasury_did}");
         }
 
         let budget = TreasuryBudget::new(
@@ -682,10 +682,10 @@ impl TreasuryManager {
             let budget = self
                 .budgets
                 .get(budget_id)
-                .ok_or_else(|| anyhow::anyhow!("Budget not found: {}", budget_id))?;
+                .ok_or_else(|| anyhow::anyhow!("Budget not found: {budget_id}"))?;
 
             if !budget.can_spend() {
-                bail!("Budget {} is not available for spending", budget_id);
+                bail!("Budget {budget_id} is not available for spending");
             }
 
             if amount > budget.remaining() {
@@ -708,7 +708,7 @@ impl TreasuryManager {
         let budget = self
             .budgets
             .get_mut(budget_id)
-            .ok_or_else(|| anyhow::anyhow!("Budget not found: {}", budget_id))?;
+            .ok_or_else(|| anyhow::anyhow!("Budget not found: {budget_id}"))?;
         let triggered_thresholds = budget.record_spending(amount);
         let budget_clone = budget.clone();
 
@@ -725,7 +725,7 @@ impl TreasuryManager {
         let budget = self
             .budgets
             .get_mut(budget_id)
-            .ok_or_else(|| anyhow::anyhow!("Budget not found: {}", budget_id))?;
+            .ok_or_else(|| anyhow::anyhow!("Budget not found: {budget_id}"))?;
 
         info!(
             budget_id = %budget_id,
@@ -831,7 +831,7 @@ impl TreasuryManager {
         let rule = self
             .spending_rules
             .get_mut(rule_id)
-            .ok_or_else(|| anyhow::anyhow!("Spending rule not found: {}", rule_id))?;
+            .ok_or_else(|| anyhow::anyhow!("Spending rule not found: {rule_id}"))?;
 
         if let Some(threshold) = threshold_amount {
             rule.threshold_amount = threshold;
@@ -889,12 +889,10 @@ impl TreasuryManager {
                 // indicated by a contract_ref (proposal execution creates entries with contract_ref)
                 if entry.contract_ref.is_none() {
                     bail!(
-                        "Treasury withdrawal of {} {} from {} requires {} approval. \
+                        "Treasury withdrawal of {debit_amount} {} from {} requires {approval_type:?} approval. \
                          Submit a treasury proposal for governance approval.",
-                        debit_amount,
                         delta.currency,
                         delta.account_id,
-                        format!("{:?}", approval_type)
                     );
                 }
             }
@@ -916,7 +914,7 @@ impl TreasuryManager {
         ledger_entry_hash: Option<ContentHash>,
     ) -> Result<TreasuryAuditRecord> {
         if !self.treasuries.contains_key(treasury_did) {
-            bail!("Treasury not found: {}", treasury_did);
+            bail!("Treasury not found: {treasury_did}");
         }
 
         let mut record =
@@ -954,7 +952,7 @@ impl TreasuryManager {
             return Ok(Vec::new());
         };
 
-        let prefix = format!("{}{}", TREASURY_AUDIT_PREFIX, treasury_did);
+        let prefix = format!("{TREASURY_AUDIT_PREFIX}{treasury_did}");
         let pairs = store.scan(prefix.as_bytes())?;
 
         let mut records: Vec<TreasuryAuditRecord> = pairs
@@ -1047,7 +1045,7 @@ impl TreasuryManager {
         treasury_did: &Did,
         store: &Arc<dyn Store>,
     ) -> Result<()> {
-        let key = format!("{}{}", TREASURY_IDX_COOP_PREFIX, coop_id);
+        let key = format!("{TREASURY_IDX_COOP_PREFIX}{coop_id}");
         let value = treasury_did.to_string();
         store.put(key.as_bytes(), value.as_bytes())?;
         Ok(())
@@ -1067,8 +1065,7 @@ impl TreasuryManager {
         store: &Arc<dyn Store>,
     ) -> Result<()> {
         let key = format!(
-            "{}{}:{}",
-            TREASURY_IDX_BUDGETS_PREFIX, treasury_did, budget_id
+            "{TREASURY_IDX_BUDGETS_PREFIX}{treasury_did}:{budget_id}"
         );
         store.put(key.as_bytes(), budget_id.as_bytes())?;
         Ok(())
@@ -1121,7 +1118,7 @@ fn uuid_simple() -> String {
         .duration_since(UNIX_EPOCH)
         .map(|d| d.subsec_nanos())
         .unwrap_or(0);
-    format!("{:08x}", nanos)
+    format!("{nanos:08x}")
 }
 
 #[cfg(test)]

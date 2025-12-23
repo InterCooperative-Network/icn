@@ -253,8 +253,7 @@ pub async fn get_treasury_status(
 
     // Placeholder - will be replaced with actual data when wired to supervisor
     Err(GatewayError::NotFound(format!(
-        "Treasury not configured for cooperative '{}'. Register via governance proposal.",
-        coop_id
+        "Treasury not configured for cooperative '{coop_id}'. Register via governance proposal."
     )))
 }
 
@@ -275,8 +274,7 @@ pub async fn get_treasury_balance(
 
     // TODO: Wire to actual TreasuryManager from supervisor
     Err(GatewayError::NotFound(format!(
-        "Treasury not configured for cooperative '{}'",
-        coop_id
+        "Treasury not configured for cooperative '{coop_id}'"
     )))
 }
 
@@ -319,8 +317,7 @@ pub async fn get_budget(
 
     // TODO: Wire to actual TreasuryManager from supervisor
     Err(GatewayError::NotFound(format!(
-        "Budget not found: {}",
-        budget_id
+        "Budget not found: {budget_id}"
     )))
 }
 
