@@ -211,6 +211,9 @@ pub struct DepositRequest {
 
 /// Treasury manager placeholder for API
 /// In production, this will be injected from the supervisor's LedgerServices
+///
+/// NOTE: This is a Phase 1 placeholder. See issue #258 for wiring to real TreasuryManager.
+#[allow(dead_code)]
 pub struct TreasuryApiManager {
     // Placeholder - in real implementation, this holds Arc<RwLock<TreasuryManager>>
     _placeholder: (),

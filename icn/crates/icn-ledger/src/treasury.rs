@@ -475,6 +475,19 @@ impl TreasuryAuditRecord {
     }
 }
 
+/// Paginated audit trail response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PaginatedAuditTrail {
+    /// Audit records for the current page
+    pub records: Vec<TreasuryAuditRecord>,
+    /// Total number of records (for pagination UI)
+    pub total: usize,
+    /// Current offset
+    pub offset: usize,
+    /// Page size limit
+    pub limit: usize,
+}
+
 /// Manager for treasury accounts with persistent storage
 pub struct TreasuryManager {
     /// Storage backend
@@ -987,15 +1000,22 @@ impl TreasuryManager {
         Ok(record)
     }
 
-    /// Get audit trail for a treasury
+    /// Get audit trail for a treasury with pagination
+    ///
+    /// Returns a `PaginatedAuditTrail` containing records and total count for UI pagination.
     pub fn get_audit_trail(
         &self,
         treasury_did: &Did,
         limit: usize,
         offset: usize,
-    ) -> Result<Vec<TreasuryAuditRecord>> {
+    ) -> Result<PaginatedAuditTrail> {
         let Some(ref store) = self.store else {
-            return Ok(Vec::new());
+            return Ok(PaginatedAuditTrail {
+                records: Vec::new(),
+                total: 0,
+                offset,
+                limit,
+            });
         };
 
         let prefix = format!("{TREASURY_AUDIT_PREFIX}{treasury_did}");
@@ -1009,8 +1029,19 @@ impl TreasuryManager {
         // Sort by timestamp descending (most recent first)
         records.sort_by(|a, b| b.performed_at.cmp(&a.performed_at));
 
+        // Get total count before pagination
+        let total = records.len();
+
         // Apply pagination
-        Ok(records.into_iter().skip(offset).take(limit).collect())
+        let paginated_records: Vec<TreasuryAuditRecord> =
+            records.into_iter().skip(offset).take(limit).collect();
+
+        Ok(PaginatedAuditTrail {
+            records: paginated_records,
+            total,
+            offset,
+            limit,
+        })
     }
 
     // === Persistence Methods ===
@@ -1486,5 +1517,59 @@ mod tests {
 
         budget.spent_amount = 100;
         assert_eq!(budget.percentage_used(), 100.0);
+    }
+
+    #[test]
+    fn test_negative_amount_validation() {
+        let mut manager = TreasuryManager::new();
+        let treasury_did = test_did("treasury");
+        let admin = test_did("admin");
+
+        manager
+            .register_treasury(
+                treasury_did.clone(),
+                "test-coop".to_string(),
+                "hours".to_string(),
+                admin.clone(),
+                None,
+            )
+            .unwrap();
+
+        let budget = manager
+            .create_budget(
+                treasury_did.clone(),
+                "Test budget".to_string(),
+                1000,
+                "hours".to_string(),
+                None,
+                admin.clone(),
+                None,
+            )
+            .unwrap();
+
+        let entry_hash = ContentHash::from_bytes([0u8; 32]);
+
+        // Negative amount should fail
+        let result = manager.record_spending(&budget.id, -100, entry_hash.clone());
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("must be positive"));
+
+        // Zero amount should also fail
+        let result = manager.record_spending(&budget.id, 0, entry_hash);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("must be positive"));
+
+        // Negative budget creation should fail
+        let result = manager.create_budget(
+            treasury_did,
+            "Bad budget".to_string(),
+            -500,
+            "hours".to_string(),
+            None,
+            admin,
+            None,
+        );
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("must be positive"));
     }
 }

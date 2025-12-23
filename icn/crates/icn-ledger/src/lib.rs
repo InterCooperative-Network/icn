@@ -80,8 +80,8 @@ pub use merge::{ConflictPair, MergeDecision, QuarantineItem};
 pub use quarantine::QuarantineStore;
 pub use sync::{deserialize_sync_message, ledger_topic, serialize_sync_message, LedgerSyncMessage};
 pub use treasury::{
-    ApprovalType, BudgetStatus, SpendingRule, Treasury, TreasuryAuditRecord, TreasuryBudget,
-    TreasuryManager, TreasuryOperation,
+    ApprovalType, BudgetStatus, PaginatedAuditTrail, SpendingRule, Treasury, TreasuryAuditRecord,
+    TreasuryBudget, TreasuryManager, TreasuryOperation,
 };
 pub use types::{
     AccountBalances, AccountDelta, ContentHash, CreditLimit, Currency, Dispute, DisputeOutcome,
