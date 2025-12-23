@@ -37,6 +37,8 @@ pub mod charter;
 #[allow(missing_docs)]
 pub mod charter_store;
 pub mod config;
+#[allow(missing_docs)]
+pub mod delegation;
 pub mod domain;
 #[allow(missing_docs)]
 pub mod error;
@@ -75,6 +77,10 @@ pub use charter::{
 };
 pub use charter_store::{CharterStore, CharterStoreBackend, InMemoryCharterStore};
 pub use config::{EmergencyThresholds, GovernanceConfig, GovernanceParams};
+pub use delegation::{
+    Delegation, DelegationError, DelegationId, DelegationManager, DelegationScope,
+    DEFAULT_MAX_DELEGATION_DEPTH,
+};
 pub use domain::{GovernanceDomain, GovernanceDomainId};
 pub use error::{GovernanceError, Result};
 pub use handle::GovernanceOps;
@@ -96,7 +102,10 @@ pub use steward::{
 };
 pub use steward_store::{InMemoryStewardStore, StewardStore, StewardStoreBackend};
 pub use store::{GovernanceStore, InMemoryGovernanceStore};
-pub use tally::VoteTally;
+pub use tally::{
+    compute_detailed_tally_with_delegations, compute_tally_with_delegations, DelegatedTallyResult,
+    VoteTally,
+};
 pub use vote::{Vote, VoteChoice};
 
 /// Unix timestamp in seconds

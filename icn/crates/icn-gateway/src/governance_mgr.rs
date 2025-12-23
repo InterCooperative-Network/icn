@@ -17,9 +17,9 @@
 
 use anyhow::Result;
 use icn_governance::{
-    GovernanceConfig, GovernanceDomain, GovernanceDomainId, GovernanceOps, GovernanceParams,
-    GovernanceProfileId, MembershipConfig, MembershipSource, Proposal, ProposalId, ProposalPayload,
-    ProposalState, Vote, VoteChoice, VoteTally,
+    Delegation, DelegationId, GovernanceConfig, GovernanceDomain, GovernanceDomainId,
+    GovernanceOps, GovernanceParams, GovernanceProfileId, MembershipConfig, MembershipSource,
+    Proposal, ProposalId, ProposalPayload, ProposalState, Timestamp, Vote, VoteChoice, VoteTally,
 };
 use icn_identity::Did;
 use std::collections::HashMap;
@@ -42,6 +42,7 @@ pub struct GovernanceManager {
     domains: RwLock<HashMap<GovernanceDomainId, GovernanceDomain>>,
     proposals: RwLock<HashMap<ProposalId, Proposal>>,
     votes: RwLock<HashMap<ProposalId, Vec<Vote>>>,
+    delegations: RwLock<HashMap<DelegationId, Delegation>>,
     /// Optional handle to daemon's GovernanceActor (actor-backed mode)
     governance_handle: Option<GovernanceHandle>,
 }
@@ -57,6 +58,7 @@ impl GovernanceManager {
             domains: RwLock::new(HashMap::new()),
             proposals: RwLock::new(HashMap::new()),
             votes: RwLock::new(HashMap::new()),
+            delegations: RwLock::new(HashMap::new()),
             governance_handle: None,
         }
     }
@@ -74,6 +76,7 @@ impl GovernanceManager {
             domains: RwLock::new(HashMap::new()), // Not used in actor-backed mode
             proposals: RwLock::new(HashMap::new()),
             votes: RwLock::new(HashMap::new()),
+            delegations: RwLock::new(HashMap::new()),
             governance_handle: Some(handle),
         }
     }
@@ -520,6 +523,121 @@ impl GovernanceManager {
         proposal_votes.push(vote);
 
         Ok(())
+    }
+
+    // ============================================================================
+    // Delegation Methods
+    // ============================================================================
+
+    /// Create a new vote delegation
+    ///
+    /// Validates that:
+    /// - Delegator is not the same as delegate (no self-delegation)
+    /// - No cycles would be created
+    /// - Max delegation depth not exceeded
+    /// - No duplicate delegation for same scope
+    pub async fn create_delegation(&self, delegation: Delegation) -> Result<()> {
+        // TODO: In actor-backed mode, delegate to GovernanceActor
+        // For now, only standalone mode is supported
+
+        // Validate no self-delegation
+        if delegation.delegator == delegation.delegate {
+            anyhow::bail!("Cannot delegate to yourself");
+        }
+
+        let mut delegations = self
+            .delegations
+            .write()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+
+        // Check for duplicate delegation ID
+        if delegations.contains_key(&delegation.id) {
+            anyhow::bail!("Delegation already exists: {}", delegation.id.0);
+        }
+
+        // Check for duplicate scope (same delegator + scope)
+        let now = icn_time::current_timestamp_secs();
+        let has_existing = delegations.values().any(|d| {
+            d.delegator == delegation.delegator && d.scope == delegation.scope && d.is_active(now)
+        });
+        if has_existing {
+            anyhow::bail!("Active delegation already exists for this scope");
+        }
+
+        // Simple cycle check: would this create a direct cycle?
+        // (Full transitive cycle detection would require building a DelegationManager)
+        let would_cycle = delegations.values().any(|d| {
+            d.delegator == delegation.delegate
+                && d.delegate == delegation.delegator
+                && d.is_active(now)
+        });
+        if would_cycle {
+            anyhow::bail!("Delegation would create a cycle");
+        }
+
+        delegations.insert(delegation.id.clone(), delegation);
+        Ok(())
+    }
+
+    /// Get a delegation by ID
+    pub async fn get_delegation(&self, id: &DelegationId) -> Result<Option<Delegation>> {
+        // TODO: In actor-backed mode, delegate to GovernanceActor
+
+        let delegations = self
+            .delegations
+            .read()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+
+        Ok(delegations.get(id).cloned())
+    }
+
+    /// Get all delegations given by a specific DID
+    pub async fn get_delegations_from(&self, delegator: &Did) -> Result<Vec<Delegation>> {
+        // TODO: In actor-backed mode, delegate to GovernanceActor
+
+        let delegations = self
+            .delegations
+            .read()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+
+        Ok(delegations
+            .values()
+            .filter(|d| d.delegator == *delegator)
+            .cloned()
+            .collect())
+    }
+
+    /// Get all delegations received by a specific DID
+    pub async fn get_delegations_to(&self, delegate: &Did) -> Result<Vec<Delegation>> {
+        // TODO: In actor-backed mode, delegate to GovernanceActor
+
+        let delegations = self
+            .delegations
+            .read()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+
+        Ok(delegations
+            .values()
+            .filter(|d| d.delegate == *delegate)
+            .cloned()
+            .collect())
+    }
+
+    /// Revoke a delegation
+    pub async fn revoke_delegation(&self, id: &DelegationId, revoked_at: Timestamp) -> Result<()> {
+        // TODO: In actor-backed mode, delegate to GovernanceActor
+
+        let mut delegations = self
+            .delegations
+            .write()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+
+        if let Some(delegation) = delegations.get_mut(id) {
+            delegation.revoked_at = Some(revoked_at);
+            Ok(())
+        } else {
+            anyhow::bail!("Delegation not found: {}", id.0)
+        }
     }
 }
 

@@ -1,6 +1,9 @@
 //! Governance storage layer
 
-use crate::{GovernanceDomain, GovernanceDomainId, Proposal, ProposalId, Vote, VoteTally};
+use crate::{
+    Delegation, DelegationId, DelegationScope, GovernanceDomain, GovernanceDomainId, Proposal,
+    ProposalId, Timestamp, Vote, VoteTally,
+};
 use anyhow::Result;
 use icn_identity::Did;
 use std::collections::HashMap;
@@ -38,6 +41,33 @@ pub trait GovernanceStore: Send + Sync {
 
     /// Compute vote tally for a proposal
     fn compute_tally(&self, proposal_id: &ProposalId) -> Result<VoteTally>;
+
+    // === Delegation Methods ===
+
+    /// Store a delegation
+    fn store_delegation(&self, delegation: &Delegation) -> Result<()>;
+
+    /// Get a delegation by ID
+    fn get_delegation(&self, id: &DelegationId) -> Result<Option<Delegation>>;
+
+    /// Get all delegations from a delegator
+    fn get_delegations_from(&self, delegator: &Did) -> Result<Vec<Delegation>>;
+
+    /// Get all delegations to a delegate
+    fn get_delegations_to(&self, delegate: &Did) -> Result<Vec<Delegation>>;
+
+    /// Get active delegation for a delegator and scope
+    fn get_active_delegation(
+        &self,
+        delegator: &Did,
+        scope: &DelegationScope,
+    ) -> Result<Option<Delegation>>;
+
+    /// Revoke a delegation
+    fn revoke_delegation(&self, id: &DelegationId, revoked_at: Timestamp) -> Result<()>;
+
+    /// List all active delegations
+    fn list_active_delegations(&self) -> Result<Vec<Delegation>>;
 }
 
 /// In-memory governance store implementation
@@ -49,6 +79,7 @@ pub struct InMemoryGovernanceStore {
     domains: Arc<std::sync::RwLock<HashMap<String, GovernanceDomain>>>,
     proposals: Arc<std::sync::RwLock<HashMap<String, Proposal>>>,
     votes: Arc<std::sync::RwLock<HashMap<String, Vec<Vote>>>>,
+    delegations: Arc<std::sync::RwLock<HashMap<String, Delegation>>>,
 }
 
 impl InMemoryGovernanceStore {
@@ -58,6 +89,7 @@ impl InMemoryGovernanceStore {
             domains: Arc::new(std::sync::RwLock::new(HashMap::new())),
             proposals: Arc::new(std::sync::RwLock::new(HashMap::new())),
             votes: Arc::new(std::sync::RwLock::new(HashMap::new())),
+            delegations: Arc::new(std::sync::RwLock::new(HashMap::new())),
         }
     }
 }
@@ -159,6 +191,89 @@ impl GovernanceStore for InMemoryGovernanceStore {
         let votes = self.list_votes(proposal_id)?;
         Ok(VoteTally::from(votes))
     }
+
+    // === Delegation Methods ===
+
+    fn store_delegation(&self, delegation: &Delegation) -> Result<()> {
+        let mut delegations = self.delegations.write().unwrap_or_else(|poisoned| {
+            warn!("Delegations lock poisoned, recovering");
+            poisoned.into_inner()
+        });
+        delegations.insert(delegation.id.0.clone(), delegation.clone());
+        Ok(())
+    }
+
+    fn get_delegation(&self, id: &DelegationId) -> Result<Option<Delegation>> {
+        let delegations = self.delegations.read().unwrap_or_else(|poisoned| {
+            warn!("Delegations lock poisoned, recovering");
+            poisoned.into_inner()
+        });
+        Ok(delegations.get(&id.0).cloned())
+    }
+
+    fn get_delegations_from(&self, delegator: &Did) -> Result<Vec<Delegation>> {
+        let delegations = self.delegations.read().unwrap_or_else(|poisoned| {
+            warn!("Delegations lock poisoned, recovering");
+            poisoned.into_inner()
+        });
+        Ok(delegations
+            .values()
+            .filter(|d| d.delegator == *delegator)
+            .cloned()
+            .collect())
+    }
+
+    fn get_delegations_to(&self, delegate: &Did) -> Result<Vec<Delegation>> {
+        let delegations = self.delegations.read().unwrap_or_else(|poisoned| {
+            warn!("Delegations lock poisoned, recovering");
+            poisoned.into_inner()
+        });
+        Ok(delegations
+            .values()
+            .filter(|d| d.delegate == *delegate)
+            .cloned()
+            .collect())
+    }
+
+    fn get_active_delegation(
+        &self,
+        delegator: &Did,
+        scope: &DelegationScope,
+    ) -> Result<Option<Delegation>> {
+        let now = icn_time::current_timestamp_secs();
+        let delegations = self.delegations.read().unwrap_or_else(|poisoned| {
+            warn!("Delegations lock poisoned, recovering");
+            poisoned.into_inner()
+        });
+        Ok(delegations
+            .values()
+            .find(|d| d.delegator == *delegator && d.scope == *scope && d.is_active(now))
+            .cloned())
+    }
+
+    fn revoke_delegation(&self, id: &DelegationId, revoked_at: Timestamp) -> Result<()> {
+        let mut delegations = self.delegations.write().unwrap_or_else(|poisoned| {
+            warn!("Delegations lock poisoned, recovering");
+            poisoned.into_inner()
+        });
+        if let Some(delegation) = delegations.get_mut(&id.0) {
+            delegation.revoked_at = Some(revoked_at);
+        }
+        Ok(())
+    }
+
+    fn list_active_delegations(&self) -> Result<Vec<Delegation>> {
+        let now = icn_time::current_timestamp_secs();
+        let delegations = self.delegations.read().unwrap_or_else(|poisoned| {
+            warn!("Delegations lock poisoned, recovering");
+            poisoned.into_inner()
+        });
+        Ok(delegations
+            .values()
+            .filter(|d| d.is_active(now))
+            .cloned()
+            .collect())
+    }
 }
 
 /// Persistent governance store using Sled (reserved for future use)
@@ -197,6 +312,22 @@ impl SledGovernanceStore {
 
     fn vote_index_key(proposal_id: &ProposalId) -> Vec<u8> {
         format!("index:votes:{}", proposal_id.0).into_bytes()
+    }
+
+    fn delegation_key(id: &DelegationId) -> Vec<u8> {
+        format!("delegation:{}", id.0).into_bytes()
+    }
+
+    fn delegation_index_key() -> Vec<u8> {
+        b"index:delegations".to_vec()
+    }
+
+    fn delegation_from_index_key(delegator: &Did) -> Vec<u8> {
+        format!("index:delegations:from:{delegator}").into_bytes()
+    }
+
+    fn delegation_to_index_key(delegate: &Did) -> Vec<u8> {
+        format!("index:delegations:to:{delegate}").into_bytes()
     }
 }
 
@@ -353,6 +484,143 @@ impl GovernanceStore for SledGovernanceStore {
         let votes = self.list_votes(proposal_id)?;
         Ok(VoteTally::from(votes))
     }
+
+    // === Delegation Methods ===
+
+    fn store_delegation(&self, delegation: &Delegation) -> Result<()> {
+        let key = Self::delegation_key(&delegation.id);
+        let value = serde_json::to_vec(delegation)?;
+        self.db.insert(&key, value)?;
+
+        // Update main index
+        let index_key = Self::delegation_index_key();
+        let mut delegation_ids: Vec<String> = self
+            .db
+            .get(&index_key)?
+            .map(|v| serde_json::from_slice(&v).unwrap_or_default())
+            .unwrap_or_default();
+
+        if !delegation_ids.contains(&delegation.id.0) {
+            delegation_ids.push(delegation.id.0.clone());
+            self.db
+                .insert(&index_key, serde_json::to_vec(&delegation_ids)?)?;
+        }
+
+        // Update delegator index
+        let from_key = Self::delegation_from_index_key(&delegation.delegator);
+        let mut from_ids: Vec<String> = self
+            .db
+            .get(&from_key)?
+            .map(|v| serde_json::from_slice(&v).unwrap_or_default())
+            .unwrap_or_default();
+
+        if !from_ids.contains(&delegation.id.0) {
+            from_ids.push(delegation.id.0.clone());
+            self.db.insert(&from_key, serde_json::to_vec(&from_ids)?)?;
+        }
+
+        // Update delegate index
+        let to_key = Self::delegation_to_index_key(&delegation.delegate);
+        let mut to_ids: Vec<String> = self
+            .db
+            .get(&to_key)?
+            .map(|v| serde_json::from_slice(&v).unwrap_or_default())
+            .unwrap_or_default();
+
+        if !to_ids.contains(&delegation.id.0) {
+            to_ids.push(delegation.id.0.clone());
+            self.db.insert(&to_key, serde_json::to_vec(&to_ids)?)?;
+        }
+
+        Ok(())
+    }
+
+    fn get_delegation(&self, id: &DelegationId) -> Result<Option<Delegation>> {
+        let key = Self::delegation_key(id);
+        match self.db.get(&key)? {
+            Some(data) => Ok(Some(serde_json::from_slice(&data)?)),
+            None => Ok(None),
+        }
+    }
+
+    fn get_delegations_from(&self, delegator: &Did) -> Result<Vec<Delegation>> {
+        let from_key = Self::delegation_from_index_key(delegator);
+        let delegation_ids: Vec<String> = self
+            .db
+            .get(&from_key)?
+            .map(|v| serde_json::from_slice(&v).unwrap_or_default())
+            .unwrap_or_default();
+
+        let mut delegations = Vec::new();
+        for id in delegation_ids {
+            if let Some(delegation) = self.get_delegation(&DelegationId(id))? {
+                delegations.push(delegation);
+            }
+        }
+
+        Ok(delegations)
+    }
+
+    fn get_delegations_to(&self, delegate: &Did) -> Result<Vec<Delegation>> {
+        let to_key = Self::delegation_to_index_key(delegate);
+        let delegation_ids: Vec<String> = self
+            .db
+            .get(&to_key)?
+            .map(|v| serde_json::from_slice(&v).unwrap_or_default())
+            .unwrap_or_default();
+
+        let mut delegations = Vec::new();
+        for id in delegation_ids {
+            if let Some(delegation) = self.get_delegation(&DelegationId(id))? {
+                delegations.push(delegation);
+            }
+        }
+
+        Ok(delegations)
+    }
+
+    fn get_active_delegation(
+        &self,
+        delegator: &Did,
+        scope: &DelegationScope,
+    ) -> Result<Option<Delegation>> {
+        let now = icn_time::current_timestamp_secs();
+        let delegations = self.get_delegations_from(delegator)?;
+        Ok(delegations
+            .into_iter()
+            .find(|d| d.scope == *scope && d.is_active(now)))
+    }
+
+    fn revoke_delegation(&self, id: &DelegationId, revoked_at: Timestamp) -> Result<()> {
+        if let Some(mut delegation) = self.get_delegation(id)? {
+            delegation.revoked_at = Some(revoked_at);
+            let key = Self::delegation_key(id);
+            let value = serde_json::to_vec(&delegation)?;
+            self.db.insert(&key, value)?;
+        }
+        Ok(())
+    }
+
+    fn list_active_delegations(&self) -> Result<Vec<Delegation>> {
+        let now = icn_time::current_timestamp_secs();
+        let index_key = Self::delegation_index_key();
+        let delegation_ids: Vec<String> = self
+            .db
+            .get(&index_key)?
+            .map(|v| serde_json::from_slice(&v).unwrap_or_default())
+            .unwrap_or_default();
+
+        let mut delegations = Vec::new();
+        for id in delegation_ids {
+            if let Some(delegation) = self.get_delegation(&DelegationId(id))? {
+                if delegation.is_active(now) {
+                    delegations.push(delegation);
+                }
+            }
+        }
+
+        Ok(delegations)
+    }
 }
 
 #[cfg(test)]
@@ -481,5 +749,103 @@ mod tests {
         assert_eq!(tally.for_votes, 2);
         assert_eq!(tally.against_votes, 1);
         assert_eq!(tally.abstain_votes, 0);
+    }
+
+    #[test]
+    fn test_store_delegation() {
+        let store = InMemoryGovernanceStore::new();
+        let kp1 = KeyPair::generate().unwrap();
+        let kp2 = KeyPair::generate().unwrap();
+        let delegator = kp1.did().clone();
+        let delegate = kp2.did().clone();
+
+        let delegation = Delegation::new(
+            delegator.clone(),
+            delegate.clone(),
+            DelegationScope::Blanket,
+        );
+        let id = delegation.id.clone();
+
+        store.store_delegation(&delegation).unwrap();
+
+        let retrieved = store.get_delegation(&id).unwrap();
+        assert!(retrieved.is_some());
+        assert_eq!(retrieved.unwrap().delegator, delegator);
+    }
+
+    #[test]
+    fn test_get_delegations_from() {
+        let store = InMemoryGovernanceStore::new();
+        let kp1 = KeyPair::generate().unwrap();
+        let kp2 = KeyPair::generate().unwrap();
+        let kp3 = KeyPair::generate().unwrap();
+        let alice = kp1.did().clone();
+        let bob = kp2.did().clone();
+        let charlie = kp3.did().clone();
+
+        // Alice delegates to both Bob and Charlie (different scopes)
+        let d1 = Delegation::new(alice.clone(), bob.clone(), DelegationScope::Blanket);
+        let d2 = Delegation::new(
+            alice.clone(),
+            charlie.clone(),
+            DelegationScope::Domain(GovernanceDomainId::new("test")),
+        );
+
+        store.store_delegation(&d1).unwrap();
+        store.store_delegation(&d2).unwrap();
+
+        let delegations = store.get_delegations_from(&alice).unwrap();
+        assert_eq!(delegations.len(), 2);
+    }
+
+    #[test]
+    fn test_get_delegations_to() {
+        let store = InMemoryGovernanceStore::new();
+        let kp1 = KeyPair::generate().unwrap();
+        let kp2 = KeyPair::generate().unwrap();
+        let kp3 = KeyPair::generate().unwrap();
+        let alice = kp1.did().clone();
+        let bob = kp2.did().clone();
+        let charlie = kp3.did().clone();
+
+        // Alice and Bob both delegate to Charlie
+        let d1 = Delegation::new(alice.clone(), charlie.clone(), DelegationScope::Blanket);
+        let d2 = Delegation::new(bob.clone(), charlie.clone(), DelegationScope::Blanket);
+
+        store.store_delegation(&d1).unwrap();
+        store.store_delegation(&d2).unwrap();
+
+        let delegations = store.get_delegations_to(&charlie).unwrap();
+        assert_eq!(delegations.len(), 2);
+    }
+
+    #[test]
+    fn test_revoke_delegation() {
+        let store = InMemoryGovernanceStore::new();
+        let kp1 = KeyPair::generate().unwrap();
+        let kp2 = KeyPair::generate().unwrap();
+        let delegator = kp1.did().clone();
+        let delegate = kp2.did().clone();
+
+        let delegation = Delegation::new(
+            delegator.clone(),
+            delegate.clone(),
+            DelegationScope::Blanket,
+        );
+        let id = delegation.id.clone();
+
+        store.store_delegation(&delegation).unwrap();
+
+        // Initially should be in active list
+        let active = store.list_active_delegations().unwrap();
+        assert_eq!(active.len(), 1);
+
+        // Revoke
+        let now = icn_time::current_timestamp_secs();
+        store.revoke_delegation(&id, now).unwrap();
+
+        // Should no longer be in active list
+        let active = store.list_active_delegations().unwrap();
+        assert_eq!(active.len(), 0);
     }
 }

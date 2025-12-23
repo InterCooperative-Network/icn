@@ -629,6 +629,11 @@ impl GatewayServer {
                                 .service(api::governance::open_proposal)
                                 .service(api::governance::close_proposal)
                                 .service(api::governance::cast_vote)
+                                // Delegation endpoints
+                                .service(api::governance::create_delegation)
+                                .service(api::governance::list_delegations)
+                                .service(api::governance::get_delegation)
+                                .service(api::governance::revoke_delegation)
                                 // Apply auth first, then rate limiting (wrapping order: last runs first)
                                 .wrap(middleware::from_fn(
                                     crate::rate_limit::rate_limit_middleware,
