@@ -137,8 +137,14 @@ impl Delegation {
     }
 
     /// Set expiration time
+    ///
+    /// Note: The expiry must be in the future (greater than created_at).
+    /// If an invalid expiry is provided, the delegation is returned unchanged.
     pub fn with_expiry(mut self, expires_at: Timestamp) -> Self {
-        self.expires_at = Some(expires_at);
+        // Validate: expiry must be after creation time
+        if expires_at > self.created_at {
+            self.expires_at = Some(expires_at);
+        }
         self
     }
 
@@ -535,13 +541,24 @@ impl DelegationManager {
     }
 
     /// Check if two scopes overlap (for cycle detection)
+    ///
+    /// This function is used to determine if two delegations could conflict.
+    /// It is conservative: when uncertain, it assumes overlap to prevent potential cycles.
+    ///
+    /// # Known Limitation
+    ///
+    /// Domain and Proposal scopes are assumed to overlap because we don't have
+    /// access to proposal metadata to verify domain membership. This could cause
+    /// false positive cycle detection in edge cases (e.g., Alice delegates domain A
+    /// to Bob, Bob delegates proposal in domain B to Alice - flagged as cycle but isn't).
+    /// This conservative approach ensures safety at the cost of some flexibility.
     fn scopes_overlap(&self, a: &DelegationScope, b: &DelegationScope) -> bool {
         match (a, b) {
             (DelegationScope::Blanket, _) | (_, DelegationScope::Blanket) => true,
             (DelegationScope::Domain(d1), DelegationScope::Domain(d2)) => d1 == d2,
             (DelegationScope::Domain(d), DelegationScope::Proposal(p))
             | (DelegationScope::Proposal(p), DelegationScope::Domain(d)) => {
-                // Can't easily check without proposal metadata, assume overlap
+                // Conservative: assume overlap since we can't verify domain membership
                 let _ = (d, p);
                 true
             }
@@ -554,6 +571,28 @@ impl DelegationManager {
     /// This counts how many hops lead TO this person as a delegate.
     /// For example, if Alice -> Bob -> Charlie, then Charlie has incoming depth 2.
     fn compute_incoming_depth(&self, delegate: &Did, scope: &DelegationScope) -> usize {
+        let mut visited = HashSet::new();
+        self.compute_incoming_depth_with_visited(delegate, scope, &mut visited)
+    }
+
+    /// Helper for compute_incoming_depth with visited set to prevent infinite recursion
+    fn compute_incoming_depth_with_visited(
+        &self,
+        delegate: &Did,
+        scope: &DelegationScope,
+        visited: &mut HashSet<Did>,
+    ) -> usize {
+        // Prevent infinite recursion if we've already visited this delegate
+        if visited.contains(delegate) {
+            return 0;
+        }
+        visited.insert(delegate.clone());
+
+        // Safety limit to prevent stack overflow even with corrupted data
+        if visited.len() > self.max_depth + 10 {
+            return 0;
+        }
+
         let now = icn_time::current_timestamp_secs();
 
         // Find all delegators who have delegated to this delegate
@@ -576,7 +615,7 @@ impl DelegationManager {
         // Recursively find the maximum depth
         let mut max_depth = 0;
         for delegator in delegators {
-            let depth = 1 + self.compute_incoming_depth(&delegator, scope);
+            let depth = 1 + self.compute_incoming_depth_with_visited(&delegator, scope, visited);
             if depth > max_depth {
                 max_depth = depth;
             }

@@ -533,7 +533,9 @@ impl GovernanceManager {
     ///
     /// Validates that:
     /// - Delegator is not the same as delegate (no self-delegation)
-    /// - Creates and stores the delegation
+    /// - No cycles would be created
+    /// - Max delegation depth not exceeded
+    /// - No duplicate delegation for same scope
     pub async fn create_delegation(&self, delegation: Delegation) -> Result<()> {
         // TODO: In actor-backed mode, delegate to GovernanceActor
         // For now, only standalone mode is supported
@@ -551,6 +553,26 @@ impl GovernanceManager {
         // Check for duplicate delegation ID
         if delegations.contains_key(&delegation.id) {
             anyhow::bail!("Delegation already exists: {}", delegation.id.0);
+        }
+
+        // Check for duplicate scope (same delegator + scope)
+        let now = icn_time::current_timestamp_secs();
+        let has_existing = delegations.values().any(|d| {
+            d.delegator == delegation.delegator && d.scope == delegation.scope && d.is_active(now)
+        });
+        if has_existing {
+            anyhow::bail!("Active delegation already exists for this scope");
+        }
+
+        // Simple cycle check: would this create a direct cycle?
+        // (Full transitive cycle detection would require building a DelegationManager)
+        let would_cycle = delegations.values().any(|d| {
+            d.delegator == delegation.delegate
+                && d.delegate == delegation.delegator
+                && d.is_active(now)
+        });
+        if would_cycle {
+            anyhow::bail!("Delegation would create a cycle");
         }
 
         delegations.insert(delegation.id.clone(), delegation);

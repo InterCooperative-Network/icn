@@ -5575,6 +5575,16 @@ async fn handle_gov_command(cmd: GovCommands, data_dir: &Path, endpoint: &str) -
 }
 
 /// Parse a duration string (e.g., "7d", "30d", "1y") to seconds
+///
+/// Supported formats:
+/// - `Nd` - N days (e.g., "7d", "30d")
+/// - `Nw` - N weeks (e.g., "2w", "4w")
+/// - `Ny` - N years (e.g., "1y", "2y")
+/// - `Nh` - N hours (e.g., "24h", "48h")
+/// - Numeric value - seconds (e.g., "3600")
+///
+/// Note: Years use a fixed 365 days (leap years are not accounted for).
+/// For precise long-term delegations, prefer using days or a specific timestamp.
 fn parse_duration_to_seconds(s: &str) -> Result<u64> {
     let s = s.trim().to_lowercase();
 

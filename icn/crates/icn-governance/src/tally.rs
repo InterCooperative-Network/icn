@@ -130,9 +130,10 @@ pub fn compute_tally_with_delegations(
         // and the delegate voted, count the vote for the delegator
         if delegate != *voter {
             if let Some(delegate_vote) = vote_map.get(&delegate) {
-                // Create a vote for the delegator based on the delegate's choice
+                // Create a vote for the delegator based on the delegate's choice and weight
                 let delegated_vote =
-                    Vote::new(proposal_id.clone(), voter.clone(), delegate_vote.choice);
+                    Vote::new(proposal_id.clone(), voter.clone(), delegate_vote.choice)
+                        .with_weight(delegate_vote.weight);
                 tally.add_vote(&delegated_vote);
                 counted.insert(voter);
             }
@@ -183,8 +184,10 @@ pub fn compute_detailed_tally_with_delegations(
 
         if delegate != *voter {
             if let Some(delegate_vote) = vote_map.get(&delegate) {
+                // Preserve the delegate's vote weight
                 let delegated_vote =
-                    Vote::new(proposal_id.clone(), voter.clone(), delegate_vote.choice);
+                    Vote::new(proposal_id.clone(), voter.clone(), delegate_vote.choice)
+                        .with_weight(delegate_vote.weight);
                 tally.add_vote(&delegated_vote);
                 counted.insert(voter);
                 delegated_count += 1;

@@ -940,6 +940,8 @@ pub async fn list_delegations(
 }
 
 /// GET /gov/delegations/{id} - Get a specific delegation
+///
+/// Only the delegator or delegate can view a delegation to protect privacy.
 #[get("/delegations/{id}")]
 pub async fn get_delegation(
     http_req: HttpRequest,
@@ -948,6 +950,15 @@ pub async fn get_delegation(
 ) -> Result<HttpResponse> {
     // Check authorization
     require_scope(&http_req, "gov:read")?;
+
+    // Extract authenticated DID from JWT claims
+    let claims = get_claims(&http_req).ok_or_else(|| {
+        crate::error::GatewayError::AuthenticationFailed("No claims found".to_string())
+    })?;
+
+    let caller_did: Did = claims.sub.parse().map_err(|e| {
+        crate::error::GatewayError::BadRequest(format!("Invalid DID in token: {e}"))
+    })?;
 
     let delegation_id = icn_governance::DelegationId(id.into_inner());
     let delegation = gov_mgr
@@ -959,6 +970,13 @@ pub async fn get_delegation(
                 delegation_id.0
             ))
         })?;
+
+    // Privacy: Only allow the delegator or delegate to view the delegation
+    if delegation.delegator != caller_did && delegation.delegate != caller_did {
+        return Err(crate::error::GatewayError::AuthorizationFailed(
+            "You can only view delegations you are involved in".to_string(),
+        ));
+    }
 
     Ok(HttpResponse::Ok().json(delegation_to_response(&delegation)))
 }
