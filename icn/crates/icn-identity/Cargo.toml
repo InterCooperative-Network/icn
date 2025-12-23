@@ -22,8 +22,8 @@ icn-obs.workspace = true
 icn-crypto-pq.workspace = true
 icn-time.workspace = true
 multibase = "0.9"
-age = "0.11"
-secrecy = "0.10"
+age = "0.10"
+secrecy = "0.8"
 serde_json = "1.0"
 bincode.workspace = true
 base64 = "0.22"
@@ -32,7 +32,7 @@ sha2.workspace = true
 rustls.workspace = true
 pem.workspace = true
 hex = "0.4"
-lru = "0.16"
+lru = "0.12"
 
 [dev-dependencies]
 tempfile = "3.8"
