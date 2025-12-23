@@ -2353,8 +2353,6 @@ version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "841d1cc9bed7f9236f321df977030373f4a4163ae1a7dbfe1a51a2c1a51d9100"
 dependencies = [
- "allocator-api2",
- "equivalent",
  "foldhash 0.2.0",
 ]
 
@@ -2925,7 +2923,7 @@ dependencies = [
  "icn-store",
  "icn-testkit",
  "icn-trust",
- "lru 0.16.2",
+ "lru",
  "metrics",
  "rand 0.8.5",
  "reqwest 0.12.26",
@@ -2979,7 +2977,7 @@ dependencies = [
  "icn-zkp",
  "jsonwebtoken",
  "lettre",
- "lru 0.16.2",
+ "lru",
  "metrics",
  "prometheus",
  "rand 0.8.5",
@@ -3037,7 +3035,7 @@ dependencies = [
  "icn-store",
  "icn-time",
  "icn-trust",
- "lru 0.16.2",
+ "lru",
  "serde",
  "serde_json",
  "sha2",
@@ -3061,7 +3059,7 @@ dependencies = [
  "icn-crypto-pq",
  "icn-obs",
  "icn-time",
- "lru 0.12.5",
+ "lru",
  "multibase",
  "pem",
  "rand 0.8.5",
@@ -3340,7 +3338,7 @@ dependencies = [
  "icn-obs",
  "icn-store",
  "icn-time",
- "lru 0.16.2",
+ "lru",
  "multibase",
  "ordered-float",
  "rand 0.8.5",
@@ -3942,15 +3940,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "234cf4f4a04dc1f57e24b96cc0cd600cf2af460d4161ac5ecdd0af8e1f3b2a38"
 dependencies = [
  "hashbrown 0.15.5",
-]
-
-[[package]]
-name = "lru"
-version = "0.16.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "96051b46fc183dc9cd4a223960ef37b9af631b55191852a8274bfef064cda20f"
-dependencies = [
- "hashbrown 0.16.1",
 ]
 
 [[package]]
@@ -5043,7 +5032,7 @@ dependencies = [
  "crossterm",
  "instability",
  "itertools 0.13.0",
- "lru 0.12.5",
+ "lru",
  "paste",
  "strum",
  "strum_macros",
