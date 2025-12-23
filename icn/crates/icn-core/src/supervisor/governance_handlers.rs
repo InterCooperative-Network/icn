@@ -859,7 +859,9 @@ impl GovernanceEventHandler {
                 if let Err(dlq_err) = dlq.enqueue(failed_op) {
                     error!("   Failed to write to dead-letter queue: {}", dlq_err);
                 }
-                icn_obs::metrics::governance::execution_failures_inc("treasury_transfer_between_budgets");
+                icn_obs::metrics::governance::execution_failures_inc(
+                    "treasury_transfer_between_budgets",
+                );
                 return;
             }
 
@@ -892,7 +894,9 @@ impl GovernanceEventHandler {
                         if let Err(dlq_err) = dlq.enqueue(failed_op) {
                             error!("   Failed to write to dead-letter queue: {}", dlq_err);
                         }
-                        icn_obs::metrics::governance::execution_failures_inc("treasury_transfer_between_budgets");
+                        icn_obs::metrics::governance::execution_failures_inc(
+                            "treasury_transfer_between_budgets",
+                        );
                         return;
                     }
                     (budget.remaining(), budget.currency.clone())
@@ -914,7 +918,9 @@ impl GovernanceEventHandler {
                     if let Err(dlq_err) = dlq.enqueue(failed_op) {
                         error!("   Failed to write to dead-letter queue: {}", dlq_err);
                     }
-                    icn_obs::metrics::governance::execution_failures_inc("treasury_transfer_between_budgets");
+                    icn_obs::metrics::governance::execution_failures_inc(
+                        "treasury_transfer_between_budgets",
+                    );
                     return;
                 }
             };
@@ -939,7 +945,9 @@ impl GovernanceEventHandler {
                 if let Err(dlq_err) = dlq.enqueue(failed_op) {
                     error!("   Failed to write to dead-letter queue: {}", dlq_err);
                 }
-                icn_obs::metrics::governance::execution_failures_inc("treasury_transfer_between_budgets");
+                icn_obs::metrics::governance::execution_failures_inc(
+                    "treasury_transfer_between_budgets",
+                );
                 return;
             }
 
@@ -965,7 +973,9 @@ impl GovernanceEventHandler {
                     if let Err(dlq_err) = dlq.enqueue(failed_op) {
                         error!("   Failed to write to dead-letter queue: {}", dlq_err);
                     }
-                    icn_obs::metrics::governance::execution_failures_inc("treasury_transfer_between_budgets");
+                    icn_obs::metrics::governance::execution_failures_inc(
+                        "treasury_transfer_between_budgets",
+                    );
                     return;
                 }
 
@@ -994,7 +1004,9 @@ impl GovernanceEventHandler {
                     if let Err(dlq_err) = dlq.enqueue(failed_op) {
                         error!("   Failed to write to dead-letter queue: {}", dlq_err);
                     }
-                    icn_obs::metrics::governance::execution_failures_inc("treasury_transfer_between_budgets");
+                    icn_obs::metrics::governance::execution_failures_inc(
+                        "treasury_transfer_between_budgets",
+                    );
                     return;
                 }
             } else {
@@ -1015,7 +1027,9 @@ impl GovernanceEventHandler {
                 if let Err(dlq_err) = dlq.enqueue(failed_op) {
                     error!("   Failed to write to dead-letter queue: {}", dlq_err);
                 }
-                icn_obs::metrics::governance::execution_failures_inc("treasury_transfer_between_budgets");
+                icn_obs::metrics::governance::execution_failures_inc(
+                    "treasury_transfer_between_budgets",
+                );
                 return;
             }
 
@@ -1045,7 +1059,9 @@ impl GovernanceEventHandler {
                 if let Err(dlq_err) = dlq.enqueue(failed_op) {
                     error!("   Failed to write to dead-letter queue: {}", dlq_err);
                 }
-                icn_obs::metrics::governance::execution_failures_inc("treasury_transfer_between_budgets");
+                icn_obs::metrics::governance::execution_failures_inc(
+                    "treasury_transfer_between_budgets",
+                );
                 return;
             }
 
@@ -1087,7 +1103,9 @@ impl GovernanceEventHandler {
                 if let Err(dlq_err) = dlq.enqueue(failed_op) {
                     error!("   Failed to write to dead-letter queue: {}", dlq_err);
                 }
-                icn_obs::metrics::governance::execution_failures_inc("treasury_transfer_between_budgets");
+                icn_obs::metrics::governance::execution_failures_inc(
+                    "treasury_transfer_between_budgets",
+                );
                 return;
             }
             if let Err(e) = treasury_guard.save_budget(&to_budget) {
@@ -1125,7 +1143,9 @@ impl GovernanceEventHandler {
                 if let Err(dlq_err) = dlq.enqueue(failed_op) {
                     error!("   Failed to write to dead-letter queue: {}", dlq_err);
                 }
-                icn_obs::metrics::governance::execution_failures_inc("treasury_transfer_between_budgets");
+                icn_obs::metrics::governance::execution_failures_inc(
+                    "treasury_transfer_between_budgets",
+                );
                 return;
             }
 
@@ -1182,8 +1202,13 @@ impl GovernanceEventHandler {
             }
 
             let duration = start.elapsed().as_secs_f64();
-            icn_obs::metrics::governance::proposals_executed_inc("treasury_transfer_between_budgets");
-            icn_obs::metrics::governance::execution_duration_record("treasury_transfer_between_budgets", duration);
+            icn_obs::metrics::governance::proposals_executed_inc(
+                "treasury_transfer_between_budgets",
+            );
+            icn_obs::metrics::governance::execution_duration_record(
+                "treasury_transfer_between_budgets",
+                duration,
+            );
         });
     }
 
