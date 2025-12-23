@@ -680,9 +680,13 @@ impl GovernanceEventHandler {
                 }
             }
 
+            // ATOMIC OPERATION: Acquire exclusive write lock on treasury_manager.
+            // This lock is held for the ENTIRE operation (validation + mutation + persistence)
+            // to prevent TOCTOU race conditions. The lock is only released when treasury_guard
+            // goes out of scope at the end of this async block.
             let mut treasury_guard = treasury_manager.write().await;
 
-            // Get from_budget and reduce its allocated amount
+            // Validate source budget exists and has sufficient funds (lock held)
             let from_remaining = {
                 if let Some(budget) = treasury_guard.get_budget(&from_budget) {
                     budget.remaining()
@@ -756,31 +760,63 @@ impl GovernanceEventHandler {
                 return;
             }
 
-            // Update from_budget (reduce allocation)
+            // Perform atomic mutation (lock still held)
             if let Some(from) = treasury_guard.get_budget_mut(&from_budget) {
                 from.allocated_amount -= amount;
             }
-
-            // Update to_budget (increase allocation)
             if let Some(to) = treasury_guard.get_budget_mut(&to_budget) {
                 to.allocated_amount += amount;
             }
 
-            // Persist budget changes
+            // Persist budget changes - CRITICAL: failures here mean in-memory state diverges
+            // from persistent state. We treat this as a failure and enqueue to DLQ for retry.
             if let Err(e) = treasury_guard.save_budget(&from_budget) {
-                warn!(
-                    "⚠️ Failed to persist from_budget {} after transfer: {}",
+                error!(
+                    "🚨 Failed to persist from_budget {} after transfer: {}",
                     from_budget, e
                 );
+                let failed_op = FailedOperation::new(
+                    format!("treasury:transfer:persist:{}", proposal_id.0),
+                    FailureType::StorageFailure,
+                    serde_json::json!({
+                        "proposal_id": proposal_id.0,
+                        "error": "persistence_failed",
+                        "budget_id": from_budget,
+                        "operation": "save_from_budget",
+                    }),
+                    e.to_string(),
+                );
+                if let Err(dlq_err) = dlq.enqueue(failed_op) {
+                    error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                }
+                icn_obs::metrics::governance::execution_failures_inc("treasury_transfer");
+                return;
             }
             if let Err(e) = treasury_guard.save_budget(&to_budget) {
-                warn!(
-                    "⚠️ Failed to persist to_budget {} after transfer: {}",
+                error!(
+                    "🚨 Failed to persist to_budget {} after transfer: {}",
                     to_budget, e
                 );
+                let failed_op = FailedOperation::new(
+                    format!("treasury:transfer:persist:{}", proposal_id.0),
+                    FailureType::StorageFailure,
+                    serde_json::json!({
+                        "proposal_id": proposal_id.0,
+                        "error": "persistence_failed",
+                        "budget_id": to_budget,
+                        "operation": "save_to_budget",
+                        "note": "from_budget was persisted successfully",
+                    }),
+                    e.to_string(),
+                );
+                if let Err(dlq_err) = dlq.enqueue(failed_op) {
+                    error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                }
+                icn_obs::metrics::governance::execution_failures_inc("treasury_transfer");
+                return;
             }
 
-            // Record audit trail
+            // Record treasury audit trail
             let operation = TreasuryOperation::TransferBetweenBudgets {
                 from_budget: from_budget.clone(),
                 to_budget: to_budget.clone(),
@@ -789,11 +825,13 @@ impl GovernanceEventHandler {
                 reason: reason.clone(),
             };
 
+            // Note: balance_after is 0 because treasury transfers don't affect the main treasury
+            // balance directly - they only reallocate between budgets within the treasury.
             if let Err(e) = treasury_guard.record_audit(
                 &treasury_did,
                 operation,
                 treasury_did.clone(),
-                0, // balance_after
+                0, // balance_after: transfers don't change total treasury balance
                 Some(proposal_id.0.clone()),
                 None,
             ) {
@@ -801,6 +839,7 @@ impl GovernanceEventHandler {
                     "⚠️ Failed to record treasury audit for transfer proposal {}: {}",
                     proposal_id.0, e
                 );
+                // Audit failure is non-fatal - the transfer succeeded, just logging failed
             }
 
             info!(
@@ -882,9 +921,12 @@ impl GovernanceEventHandler {
                 }
             }
 
+            // ATOMIC OPERATION: Acquire exclusive write lock on treasury_manager.
+            // This lock is held for the ENTIRE operation (validation + mutation + persistence)
+            // to prevent TOCTOU race conditions.
             let mut treasury_guard = treasury_manager.write().await;
 
-            // Get budget info before cancelling (for return_to_treasury logic)
+            // Validate budget exists and get info (lock held)
             let (treasury_did, remaining_amount, currency) = {
                 if let Some(budget) = treasury_guard.get_budget(&budget_id) {
                     (
@@ -947,11 +989,13 @@ impl GovernanceEventHandler {
                         return_to_treasury,
                     };
 
+                    // Note: balance_after is 0 because cancellation only affects budget allocation,
+                    // not the main treasury balance. Reclaimed funds return to unallocated pool.
                     if let Err(e) = treasury_guard.record_audit(
                         &treasury_did,
                         operation,
                         treasury_did.clone(),
-                        0, // balance_after
+                        0, // balance_after: cancellation doesn't change treasury balance
                         Some(proposal_id.0.clone()),
                         None,
                     ) {
@@ -959,6 +1003,7 @@ impl GovernanceEventHandler {
                             "⚠️ Failed to record treasury audit for cancel proposal {}: {}",
                             proposal_id.0, e
                         );
+                        // Audit failure is non-fatal - the cancellation succeeded
                     }
 
                     let audit_record = serde_json::json!({
@@ -1060,9 +1105,12 @@ impl GovernanceEventHandler {
                 }
             }
 
+            // ATOMIC OPERATION: Acquire exclusive write lock on treasury_manager.
+            // This lock is held for the ENTIRE operation (validation + mutation + persistence)
+            // to prevent TOCTOU race conditions.
             let mut treasury_guard = treasury_manager.write().await;
 
-            // Get the budget and check remaining funds
+            // Validate budget exists and has sufficient funds (lock held)
             let (treasury_did, remaining) = {
                 if let Some(budget) = treasury_guard.get_budget(&budget_id) {
                     (budget.treasury_did.clone(), budget.remaining())
@@ -1113,7 +1161,7 @@ impl GovernanceEventHandler {
                 return;
             }
 
-            // Reduce the allocated amount
+            // Perform atomic mutation (lock still held)
             if let Some(budget) = treasury_guard.get_budget_mut(&budget_id) {
                 budget.allocated_amount -= amount;
                 info!(
@@ -1122,15 +1170,32 @@ impl GovernanceEventHandler {
                 );
             }
 
-            // Persist budget changes
+            // Persist budget changes - CRITICAL: failures here mean in-memory state diverges
+            // from persistent state. We treat this as a failure and enqueue to DLQ for retry.
             if let Err(e) = treasury_guard.save_budget(&budget_id) {
-                warn!(
-                    "⚠️ Failed to persist budget {} after reclaim: {}",
+                error!(
+                    "🚨 Failed to persist budget {} after reclaim: {}",
                     budget_id, e
                 );
+                let failed_op = FailedOperation::new(
+                    format!("treasury:reclaim:persist:{}", proposal_id.0),
+                    FailureType::StorageFailure,
+                    serde_json::json!({
+                        "proposal_id": proposal_id.0,
+                        "error": "persistence_failed",
+                        "budget_id": budget_id,
+                        "amount": amount,
+                    }),
+                    e.to_string(),
+                );
+                if let Err(dlq_err) = dlq.enqueue(failed_op) {
+                    error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                }
+                icn_obs::metrics::governance::execution_failures_inc("treasury_reclaim");
+                return;
             }
 
-            // Record audit trail
+            // Record treasury audit trail
             let operation = TreasuryOperation::ReclaimBudget {
                 budget_id: budget_id.clone(),
                 amount,
@@ -1138,11 +1203,13 @@ impl GovernanceEventHandler {
                 reason: reason.clone(),
             };
 
+            // Note: balance_after is 0 because reclaim only affects budget allocation,
+            // not the main treasury balance. Reclaimed funds return to unallocated pool.
             if let Err(e) = treasury_guard.record_audit(
                 &treasury_did,
                 operation,
                 treasury_did.clone(),
-                0, // balance_after
+                0, // balance_after: reclaim doesn't change treasury balance
                 Some(proposal_id.0.clone()),
                 None,
             ) {
@@ -1150,6 +1217,7 @@ impl GovernanceEventHandler {
                     "⚠️ Failed to record treasury audit for reclaim proposal {}: {}",
                     proposal_id.0, e
                 );
+                // Audit failure is non-fatal - the reclaim succeeded
             }
 
             let gov_audit = serde_json::json!({
