@@ -12,6 +12,7 @@
 //! the governance process defined within them.
 
 use crate::config::GovernanceConfig;
+use icn_entity::EntityId;
 use icn_identity::Did;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -97,10 +98,19 @@ pub struct Charter {
     /// Unique charter ID (hash of founding content)
     pub charter_id: CharterId,
 
+    /// Entity ID for this jurisdiction (cooperative/federation)
+    ///
+    /// This provides type-safe organizational identity. When set, `domain_id`
+    /// is derived from `entity_id.identifier()` for backwards compatibility.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub entity_id: Option<EntityId>,
+
     /// Type of organization
     pub org_type: OrgType,
 
     /// Domain ID for this jurisdiction (e.g., "coop:food-portland")
+    ///
+    /// **Note**: When `entity_id` is set, this should match `entity_id.identifier()`.
     pub domain_id: String,
 
     /// Human-readable name
@@ -164,6 +174,7 @@ impl Charter {
 
         Self {
             charter_id,
+            entity_id: None,
             org_type,
             domain_id,
             name,
@@ -179,6 +190,36 @@ impl Charter {
             status: CharterStatus::Draft,
             amendments: Vec::new(),
         }
+    }
+
+    /// Create a new charter with entity_id
+    ///
+    /// This is the preferred method for creating charters as it uses
+    /// type-safe EntityId for organizational identity.
+    pub fn new_with_entity(
+        entity_id: EntityId,
+        org_type: OrgType,
+        name: String,
+        governance: GovernanceConfig,
+        membership_policy: MembershipPolicy,
+        dispute_policy: DisputePolicy,
+    ) -> Self {
+        let domain_id = entity_id.identifier().to_string();
+        let mut charter = Self::new(
+            org_type,
+            domain_id,
+            name,
+            governance,
+            membership_policy,
+            dispute_policy,
+        );
+        charter.entity_id = Some(entity_id);
+        charter
+    }
+
+    /// Get the entity ID, if set
+    pub fn entity_id(&self) -> Option<&EntityId> {
+        self.entity_id.as_ref()
     }
 
     /// Create a cooperative charter with default economics
@@ -493,7 +534,17 @@ pub struct EconomicPolicy {
     /// Whether external bridging is allowed
     pub bridging_allowed: bool,
 
+    /// Treasury entity reference (type-safe entity identifier)
+    ///
+    /// This is the preferred way to reference the treasury-owning entity.
+    /// When set, `treasury_did` is typically also set for ledger operations.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub treasury_entity: Option<EntityId>,
+
     /// Treasury DID (if set, separate from governance DID)
+    ///
+    /// **Note**: Consider using `treasury_entity` for structured entity references.
+    /// This field is retained for backwards compatibility and ledger operations.
     pub treasury_did: Option<String>,
 
     /// Contribution routing policy
@@ -510,6 +561,7 @@ impl EconomicPolicy {
             demurrage_rate: 0.0,
             demurrage_threshold: 1000,
             bridging_allowed: false,
+            treasury_entity: None,
             treasury_did: None,
             contribution_routing: ContributionRouting::default(),
         }
@@ -524,6 +576,7 @@ impl EconomicPolicy {
             demurrage_rate: 2.0, // 2% per year
             demurrage_threshold: 10000,
             bridging_allowed: true,
+            treasury_entity: None,
             treasury_did: None,
             contribution_routing: ContributionRouting::default(),
         }

@@ -16,6 +16,7 @@ async-trait = "0.1"
 serde = { workspace = true, features = ["derive"] }
 serde_json = "1.0"
 icn-identity = { path = "../icn-identity" }
+icn-entity = { path = "../icn-entity" }
 icn-trust = { path = "../icn-trust" }
 icn-time.workspace = true
 thiserror.workspace = true

@@ -58,6 +58,7 @@
 
 use crate::types::{ContentHash, JournalEntry};
 use anyhow::{bail, Result};
+use icn_entity::EntityId;
 use icn_identity::Did;
 use icn_store::Store;
 use serde::{Deserialize, Serialize};
@@ -79,7 +80,17 @@ pub struct Treasury {
     /// The treasury DID (cooperative-owned account)
     pub treasury_did: Did,
 
+    /// Entity that owns this treasury (cooperative or federation)
+    ///
+    /// This provides type-safe organizational identity. When set, `coop_id`
+    /// is derived from `entity_id.identifier()` for backwards compatibility.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub entity_id: Option<EntityId>,
+
     /// Cooperative/domain this treasury belongs to
+    ///
+    /// **Deprecated**: Use `entity_id` instead. Retained for backwards compatibility.
+    /// When `entity_id` is set, this field is automatically derived from it.
     pub coop_id: String,
 
     /// Currency managed by this treasury
@@ -99,7 +110,34 @@ pub struct Treasury {
 }
 
 impl Treasury {
-    /// Create a new treasury
+    /// Create a new treasury with entity_id
+    ///
+    /// The `entity_id` provides type-safe organizational identity.
+    /// The `coop_id` field is derived from `entity_id.identifier()` for
+    /// backwards compatibility with existing code.
+    pub fn new_with_entity(
+        treasury_did: Did,
+        entity_id: EntityId,
+        currency: String,
+        created_by: Did,
+        description: Option<String>,
+    ) -> Self {
+        let coop_id = entity_id.identifier().to_string();
+        Self {
+            treasury_did,
+            entity_id: Some(entity_id),
+            coop_id,
+            currency,
+            created_at: icn_time::current_timestamp_secs(),
+            created_by,
+            description,
+            is_active: true,
+        }
+    }
+
+    /// Create a new treasury (legacy API)
+    ///
+    /// **Deprecated**: Use `new_with_entity` instead for type-safe entity references.
     pub fn new(
         treasury_did: Did,
         coop_id: String,
@@ -109,6 +147,7 @@ impl Treasury {
     ) -> Self {
         Self {
             treasury_did,
+            entity_id: None,
             coop_id,
             currency,
             created_at: icn_time::current_timestamp_secs(),
@@ -116,6 +155,18 @@ impl Treasury {
             description,
             is_active: true,
         }
+    }
+
+    /// Get the owning entity ID, if set
+    pub fn entity_id(&self) -> Option<&EntityId> {
+        self.entity_id.as_ref()
+    }
+
+    /// Get the cooperative/domain identifier
+    ///
+    /// This returns the coop_id string regardless of whether entity_id is set.
+    pub fn coop_id(&self) -> &str {
+        &self.coop_id
     }
 }
 
@@ -573,6 +624,59 @@ impl TreasuryManager {
             treasury_did = %treasury_did,
             coop_id = %coop_id,
             "Registering new treasury"
+        );
+
+        self.treasuries
+            .insert(treasury_did.clone(), treasury.clone());
+        self.coop_treasuries
+            .insert(coop_id.clone(), treasury_did.clone());
+        self.treasury_budgets
+            .insert(treasury_did.clone(), Vec::new());
+        self.treasury_rules.insert(treasury_did.clone(), Vec::new());
+
+        // Persist
+        if let Some(ref store) = self.store {
+            self.persist_treasury(&treasury, store)?;
+            self.persist_coop_index(&coop_id, &treasury_did, store)?;
+        }
+
+        Ok(treasury)
+    }
+
+    /// Register a treasury for an entity (cooperative or federation)
+    ///
+    /// This is the preferred method for creating treasuries as it uses
+    /// type-safe EntityId for organizational identity.
+    pub fn register_treasury_with_entity(
+        &mut self,
+        treasury_did: Did,
+        entity_id: EntityId,
+        currency: String,
+        created_by: Did,
+        description: Option<String>,
+    ) -> Result<Treasury> {
+        let coop_id = entity_id.identifier().to_string();
+
+        if self.treasuries.contains_key(&treasury_did) {
+            bail!("Treasury already exists for DID: {treasury_did}");
+        }
+
+        if self.coop_treasuries.contains_key(&coop_id) {
+            bail!("Treasury already exists for entity: {entity_id}");
+        }
+
+        let treasury = Treasury::new_with_entity(
+            treasury_did.clone(),
+            entity_id.clone(),
+            currency,
+            created_by,
+            description,
+        );
+
+        info!(
+            treasury_did = %treasury_did,
+            entity_id = %entity_id,
+            "Registering new treasury for entity"
         );
 
         self.treasuries
@@ -1286,6 +1390,36 @@ mod tests {
         assert!(manager.is_treasury_account(&treasury_did));
         assert!(manager.get_treasury(&treasury_did).is_some());
         assert!(manager.get_treasury_by_coop("test-coop").is_some());
+    }
+
+    #[test]
+    fn test_register_treasury_with_entity() {
+        let mut manager = TreasuryManager::new();
+        let treasury_did = test_did("treasury");
+        let admin = test_did("admin");
+        let entity_id = EntityId::cooperative("food-coop").unwrap();
+
+        let result = manager.register_treasury_with_entity(
+            treasury_did.clone(),
+            entity_id.clone(),
+            "hours".to_string(),
+            admin,
+            Some("Food coop treasury".to_string()),
+        );
+
+        assert!(result.is_ok());
+        let treasury = result.unwrap();
+
+        // Entity ID should be set
+        assert!(treasury.entity_id().is_some());
+        assert_eq!(treasury.entity_id().unwrap(), &entity_id);
+
+        // coop_id should be derived from entity_id
+        assert_eq!(treasury.coop_id(), "food-coop");
+        assert_eq!(&treasury.coop_id, "food-coop");
+
+        // Should be retrievable by coop_id
+        assert!(manager.get_treasury_by_coop("food-coop").is_some());
     }
 
     #[test]

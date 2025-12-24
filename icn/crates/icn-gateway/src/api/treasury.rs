@@ -11,6 +11,7 @@
 //! proposal system.
 
 use actix_web::{get, post, web, HttpMessage, HttpRequest, HttpResponse};
+use icn_governance::{GovernanceDomainId, ProposalId, ProposalPayload, TreasuryProposalOperation};
 use icn_identity::Did;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -19,7 +20,8 @@ use tracing::info;
 
 use crate::auth::TokenClaims;
 use crate::error::{GatewayError, Result};
-use crate::middleware::{require_coop_access, require_scope};
+use crate::governance_mgr::GovernanceManager;
+use crate::middleware::{get_claims, require_coop_access, require_scope};
 use crate::treasury_mgr::GatewayTreasuryManager;
 
 // ============================================================================
@@ -497,11 +499,21 @@ pub async fn create_budget(
     req: HttpRequest,
     path: web::Path<String>,
     body: web::Json<CreateBudgetRequest>,
+    treasury_mgr: web::Data<Arc<GatewayTreasuryManager>>,
+    governance_mgr: web::Data<Arc<GovernanceManager>>,
 ) -> Result<HttpResponse> {
     require_scope(&req, "treasury:write")?;
 
     let coop_id = path.into_inner();
     require_coop_access(&req, &coop_id)?;
+
+    // Get proposer DID from JWT claims
+    let claims = get_claims(&req).ok_or_else(|| {
+        GatewayError::AuthenticationFailed("No claims found".to_string())
+    })?;
+    let proposer_did: Did = claims.sub.parse().map_err(|e| {
+        GatewayError::BadRequest(format!("Invalid DID in token: {e}"))
+    })?;
 
     // Input validation
     if body.amount <= 0 {
@@ -535,22 +547,71 @@ pub async fn create_budget(
         }
     }
 
+    // Get treasury for this cooperative to get treasury_did
+    let treasury = treasury_mgr
+        .get_treasury_by_coop(&coop_id)
+        .await
+        .map_err(|e| GatewayError::InternalError(e.to_string()))?;
+
+    let treasury = treasury.ok_or_else(|| {
+        GatewayError::NotFound(format!(
+            "Treasury not configured for cooperative '{coop_id}'. \
+             Register a treasury before creating budgets."
+        ))
+    })?;
+
     info!(
         coop_id = %coop_id,
         purpose = %body.purpose,
         amount = body.amount,
-        "Treasury budget creation requested"
+        treasury_did = %treasury.treasury_did,
+        proposer = %proposer_did,
+        "Creating governance proposal for treasury budget"
     );
 
-    // TODO: Create governance proposal for budget creation
-    // The proposal will be of type ProposalPayload::Treasury {
-    //     operation: TreasuryProposalOperation::CreateBudget { ... }
-    // }
+    // Create governance proposal for budget creation
+    let proposal_id = ProposalId::generate();
+    let domain_id = GovernanceDomainId::new(&coop_id);
+
+    let payload = ProposalPayload::Treasury {
+        operation: TreasuryProposalOperation::CreateBudget {
+            treasury_did: treasury.treasury_did.clone(),
+            purpose: body.purpose.clone(),
+            amount: body.amount,
+            currency: body.currency.clone(),
+            period_end: body.period_end,
+        },
+    };
+
+    let title = format!("Budget Allocation: {}", body.purpose);
+    let description = format!(
+        "Proposal to allocate {} {} from treasury for: {}",
+        body.amount, body.currency, body.purpose
+    );
+
+    // Submit proposal to governance system
+    let created_proposal_id = governance_mgr
+        .create_proposal(
+            proposal_id.clone(),
+            domain_id,
+            proposer_did,
+            title,
+            description,
+            payload,
+        )
+        .await
+        .map_err(|e| GatewayError::InternalError(format!("Failed to create proposal: {e}")))?;
+
+    info!(
+        proposal_id = %created_proposal_id,
+        coop_id = %coop_id,
+        "Treasury budget proposal created successfully"
+    );
 
     let response = serde_json::json!({
         "status": "proposal_created",
         "message": "Budget creation requires governance approval",
-        "proposal_id": null, // Will be filled in when wired to governance
+        "proposal_id": created_proposal_id.to_string(),
         "coop_id": coop_id,
         "purpose": body.purpose,
         "amount": body.amount,
@@ -829,6 +890,10 @@ mod tests {
         Arc::new(GatewayTreasuryManager::new())
     }
 
+    fn create_test_governance_manager() -> Arc<GovernanceManager> {
+        Arc::new(GovernanceManager::new())
+    }
+
     #[actix_web::test]
     async fn test_get_treasury_status_not_found() {
         let treasury_mgr = create_test_treasury_manager();
@@ -892,9 +957,11 @@ mod tests {
     #[actix_web::test]
     async fn test_create_budget_requires_write_scope() {
         let treasury_mgr = create_test_treasury_manager();
+        let governance_mgr = create_test_governance_manager();
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(treasury_mgr))
+                .app_data(web::Data::new(governance_mgr))
                 .service(web::scope("/treasury").configure(configure)),
         )
         .await;
