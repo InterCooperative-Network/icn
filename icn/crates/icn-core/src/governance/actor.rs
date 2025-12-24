@@ -17,10 +17,11 @@ use icn_identity::Did;
 use icn_store::Store;
 
 use icn_governance::{
-    DecisionOutcome, GovernanceConfig, GovernanceDomain, GovernanceDomainId, GovernanceMessage,
-    GovernanceParams, GovernanceProfile, GovernanceProfileId, GovernanceRule, MembershipAction,
-    MembershipConfig, MembershipResolver, MembershipSource, Proposal, ProposalId, ProposalOutcome,
-    ProposalPayload, ProposalState, TallySnapshot, Vote, VoteChoice, VoteTally,
+    DecisionOutcome, Delegation, DelegationId, GovernanceConfig, GovernanceDomain,
+    GovernanceDomainId, GovernanceMessage, GovernanceParams, GovernanceProfile,
+    GovernanceProfileId, GovernanceRule, MembershipAction, MembershipConfig, MembershipResolver,
+    MembershipSource, Proposal, ProposalId, ProposalOutcome, ProposalPayload, ProposalState,
+    TallySnapshot, Timestamp, Vote, VoteChoice, VoteTally,
 };
 
 use crate::events::{EventBus, SystemEvent};
@@ -173,6 +174,31 @@ impl GovernanceHandle {
     pub async fn get_proposal(&self, id: &ProposalId) -> Result<Option<Proposal>> {
         self.inner.read().await.load_proposal(id)
     }
+
+    /// Create a new delegation
+    pub async fn create_delegation(&self, delegation: Delegation) -> Result<()> {
+        self.inner.write().await.create_delegation(delegation)
+    }
+
+    /// Get a delegation by ID
+    pub async fn get_delegation(&self, id: &DelegationId) -> Result<Option<Delegation>> {
+        self.inner.read().await.load_delegation(id)
+    }
+
+    /// Get all delegations from a delegator
+    pub async fn get_delegations_from(&self, delegator: &Did) -> Result<Vec<Delegation>> {
+        self.inner.read().await.list_delegations_from(delegator)
+    }
+
+    /// Get all delegations to a delegate
+    pub async fn get_delegations_to(&self, delegate: &Did) -> Result<Vec<Delegation>> {
+        self.inner.read().await.list_delegations_to(delegate)
+    }
+
+    /// Revoke a delegation
+    pub async fn revoke_delegation(&self, id: &DelegationId, revoked_at: Timestamp) -> Result<()> {
+        self.inner.write().await.revoke_delegation(id, revoked_at)
+    }
 }
 
 /// Implement GovernanceOps trait to allow RPC integration without circular dependencies
@@ -271,6 +297,28 @@ impl icn_governance::GovernanceOps for GovernanceHandle {
     async fn close_proposal(&self, proposal_id: ProposalId) -> Result<()> {
         self.submit(GovernanceCommand::CloseProposal { proposal_id })
             .await
+    }
+
+    // Delegation operations
+
+    async fn create_delegation(&self, delegation: Delegation) -> Result<()> {
+        Self::create_delegation(self, delegation).await
+    }
+
+    async fn get_delegation(&self, id: &DelegationId) -> Result<Option<Delegation>> {
+        Self::get_delegation(self, id).await
+    }
+
+    async fn get_delegations_from(&self, delegator: &Did) -> Result<Vec<Delegation>> {
+        Self::get_delegations_from(self, delegator).await
+    }
+
+    async fn get_delegations_to(&self, delegate: &Did) -> Result<Vec<Delegation>> {
+        Self::get_delegations_to(self, delegate).await
+    }
+
+    async fn revoke_delegation(&self, id: &DelegationId, revoked_at: Timestamp) -> Result<()> {
+        Self::revoke_delegation(self, id, revoked_at).await
     }
 }
 
@@ -881,6 +929,283 @@ impl GovernanceActor {
             .map(|(_k, v)| Ok(serde_json::from_slice::<Vote>(&v)?))
             .collect()
     }
+
+    /// Maximum depth for transitive delegations
+    const MAX_DELEGATION_DEPTH: usize = 3;
+
+    /// Create a new delegation
+    fn create_delegation(&mut self, delegation: Delegation) -> Result<()> {
+        // Validate no self-delegation
+        if delegation.delegator == delegation.delegate {
+            bail!("Cannot delegate to yourself");
+        }
+
+        // Validate no duplicate delegation for this scope
+        if self.has_active_delegation_for_scope(&delegation.delegator, &delegation.scope)? {
+            bail!(
+                "Active delegation already exists for scope {:?}",
+                delegation.scope
+            );
+        }
+
+        // Validate no cycles: check if following the chain from delegate leads back to delegator
+        if self.would_create_cycle(
+            &delegation.delegator,
+            &delegation.delegate,
+            &delegation.scope,
+        )? {
+            bail!(
+                "Delegation would create a cycle: {} -> {} (scope: {:?})",
+                delegation.delegator,
+                delegation.delegate,
+                delegation.scope
+            );
+        }
+
+        // Validate max depth: check how many hops lead TO the delegator
+        let incoming_depth =
+            self.compute_incoming_depth(&delegation.delegator, &delegation.scope)?;
+        if incoming_depth >= Self::MAX_DELEGATION_DEPTH {
+            bail!(
+                "Maximum delegation depth ({}) exceeded; current incoming depth is {}",
+                Self::MAX_DELEGATION_DEPTH,
+                incoming_depth
+            );
+        }
+
+        // Store the delegation
+        self.store.put(
+            &delegation_key(&delegation.id),
+            &serde_json::to_vec(&delegation)?,
+        )?;
+
+        info!(
+            "✓ Delegation created: {} -> {} (scope: {:?})",
+            delegation.delegator, delegation.delegate, delegation.scope
+        );
+
+        Ok(())
+    }
+
+    /// Check if a delegator already has an active delegation for a given scope
+    fn has_active_delegation_for_scope(
+        &self,
+        delegator: &Did,
+        scope: &icn_governance::DelegationScope,
+    ) -> Result<bool> {
+        let now = icn_time::current_timestamp_secs();
+        let delegations = self.list_delegations_from(delegator)?;
+
+        Ok(delegations
+            .iter()
+            .any(|d| d.revoked_at.is_none() && d.is_active(now) && d.scope == *scope))
+    }
+
+    /// Check if adding a delegation would create a cycle
+    fn would_create_cycle(
+        &self,
+        delegator: &Did,
+        delegate: &Did,
+        scope: &icn_governance::DelegationScope,
+    ) -> Result<bool> {
+        use std::collections::HashSet;
+
+        let now = icn_time::current_timestamp_secs();
+        let mut current = delegate.clone();
+        let mut visited = HashSet::new();
+        visited.insert(delegator.clone());
+
+        // Use inclusive range to allow exactly MAX_DELEGATION_DEPTH hops
+        // With MAX_DELEGATION_DEPTH=3: 0..=3 checks 4 positions (delegate + 3 hops)
+        // This ensures we detect cycles at the depth boundary
+        for _ in 0..=Self::MAX_DELEGATION_DEPTH {
+            if visited.contains(&current) {
+                return Ok(true);
+            }
+            visited.insert(current.clone());
+
+            // Find any active delegation from current that matches scope
+            let delegations = self.list_delegations_from(&current)?;
+            let next = delegations
+                .into_iter()
+                .find(|d| {
+                    d.revoked_at.is_none()
+                        && d.is_active(now)
+                        && self.scopes_overlap(&d.scope, scope)
+                })
+                .map(|d| d.delegate.clone());
+
+            match next {
+                Some(d) => current = d,
+                None => return Ok(false),
+            }
+        }
+
+        Ok(false)
+    }
+
+    /// Check if two delegation scopes overlap (for cycle detection)
+    fn scopes_overlap(
+        &self,
+        a: &icn_governance::DelegationScope,
+        b: &icn_governance::DelegationScope,
+    ) -> bool {
+        use icn_governance::DelegationScope;
+
+        match (a, b) {
+            (DelegationScope::Blanket, _) | (_, DelegationScope::Blanket) => true,
+            (DelegationScope::Domain(d1), DelegationScope::Domain(d2)) => d1 == d2,
+            // Conservative: assume overlap for Domain/Proposal combinations
+            (DelegationScope::Domain(_), DelegationScope::Proposal(_))
+            | (DelegationScope::Proposal(_), DelegationScope::Domain(_)) => true,
+            (DelegationScope::Proposal(p1), DelegationScope::Proposal(p2)) => p1 == p2,
+        }
+    }
+
+    /// Compute the incoming delegation chain depth to a person
+    fn compute_incoming_depth(
+        &self,
+        delegate: &Did,
+        scope: &icn_governance::DelegationScope,
+    ) -> Result<usize> {
+        use std::collections::HashSet;
+
+        let mut visited = HashSet::new();
+        self.compute_incoming_depth_recursive(delegate, scope, &mut visited)
+    }
+
+    fn compute_incoming_depth_recursive(
+        &self,
+        delegate: &Did,
+        scope: &icn_governance::DelegationScope,
+        visited: &mut std::collections::HashSet<Did>,
+    ) -> Result<usize> {
+        if visited.contains(delegate) {
+            return Ok(0);
+        }
+        visited.insert(delegate.clone());
+
+        // Safety limit
+        if visited.len() > Self::MAX_DELEGATION_DEPTH + 10 {
+            return Ok(0);
+        }
+
+        let now = icn_time::current_timestamp_secs();
+
+        // Find all delegators who have delegated to this delegate
+        let delegations = self.list_delegations_to(delegate)?;
+        let delegators: Vec<Did> = delegations
+            .into_iter()
+            .filter(|d| {
+                d.revoked_at.is_none() && d.is_active(now) && self.scopes_overlap(&d.scope, scope)
+            })
+            .map(|d| d.delegator.clone())
+            .collect();
+
+        if delegators.is_empty() {
+            return Ok(0);
+        }
+
+        // Recursively find the maximum depth
+        let mut max_depth = 0;
+        for delegator in delegators {
+            let depth = 1 + self.compute_incoming_depth_recursive(&delegator, scope, visited)?;
+            if depth > max_depth {
+                max_depth = depth;
+            }
+        }
+
+        Ok(max_depth)
+    }
+
+    /// Load a delegation by ID
+    fn load_delegation(&self, id: &DelegationId) -> Result<Option<Delegation>> {
+        load_json(self.store.as_ref(), &delegation_key(id))
+    }
+
+    /// List all delegations from a delegator
+    ///
+    /// Returns error on deserialization failures to surface data corruption issues.
+    fn list_delegations_from(&self, delegator: &Did) -> Result<Vec<Delegation>> {
+        let prefix = delegation_key_prefix();
+        let rows = self.store.scan(prefix)?;
+        let mut delegations = Vec::new();
+
+        for (k, v) in rows {
+            match serde_json::from_slice::<Delegation>(&v) {
+                Ok(d) => {
+                    if &d.delegator == delegator && d.revoked_at.is_none() {
+                        delegations.push(d);
+                    }
+                }
+                Err(e) => {
+                    let key_str = String::from_utf8_lossy(&k);
+                    tracing::error!(
+                        key = %key_str,
+                        error = %e,
+                        "Failed to deserialize delegation record - data may be corrupted"
+                    );
+                    icn_obs::metrics::governance::deserialization_failures_inc();
+                    anyhow::bail!(
+                        "Failed to deserialize delegation record for key '{key_str}': {e}"
+                    );
+                }
+            }
+        }
+
+        Ok(delegations)
+    }
+
+    /// List all delegations to a delegate
+    ///
+    /// Returns error on deserialization failures to surface data corruption issues.
+    fn list_delegations_to(&self, delegate: &Did) -> Result<Vec<Delegation>> {
+        let prefix = delegation_key_prefix();
+        let rows = self.store.scan(prefix)?;
+        let mut delegations = Vec::new();
+
+        for (k, v) in rows {
+            match serde_json::from_slice::<Delegation>(&v) {
+                Ok(d) => {
+                    if &d.delegate == delegate && d.revoked_at.is_none() {
+                        delegations.push(d);
+                    }
+                }
+                Err(e) => {
+                    let key_str = String::from_utf8_lossy(&k);
+                    tracing::error!(
+                        key = %key_str,
+                        error = %e,
+                        "Failed to deserialize delegation record - data may be corrupted"
+                    );
+                    icn_obs::metrics::governance::deserialization_failures_inc();
+                    anyhow::bail!(
+                        "Failed to deserialize delegation record for key '{key_str}': {e}"
+                    );
+                }
+            }
+        }
+
+        Ok(delegations)
+    }
+
+    /// Revoke a delegation
+    fn revoke_delegation(&mut self, id: &DelegationId, revoked_at: Timestamp) -> Result<()> {
+        let mut delegation = self
+            .load_delegation(id)?
+            .ok_or_else(|| anyhow::anyhow!("Delegation not found: {}", id.0))?;
+
+        delegation.revoked_at = Some(revoked_at);
+
+        self.store.put(
+            &delegation_key(&delegation.id),
+            &serde_json::to_vec(&delegation)?,
+        )?;
+
+        info!("✓ Delegation revoked: {}", id.0);
+
+        Ok(())
+    }
 }
 
 /// Handle incoming governance messages from gossip
@@ -979,6 +1304,14 @@ fn vote_key(proposal_id: &ProposalId, voter: &Did) -> Vec<u8> {
 
 fn vote_key_prefix(proposal_id: &ProposalId) -> Vec<u8> {
     format!("gov:vote:{}:", proposal_id.0).into_bytes()
+}
+
+fn delegation_key(id: &DelegationId) -> Vec<u8> {
+    format!("gov:delegation:{}", id.0).into_bytes()
+}
+
+fn delegation_key_prefix() -> &'static [u8] {
+    b"gov:delegation:"
 }
 
 // ---- Utility functions ----

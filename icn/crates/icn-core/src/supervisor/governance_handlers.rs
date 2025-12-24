@@ -1065,30 +1065,50 @@ impl GovernanceEventHandler {
                 return;
             }
 
-            // Safe to mutate now - arithmetic is validated
-            if let Some(from) = treasury_guard.get_budget_mut(&from_budget) {
-                from.allocated_amount -= amount;
-            }
-            if let Some(to) = treasury_guard.get_budget_mut(&to_budget) {
-                to.allocated_amount += amount;
-            }
+            // Two-Phase Commit: Persist BEFORE updating in-memory state
+            // This prevents data corruption if persistence fails partway through.
+            //
+            // Phase 1: Clone budgets and apply changes to clones
+            let mut from_budget_clone = match treasury_guard.get_budget(&from_budget) {
+                Some(b) => b.clone(),
+                None => {
+                    error!(
+                        "❌ Source budget {} disappeared during transfer",
+                        from_budget
+                    );
+                    icn_obs::metrics::governance::execution_failures_inc(
+                        "treasury_transfer_between_budgets",
+                    );
+                    return;
+                }
+            };
+            let mut to_budget_clone = match treasury_guard.get_budget(&to_budget) {
+                Some(b) => b.clone(),
+                None => {
+                    error!(
+                        "❌ Destination budget {} disappeared during transfer",
+                        to_budget
+                    );
+                    icn_obs::metrics::governance::execution_failures_inc(
+                        "treasury_transfer_between_budgets",
+                    );
+                    return;
+                }
+            };
 
-            // Persist budget changes - CRITICAL: failures here mean in-memory state diverges
-            // from persistent state. We use a "best effort rollback" approach:
-            // 1. Save from_budget first
-            // 2. If to_budget save fails, attempt to rollback from_budget
-            if let Err(e) = treasury_guard.save_budget(&from_budget) {
+            // Apply changes to clones (not in-memory state yet)
+            from_budget_clone.allocated_amount -= amount;
+            to_budget_clone.allocated_amount += amount;
+
+            // Phase 2: Persist both clones - if either fails, no state is corrupted
+            // Note: We capture the ORIGINAL in memory (before persisting modified clones) for rollback
+            let from_budget_original = treasury_guard.get_budget(&from_budget).cloned();
+
+            if let Err(e) = treasury_guard.save_budget_snapshot(&from_budget_clone) {
                 error!(
-                    "🚨 Failed to persist from_budget {} after transfer: {}",
+                    "🚨 Failed to persist from_budget {} for transfer: {}",
                     from_budget, e
                 );
-                // Rollback in-memory state
-                if let Some(from) = treasury_guard.get_budget_mut(&from_budget) {
-                    from.allocated_amount += amount;
-                }
-                if let Some(to) = treasury_guard.get_budget_mut(&to_budget) {
-                    to.allocated_amount -= amount;
-                }
                 let failed_op = FailedOperation::new(
                     format!("treasury:transfer:persist:{}", proposal_id.0),
                     FailureType::StorageFailure,
@@ -1108,25 +1128,21 @@ impl GovernanceEventHandler {
                 );
                 return;
             }
-            if let Err(e) = treasury_guard.save_budget(&to_budget) {
+
+            if let Err(e) = treasury_guard.save_budget_snapshot(&to_budget_clone) {
                 error!(
-                    "🚨 Failed to persist to_budget {} after transfer: {}",
+                    "🚨 Failed to persist to_budget {} for transfer: {}",
                     to_budget, e
                 );
-                // Attempt compensating rollback: restore from_budget to original state
-                if let Some(from) = treasury_guard.get_budget_mut(&from_budget) {
-                    from.allocated_amount += amount;
-                }
-                if let Err(rollback_err) = treasury_guard.save_budget(&from_budget) {
-                    error!(
-                        "🚨🚨 CRITICAL: Failed to rollback from_budget {} after partial transfer failure: {}",
-                        from_budget, rollback_err
-                    );
-                    // DLQ entry includes rollback failure for manual intervention
-                }
-                // Rollback to_budget in memory
-                if let Some(to) = treasury_guard.get_budget_mut(&to_budget) {
-                    to.allocated_amount -= amount;
+                // Rollback from_budget to original state (not the modified clone)
+                if let Some(original) = from_budget_original {
+                    if let Err(rollback_err) = treasury_guard.save_budget_snapshot(&original) {
+                        error!(
+                            "🚨🚨 CRITICAL: Failed to rollback from_budget {} after partial \
+                             transfer failure: {}. Manual intervention required.",
+                            from_budget, rollback_err
+                        );
+                    }
                 }
                 let failed_op = FailedOperation::new(
                     format!("treasury:transfer:persist:{}", proposal_id.0),
@@ -1147,6 +1163,23 @@ impl GovernanceEventHandler {
                     "treasury_transfer_between_budgets",
                 );
                 return;
+            }
+
+            // Phase 3: Both persisted successfully - now update in-memory state
+            // Use apply_budget_snapshot to ensure consistency
+            if let Err(e) = treasury_guard.apply_budget_snapshot(&from_budget_clone) {
+                error!(
+                    "🚨 Failed to apply from_budget snapshot to in-memory state: {}. \
+                     Storage is updated but memory is stale - restart may be needed.",
+                    e
+                );
+            }
+            if let Err(e) = treasury_guard.apply_budget_snapshot(&to_budget_clone) {
+                error!(
+                    "🚨 Failed to apply to_budget snapshot to in-memory state: {}. \
+                     Storage is updated but memory is stale - restart may be needed.",
+                    e
+                );
             }
 
             // Record treasury audit trail

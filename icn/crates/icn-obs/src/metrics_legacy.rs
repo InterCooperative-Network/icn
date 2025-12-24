@@ -2084,6 +2084,10 @@ pub mod governance {
     pub fn membership_updated_inc() {
         counter!("icn_governance_membership_updated_total").increment(1);
     }
+
+    pub fn deserialization_failures_inc() {
+        counter!("icn_governance_deserialization_failures_total").increment(1);
+    }
 }
 
 /// Trust graph metrics
@@ -3925,5 +3929,46 @@ pub mod commons {
     /// Set dispute resolution time histogram
     pub fn dispute_resolution_time(duration_secs: f64) {
         histogram!("icn_dispute_resolution_time_seconds").record(duration_secs);
+    }
+}
+
+/// Treasury metrics
+pub mod treasury {
+    use metrics::counter;
+
+    /// Increment when treasury validation succeeds
+    pub fn validation_success_inc() {
+        counter!("icn_treasury_validation_success_total").increment(1);
+    }
+
+    /// Increment when treasury validation fails (rule violation)
+    pub fn validation_failed_inc() {
+        counter!("icn_treasury_validation_failed_total").increment(1);
+    }
+
+    /// Increment when treasury validation lock contention occurs
+    /// This helps identify if lock contention is causing issues
+    pub fn validation_lock_contention_inc() {
+        counter!("icn_treasury_validation_lock_contention_total").increment(1);
+    }
+
+    /// Increment when a deposit is processed
+    pub fn deposit_processed_inc() {
+        counter!("icn_treasury_deposits_total").increment(1);
+    }
+
+    /// Increment when a withdrawal is processed
+    pub fn withdrawal_processed_inc() {
+        counter!("icn_treasury_withdrawals_total").increment(1);
+    }
+
+    /// Increment when a budget is created
+    pub fn budget_created_inc() {
+        counter!("icn_treasury_budgets_created_total").increment(1);
+    }
+
+    /// Increment when a budget allocation is made
+    pub fn budget_allocated_inc() {
+        counter!("icn_treasury_budget_allocations_total").increment(1);
     }
 }

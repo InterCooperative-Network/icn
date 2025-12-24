@@ -101,8 +101,8 @@ pub struct Ledger {
     /// Byzantine fault detector (Phase 18)
     misbehavior_detector: Option<Arc<tokio::sync::RwLock<icn_security::MisbehaviorDetector>>>,
 
-    /// Trust graph for entry validation
-    trust_graph: Option<Arc<TrustGraph>>,
+    /// Trust graph for entry validation (wrapped in RwLock for live updates)
+    trust_graph: Option<Arc<tokio::sync::RwLock<TrustGraph>>>,
 
     /// Minimum trust score for entry acceptance
     min_trust_for_entry: f64,
@@ -200,7 +200,7 @@ impl Ledger {
     }
 
     /// Set the trust graph for trust-weighted fork resolution and entry validation
-    pub fn set_trust_graph(&mut self, trust_graph: Arc<TrustGraph>) {
+    pub fn set_trust_graph(&mut self, trust_graph: Arc<tokio::sync::RwLock<TrustGraph>>) {
         self.trust_graph = Some(trust_graph.clone());
         self.fork_resolver.set_trust_graph(trust_graph);
     }
@@ -316,22 +316,29 @@ impl Ledger {
         // Skip trust check if no trust graph configured (allows local-only operation)
         if let Some(ref trust_graph) = self.trust_graph {
             let author_did = &entry.author;
-            match trust_graph.compute_trust_score(author_did) {
+            let min_trust = self.min_trust_for_entry;
+
+            // Acquire read lock on trust graph using blocking_read for sync context
+            let trust_result: Result<f64, anyhow::Error> = {
+                let graph = trust_graph.blocking_read();
+                graph
+                    .compute_trust_score(author_did)
+                    .map_err(|e| anyhow::anyhow!(e))
+            };
+
+            match trust_result {
                 Ok(trust_score) => {
-                    if trust_score < self.min_trust_for_entry {
+                    if trust_score < min_trust {
                         warn!(
                             author = %author_did,
                             trust_score = trust_score,
-                            min_required = self.min_trust_for_entry,
+                            min_required = min_trust,
                             entry_hash = %hash,
                             "Rejecting entry from low-trust author"
                         );
                         icn_obs::metrics::ledger::entries_rejected_low_trust_inc();
                         anyhow::bail!(
-                            "Entry author {} has insufficient trust score ({:.3} < {:.3})",
-                            author_did,
-                            trust_score,
-                            self.min_trust_for_entry
+                            "Entry author {author_did} has insufficient trust score ({trust_score:.3} < {min_trust:.3})"
                         );
                     }
                     debug!(
@@ -349,7 +356,7 @@ impl Ledger {
                         "Cannot compute trust score for entry author, treating as isolated"
                     );
                     // For unknown peers, check against minimum threshold
-                    if self.min_trust_for_entry > 0.0 {
+                    if min_trust > 0.0 {
                         icn_obs::metrics::ledger::entries_rejected_low_trust_inc();
                         anyhow::bail!("Cannot verify trust for entry author {author_did}: {e}");
                     }
@@ -1165,7 +1172,7 @@ impl Ledger {
                 entry2: conflicting_hash.as_bytes().try_into().unwrap_or([0u8; 32]),
             };
 
-            // Report violation asynchronously (block_in_place for sync context)
+            // Report violation using block_in_place (may be called from tokio runtime)
             let detector_clone = detector.clone();
             let author = entry.author.clone();
             tokio::task::block_in_place(|| {
@@ -2016,12 +2023,13 @@ impl Ledger {
                 let current_balance = self.get_balance(account, currency);
 
                 // Get trust score for the account (or 0.0 if unknown)
-                let trust_score = self
-                    .trust_graph
-                    .as_ref()
-                    .and_then(|tg| tg.compute_trust_score(account).ok())
-                    .unwrap_or(0.0)
-                    .clamp(0.0, 1.0);
+                let trust_score: f64 = if let Some(ref trust_graph) = self.trust_graph {
+                    let graph = trust_graph.blocking_read();
+                    graph.compute_trust_score(account).unwrap_or(0.0)
+                } else {
+                    0.0
+                }
+                .clamp(0.0, 1.0);
 
                 // Get cleared volume for history bonus
                 let cleared_volume = self

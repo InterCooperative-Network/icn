@@ -800,6 +800,46 @@ impl TreasuryManager {
         Ok(())
     }
 
+    /// Persist a budget snapshot directly to storage without updating in-memory state.
+    ///
+    /// This is used for two-phase commit patterns where we want to persist changes
+    /// before committing them to in-memory state. The budget's ID is used as the key.
+    ///
+    /// # Two-Phase Commit Pattern
+    ///
+    /// 1. Clone budgets from in-memory state
+    /// 2. Modify the clones
+    /// 3. Call `save_budget_snapshot` to persist clones (if this fails, no state corruption)
+    /// 4. Call `apply_budget_snapshot` to update in-memory state
+    ///
+    /// This ensures that if persistence fails, in-memory state remains consistent.
+    pub fn save_budget_snapshot(&self, budget: &TreasuryBudget) -> Result<()> {
+        if let Some(ref store) = self.store {
+            self.persist_budget(budget, store)?;
+        }
+        Ok(())
+    }
+
+    /// Apply a budget snapshot to in-memory state.
+    ///
+    /// Used after the persist phase of two-phase commit to sync in-memory state
+    /// with storage. Returns error if the budget ID doesn't exist in-memory.
+    ///
+    /// Takes a reference and clones internally to avoid consuming the caller's budget,
+    /// allowing the caller to continue using the budget if needed (e.g., for logging).
+    ///
+    /// # Safety
+    ///
+    /// Only call this after successfully calling `save_budget_snapshot` for the same budget.
+    /// This ensures storage and memory remain consistent.
+    pub fn apply_budget_snapshot(&mut self, budget: &TreasuryBudget) -> Result<()> {
+        if !self.budgets.contains_key(&budget.id) {
+            bail!("Budget not found in-memory: {}", budget.id);
+        }
+        self.budgets.insert(budget.id.clone(), budget.clone());
+        Ok(())
+    }
+
     // === Spending Rules ===
 
     /// Add a spending rule
@@ -1588,5 +1628,169 @@ mod tests {
         );
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("must be positive"));
+    }
+
+    #[test]
+    fn test_two_phase_commit_snapshot_methods() {
+        let mut manager = TreasuryManager::new();
+        let treasury_did = test_did("treasury");
+        let admin = test_did("admin");
+
+        manager
+            .register_treasury(
+                treasury_did.clone(),
+                "test-coop".to_string(),
+                "hours".to_string(),
+                admin.clone(),
+                None,
+            )
+            .unwrap();
+
+        let budget = manager
+            .create_budget(
+                treasury_did.clone(),
+                "Test budget".to_string(),
+                1000,
+                "hours".to_string(),
+                None,
+                admin,
+                None,
+            )
+            .unwrap();
+
+        let budget_id = budget.id.clone();
+
+        // Phase 1: Clone and modify
+        let mut budget_clone = manager.get_budget(&budget_id).unwrap().clone();
+        assert_eq!(budget_clone.allocated_amount, 1000);
+        budget_clone.allocated_amount = 500;
+
+        // Phase 2: Persist snapshot (no-op for in-memory manager, but API should work)
+        let result = manager.save_budget_snapshot(&budget_clone);
+        assert!(result.is_ok());
+
+        // In-memory state should still be 1000 (unchanged)
+        assert_eq!(
+            manager.get_budget(&budget_id).unwrap().allocated_amount,
+            1000
+        );
+
+        // Phase 3: Apply snapshot to in-memory state
+        let result = manager.apply_budget_snapshot(&budget_clone);
+        assert!(result.is_ok());
+
+        // Now in-memory state should be 500
+        assert_eq!(
+            manager.get_budget(&budget_id).unwrap().allocated_amount,
+            500
+        );
+    }
+
+    #[test]
+    fn test_apply_snapshot_nonexistent_budget_fails() {
+        let mut manager = TreasuryManager::new();
+        let treasury_did = test_did("treasury");
+        let admin = test_did("admin");
+
+        manager
+            .register_treasury(
+                treasury_did.clone(),
+                "test-coop".to_string(),
+                "hours".to_string(),
+                admin.clone(),
+                None,
+            )
+            .unwrap();
+
+        // Create a fake budget that doesn't exist in manager
+        let fake_budget = TreasuryBudget::new(
+            treasury_did,
+            "Fake".to_string(),
+            1000,
+            "hours".to_string(),
+            None,
+            admin,
+            None,
+        );
+
+        // Applying snapshot for non-existent budget should fail
+        let result = manager.apply_budget_snapshot(&fake_budget);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("not found in-memory"));
+    }
+
+    #[test]
+    fn test_two_phase_commit_simulates_transfer() {
+        let mut manager = TreasuryManager::new();
+        let treasury_did = test_did("treasury");
+        let admin = test_did("admin");
+
+        manager
+            .register_treasury(
+                treasury_did.clone(),
+                "test-coop".to_string(),
+                "hours".to_string(),
+                admin.clone(),
+                None,
+            )
+            .unwrap();
+
+        // Create source budget with 1000
+        let from_budget = manager
+            .create_budget(
+                treasury_did.clone(),
+                "Source".to_string(),
+                1000,
+                "hours".to_string(),
+                None,
+                admin.clone(),
+                None,
+            )
+            .unwrap();
+
+        // Create destination budget with 500
+        let to_budget = manager
+            .create_budget(
+                treasury_did,
+                "Destination".to_string(),
+                500,
+                "hours".to_string(),
+                None,
+                admin,
+                None,
+            )
+            .unwrap();
+
+        let from_id = from_budget.id.clone();
+        let to_id = to_budget.id.clone();
+
+        // Simulate transfer of 300 using two-phase commit pattern
+        let transfer_amount = 300;
+
+        // Phase 1: Clone and modify
+        let mut from_clone = manager.get_budget(&from_id).unwrap().clone();
+        let mut to_clone = manager.get_budget(&to_id).unwrap().clone();
+
+        from_clone.allocated_amount -= transfer_amount;
+        to_clone.allocated_amount += transfer_amount;
+
+        // Phase 2: Persist (no-op for in-memory, but validates API)
+        manager.save_budget_snapshot(&from_clone).unwrap();
+        manager.save_budget_snapshot(&to_clone).unwrap();
+
+        // Verify in-memory state unchanged during persist phase
+        assert_eq!(manager.get_budget(&from_id).unwrap().allocated_amount, 1000);
+        assert_eq!(manager.get_budget(&to_id).unwrap().allocated_amount, 500);
+
+        // Phase 3: Apply both snapshots
+        manager.apply_budget_snapshot(&from_clone).unwrap();
+        manager.apply_budget_snapshot(&to_clone).unwrap();
+
+        // Verify transfer completed
+        assert_eq!(manager.get_budget(&from_id).unwrap().allocated_amount, 700);
+        assert_eq!(manager.get_budget(&to_id).unwrap().allocated_amount, 800);
     }
 }

@@ -69,7 +69,7 @@ pub enum ForkResolution {
 /// Fork resolution system
 pub struct ForkResolver {
     strategy: ForkResolutionStrategy,
-    trust_graph: Option<Arc<TrustGraph>>,
+    trust_graph: Option<Arc<tokio::sync::RwLock<TrustGraph>>>,
 }
 
 impl ForkResolver {
@@ -82,7 +82,7 @@ impl ForkResolver {
     }
 
     /// Set the trust graph for trust-weighted resolution
-    pub fn set_trust_graph(&mut self, trust_graph: Arc<TrustGraph>) {
+    pub fn set_trust_graph(&mut self, trust_graph: Arc<tokio::sync::RwLock<TrustGraph>>) {
         self.trust_graph = Some(trust_graph);
     }
 
@@ -159,12 +159,19 @@ impl ForkResolver {
             .ok_or_else(|| anyhow!("Trust graph required for trust-weighted resolution"))?;
 
         // Compute trust scores for both authors
-        let trust1 = trust_graph
-            .compute_trust_score(&entry1.author)
-            .unwrap_or(0.0);
-        let trust2 = trust_graph
-            .compute_trust_score(&entry2.author)
-            .unwrap_or(0.0);
+        // Use block_in_place to handle async lock from sync context (may be called from tokio runtime)
+        let trust_graph_clone = trust_graph.clone();
+        let author1 = entry1.author.clone();
+        let author2 = entry2.author.clone();
+        let (trust1, trust2) = tokio::task::block_in_place(|| {
+            let rt = tokio::runtime::Handle::current();
+            rt.block_on(async {
+                let graph = trust_graph_clone.read().await;
+                let t1 = graph.compute_trust_score(&author1).unwrap_or(0.0);
+                let t2 = graph.compute_trust_score(&author2).unwrap_or(0.0);
+                (t1, t2)
+            })
+        });
 
         debug!(
             "Resolving by trust: {} (trust={:.2}) vs {} (trust={:.2})",
@@ -242,9 +249,16 @@ impl ForkResolver {
 
         // Trust component (40% weight)
         if let Some(ref trust_graph) = self.trust_graph {
-            let trust = trust_graph
-                .compute_trust_score(&entry.author)
-                .unwrap_or(0.0);
+            // Use block_in_place to handle async lock from sync context (may be called from tokio runtime)
+            let trust_graph_clone = trust_graph.clone();
+            let author_clone = entry.author.clone();
+            let trust = tokio::task::block_in_place(|| {
+                let rt = tokio::runtime::Handle::current();
+                rt.block_on(async {
+                    let graph = trust_graph_clone.read().await;
+                    graph.compute_trust_score(&author_clone).unwrap_or(0.0)
+                })
+            });
             score += trust * 0.4;
         }
 
