@@ -26,6 +26,7 @@ members = [
     "crates/icn-crypto-pq",
     "crates/icn-steward",
     "crates/icn-zkp", "crates/icn-cooperative", "crates/icn-community", "crates/icn-coop",
+    "crates/icn-entity",
 ]
 
 [workspace.package]
