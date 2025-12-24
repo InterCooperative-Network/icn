@@ -23,16 +23,26 @@ use crate::middleware::{require_coop_access, require_scope};
 use crate::treasury_mgr::GatewayTreasuryManager;
 
 // ============================================================================
-// Constants
+// Configurable Limits
 // ============================================================================
 
 /// Default pagination limit for audit trail queries
-/// TODO: Make configurable via gateway config or environment variable
-const DEFAULT_AUDIT_LIMIT: usize = 20;
+/// Can be overridden via ICN_AUDIT_DEFAULT_LIMIT environment variable
+fn default_audit_limit() -> usize {
+    std::env::var("ICN_AUDIT_DEFAULT_LIMIT")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(20)
+}
 
 /// Maximum pagination limit for audit trail queries
-/// TODO: Make configurable via gateway config or environment variable
-const MAX_AUDIT_LIMIT: usize = 100;
+/// Can be overridden via ICN_AUDIT_MAX_LIMIT environment variable
+fn max_audit_limit() -> usize {
+    std::env::var("ICN_AUDIT_MAX_LIMIT")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(100)
+}
 
 // ============================================================================
 // Request/Response Types
@@ -596,8 +606,8 @@ pub async fn get_audit_trail(
     let limit: usize = query
         .get("limit")
         .and_then(|s| s.parse().ok())
-        .unwrap_or(DEFAULT_AUDIT_LIMIT)
-        .min(MAX_AUDIT_LIMIT);
+        .unwrap_or_else(default_audit_limit)
+        .min(max_audit_limit());
 
     let offset: usize = query
         .get("offset")
