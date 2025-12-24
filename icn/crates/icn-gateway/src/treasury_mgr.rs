@@ -351,6 +351,81 @@ impl GatewayTreasuryManager {
         }
         Ok(HashMap::new()) // Ledger not wired
     }
+
+    // ============================================================================
+    // Ledger Write Operations
+    // ============================================================================
+
+    /// Create a deposit entry in the ledger
+    ///
+    /// Creates a journal entry that credits the treasury and debits the depositor.
+    /// Returns the entry hash on success.
+    ///
+    /// Requires both ledger_handle and treasury_handle to be wired.
+    pub async fn create_deposit(
+        &self,
+        treasury_did: &Did,
+        from_did: &Did,
+        amount: i64,
+        currency: String,
+        memo: Option<String>,
+    ) -> Result<icn_ledger::ContentHash> {
+        let ledger_handle = self
+            .ledger_handle
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Ledger not wired - deposits require daemon mode"))?;
+
+        // Build the journal entry: debit from depositor, credit to treasury
+        let mut entry = icn_ledger::entry::JournalEntryBuilder::new(from_did.clone())
+            .debit(from_did.clone(), currency.clone(), amount)
+            .credit(treasury_did.clone(), currency.clone(), amount)
+            .build()?;
+
+        // Compute the hash
+        let hash = entry.compute_hash()?;
+
+        // Append to ledger
+        {
+            let mut ledger = ledger_handle.write().await;
+            ledger.append_entry(entry)?;
+        }
+
+        // Record audit trail if treasury handle is available
+        if self.treasury_handle.is_some() {
+            // Get the new balance for audit
+            let new_balance = self
+                .get_treasury_balance(treasury_did, &currency)
+                .await?
+                .unwrap_or(0);
+
+            let operation = TreasuryOperation::Deposit {
+                from: from_did.clone(),
+                amount,
+                currency,
+                memo,
+            };
+
+            self.record_audit(
+                treasury_did,
+                operation,
+                from_did.clone(),
+                new_balance,
+                None, // No proposal for deposits
+                Some(hash.clone()),
+            )
+            .await?;
+        }
+
+        debug!(
+            treasury = %treasury_did,
+            from = %from_did,
+            amount = amount,
+            hash = %hash,
+            "Created treasury deposit entry"
+        );
+
+        Ok(hash)
+    }
 }
 
 impl Default for GatewayTreasuryManager {

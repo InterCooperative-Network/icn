@@ -10,12 +10,14 @@
 //! spending thresholds, budget creation) must go through the governance
 //! proposal system.
 
-use actix_web::{get, post, web, HttpRequest, HttpResponse};
+use actix_web::{get, post, web, HttpMessage, HttpRequest, HttpResponse};
+use icn_identity::Did;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::info;
 
+use crate::auth::TokenClaims;
 use crate::error::{GatewayError, Result};
 use crate::middleware::{require_coop_access, require_scope};
 use crate::treasury_mgr::GatewayTreasuryManager;
@@ -663,6 +665,7 @@ pub async fn deposit_to_treasury(
     req: HttpRequest,
     path: web::Path<String>,
     body: web::Json<DepositRequest>,
+    treasury_mgr: web::Data<Arc<GatewayTreasuryManager>>,
 ) -> Result<HttpResponse> {
     require_scope(&req, "treasury:write")?;
 
@@ -682,25 +685,74 @@ pub async fn deposit_to_treasury(
         ));
     }
 
+    // Get depositor DID from auth token
+    let claims = req
+        .extensions()
+        .get::<TokenClaims>()
+        .cloned()
+        .ok_or_else(|| {
+            GatewayError::AuthenticationFailed("Missing authentication claims".to_string())
+        })?;
+
+    let depositor_did: Did = claims.sub.parse().map_err(|e| {
+        GatewayError::InternalError(format!("Invalid depositor DID in claims: {e}"))
+    })?;
+
+    // Get the treasury for this cooperative
+    let treasury = treasury_mgr
+        .get_treasury_by_coop(&coop_id)
+        .await
+        .map_err(|e| GatewayError::InternalError(e.to_string()))?
+        .ok_or_else(|| {
+            GatewayError::NotFound(format!("Treasury not found for cooperative: {coop_id}"))
+        })?;
+
     info!(
         coop_id = %coop_id,
+        depositor = %depositor_did,
+        treasury = %treasury.treasury_did,
         amount = body.amount,
         currency = %body.currency,
         "Treasury deposit requested"
     );
 
-    // TODO: Wire to ledger to create deposit entry
-    // Deposits don't require approval - they add to treasury
+    // Check if ledger is wired for deposits
+    if !treasury_mgr.is_ledger_wired() {
+        return Err(GatewayError::ServiceUnavailable(
+            "Treasury deposits require daemon integration. \
+             Start icnd with full identity to enable deposits."
+                .to_string(),
+        ));
+    }
+
+    // Create the deposit entry
+    let entry_hash = treasury_mgr
+        .create_deposit(
+            &treasury.treasury_did,
+            &depositor_did,
+            body.amount,
+            body.currency.clone(),
+            body.memo.clone(),
+        )
+        .await
+        .map_err(|e| GatewayError::InternalError(e.to_string()))?;
+
+    info!(
+        coop_id = %coop_id,
+        entry_hash = %entry_hash,
+        "Treasury deposit completed"
+    );
 
     let response = serde_json::json!({
-        "status": "pending",
-        "message": "Treasury deposit processing",
+        "status": "completed",
+        "message": "Treasury deposit successful",
         "coop_id": coop_id,
         "amount": body.amount,
-        "currency": body.currency
+        "currency": body.currency,
+        "entry_hash": entry_hash.to_string()
     });
 
-    Ok(HttpResponse::Accepted().json(response))
+    Ok(HttpResponse::Ok().json(response))
 }
 
 // ============================================================================
