@@ -258,6 +258,21 @@ impl GovernanceHandle {
             None => bail!("Protocol parameter store not configured"),
         }
     }
+
+    /// Set a protocol parameter value
+    ///
+    /// Used to persist approved ProtocolChange proposals.
+    pub fn set_protocol_parameter(
+        &self,
+        param: ProtocolParameter,
+        proposal_id: Option<String>,
+        changed_by: Option<String>,
+    ) -> Result<()> {
+        match &self.protocol_params {
+            Some(store) => store.set(param, proposal_id, changed_by),
+            None => bail!("Protocol parameter store not configured"),
+        }
+    }
 }
 
 /// Implement GovernanceOps trait to allow RPC integration without circular dependencies

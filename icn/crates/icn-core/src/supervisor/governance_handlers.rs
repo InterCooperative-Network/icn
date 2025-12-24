@@ -2339,23 +2339,35 @@ impl GovernanceEventHandler {
         let param_result = self
             .gov_handle
             .get_protocol_parameter(&proposal.parameter_id);
-        let proposal_id_str = &proposal_id.0;
+        let proposal_id_str = proposal_id.0.clone();
         match param_result {
             Ok(Some(mut param)) => {
                 // Update the parameter with the new value
                 param.value = proposal.new_value.clone();
                 param.updated_at = icn_time::current_timestamp_secs();
-                param.updated_by = Some(proposal_id_str.to_string());
+                param.updated_by = Some(proposal_id_str.clone());
 
                 // Update the scope if specified in the proposal
                 if let Some(scope) = proposal.scope {
                     param.scope = scope;
                 }
 
-                info!(
-                    "✓ Protocol parameter {} updated to {:?}",
-                    proposal.parameter_id, proposal.new_value
-                );
+                // Persist the updated parameter
+                if let Err(e) = self.gov_handle.set_protocol_parameter(
+                    param,
+                    Some(proposal_id_str.clone()),
+                    None,
+                ) {
+                    warn!(
+                        "Failed to persist protocol parameter {} for proposal {}: {}",
+                        proposal.parameter_id, proposal_id_str, e
+                    );
+                } else {
+                    info!(
+                        "✓ Protocol parameter {} updated to {:?}",
+                        proposal.parameter_id, proposal.new_value
+                    );
+                }
             }
             Ok(None) => {
                 warn!(

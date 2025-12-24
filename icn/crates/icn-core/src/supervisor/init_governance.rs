@@ -131,13 +131,12 @@ pub async fn init_governance_services(
         let existing = protocol_parameter_store.list()?;
         if existing.is_empty() {
             info!("Loading default protocol parameters...");
-            for param in default_parameters() {
+            let defaults = default_parameters();
+            let count = defaults.len();
+            for param in defaults {
                 protocol_parameter_store.set(param, None, None)?;
             }
-            info!(
-                "✓ {} default protocol parameters initialized",
-                default_parameters().len()
-            );
+            info!("✓ {} default protocol parameters initialized", count);
         } else {
             info!(
                 "✓ Protocol parameter store loaded ({} parameters)",

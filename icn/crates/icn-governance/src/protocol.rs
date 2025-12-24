@@ -210,7 +210,7 @@ pub enum ParameterValue {
     /// Size in bytes
     Bytes(u64),
 
-    /// Percentage (0.0 to 1.0)
+    /// Percentage (0.0 to 100.0)
     Percentage(f64),
 }
 
@@ -322,7 +322,7 @@ impl fmt::Display for ParameterValue {
                     write!(f, "{v}B")
                 }
             }
-            ParameterValue::Percentage(v) => write!(f, "{:.1}%", v * 100.0),
+            ParameterValue::Percentage(v) => write!(f, "{v:.1}%"),
         }
     }
 }
@@ -649,7 +649,7 @@ mod tests {
         assert_eq!(ParameterValue::Duration(45).to_string(), "45s");
         assert_eq!(ParameterValue::Bytes(1_048_576).to_string(), "1MB");
         assert_eq!(ParameterValue::Bytes(1024).to_string(), "1KB");
-        assert_eq!(ParameterValue::Percentage(0.5).to_string(), "50.0%");
+        assert_eq!(ParameterValue::Percentage(50.0).to_string(), "50.0%");
     }
 
     #[test]
@@ -723,7 +723,7 @@ mod tests {
     #[test]
     fn test_parameter_value_accessors() {
         assert_eq!(ParameterValue::Integer(42).as_integer(), Some(42));
-        assert_eq!(ParameterValue::Float(3.14).as_float(), Some(3.14));
+        assert_eq!(ParameterValue::Float(1.5).as_float(), Some(1.5));
         assert_eq!(
             ParameterValue::String("hello".into()).as_string(),
             Some("hello")
