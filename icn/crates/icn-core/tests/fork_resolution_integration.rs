@@ -58,7 +58,10 @@ impl TestLedgerNode {
         // Create trust graph
         let trust_path = temp_dir.path().join("trust");
         let trust_store = Arc::new(SledStore::open(&trust_path)?);
-        let trust_graph = Arc::new(tokio::sync::RwLock::new(TrustGraph::new(trust_store, did.clone())));
+        let trust_graph = Arc::new(tokio::sync::RwLock::new(TrustGraph::new(
+            trust_store,
+            did.clone(),
+        )));
 
         // Create fork resolution components
         let fork_detector = ForkDetector::new();
@@ -432,7 +435,10 @@ async fn test_fork_resolution_trust_weighted() -> Result<()> {
     let charlie = KeyPair::generate()?;
 
     // Create trust graph with Alice as root
-    let trust_graph = Arc::new(tokio::sync::RwLock::new(TrustGraph::new(trust_store, alice.did().clone())));
+    let trust_graph = Arc::new(tokio::sync::RwLock::new(TrustGraph::new(
+        trust_store,
+        alice.did().clone(),
+    )));
 
     // Set up trust edges: Alice trusts Bob highly, Charlie less
     // Note: In real system this would be through trust_graph.add_edge()

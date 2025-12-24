@@ -961,23 +961,21 @@ impl GovernanceActor {
         let prefix = delegation_key_prefix();
         let rows = self.store.scan(prefix)?;
         rows.into_iter()
-            .filter_map(|(k, v)| {
-                match serde_json::from_slice::<Delegation>(&v) {
-                    Ok(d) => {
-                        if &d.delegator == delegator && d.revoked_at.is_none() {
-                            Some(Ok(d))
-                        } else {
-                            None
-                        }
-                    }
-                    Err(e) => {
-                        tracing::warn!(
-                            key = %String::from_utf8_lossy(&k),
-                            error = %e,
-                            "Failed to deserialize delegation record, skipping"
-                        );
+            .filter_map(|(k, v)| match serde_json::from_slice::<Delegation>(&v) {
+                Ok(d) => {
+                    if &d.delegator == delegator && d.revoked_at.is_none() {
+                        Some(Ok(d))
+                    } else {
                         None
                     }
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        key = %String::from_utf8_lossy(&k),
+                        error = %e,
+                        "Failed to deserialize delegation record, skipping"
+                    );
+                    None
                 }
             })
             .collect()
@@ -988,23 +986,21 @@ impl GovernanceActor {
         let prefix = delegation_key_prefix();
         let rows = self.store.scan(prefix)?;
         rows.into_iter()
-            .filter_map(|(k, v)| {
-                match serde_json::from_slice::<Delegation>(&v) {
-                    Ok(d) => {
-                        if &d.delegate == delegate && d.revoked_at.is_none() {
-                            Some(Ok(d))
-                        } else {
-                            None
-                        }
-                    }
-                    Err(e) => {
-                        tracing::warn!(
-                            key = %String::from_utf8_lossy(&k),
-                            error = %e,
-                            "Failed to deserialize delegation record, skipping"
-                        );
+            .filter_map(|(k, v)| match serde_json::from_slice::<Delegation>(&v) {
+                Ok(d) => {
+                    if &d.delegate == delegate && d.revoked_at.is_none() {
+                        Some(Ok(d))
+                    } else {
                         None
                     }
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        key = %String::from_utf8_lossy(&k),
+                        error = %e,
+                        "Failed to deserialize delegation record, skipping"
+                    );
+                    None
                 }
             })
             .collect()
