@@ -78,7 +78,9 @@ pub mod membership;
 pub mod registry;
 
 // Re-export main types at crate root
-pub use entity::{AccountId, AccountReference, CooperativeEntity, EntityId, EntityStatus, EntityType};
+pub use entity::{
+    AccountId, AccountReference, CooperativeEntity, EntityId, EntityStatus, EntityType,
+};
 pub use error::{EntityError, Result};
 pub use lifecycle::{EntityLifecycle, LifecycleEvent};
 pub use membership::{Membership, MembershipCapability, MembershipRole, MembershipStatus};

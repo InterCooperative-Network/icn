@@ -90,15 +90,19 @@ impl EntityId {
     }
 
     /// Get the entity type from this ID
+    ///
+    /// Parses the format `entity:icn:<type>:<identifier>` and extracts the type.
     pub fn entity_type(&self) -> EntityType {
-        if self.0.contains(":individual:") {
-            EntityType::Individual
-        } else if self.0.contains(":cooperative:") {
-            EntityType::Cooperative
-        } else if self.0.contains(":federation:") {
-            EntityType::Federation
-        } else {
-            EntityType::Unknown
+        // Expected format: entity:icn:<type>:<identifier>
+        let mut parts = self.0.split(':');
+        // Skip "entity" and "icn"
+        let _ = parts.next();
+        let _ = parts.next();
+        match parts.next() {
+            Some("individual") => EntityType::Individual,
+            Some("cooperative") => EntityType::Cooperative,
+            Some("federation") => EntityType::Federation,
+            _ => EntityType::Unknown,
         }
     }
 
@@ -525,6 +529,7 @@ impl fmt::Display for AccountId {
 // ============================================================================
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
     use icn_identity::KeyPair;

@@ -70,8 +70,11 @@ pub trait EntityRegistry: Send + Sync {
     fn add_membership(&mut self, membership: Membership) -> Result<()>;
 
     /// Get a specific membership
-    fn get_membership(&self, member_id: &EntityId, parent_id: &EntityId)
-        -> Result<Option<Membership>>;
+    fn get_membership(
+        &self,
+        member_id: &EntityId,
+        parent_id: &EntityId,
+    ) -> Result<Option<Membership>>;
 
     /// Get all memberships for an entity (where it's a member)
     fn get_memberships_of(&self, member_id: &EntityId) -> Result<Vec<Membership>>;
@@ -144,11 +147,8 @@ impl EntityRegistry for InMemoryRegistry {
     fn delete(&mut self, id: &EntityId) -> Result<()> {
         let id_str = id.as_str().to_string();
 
-        // Check if entity has members
-        let has_members = self
-            .memberships
-            .keys()
-            .any(|(_, parent)| parent == &id_str);
+        // Check if entity has members (is a parent)
+        let has_members = self.memberships.keys().any(|(_, parent)| parent == &id_str);
         if has_members {
             return Err(EntityError::RegistryError(
                 "Cannot delete entity with active members".into(),
@@ -158,6 +158,10 @@ impl EntityRegistry for InMemoryRegistry {
         if self.entities.remove(&id_str).is_none() {
             return Err(EntityError::NotFound(id_str));
         }
+
+        // Remove any memberships where this entity is a member
+        self.memberships.retain(|(member, _), _| member != &id_str);
+
         Ok(())
     }
 
@@ -193,7 +197,10 @@ impl EntityRegistry for InMemoryRegistry {
     }
 
     fn get_parent(&self, entity_id: &EntityId) -> Result<Option<EntityId>> {
-        Ok(self.entities.get(entity_id.as_str()).and_then(|e| e.parent_id.clone()))
+        Ok(self
+            .entities
+            .get(entity_id.as_str())
+            .and_then(|e| e.parent_id.clone()))
     }
 
     fn count(&self) -> Result<usize> {
@@ -201,10 +208,22 @@ impl EntityRegistry for InMemoryRegistry {
     }
 
     fn add_membership(&mut self, membership: Membership) -> Result<()> {
-        let key = (
-            membership.member_id.as_str().to_string(),
-            membership.parent_id.as_str().to_string(),
-        );
+        let member_str = membership.member_id.as_str();
+        let parent_str = membership.parent_id.as_str();
+
+        // Verify both entities exist
+        if !self.entities.contains_key(member_str) {
+            return Err(EntityError::MembershipError(format!(
+                "Member entity not found: {member_str}"
+            )));
+        }
+        if !self.entities.contains_key(parent_str) {
+            return Err(EntityError::MembershipError(format!(
+                "Parent entity not found: {parent_str}"
+            )));
+        }
+
+        let key = (member_str.to_string(), parent_str.to_string());
 
         // Check membership doesn't already exist
         if self.memberships.contains_key(&key) {
@@ -213,7 +232,6 @@ impl EntityRegistry for InMemoryRegistry {
             ));
         }
 
-        // Optionally verify entities exist (skip for flexibility in testing)
         self.memberships.insert(key, membership);
         Ok(())
     }
@@ -257,9 +275,7 @@ impl EntityRegistry for InMemoryRegistry {
         );
 
         if !self.memberships.contains_key(&key) {
-            return Err(EntityError::MembershipError(
-                "Membership not found".into(),
-            ));
+            return Err(EntityError::MembershipError("Membership not found".into()));
         }
 
         self.memberships.insert(key, membership);
@@ -273,9 +289,7 @@ impl EntityRegistry for InMemoryRegistry {
         );
 
         if self.memberships.remove(&key).is_none() {
-            return Err(EntityError::MembershipError(
-                "Membership not found".into(),
-            ));
+            return Err(EntityError::MembershipError("Membership not found".into()));
         }
         Ok(())
     }
@@ -358,6 +372,7 @@ impl EntityRegistryHandle {
 // ============================================================================
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
     use crate::membership::MembershipRole;

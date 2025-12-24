@@ -54,15 +54,16 @@ impl Membership {
     /// Create a new pending membership
     pub fn new(member_id: EntityId, parent_id: EntityId, role: MembershipRole) -> Self {
         let now = icn_time::current_timestamp_secs();
+        let capabilities = role.default_capabilities();
         Membership {
             member_id,
             parent_id,
-            role: role.clone(),
+            role,
             status: MembershipStatus::Pending,
             joined_at: now,
             updated_at: now,
             shares: 1, // Default to 1 share (one member, one vote)
-            capabilities: role.default_capabilities(),
+            capabilities,
             notes: None,
         }
     }
@@ -110,9 +111,7 @@ impl Membership {
 
     /// Check if member can vote
     pub fn can_vote(&self) -> bool {
-        self.is_active()
-            && self.shares > 0
-            && self.has_capability(&MembershipCapability::Vote)
+        self.is_active() && self.shares > 0 && self.has_capability(&MembershipCapability::Vote)
     }
 
     /// Check if member can create proposals
@@ -216,10 +215,9 @@ impl MembershipRole {
             MembershipRole::Worker
             | MembershipRole::Consumer
             | MembershipRole::Producer
-            | MembershipRole::Member => vec![
-                MembershipCapability::Vote,
-                MembershipCapability::Propose,
-            ],
+            | MembershipRole::Member => {
+                vec![MembershipCapability::Vote, MembershipCapability::Propose]
+            }
 
             // Federated members get full voting rights
             MembershipRole::FederatedMember => vec![
@@ -229,23 +227,18 @@ impl MembershipRole {
             ],
 
             // Associate members may have limited rights
-            MembershipRole::AssociateMember => vec![
-                MembershipCapability::Propose,
-            ],
+            MembershipRole::AssociateMember => vec![MembershipCapability::Propose],
 
             // Observers have no default capabilities
             MembershipRole::ObserverMember => vec![],
 
             // Provisional members have limited rights
-            MembershipRole::ProvisionalMember => vec![
-                MembershipCapability::Propose,
-            ],
+            MembershipRole::ProvisionalMember => vec![MembershipCapability::Propose],
 
             // Custom roles start with basic member rights
-            MembershipRole::Custom { .. } => vec![
-                MembershipCapability::Vote,
-                MembershipCapability::Propose,
-            ],
+            MembershipRole::Custom { .. } => {
+                vec![MembershipCapability::Vote, MembershipCapability::Propose]
+            }
         }
     }
 
@@ -334,9 +327,7 @@ impl MembershipStatus {
     pub fn is_terminated(&self) -> bool {
         matches!(
             self,
-            MembershipStatus::Resigned
-                | MembershipStatus::Removed
-                | MembershipStatus::Expelled
+            MembershipStatus::Resigned | MembershipStatus::Removed | MembershipStatus::Expelled
         )
     }
 }
@@ -414,6 +405,7 @@ impl fmt::Display for MembershipCapability {
 // ============================================================================
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
     use icn_identity::KeyPair;
@@ -470,7 +462,8 @@ mod tests {
         let member_coop = EntityId::cooperative("member-coop").unwrap();
         let federation = EntityId::federation("fed").unwrap();
 
-        let membership = Membership::active(member_coop, federation, MembershipRole::ObserverMember);
+        let membership =
+            Membership::active(member_coop, federation, MembershipRole::ObserverMember);
 
         // Observers have no shares by default but we gave them 1
         // They don't have Vote capability
@@ -511,10 +504,9 @@ mod tests {
         let member = create_test_individual();
         let coop = create_test_coop();
 
-        let no_shares = Membership::active(member.clone(), coop.clone(), MembershipRole::Member)
-            .with_shares(0);
-        let with_shares = Membership::active(member, coop, MembershipRole::Member)
-            .with_shares(10);
+        let no_shares =
+            Membership::active(member.clone(), coop.clone(), MembershipRole::Member).with_shares(0);
+        let with_shares = Membership::active(member, coop, MembershipRole::Member).with_shares(10);
 
         assert!(!no_shares.can_vote()); // 0 shares = no vote
         assert!(with_shares.can_vote());
@@ -539,7 +531,10 @@ mod tests {
         assert_eq!(MembershipRole::Founder.to_string(), "Founder");
         assert_eq!(MembershipRole::Worker.to_string(), "Worker");
         assert_eq!(
-            MembershipRole::Officer { title: "President".into() }.to_string(),
+            MembershipRole::Officer {
+                title: "President".into()
+            }
+            .to_string(),
             "Officer (President)"
         );
     }

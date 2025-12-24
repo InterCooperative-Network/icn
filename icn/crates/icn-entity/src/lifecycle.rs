@@ -57,10 +57,7 @@ pub enum LifecycleEvent {
     },
 
     /// Entity was fully dissolved
-    Dissolved {
-        entity_id: EntityId,
-        timestamp: u64,
-    },
+    Dissolved { entity_id: EntityId, timestamp: u64 },
 
     /// Entity merged into another
     Merged {
@@ -127,13 +124,21 @@ impl LifecycleEvent {
             LifecycleEvent::Activated { entity_id, .. } => {
                 format!("Entity {} was activated", entity_id.identifier())
             }
-            LifecycleEvent::Suspended { entity_id, reason, .. } => {
-                format!("Entity {} was suspended: {}", entity_id.identifier(), reason)
+            LifecycleEvent::Suspended {
+                entity_id, reason, ..
+            } => {
+                format!(
+                    "Entity {} was suspended: {}",
+                    entity_id.identifier(),
+                    reason
+                )
             }
             LifecycleEvent::Resumed { entity_id, .. } => {
                 format!("Entity {} was resumed", entity_id.identifier())
             }
-            LifecycleEvent::DissolutionStarted { entity_id, reason, .. } => {
+            LifecycleEvent::DissolutionStarted {
+                entity_id, reason, ..
+            } => {
                 format!(
                     "Entity {} dissolution started: {}",
                     entity_id.identifier(),
@@ -160,18 +165,12 @@ impl LifecycleEvent {
                 ..
             } => {
                 let new_ids: Vec<_> = new_entity_ids.iter().map(|e| e.identifier()).collect();
-                format!(
-                    "Entity {} split into {:?}",
-                    source_id.identifier(),
-                    new_ids
-                )
+                format!("Entity {} split into {:?}", source_id.identifier(), new_ids)
             }
-            LifecycleEvent::Updated { entity_id, changes, .. } => {
-                format!(
-                    "Entity {} updated: {:?}",
-                    entity_id.identifier(),
-                    changes
-                )
+            LifecycleEvent::Updated {
+                entity_id, changes, ..
+            } => {
+                format!("Entity {} updated: {:?}", entity_id.identifier(), changes)
             }
         }
     }
@@ -300,6 +299,7 @@ pub fn validate_transition(from: &EntityStatus, to: &EntityStatus) -> Result<()>
 // ============================================================================
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 
