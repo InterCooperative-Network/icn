@@ -485,9 +485,9 @@ pub enum LifecycleEvent {
         suspended_by: EntityId,
         timestamp: u64,
     },
-    Reactivated {
+    Resumed {
         entity_id: EntityId,
-        reactivated_by: EntityId,
+        resumed_by: EntityId,
         timestamp: u64,
     },
     DissolutionStarted {
@@ -502,13 +502,13 @@ pub enum LifecycleEvent {
     Merged {
         source_id: EntityId,
         target_id: EntityId,
-        merged_by: EntityId,
+        merger_proposal_id: Option<String>,
         timestamp: u64,
     },
     Split {
         source_id: EntityId,
         new_entity_ids: Vec<EntityId>,
-        split_by: EntityId,
+        split_proposal_id: Option<String>,
         timestamp: u64,
     },
 }
@@ -527,7 +527,7 @@ pub trait EntityLifecycle {
     fn suspend(&mut self, entity_id: &EntityId, reason: String, by: &EntityId)
         -> Result<LifecycleEvent>;
 
-    fn reactivate(&mut self, entity_id: &EntityId, by: &EntityId)
+    fn resume(&mut self, entity_id: &EntityId, by: &EntityId)
         -> Result<LifecycleEvent>;
 
     fn begin_dissolution(&mut self, entity_id: &EntityId, by: &EntityId)

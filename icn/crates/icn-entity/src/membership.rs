@@ -465,8 +465,8 @@ mod tests {
         let membership =
             Membership::active(member_coop, federation, MembershipRole::ObserverMember);
 
-        // Observers have no shares by default but we gave them 1
-        // They don't have Vote capability
+        // Observers receive the default 1 share like other members,
+        // but their role does not include the Vote capability, so can_vote() is false
         assert!(!membership.has_capability(&MembershipCapability::Vote));
         assert!(!membership.can_vote());
     }
