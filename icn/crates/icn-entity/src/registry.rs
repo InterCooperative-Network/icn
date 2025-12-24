@@ -605,7 +605,7 @@ mod tests {
         // Register some entities
         for i in 0..10 {
             let entity =
-                CooperativeEntity::cooperative(&format!("coop-{i:03}"), &format!("Coop {i}"))
+                CooperativeEntity::cooperative(&format!("coop-{i:03}"), format!("Coop {i}"))
                     .unwrap();
             handle.register(entity).await.unwrap();
         }
@@ -640,7 +640,7 @@ mod tests {
             let h = Arc::clone(&handle);
             tasks.push(tokio::spawn(async move {
                 let entity =
-                    CooperativeEntity::cooperative(&format!("coop-{i:03}"), &format!("Coop {i}"))
+                    CooperativeEntity::cooperative(&format!("coop-{i:03}"), format!("Coop {i}"))
                         .unwrap();
                 h.register(entity).await
             }));
