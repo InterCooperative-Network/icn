@@ -52,6 +52,8 @@ pub mod proposal;
 #[allow(missing_docs)]
 pub mod protocol;
 #[allow(missing_docs)]
+pub mod protocol_defaults;
+#[allow(missing_docs)]
 pub mod protocol_store;
 #[allow(missing_docs)]
 pub mod resolver;
@@ -118,6 +120,7 @@ pub use protocol::{
     ParameterValue, ProtocolChangeProposal, ProtocolParameter,
 };
 pub use protocol_store::{InMemoryParameterStore, ProtocolParameterStore, SledParameterStore};
+pub use protocol_defaults::{default_parameters, get_default_parameter, ParameterCategory};
 
 /// Unix timestamp in seconds
 pub type Timestamp = u64;
