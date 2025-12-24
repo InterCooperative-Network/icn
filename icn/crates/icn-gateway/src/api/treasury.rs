@@ -21,6 +21,16 @@ use crate::middleware::{require_coop_access, require_scope};
 use crate::treasury_mgr::GatewayTreasuryManager;
 
 // ============================================================================
+// Constants
+// ============================================================================
+
+/// Default pagination limit for audit trail queries
+const DEFAULT_AUDIT_LIMIT: usize = 20;
+
+/// Maximum pagination limit for audit trail queries
+const MAX_AUDIT_LIMIT: usize = 100;
+
+// ============================================================================
 // Request/Response Types
 // ============================================================================
 
@@ -564,8 +574,8 @@ pub async fn get_audit_trail(
     let limit: usize = query
         .get("limit")
         .and_then(|s| s.parse().ok())
-        .unwrap_or(20)
-        .min(100);
+        .unwrap_or(DEFAULT_AUDIT_LIMIT)
+        .min(MAX_AUDIT_LIMIT);
 
     let offset: usize = query
         .get("offset")
