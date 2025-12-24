@@ -369,10 +369,11 @@ pub async fn list_budgets(
         })
         .collect();
 
+    let total = budget_summaries.len();
     let response = BudgetListResponse {
         treasury_did: treasury.treasury_did.to_string(),
-        budgets: budget_summaries.clone(),
-        total: budget_summaries.len(),
+        budgets: budget_summaries,
+        total,
     };
 
     Ok(HttpResponse::Ok().json(response))

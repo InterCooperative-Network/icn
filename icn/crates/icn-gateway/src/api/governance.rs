@@ -1877,7 +1877,13 @@ mod tests {
             .await;
 
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Domain not found"));
+        // Check for the improved error message that includes domain ID and action suggestion
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("not found"),
+            "Expected 'not found' in error message but got: {}",
+            err_msg
+        );
     }
 
     #[actix_web::test]

@@ -930,11 +930,47 @@ impl GovernanceActor {
             .collect()
     }
 
+    /// Maximum depth for transitive delegations
+    const MAX_DELEGATION_DEPTH: usize = 3;
+
     /// Create a new delegation
     fn create_delegation(&mut self, delegation: Delegation) -> Result<()> {
         // Validate no self-delegation
         if delegation.delegator == delegation.delegate {
             bail!("Cannot delegate to yourself");
+        }
+
+        // Validate no duplicate delegation for this scope
+        if self.has_active_delegation_for_scope(&delegation.delegator, &delegation.scope)? {
+            bail!(
+                "Active delegation already exists for scope {:?}",
+                delegation.scope
+            );
+        }
+
+        // Validate no cycles: check if following the chain from delegate leads back to delegator
+        if self.would_create_cycle(
+            &delegation.delegator,
+            &delegation.delegate,
+            &delegation.scope,
+        )? {
+            bail!(
+                "Delegation would create a cycle: {} -> {} (scope: {:?})",
+                delegation.delegator,
+                delegation.delegate,
+                delegation.scope
+            );
+        }
+
+        // Validate max depth: check how many hops lead TO the delegator
+        let incoming_depth =
+            self.compute_incoming_depth(&delegation.delegator, &delegation.scope)?;
+        if incoming_depth >= Self::MAX_DELEGATION_DEPTH {
+            bail!(
+                "Maximum delegation depth ({}) exceeded; current incoming depth is {}",
+                Self::MAX_DELEGATION_DEPTH,
+                incoming_depth
+            );
         }
 
         // Store the delegation
@@ -949,6 +985,134 @@ impl GovernanceActor {
         );
 
         Ok(())
+    }
+
+    /// Check if a delegator already has an active delegation for a given scope
+    fn has_active_delegation_for_scope(
+        &self,
+        delegator: &Did,
+        scope: &icn_governance::DelegationScope,
+    ) -> Result<bool> {
+        let now = icn_time::current_timestamp_secs();
+        let delegations = self.list_delegations_from(delegator)?;
+
+        Ok(delegations
+            .iter()
+            .any(|d| d.revoked_at.is_none() && d.is_active(now) && d.scope == *scope))
+    }
+
+    /// Check if adding a delegation would create a cycle
+    fn would_create_cycle(
+        &self,
+        delegator: &Did,
+        delegate: &Did,
+        scope: &icn_governance::DelegationScope,
+    ) -> Result<bool> {
+        use std::collections::HashSet;
+
+        let now = icn_time::current_timestamp_secs();
+        let mut current = delegate.clone();
+        let mut visited = HashSet::new();
+        visited.insert(delegator.clone());
+
+        for _ in 0..Self::MAX_DELEGATION_DEPTH {
+            if visited.contains(&current) {
+                return Ok(true);
+            }
+            visited.insert(current.clone());
+
+            // Find any active delegation from current that matches scope
+            let delegations = self.list_delegations_from(&current)?;
+            let next = delegations
+                .into_iter()
+                .find(|d| {
+                    d.revoked_at.is_none()
+                        && d.is_active(now)
+                        && self.scopes_overlap(&d.scope, scope)
+                })
+                .map(|d| d.delegate.clone());
+
+            match next {
+                Some(d) => current = d,
+                None => return Ok(false),
+            }
+        }
+
+        Ok(false)
+    }
+
+    /// Check if two delegation scopes overlap (for cycle detection)
+    fn scopes_overlap(
+        &self,
+        a: &icn_governance::DelegationScope,
+        b: &icn_governance::DelegationScope,
+    ) -> bool {
+        use icn_governance::DelegationScope;
+
+        match (a, b) {
+            (DelegationScope::Blanket, _) | (_, DelegationScope::Blanket) => true,
+            (DelegationScope::Domain(d1), DelegationScope::Domain(d2)) => d1 == d2,
+            // Conservative: assume overlap for Domain/Proposal combinations
+            (DelegationScope::Domain(_), DelegationScope::Proposal(_))
+            | (DelegationScope::Proposal(_), DelegationScope::Domain(_)) => true,
+            (DelegationScope::Proposal(p1), DelegationScope::Proposal(p2)) => p1 == p2,
+        }
+    }
+
+    /// Compute the incoming delegation chain depth to a person
+    fn compute_incoming_depth(
+        &self,
+        delegate: &Did,
+        scope: &icn_governance::DelegationScope,
+    ) -> Result<usize> {
+        use std::collections::HashSet;
+
+        let mut visited = HashSet::new();
+        self.compute_incoming_depth_recursive(delegate, scope, &mut visited)
+    }
+
+    fn compute_incoming_depth_recursive(
+        &self,
+        delegate: &Did,
+        scope: &icn_governance::DelegationScope,
+        visited: &mut std::collections::HashSet<Did>,
+    ) -> Result<usize> {
+        if visited.contains(delegate) {
+            return Ok(0);
+        }
+        visited.insert(delegate.clone());
+
+        // Safety limit
+        if visited.len() > Self::MAX_DELEGATION_DEPTH + 10 {
+            return Ok(0);
+        }
+
+        let now = icn_time::current_timestamp_secs();
+
+        // Find all delegators who have delegated to this delegate
+        let delegations = self.list_delegations_to(delegate)?;
+        let delegators: Vec<Did> = delegations
+            .into_iter()
+            .filter(|d| {
+                d.revoked_at.is_none() && d.is_active(now) && self.scopes_overlap(&d.scope, scope)
+            })
+            .map(|d| d.delegator.clone())
+            .collect();
+
+        if delegators.is_empty() {
+            return Ok(0);
+        }
+
+        // Recursively find the maximum depth
+        let mut max_depth = 0;
+        for delegator in delegators {
+            let depth = 1 + self.compute_incoming_depth_recursive(&delegator, scope, visited)?;
+            if depth > max_depth {
+                max_depth = depth;
+            }
+        }
+
+        Ok(max_depth)
     }
 
     /// Load a delegation by ID

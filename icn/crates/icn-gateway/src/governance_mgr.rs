@@ -117,14 +117,16 @@ impl GovernanceManager {
 
         let domain = GovernanceDomain::new(name, config);
 
-        let mut domains = self
-            .domains
-            .write()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        let mut domains = self.domains.write().map_err(|e| {
+            anyhow::anyhow!("Domains storage lock poisoned (concurrent panic?): {e}")
+        })?;
 
         // Check for duplicate domain ID
         if domains.contains_key(&domain_id) {
-            anyhow::bail!("Domain already exists: {}", domain_id.0);
+            anyhow::bail!(
+                "Domain '{}' already exists. Use a unique domain ID or update the existing domain.",
+                domain_id.0
+            );
         }
 
         domains.insert(domain_id, domain);
@@ -143,10 +145,9 @@ impl GovernanceManager {
         }
 
         // Standalone mode: in-memory storage
-        let domains = self
-            .domains
-            .read()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        let domains = self.domains.read().map_err(|e| {
+            anyhow::anyhow!("Domains storage lock poisoned (concurrent panic?): {e}")
+        })?;
         Ok(domains.get(domain_id).cloned())
     }
 
@@ -158,10 +159,9 @@ impl GovernanceManager {
         }
 
         // Standalone mode: in-memory storage
-        let domains = self
-            .domains
-            .read()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        let domains = self.domains.read().map_err(|e| {
+            anyhow::anyhow!("Domains storage lock poisoned (concurrent panic?): {e}")
+        })?;
         Ok(domains.values().cloned().collect())
     }
 
@@ -193,12 +193,14 @@ impl GovernanceManager {
 
         // Standalone mode: in-memory storage
         // Validate domain exists
-        let domains = self
-            .domains
-            .read()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        let domains = self.domains.read().map_err(|e| {
+            anyhow::anyhow!("Domains storage lock poisoned (concurrent panic?): {e}")
+        })?;
         if !domains.contains_key(&domain_id) {
-            anyhow::bail!("Domain not found: {}", domain_id.0);
+            anyhow::bail!(
+                "Domain '{}' not found. Create the domain first using create_domain().",
+                domain_id.0
+            );
         }
         drop(domains); // Release read lock before acquiring write lock
 
@@ -206,14 +208,16 @@ impl GovernanceManager {
         // Override the generated ID with the one provided
         proposal.id = proposal_id.clone();
 
-        let mut proposals = self
-            .proposals
-            .write()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        let mut proposals = self.proposals.write().map_err(|e| {
+            anyhow::anyhow!("Proposals storage lock poisoned (concurrent panic?): {e}")
+        })?;
 
         // Check for duplicate proposal ID
         if proposals.contains_key(&proposal_id) {
-            anyhow::bail!("Proposal already exists: {}", proposal_id.0);
+            anyhow::bail!(
+                "Proposal '{}' already exists. Use a unique proposal ID.",
+                proposal_id.0
+            );
         }
 
         proposals.insert(proposal_id.clone(), proposal);
@@ -229,10 +233,9 @@ impl GovernanceManager {
         }
 
         // Standalone mode: in-memory storage
-        let proposals = self
-            .proposals
-            .read()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        let proposals = self.proposals.read().map_err(|e| {
+            anyhow::anyhow!("Proposals storage lock poisoned (concurrent panic?): {e}")
+        })?;
         Ok(proposals.get(proposal_id).cloned())
     }
 
@@ -244,10 +247,9 @@ impl GovernanceManager {
         }
 
         // Standalone mode: in-memory storage
-        let proposals = self
-            .proposals
-            .read()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        let proposals = self.proposals.read().map_err(|e| {
+            anyhow::anyhow!("Proposals storage lock poisoned (concurrent panic?): {e}")
+        })?;
         Ok(proposals.values().cloned().collect())
     }
 
@@ -265,16 +267,18 @@ impl GovernanceManager {
         }
 
         // Standalone mode: in-memory storage
-        let mut proposals = self
-            .proposals
-            .write()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        let mut proposals = self.proposals.write().map_err(|e| {
+            anyhow::anyhow!("Proposals storage lock poisoned (concurrent panic?): {e}")
+        })?;
 
         if let Some(proposal) = proposals.get_mut(&proposal_id) {
             proposal.open(voting_period_seconds)?;
             Ok(())
         } else {
-            anyhow::bail!("Proposal not found: {}", proposal_id.0)
+            anyhow::bail!(
+                "Proposal '{}' not found. Create the proposal first using create_proposal().",
+                proposal_id.0
+            )
         }
     }
 
@@ -286,32 +290,36 @@ impl GovernanceManager {
         }
 
         // Standalone mode: in-memory storage
-        let mut proposals = self
-            .proposals
-            .write()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        let mut proposals = self.proposals.write().map_err(|e| {
+            anyhow::anyhow!("Proposals storage lock poisoned (concurrent panic?): {e}")
+        })?;
         let votes = self
             .votes
             .read()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-        let domains = self
-            .domains
-            .read()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+            .map_err(|e| anyhow::anyhow!("Votes storage lock poisoned (concurrent panic?): {e}"))?;
+        let domains = self.domains.read().map_err(|e| {
+            anyhow::anyhow!("Domains storage lock poisoned (concurrent panic?): {e}")
+        })?;
 
         if let Some(proposal) = proposals.get_mut(&proposal_id) {
             // Validate proposal is in Open state
             if !proposal.state.is_open() {
                 anyhow::bail!(
-                    "Proposal is not open for voting (current state: {:?})",
+                    "Proposal '{}' cannot be closed: not open for voting (current state: {:?}). \
+                     Only proposals in 'Open' state can be closed.",
+                    proposal_id.0,
                     proposal.state
                 );
             }
 
             // Get domain to access governance params
-            let domain = domains
-                .get(&proposal.domain_id)
-                .ok_or_else(|| anyhow::anyhow!("Domain not found: {}", proposal.domain_id.0))?;
+            let domain = domains.get(&proposal.domain_id).ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Domain '{}' not found for proposal '{}'. Domain may have been deleted.",
+                    proposal.domain_id.0,
+                    proposal_id.0
+                )
+            })?;
 
             // Calculate vote tally using proper vote tally system
             let proposal_votes = votes.get(&proposal_id).cloned().unwrap_or_default();
@@ -359,7 +367,10 @@ impl GovernanceManager {
             proposal.close(final_state)?;
             Ok(())
         } else {
-            anyhow::bail!("Proposal not found: {}", proposal_id.0)
+            anyhow::bail!(
+                "Proposal '{}' not found. It may not exist or was already deleted.",
+                proposal_id.0
+            )
         }
     }
 
@@ -370,9 +381,11 @@ impl GovernanceManager {
     pub async fn get_vote_tally(&self, proposal_id: &ProposalId) -> Result<VoteTally> {
         if self.governance_handle.is_some() {
             // Actor-backed mode: vote tally not exposed via GovernanceOps
-            debug!(
+            // This is a known limitation - the tally must be retrieved via proposal state
+            tracing::warn!(
                 proposal_id = %proposal_id.0,
-                "get_vote_tally not available in actor-backed mode"
+                "get_vote_tally called in actor-backed mode; returning empty tally. \
+                 Use proposal.state to get final outcome or add get_vote_tally to GovernanceOps."
             );
             return Ok(VoteTally::empty());
         }
@@ -381,7 +394,7 @@ impl GovernanceManager {
         let votes = self
             .votes
             .read()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+            .map_err(|e| anyhow::anyhow!("Votes storage lock poisoned (concurrent panic?): {e}"))?;
         let proposal_votes = votes.get(proposal_id).cloned().unwrap_or_default();
         Ok(VoteTally::from(proposal_votes))
     }
@@ -393,9 +406,10 @@ impl GovernanceManager {
     pub async fn get_voter_dids(&self, proposal_id: &ProposalId) -> Result<Vec<Did>> {
         if self.governance_handle.is_some() {
             // Actor-backed mode: voter DIDs not exposed via GovernanceOps
-            debug!(
+            tracing::warn!(
                 proposal_id = %proposal_id.0,
-                "get_voter_dids not available in actor-backed mode"
+                "get_voter_dids called in actor-backed mode; returning empty list. \
+                 Add get_voter_dids to GovernanceOps to expose this data."
             );
             return Ok(Vec::new());
         }
@@ -404,7 +418,7 @@ impl GovernanceManager {
         let votes = self
             .votes
             .read()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+            .map_err(|e| anyhow::anyhow!("Votes storage lock poisoned (concurrent panic?): {e}"))?;
         let voter_dids = votes
             .get(proposal_id)
             .map(|votes| votes.iter().map(|v| v.voter.clone()).collect())
@@ -435,29 +449,35 @@ impl GovernanceManager {
 
         // Standalone mode: in-memory storage
         // Validate proposal exists and is open for voting
-        let proposals = self
-            .proposals
-            .read()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-        let proposal = proposals
-            .get(&proposal_id)
-            .ok_or_else(|| anyhow::anyhow!("Proposal not found: {}", proposal_id.0))?;
+        let proposals = self.proposals.read().map_err(|e| {
+            anyhow::anyhow!("Proposals storage lock poisoned (concurrent panic?): {e}")
+        })?;
+        let proposal = proposals.get(&proposal_id).ok_or_else(|| {
+            anyhow::anyhow!(
+                "Proposal '{}' not found. Cannot cast vote on non-existent proposal.",
+                proposal_id.0
+            )
+        })?;
 
         if !proposal.state.is_open() {
             anyhow::bail!(
-                "Proposal is not open for voting (current state: {:?})",
+                "Cannot vote on proposal '{}': not open for voting (current state: {:?}). \
+                 Proposal may have been closed or not yet opened.",
+                proposal_id.0,
                 proposal.state
             );
         }
 
         // Validate voter is a member of the domain
-        let domains = self
-            .domains
-            .read()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-        let domain = domains
-            .get(&proposal.domain_id)
-            .ok_or_else(|| anyhow::anyhow!("Domain not found: {}", proposal.domain_id.0))?;
+        let domains = self.domains.read().map_err(|e| {
+            anyhow::anyhow!("Domains storage lock poisoned (concurrent panic?): {e}")
+        })?;
+        let domain = domains.get(&proposal.domain_id).ok_or_else(|| {
+            anyhow::anyhow!(
+                "Domain '{}' not found. Cannot verify voter membership.",
+                proposal.domain_id.0
+            )
+        })?;
 
         let is_member = match &domain.config.membership.source {
             MembershipSource::StaticList(members) => members.contains(&voter),
@@ -484,17 +504,19 @@ impl GovernanceManager {
         let mut votes = self
             .votes
             .write()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+            .map_err(|e| anyhow::anyhow!("Votes storage lock poisoned (concurrent panic?): {e}"))?;
 
         // CRITICAL: Re-check proposal state after acquiring votes lock to prevent TOCTOU
         // Another thread could have closed the proposal between our initial check and now
-        let proposals_recheck = self
-            .proposals
-            .read()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-        let proposal_recheck = proposals_recheck
-            .get(&proposal_id)
-            .ok_or_else(|| anyhow::anyhow!("Proposal not found: {}", proposal_id.0))?;
+        let proposals_recheck = self.proposals.read().map_err(|e| {
+            anyhow::anyhow!("Proposals storage lock poisoned (concurrent panic?): {e}")
+        })?;
+        let proposal_recheck = proposals_recheck.get(&proposal_id).ok_or_else(|| {
+            anyhow::anyhow!(
+                "Proposal '{}' was deleted during vote submission.",
+                proposal_id.0
+            )
+        })?;
 
         if !proposal_recheck.state.is_open() {
             anyhow::bail!(
@@ -545,17 +567,21 @@ impl GovernanceManager {
         // Standalone mode: use local storage
         // Validate no self-delegation
         if delegation.delegator == delegation.delegate {
-            anyhow::bail!("Cannot delegate to yourself");
+            anyhow::bail!(
+                "Cannot delegate to yourself. Delegator and delegate must be different DIDs."
+            );
         }
 
-        let mut delegations = self
-            .delegations
-            .write()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        let mut delegations = self.delegations.write().map_err(|e| {
+            anyhow::anyhow!("Delegations storage lock poisoned (concurrent panic?): {e}")
+        })?;
 
         // Check for duplicate delegation ID
         if delegations.contains_key(&delegation.id) {
-            anyhow::bail!("Delegation already exists: {}", delegation.id.0);
+            anyhow::bail!(
+                "Delegation '{}' already exists. Use a unique delegation ID.",
+                delegation.id.0
+            );
         }
 
         // Check for duplicate scope (same delegator + scope)
@@ -564,7 +590,10 @@ impl GovernanceManager {
             d.delegator == delegation.delegator && d.scope == delegation.scope && d.is_active(now)
         });
         if has_existing {
-            anyhow::bail!("Active delegation already exists for this scope");
+            anyhow::bail!(
+                "Active delegation already exists for scope {:?}. Revoke the existing delegation first.",
+                delegation.scope
+            );
         }
 
         // Simple cycle check: would this create a direct cycle?
@@ -575,7 +604,11 @@ impl GovernanceManager {
                 && d.is_active(now)
         });
         if would_cycle {
-            anyhow::bail!("Delegation would create a cycle");
+            anyhow::bail!(
+                "Delegation would create a cycle: {} <-> {}. The delegate already delegates to this delegator.",
+                delegation.delegator,
+                delegation.delegate
+            );
         }
 
         delegations.insert(delegation.id.clone(), delegation);
@@ -590,10 +623,9 @@ impl GovernanceManager {
         }
 
         // Standalone mode: use local storage
-        let delegations = self
-            .delegations
-            .read()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        let delegations = self.delegations.read().map_err(|e| {
+            anyhow::anyhow!("Delegations storage lock poisoned (concurrent panic?): {e}")
+        })?;
 
         Ok(delegations.get(id).cloned())
     }
@@ -606,10 +638,9 @@ impl GovernanceManager {
         }
 
         // Standalone mode: use local storage
-        let delegations = self
-            .delegations
-            .read()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        let delegations = self.delegations.read().map_err(|e| {
+            anyhow::anyhow!("Delegations storage lock poisoned (concurrent panic?): {e}")
+        })?;
 
         Ok(delegations
             .values()
@@ -626,10 +657,9 @@ impl GovernanceManager {
         }
 
         // Standalone mode: use local storage
-        let delegations = self
-            .delegations
-            .read()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        let delegations = self.delegations.read().map_err(|e| {
+            anyhow::anyhow!("Delegations storage lock poisoned (concurrent panic?): {e}")
+        })?;
 
         Ok(delegations
             .values()
@@ -646,16 +676,18 @@ impl GovernanceManager {
         }
 
         // Standalone mode: use local storage
-        let mut delegations = self
-            .delegations
-            .write()
-            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        let mut delegations = self.delegations.write().map_err(|e| {
+            anyhow::anyhow!("Delegations storage lock poisoned (concurrent panic?): {e}")
+        })?;
 
         if let Some(delegation) = delegations.get_mut(id) {
             delegation.revoked_at = Some(revoked_at);
             Ok(())
         } else {
-            anyhow::bail!("Delegation not found: {}", id.0)
+            anyhow::bail!(
+                "Delegation '{}' not found. It may not exist or was already deleted.",
+                id.0
+            )
         }
     }
 }
