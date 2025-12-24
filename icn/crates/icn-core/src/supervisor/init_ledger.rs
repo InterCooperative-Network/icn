@@ -54,10 +54,11 @@ pub async fn init_ledger_services(
     let store_path = config.store_path().join("ledger");
     let store = Arc::new(SledStore::open(&store_path)?);
 
-    // Initialize ledger with gossip and misbehavior detection
+    // Initialize ledger with gossip, misbehavior detection, and trust graph
     let mut ledger = Ledger::new(store.clone())?;
     ledger.set_gossip(deps.gossip_handle.clone());
     ledger.set_misbehavior_detector(deps.misbehavior_detector.clone());
+    ledger.set_trust_graph(deps.trust_graph.clone());
     let ledger_handle = Arc::new(RwLock::new(ledger));
 
     info!("Ledger initialized at {}", store_path.display());
