@@ -10,6 +10,15 @@
 //! - `membership:{parent_id}:{member_id}` -> Membership (bincode)
 //! - `type:{entity_type}:{id}` -> () (secondary index for list_by_type)
 //! - `member_of:{member_id}:{parent_id}` -> () (secondary index for get_memberships_of)
+//!
+//! # Known Limitations
+//!
+//! - **Atomicity**: Multi-key operations (register, delete, update with type change)
+//!   do not use Sled transactions. In rare cases of process crash mid-operation,
+//!   secondary indexes could become inconsistent. A future enhancement should
+//!   use `Tree::transaction()` for these operations.
+//! - **Performance**: `list_by_type()` and `list_children()` load all entities
+//!   into memory. For large datasets, consider adding pagination.
 
 use crate::entity::{CooperativeEntity, EntityId, EntityType};
 use crate::error::{EntityError, Result};

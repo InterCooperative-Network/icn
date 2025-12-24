@@ -499,8 +499,7 @@ mod tests {
             // Cannot transition to Active
             assert!(
                 validate_transition(terminal, &EntityStatus::Active).is_err(),
-                "Terminal state {:?} should not transition to Active",
-                terminal
+                "Terminal state {terminal:?} should not transition to Active"
             );
 
             // Cannot transition to any other state
@@ -513,8 +512,7 @@ mod tests {
                     }
                 )
                 .is_err(),
-                "Terminal state {:?} should not transition to Suspended",
-                terminal
+                "Terminal state {terminal:?} should not transition to Suspended"
             );
         }
     }
@@ -562,8 +560,7 @@ mod tests {
             assert_eq!(
                 event.entity_id(),
                 &coop_id,
-                "entity_id() should return correct ID for {:?}",
-                event
+                "entity_id() should return correct ID for {event:?}"
             );
         }
     }

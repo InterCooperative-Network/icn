@@ -32,7 +32,7 @@
 //!     "governance.min_quorum",
 //!     "Minimum Quorum",
 //!     "Minimum percentage of eligible voters required for a valid vote",
-//!     ParameterValue::Float(0.5),
+//!     ParameterValue::Percentage(50.0),  // 50% quorum
 //! ).with_scope(ParameterScope::Global);
 //! ```
 

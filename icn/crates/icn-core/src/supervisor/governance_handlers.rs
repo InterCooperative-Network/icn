@@ -2342,6 +2342,15 @@ impl GovernanceEventHandler {
         let proposal_id_str = proposal_id.0.clone();
         match param_result {
             Ok(Some(mut param)) => {
+                // Validate the new value against parameter constraints
+                if let Err(e) = param.validate(&proposal.new_value) {
+                    warn!(
+                        "Protocol parameter {} validation failed for proposal {}: {}",
+                        proposal.parameter_id, proposal_id_str, e
+                    );
+                    return;
+                }
+
                 // Update the parameter with the new value
                 param.value = proposal.new_value.clone();
                 param.updated_at = icn_time::current_timestamp_secs();

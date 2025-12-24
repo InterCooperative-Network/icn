@@ -5,9 +5,9 @@
 //!
 //! # Key Schema
 //!
-//! - `param:{id}` -> ProtocolParameter (bincode)
-//! - `param_scope:{scope}:{id}` -> ProtocolParameter (bincode) for scoped overrides
-//! - `history:{id}:{timestamp}` -> ParameterChange (bincode)
+//! - `param:{id}` -> ProtocolParameter (JSON)
+//! - `param_scope:{scope}:{id}` -> ProtocolParameter (JSON) for scoped overrides
+//! - `history:{id}:{timestamp}` -> ParameterChange (JSON)
 //!
 //! # Scope Resolution
 //!
@@ -15,6 +15,16 @@
 //! 1. Cooperative scope (most specific)
 //! 2. Federation scope
 //! 3. Global scope (default)
+//!
+//! # Known Limitations
+//!
+//! - **Atomicity**: The `set()` operation performs read-modify-write without
+//!   transactions. Concurrent updates could interleave. A future enhancement
+//!   should use Sled transactions.
+//! - **Delete Performance**: The `delete()` method scans all scoped parameters
+//!   (O(n) complexity). For large parameter sets, consider a reverse index.
+//! - **History Growth**: Parameter history is unbounded. Consider adding a
+//!   cleanup mechanism for very old history entries.
 
 use crate::protocol::{
     ParameterChange, ParameterScope, ParameterValidationError, ParameterValue, ProtocolParameter,
