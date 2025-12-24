@@ -96,10 +96,11 @@ fn parse_entity_type(type_str: &str) -> Result<EntityType> {
 }
 
 fn parse_role(role_str: &str) -> Result<MembershipRole> {
-    let lower = role_str.to_lowercase();
-    let parts: Vec<&str> = lower.splitn(2, ':').collect();
+    // Split on colon first to preserve title case
+    let parts: Vec<&str> = role_str.splitn(2, ':').collect();
+    let role_type = parts[0].to_lowercase();
 
-    match parts[0] {
+    match role_type.as_str() {
         "founder" => Ok(MembershipRole::Founder),
         "member" => Ok(MembershipRole::Member),
         "worker" => Ok(MembershipRole::Worker),
@@ -108,6 +109,7 @@ fn parse_role(role_str: &str) -> Result<MembershipRole> {
         "board_member" | "board" => Ok(MembershipRole::BoardMember),
         "officer" => {
             // Support "officer:President" or just "officer" (defaults to "Officer")
+            // Preserve original case of title
             let title = parts
                 .get(1)
                 .map(|s| s.to_string())
@@ -124,12 +126,68 @@ fn parse_role(role_str: &str) -> Result<MembershipRole> {
     }
 }
 
+/// Format entity type for API response (cleaner than Debug)
+fn format_entity_type(entity_type: &EntityType) -> &'static str {
+    match entity_type {
+        EntityType::Individual => "individual",
+        EntityType::Cooperative => "cooperative",
+        EntityType::Federation => "federation",
+        EntityType::Unknown => "unknown",
+    }
+}
+
+/// Format entity status for API response (cleaner than Debug)
+fn format_entity_status(status: &icn_entity::EntityStatus) -> String {
+    use icn_entity::EntityStatus;
+    match status {
+        EntityStatus::Forming => "forming".to_string(),
+        EntityStatus::Active => "active".to_string(),
+        EntityStatus::Suspended { reason, .. } => format!("suspended:{reason}"),
+        EntityStatus::Dissolving { .. } => "dissolving".to_string(),
+        EntityStatus::Dissolved { .. } => "dissolved".to_string(),
+        EntityStatus::Merged { into, .. } => format!("merged:{into}"),
+        EntityStatus::Split { .. } => "split".to_string(),
+    }
+}
+
+/// Format membership role for API response (cleaner than Debug)
+fn format_role(role: &MembershipRole) -> String {
+    match role {
+        MembershipRole::Founder => "founder".to_string(),
+        MembershipRole::Member => "member".to_string(),
+        MembershipRole::Worker => "worker".to_string(),
+        MembershipRole::Consumer => "consumer".to_string(),
+        MembershipRole::Producer => "producer".to_string(),
+        MembershipRole::BoardMember => "board_member".to_string(),
+        MembershipRole::Officer { title } => format!("officer:{title}"),
+        MembershipRole::FederatedMember => "federated_member".to_string(),
+        MembershipRole::AssociateMember => "associate_member".to_string(),
+        MembershipRole::ObserverMember => "observer_member".to_string(),
+        MembershipRole::ProvisionalMember => "provisional_member".to_string(),
+        MembershipRole::Custom { name } => format!("custom:{name}"),
+    }
+}
+
+/// Format membership status for API response (cleaner than Debug)
+fn format_membership_status(status: &icn_entity::MembershipStatus) -> &'static str {
+    use icn_entity::MembershipStatus;
+    match status {
+        MembershipStatus::Pending => "pending",
+        MembershipStatus::Active => "active",
+        MembershipStatus::Suspended => "suspended",
+        MembershipStatus::Inactive => "inactive",
+        MembershipStatus::Removed => "removed",
+        MembershipStatus::Resigned => "resigned",
+        MembershipStatus::Expelled => "expelled",
+    }
+}
+
 fn entity_to_response(entity: &CooperativeEntity, member_count: usize) -> EntityResponse {
     EntityResponse {
         id: entity.id.to_string(),
-        entity_type: format!("{:?}", entity.entity_type),
+        entity_type: format_entity_type(&entity.entity_type).to_string(),
         name: entity.name.clone(),
-        status: format!("{:?}", entity.status),
+        status: format_entity_status(&entity.status),
         parent_id: entity.parent_id.as_ref().map(|p| p.to_string()),
         created_at: entity.created_at,
         member_count,
@@ -140,11 +198,46 @@ fn membership_to_response(m: &Membership) -> MembershipResponse {
     MembershipResponse {
         member_id: m.member_id.to_string(),
         parent_id: m.parent_id.to_string(),
-        role: format!("{:?}", m.role),
-        status: format!("{:?}", m.status),
+        role: format_role(&m.role),
+        status: format_membership_status(&m.status).to_string(),
         shares: m.shares,
         joined_at: m.joined_at,
     }
+}
+
+/// Check if the caller has permission to modify an entity.
+///
+/// Returns Ok(()) if:
+/// - The caller is a Founder or BoardMember of the entity
+/// - The caller is the entity itself (for individual entities)
+///
+/// Returns Err if the caller lacks permission.
+fn require_entity_write_access(
+    entity_mgr: &EntityManager,
+    entity_id: &EntityId,
+    caller_id: &EntityId,
+) -> Result<()> {
+    let members = entity_mgr
+        .get_members(entity_id)
+        .map_err(|e| GatewayError::InternalError(format!("Failed to check permissions: {e}")))?;
+
+    // Check if caller is a founder or board member
+    let has_access = members.iter().any(|m| {
+        &m.member_id == caller_id
+            && matches!(
+                m.role,
+                MembershipRole::Founder | MembershipRole::BoardMember
+            )
+    });
+
+    if has_access {
+        return Ok(());
+    }
+
+    Err(GatewayError::Forbidden(format!(
+        "Caller {caller_id} lacks permission to modify entity {entity_id}. \
+         Only Founders and BoardMembers can modify entities."
+    )))
 }
 
 // ============================================================================
@@ -287,6 +380,15 @@ pub async fn update_entity(
 ) -> Result<HttpResponse> {
     require_scope(&req, "entity:write")?;
 
+    // Get caller DID for authorization
+    let claims = get_claims(&req)
+        .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
+    let caller_did: Did = claims
+        .sub
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in claims: {e}")))?;
+    let caller_id = EntityId::from_did(&caller_did);
+
     let entity_id_str = path.into_inner();
     let entity_id: EntityId = entity_id_str
         .parse()
@@ -296,6 +398,9 @@ pub async fn update_entity(
         .get(&entity_id)
         .map_err(|e| GatewayError::InternalError(format!("Failed to get entity: {e}")))?
         .ok_or_else(|| GatewayError::NotFound(format!("Entity not found: {entity_id}")))?;
+
+    // Check caller has permission to modify this entity
+    require_entity_write_access(&entity_mgr, &entity_id, &caller_id)?;
 
     // Apply updates
     if let Some(ref name) = body.name {
@@ -337,6 +442,15 @@ pub async fn delete_entity(
 ) -> Result<HttpResponse> {
     require_scope(&req, "entity:write")?;
 
+    // Get caller DID for authorization
+    let claims = get_claims(&req)
+        .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
+    let caller_did: Did = claims
+        .sub
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in claims: {e}")))?;
+    let caller_id = EntityId::from_did(&caller_did);
+
     let entity_id_str = path.into_inner();
     let entity_id: EntityId = entity_id_str
         .parse()
@@ -347,6 +461,9 @@ pub async fn delete_entity(
         .get(&entity_id)
         .map_err(|e| GatewayError::InternalError(format!("Failed to get entity: {e}")))?
         .ok_or_else(|| GatewayError::NotFound(format!("Entity not found: {entity_id}")))?;
+
+    // Check caller has permission to delete this entity (Founders only for deletion)
+    require_entity_write_access(&entity_mgr, &entity_id, &caller_id)?;
 
     info!(
         entity_id = %entity_id,
@@ -403,6 +520,15 @@ pub async fn add_membership(
 ) -> Result<HttpResponse> {
     require_scope(&req, "entity:write")?;
 
+    // Get caller DID for authorization
+    let claims = get_claims(&req)
+        .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
+    let caller_did: Did = claims
+        .sub
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in claims: {e}")))?;
+    let caller_id = EntityId::from_did(&caller_did);
+
     let entity_id_str = path.into_inner();
     let entity_id: EntityId = entity_id_str
         .parse()
@@ -413,6 +539,9 @@ pub async fn add_membership(
         .get(&entity_id)
         .map_err(|e| GatewayError::InternalError(format!("Failed to get entity: {e}")))?
         .ok_or_else(|| GatewayError::NotFound(format!("Entity not found: {entity_id}")))?;
+
+    // Check caller has permission to add members
+    require_entity_write_access(&entity_mgr, &entity_id, &caller_id)?;
 
     // Parse member ID (can be DID or EntityId)
     let member_id = if body.member_id.starts_with("did:") {
@@ -459,6 +588,15 @@ pub async fn remove_membership(
 ) -> Result<HttpResponse> {
     require_scope(&req, "entity:write")?;
 
+    // Get caller DID for authorization
+    let claims = get_claims(&req)
+        .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
+    let caller_did: Did = claims
+        .sub
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in claims: {e}")))?;
+    let caller_id = EntityId::from_did(&caller_did);
+
     let (entity_id_str, member_id_str) = path.into_inner();
 
     let entity_id: EntityId = entity_id_str
@@ -475,6 +613,12 @@ pub async fn remove_membership(
             .parse()
             .map_err(|e| GatewayError::BadRequest(format!("Invalid member ID: {e}")))?
     };
+
+    // Check caller has permission to remove members (founders/board) or is the member themselves
+    let is_self_removal = caller_id == member_id;
+    if !is_self_removal {
+        require_entity_write_access(&entity_mgr, &entity_id, &caller_id)?;
+    }
 
     // Verify entity exists
     let _entity = entity_mgr
@@ -545,9 +689,13 @@ mod tests {
         assert!(
             matches!(parse_role("officer").unwrap(), MembershipRole::Officer { title } if title == "Officer")
         );
-        // Officer with custom title
+        // Officer with custom title (case preserved)
         assert!(
-            matches!(parse_role("officer:president").unwrap(), MembershipRole::Officer { title } if title == "president")
+            matches!(parse_role("officer:President").unwrap(), MembershipRole::Officer { title } if title == "President")
+        );
+        // Mixed case role type still works
+        assert!(
+            matches!(parse_role("OFFICER:CEO").unwrap(), MembershipRole::Officer { title } if title == "CEO")
         );
         assert!(parse_role("invalid").is_err());
     }
