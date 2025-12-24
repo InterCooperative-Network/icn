@@ -70,14 +70,14 @@ impl EntityId {
     /// Validate a slug for use in EntityId
     ///
     /// Rules:
-    /// - 3-64 characters
+    /// - 4-64 characters (minimum 4 to avoid namespace collisions)
     /// - Lowercase letters, numbers, hyphens only
     /// - Must start with a letter
     /// - No consecutive hyphens
     fn validate_slug(slug: &str) -> Result<()> {
-        if slug.len() < 3 {
+        if slug.len() < 4 {
             return Err(EntityError::InvalidFormat(
-                "Slug must be at least 3 characters".into(),
+                "Slug must be at least 4 characters".into(),
             ));
         }
         if slug.len() > 64 {
@@ -202,10 +202,27 @@ impl FromStr for EntityId {
         }
 
         let type_part = parts[2];
-        if !["individual", "cooperative", "federation"].contains(&type_part) {
-            return Err(EntityError::InvalidFormat(format!(
-                "Unknown entity type: {type_part}"
-            )));
+        let identifier = parts[3];
+
+        match type_part {
+            "individual" => {
+                // Individual identifiers are base58-encoded public keys
+                // Just verify it's non-empty
+                if identifier.is_empty() {
+                    return Err(EntityError::InvalidFormat(
+                        "Individual identifier cannot be empty".into(),
+                    ));
+                }
+            }
+            "cooperative" | "federation" => {
+                // Cooperative/federation identifiers must be valid slugs
+                Self::validate_slug(identifier)?;
+            }
+            _ => {
+                return Err(EntityError::InvalidFormat(format!(
+                    "Unknown entity type: {type_part}"
+                )));
+            }
         }
 
         Ok(EntityId(s.to_string()))
@@ -650,14 +667,32 @@ mod tests {
     }
 
     #[test]
+    fn test_entity_id_fromstr_validates_slug() {
+        // Valid FromStr parsing
+        assert!(EntityId::from_str("entity:icn:cooperative:valid-slug").is_ok());
+        assert!(EntityId::from_str("entity:icn:federation:test-fed").is_ok());
+        assert!(EntityId::from_str("entity:icn:individual:z5TrA8Qk").is_ok());
+
+        // Invalid: cooperative/federation slugs must pass validation
+        assert!(EntityId::from_str("entity:icn:cooperative:ab").is_err()); // too short
+        assert!(EntityId::from_str("entity:icn:cooperative:abc").is_err()); // too short (< 4)
+        assert!(EntityId::from_str("entity:icn:federation:123").is_err()); // doesn't start with letter
+        assert!(EntityId::from_str("entity:icn:cooperative:Test").is_err()); // uppercase
+
+        // Individual identifiers just need to be non-empty
+        assert!(EntityId::from_str("entity:icn:individual:").is_err()); // empty
+    }
+
+    #[test]
     fn test_entity_id_slug_validation() {
-        // Valid slugs (lowercase, 3-64 chars, start with letter)
+        // Valid slugs (lowercase, 4-64 chars, start with letter)
         assert!(EntityId::cooperative("valid-slug").is_ok());
-        assert!(EntityId::cooperative("abc").is_ok());
+        assert!(EntityId::cooperative("abcd").is_ok());
         assert!(EntityId::cooperative("test123").is_ok());
         assert!(EntityId::cooperative("food-coop-2024").is_ok());
 
-        // Invalid: too short
+        // Invalid: too short (minimum 4 chars)
+        assert!(EntityId::cooperative("abc").is_err());
         assert!(EntityId::cooperative("ab").is_err());
 
         // Invalid: doesn't start with letter

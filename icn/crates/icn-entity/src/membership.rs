@@ -460,7 +460,7 @@ mod tests {
     #[test]
     fn test_observer_no_vote() {
         let member_coop = EntityId::cooperative("member-coop").unwrap();
-        let federation = EntityId::federation("fed").unwrap();
+        let federation = EntityId::federation("test-fed").unwrap();
 
         let membership =
             Membership::active(member_coop, federation, MembershipRole::ObserverMember);

@@ -89,7 +89,7 @@ impl EntityId {
 ```
 
 **Slug Validation Rules**:
-- 3-64 characters
+- 4-64 characters (minimum 4 to avoid namespace collisions)
 - Lowercase letters, numbers, hyphens only
 - Must start with a letter
 - No consecutive hyphens
