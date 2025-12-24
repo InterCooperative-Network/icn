@@ -180,6 +180,9 @@ impl GovernanceEventHandler {
             ProposalPayload::Treasury { operation } => {
                 self.handle_treasury_proposal(proposal_id, operation, decided_at);
             }
+            ProposalPayload::ProtocolChange { proposal } => {
+                self.handle_protocol_change(proposal_id, proposal);
+            }
         }
     }
 
@@ -2319,6 +2322,54 @@ impl GovernanceEventHandler {
         }
 
         icn_obs::metrics::governance::proposals_executed_inc("protocol_upgrade");
+    }
+
+    /// Handle a protocol parameter change proposal (Phase 20)
+    fn handle_protocol_change(
+        &self,
+        proposal_id: ProposalId,
+        proposal: icn_governance::ProtocolChangeProposal,
+    ) {
+        info!(
+            "⚙️  Protocol change proposal {} accepted: {} -> {:?}",
+            proposal_id.0, proposal.parameter_id, proposal.new_value
+        );
+
+        // Get the protocol parameter store through the governance handle
+        let param_result = self.gov_handle.get_protocol_parameter(&proposal.parameter_id);
+        let proposal_id_str = &proposal_id.0;
+        match param_result {
+            Ok(Some(mut param)) => {
+                // Update the parameter with the new value
+                param.value = proposal.new_value.clone();
+                param.updated_at = icn_time::current_timestamp_secs();
+                param.updated_by = Some(proposal_id_str.to_string());
+
+                // Update the scope if specified in the proposal
+                if let Some(scope) = proposal.scope {
+                    param.scope = scope;
+                }
+
+                info!(
+                    "✓ Protocol parameter {} updated to {:?}",
+                    proposal.parameter_id, proposal.new_value
+                );
+            }
+            Ok(None) => {
+                warn!(
+                    "Protocol parameter {} not found, cannot apply change from proposal {}",
+                    proposal.parameter_id, proposal_id_str
+                );
+            }
+            Err(e) => {
+                warn!(
+                    "Failed to get protocol parameter {} for proposal {}: {}",
+                    proposal.parameter_id, proposal_id_str, e
+                );
+            }
+        }
+
+        icn_obs::metrics::governance::proposals_executed_inc("protocol_change");
     }
 }
 

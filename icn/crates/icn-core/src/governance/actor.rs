@@ -16,12 +16,14 @@ use icn_gossip::GossipActor;
 use icn_identity::Did;
 use icn_store::Store;
 
+use icn_entity::EntityId;
 use icn_governance::{
     DecisionOutcome, Delegation, DelegationId, GovernanceConfig, GovernanceDomain,
     GovernanceDomainId, GovernanceMessage, GovernanceParams, GovernanceProfile,
     GovernanceProfileId, GovernanceRule, MembershipAction, MembershipConfig, MembershipResolver,
-    MembershipSource, Proposal, ProposalId, ProposalOutcome, ProposalPayload, ProposalState,
-    TallySnapshot, Timestamp, Vote, VoteChoice, VoteTally,
+    MembershipSource, ParameterChange, Proposal, ProposalId, ProposalOutcome, ProposalPayload,
+    ProposalState, ProtocolParameter, ProtocolParameterStore, TallySnapshot, Timestamp, Vote,
+    VoteChoice, VoteTally,
 };
 
 use crate::events::{EventBus, SystemEvent};
@@ -147,6 +149,8 @@ pub enum GovernanceCommand {
 #[derive(Clone)]
 pub struct GovernanceHandle {
     inner: Arc<RwLock<GovernanceActor>>,
+    /// Protocol parameter store for governable parameters (Phase 20)
+    protocol_params: Option<Arc<dyn ProtocolParameterStore>>,
 }
 
 impl GovernanceHandle {
@@ -208,6 +212,51 @@ impl GovernanceHandle {
     /// Get list of voter DIDs for a proposal
     pub async fn get_voter_dids(&self, proposal_id: &ProposalId) -> Result<Vec<Did>> {
         self.inner.read().await.get_voter_dids(proposal_id)
+    }
+
+    /// Set the protocol parameter store
+    ///
+    /// This must be called after spawn() to enable protocol parameter operations.
+    pub fn with_protocol_params(mut self, store: Arc<dyn ProtocolParameterStore>) -> Self {
+        self.protocol_params = Some(store);
+        self
+    }
+
+    /// List all protocol parameters
+    pub fn list_protocol_parameters(&self) -> Result<Vec<ProtocolParameter>> {
+        match &self.protocol_params {
+            Some(store) => store.list(),
+            None => bail!("Protocol parameter store not configured"),
+        }
+    }
+
+    /// Get a specific protocol parameter by ID
+    pub fn get_protocol_parameter(&self, id: &str) -> Result<Option<ProtocolParameter>> {
+        match &self.protocol_params {
+            Some(store) => store.get(id),
+            None => bail!("Protocol parameter store not configured"),
+        }
+    }
+
+    /// Get the effective value of a protocol parameter with scope resolution
+    pub fn get_effective_protocol_parameter(
+        &self,
+        id: &str,
+        coop_id: Option<&EntityId>,
+        fed_id: Option<&EntityId>,
+    ) -> Result<Option<ProtocolParameter>> {
+        match &self.protocol_params {
+            Some(store) => store.get_effective(id, coop_id, fed_id),
+            None => bail!("Protocol parameter store not configured"),
+        }
+    }
+
+    /// Get the change history for a protocol parameter
+    pub fn get_protocol_parameter_history(&self, id: &str) -> Result<Vec<ParameterChange>> {
+        match &self.protocol_params {
+            Some(store) => store.get_history(id),
+            None => bail!("Protocol parameter store not configured"),
+        }
     }
 }
 
@@ -340,6 +389,29 @@ impl icn_governance::GovernanceOps for GovernanceHandle {
     async fn get_voter_dids(&self, proposal_id: &ProposalId) -> Result<Vec<Did>> {
         Self::get_voter_dids(self, proposal_id).await
     }
+
+    // Protocol parameter operations (Phase 20)
+
+    async fn list_protocol_parameters(&self) -> Result<Vec<ProtocolParameter>> {
+        Self::list_protocol_parameters(self)
+    }
+
+    async fn get_protocol_parameter(&self, id: &str) -> Result<Option<ProtocolParameter>> {
+        Self::get_protocol_parameter(self, id)
+    }
+
+    async fn get_effective_protocol_parameter(
+        &self,
+        id: &str,
+        coop_id: Option<&EntityId>,
+        fed_id: Option<&EntityId>,
+    ) -> Result<Option<ProtocolParameter>> {
+        Self::get_effective_protocol_parameter(self, id, coop_id, fed_id)
+    }
+
+    async fn get_protocol_parameter_history(&self, id: &str) -> Result<Vec<ParameterChange>> {
+        Self::get_protocol_parameter_history(self, id)
+    }
 }
 
 /// The governance actor
@@ -417,6 +489,7 @@ impl GovernanceActor {
 
         let handle = GovernanceHandle {
             inner: Arc::new(RwLock::new(actor)),
+            protocol_params: None,
         };
 
         // Spawn background timer task for auto-closing proposals

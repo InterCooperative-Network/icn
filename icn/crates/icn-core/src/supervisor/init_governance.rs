@@ -8,6 +8,7 @@ use tokio::sync::RwLock;
 use tracing::info;
 
 use crate::config::Config;
+use icn_governance::{default_parameters, ProtocolParameterStore, SledParameterStore};
 use icn_identity::Did;
 use icn_store::SledStore;
 
@@ -42,6 +43,8 @@ pub struct GovernanceServices {
     pub dead_letter_queue: Arc<crate::dead_letter::DeadLetterQueue<SledStore>>,
     /// Governance store for audit trail
     pub governance_store: Arc<dyn icn_store::Store>,
+    /// Protocol parameter store for governable parameters (Phase 20)
+    pub protocol_parameter_store: Arc<dyn ProtocolParameterStore>,
 }
 
 /// Initialize governance services
@@ -117,12 +120,42 @@ pub async fn init_governance_services(
         dlq_store_path.display()
     );
 
+    // Initialize protocol parameter store (Phase 20)
+    let param_store_path = config.store_path().join("protocol_params");
+    let param_db = sled::open(&param_store_path)?;
+    let protocol_parameter_store: Arc<dyn ProtocolParameterStore> =
+        Arc::new(SledParameterStore::new(Arc::new(param_db))?);
+
+    // Load default parameters on first run (if store is empty)
+    {
+        let existing = protocol_parameter_store.list()?;
+        if existing.is_empty() {
+            info!("Loading default protocol parameters...");
+            for param in default_parameters() {
+                protocol_parameter_store.set(param, None, None)?;
+            }
+            info!(
+                "✓ {} default protocol parameters initialized",
+                default_parameters().len()
+            );
+        } else {
+            info!(
+                "✓ Protocol parameter store loaded ({} parameters)",
+                existing.len()
+            );
+        }
+    }
+
+    // Attach protocol parameter store to governance handle
+    let governance_handle = governance_handle.with_protocol_params(protocol_parameter_store.clone());
+
     Ok(GovernanceServices {
         governance_handle,
         upgrade_handle,
         version_tracker,
         dead_letter_queue,
         governance_store: gov_store,
+        protocol_parameter_store,
     })
 }
 
