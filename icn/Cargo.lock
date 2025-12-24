@@ -2915,10 +2915,13 @@ name = "icn-entity"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "bincode",
  "icn-identity",
  "icn-time",
  "serde",
  "serde_json",
+ "sled",
+ "tempfile",
  "thiserror 2.0.17",
  "tokio",
  "tracing",

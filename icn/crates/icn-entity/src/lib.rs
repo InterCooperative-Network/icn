@@ -76,6 +76,7 @@ pub mod error;
 pub mod lifecycle;
 pub mod membership;
 pub mod registry;
+pub mod sled_registry;
 
 // Re-export main types at crate root
 pub use entity::{
@@ -85,3 +86,4 @@ pub use error::{EntityError, Result};
 pub use lifecycle::{EntityLifecycle, LifecycleEvent};
 pub use membership::{Membership, MembershipCapability, MembershipRole, MembershipStatus};
 pub use registry::{EntityRegistry, EntityRegistryHandle, InMemoryRegistry};
+pub use sled_registry::SledEntityRegistry;
