@@ -508,12 +508,12 @@ pub async fn create_budget(
     require_coop_access(&req, &coop_id)?;
 
     // Get proposer DID from JWT claims
-    let claims = get_claims(&req).ok_or_else(|| {
-        GatewayError::AuthenticationFailed("No claims found".to_string())
-    })?;
-    let proposer_did: Did = claims.sub.parse().map_err(|e| {
-        GatewayError::BadRequest(format!("Invalid DID in token: {e}"))
-    })?;
+    let claims = get_claims(&req)
+        .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
+    let proposer_did: Did = claims
+        .sub
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
 
     // Input validation
     if body.amount <= 0 {

@@ -60,16 +60,16 @@ impl EntityManager {
     /// Register a new entity
     pub fn register(&self, entity: CooperativeEntity) -> Result<()> {
         if let Some(ref handle) = self.entity_handle {
-            let mut registry = handle.write().map_err(|e| {
-                anyhow::anyhow!("Entity registry lock poisoned: {e}")
-            })?;
+            let mut registry = handle
+                .write()
+                .map_err(|e| anyhow::anyhow!("Entity registry lock poisoned: {e}"))?;
             return Ok(registry.register(entity)?);
         }
 
         if let Some(ref standalone) = self.standalone {
-            let mut registry = standalone.write().map_err(|e| {
-                anyhow::anyhow!("Entity registry lock poisoned: {e}")
-            })?;
+            let mut registry = standalone
+                .write()
+                .map_err(|e| anyhow::anyhow!("Entity registry lock poisoned: {e}"))?;
             return Ok(registry.register(entity)?);
         }
 
@@ -79,16 +79,16 @@ impl EntityManager {
     /// Get an entity by ID
     pub fn get(&self, id: &EntityId) -> Result<Option<CooperativeEntity>> {
         if let Some(ref handle) = self.entity_handle {
-            let registry = handle.read().map_err(|e| {
-                anyhow::anyhow!("Entity registry lock poisoned: {e}")
-            })?;
+            let registry = handle
+                .read()
+                .map_err(|e| anyhow::anyhow!("Entity registry lock poisoned: {e}"))?;
             return Ok(registry.get(id)?);
         }
 
         if let Some(ref standalone) = self.standalone {
-            let registry = standalone.read().map_err(|e| {
-                anyhow::anyhow!("Entity registry lock poisoned: {e}")
-            })?;
+            let registry = standalone
+                .read()
+                .map_err(|e| anyhow::anyhow!("Entity registry lock poisoned: {e}"))?;
             return Ok(registry.get(id)?);
         }
 
@@ -98,16 +98,16 @@ impl EntityManager {
     /// Update an entity
     pub fn update(&self, entity: CooperativeEntity) -> Result<()> {
         if let Some(ref handle) = self.entity_handle {
-            let mut registry = handle.write().map_err(|e| {
-                anyhow::anyhow!("Entity registry lock poisoned: {e}")
-            })?;
+            let mut registry = handle
+                .write()
+                .map_err(|e| anyhow::anyhow!("Entity registry lock poisoned: {e}"))?;
             return Ok(registry.update(entity)?);
         }
 
         if let Some(ref standalone) = self.standalone {
-            let mut registry = standalone.write().map_err(|e| {
-                anyhow::anyhow!("Entity registry lock poisoned: {e}")
-            })?;
+            let mut registry = standalone
+                .write()
+                .map_err(|e| anyhow::anyhow!("Entity registry lock poisoned: {e}"))?;
             return Ok(registry.update(entity)?);
         }
 
@@ -123,16 +123,16 @@ impl EntityManager {
         }
 
         if let Some(ref handle) = self.entity_handle {
-            let mut registry = handle.write().map_err(|e| {
-                anyhow::anyhow!("Entity registry lock poisoned: {e}")
-            })?;
+            let mut registry = handle
+                .write()
+                .map_err(|e| anyhow::anyhow!("Entity registry lock poisoned: {e}"))?;
             return Ok(registry.delete(id)?);
         }
 
         if let Some(ref standalone) = self.standalone {
-            let mut registry = standalone.write().map_err(|e| {
-                anyhow::anyhow!("Entity registry lock poisoned: {e}")
-            })?;
+            let mut registry = standalone
+                .write()
+                .map_err(|e| anyhow::anyhow!("Entity registry lock poisoned: {e}"))?;
             return Ok(registry.delete(id)?);
         }
 
@@ -166,16 +166,16 @@ impl EntityManager {
     /// List entity IDs by type
     fn list_by_type(&self, entity_type: EntityType) -> Result<Vec<EntityId>> {
         if let Some(ref handle) = self.entity_handle {
-            let registry = handle.read().map_err(|e| {
-                anyhow::anyhow!("Entity registry lock poisoned: {e}")
-            })?;
+            let registry = handle
+                .read()
+                .map_err(|e| anyhow::anyhow!("Entity registry lock poisoned: {e}"))?;
             return Ok(registry.list_by_type(entity_type)?);
         }
 
         if let Some(ref standalone) = self.standalone {
-            let registry = standalone.read().map_err(|e| {
-                anyhow::anyhow!("Entity registry lock poisoned: {e}")
-            })?;
+            let registry = standalone
+                .read()
+                .map_err(|e| anyhow::anyhow!("Entity registry lock poisoned: {e}"))?;
             return Ok(registry.list_by_type(entity_type)?);
         }
 
@@ -185,16 +185,16 @@ impl EntityManager {
     /// Add a membership
     pub fn add_membership(&self, membership: Membership) -> Result<()> {
         if let Some(ref handle) = self.entity_handle {
-            let mut registry = handle.write().map_err(|e| {
-                anyhow::anyhow!("Entity registry lock poisoned: {e}")
-            })?;
+            let mut registry = handle
+                .write()
+                .map_err(|e| anyhow::anyhow!("Entity registry lock poisoned: {e}"))?;
             return Ok(registry.add_membership(membership)?);
         }
 
         if let Some(ref standalone) = self.standalone {
-            let mut registry = standalone.write().map_err(|e| {
-                anyhow::anyhow!("Entity registry lock poisoned: {e}")
-            })?;
+            let mut registry = standalone
+                .write()
+                .map_err(|e| anyhow::anyhow!("Entity registry lock poisoned: {e}"))?;
             return Ok(registry.add_membership(membership)?);
         }
 
@@ -204,16 +204,16 @@ impl EntityManager {
     /// Get members of an entity
     pub fn get_members(&self, parent_id: &EntityId) -> Result<Vec<Membership>> {
         if let Some(ref handle) = self.entity_handle {
-            let registry = handle.read().map_err(|e| {
-                anyhow::anyhow!("Entity registry lock poisoned: {e}")
-            })?;
+            let registry = handle
+                .read()
+                .map_err(|e| anyhow::anyhow!("Entity registry lock poisoned: {e}"))?;
             return Ok(registry.get_members(parent_id)?);
         }
 
         if let Some(ref standalone) = self.standalone {
-            let registry = standalone.read().map_err(|e| {
-                anyhow::anyhow!("Entity registry lock poisoned: {e}")
-            })?;
+            let registry = standalone
+                .read()
+                .map_err(|e| anyhow::anyhow!("Entity registry lock poisoned: {e}"))?;
             return Ok(registry.get_members(parent_id)?);
         }
 
@@ -225,17 +225,17 @@ impl EntityManager {
     /// Note: Removes the membership of `member_id` from `parent_id`
     pub fn remove_membership(&self, parent_id: &EntityId, member_id: &EntityId) -> Result<()> {
         if let Some(ref handle) = self.entity_handle {
-            let mut registry = handle.write().map_err(|e| {
-                anyhow::anyhow!("Entity registry lock poisoned: {e}")
-            })?;
+            let mut registry = handle
+                .write()
+                .map_err(|e| anyhow::anyhow!("Entity registry lock poisoned: {e}"))?;
             // EntityRegistry trait takes (member_id, parent_id)
             return Ok(registry.remove_membership(member_id, parent_id)?);
         }
 
         if let Some(ref standalone) = self.standalone {
-            let mut registry = standalone.write().map_err(|e| {
-                anyhow::anyhow!("Entity registry lock poisoned: {e}")
-            })?;
+            let mut registry = standalone
+                .write()
+                .map_err(|e| anyhow::anyhow!("Entity registry lock poisoned: {e}"))?;
             // EntityRegistry trait takes (member_id, parent_id)
             return Ok(registry.remove_membership(member_id, parent_id)?);
         }
@@ -290,7 +290,8 @@ mod tests {
         mgr.register(member_entity).unwrap();
 
         // Add a member
-        let membership = Membership::new(member_id.clone(), coop_id.clone(), MembershipRole::Member);
+        let membership =
+            Membership::new(member_id.clone(), coop_id.clone(), MembershipRole::Member);
         mgr.add_membership(membership).unwrap();
 
         // Try to remove - should fail

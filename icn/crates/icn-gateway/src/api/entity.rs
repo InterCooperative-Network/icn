@@ -108,7 +108,10 @@ fn parse_role(role_str: &str) -> Result<MembershipRole> {
         "board_member" | "board" => Ok(MembershipRole::BoardMember),
         "officer" => {
             // Support "officer:President" or just "officer" (defaults to "Officer")
-            let title = parts.get(1).map(|s| s.to_string()).unwrap_or_else(|| "Officer".to_string());
+            let title = parts
+                .get(1)
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| "Officer".to_string());
             Ok(MembershipRole::Officer { title })
         }
         "federated_member" | "federated" => Ok(MembershipRole::FederatedMember),
@@ -158,13 +161,13 @@ pub async fn register_entity(
     require_scope(&req, "entity:write")?;
 
     // Get creator DID from claims
-    let claims = get_claims(&req).ok_or_else(|| {
-        GatewayError::AuthenticationFailed("No claims found".to_string())
-    })?;
+    let claims = get_claims(&req)
+        .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
 
-    let creator_did: Did = claims.sub.parse().map_err(|e| {
-        GatewayError::BadRequest(format!("Invalid DID in claims: {e}"))
-    })?;
+    let creator_did: Did = claims
+        .sub
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in claims: {e}")))?;
     let creator_id = EntityId::from_did(&creator_did);
 
     // Validate identifier
@@ -185,16 +188,12 @@ pub async fn register_entity(
 
     // Create the entity based on type
     let mut entity = match entity_type {
-        EntityType::Cooperative => {
-            CooperativeEntity::cooperative(&body.identifier, &body.name).map_err(|e| {
+        EntityType::Cooperative => CooperativeEntity::cooperative(&body.identifier, &body.name)
+            .map_err(|e| {
                 GatewayError::BadRequest(format!("Invalid cooperative identifier: {e}"))
-            })?
-        }
-        EntityType::Federation => {
-            CooperativeEntity::federation(&body.identifier, &body.name).map_err(|e| {
-                GatewayError::BadRequest(format!("Invalid federation identifier: {e}"))
-            })?
-        }
+            })?,
+        EntityType::Federation => CooperativeEntity::federation(&body.identifier, &body.name)
+            .map_err(|e| GatewayError::BadRequest(format!("Invalid federation identifier: {e}")))?,
         EntityType::Individual => {
             return Err(GatewayError::BadRequest(
                 "Cannot register individual entities via this endpoint".to_string(),
@@ -210,13 +209,15 @@ pub async fn register_entity(
     let entity_id = entity.id.clone();
 
     if let Some(ref desc) = body.description {
-        entity.metadata.insert("description".to_string(), desc.clone());
+        entity
+            .metadata
+            .insert("description".to_string(), desc.clone());
     }
 
     if let Some(ref parent_str) = body.parent_id {
-        let parent_id: EntityId = parent_str.parse().map_err(|e| {
-            GatewayError::BadRequest(format!("Invalid parent entity ID: {e}"))
-        })?;
+        let parent_id: EntityId = parent_str
+            .parse()
+            .map_err(|e| GatewayError::BadRequest(format!("Invalid parent entity ID: {e}")))?;
         entity.parent_id = Some(parent_id);
     }
 
@@ -229,12 +230,13 @@ pub async fn register_entity(
     );
 
     // Register the entity
-    entity_mgr.register(entity.clone()).map_err(|e| {
-        GatewayError::InternalError(format!("Failed to register entity: {e}"))
-    })?;
+    entity_mgr
+        .register(entity.clone())
+        .map_err(|e| GatewayError::InternalError(format!("Failed to register entity: {e}")))?;
 
     // Add the creator as a founder member
-    let founder_membership = Membership::new(creator_id, entity_id.clone(), MembershipRole::Founder);
+    let founder_membership =
+        Membership::new(creator_id, entity_id.clone(), MembershipRole::Founder);
     entity_mgr.add_membership(founder_membership).map_err(|e| {
         GatewayError::InternalError(format!("Failed to add founder membership: {e}"))
     })?;
@@ -255,13 +257,13 @@ pub async fn get_entity(
     require_scope(&req, "entity:read")?;
 
     let entity_id_str = path.into_inner();
-    let entity_id: EntityId = entity_id_str.parse().map_err(|e| {
-        GatewayError::BadRequest(format!("Invalid entity ID: {e}"))
-    })?;
+    let entity_id: EntityId = entity_id_str
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid entity ID: {e}")))?;
 
-    let entity = entity_mgr.get(&entity_id).map_err(|e| {
-        GatewayError::InternalError(format!("Failed to get entity: {e}"))
-    })?;
+    let entity = entity_mgr
+        .get(&entity_id)
+        .map_err(|e| GatewayError::InternalError(format!("Failed to get entity: {e}")))?;
 
     let Some(entity) = entity else {
         return Err(GatewayError::NotFound(format!(
@@ -286,15 +288,14 @@ pub async fn update_entity(
     require_scope(&req, "entity:write")?;
 
     let entity_id_str = path.into_inner();
-    let entity_id: EntityId = entity_id_str.parse().map_err(|e| {
-        GatewayError::BadRequest(format!("Invalid entity ID: {e}"))
-    })?;
+    let entity_id: EntityId = entity_id_str
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid entity ID: {e}")))?;
 
-    let mut entity = entity_mgr.get(&entity_id).map_err(|e| {
-        GatewayError::InternalError(format!("Failed to get entity: {e}"))
-    })?.ok_or_else(|| {
-        GatewayError::NotFound(format!("Entity not found: {entity_id}"))
-    })?;
+    let mut entity = entity_mgr
+        .get(&entity_id)
+        .map_err(|e| GatewayError::InternalError(format!("Failed to get entity: {e}")))?
+        .ok_or_else(|| GatewayError::NotFound(format!("Entity not found: {entity_id}")))?;
 
     // Apply updates
     if let Some(ref name) = body.name {
@@ -307,7 +308,9 @@ pub async fn update_entity(
     }
 
     if let Some(ref desc) = body.description {
-        entity.metadata.insert("description".to_string(), desc.clone());
+        entity
+            .metadata
+            .insert("description".to_string(), desc.clone());
     }
 
     info!(
@@ -315,9 +318,9 @@ pub async fn update_entity(
         "Updating entity"
     );
 
-    entity_mgr.update(entity.clone()).map_err(|e| {
-        GatewayError::InternalError(format!("Failed to update entity: {e}"))
-    })?;
+    entity_mgr
+        .update(entity.clone())
+        .map_err(|e| GatewayError::InternalError(format!("Failed to update entity: {e}")))?;
 
     let members = entity_mgr.get_members(&entity_id).unwrap_or_default();
     let response = entity_to_response(&entity, members.len());
@@ -335,16 +338,15 @@ pub async fn delete_entity(
     require_scope(&req, "entity:write")?;
 
     let entity_id_str = path.into_inner();
-    let entity_id: EntityId = entity_id_str.parse().map_err(|e| {
-        GatewayError::BadRequest(format!("Invalid entity ID: {e}"))
-    })?;
+    let entity_id: EntityId = entity_id_str
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid entity ID: {e}")))?;
 
     // Verify entity exists
-    let _entity = entity_mgr.get(&entity_id).map_err(|e| {
-        GatewayError::InternalError(format!("Failed to get entity: {e}"))
-    })?.ok_or_else(|| {
-        GatewayError::NotFound(format!("Entity not found: {entity_id}"))
-    })?;
+    let _entity = entity_mgr
+        .get(&entity_id)
+        .map_err(|e| GatewayError::InternalError(format!("Failed to get entity: {e}")))?
+        .ok_or_else(|| GatewayError::NotFound(format!("Entity not found: {entity_id}")))?;
 
     info!(
         entity_id = %entity_id,
@@ -372,20 +374,19 @@ pub async fn list_members(
     require_scope(&req, "entity:read")?;
 
     let entity_id_str = path.into_inner();
-    let entity_id: EntityId = entity_id_str.parse().map_err(|e| {
-        GatewayError::BadRequest(format!("Invalid entity ID: {e}"))
-    })?;
+    let entity_id: EntityId = entity_id_str
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid entity ID: {e}")))?;
 
     // Verify entity exists
-    let _entity = entity_mgr.get(&entity_id).map_err(|e| {
-        GatewayError::InternalError(format!("Failed to get entity: {e}"))
-    })?.ok_or_else(|| {
-        GatewayError::NotFound(format!("Entity not found: {entity_id}"))
-    })?;
+    let _entity = entity_mgr
+        .get(&entity_id)
+        .map_err(|e| GatewayError::InternalError(format!("Failed to get entity: {e}")))?
+        .ok_or_else(|| GatewayError::NotFound(format!("Entity not found: {entity_id}")))?;
 
-    let members = entity_mgr.get_members(&entity_id).map_err(|e| {
-        GatewayError::InternalError(format!("Failed to get members: {e}"))
-    })?;
+    let members = entity_mgr
+        .get_members(&entity_id)
+        .map_err(|e| GatewayError::InternalError(format!("Failed to get members: {e}")))?;
 
     let response: Vec<MembershipResponse> = members.iter().map(membership_to_response).collect();
 
@@ -403,27 +404,27 @@ pub async fn add_membership(
     require_scope(&req, "entity:write")?;
 
     let entity_id_str = path.into_inner();
-    let entity_id: EntityId = entity_id_str.parse().map_err(|e| {
-        GatewayError::BadRequest(format!("Invalid entity ID: {e}"))
-    })?;
+    let entity_id: EntityId = entity_id_str
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid entity ID: {e}")))?;
 
     // Verify entity exists
-    let _entity = entity_mgr.get(&entity_id).map_err(|e| {
-        GatewayError::InternalError(format!("Failed to get entity: {e}"))
-    })?.ok_or_else(|| {
-        GatewayError::NotFound(format!("Entity not found: {entity_id}"))
-    })?;
+    let _entity = entity_mgr
+        .get(&entity_id)
+        .map_err(|e| GatewayError::InternalError(format!("Failed to get entity: {e}")))?
+        .ok_or_else(|| GatewayError::NotFound(format!("Entity not found: {entity_id}")))?;
 
     // Parse member ID (can be DID or EntityId)
     let member_id = if body.member_id.starts_with("did:") {
-        let did: Did = body.member_id.parse().map_err(|e| {
-            GatewayError::BadRequest(format!("Invalid DID: {e}"))
-        })?;
+        let did: Did = body
+            .member_id
+            .parse()
+            .map_err(|e| GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
         EntityId::from_did(&did)
     } else {
-        body.member_id.parse().map_err(|e| {
-            GatewayError::BadRequest(format!("Invalid member ID: {e}"))
-        })?
+        body.member_id
+            .parse()
+            .map_err(|e| GatewayError::BadRequest(format!("Invalid member ID: {e}")))?
     };
 
     let role = parse_role(&body.role)?;
@@ -440,9 +441,9 @@ pub async fn add_membership(
         membership.shares = shares;
     }
 
-    entity_mgr.add_membership(membership.clone()).map_err(|e| {
-        GatewayError::InternalError(format!("Failed to add membership: {e}"))
-    })?;
+    entity_mgr
+        .add_membership(membership.clone())
+        .map_err(|e| GatewayError::InternalError(format!("Failed to add membership: {e}")))?;
 
     let response = membership_to_response(&membership);
 
@@ -460,27 +461,26 @@ pub async fn remove_membership(
 
     let (entity_id_str, member_id_str) = path.into_inner();
 
-    let entity_id: EntityId = entity_id_str.parse().map_err(|e| {
-        GatewayError::BadRequest(format!("Invalid entity ID: {e}"))
-    })?;
+    let entity_id: EntityId = entity_id_str
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid entity ID: {e}")))?;
 
     let member_id = if member_id_str.starts_with("did:") {
-        let did: Did = member_id_str.parse().map_err(|e| {
-            GatewayError::BadRequest(format!("Invalid DID: {e}"))
-        })?;
+        let did: Did = member_id_str
+            .parse()
+            .map_err(|e| GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
         EntityId::from_did(&did)
     } else {
-        member_id_str.parse().map_err(|e| {
-            GatewayError::BadRequest(format!("Invalid member ID: {e}"))
-        })?
+        member_id_str
+            .parse()
+            .map_err(|e| GatewayError::BadRequest(format!("Invalid member ID: {e}")))?
     };
 
     // Verify entity exists
-    let _entity = entity_mgr.get(&entity_id).map_err(|e| {
-        GatewayError::InternalError(format!("Failed to get entity: {e}"))
-    })?.ok_or_else(|| {
-        GatewayError::NotFound(format!("Entity not found: {entity_id}"))
-    })?;
+    let _entity = entity_mgr
+        .get(&entity_id)
+        .map_err(|e| GatewayError::InternalError(format!("Failed to get entity: {e}")))?
+        .ok_or_else(|| GatewayError::NotFound(format!("Entity not found: {entity_id}")))?;
 
     info!(
         entity_id = %entity_id,
@@ -488,9 +488,9 @@ pub async fn remove_membership(
         "Removing membership"
     );
 
-    entity_mgr.remove_membership(&entity_id, &member_id).map_err(|e| {
-        GatewayError::InternalError(format!("Failed to remove membership: {e}"))
-    })?;
+    entity_mgr
+        .remove_membership(&entity_id, &member_id)
+        .map_err(|e| GatewayError::InternalError(format!("Failed to remove membership: {e}")))?;
 
     Ok(HttpResponse::NoContent().finish())
 }
@@ -512,21 +512,43 @@ mod tests {
 
     #[test]
     fn test_parse_entity_type() {
-        assert!(matches!(parse_entity_type("cooperative").unwrap(), EntityType::Cooperative));
-        assert!(matches!(parse_entity_type("coop").unwrap(), EntityType::Cooperative));
-        assert!(matches!(parse_entity_type("federation").unwrap(), EntityType::Federation));
+        assert!(matches!(
+            parse_entity_type("cooperative").unwrap(),
+            EntityType::Cooperative
+        ));
+        assert!(matches!(
+            parse_entity_type("coop").unwrap(),
+            EntityType::Cooperative
+        ));
+        assert!(matches!(
+            parse_entity_type("federation").unwrap(),
+            EntityType::Federation
+        ));
         assert!(parse_entity_type("invalid").is_err());
     }
 
     #[test]
     fn test_parse_role() {
-        assert!(matches!(parse_role("founder").unwrap(), MembershipRole::Founder));
-        assert!(matches!(parse_role("member").unwrap(), MembershipRole::Member));
-        assert!(matches!(parse_role("board_member").unwrap(), MembershipRole::BoardMember));
+        assert!(matches!(
+            parse_role("founder").unwrap(),
+            MembershipRole::Founder
+        ));
+        assert!(matches!(
+            parse_role("member").unwrap(),
+            MembershipRole::Member
+        ));
+        assert!(matches!(
+            parse_role("board_member").unwrap(),
+            MembershipRole::BoardMember
+        ));
         // Officer with default title
-        assert!(matches!(parse_role("officer").unwrap(), MembershipRole::Officer { title } if title == "Officer"));
+        assert!(
+            matches!(parse_role("officer").unwrap(), MembershipRole::Officer { title } if title == "Officer")
+        );
         // Officer with custom title
-        assert!(matches!(parse_role("officer:president").unwrap(), MembershipRole::Officer { title } if title == "president"));
+        assert!(
+            matches!(parse_role("officer:president").unwrap(), MembershipRole::Officer { title } if title == "president")
+        );
         assert!(parse_role("invalid").is_err());
     }
 }

@@ -60,6 +60,7 @@ pub use commons_mgr::CommonsManager;
 pub use commons_store::SledCommonsStore;
 pub use commons_store::{CommonsStore, CommonsStoreBackend, InMemoryCommonsStore};
 pub use compute_events::{create_forwarding_callback, forward_compute_event};
+pub use entity_mgr::EntityHandle;
 pub use error::{GatewayError, Result};
 pub use events::{BalanceChangeDetail, EventBroadcaster, GatewayEvent, SequencedEvent};
 pub use identity_mgr::{DeviceInfo, IdentityManager, RegisterDeviceRequest};
@@ -77,5 +78,4 @@ pub use rate_limit::{
     RateLimiter, VelocityLimitConfig, VelocityLimiter,
 };
 pub use server::GatewayServer;
-pub use entity_mgr::EntityHandle;
 pub use treasury_mgr::{GatewayTreasuryManager, LedgerHandle, TreasuryHandle};

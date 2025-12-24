@@ -91,7 +91,8 @@ mod tests {
             registry.register(individual).unwrap();
 
             // Add membership
-            let membership = Membership::new(member_id.clone(), coop_id.clone(), MembershipRole::Member);
+            let membership =
+                Membership::new(member_id.clone(), coop_id.clone(), MembershipRole::Member);
             registry.add_membership(membership).unwrap();
         }
 
