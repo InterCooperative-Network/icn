@@ -18,9 +18,10 @@
 use anyhow::Result;
 use icn_identity::Did;
 use icn_ledger::{
-    ApprovalType, PaginatedAuditTrail, SpendingRule, Treasury, TreasuryAuditRecord, TreasuryBudget,
-    TreasuryManager as LedgerTreasuryManager, TreasuryOperation,
+    ApprovalType, Ledger, PaginatedAuditTrail, SpendingRule, Treasury, TreasuryAuditRecord,
+    TreasuryBudget, TreasuryManager as LedgerTreasuryManager, TreasuryOperation,
 };
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::debug;
@@ -30,16 +31,26 @@ use tracing::debug;
 /// This wraps the daemon's TreasuryManager for gateway integration.
 pub type TreasuryHandle = Arc<RwLock<LedgerTreasuryManager>>;
 
+/// Handle type for ledger balance queries
+///
+/// This wraps the daemon's Ledger for balance lookups.
+pub type LedgerHandle = Arc<RwLock<Ledger>>;
+
 /// Treasury manager for gateway API
 ///
 /// Supports two modes:
 /// - **Standalone mode** (`new()`): In-memory storage, for testing only
 /// - **Actor-backed mode** (`with_handle()`): Delegates to daemon's TreasuryManager
+///
+/// When a `LedgerHandle` is set (via `set_ledger_handle`), balance queries
+/// return actual ledger balances instead of placeholders.
 pub struct GatewayTreasuryManager {
     /// In-memory TreasuryManager - used in standalone mode
     standalone: Option<LedgerTreasuryManager>,
     /// Optional handle to daemon's TreasuryManager (actor-backed mode)
     treasury_handle: Option<TreasuryHandle>,
+    /// Optional handle to daemon's Ledger (for balance queries)
+    ledger_handle: Option<LedgerHandle>,
 }
 
 impl GatewayTreasuryManager {
@@ -52,6 +63,7 @@ impl GatewayTreasuryManager {
         GatewayTreasuryManager {
             standalone: Some(LedgerTreasuryManager::new()),
             treasury_handle: None,
+            ledger_handle: None,
         }
     }
 
@@ -67,12 +79,27 @@ impl GatewayTreasuryManager {
         GatewayTreasuryManager {
             standalone: None,
             treasury_handle: Some(handle),
+            ledger_handle: None,
         }
+    }
+
+    /// Set ledger handle for balance queries
+    ///
+    /// When set, balance queries return actual ledger balances.
+    /// When not set, balance endpoints return None or 503.
+    pub fn set_ledger_handle(&mut self, handle: LedgerHandle) {
+        debug!("GatewayTreasuryManager wired to daemon Ledger for balance queries");
+        self.ledger_handle = Some(handle);
     }
 
     /// Check if running in actor-backed mode
     pub fn is_actor_backed(&self) -> bool {
         self.treasury_handle.is_some()
+    }
+
+    /// Check if ledger is wired for balance queries
+    pub fn is_ledger_wired(&self) -> bool {
+        self.ledger_handle.is_some()
     }
 
     // ============================================================================
@@ -288,6 +315,41 @@ impl GatewayTreasuryManager {
         }
 
         anyhow::bail!("Audit recording not supported in standalone mode")
+    }
+
+    // ============================================================================
+    // Ledger Balance Queries
+    // ============================================================================
+
+    /// Get balance for a treasury account from ledger
+    ///
+    /// Returns the balance for a specific currency, or None if ledger not wired.
+    pub async fn get_treasury_balance(
+        &self,
+        treasury_did: &Did,
+        currency: &str,
+    ) -> Result<Option<i64>> {
+        if let Some(ref ledger_handle) = self.ledger_handle {
+            let ledger = ledger_handle.read().await;
+            let balance = ledger.get_balance(treasury_did, currency);
+            return Ok(Some(balance));
+        }
+        Ok(None) // Ledger not wired
+    }
+
+    /// Get all balances for a treasury account
+    ///
+    /// Returns a map of currency -> balance, or empty if ledger not wired.
+    pub async fn get_all_treasury_balances(
+        &self,
+        treasury_did: &Did,
+    ) -> Result<HashMap<String, i64>> {
+        if let Some(ref ledger_handle) = self.ledger_handle {
+            let ledger = ledger_handle.read().await;
+            let account_balances = ledger.get_account_balances(treasury_did);
+            return Ok(account_balances.balances);
+        }
+        Ok(HashMap::new()) // Ledger not wired
     }
 }
 

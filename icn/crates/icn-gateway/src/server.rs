@@ -31,7 +31,7 @@ use crate::notification_triggers::{GovernanceNotificationTrigger, LedgerNotifica
 use crate::notifications::NotificationService;
 use crate::rate_limit::{IpRateLimiter, RateLimitConfig, RateLimiter};
 use crate::security::{configure_cors, SecurityConfig, SecurityHeaders};
-use crate::treasury_mgr::{GatewayTreasuryManager, TreasuryHandle};
+use crate::treasury_mgr::{GatewayTreasuryManager, LedgerHandle, TreasuryHandle};
 use crate::trust_mgr::{TrustGraphHandle, TrustManager};
 use icn_compute::ComputeHandle;
 
@@ -53,6 +53,8 @@ pub struct GatewayServer {
     contract_registry_handle: Option<icn_ccl::ContractRegistryHandle>,
     /// Optional handle to daemon's TreasuryManager (for treasury operations)
     treasury_handle: Option<TreasuryHandle>,
+    /// Optional handle to daemon's Ledger (for balance queries)
+    ledger_handle: Option<LedgerHandle>,
 }
 
 impl GatewayServer {
@@ -71,6 +73,7 @@ impl GatewayServer {
             governance_handle: None,
             contract_registry_handle: None,
             treasury_handle: None,
+            ledger_handle: None,
         }
     }
 
@@ -93,6 +96,7 @@ impl GatewayServer {
             governance_handle: None,
             contract_registry_handle: None,
             treasury_handle: None,
+            ledger_handle: None,
         }
     }
 
@@ -116,6 +120,7 @@ impl GatewayServer {
             governance_handle: None,
             contract_registry_handle: None,
             treasury_handle: None,
+            ledger_handle: None,
         }
     }
 
@@ -173,6 +178,15 @@ impl GatewayServer {
     /// TreasuryManager, enabling treasury operations with governance integration.
     pub fn with_treasury_handle(mut self, handle: TreasuryHandle) -> Self {
         self.treasury_handle = Some(handle);
+        self
+    }
+
+    /// Set ledger handle for balance queries
+    ///
+    /// When set, treasury balance endpoints query actual ledger balances
+    /// instead of returning placeholders.
+    pub fn with_ledger_handle(mut self, handle: LedgerHandle) -> Self {
+        self.ledger_handle = Some(handle);
         self
     }
 
@@ -260,14 +274,22 @@ impl GatewayServer {
         let commons_manager = Arc::new(CommonsManager::new());
 
         // Create treasury manager (uses handle if available, otherwise in-memory)
-        let treasury_manager: Arc<GatewayTreasuryManager> =
-            if let Some(handle) = self.treasury_handle {
-                info!("Treasury manager connected to daemon (using TreasuryManager handle)");
-                Arc::new(GatewayTreasuryManager::with_handle(handle))
+        let treasury_manager: Arc<GatewayTreasuryManager> = if let Some(handle) =
+            self.treasury_handle
+        {
+            let mut mgr = GatewayTreasuryManager::with_handle(handle);
+            // Wire ledger handle for balance queries
+            if let Some(ledger_handle) = self.ledger_handle.clone() {
+                mgr.set_ledger_handle(ledger_handle);
+                info!("Treasury manager connected to daemon (TreasuryManager + Ledger handles)");
             } else {
-                info!("Treasury manager running standalone (in-memory only)");
-                Arc::new(GatewayTreasuryManager::new())
-            };
+                info!("Treasury manager connected to daemon (TreasuryManager handle only)");
+            }
+            Arc::new(mgr)
+        } else {
+            info!("Treasury manager running standalone (in-memory only)");
+            Arc::new(GatewayTreasuryManager::new())
+        };
 
         // Create SDIS state for identity verification
         let sdis_state = Arc::new(crate::api::sdis::SdisState::new());

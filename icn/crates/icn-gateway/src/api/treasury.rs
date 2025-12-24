@@ -269,14 +269,18 @@ pub async fn get_treasury_status(
         .filter(|b| matches!(b.status, icn_ledger::BudgetStatus::Active))
         .count();
 
-    // TODO: Get actual balance from ledger via LedgerActor
-    // For now, omit balance field (None is skipped in serialization)
+    // Query actual balance from ledger (returns None if ledger not wired)
+    let balance = treasury_mgr
+        .get_treasury_balance(&treasury.treasury_did, &treasury.currency)
+        .await
+        .map_err(|e| GatewayError::InternalError(e.to_string()))?;
+
     let response = TreasuryStatusResponse {
         treasury_did: treasury.treasury_did.to_string(),
         coop_id: treasury.coop_id,
         currency: treasury.currency,
         is_active: treasury.is_active,
-        balance: None,
+        balance,
         active_budget_count,
         spending_rule_count: rules.len(),
     };
@@ -306,19 +310,33 @@ pub async fn get_treasury_balance(
         .await
         .map_err(|e| GatewayError::InternalError(e.to_string()))?;
 
-    let Some(_treasury) = treasury else {
+    let Some(treasury) = treasury else {
         return Err(GatewayError::NotFound(format!(
             "Treasury not configured for cooperative '{coop_id}'"
         )));
     };
 
-    // Balance lookup requires ledger integration which is not yet implemented.
-    // Return 503 Service Unavailable instead of fake/empty data.
-    // TODO: Wire LedgerActor to get actual balances once ledger integration is complete.
-    Err(GatewayError::ServiceUnavailable(
-        "Treasury balance lookup not yet implemented. Use budget endpoints for allocated amounts."
-            .to_string(),
-    ))
+    // Check if ledger is wired for balance queries
+    if !treasury_mgr.is_ledger_wired() {
+        return Err(GatewayError::ServiceUnavailable(
+            "Treasury balance lookup requires daemon integration. \
+             Start icnd with full identity to enable balance queries."
+                .to_string(),
+        ));
+    }
+
+    // Query all balances from ledger
+    let balances = treasury_mgr
+        .get_all_treasury_balances(&treasury.treasury_did)
+        .await
+        .map_err(|e| GatewayError::InternalError(e.to_string()))?;
+
+    let response = TreasuryBalanceResponse {
+        treasury_did: treasury.treasury_did.to_string(),
+        balances,
+    };
+
+    Ok(HttpResponse::Ok().json(response))
 }
 
 /// GET /treasury/{coop_id}/budgets - List budgets
