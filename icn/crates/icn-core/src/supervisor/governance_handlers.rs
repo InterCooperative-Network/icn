@@ -2336,7 +2336,9 @@ impl GovernanceEventHandler {
         );
 
         // Get the protocol parameter store through the governance handle
-        let param_result = self.gov_handle.get_protocol_parameter(&proposal.parameter_id);
+        let param_result = self
+            .gov_handle
+            .get_protocol_parameter(&proposal.parameter_id);
         let proposal_id_str = &proposal_id.0;
         match param_result {
             Ok(Some(mut param)) => {

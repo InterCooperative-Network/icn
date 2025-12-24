@@ -147,7 +147,8 @@ pub async fn init_governance_services(
     }
 
     // Attach protocol parameter store to governance handle
-    let governance_handle = governance_handle.with_protocol_params(protocol_parameter_store.clone());
+    let governance_handle =
+        governance_handle.with_protocol_params(protocol_parameter_store.clone());
 
     Ok(GovernanceServices {
         governance_handle,

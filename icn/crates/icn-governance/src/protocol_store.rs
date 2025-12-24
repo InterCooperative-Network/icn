@@ -170,7 +170,9 @@ impl ProtocolParameterStore for InMemoryParameterStore {
                 .scoped_params
                 .read()
                 .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-            scoped.get(&(scope_key.clone(), id.clone())).map(|p| p.value.clone())
+            scoped
+                .get(&(scope_key.clone(), id.clone()))
+                .map(|p| p.value.clone())
         };
 
         // Store the parameter
@@ -616,7 +618,9 @@ mod tests {
         let fed_id = EntityId::federation("test-fed").unwrap();
 
         // Set global default
-        store.set(test_param("test.scoped", 10), None, None).unwrap();
+        store
+            .set(test_param("test.scoped", 10), None, None)
+            .unwrap();
 
         // Set federation override
         let fed_param = ProtocolParameter::new(
@@ -641,7 +645,10 @@ mod tests {
         store.set(coop_param, None, None).unwrap();
 
         // Global resolution
-        let global = store.get_effective("test.scoped", None, None).unwrap().unwrap();
+        let global = store
+            .get_effective("test.scoped", None, None)
+            .unwrap()
+            .unwrap();
         assert_eq!(global.value, ParameterValue::Integer(10));
 
         // Federation resolution
@@ -723,7 +730,9 @@ mod tests {
         let fed_id = EntityId::federation("test-fed").unwrap();
 
         // Set global default
-        store.set(test_param("test.scoped", 10), None, None).unwrap();
+        store
+            .set(test_param("test.scoped", 10), None, None)
+            .unwrap();
 
         // Set federation override
         let fed_param = ProtocolParameter::new(
@@ -748,7 +757,10 @@ mod tests {
         store.set(coop_param, None, None).unwrap();
 
         // Global resolution
-        let global = store.get_effective("test.scoped", None, None).unwrap().unwrap();
+        let global = store
+            .get_effective("test.scoped", None, None)
+            .unwrap()
+            .unwrap();
         assert_eq!(global.value, ParameterValue::Integer(10));
 
         // Federation resolution
@@ -819,7 +831,9 @@ mod tests {
         {
             let db = sled::open(&db_path).unwrap();
             let store = SledParameterStore::new(Arc::new(db)).unwrap();
-            store.set(test_param("persist.test", 999), None, None).unwrap();
+            store
+                .set(test_param("persist.test", 999), None, None)
+                .unwrap();
             assert_eq!(store.count().unwrap(), 1);
         }
 

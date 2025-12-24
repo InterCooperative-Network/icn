@@ -119,8 +119,8 @@ pub use protocol::{
     ParameterChange, ParameterConstraints, ParameterScope, ParameterValidationError,
     ParameterValue, ProtocolChangeProposal, ProtocolParameter,
 };
-pub use protocol_store::{InMemoryParameterStore, ProtocolParameterStore, SledParameterStore};
 pub use protocol_defaults::{default_parameters, get_default_parameter, ParameterCategory};
+pub use protocol_store::{InMemoryParameterStore, ProtocolParameterStore, SledParameterStore};
 
 /// Unix timestamp in seconds
 pub type Timestamp = u64;

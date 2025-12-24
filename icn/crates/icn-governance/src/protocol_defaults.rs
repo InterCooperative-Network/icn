@@ -3,9 +3,7 @@
 //! These defaults are applied on first run before governance can modify them.
 //! Each parameter includes constraints that limit what values governance can set.
 
-use crate::protocol::{
-    ParameterConstraints, ParameterScope, ParameterValue, ProtocolParameter,
-};
+use crate::protocol::{ParameterConstraints, ParameterScope, ParameterValue, ProtocolParameter};
 use icn_time::current_timestamp_secs;
 
 /// Create a global protocol parameter with constraints
@@ -41,8 +39,8 @@ pub fn default_parameters() -> Vec<ProtocolParameter> {
             "Maximum size in bytes for gossip messages. Larger messages are rejected.",
             ParameterValue::Bytes(1_048_576), // 1MB
             ParameterConstraints {
-                min: Some(ParameterValue::Bytes(1024)),        // 1KB minimum
-                max: Some(ParameterValue::Bytes(10_485_760)),  // 10MB maximum
+                min: Some(ParameterValue::Bytes(1024)),       // 1KB minimum
+                max: Some(ParameterValue::Bytes(10_485_760)), // 10MB maximum
                 allowed_values: None,
                 requires_restart: false,
                 allow_override: true,
@@ -187,7 +185,7 @@ pub fn default_parameters() -> Vec<ProtocolParameter> {
             "Default voting period in seconds.",
             ParameterValue::Duration(604_800), // 7 days
             ParameterConstraints {
-                min: Some(ParameterValue::Duration(3600)),      // 1 hour minimum
+                min: Some(ParameterValue::Duration(3600)), // 1 hour minimum
                 max: Some(ParameterValue::Duration(2_592_000)), // 30 days maximum
                 allowed_values: None,
                 requires_restart: false,
@@ -438,7 +436,11 @@ mod tests {
         let params = default_parameters();
         for param in params {
             assert!(!param.id.is_empty());
-            assert!(param.id.contains('.'), "Parameter ID should be namespaced: {}", param.id);
+            assert!(
+                param.id.contains('.'),
+                "Parameter ID should be namespaced: {}",
+                param.id
+            );
         }
     }
 
@@ -447,7 +449,11 @@ mod tests {
         let params = default_parameters();
         for param in params {
             let category = ParameterCategory::from_id(&param.id);
-            assert!(category.is_some(), "Parameter {} should have a category", param.id);
+            assert!(
+                category.is_some(),
+                "Parameter {} should have a category",
+                param.id
+            );
         }
     }
 
@@ -468,13 +474,34 @@ mod tests {
 
     #[test]
     fn test_parameter_categories() {
-        assert_eq!(ParameterCategory::from_id("gossip.fanout"), Some(ParameterCategory::Gossip));
-        assert_eq!(ParameterCategory::from_id("network.max_connections"), Some(ParameterCategory::Network));
-        assert_eq!(ParameterCategory::from_id("ledger.default_credit_limit"), Some(ParameterCategory::Ledger));
-        assert_eq!(ParameterCategory::from_id("governance.min_quorum"), Some(ParameterCategory::Governance));
-        assert_eq!(ParameterCategory::from_id("trust.min_endorsements"), Some(ParameterCategory::Trust));
-        assert_eq!(ParameterCategory::from_id("ratelimit.isolated_limit"), Some(ParameterCategory::RateLimit));
-        assert_eq!(ParameterCategory::from_id("compute.task_timeout"), Some(ParameterCategory::Compute));
+        assert_eq!(
+            ParameterCategory::from_id("gossip.fanout"),
+            Some(ParameterCategory::Gossip)
+        );
+        assert_eq!(
+            ParameterCategory::from_id("network.max_connections"),
+            Some(ParameterCategory::Network)
+        );
+        assert_eq!(
+            ParameterCategory::from_id("ledger.default_credit_limit"),
+            Some(ParameterCategory::Ledger)
+        );
+        assert_eq!(
+            ParameterCategory::from_id("governance.min_quorum"),
+            Some(ParameterCategory::Governance)
+        );
+        assert_eq!(
+            ParameterCategory::from_id("trust.min_endorsements"),
+            Some(ParameterCategory::Trust)
+        );
+        assert_eq!(
+            ParameterCategory::from_id("ratelimit.isolated_limit"),
+            Some(ParameterCategory::RateLimit)
+        );
+        assert_eq!(
+            ParameterCategory::from_id("compute.task_timeout"),
+            Some(ParameterCategory::Compute)
+        );
         assert_eq!(ParameterCategory::from_id("unknown.param"), None);
     }
 
@@ -486,7 +513,11 @@ mod tests {
             let has_constraints = param.constraints.min.is_some()
                 || param.constraints.max.is_some()
                 || param.constraints.allowed_values.is_some();
-            assert!(has_constraints, "Parameter {} should have constraints", param.id);
+            assert!(
+                has_constraints,
+                "Parameter {} should have constraints",
+                param.id
+            );
         }
     }
 
