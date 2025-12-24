@@ -50,6 +50,8 @@ pub mod profile;
 #[allow(missing_docs)]
 pub mod proposal;
 #[allow(missing_docs)]
+pub mod protocol;
+#[allow(missing_docs)]
 pub mod resolver;
 #[allow(missing_docs)]
 pub mod sdis;
@@ -107,6 +109,12 @@ pub use tally::{
     VoteTally,
 };
 pub use vote::{Vote, VoteChoice};
+
+// Protocol governance types (Phase 20)
+pub use protocol::{
+    ParameterChange, ParameterConstraints, ParameterScope, ParameterValidationError,
+    ParameterValue, ProtocolChangeProposal, ProtocolParameter,
+};
 
 /// Unix timestamp in seconds
 pub type Timestamp = u64;
