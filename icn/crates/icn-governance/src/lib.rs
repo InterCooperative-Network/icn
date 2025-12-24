@@ -52,6 +52,8 @@ pub mod proposal;
 #[allow(missing_docs)]
 pub mod protocol;
 #[allow(missing_docs)]
+pub mod protocol_store;
+#[allow(missing_docs)]
 pub mod resolver;
 #[allow(missing_docs)]
 pub mod sdis;
@@ -115,6 +117,7 @@ pub use protocol::{
     ParameterChange, ParameterConstraints, ParameterScope, ParameterValidationError,
     ParameterValue, ProtocolChangeProposal, ProtocolParameter,
 };
+pub use protocol_store::{InMemoryParameterStore, ProtocolParameterStore, SledParameterStore};
 
 /// Unix timestamp in seconds
 pub type Timestamp = u64;

@@ -7,10 +7,10 @@ repository.workspace = true
 
 [features]
 default = []
-governance_sled = ["sled"]
+governance_sled = []
 
 [dependencies]
-sled = { version = "0.34", optional = true }
+sled.workspace = true
 anyhow.workspace = true
 async-trait = "0.1"
 serde = { workspace = true, features = ["derive"] }
@@ -30,6 +30,7 @@ tracing.workspace = true
 
 [dev-dependencies]
 icn-store = { path = "../icn-store" }
+tempfile = "3"
 
 [lints]
 workspace = true
