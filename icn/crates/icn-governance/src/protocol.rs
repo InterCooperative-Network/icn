@@ -145,6 +145,23 @@ impl ProtocolParameter {
             });
         }
 
+        // Check for NaN/Infinity in floating-point values
+        match new_value {
+            ParameterValue::Float(f) if !f.is_finite() => {
+                return Err(ParameterValidationError::InvalidFloatValue {
+                    value: *f,
+                    reason: "value must be finite (not NaN or Infinity)",
+                });
+            }
+            ParameterValue::Percentage(f) if !f.is_finite() => {
+                return Err(ParameterValidationError::InvalidFloatValue {
+                    value: *f,
+                    reason: "percentage must be finite (not NaN or Infinity)",
+                });
+            }
+            _ => {}
+        }
+
         // Check minimum constraint
         if let Some(ref min) = self.constraints.min {
             if new_value < min {
@@ -558,6 +575,15 @@ pub enum ParameterValidationError {
         allowed: Vec<ParameterValue>,
     },
 
+    /// Invalid floating-point value (NaN or Infinity)
+    #[error("Invalid float value {value}: {reason}")]
+    InvalidFloatValue {
+        /// The invalid value
+        value: f64,
+        /// Reason for rejection
+        reason: &'static str,
+    },
+
     /// Parameter not found
     #[error("Parameter not found: {0}")]
     NotFound(String),
@@ -637,6 +663,55 @@ mod tests {
         assert!(matches!(
             result,
             Err(ParameterValidationError::AboveMaximum { .. })
+        ));
+    }
+
+    #[test]
+    fn test_parameter_validation_nan_infinity() {
+        let param = ProtocolParameter::new(
+            "test.float",
+            "Float Test",
+            "Test parameter",
+            ParameterValue::Float(1.0),
+        );
+
+        // Valid finite values should pass
+        assert!(param.validate(&ParameterValue::Float(0.0)).is_ok());
+        assert!(param.validate(&ParameterValue::Float(-100.5)).is_ok());
+
+        // NaN should fail
+        let result = param.validate(&ParameterValue::Float(f64::NAN));
+        assert!(matches!(
+            result,
+            Err(ParameterValidationError::InvalidFloatValue { .. })
+        ));
+
+        // Infinity should fail
+        let result = param.validate(&ParameterValue::Float(f64::INFINITY));
+        assert!(matches!(
+            result,
+            Err(ParameterValidationError::InvalidFloatValue { .. })
+        ));
+
+        // Negative infinity should fail
+        let result = param.validate(&ParameterValue::Float(f64::NEG_INFINITY));
+        assert!(matches!(
+            result,
+            Err(ParameterValidationError::InvalidFloatValue { .. })
+        ));
+
+        // Test percentage type as well
+        let pct_param = ProtocolParameter::new(
+            "test.pct",
+            "Percentage Test",
+            "Test parameter",
+            ParameterValue::Percentage(50.0),
+        );
+
+        let result = pct_param.validate(&ParameterValue::Percentage(f64::NAN));
+        assert!(matches!(
+            result,
+            Err(ParameterValidationError::InvalidFloatValue { .. })
         ));
     }
 

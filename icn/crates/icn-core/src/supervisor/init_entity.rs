@@ -4,15 +4,16 @@
 //! stores cooperative/federation organizational structures and memberships.
 
 use anyhow::Result;
-use icn_entity::{EntityRegistry, InMemoryRegistry};
+use icn_entity::{EntityRegistry, SledEntityRegistry};
 use std::sync::{Arc, RwLock};
 use tracing::info;
+
+use crate::config::Config;
 
 /// Handle type for entity registry
 ///
 /// This provides thread-safe access to the entity registry.
-/// For now, we use InMemoryRegistry which is not persistent.
-/// A future enhancement would add SledEntityRegistry for persistence.
+/// Uses SledEntityRegistry for persistent storage across daemon restarts.
 pub type EntityHandle = Arc<RwLock<dyn EntityRegistry + Send + Sync>>;
 
 /// Services provided by entity layer
@@ -21,25 +22,37 @@ pub struct EntityServices {
     pub entity_handle: EntityHandle,
 }
 
-/// Initialize entity services
+/// Initialize entity services with persistent storage
 ///
 /// This creates an entity registry for managing cooperative entities
-/// and their memberships. The registry is wrapped in Arc<RwLock> for
-/// thread-safe concurrent access.
+/// and their memberships. The registry is backed by Sled for persistence
+/// and wrapped in Arc<RwLock> for thread-safe concurrent access.
 ///
-/// # Note
-/// Currently uses InMemoryRegistry which is not persistent across restarts.
-/// For production use, this should be replaced with a Sled-backed implementation.
-pub fn init_entity_services() -> Result<EntityServices> {
+/// # Arguments
+///
+/// * `config` - Configuration containing the store path
+pub fn init_entity_services(config: &Config) -> Result<EntityServices> {
     info!("Initializing entity services");
 
-    // Create in-memory registry
-    // TODO: Replace with SledEntityRegistry for persistence
-    let registry = InMemoryRegistry::new();
+    let entity_store_path = config.store_path().join("entities");
+    let db = sled::open(&entity_store_path)?;
+    let registry = SledEntityRegistry::new(Arc::new(db))?;
     let entity_handle: EntityHandle = Arc::new(RwLock::new(registry));
 
-    info!("Entity registry initialized (in-memory mode)");
+    info!(
+        "✓ Entity registry initialized at {}",
+        entity_store_path.display()
+    );
 
+    Ok(EntityServices { entity_handle })
+}
+
+/// Initialize entity services with a custom path (for testing)
+#[cfg(test)]
+pub fn init_entity_services_with_path(path: &std::path::Path) -> Result<EntityServices> {
+    let db = sled::open(path)?;
+    let registry = SledEntityRegistry::new(Arc::new(db))?;
+    let entity_handle: EntityHandle = Arc::new(RwLock::new(registry));
     Ok(EntityServices { entity_handle })
 }
 
@@ -51,7 +64,8 @@ mod tests {
 
     #[test]
     fn test_init_entity_services() {
-        let services = init_entity_services().unwrap();
+        let temp_dir = tempfile::tempdir().unwrap();
+        let services = init_entity_services_with_path(temp_dir.path()).unwrap();
         let handle = services.entity_handle;
 
         // Register an entity
@@ -73,7 +87,8 @@ mod tests {
 
     #[test]
     fn test_entity_services_membership() {
-        let services = init_entity_services().unwrap();
+        let temp_dir = tempfile::tempdir().unwrap();
+        let services = init_entity_services_with_path(temp_dir.path()).unwrap();
         let handle = services.entity_handle;
 
         // Create a cooperative

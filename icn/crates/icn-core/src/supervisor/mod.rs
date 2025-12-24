@@ -223,8 +223,8 @@ impl Supervisor {
             let coop_handle = coop_services.coop_handle.clone();
             let coop_store = coop_services.coop_store.clone(); // Used for gossip sync
 
-            // Initialize entity services
-            let entity_services = init_entity::init_entity_services()?;
+            // Initialize entity services (persistent storage)
+            let entity_services = init_entity::init_entity_services(&self.config)?;
             icn_obs::metrics::supervisor::actor_spawned_inc("entity");
 
             // Store handles for gateway integration (outside of identity_bundle scope)
