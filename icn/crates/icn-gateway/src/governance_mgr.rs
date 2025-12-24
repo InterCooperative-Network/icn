@@ -404,18 +404,10 @@ impl GovernanceManager {
     }
 
     /// Get vote tally for a proposal
-    ///
-    /// Note: Returns error in actor-backed mode (not exposed via GovernanceOps).
-    /// TODO(#273): Add get_vote_tally to GovernanceOps trait.
     pub async fn get_vote_tally(&self, proposal_id: &ProposalId) -> Result<VoteTally> {
-        if self.governance_handle.is_some() {
-            // Actor-backed mode: vote tally not exposed via GovernanceOps
-            // Return explicit error rather than silent empty data
-            anyhow::bail!(
-                "Vote tally not available in actor-backed mode for proposal '{}'. \
-                 Use proposal state to get final outcome, or add get_vote_tally to GovernanceOps trait.",
-                proposal_id.0
-            );
+        if let Some(ref handle) = self.governance_handle {
+            // Actor-backed mode: delegate to GovernanceActor via GovernanceOps
+            return handle.get_vote_tally(proposal_id).await;
         }
 
         // Standalone mode: in-memory storage
@@ -428,18 +420,10 @@ impl GovernanceManager {
     }
 
     /// Get list of voter DIDs for a proposal (for notifications)
-    ///
-    /// Note: Returns error in actor-backed mode (not exposed via GovernanceOps).
-    /// TODO(#273): Add get_voter_dids to GovernanceOps trait.
     pub async fn get_voter_dids(&self, proposal_id: &ProposalId) -> Result<Vec<Did>> {
-        if self.governance_handle.is_some() {
-            // Actor-backed mode: voter DIDs not exposed via GovernanceOps
-            // Return explicit error rather than silent empty data
-            anyhow::bail!(
-                "Voter list not available in actor-backed mode for proposal '{}'. \
-                 Add get_voter_dids to GovernanceOps trait to expose this data.",
-                proposal_id.0
-            );
+        if let Some(ref handle) = self.governance_handle {
+            // Actor-backed mode: delegate to GovernanceActor via GovernanceOps
+            return handle.get_voter_dids(proposal_id).await;
         }
 
         // Standalone mode: in-memory storage

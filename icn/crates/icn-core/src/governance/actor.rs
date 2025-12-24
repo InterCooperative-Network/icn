@@ -199,6 +199,16 @@ impl GovernanceHandle {
     pub async fn revoke_delegation(&self, id: &DelegationId, revoked_at: Timestamp) -> Result<()> {
         self.inner.write().await.revoke_delegation(id, revoked_at)
     }
+
+    /// Get vote tally for a proposal
+    pub async fn get_vote_tally(&self, proposal_id: &ProposalId) -> Result<VoteTally> {
+        self.inner.read().await.get_vote_tally(proposal_id)
+    }
+
+    /// Get list of voter DIDs for a proposal
+    pub async fn get_voter_dids(&self, proposal_id: &ProposalId) -> Result<Vec<Did>> {
+        self.inner.read().await.get_voter_dids(proposal_id)
+    }
 }
 
 /// Implement GovernanceOps trait to allow RPC integration without circular dependencies
@@ -319,6 +329,16 @@ impl icn_governance::GovernanceOps for GovernanceHandle {
 
     async fn revoke_delegation(&self, id: &DelegationId, revoked_at: Timestamp) -> Result<()> {
         Self::revoke_delegation(self, id, revoked_at).await
+    }
+
+    // Vote tracking operations
+
+    async fn get_vote_tally(&self, proposal_id: &ProposalId) -> Result<VoteTally> {
+        Self::get_vote_tally(self, proposal_id).await
+    }
+
+    async fn get_voter_dids(&self, proposal_id: &ProposalId) -> Result<Vec<Did>> {
+        Self::get_voter_dids(self, proposal_id).await
     }
 }
 
@@ -928,6 +948,18 @@ impl GovernanceActor {
         rows.into_iter()
             .map(|(_k, v)| Ok(serde_json::from_slice::<Vote>(&v)?))
             .collect()
+    }
+
+    /// Get vote tally for a proposal
+    fn get_vote_tally(&self, proposal_id: &ProposalId) -> Result<VoteTally> {
+        let votes = self.load_votes(proposal_id)?;
+        Ok(VoteTally::from(votes))
+    }
+
+    /// Get list of voter DIDs for a proposal
+    fn get_voter_dids(&self, proposal_id: &ProposalId) -> Result<Vec<Did>> {
+        let votes = self.load_votes(proposal_id)?;
+        Ok(votes.into_iter().map(|v| v.voter).collect())
     }
 
     /// Maximum depth for transitive delegations
