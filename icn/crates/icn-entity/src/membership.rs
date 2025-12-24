@@ -88,15 +88,24 @@ impl Membership {
     }
 
     /// Add a capability
+    ///
+    /// Updates `updated_at` timestamp for audit trail accuracy.
     pub fn add_capability(&mut self, capability: MembershipCapability) {
         if !self.capabilities.contains(&capability) {
             self.capabilities.push(capability);
+            self.updated_at = icn_time::current_timestamp_secs();
         }
     }
 
     /// Remove a capability
+    ///
+    /// Updates `updated_at` timestamp for audit trail accuracy.
     pub fn remove_capability(&mut self, capability: &MembershipCapability) {
+        let before_len = self.capabilities.len();
         self.capabilities.retain(|c| c != capability);
+        if self.capabilities.len() != before_len {
+            self.updated_at = icn_time::current_timestamp_secs();
+        }
     }
 
     /// Check if member has a specific capability
@@ -536,6 +545,49 @@ mod tests {
             }
             .to_string(),
             "Officer (President)"
+        );
+    }
+
+    #[test]
+    fn test_capability_modification_updates_timestamp() {
+        let member = create_test_individual();
+        let coop = create_test_coop();
+        let mut membership = Membership::active(member, coop, MembershipRole::Member);
+        let original_updated_at = membership.updated_at;
+
+        // Wait a tiny bit to ensure timestamp changes
+        std::thread::sleep(std::time::Duration::from_millis(10));
+
+        // Add a capability - should update timestamp
+        membership.add_capability(MembershipCapability::TreasuryAccess);
+        assert!(
+            membership.updated_at >= original_updated_at,
+            "updated_at should be updated on add_capability()"
+        );
+
+        let after_add = membership.updated_at;
+        std::thread::sleep(std::time::Duration::from_millis(10));
+
+        // Remove a capability - should update timestamp
+        membership.remove_capability(&MembershipCapability::TreasuryAccess);
+        assert!(
+            membership.updated_at >= after_add,
+            "updated_at should be updated on remove_capability()"
+        );
+
+        // Adding duplicate should not update timestamp
+        let before_noop = membership.updated_at;
+        membership.add_capability(MembershipCapability::Vote); // Already has Vote
+        assert_eq!(
+            membership.updated_at, before_noop,
+            "updated_at should not change when adding duplicate capability"
+        );
+
+        // Removing non-existent should not update timestamp
+        membership.remove_capability(&MembershipCapability::TreasuryAccess); // Already removed
+        assert_eq!(
+            membership.updated_at, before_noop,
+            "updated_at should not change when removing non-existent capability"
         );
     }
 }

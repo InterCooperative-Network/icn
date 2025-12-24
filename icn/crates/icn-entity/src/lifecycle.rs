@@ -391,4 +391,180 @@ mod tests {
         assert!(desc.contains("source"));
         assert!(desc.contains("target"));
     }
+
+    #[test]
+    fn test_all_valid_state_transitions() {
+        // Test all valid transitions from the state machine
+
+        // Forming -> Active (charter ratification)
+        assert!(validate_transition(&EntityStatus::Forming, &EntityStatus::Active).is_ok());
+
+        // Forming -> Dissolved (abandoned)
+        assert!(validate_transition(
+            &EntityStatus::Forming,
+            &EntityStatus::Dissolved { dissolved_at: 0 }
+        )
+        .is_ok());
+
+        // Active -> Suspended
+        assert!(validate_transition(
+            &EntityStatus::Active,
+            &EntityStatus::Suspended {
+                reason: "test".into(),
+                suspended_at: 0
+            }
+        )
+        .is_ok());
+
+        // Active -> Dissolving
+        assert!(validate_transition(
+            &EntityStatus::Active,
+            &EntityStatus::Dissolving { started_at: 0 }
+        )
+        .is_ok());
+
+        // Active -> Merged
+        assert!(validate_transition(
+            &EntityStatus::Active,
+            &EntityStatus::Merged {
+                into: EntityId::cooperative("target").unwrap(),
+                merged_at: 0
+            }
+        )
+        .is_ok());
+
+        // Active -> Split
+        assert!(validate_transition(
+            &EntityStatus::Active,
+            &EntityStatus::Split {
+                into: vec![
+                    EntityId::cooperative("new1").unwrap(),
+                    EntityId::cooperative("new2").unwrap()
+                ],
+                split_at: 0
+            }
+        )
+        .is_ok());
+
+        // Suspended -> Active (resume)
+        assert!(validate_transition(
+            &EntityStatus::Suspended {
+                reason: "test".into(),
+                suspended_at: 0
+            },
+            &EntityStatus::Active
+        )
+        .is_ok());
+
+        // Suspended -> Dissolving
+        assert!(validate_transition(
+            &EntityStatus::Suspended {
+                reason: "test".into(),
+                suspended_at: 0
+            },
+            &EntityStatus::Dissolving { started_at: 0 }
+        )
+        .is_ok());
+
+        // Dissolving -> Dissolved
+        assert!(validate_transition(
+            &EntityStatus::Dissolving { started_at: 0 },
+            &EntityStatus::Dissolved { dissolved_at: 0 }
+        )
+        .is_ok());
+
+        // Dissolving -> Active (cancellation)
+        assert!(validate_transition(
+            &EntityStatus::Dissolving { started_at: 0 },
+            &EntityStatus::Active
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn test_terminal_states_cannot_transition() {
+        let terminal_states = [
+            EntityStatus::Dissolved { dissolved_at: 0 },
+            EntityStatus::Merged {
+                into: EntityId::cooperative("target").unwrap(),
+                merged_at: 0,
+            },
+            EntityStatus::Split {
+                into: vec![EntityId::cooperative("new1").unwrap()],
+                split_at: 0,
+            },
+        ];
+
+        for terminal in &terminal_states {
+            // Cannot transition to Active
+            assert!(
+                validate_transition(terminal, &EntityStatus::Active).is_err(),
+                "Terminal state {:?} should not transition to Active",
+                terminal
+            );
+
+            // Cannot transition to any other state
+            assert!(
+                validate_transition(
+                    terminal,
+                    &EntityStatus::Suspended {
+                        reason: "test".into(),
+                        suspended_at: 0
+                    }
+                )
+                .is_err(),
+                "Terminal state {:?} should not transition to Suspended",
+                terminal
+            );
+        }
+    }
+
+    #[test]
+    fn test_lifecycle_event_entity_id_extraction() {
+        let coop_id = EntityId::cooperative("test-coop").unwrap();
+
+        let events = vec![
+            LifecycleEvent::Created {
+                entity_id: coop_id.clone(),
+                created_by: EntityId::cooperative("creator").unwrap(),
+                timestamp: 0,
+            },
+            LifecycleEvent::Activated {
+                entity_id: coop_id.clone(),
+                charter_hash: "abc123".into(),
+                activated_by: EntityId::cooperative("activator").unwrap(),
+                timestamp: 0,
+            },
+            LifecycleEvent::Suspended {
+                entity_id: coop_id.clone(),
+                reason: "testing".into(),
+                suspended_by: EntityId::cooperative("suspender").unwrap(),
+                timestamp: 0,
+            },
+            LifecycleEvent::Resumed {
+                entity_id: coop_id.clone(),
+                resumed_by: EntityId::cooperative("resumer").unwrap(),
+                timestamp: 0,
+            },
+            LifecycleEvent::DissolutionStarted {
+                entity_id: coop_id.clone(),
+                initiator: EntityId::cooperative("initiator").unwrap(),
+                reason: "closing".into(),
+                timestamp: 0,
+            },
+            LifecycleEvent::Dissolved {
+                entity_id: coop_id.clone(),
+                timestamp: 0,
+            },
+        ];
+
+        for event in events {
+            assert_eq!(
+                event.entity_id(),
+                &coop_id,
+                "entity_id() should return correct ID for {:?}",
+                event
+            );
+        }
+    }
 }

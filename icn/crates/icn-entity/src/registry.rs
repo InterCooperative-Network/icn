@@ -135,11 +135,13 @@ impl EntityRegistry for InMemoryRegistry {
         Ok(self.entities.get(id.as_str()).cloned())
     }
 
-    fn update(&mut self, entity: CooperativeEntity) -> Result<()> {
+    fn update(&mut self, mut entity: CooperativeEntity) -> Result<()> {
         let id = entity.id.as_str().to_string();
         if !self.entities.contains_key(&id) {
             return Err(EntityError::NotFound(id));
         }
+        // Auto-update the updated_at timestamp for audit trail accuracy
+        entity.updated_at = icn_time::current_timestamp_secs();
         self.entities.insert(id, entity);
         Ok(())
     }
@@ -591,5 +593,90 @@ mod tests {
 
         assert!(handle.exists(&id).await.unwrap());
         assert_eq!(handle.count().await.unwrap(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_handle_concurrent_reads() {
+        use std::sync::Arc;
+
+        let registry = InMemoryRegistry::new();
+        let handle = Arc::new(registry.into_handle());
+
+        // Register some entities
+        for i in 0..10 {
+            let entity =
+                CooperativeEntity::cooperative(&format!("coop-{i:03}"), &format!("Coop {i}"))
+                    .unwrap();
+            handle.register(entity).await.unwrap();
+        }
+
+        // Spawn multiple concurrent read tasks
+        let mut tasks = Vec::new();
+        for _ in 0..10 {
+            let h = Arc::clone(&handle);
+            tasks.push(tokio::spawn(async move {
+                // Each task reads all entities
+                h.count().await.unwrap()
+            }));
+        }
+
+        // All tasks should succeed and see the same count
+        for task in tasks {
+            let count = task.await.unwrap();
+            assert_eq!(count, 10);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_handle_concurrent_writes() {
+        use std::sync::Arc;
+
+        let registry = InMemoryRegistry::new();
+        let handle = Arc::new(registry.into_handle());
+
+        // Spawn multiple concurrent write tasks
+        let mut tasks = Vec::new();
+        for i in 0..10 {
+            let h = Arc::clone(&handle);
+            tasks.push(tokio::spawn(async move {
+                let entity =
+                    CooperativeEntity::cooperative(&format!("coop-{i:03}"), &format!("Coop {i}"))
+                        .unwrap();
+                h.register(entity).await
+            }));
+        }
+
+        // All tasks should succeed
+        for task in tasks {
+            task.await.unwrap().unwrap();
+        }
+
+        // Should have all 10 entities
+        assert_eq!(handle.count().await.unwrap(), 10);
+    }
+
+    #[test]
+    fn test_update_auto_updates_timestamp() {
+        let mut registry = InMemoryRegistry::new();
+        let entity = create_test_coop();
+        let id = entity.id.clone();
+        let original_updated_at = entity.updated_at;
+
+        registry.register(entity.clone()).unwrap();
+
+        // Wait a tiny bit to ensure timestamp changes
+        std::thread::sleep(std::time::Duration::from_millis(10));
+
+        // Update the entity
+        let mut updated_entity = entity.clone();
+        updated_entity.name = "Updated Name".to_string();
+        registry.update(updated_entity).unwrap();
+
+        // Verify updated_at was auto-updated
+        let retrieved = registry.get(&id).unwrap().unwrap();
+        assert!(
+            retrieved.updated_at >= original_updated_at,
+            "updated_at should be updated on registry.update()"
+        );
     }
 }
