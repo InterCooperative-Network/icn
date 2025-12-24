@@ -406,7 +406,7 @@ impl GovernanceManager {
     /// Get vote tally for a proposal
     ///
     /// Note: Returns error in actor-backed mode (not exposed via GovernanceOps).
-    /// TODO(#272): Add get_vote_tally to GovernanceOps trait.
+    /// TODO(#273): Add get_vote_tally to GovernanceOps trait.
     pub async fn get_vote_tally(&self, proposal_id: &ProposalId) -> Result<VoteTally> {
         if self.governance_handle.is_some() {
             // Actor-backed mode: vote tally not exposed via GovernanceOps
@@ -430,7 +430,7 @@ impl GovernanceManager {
     /// Get list of voter DIDs for a proposal (for notifications)
     ///
     /// Note: Returns error in actor-backed mode (not exposed via GovernanceOps).
-    /// TODO(#272): Add get_voter_dids to GovernanceOps trait.
+    /// TODO(#273): Add get_voter_dids to GovernanceOps trait.
     pub async fn get_voter_dids(&self, proposal_id: &ProposalId) -> Result<Vec<Did>> {
         if self.governance_handle.is_some() {
             // Actor-backed mode: voter DIDs not exposed via GovernanceOps
