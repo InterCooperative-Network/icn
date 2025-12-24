@@ -5,6 +5,7 @@ pub mod governance_handlers;
 pub mod init_compute;
 pub mod init_contract_registry;
 pub mod init_coop;
+pub mod init_entity;
 pub mod init_gossip;
 pub mod init_governance;
 pub mod init_ledger;
@@ -132,6 +133,9 @@ impl Supervisor {
         // Ledger handle for gateway balance queries
         let ledger_handle_for_gateway: Option<icn_gateway::LedgerHandle>;
 
+        // Entity handle for gateway integration
+        let entity_handle_for_gateway: Option<init_entity::EntityHandle>;
+
         // Governance event subscription handles - MUST persist for daemon lifetime
         // Stored at function scope to prevent premature Drop (which would unsubscribe)
         let governance_event_subscription: Option<crate::events::SubscriptionHandle>;
@@ -219,9 +223,14 @@ impl Supervisor {
             let coop_handle = coop_services.coop_handle.clone();
             let coop_store = coop_services.coop_store.clone(); // Used for gossip sync
 
+            // Initialize entity services
+            let entity_services = init_entity::init_entity_services()?;
+            icn_obs::metrics::supervisor::actor_spawned_inc("entity");
+
             // Store handles for gateway integration (outside of identity_bundle scope)
             coop_handle_for_gateway = Some(coop_handle);
             trust_graph_handle_for_gateway = Some(trust_graph_handle.clone());
+            entity_handle_for_gateway = Some(entity_services.entity_handle);
 
             // Spawn Identity actor (provides signing and trust graph access)
             let identity_handle = crate::identity::IdentityActor::spawn(
@@ -1082,7 +1091,7 @@ impl Supervisor {
 
             info!("Metrics update task spawned (system metrics only)");
 
-            // No event broadcaster or compute/trust/governance/treasury/ledger handles without identity
+            // No event broadcaster or compute/trust/governance/treasury/ledger/entity handles without identity
             event_broadcaster = None;
             compute_handle_for_gateway = None;
             coop_handle_for_gateway = None;
@@ -1090,6 +1099,7 @@ impl Supervisor {
             governance_handle_for_gateway = None;
             treasury_handle_for_gateway = None;
             ledger_handle_for_gateway = None;
+            entity_handle_for_gateway = None;
 
             (None, None, None)
         };
@@ -1167,6 +1177,11 @@ impl Supervisor {
                         // Connect ledger handle for balance queries
                         if let Some(handle) = ledger_handle_for_gateway {
                             gateway_server = gateway_server.with_ledger_handle(handle);
+                        }
+
+                        // Connect entity handle for entity management
+                        if let Some(handle) = entity_handle_for_gateway {
+                            gateway_server = gateway_server.with_entity_handle(handle);
                         }
 
                         if let Err(e) = gateway_server.run().await {

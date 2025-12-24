@@ -18,6 +18,7 @@ use crate::auth::AuthManager;
 use crate::commons_mgr::CommonsManager;
 use crate::compute_mgr::ComputeManager;
 use crate::coop::CoopManager;
+use crate::entity_mgr::{EntityHandle, EntityManager};
 use crate::error::{GatewayError, Result};
 use crate::events::EventBroadcaster;
 use crate::federation_mgr::FederationManager;
@@ -55,6 +56,8 @@ pub struct GatewayServer {
     treasury_handle: Option<TreasuryHandle>,
     /// Optional handle to daemon's Ledger (for balance queries)
     ledger_handle: Option<LedgerHandle>,
+    /// Optional handle to daemon's EntityRegistry (for entity management)
+    entity_handle: Option<EntityHandle>,
 }
 
 impl GatewayServer {
@@ -74,6 +77,7 @@ impl GatewayServer {
             contract_registry_handle: None,
             treasury_handle: None,
             ledger_handle: None,
+            entity_handle: None,
         }
     }
 
@@ -97,6 +101,7 @@ impl GatewayServer {
             contract_registry_handle: None,
             treasury_handle: None,
             ledger_handle: None,
+            entity_handle: None,
         }
     }
 
@@ -121,6 +126,7 @@ impl GatewayServer {
             contract_registry_handle: None,
             treasury_handle: None,
             ledger_handle: None,
+            entity_handle: None,
         }
     }
 
@@ -187,6 +193,15 @@ impl GatewayServer {
     /// instead of returning placeholders.
     pub fn with_ledger_handle(mut self, handle: LedgerHandle) -> Self {
         self.ledger_handle = Some(handle);
+        self
+    }
+
+    /// Set entity handle for entity management
+    ///
+    /// When set, the EntityManager delegates all operations to the daemon's
+    /// EntityRegistry, ensuring persistence and consistent state.
+    pub fn with_entity_handle(mut self, handle: EntityHandle) -> Self {
+        self.entity_handle = Some(handle);
         self
     }
 
@@ -272,6 +287,15 @@ impl GatewayServer {
 
         let federation_manager = Arc::new(FederationManager::new());
         let commons_manager = Arc::new(CommonsManager::new());
+
+        // Create entity manager (uses actor if handle available, otherwise in-memory)
+        let entity_manager: Arc<EntityManager> = if let Some(handle) = self.entity_handle {
+            info!("Entity manager wired to daemon EntityRegistry");
+            Arc::new(EntityManager::with_handle(handle))
+        } else {
+            warn!("Entity manager running standalone (in-memory only)");
+            Arc::new(EntityManager::new())
+        };
 
         // Create treasury manager (uses handle if available, otherwise in-memory)
         let treasury_manager: Arc<GatewayTreasuryManager> = if let Some(handle) =
@@ -520,6 +544,7 @@ impl GatewayServer {
                 .app_data(web::Data::new(compute_manager.clone()))
                 .app_data(web::Data::new(federation_manager.clone()))
                 .app_data(web::Data::new(commons_manager.clone()))
+                .app_data(web::Data::new(entity_manager.clone()))
                 .app_data(web::Data::new(treasury_manager.clone()))
                 .app_data(web::Data::new(ledger_manager.clone()))
                 .app_data(web::Data::new(identity_manager.clone()))
@@ -714,6 +739,16 @@ impl GatewayServer {
                         .service(
                             web::scope("/contracts")
                                 .configure(api::contracts::configure)
+                                .wrap(middleware::from_fn(
+                                    crate::rate_limit::rate_limit_middleware,
+                                ))
+                                .wrap(auth.clone()),
+                        )
+                        // Protected entity endpoints (auth + rate limiting)
+                        // Entity CRUD for cooperatives and federations
+                        .service(
+                            web::scope("/entities")
+                                .configure(api::entity::configure)
                                 .wrap(middleware::from_fn(
                                     crate::rate_limit::rate_limit_middleware,
                                 ))
