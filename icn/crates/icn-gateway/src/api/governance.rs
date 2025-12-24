@@ -909,11 +909,24 @@ pub async fn create_delegation(
     Ok(HttpResponse::Created().json(delegation_to_response(&delegation)))
 }
 
+/// Query parameters for listing delegations
+#[derive(Debug, serde::Deserialize)]
+pub struct ListDelegationsQuery {
+    /// Include revoked delegations (default: false)
+    /// By default, only active delegations are shown to protect privacy and reduce noise.
+    #[serde(default)]
+    include_revoked: bool,
+}
+
 /// GET /gov/delegations - List delegations for the authenticated user
+///
+/// By default, only active (non-revoked) delegations are returned.
+/// Use `?include_revoked=true` to also see revoked delegations.
 #[get("/delegations")]
 pub async fn list_delegations(
     http_req: HttpRequest,
     gov_mgr: web::Data<Arc<GovernanceManager>>,
+    query: web::Query<ListDelegationsQuery>,
 ) -> Result<HttpResponse> {
     // Check authorization
     require_scope(&http_req, "gov:read")?;
@@ -931,9 +944,20 @@ pub async fn list_delegations(
     let given = gov_mgr.get_delegations_from(&caller_did).await?;
     let received = gov_mgr.get_delegations_to(&caller_did).await?;
 
+    // Filter out revoked delegations unless explicitly requested
+    let filter_revoked = |d: &Delegation| query.include_revoked || d.revoked_at.is_none();
+
     let response = DelegationListResponse {
-        given: given.iter().map(delegation_to_response).collect(),
-        received: received.iter().map(delegation_to_response).collect(),
+        given: given
+            .iter()
+            .filter(|d| filter_revoked(d))
+            .map(delegation_to_response)
+            .collect(),
+        received: received
+            .iter()
+            .filter(|d| filter_revoked(d))
+            .map(delegation_to_response)
+            .collect(),
     };
 
     Ok(HttpResponse::Ok().json(response))

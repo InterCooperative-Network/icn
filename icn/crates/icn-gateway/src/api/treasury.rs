@@ -47,8 +47,9 @@ pub struct TreasuryStatusResponse {
     pub currency: String,
     /// Whether treasury is active
     pub is_active: bool,
-    /// Current balance (from ledger)
-    pub balance: i64,
+    /// Current balance (from ledger) - None if ledger lookup not yet implemented
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub balance: Option<i64>,
     /// Number of active budgets
     pub active_budget_count: usize,
     /// Number of spending rules
@@ -268,12 +269,14 @@ pub async fn get_treasury_status(
         .filter(|b| matches!(b.status, icn_ledger::BudgetStatus::Active))
         .count();
 
+    // TODO: Get actual balance from ledger via LedgerActor
+    // For now, omit balance field (None is skipped in serialization)
     let response = TreasuryStatusResponse {
         treasury_did: treasury.treasury_did.to_string(),
         coop_id: treasury.coop_id,
         currency: treasury.currency,
         is_active: treasury.is_active,
-        balance: 0, // TODO: Get actual balance from ledger
+        balance: None,
         active_budget_count,
         spending_rule_count: rules.len(),
     };
@@ -303,20 +306,19 @@ pub async fn get_treasury_balance(
         .await
         .map_err(|e| GatewayError::InternalError(e.to_string()))?;
 
-    let Some(treasury) = treasury else {
+    let Some(_treasury) = treasury else {
         return Err(GatewayError::NotFound(format!(
             "Treasury not configured for cooperative '{coop_id}'"
         )));
     };
 
-    // TODO: Get actual balances from ledger
-    // For now, return empty balances
-    let response = TreasuryBalanceResponse {
-        treasury_did: treasury.treasury_did.to_string(),
-        balances: HashMap::new(),
-    };
-
-    Ok(HttpResponse::Ok().json(response))
+    // Balance lookup requires ledger integration which is not yet implemented.
+    // Return 503 Service Unavailable instead of fake/empty data.
+    // TODO: Wire LedgerActor to get actual balances once ledger integration is complete.
+    Err(GatewayError::ServiceUnavailable(
+        "Treasury balance lookup not yet implemented. Use budget endpoints for allocated amounts."
+            .to_string(),
+    ))
 }
 
 /// GET /treasury/{coop_id}/budgets - List budgets

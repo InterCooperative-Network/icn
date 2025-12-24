@@ -1015,7 +1015,10 @@ impl GovernanceActor {
         let mut visited = HashSet::new();
         visited.insert(delegator.clone());
 
-        for _ in 0..Self::MAX_DELEGATION_DEPTH {
+        // Use inclusive range to allow exactly MAX_DELEGATION_DEPTH hops
+        // With MAX_DELEGATION_DEPTH=3: 0..=3 checks 4 positions (delegate + 3 hops)
+        // This ensures we detect cycles at the depth boundary
+        for _ in 0..=Self::MAX_DELEGATION_DEPTH {
             if visited.contains(&current) {
                 return Ok(true);
             }
