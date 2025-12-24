@@ -344,13 +344,10 @@ pub async fn list_budgets(
         .map_err(|e| GatewayError::InternalError(e.to_string()))?;
 
     let Some(treasury) = treasury else {
-        // Return empty list if no treasury configured
-        let response = BudgetListResponse {
-            treasury_did: String::new(),
-            budgets: Vec::new(),
-            total: 0,
-        };
-        return Ok(HttpResponse::Ok().json(response));
+        // Consistent with get_treasury_status: return 404 if treasury not found
+        return Err(GatewayError::NotFound(format!(
+            "Treasury not configured for cooperative '{coop_id}'. Register via governance proposal."
+        )));
     };
 
     // Get budgets
@@ -744,7 +741,9 @@ mod tests {
     }
 
     #[actix_web::test]
-    async fn test_list_budgets_empty() {
+    async fn test_list_budgets_not_found() {
+        // When no treasury is registered for a coop, list_budgets returns 404
+        // (consistent with get_treasury_status)
         let treasury_mgr = create_test_treasury_manager();
         let app = test::init_service(
             App::new()
@@ -758,8 +757,8 @@ mod tests {
             .to_request();
         req.extensions_mut().insert(test_claims("test-coop"));
 
-        let resp: BudgetListResponse = test::call_and_read_body_json(&app, req).await;
-        assert_eq!(resp.budgets.len(), 0);
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), actix_web::http::StatusCode::NOT_FOUND);
     }
 
     #[actix_web::test]

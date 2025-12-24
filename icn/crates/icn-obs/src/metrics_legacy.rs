@@ -2084,6 +2084,10 @@ pub mod governance {
     pub fn membership_updated_inc() {
         counter!("icn_governance_membership_updated_total").increment(1);
     }
+
+    pub fn deserialization_failures_inc() {
+        counter!("icn_governance_deserialization_failures_total").increment(1);
+    }
 }
 
 /// Trust graph metrics

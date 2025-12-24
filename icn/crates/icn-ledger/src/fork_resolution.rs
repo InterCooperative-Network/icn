@@ -158,7 +158,8 @@ impl ForkResolver {
             .as_ref()
             .ok_or_else(|| anyhow!("Trust graph required for trust-weighted resolution"))?;
 
-        // Compute trust scores for both authors (using block_in_place for sync context)
+        // Compute trust scores for both authors
+        // Use block_in_place to handle async lock from sync context (may be called from tokio runtime)
         let trust_graph_clone = trust_graph.clone();
         let author1 = entry1.author.clone();
         let author2 = entry2.author.clone();
@@ -248,7 +249,7 @@ impl ForkResolver {
 
         // Trust component (40% weight)
         if let Some(ref trust_graph) = self.trust_graph {
-            // Acquire read lock on trust graph (using block_in_place for sync context)
+            // Use block_in_place to handle async lock from sync context (may be called from tokio runtime)
             let trust_graph_clone = trust_graph.clone();
             let author_clone = entry.author.clone();
             let trust = tokio::task::block_in_place(|| {

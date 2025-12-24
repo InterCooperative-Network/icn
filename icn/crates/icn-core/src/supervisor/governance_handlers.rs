@@ -1101,7 +1101,7 @@ impl GovernanceEventHandler {
             to_budget_clone.allocated_amount += amount;
 
             // Phase 2: Persist both clones - if either fails, no state is corrupted
-            // Note: We save the ORIGINAL first (before any modification) as our rollback point
+            // Note: We capture the ORIGINAL in memory (before persisting modified clones) for rollback
             let from_budget_original = treasury_guard.get_budget(&from_budget).cloned();
 
             if let Err(e) = treasury_guard.save_budget_snapshot(&from_budget_clone) {
@@ -1167,14 +1167,14 @@ impl GovernanceEventHandler {
 
             // Phase 3: Both persisted successfully - now update in-memory state
             // Use apply_budget_snapshot to ensure consistency
-            if let Err(e) = treasury_guard.apply_budget_snapshot(from_budget_clone) {
+            if let Err(e) = treasury_guard.apply_budget_snapshot(&from_budget_clone) {
                 error!(
                     "🚨 Failed to apply from_budget snapshot to in-memory state: {}. \
                      Storage is updated but memory is stale - restart may be needed.",
                     e
                 );
             }
-            if let Err(e) = treasury_guard.apply_budget_snapshot(to_budget_clone) {
+            if let Err(e) = treasury_guard.apply_budget_snapshot(&to_budget_clone) {
                 error!(
                     "🚨 Failed to apply to_budget snapshot to in-memory state: {}. \
                      Storage is updated but memory is stale - restart may be needed.",

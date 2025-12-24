@@ -349,13 +349,30 @@ impl GovernanceManager {
 
             // Calculate quorum: percentage of eligible voters who participated
             let quorum_percentage = if total_members > 0 {
-                // Use checked_mul to prevent overflow, then clamp to u8 range
+                // Use checked_mul to prevent overflow
                 let total_votes = tally.total_votes();
                 let percentage = total_votes
                     .checked_mul(100)
-                    .and_then(|v| v.checked_div(total_members))
-                    .unwrap_or(0); // Overflow = 0% (conservative)
-                percentage.min(100) as u8 // Clamp to 100% max
+                    .and_then(|v| v.checked_div(total_members));
+
+                match percentage {
+                    Some(p) => p.min(100) as u8, // Clamp to 100% max
+                    None => {
+                        // Overflow in quorum calculation is a critical error - don't silently fail
+                        tracing::error!(
+                            proposal_id = %proposal_id.0,
+                            total_votes = total_votes,
+                            total_members = total_members,
+                            "Integer overflow in quorum calculation"
+                        );
+                        anyhow::bail!(
+                            "Integer overflow calculating quorum for proposal '{}': \
+                             {} votes * 100 overflowed. This indicates corrupted vote data.",
+                            proposal_id.0,
+                            total_votes
+                        );
+                    }
+                }
             } else {
                 0
             };
@@ -388,18 +405,17 @@ impl GovernanceManager {
 
     /// Get vote tally for a proposal
     ///
-    /// Note: Not available in actor-backed mode (returns empty tally).
-    /// TODO: Add get_vote_tally to GovernanceOps trait.
+    /// Note: Returns error in actor-backed mode (not exposed via GovernanceOps).
+    /// TODO(#272): Add get_vote_tally to GovernanceOps trait.
     pub async fn get_vote_tally(&self, proposal_id: &ProposalId) -> Result<VoteTally> {
         if self.governance_handle.is_some() {
             // Actor-backed mode: vote tally not exposed via GovernanceOps
-            // This is a known limitation - the tally must be retrieved via proposal state
-            tracing::warn!(
-                proposal_id = %proposal_id.0,
-                "get_vote_tally called in actor-backed mode; returning empty tally. \
-                 Use proposal.state to get final outcome or add get_vote_tally to GovernanceOps."
+            // Return explicit error rather than silent empty data
+            anyhow::bail!(
+                "Vote tally not available in actor-backed mode for proposal '{}'. \
+                 Use proposal state to get final outcome, or add get_vote_tally to GovernanceOps trait.",
+                proposal_id.0
             );
-            return Ok(VoteTally::empty());
         }
 
         // Standalone mode: in-memory storage
@@ -413,17 +429,17 @@ impl GovernanceManager {
 
     /// Get list of voter DIDs for a proposal (for notifications)
     ///
-    /// Note: Not available in actor-backed mode (returns empty list).
-    /// TODO: Add get_voter_dids to GovernanceOps trait.
+    /// Note: Returns error in actor-backed mode (not exposed via GovernanceOps).
+    /// TODO(#272): Add get_voter_dids to GovernanceOps trait.
     pub async fn get_voter_dids(&self, proposal_id: &ProposalId) -> Result<Vec<Did>> {
         if self.governance_handle.is_some() {
             // Actor-backed mode: voter DIDs not exposed via GovernanceOps
-            tracing::warn!(
-                proposal_id = %proposal_id.0,
-                "get_voter_dids called in actor-backed mode; returning empty list. \
-                 Add get_voter_dids to GovernanceOps to expose this data."
+            // Return explicit error rather than silent empty data
+            anyhow::bail!(
+                "Voter list not available in actor-backed mode for proposal '{}'. \
+                 Add get_voter_dids to GovernanceOps trait to expose this data.",
+                proposal_id.0
             );
-            return Ok(Vec::new());
         }
 
         // Standalone mode: in-memory storage

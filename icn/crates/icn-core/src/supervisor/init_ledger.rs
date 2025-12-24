@@ -17,7 +17,9 @@ use icn_trust::TrustGraph;
 use crate::config::Config;
 
 /// Timeout for acquiring treasury validation lock (milliseconds)
-const TREASURY_VALIDATION_LOCK_TIMEOUT_MS: u64 = 100;
+/// Set to 1000ms (1 second) to handle high load and slow storage backends.
+/// If validation times out, the transaction is rejected to prevent unauthorized withdrawals.
+const TREASURY_VALIDATION_LOCK_TIMEOUT_MS: u64 = 1000;
 
 /// Services initialized during ledger setup
 pub struct LedgerServices {

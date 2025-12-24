@@ -1124,53 +1124,69 @@ impl GovernanceActor {
     }
 
     /// List all delegations from a delegator
+    ///
+    /// Returns error on deserialization failures to surface data corruption issues.
     fn list_delegations_from(&self, delegator: &Did) -> Result<Vec<Delegation>> {
         let prefix = delegation_key_prefix();
         let rows = self.store.scan(prefix)?;
-        rows.into_iter()
-            .filter_map(|(k, v)| match serde_json::from_slice::<Delegation>(&v) {
+        let mut delegations = Vec::new();
+
+        for (k, v) in rows {
+            match serde_json::from_slice::<Delegation>(&v) {
                 Ok(d) => {
                     if &d.delegator == delegator && d.revoked_at.is_none() {
-                        Some(Ok(d))
-                    } else {
-                        None
+                        delegations.push(d);
                     }
                 }
                 Err(e) => {
-                    tracing::warn!(
-                        key = %String::from_utf8_lossy(&k),
+                    let key_str = String::from_utf8_lossy(&k);
+                    tracing::error!(
+                        key = %key_str,
                         error = %e,
-                        "Failed to deserialize delegation record, skipping"
+                        "Failed to deserialize delegation record - data may be corrupted"
                     );
-                    None
+                    icn_obs::metrics::governance::deserialization_failures_inc();
+                    anyhow::bail!(
+                        "Failed to deserialize delegation record for key '{key_str}': {e}"
+                    );
                 }
-            })
-            .collect()
+            }
+        }
+
+        Ok(delegations)
     }
 
     /// List all delegations to a delegate
+    ///
+    /// Returns error on deserialization failures to surface data corruption issues.
     fn list_delegations_to(&self, delegate: &Did) -> Result<Vec<Delegation>> {
         let prefix = delegation_key_prefix();
         let rows = self.store.scan(prefix)?;
-        rows.into_iter()
-            .filter_map(|(k, v)| match serde_json::from_slice::<Delegation>(&v) {
+        let mut delegations = Vec::new();
+
+        for (k, v) in rows {
+            match serde_json::from_slice::<Delegation>(&v) {
                 Ok(d) => {
                     if &d.delegate == delegate && d.revoked_at.is_none() {
-                        Some(Ok(d))
-                    } else {
-                        None
+                        delegations.push(d);
                     }
                 }
                 Err(e) => {
-                    tracing::warn!(
-                        key = %String::from_utf8_lossy(&k),
+                    let key_str = String::from_utf8_lossy(&k);
+                    tracing::error!(
+                        key = %key_str,
                         error = %e,
-                        "Failed to deserialize delegation record, skipping"
+                        "Failed to deserialize delegation record - data may be corrupted"
                     );
-                    None
+                    icn_obs::metrics::governance::deserialization_failures_inc();
+                    anyhow::bail!(
+                        "Failed to deserialize delegation record for key '{key_str}': {e}"
+                    );
                 }
-            })
-            .collect()
+            }
+        }
+
+        Ok(delegations)
     }
 
     /// Revoke a delegation

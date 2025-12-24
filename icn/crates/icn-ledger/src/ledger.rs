@@ -318,18 +318,13 @@ impl Ledger {
             let author_did = &entry.author;
             let min_trust = self.min_trust_for_entry;
 
-            // Acquire read lock on trust graph (using block_in_place for sync context)
-            let trust_graph_clone = trust_graph.clone();
-            let author_clone = author_did.clone();
-            let trust_result: Result<f64, anyhow::Error> = tokio::task::block_in_place(|| {
-                let rt = tokio::runtime::Handle::current();
-                rt.block_on(async {
-                    let graph = trust_graph_clone.read().await;
-                    graph
-                        .compute_trust_score(&author_clone)
-                        .map_err(|e| anyhow::anyhow!(e))
-                })
-            });
+            // Acquire read lock on trust graph using blocking_read for sync context
+            let trust_result: Result<f64, anyhow::Error> = {
+                let graph = trust_graph.blocking_read();
+                graph
+                    .compute_trust_score(author_did)
+                    .map_err(|e| anyhow::anyhow!(e))
+            };
 
             match trust_result {
                 Ok(trust_score) => {
@@ -1177,7 +1172,7 @@ impl Ledger {
                 entry2: conflicting_hash.as_bytes().try_into().unwrap_or([0u8; 32]),
             };
 
-            // Report violation asynchronously (block_in_place for sync context)
+            // Report violation using block_in_place (may be called from tokio runtime)
             let detector_clone = detector.clone();
             let author = entry.author.clone();
             tokio::task::block_in_place(|| {
@@ -2029,15 +2024,8 @@ impl Ledger {
 
                 // Get trust score for the account (or 0.0 if unknown)
                 let trust_score: f64 = if let Some(ref trust_graph) = self.trust_graph {
-                    let trust_graph_clone = trust_graph.clone();
-                    let account_clone = account.clone();
-                    tokio::task::block_in_place(|| {
-                        let rt = tokio::runtime::Handle::current();
-                        rt.block_on(async {
-                            let graph = trust_graph_clone.read().await;
-                            graph.compute_trust_score(&account_clone).unwrap_or(0.0)
-                        })
-                    })
+                    let graph = trust_graph.blocking_read();
+                    graph.compute_trust_score(account).unwrap_or(0.0)
                 } else {
                     0.0
                 }

@@ -825,15 +825,18 @@ impl TreasuryManager {
     /// Used after the persist phase of two-phase commit to sync in-memory state
     /// with storage. Returns error if the budget ID doesn't exist in-memory.
     ///
+    /// Takes a reference and clones internally to avoid consuming the caller's budget,
+    /// allowing the caller to continue using the budget if needed (e.g., for logging).
+    ///
     /// # Safety
     ///
     /// Only call this after successfully calling `save_budget_snapshot` for the same budget.
     /// This ensures storage and memory remain consistent.
-    pub fn apply_budget_snapshot(&mut self, budget: TreasuryBudget) -> Result<()> {
+    pub fn apply_budget_snapshot(&mut self, budget: &TreasuryBudget) -> Result<()> {
         if !self.budgets.contains_key(&budget.id) {
             bail!("Budget not found in-memory: {}", budget.id);
         }
-        self.budgets.insert(budget.id.clone(), budget);
+        self.budgets.insert(budget.id.clone(), budget.clone());
         Ok(())
     }
 
@@ -1673,7 +1676,7 @@ mod tests {
         );
 
         // Phase 3: Apply snapshot to in-memory state
-        let result = manager.apply_budget_snapshot(budget_clone);
+        let result = manager.apply_budget_snapshot(&budget_clone);
         assert!(result.is_ok());
 
         // Now in-memory state should be 500
@@ -1711,7 +1714,7 @@ mod tests {
         );
 
         // Applying snapshot for non-existent budget should fail
-        let result = manager.apply_budget_snapshot(fake_budget);
+        let result = manager.apply_budget_snapshot(&fake_budget);
         assert!(result.is_err());
         assert!(result
             .unwrap_err()
@@ -1783,8 +1786,8 @@ mod tests {
         assert_eq!(manager.get_budget(&to_id).unwrap().allocated_amount, 500);
 
         // Phase 3: Apply both snapshots
-        manager.apply_budget_snapshot(from_clone).unwrap();
-        manager.apply_budget_snapshot(to_clone).unwrap();
+        manager.apply_budget_snapshot(&from_clone).unwrap();
+        manager.apply_budget_snapshot(&to_clone).unwrap();
 
         // Verify transfer completed
         assert_eq!(manager.get_budget(&from_id).unwrap().allocated_amount, 700);
