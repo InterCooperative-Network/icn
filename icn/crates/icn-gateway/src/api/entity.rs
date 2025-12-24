@@ -637,6 +637,31 @@ pub async fn remove_membership(
         .map_err(|e| GatewayError::InternalError(format!("Failed to get entity: {e}")))?
         .ok_or_else(|| GatewayError::NotFound(format!("Entity not found: {entity_id}")))?;
 
+    // Get current members to check if removing last founder
+    let members = entity_mgr
+        .get_members(&entity_id)
+        .map_err(|e| GatewayError::InternalError(format!("Failed to get members: {e}")))?;
+
+    // Find the membership being removed
+    let membership_to_remove = members.iter().find(|m| m.member_id == member_id);
+
+    // Prevent removing the last founder
+    if let Some(membership) = membership_to_remove {
+        if matches!(membership.role, MembershipRole::Founder) {
+            let founder_count = members
+                .iter()
+                .filter(|m| matches!(m.role, MembershipRole::Founder))
+                .count();
+
+            if founder_count <= 1 {
+                return Err(GatewayError::BadRequest(
+                    "Cannot remove the last founder. Transfer founder role to another member first."
+                        .to_string(),
+                ));
+            }
+        }
+    }
+
     info!(
         entity_id = %entity_id,
         member_id = %member_id,
@@ -709,5 +734,119 @@ mod tests {
             matches!(parse_role("OFFICER:CEO").unwrap(), MembershipRole::Officer { title } if title == "CEO")
         );
         assert!(parse_role("invalid").is_err());
+    }
+
+    #[test]
+    fn test_format_entity_type() {
+        assert_eq!(format_entity_type(&EntityType::Individual), "individual");
+        assert_eq!(format_entity_type(&EntityType::Cooperative), "cooperative");
+        assert_eq!(format_entity_type(&EntityType::Federation), "federation");
+        assert_eq!(format_entity_type(&EntityType::Unknown), "unknown");
+    }
+
+    #[test]
+    fn test_format_entity_status() {
+        use icn_entity::EntityStatus;
+
+        assert_eq!(format_entity_status(&EntityStatus::Forming), "forming");
+        assert_eq!(format_entity_status(&EntityStatus::Active), "active");
+
+        let suspended = EntityStatus::Suspended {
+            reason: "audit".to_string(),
+            suspended_at: 123456,
+        };
+        assert_eq!(format_entity_status(&suspended), "suspended:audit");
+
+        let dissolving = EntityStatus::Dissolving { started_at: 123456 };
+        assert_eq!(format_entity_status(&dissolving), "dissolving");
+
+        let dissolved = EntityStatus::Dissolved {
+            dissolved_at: 123456,
+        };
+        assert_eq!(format_entity_status(&dissolved), "dissolved");
+
+        let merged = EntityStatus::Merged {
+            into: "entity:icn:cooperative:target-coop".parse().unwrap(),
+            merged_at: 123456,
+        };
+        assert!(format_entity_status(&merged).starts_with("merged:"));
+
+        let split = EntityStatus::Split {
+            into: vec!["entity:icn:cooperative:coop-a".parse().unwrap()],
+            split_at: 123456,
+        };
+        assert_eq!(format_entity_status(&split), "split");
+    }
+
+    #[test]
+    fn test_format_role() {
+        assert_eq!(format_role(&MembershipRole::Founder), "founder");
+        assert_eq!(format_role(&MembershipRole::Member), "member");
+        assert_eq!(format_role(&MembershipRole::Worker), "worker");
+        assert_eq!(format_role(&MembershipRole::Consumer), "consumer");
+        assert_eq!(format_role(&MembershipRole::Producer), "producer");
+        assert_eq!(format_role(&MembershipRole::BoardMember), "board_member");
+        assert_eq!(
+            format_role(&MembershipRole::Officer {
+                title: "President".to_string()
+            }),
+            "officer:President"
+        );
+        assert_eq!(
+            format_role(&MembershipRole::FederatedMember),
+            "federated_member"
+        );
+        assert_eq!(
+            format_role(&MembershipRole::AssociateMember),
+            "associate_member"
+        );
+        assert_eq!(
+            format_role(&MembershipRole::ObserverMember),
+            "observer_member"
+        );
+        assert_eq!(
+            format_role(&MembershipRole::ProvisionalMember),
+            "provisional_member"
+        );
+        assert_eq!(
+            format_role(&MembershipRole::Custom {
+                name: "Steward".to_string()
+            }),
+            "custom:Steward"
+        );
+    }
+
+    #[test]
+    fn test_format_membership_status() {
+        use icn_entity::MembershipStatus;
+
+        assert_eq!(
+            format_membership_status(&MembershipStatus::Pending),
+            "pending"
+        );
+        assert_eq!(
+            format_membership_status(&MembershipStatus::Active),
+            "active"
+        );
+        assert_eq!(
+            format_membership_status(&MembershipStatus::Suspended),
+            "suspended"
+        );
+        assert_eq!(
+            format_membership_status(&MembershipStatus::Inactive),
+            "inactive"
+        );
+        assert_eq!(
+            format_membership_status(&MembershipStatus::Removed),
+            "removed"
+        );
+        assert_eq!(
+            format_membership_status(&MembershipStatus::Resigned),
+            "resigned"
+        );
+        assert_eq!(
+            format_membership_status(&MembershipStatus::Expelled),
+            "expelled"
+        );
     }
 }
