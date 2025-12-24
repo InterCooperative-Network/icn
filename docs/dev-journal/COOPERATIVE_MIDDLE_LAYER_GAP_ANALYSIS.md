@@ -1,6 +1,14 @@
 # Cooperative Middle Layer: Gap Analysis
 
-**Date**: 2025-12-23
+---
+**Status**: DRAFT
+**Created**: 2025-12-23
+**Updated**: 2025-12-24
+**Authors**: fahertym, Claude Code
+**Decision Makers**: TBD (pending review)
+
+---
+
 **Related**: [ICN_SDIS_INTEGRATED_VISION.md](ICN_SDIS_INTEGRATED_VISION.md)
 
 ## Executive Summary

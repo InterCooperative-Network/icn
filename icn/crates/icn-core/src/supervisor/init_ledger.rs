@@ -3,6 +3,7 @@
 //! Initializes the double-entry ledger, dispute management, and contract execution.
 
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::RwLock;
 use tracing::info;
 
@@ -14,6 +15,9 @@ use icn_store::SledStore;
 use icn_trust::TrustGraph;
 
 use crate::config::Config;
+
+/// Timeout for acquiring treasury validation lock (milliseconds)
+const TREASURY_VALIDATION_LOCK_TIMEOUT_MS: u64 = 100;
 
 /// Services initialized during ledger setup
 pub struct LedgerServices {
@@ -99,21 +103,37 @@ pub async fn init_ledger_services(
 
             // Then validate treasury spending rules
             // SECURITY: Treasury validation is critical - unauthorized withdrawals must be blocked.
-            // If we can't acquire the lock, reject the entry to prevent bypass attacks.
-            match treasury_clone.try_read() {
-                Ok(treasury_mgr) => {
-                    treasury_mgr.validate_entry(entry)?;
-                }
-                Err(_) => {
-                    // Lock contention during validation - reject to prevent bypass
-                    anyhow::bail!(
-                        "Treasury validation temporarily unavailable - please retry. \
-                         This prevents unauthorized withdrawals during high contention."
-                    );
-                }
-            }
+            // Use timeout-based lock acquisition to balance availability with security.
+            let timeout_duration = Duration::from_millis(TREASURY_VALIDATION_LOCK_TIMEOUT_MS);
 
-            Ok(())
+            // Use block_in_place to acquire async lock in sync validation context
+            let validation_result = tokio::task::block_in_place(|| {
+                let rt = tokio::runtime::Handle::current();
+                rt.block_on(async {
+                    match tokio::time::timeout(timeout_duration, treasury_clone.read()).await {
+                        Ok(treasury_mgr) => {
+                            let result = treasury_mgr.validate_entry(entry);
+                            if result.is_ok() {
+                                icn_obs::metrics::treasury::validation_success_inc();
+                            } else {
+                                icn_obs::metrics::treasury::validation_failed_inc();
+                            }
+                            result
+                        }
+                        Err(_timeout) => {
+                            // Lock acquisition timeout - track metric and reject
+                            icn_obs::metrics::treasury::validation_lock_contention_inc();
+                            let timeout_ms = TREASURY_VALIDATION_LOCK_TIMEOUT_MS;
+                            Err(anyhow::anyhow!(
+                                "Treasury validation timeout after {timeout_ms}ms - please retry. \
+                                 This prevents unauthorized withdrawals during high contention."
+                            ))
+                        }
+                    }
+                })
+            });
+
+            validation_result
         });
     }
 

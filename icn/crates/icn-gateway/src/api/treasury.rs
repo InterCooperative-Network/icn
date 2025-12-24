@@ -25,9 +25,11 @@ use crate::treasury_mgr::GatewayTreasuryManager;
 // ============================================================================
 
 /// Default pagination limit for audit trail queries
+/// TODO: Make configurable via gateway config or environment variable
 const DEFAULT_AUDIT_LIMIT: usize = 20;
 
 /// Maximum pagination limit for audit trail queries
+/// TODO: Make configurable via gateway config or environment variable
 const MAX_AUDIT_LIMIT: usize = 100;
 
 // ============================================================================

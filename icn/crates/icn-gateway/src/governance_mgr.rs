@@ -37,11 +37,18 @@ pub type GovernanceHandle = Arc<dyn GovernanceOps + Send + Sync>;
 /// Supports two modes:
 /// - **Standalone mode** (`new()`): In-memory storage, for testing only
 /// - **Actor-backed mode** (`with_handle()`): Delegates to daemon's GovernanceActor
+///
+/// Note: In actor-backed mode, the in-memory fields (domains, proposals, votes,
+/// delegations) are initialized but unused - all operations delegate to the
+/// daemon's GovernanceActor. They exist for standalone testing fallback.
 pub struct GovernanceManager {
-    /// In-memory storage - used in standalone mode
+    /// In-memory storage for domains (standalone mode only)
     domains: RwLock<HashMap<GovernanceDomainId, GovernanceDomain>>,
+    /// In-memory storage for proposals (standalone mode only)
     proposals: RwLock<HashMap<ProposalId, Proposal>>,
+    /// In-memory storage for votes (standalone mode only)
     votes: RwLock<HashMap<ProposalId, Vec<Vote>>>,
+    /// In-memory storage for delegations (standalone mode only)
     delegations: RwLock<HashMap<DelegationId, Delegation>>,
     /// Optional handle to daemon's GovernanceActor (actor-backed mode)
     governance_handle: Option<GovernanceHandle>,
@@ -70,10 +77,15 @@ impl GovernanceManager {
     /// - Persistence across restarts
     /// - Gossip synchronization
     /// - Single source of truth
+    ///
+    /// Note: The in-memory HashMaps are initialized but never used in this mode.
+    /// They exist only for API consistency with standalone mode.
     pub fn with_handle(handle: GovernanceHandle) -> Self {
         debug!("GovernanceManager created with daemon GovernanceActor handle");
         GovernanceManager {
-            domains: RwLock::new(HashMap::new()), // Not used in actor-backed mode
+            // These fields are unused in actor-backed mode - all operations
+            // delegate to the GovernanceActor via governance_handle
+            domains: RwLock::new(HashMap::new()),
             proposals: RwLock::new(HashMap::new()),
             votes: RwLock::new(HashMap::new()),
             delegations: RwLock::new(HashMap::new()),

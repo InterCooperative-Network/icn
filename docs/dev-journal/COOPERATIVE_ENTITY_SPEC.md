@@ -1,8 +1,15 @@
 # CooperativeEntity Type Specification
 
-**Date**: 2025-12-24
-**Phase**: 19 - Cooperative Entity Foundation
+---
 **Status**: DRAFT
+**Created**: 2025-12-24
+**Updated**: 2025-12-24
+**Phase**: 19 - Cooperative Entity Foundation
+**Authors**: fahertym, Claude Code
+**Decision Makers**: TBD (pending review)
+
+---
+
 **Related**: [COOPERATIVE_MIDDLE_LAYER_GAP_ANALYSIS.md](COOPERATIVE_MIDDLE_LAYER_GAP_ANALYSIS.md)
 
 ## Overview

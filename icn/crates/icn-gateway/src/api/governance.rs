@@ -1881,8 +1881,7 @@ mod tests {
         let err_msg = result.unwrap_err().to_string();
         assert!(
             err_msg.contains("not found"),
-            "Expected 'not found' in error message but got: {}",
-            err_msg
+            "Expected 'not found' in error message but got: {err_msg}",
         );
     }
 
