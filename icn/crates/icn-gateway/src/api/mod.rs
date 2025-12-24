@@ -9,6 +9,7 @@ pub mod constitutional;
 pub mod contracts;
 pub mod coops;
 pub mod devices;
+pub mod entity;
 pub mod escrow;
 pub mod federation;
 pub mod governance;

@@ -273,6 +273,11 @@ impl GatewayServer {
         let federation_manager = Arc::new(FederationManager::new());
         let commons_manager = Arc::new(CommonsManager::new());
 
+        // Create entity manager (uses actor if handle available, otherwise in-memory)
+        // TODO: Add entity handle for actor-backed mode when EntityActor is ready
+        let entity_manager = Arc::new(crate::entity_mgr::EntityManager::new());
+        info!("Entity manager running standalone (in-memory only)");
+
         // Create treasury manager (uses handle if available, otherwise in-memory)
         let treasury_manager: Arc<GatewayTreasuryManager> = if let Some(handle) =
             self.treasury_handle
@@ -520,6 +525,7 @@ impl GatewayServer {
                 .app_data(web::Data::new(compute_manager.clone()))
                 .app_data(web::Data::new(federation_manager.clone()))
                 .app_data(web::Data::new(commons_manager.clone()))
+                .app_data(web::Data::new(entity_manager.clone()))
                 .app_data(web::Data::new(treasury_manager.clone()))
                 .app_data(web::Data::new(ledger_manager.clone()))
                 .app_data(web::Data::new(identity_manager.clone()))
@@ -714,6 +720,16 @@ impl GatewayServer {
                         .service(
                             web::scope("/contracts")
                                 .configure(api::contracts::configure)
+                                .wrap(middleware::from_fn(
+                                    crate::rate_limit::rate_limit_middleware,
+                                ))
+                                .wrap(auth.clone()),
+                        )
+                        // Protected entity endpoints (auth + rate limiting)
+                        // Entity CRUD for cooperatives and federations
+                        .service(
+                            web::scope("/entities")
+                                .configure(api::entity::configure)
                                 .wrap(middleware::from_fn(
                                     crate::rate_limit::rate_limit_middleware,
                                 ))

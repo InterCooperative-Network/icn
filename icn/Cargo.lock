@@ -2978,6 +2978,7 @@ dependencies = [
  "icn-coop",
  "icn-cooperative",
  "icn-crypto-pq",
+ "icn-entity",
  "icn-federation",
  "icn-governance",
  "icn-identity",

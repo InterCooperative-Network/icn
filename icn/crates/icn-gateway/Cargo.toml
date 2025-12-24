@@ -60,6 +60,7 @@ sha2 = "0.10"
 
 # ICN dependencies
 icn-identity = { path = "../icn-identity" }
+icn-entity = { path = "../icn-entity" }
 icn-time = { path = "../icn-time" }
 icn-ledger = { path = "../icn-ledger" }
 icn-store = { path = "../icn-store", features = ["openapi"] }
