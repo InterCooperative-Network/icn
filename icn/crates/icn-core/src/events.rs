@@ -55,6 +55,18 @@ pub enum SystemEvent {
         /// Execution outcome as JSON
         outcome: serde_json::Value,
     },
+
+    /// A proposal execution failed (proposal was accepted but could not be applied)
+    ProposalExecutionFailed {
+        /// Unique identifier for the proposal
+        proposal_id: ProposalId,
+        /// Type of the proposal (e.g., "protocol_change", "treasury")
+        proposal_type: String,
+        /// Human-readable error message
+        error: String,
+        /// Unix timestamp when the failure occurred
+        failed_at: u64,
+    },
 }
 
 /// Callback function for event subscribers
@@ -146,6 +158,7 @@ impl EventBus {
             SystemEvent::ProposalRejected { .. } => "ProposalRejected",
             SystemEvent::TransactionExecuted { .. } => "TransactionExecuted",
             SystemEvent::ContractExecuted { .. } => "ContractExecuted",
+            SystemEvent::ProposalExecutionFailed { .. } => "ProposalExecutionFailed",
         };
 
         debug!(

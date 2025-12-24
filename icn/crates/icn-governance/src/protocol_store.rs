@@ -75,6 +75,11 @@ pub trait ProtocolParameterStore: Send + Sync {
     /// Get change history for a parameter
     fn get_history(&self, id: &str) -> Result<Vec<ParameterChange>>;
 
+    /// Prune old history entries, keeping only the last `max_entries` per parameter
+    ///
+    /// Returns the number of entries removed.
+    fn prune_history(&self, id: &str, max_entries: usize) -> Result<usize>;
+
     /// Delete a parameter (for testing/admin only)
     fn delete(&self, id: &str) -> Result<()>;
 
@@ -172,6 +177,17 @@ impl ProtocolParameterStore for InMemoryParameterStore {
         let id = param.id.clone();
         let scope_key = Self::scope_key(&param.scope);
 
+        // Validate scope override permissions for non-global scopes
+        if !matches!(param.scope, ParameterScope::Global) {
+            if let Some(global_param) = self.get(&id)? {
+                if !global_param.constraints.allow_override {
+                    return Err(anyhow::anyhow!(
+                        "Parameter '{id}' does not allow scope overrides"
+                    ));
+                }
+            }
+        }
+
         // Get old value for history
         let old_value = if matches!(param.scope, ParameterScope::Global) {
             self.get(&id)?.map(|p| p.value)
@@ -247,6 +263,25 @@ impl ProtocolParameterStore for InMemoryParameterStore {
             .read()
             .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
         Ok(history.get(id).cloned().unwrap_or_default())
+    }
+
+    fn prune_history(&self, id: &str, max_entries: usize) -> Result<usize> {
+        let mut history = self
+            .history
+            .write()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+
+        if let Some(entries) = history.get_mut(id) {
+            if entries.len() > max_entries {
+                // Sort by timestamp descending (newest first)
+                entries.sort_by(|a, b| b.changed_at.cmp(&a.changed_at));
+                // Keep only the most recent max_entries
+                let removed = entries.len() - max_entries;
+                entries.truncate(max_entries);
+                return Ok(removed);
+            }
+        }
+        Ok(0)
     }
 
     fn delete(&self, id: &str) -> Result<()> {
@@ -342,8 +377,9 @@ impl SledParameterStore {
         format!("param_scope:{scope_str}:{id}").into_bytes()
     }
 
-    fn history_key(id: &str, timestamp: u64) -> Vec<u8> {
-        format!("history:{id}:{timestamp:020}").into_bytes()
+    fn history_key(id: &str, timestamp: u64, nonce: u64) -> Vec<u8> {
+        // Include nonce to ensure uniqueness even if multiple updates happen in same second
+        format!("history:{id}:{timestamp:020}:{nonce:020}").into_bytes()
     }
 
     fn history_prefix(id: &str) -> Vec<u8> {
@@ -409,6 +445,18 @@ impl ProtocolParameterStore for SledParameterStore {
     ) -> Result<()> {
         let id = param.id.clone();
 
+        // Validate scope override permissions for non-global scopes
+        if !matches!(param.scope, ParameterScope::Global) {
+            // Check if the global parameter allows overrides
+            if let Some(global_param) = self.get(&id)? {
+                if !global_param.constraints.allow_override {
+                    return Err(anyhow::anyhow!(
+                        "Parameter '{id}' does not allow scope overrides"
+                    ));
+                }
+            }
+        }
+
         // Get old value for history
         let old_value = if matches!(param.scope, ParameterScope::Global) {
             self.get(&id)?.map(|p| p.value)
@@ -433,6 +481,7 @@ impl ProtocolParameterStore for SledParameterStore {
         // Record history if we had an old value
         if let Some(old) = old_value {
             let now = icn_time::current_timestamp_secs();
+            let nonce = self.db.generate_id()?;
             let change = ParameterChange {
                 parameter_id: id.clone(),
                 old_value: old,
@@ -442,7 +491,7 @@ impl ProtocolParameterStore for SledParameterStore {
                 changed_by,
             };
 
-            let history_key = Self::history_key(&id, now);
+            let history_key = Self::history_key(&id, now, nonce);
             let history_value = Self::serialize(&change)?;
             self.db.insert(&history_key, history_value)?;
         }
@@ -487,6 +536,34 @@ impl ProtocolParameterStore for SledParameterStore {
         // Sort by timestamp (oldest first)
         changes.sort_by_key(|c| c.changed_at);
         Ok(changes)
+    }
+
+    fn prune_history(&self, id: &str, max_entries: usize) -> Result<usize> {
+        let prefix = Self::history_prefix(id);
+        let mut entries: Vec<(sled::IVec, u64)> = Vec::new();
+
+        // Collect all history entries with their timestamps
+        for item in self.db.scan_prefix(&prefix) {
+            let (key, value) = item?;
+            let change: ParameterChange = Self::deserialize_change(&value)?;
+            entries.push((key, change.changed_at));
+        }
+
+        if entries.len() <= max_entries {
+            return Ok(0);
+        }
+
+        // Sort by timestamp descending (newest first)
+        entries.sort_by(|a, b| b.1.cmp(&a.1));
+
+        // Remove entries beyond max_entries
+        let mut removed = 0;
+        for (key, _) in entries.into_iter().skip(max_entries) {
+            self.db.remove(&key)?;
+            removed += 1;
+        }
+
+        Ok(removed)
     }
 
     fn delete(&self, id: &str) -> Result<()> {
@@ -565,6 +642,17 @@ mod tests {
         )
     }
 
+    fn test_param_with_override(id: &str, value: i64, allow_override: bool) -> ProtocolParameter {
+        let mut param = ProtocolParameter::new(
+            id,
+            "Test Parameter",
+            "A test parameter",
+            ParameterValue::Integer(value),
+        );
+        param.constraints.allow_override = allow_override;
+        param
+    }
+
     // ========================================
     // InMemoryParameterStore tests
     // ========================================
@@ -627,9 +715,13 @@ mod tests {
         let coop_id = EntityId::cooperative("test-coop").unwrap();
         let fed_id = EntityId::federation("test-fed").unwrap();
 
-        // Set global default
+        // Set global default with allow_override = true to allow scoped overrides
         store
-            .set(test_param("test.scoped", 10), None, None)
+            .set(
+                test_param_with_override("test.scoped", 10, true),
+                None,
+                None,
+            )
             .unwrap();
 
         // Set federation override
@@ -739,9 +831,13 @@ mod tests {
         let coop_id = EntityId::cooperative("test-coop").unwrap();
         let fed_id = EntityId::federation("test-fed").unwrap();
 
-        // Set global default
+        // Set global default with allow_override = true to allow scoped overrides
         store
-            .set(test_param("test.scoped", 10), None, None)
+            .set(
+                test_param_with_override("test.scoped", 10, true),
+                None,
+                None,
+            )
             .unwrap();
 
         // Set federation override
@@ -855,5 +951,121 @@ mod tests {
             let param = store.get("persist.test").unwrap().unwrap();
             assert_eq!(param.value, ParameterValue::Integer(999));
         }
+    }
+
+    #[test]
+    fn test_scope_override_validation_inmemory() {
+        let store = InMemoryParameterStore::new();
+
+        // Create a parameter that does NOT allow overrides
+        let mut param = test_param("test.no_override", 100);
+        param.constraints.allow_override = false;
+        store.set(param, None, None).unwrap();
+
+        // Try to set a scoped override - should fail
+        let fed_id = EntityId::federation("test-fed").unwrap();
+        let scoped_param = ProtocolParameter::new(
+            "test.no_override",
+            "No Override",
+            "Cannot be overridden",
+            ParameterValue::Integer(200),
+        )
+        .with_scope(ParameterScope::Federation { id: fed_id });
+
+        let result = store.set(scoped_param, None, None);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("does not allow scope overrides"));
+    }
+
+    #[test]
+    fn test_scope_override_validation_sled() {
+        let store = SledParameterStore::temporary().unwrap();
+
+        // Create a parameter that does NOT allow overrides
+        let mut param = test_param("test.no_override", 100);
+        param.constraints.allow_override = false;
+        store.set(param, None, None).unwrap();
+
+        // Try to set a scoped override - should fail
+        let coop_id = EntityId::cooperative("test-coop").unwrap();
+        let scoped_param = ProtocolParameter::new(
+            "test.no_override",
+            "No Override",
+            "Cannot be overridden",
+            ParameterValue::Integer(200),
+        )
+        .with_scope(ParameterScope::Cooperative { id: coop_id });
+
+        let result = store.set(scoped_param, None, None);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("does not allow scope overrides"));
+    }
+
+    #[test]
+    fn test_prune_history_inmemory() {
+        let store = InMemoryParameterStore::new();
+
+        // Create a parameter and update it several times
+        store.set(test_param("test.prune", 1), None, None).unwrap();
+        for i in 2..=10 {
+            let param = ProtocolParameter::new(
+                "test.prune",
+                "Prune Test",
+                "Test pruning",
+                ParameterValue::Integer(i),
+            );
+            store
+                .set(param, Some(format!("proposal-{i}")), None)
+                .unwrap();
+        }
+
+        // Should have 9 history entries (first set doesn't create history)
+        let history = store.get_history("test.prune").unwrap();
+        assert_eq!(history.len(), 9);
+
+        // Prune to keep only last 3
+        let removed = store.prune_history("test.prune", 3).unwrap();
+        assert_eq!(removed, 6);
+
+        // Verify only 3 remain
+        let history = store.get_history("test.prune").unwrap();
+        assert_eq!(history.len(), 3);
+    }
+
+    #[test]
+    fn test_prune_history_sled() {
+        let store = SledParameterStore::temporary().unwrap();
+
+        // Create a parameter and update it several times
+        store.set(test_param("test.prune", 1), None, None).unwrap();
+        for i in 2..=10 {
+            let param = ProtocolParameter::new(
+                "test.prune",
+                "Prune Test",
+                "Test pruning",
+                ParameterValue::Integer(i),
+            );
+            store
+                .set(param, Some(format!("proposal-{i}")), None)
+                .unwrap();
+        }
+
+        // Should have 9 history entries
+        let history = store.get_history("test.prune").unwrap();
+        assert_eq!(history.len(), 9);
+
+        // Prune to keep only last 5
+        let removed = store.prune_history("test.prune", 5).unwrap();
+        assert_eq!(removed, 4);
+
+        // Verify only 5 remain
+        let history = store.get_history("test.prune").unwrap();
+        assert_eq!(history.len(), 5);
     }
 }

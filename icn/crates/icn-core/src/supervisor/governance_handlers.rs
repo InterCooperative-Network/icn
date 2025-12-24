@@ -29,6 +29,9 @@ pub type DisputeManagerHandle = Arc<RwLock<DisputeManager>>;
 /// Type alias for the treasury manager handle
 pub type TreasuryManagerHandle = Arc<RwLock<TreasuryManager>>;
 
+/// Type alias for the event bus
+pub type EventBus = Arc<crate::events::EventBus>;
+
 /// Handler for governance proposal events
 ///
 /// Encapsulates all dependencies needed to execute governance proposals,
@@ -49,6 +52,8 @@ pub struct GovernanceEventHandler {
     treasury_manager: TreasuryManagerHandle,
     /// Treasury DID for budget payouts
     treasury_did: Did,
+    /// Event bus for emitting system events
+    event_bus: Option<EventBus>,
 }
 
 impl GovernanceEventHandler {
@@ -70,6 +75,30 @@ impl GovernanceEventHandler {
             dispute_manager,
             treasury_manager,
             treasury_did,
+            event_bus: None,
+        }
+    }
+
+    /// Set the event bus for error reporting
+    pub fn with_event_bus(mut self, event_bus: EventBus) -> Self {
+        self.event_bus = Some(event_bus);
+        self
+    }
+
+    /// Emit a proposal execution failure event
+    fn emit_execution_failure(&self, proposal_id: &ProposalId, proposal_type: &str, error: &str) {
+        if let Some(ref bus) = self.event_bus {
+            let bus = bus.clone();
+            let event = crate::events::SystemEvent::ProposalExecutionFailed {
+                proposal_id: proposal_id.clone(),
+                proposal_type: proposal_type.to_string(),
+                error: error.to_string(),
+                failed_at: icn_time::current_timestamp_secs(),
+            };
+            // Spawn async emit in the background (fire-and-forget)
+            tokio::spawn(async move {
+                bus.emit(event).await;
+            });
         }
     }
 
@@ -2344,10 +2373,12 @@ impl GovernanceEventHandler {
             Ok(Some(mut param)) => {
                 // Validate the new value against parameter constraints
                 if let Err(e) = param.validate(&proposal.new_value) {
-                    warn!(
-                        "Protocol parameter {} validation failed for proposal {}: {}",
-                        proposal.parameter_id, proposal_id_str, e
+                    let error_msg = format!(
+                        "Validation failed for parameter '{}': {}",
+                        proposal.parameter_id, e
                     );
+                    warn!("{} (proposal {})", error_msg, proposal_id_str);
+                    self.emit_execution_failure(&proposal_id, "protocol_change", &error_msg);
                     return;
                 }
 
@@ -2367,10 +2398,12 @@ impl GovernanceEventHandler {
                     Some(proposal_id_str.clone()),
                     None,
                 ) {
-                    warn!(
-                        "Failed to persist protocol parameter {} for proposal {}: {}",
-                        proposal.parameter_id, proposal_id_str, e
+                    let error_msg = format!(
+                        "Failed to persist parameter '{}': {}",
+                        proposal.parameter_id, e
                     );
+                    warn!("{} (proposal {})", error_msg, proposal_id_str);
+                    self.emit_execution_failure(&proposal_id, "protocol_change", &error_msg);
                 } else {
                     info!(
                         "✓ Protocol parameter {} updated to {:?}",
@@ -2379,16 +2412,18 @@ impl GovernanceEventHandler {
                 }
             }
             Ok(None) => {
-                warn!(
-                    "Protocol parameter {} not found, cannot apply change from proposal {}",
-                    proposal.parameter_id, proposal_id_str
+                let error_msg = format!(
+                    "Parameter '{}' not found, cannot apply change",
+                    proposal.parameter_id
                 );
+                warn!("{} (proposal {})", error_msg, proposal_id_str);
+                self.emit_execution_failure(&proposal_id, "protocol_change", &error_msg);
             }
             Err(e) => {
-                warn!(
-                    "Failed to get protocol parameter {} for proposal {}: {}",
-                    proposal.parameter_id, proposal_id_str, e
-                );
+                let error_msg =
+                    format!("Failed to get parameter '{}': {}", proposal.parameter_id, e);
+                warn!("{} (proposal {})", error_msg, proposal_id_str);
+                self.emit_execution_failure(&proposal_id, "protocol_change", &error_msg);
             }
         }
 
