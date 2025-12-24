@@ -212,14 +212,37 @@ impl EntityRegistry for InMemoryRegistry {
         let parent_str = membership.parent_id.as_str();
 
         // Verify both entities exist
-        if !self.entities.contains_key(member_str) {
+        let member_entity = self.entities.get(member_str).ok_or_else(|| {
+            EntityError::MembershipError(format!("Member entity not found: {member_str}"))
+        })?;
+        let parent_entity = self.entities.get(parent_str).ok_or_else(|| {
+            EntityError::MembershipError(format!("Parent entity not found: {parent_str}"))
+        })?;
+
+        // Validate entity type relationships:
+        // - Individuals can join Cooperatives or Federations
+        // - Cooperatives can join Federations
+        // - Federations can join Federations (recursive)
+        // - Nothing can join an Individual
+        let valid_relationship = match (&parent_entity.entity_type, &member_entity.entity_type) {
+            // Cooperatives accept individuals
+            (EntityType::Cooperative, EntityType::Individual) => true,
+            // Federations accept individuals, cooperatives, and other federations
+            (EntityType::Federation, EntityType::Individual) => true,
+            (EntityType::Federation, EntityType::Cooperative) => true,
+            (EntityType::Federation, EntityType::Federation) => true,
+            // Individuals cannot have members
+            (EntityType::Individual, _) => false,
+            // Unknown types - reject for safety
+            (EntityType::Unknown, _) | (_, EntityType::Unknown) => false,
+            // Other combinations are invalid
+            _ => false,
+        };
+
+        if !valid_relationship {
             return Err(EntityError::MembershipError(format!(
-                "Member entity not found: {member_str}"
-            )));
-        }
-        if !self.entities.contains_key(parent_str) {
-            return Err(EntityError::MembershipError(format!(
-                "Parent entity not found: {parent_str}"
+                "Invalid membership: {:?} cannot be a member of {:?}",
+                member_entity.entity_type, parent_entity.entity_type
             )));
         }
 
@@ -502,6 +525,58 @@ mod tests {
         // Try to delete coop with active member
         let result = registry.delete(&coop_id);
         assert!(matches!(result, Err(EntityError::RegistryError(_))));
+    }
+
+    #[test]
+    fn test_invalid_membership_relationships() {
+        let mut registry = InMemoryRegistry::new();
+
+        // Create entities
+        let individual = create_test_individual();
+        let individual_id = individual.id.clone();
+        registry.register(individual).unwrap();
+
+        let coop = create_test_coop();
+        let coop_id = coop.id.clone();
+        registry.register(coop).unwrap();
+
+        let fed = CooperativeEntity::federation("test-fed", "Test Federation").unwrap();
+        let fed_id = fed.id.clone();
+        registry.register(fed).unwrap();
+
+        // Valid: Individual joins Cooperative
+        let membership = Membership::active(
+            individual_id.clone(),
+            coop_id.clone(),
+            MembershipRole::Worker,
+        );
+        assert!(registry.add_membership(membership).is_ok());
+
+        // Valid: Cooperative joins Federation
+        let membership = Membership::active(
+            coop_id.clone(),
+            fed_id.clone(),
+            MembershipRole::FederatedMember,
+        );
+        assert!(registry.add_membership(membership).is_ok());
+
+        // Invalid: Cooperative cannot be member of Individual
+        let individual2 = create_test_individual();
+        let individual2_id = individual2.id.clone();
+        registry.register(individual2).unwrap();
+
+        let invalid = Membership::active(coop_id.clone(), individual2_id, MembershipRole::Member);
+        let result = registry.add_membership(invalid);
+        assert!(matches!(result, Err(EntityError::MembershipError(_))));
+
+        // Invalid: Federation cannot be member of Cooperative
+        let fed2 = CooperativeEntity::federation("test-fed-2", "Test Federation 2").unwrap();
+        let fed2_id = fed2.id.clone();
+        registry.register(fed2).unwrap();
+
+        let invalid = Membership::active(fed2_id, coop_id, MembershipRole::FederatedMember);
+        let result = registry.add_membership(invalid);
+        assert!(matches!(result, Err(EntityError::MembershipError(_))));
     }
 
     #[tokio::test]

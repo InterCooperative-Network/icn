@@ -68,24 +68,55 @@ impl EntityId {
     }
 
     /// Validate a slug for use in EntityId
+    ///
+    /// Rules:
+    /// - 3-64 characters
+    /// - Lowercase letters, numbers, hyphens only
+    /// - Must start with a letter
+    /// - No consecutive hyphens
     fn validate_slug(slug: &str) -> Result<()> {
-        if slug.is_empty() {
-            return Err(EntityError::InvalidFormat("Slug cannot be empty".into()));
-        }
-        if slug.len() > 128 {
+        if slug.len() < 3 {
             return Err(EntityError::InvalidFormat(
-                "Slug cannot exceed 128 characters".into(),
+                "Slug must be at least 3 characters".into(),
             ));
         }
-        // Allow alphanumeric, hyphens, and underscores
-        if !slug
-            .chars()
-            .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
-        {
+        if slug.len() > 64 {
             return Err(EntityError::InvalidFormat(
-                "Slug can only contain alphanumeric characters, hyphens, and underscores".into(),
+                "Slug cannot exceed 64 characters".into(),
             ));
         }
+
+        let mut chars = slug.chars().peekable();
+
+        // Must start with a lowercase letter
+        match chars.next() {
+            Some(c) if c.is_ascii_lowercase() => {}
+            _ => {
+                return Err(EntityError::InvalidFormat(
+                    "Slug must start with a lowercase letter".into(),
+                ));
+            }
+        }
+
+        // Check remaining characters
+        let mut prev_hyphen = false;
+        for c in chars {
+            if c == '-' {
+                if prev_hyphen {
+                    return Err(EntityError::InvalidFormat(
+                        "Slug cannot contain consecutive hyphens".into(),
+                    ));
+                }
+                prev_hyphen = true;
+            } else if c.is_ascii_lowercase() || c.is_ascii_digit() {
+                prev_hyphen = false;
+            } else {
+                return Err(EntityError::InvalidFormat(
+                    "Slug can only contain lowercase letters, numbers, and hyphens".into(),
+                ));
+            }
+        }
+
         Ok(())
     }
 
@@ -288,6 +319,22 @@ impl EntityStatus {
     }
 }
 
+impl std::fmt::Display for EntityStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            EntityStatus::Forming => write!(f, "Forming"),
+            EntityStatus::Active => write!(f, "Active"),
+            EntityStatus::Suspended { reason, .. } => write!(f, "Suspended: {reason}"),
+            EntityStatus::Dissolving { .. } => write!(f, "Dissolving"),
+            EntityStatus::Dissolved { .. } => write!(f, "Dissolved"),
+            EntityStatus::Merged { into, .. } => write!(f, "Merged into {}", into.identifier()),
+            EntityStatus::Split { into, .. } => {
+                write!(f, "Split into {} entities", into.len())
+            }
+        }
+    }
+}
+
 // ============================================================================
 // AccountReference
 // ============================================================================
@@ -421,31 +468,44 @@ impl CooperativeEntity {
         })
     }
 
+    // ========================================================================
+    // Builder methods
+    //
+    // Note: Builder methods are for initial construction and do NOT update
+    // the `updated_at` timestamp. When modifying an existing entity, use
+    // `EntityRegistry::update()` which should update the timestamp.
+    // ========================================================================
+
     /// Set the parent entity
+    #[must_use]
     pub fn with_parent(mut self, parent_id: EntityId) -> Self {
         self.parent_id = Some(parent_id);
         self
     }
 
     /// Set the governance domain
+    #[must_use]
     pub fn with_governance_domain(mut self, domain_id: impl Into<String>) -> Self {
         self.governance_domain_id = Some(domain_id.into());
         self
     }
 
     /// Set the treasury account
+    #[must_use]
     pub fn with_treasury(mut self, account: AccountReference) -> Self {
         self.treasury_account = Some(account);
         self
     }
 
     /// Set the description
+    #[must_use]
     pub fn with_description(mut self, description: impl Into<String>) -> Self {
         self.description = Some(description.into());
         self
     }
 
     /// Add metadata
+    #[must_use]
     pub fn with_metadata(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
         self.metadata.insert(key.into(), value.into());
         self
@@ -591,12 +651,29 @@ mod tests {
 
     #[test]
     fn test_entity_id_slug_validation() {
-        // Valid slugs
+        // Valid slugs (lowercase, 3-64 chars, start with letter)
         assert!(EntityId::cooperative("valid-slug").is_ok());
-        assert!(EntityId::cooperative("valid_slug").is_ok());
-        assert!(EntityId::cooperative("ValidSlug123").is_ok());
+        assert!(EntityId::cooperative("abc").is_ok());
+        assert!(EntityId::cooperative("test123").is_ok());
+        assert!(EntityId::cooperative("food-coop-2024").is_ok());
 
-        // Invalid slugs
+        // Invalid: too short
+        assert!(EntityId::cooperative("ab").is_err());
+
+        // Invalid: doesn't start with letter
+        assert!(EntityId::cooperative("123-coop").is_err());
+        assert!(EntityId::cooperative("-test").is_err());
+
+        // Invalid: uppercase
+        assert!(EntityId::cooperative("ValidSlug").is_err());
+
+        // Invalid: underscores not allowed
+        assert!(EntityId::cooperative("valid_slug").is_err());
+
+        // Invalid: consecutive hyphens
+        assert!(EntityId::cooperative("test--coop").is_err());
+
+        // Invalid: empty or spaces
         assert!(EntityId::cooperative("").is_err());
         assert!(EntityId::cooperative("invalid slug").is_err());
         assert!(EntityId::cooperative("invalid/slug").is_err());
