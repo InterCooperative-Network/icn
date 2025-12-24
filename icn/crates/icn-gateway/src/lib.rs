@@ -77,4 +77,5 @@ pub use rate_limit::{
     RateLimiter, VelocityLimitConfig, VelocityLimiter,
 };
 pub use server::GatewayServer;
+pub use entity_mgr::EntityHandle;
 pub use treasury_mgr::{GatewayTreasuryManager, LedgerHandle, TreasuryHandle};

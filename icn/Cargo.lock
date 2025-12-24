@@ -2854,6 +2854,7 @@ dependencies = [
  "icn-compute",
  "icn-coop",
  "icn-cooperative",
+ "icn-entity",
  "icn-federation",
  "icn-gateway",
  "icn-gossip",
