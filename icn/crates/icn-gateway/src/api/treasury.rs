@@ -10,27 +10,67 @@
 //! spending thresholds, budget creation) must go through the governance
 //! proposal system.
 
-use actix_web::{get, post, web, HttpRequest, HttpResponse};
+use actix_web::{get, post, web, HttpMessage, HttpRequest, HttpResponse};
+use icn_identity::Did;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::info;
 
+use crate::auth::TokenClaims;
 use crate::error::{GatewayError, Result};
 use crate::middleware::{require_coop_access, require_scope};
 use crate::treasury_mgr::GatewayTreasuryManager;
 
 // ============================================================================
-// Constants
+// Configurable Limits
 // ============================================================================
 
+/// Minimum allowed value for limits (prevents invalid zero limits)
+const MIN_LIMIT: usize = 1;
+
+/// Default fallback values (used when env vars are not set)
+const DEFAULT_AUDIT_LIMIT_FALLBACK: usize = 20;
+const MAX_AUDIT_LIMIT_FALLBACK: usize = 100;
+
 /// Default pagination limit for audit trail queries
-/// TODO: Make configurable via gateway config or environment variable
-const DEFAULT_AUDIT_LIMIT: usize = 20;
+/// Can be overridden via ICN_AUDIT_DEFAULT_LIMIT environment variable
+///
+/// Validation:
+/// - Must be >= MIN_LIMIT (1)
+/// - Must be <= max_audit_limit()
+/// - Invalid values fall back to DEFAULT_AUDIT_LIMIT_FALLBACK
+fn default_audit_limit() -> usize {
+    let max = max_audit_limit_raw();
+    let raw = std::env::var("ICN_AUDIT_DEFAULT_LIMIT")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(DEFAULT_AUDIT_LIMIT_FALLBACK);
+
+    // Clamp to valid range: [MIN_LIMIT, max]
+    raw.max(MIN_LIMIT).min(max)
+}
 
 /// Maximum pagination limit for audit trail queries
-/// TODO: Make configurable via gateway config or environment variable
-const MAX_AUDIT_LIMIT: usize = 100;
+/// Can be overridden via ICN_AUDIT_MAX_LIMIT environment variable
+///
+/// Validation:
+/// - Must be >= MIN_LIMIT (1)
+/// - Invalid values fall back to MAX_AUDIT_LIMIT_FALLBACK
+fn max_audit_limit() -> usize {
+    max_audit_limit_raw()
+}
+
+/// Internal: get raw max limit without clamping default
+fn max_audit_limit_raw() -> usize {
+    let raw = std::env::var("ICN_AUDIT_MAX_LIMIT")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(MAX_AUDIT_LIMIT_FALLBACK);
+
+    // Ensure at least MIN_LIMIT
+    raw.max(MIN_LIMIT)
+}
 
 // ============================================================================
 // Request/Response Types
@@ -269,14 +309,18 @@ pub async fn get_treasury_status(
         .filter(|b| matches!(b.status, icn_ledger::BudgetStatus::Active))
         .count();
 
-    // TODO: Get actual balance from ledger via LedgerActor
-    // For now, omit balance field (None is skipped in serialization)
+    // Query actual balance from ledger (returns None if ledger not wired)
+    let balance = treasury_mgr
+        .get_treasury_balance(&treasury.treasury_did, &treasury.currency)
+        .await
+        .map_err(|e| GatewayError::InternalError(e.to_string()))?;
+
     let response = TreasuryStatusResponse {
         treasury_did: treasury.treasury_did.to_string(),
         coop_id: treasury.coop_id,
         currency: treasury.currency,
         is_active: treasury.is_active,
-        balance: None,
+        balance,
         active_budget_count,
         spending_rule_count: rules.len(),
     };
@@ -306,19 +350,33 @@ pub async fn get_treasury_balance(
         .await
         .map_err(|e| GatewayError::InternalError(e.to_string()))?;
 
-    let Some(_treasury) = treasury else {
+    let Some(treasury) = treasury else {
         return Err(GatewayError::NotFound(format!(
             "Treasury not configured for cooperative '{coop_id}'"
         )));
     };
 
-    // Balance lookup requires ledger integration which is not yet implemented.
-    // Return 503 Service Unavailable instead of fake/empty data.
-    // TODO: Wire LedgerActor to get actual balances once ledger integration is complete.
-    Err(GatewayError::ServiceUnavailable(
-        "Treasury balance lookup not yet implemented. Use budget endpoints for allocated amounts."
-            .to_string(),
-    ))
+    // Check if ledger is wired for balance queries
+    if !treasury_mgr.is_ledger_wired() {
+        return Err(GatewayError::ServiceUnavailable(
+            "Treasury balance lookup requires daemon integration. \
+             Start icnd with full identity to enable balance queries."
+                .to_string(),
+        ));
+    }
+
+    // Query all balances from ledger
+    let balances = treasury_mgr
+        .get_all_treasury_balances(&treasury.treasury_did)
+        .await
+        .map_err(|e| GatewayError::InternalError(e.to_string()))?;
+
+    let response = TreasuryBalanceResponse {
+        treasury_did: treasury.treasury_did.to_string(),
+        balances,
+    };
+
+    Ok(HttpResponse::Ok().json(response))
 }
 
 /// GET /treasury/{coop_id}/budgets - List budgets
@@ -576,8 +634,8 @@ pub async fn get_audit_trail(
     let limit: usize = query
         .get("limit")
         .and_then(|s| s.parse().ok())
-        .unwrap_or(DEFAULT_AUDIT_LIMIT)
-        .min(MAX_AUDIT_LIMIT);
+        .unwrap_or_else(default_audit_limit)
+        .min(max_audit_limit());
 
     let offset: usize = query
         .get("offset")
@@ -645,6 +703,7 @@ pub async fn deposit_to_treasury(
     req: HttpRequest,
     path: web::Path<String>,
     body: web::Json<DepositRequest>,
+    treasury_mgr: web::Data<Arc<GatewayTreasuryManager>>,
 ) -> Result<HttpResponse> {
     require_scope(&req, "treasury:write")?;
 
@@ -664,25 +723,74 @@ pub async fn deposit_to_treasury(
         ));
     }
 
+    // Get depositor DID from auth token
+    let claims = req
+        .extensions()
+        .get::<TokenClaims>()
+        .cloned()
+        .ok_or_else(|| {
+            GatewayError::AuthenticationFailed("Missing authentication claims".to_string())
+        })?;
+
+    let depositor_did: Did = claims.sub.parse().map_err(|e| {
+        GatewayError::InternalError(format!("Invalid depositor DID in claims: {e}"))
+    })?;
+
+    // Get the treasury for this cooperative
+    let treasury = treasury_mgr
+        .get_treasury_by_coop(&coop_id)
+        .await
+        .map_err(|e| GatewayError::InternalError(e.to_string()))?
+        .ok_or_else(|| {
+            GatewayError::NotFound(format!("Treasury not found for cooperative: {coop_id}"))
+        })?;
+
     info!(
         coop_id = %coop_id,
+        depositor = %depositor_did,
+        treasury = %treasury.treasury_did,
         amount = body.amount,
         currency = %body.currency,
         "Treasury deposit requested"
     );
 
-    // TODO: Wire to ledger to create deposit entry
-    // Deposits don't require approval - they add to treasury
+    // Check if ledger is wired for deposits
+    if !treasury_mgr.is_ledger_wired() {
+        return Err(GatewayError::ServiceUnavailable(
+            "Treasury deposits require daemon integration. \
+             Start icnd with full identity to enable deposits."
+                .to_string(),
+        ));
+    }
+
+    // Create the deposit entry
+    let entry_hash = treasury_mgr
+        .create_deposit(
+            &treasury.treasury_did,
+            &depositor_did,
+            body.amount,
+            body.currency.clone(),
+            body.memo.clone(),
+        )
+        .await
+        .map_err(|e| GatewayError::InternalError(e.to_string()))?;
+
+    info!(
+        coop_id = %coop_id,
+        entry_hash = %entry_hash,
+        "Treasury deposit completed"
+    );
 
     let response = serde_json::json!({
-        "status": "pending",
-        "message": "Treasury deposit processing",
+        "status": "completed",
+        "message": "Treasury deposit successful",
         "coop_id": coop_id,
         "amount": body.amount,
-        "currency": body.currency
+        "currency": body.currency,
+        "entry_hash": entry_hash.to_string()
     });
 
-    Ok(HttpResponse::Accepted().json(response))
+    Ok(HttpResponse::Ok().json(response))
 }
 
 // ============================================================================

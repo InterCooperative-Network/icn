@@ -129,6 +129,9 @@ impl Supervisor {
         // Treasury handle for gateway integration
         let treasury_handle_for_gateway: Option<icn_gateway::TreasuryHandle>;
 
+        // Ledger handle for gateway balance queries
+        let ledger_handle_for_gateway: Option<icn_gateway::LedgerHandle>;
+
         // Governance event subscription handles - MUST persist for daemon lifetime
         // Stored at function scope to prevent premature Drop (which would unsubscribe)
         let governance_event_subscription: Option<crate::events::SubscriptionHandle>;
@@ -833,6 +836,9 @@ impl Supervisor {
             // Store treasury handle for gateway integration
             treasury_handle_for_gateway = Some(treasury_manager_handle.clone());
 
+            // Store ledger handle for gateway balance queries
+            ledger_handle_for_gateway = Some(ledger_handle.clone());
+
             // Subscribe to governance events for ledger execution
             // CRITICAL: Must store handle to keep subscription alive for daemon lifetime
             governance_event_subscription = Some({
@@ -1076,13 +1082,14 @@ impl Supervisor {
 
             info!("Metrics update task spawned (system metrics only)");
 
-            // No event broadcaster or compute/trust/governance/treasury handles without identity
+            // No event broadcaster or compute/trust/governance/treasury/ledger handles without identity
             event_broadcaster = None;
             compute_handle_for_gateway = None;
             coop_handle_for_gateway = None;
             trust_graph_handle_for_gateway = None;
             governance_handle_for_gateway = None;
             treasury_handle_for_gateway = None;
+            ledger_handle_for_gateway = None;
 
             (None, None, None)
         };
@@ -1155,6 +1162,11 @@ impl Supervisor {
                         // Connect treasury handle if available
                         if let Some(handle) = treasury_handle_for_gateway {
                             gateway_server = gateway_server.with_treasury_handle(handle);
+                        }
+
+                        // Connect ledger handle for balance queries
+                        if let Some(handle) = ledger_handle_for_gateway {
+                            gateway_server = gateway_server.with_ledger_handle(handle);
                         }
 
                         if let Err(e) = gateway_server.run().await {

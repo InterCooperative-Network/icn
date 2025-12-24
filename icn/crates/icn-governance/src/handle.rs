@@ -6,7 +6,7 @@ use icn_identity::Did;
 
 use crate::{
     Delegation, DelegationId, GovernanceDomain, GovernanceDomainId, GovernanceParams,
-    MembershipConfig, Proposal, ProposalId, ProposalPayload, Timestamp, VoteChoice,
+    MembershipConfig, Proposal, ProposalId, ProposalPayload, Timestamp, VoteChoice, VoteTally,
 };
 
 /// Trait for governance operations exposed to RPC layer
@@ -84,4 +84,17 @@ pub trait GovernanceOps: Send + Sync {
 
     /// Revoke a delegation
     async fn revoke_delegation(&self, id: &DelegationId, revoked_at: Timestamp) -> Result<()>;
+
+    // Vote tracking operations
+
+    /// Get the vote tally for a proposal
+    ///
+    /// Returns the current vote counts (for, against, abstain) for a proposal.
+    async fn get_vote_tally(&self, proposal_id: &ProposalId) -> Result<VoteTally>;
+
+    /// Get the list of DIDs who voted on a proposal
+    ///
+    /// Returns all DIDs that have cast votes on the proposal.
+    /// Useful for notifications and audit purposes.
+    async fn get_voter_dids(&self, proposal_id: &ProposalId) -> Result<Vec<Did>>;
 }

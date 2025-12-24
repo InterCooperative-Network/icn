@@ -18,9 +18,10 @@
 use anyhow::Result;
 use icn_identity::Did;
 use icn_ledger::{
-    ApprovalType, PaginatedAuditTrail, SpendingRule, Treasury, TreasuryAuditRecord, TreasuryBudget,
-    TreasuryManager as LedgerTreasuryManager, TreasuryOperation,
+    ApprovalType, Ledger, PaginatedAuditTrail, SpendingRule, Treasury, TreasuryAuditRecord,
+    TreasuryBudget, TreasuryManager as LedgerTreasuryManager, TreasuryOperation,
 };
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::debug;
@@ -30,16 +31,26 @@ use tracing::debug;
 /// This wraps the daemon's TreasuryManager for gateway integration.
 pub type TreasuryHandle = Arc<RwLock<LedgerTreasuryManager>>;
 
+/// Handle type for ledger balance queries
+///
+/// This wraps the daemon's Ledger for balance lookups.
+pub type LedgerHandle = Arc<RwLock<Ledger>>;
+
 /// Treasury manager for gateway API
 ///
 /// Supports two modes:
 /// - **Standalone mode** (`new()`): In-memory storage, for testing only
 /// - **Actor-backed mode** (`with_handle()`): Delegates to daemon's TreasuryManager
+///
+/// When a `LedgerHandle` is set (via `set_ledger_handle`), balance queries
+/// return actual ledger balances instead of placeholders.
 pub struct GatewayTreasuryManager {
     /// In-memory TreasuryManager - used in standalone mode
     standalone: Option<LedgerTreasuryManager>,
     /// Optional handle to daemon's TreasuryManager (actor-backed mode)
     treasury_handle: Option<TreasuryHandle>,
+    /// Optional handle to daemon's Ledger (for balance queries)
+    ledger_handle: Option<LedgerHandle>,
 }
 
 impl GatewayTreasuryManager {
@@ -52,6 +63,7 @@ impl GatewayTreasuryManager {
         GatewayTreasuryManager {
             standalone: Some(LedgerTreasuryManager::new()),
             treasury_handle: None,
+            ledger_handle: None,
         }
     }
 
@@ -67,12 +79,27 @@ impl GatewayTreasuryManager {
         GatewayTreasuryManager {
             standalone: None,
             treasury_handle: Some(handle),
+            ledger_handle: None,
         }
+    }
+
+    /// Set ledger handle for balance queries
+    ///
+    /// When set, balance queries return actual ledger balances.
+    /// When not set, balance endpoints return None or 503.
+    pub fn set_ledger_handle(&mut self, handle: LedgerHandle) {
+        debug!("GatewayTreasuryManager wired to daemon Ledger for balance queries");
+        self.ledger_handle = Some(handle);
     }
 
     /// Check if running in actor-backed mode
     pub fn is_actor_backed(&self) -> bool {
         self.treasury_handle.is_some()
+    }
+
+    /// Check if ledger is wired for balance queries
+    pub fn is_ledger_wired(&self) -> bool {
+        self.ledger_handle.is_some()
     }
 
     // ============================================================================
@@ -288,6 +315,124 @@ impl GatewayTreasuryManager {
         }
 
         anyhow::bail!("Audit recording not supported in standalone mode")
+    }
+
+    // ============================================================================
+    // Ledger Balance Queries
+    // ============================================================================
+
+    /// Get balance for a treasury account from ledger
+    ///
+    /// Returns the balance for a specific currency, or None if ledger not wired.
+    pub async fn get_treasury_balance(
+        &self,
+        treasury_did: &Did,
+        currency: &str,
+    ) -> Result<Option<i64>> {
+        if let Some(ref ledger_handle) = self.ledger_handle {
+            let ledger = ledger_handle.read().await;
+            let balance = ledger.get_balance(treasury_did, currency);
+            return Ok(Some(balance));
+        }
+        Ok(None) // Ledger not wired
+    }
+
+    /// Get all balances for a treasury account
+    ///
+    /// Returns a map of currency -> balance, or empty if ledger not wired.
+    pub async fn get_all_treasury_balances(
+        &self,
+        treasury_did: &Did,
+    ) -> Result<HashMap<String, i64>> {
+        if let Some(ref ledger_handle) = self.ledger_handle {
+            let ledger = ledger_handle.read().await;
+            let account_balances = ledger.get_account_balances(treasury_did);
+            return Ok(account_balances.balances);
+        }
+        Ok(HashMap::new()) // Ledger not wired
+    }
+
+    // ============================================================================
+    // Ledger Write Operations
+    // ============================================================================
+
+    /// Create a deposit entry in the ledger
+    ///
+    /// Creates a journal entry that transfers value from the depositor to the treasury.
+    /// In ICN's mutual credit accounting:
+    /// - The depositor is credited (balance decreases = giving funds)
+    /// - The treasury is debited (balance increases = receiving funds)
+    ///
+    /// The balance is captured atomically with the ledger update to ensure
+    /// the audit trail reflects the correct post-deposit balance.
+    ///
+    /// Returns the entry hash on success.
+    ///
+    /// Requires ledger_handle to be wired. Treasury handle is optional but
+    /// required for audit trail recording.
+    pub async fn create_deposit(
+        &self,
+        treasury_did: &Did,
+        from_did: &Did,
+        amount: i64,
+        currency: String,
+        memo: Option<String>,
+    ) -> Result<icn_ledger::ContentHash> {
+        let ledger_handle = self
+            .ledger_handle
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Ledger not wired - deposits require daemon mode"))?;
+
+        // Build the journal entry: credit depositor (giving funds), debit treasury (receiving funds)
+        // In ICN's mutual credit accounting:
+        // - Credit = balance decreases (giving value)
+        // - Debit = balance increases (receiving value)
+        let mut entry = icn_ledger::entry::JournalEntryBuilder::new(from_did.clone())
+            .credit(from_did.clone(), currency.clone(), amount) // Depositor gives funds
+            .debit(treasury_did.clone(), currency.clone(), amount) // Treasury receives funds
+            .build()?;
+
+        // Compute the hash
+        let hash = entry.compute_hash()?;
+
+        // Append to ledger and get new balance atomically to avoid race conditions.
+        // We must capture the balance while holding the lock to ensure consistency
+        // between the ledger state and the audit trail.
+        let new_balance = {
+            let mut ledger = ledger_handle.write().await;
+            ledger.append_entry(entry)?;
+            ledger.get_balance(treasury_did, &currency)
+        };
+
+        // Record audit trail if treasury handle is available
+        if self.treasury_handle.is_some() {
+            let operation = TreasuryOperation::Deposit {
+                from: from_did.clone(),
+                amount,
+                currency,
+                memo,
+            };
+
+            self.record_audit(
+                treasury_did,
+                operation,
+                from_did.clone(),
+                new_balance,
+                None, // No proposal for deposits
+                Some(hash.clone()),
+            )
+            .await?;
+        }
+
+        debug!(
+            treasury = %treasury_did,
+            from = %from_did,
+            amount = amount,
+            hash = %hash,
+            "Created treasury deposit entry"
+        );
+
+        Ok(hash)
     }
 }
 
