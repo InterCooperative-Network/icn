@@ -6,8 +6,10 @@ use icn_identity::Did;
 
 use crate::{
     Delegation, DelegationId, GovernanceDomain, GovernanceDomainId, GovernanceParams,
-    MembershipConfig, Proposal, ProposalId, ProposalPayload, Timestamp, VoteChoice, VoteTally,
+    MembershipConfig, ParameterChange, Proposal, ProposalId, ProposalPayload, ProtocolParameter,
+    Timestamp, VoteChoice, VoteTally,
 };
+use icn_entity::EntityId;
 
 /// Trait for governance operations exposed to RPC layer
 ///
@@ -97,4 +99,34 @@ pub trait GovernanceOps: Send + Sync {
     /// Returns all DIDs that have cast votes on the proposal.
     /// Useful for notifications and audit purposes.
     async fn get_voter_dids(&self, proposal_id: &ProposalId) -> Result<Vec<Did>>;
+
+    // Protocol parameter operations (Phase 20)
+
+    /// List all protocol parameters
+    ///
+    /// Returns all defined protocol parameters with their current values.
+    async fn list_protocol_parameters(&self) -> Result<Vec<ProtocolParameter>>;
+
+    /// Get a specific protocol parameter by ID
+    ///
+    /// Returns the parameter if it exists.
+    async fn get_protocol_parameter(&self, id: &str) -> Result<Option<ProtocolParameter>>;
+
+    /// Get the effective value of a protocol parameter with scope resolution
+    ///
+    /// Scope resolution order: Cooperative > Federation > Global
+    /// If coop_id is provided and has an override, that value is returned.
+    /// Otherwise, if fed_id is provided and has an override, that value is returned.
+    /// Otherwise, the global value is returned.
+    async fn get_effective_protocol_parameter(
+        &self,
+        id: &str,
+        coop_id: Option<&EntityId>,
+        fed_id: Option<&EntityId>,
+    ) -> Result<Option<ProtocolParameter>>;
+
+    /// Get the change history for a protocol parameter
+    ///
+    /// Returns all historical changes to the parameter, ordered by timestamp.
+    async fn get_protocol_parameter_history(&self, id: &str) -> Result<Vec<ParameterChange>>;
 }

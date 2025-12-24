@@ -266,6 +266,22 @@ pub enum ProposalPayload {
         min_required_version: Option<Version>,
     },
 
+    // === Protocol Parameter Change (Phase 20) ===
+    /// Protocol parameter change proposal
+    ///
+    /// Enables governance-controlled modification of protocol parameters.
+    /// Parameters can be scoped to:
+    /// - Global (network-wide defaults)
+    /// - Federation (federation-specific override)
+    /// - Cooperative (cooperative-specific override)
+    ///
+    /// Parameters are validated against constraints before application.
+    /// Changes are recorded with full history for auditing.
+    ProtocolChange {
+        /// The parameter change proposal
+        proposal: crate::protocol::ProtocolChangeProposal,
+    },
+
     // === Treasury Operations (Issue #246) ===
     /// Treasury management proposal
     ///
