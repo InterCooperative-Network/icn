@@ -26,22 +26,50 @@ use crate::treasury_mgr::GatewayTreasuryManager;
 // Configurable Limits
 // ============================================================================
 
+/// Minimum allowed value for limits (prevents invalid zero limits)
+const MIN_LIMIT: usize = 1;
+
+/// Default fallback values (used when env vars are not set)
+const DEFAULT_AUDIT_LIMIT_FALLBACK: usize = 20;
+const MAX_AUDIT_LIMIT_FALLBACK: usize = 100;
+
 /// Default pagination limit for audit trail queries
 /// Can be overridden via ICN_AUDIT_DEFAULT_LIMIT environment variable
+///
+/// Validation:
+/// - Must be >= MIN_LIMIT (1)
+/// - Must be <= max_audit_limit()
+/// - Invalid values fall back to DEFAULT_AUDIT_LIMIT_FALLBACK
 fn default_audit_limit() -> usize {
-    std::env::var("ICN_AUDIT_DEFAULT_LIMIT")
+    let max = max_audit_limit_raw();
+    let raw = std::env::var("ICN_AUDIT_DEFAULT_LIMIT")
         .ok()
         .and_then(|v| v.parse().ok())
-        .unwrap_or(20)
+        .unwrap_or(DEFAULT_AUDIT_LIMIT_FALLBACK);
+
+    // Clamp to valid range: [MIN_LIMIT, max]
+    raw.max(MIN_LIMIT).min(max)
 }
 
 /// Maximum pagination limit for audit trail queries
 /// Can be overridden via ICN_AUDIT_MAX_LIMIT environment variable
+///
+/// Validation:
+/// - Must be >= MIN_LIMIT (1)
+/// - Invalid values fall back to MAX_AUDIT_LIMIT_FALLBACK
 fn max_audit_limit() -> usize {
-    std::env::var("ICN_AUDIT_MAX_LIMIT")
+    max_audit_limit_raw()
+}
+
+/// Internal: get raw max limit without clamping default
+fn max_audit_limit_raw() -> usize {
+    let raw = std::env::var("ICN_AUDIT_MAX_LIMIT")
         .ok()
         .and_then(|v| v.parse().ok())
-        .unwrap_or(100)
+        .unwrap_or(MAX_AUDIT_LIMIT_FALLBACK);
+
+    // Ensure at least MIN_LIMIT
+    raw.max(MIN_LIMIT)
 }
 
 // ============================================================================

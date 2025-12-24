@@ -358,10 +358,18 @@ impl GatewayTreasuryManager {
 
     /// Create a deposit entry in the ledger
     ///
-    /// Creates a journal entry that credits the treasury and debits the depositor.
+    /// Creates a journal entry that transfers value from the depositor to the treasury.
+    /// In ICN's mutual credit accounting:
+    /// - The depositor is credited (balance decreases = giving funds)
+    /// - The treasury is debited (balance increases = receiving funds)
+    ///
+    /// The balance is captured atomically with the ledger update to ensure
+    /// the audit trail reflects the correct post-deposit balance.
+    ///
     /// Returns the entry hash on success.
     ///
-    /// Requires both ledger_handle and treasury_handle to be wired.
+    /// Requires ledger_handle to be wired. Treasury handle is optional but
+    /// required for audit trail recording.
     pub async fn create_deposit(
         &self,
         treasury_did: &Did,
@@ -375,29 +383,29 @@ impl GatewayTreasuryManager {
             .as_ref()
             .ok_or_else(|| anyhow::anyhow!("Ledger not wired - deposits require daemon mode"))?;
 
-        // Build the journal entry: debit from depositor, credit to treasury
+        // Build the journal entry: credit depositor (giving funds), debit treasury (receiving funds)
+        // In ICN's mutual credit accounting:
+        // - Credit = balance decreases (giving value)
+        // - Debit = balance increases (receiving value)
         let mut entry = icn_ledger::entry::JournalEntryBuilder::new(from_did.clone())
-            .debit(from_did.clone(), currency.clone(), amount)
-            .credit(treasury_did.clone(), currency.clone(), amount)
+            .credit(from_did.clone(), currency.clone(), amount) // Depositor gives funds
+            .debit(treasury_did.clone(), currency.clone(), amount) // Treasury receives funds
             .build()?;
 
         // Compute the hash
         let hash = entry.compute_hash()?;
 
-        // Append to ledger
-        {
+        // Append to ledger and get new balance atomically to avoid race conditions.
+        // We must capture the balance while holding the lock to ensure consistency
+        // between the ledger state and the audit trail.
+        let new_balance = {
             let mut ledger = ledger_handle.write().await;
             ledger.append_entry(entry)?;
-        }
+            ledger.get_balance(treasury_did, &currency)
+        };
 
         // Record audit trail if treasury handle is available
         if self.treasury_handle.is_some() {
-            // Get the new balance for audit
-            let new_balance = self
-                .get_treasury_balance(treasury_did, &currency)
-                .await?
-                .unwrap_or(0);
-
             let operation = TreasuryOperation::Deposit {
                 from: from_did.clone(),
                 amount,

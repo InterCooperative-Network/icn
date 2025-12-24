@@ -20,6 +20,27 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::debug;
 
+// ============================================================================
+// Trust Score Constants
+// ============================================================================
+
+/// Default trust score returned when trust cannot be computed.
+///
+/// This corresponds to the "Known" trust level in ICN's trust classification:
+/// - Isolated: < 0.1 (10 msg/sec rate limit)
+/// - Known: 0.1-0.4 (50 msg/sec rate limit)
+/// - Partner: 0.4-0.7 (100 msg/sec rate limit)
+/// - Federated: > 0.7 (200 msg/sec rate limit)
+///
+/// A score of 0.5 represents the middle of the "Known+" range, providing
+/// moderate rate limits while not granting excessive privileges to unknown peers.
+///
+/// This default is used when:
+/// 1. The TrustGraph returns an error during score computation
+/// 2. Running in standalone mode without a configured perspective DID
+/// 3. The target DID has no trust edges (neither direct nor transitive)
+pub const DEFAULT_TRUST_SCORE: f64 = 0.5;
+
 /// Trust edge for API responses
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TrustEdgeResponse {
@@ -254,19 +275,38 @@ impl TrustManager {
     /// This computes the trust score from the node's perspective to the given DID.
     /// Used for rate limiting based on trust level.
     ///
-    /// Returns the trust score, or 0.5 (Known level) if unable to compute.
+    /// # Trust-Based Rate Limiting
+    ///
+    /// The returned score maps to velocity limits as follows:
+    /// - Isolated (< 0.1): 10 msg/sec - Unknown/untrusted peers
+    /// - Known (0.1-0.4): 50 msg/sec - Recognized but not endorsed
+    /// - Partner (0.4-0.7): 100 msg/sec - Trusted collaborators
+    /// - Federated (> 0.7): 200 msg/sec - Highly trusted federation members
+    ///
+    /// # Default Behavior
+    ///
+    /// Returns [`DEFAULT_TRUST_SCORE`] (0.5) when trust cannot be computed:
+    /// - TrustGraph lookup fails or returns None
+    /// - Running in standalone mode without a configured perspective DID
+    /// - Target has no trust edges in the graph
+    ///
+    /// The 0.5 default places unknown targets at the Partner threshold,
+    /// which is intentionally permissive to avoid blocking legitimate traffic
+    /// from new participants while still providing some rate protection.
     pub async fn compute_trust_score_for_velocity(&self, target: &Did) -> f64 {
         if let Some(ref handle) = self.trust_graph {
             // Actor-backed mode: delegate to TrustGraph
             let graph = handle.read().await;
-            graph.compute_trust_score(target).unwrap_or(0.5)
+            graph
+                .compute_trust_score(target)
+                .unwrap_or(DEFAULT_TRUST_SCORE)
         } else {
             // Standalone mode: use own_did if set, otherwise return default
             if let Some(ref own_did) = self.own_did {
                 self.compute_trust_score_local(own_did, target)
             } else {
-                // No perspective set, return Known level default
-                0.5
+                // No perspective set - see DEFAULT_TRUST_SCORE documentation
+                DEFAULT_TRUST_SCORE
             }
         }
     }
