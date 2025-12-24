@@ -249,6 +249,28 @@ impl TrustManager {
         }
     }
 
+    /// Compute trust score for velocity limiting (async version)
+    ///
+    /// This computes the trust score from the node's perspective to the given DID.
+    /// Used for rate limiting based on trust level.
+    ///
+    /// Returns the trust score, or 0.5 (Known level) if unable to compute.
+    pub async fn compute_trust_score_for_velocity(&self, target: &Did) -> f64 {
+        if let Some(ref handle) = self.trust_graph {
+            // Actor-backed mode: delegate to TrustGraph
+            let graph = handle.read().await;
+            graph.compute_trust_score(target).unwrap_or(0.5)
+        } else {
+            // Standalone mode: use own_did if set, otherwise return default
+            if let Some(ref own_did) = self.own_did {
+                self.compute_trust_score_local(own_did, target)
+            } else {
+                // No perspective set, return Known level default
+                0.5
+            }
+        }
+    }
+
     /// Compute trust score using local (in-memory or fallback) algorithm
     fn compute_trust_score_local(&self, from: &Did, to: &Did) -> f64 {
         // Direct trust

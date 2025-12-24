@@ -12,6 +12,7 @@ use crate::models::{
     AccountDeltaResponse, BalanceResponse, CreatePaymentRequest, TransactionHistoryEntry,
 };
 use crate::rate_limit::VelocityLimiter;
+use crate::trust_mgr::TrustManager;
 use crate::validation;
 use icn_obs::metrics::gateway;
 
@@ -52,6 +53,7 @@ pub async fn create_payment(
     ledger_mgr: web::Data<Arc<LedgerManager>>,
     budget_store: web::Data<BudgetStore>,
     velocity_limiter: web::Data<VelocityLimiter>,
+    trust_mgr: web::Data<Arc<TrustManager>>,
     notification_service: web::Data<Arc<crate::notifications::NotificationService>>,
     event_broadcaster: web::Data<Arc<crate::events::EventBroadcaster>>,
     coop_id: web::Path<String>,
@@ -107,9 +109,8 @@ pub async fn create_payment(
     }
 
     // Check transaction velocity limit (Issue #164)
-    // For now, use 0.5 as default trust score (Known+ trust level)
-    // TODO: Look up actual trust score from trust graph when available
-    let trust_score = 0.5;
+    // Look up trust score from trust graph for rate limiting
+    let trust_score = trust_mgr.compute_trust_score_for_velocity(&from).await;
     velocity_limiter.check_and_record(&req.from, trust_score)?;
 
     let hash = ledger_mgr.create_payment(&coop_id, &from, &to, req.amount, req.currency.clone())?;
@@ -373,6 +374,7 @@ mod tests {
     use super::*;
     use crate::auth::TokenClaims;
     use crate::events::EventBroadcaster;
+    use crate::trust_mgr::TrustManager;
     use actix_web::{test, App, HttpMessage};
     use icn_identity::IdentityBundle;
 
@@ -382,6 +384,7 @@ mod tests {
         let db = sled::Config::new().temporary(true).open().unwrap();
         let budget_store = BudgetStore::new(db);
         let velocity_limiter = VelocityLimiter::default();
+        let trust_mgr = Arc::new(TrustManager::new());
         // Use temporary store for tests
         let store = Arc::new(crate::notifications::NotificationStore::new(
             sled::Config::new().temporary(true).open().unwrap(),
@@ -397,6 +400,7 @@ mod tests {
                 .app_data(web::Data::new(ledger_mgr.clone()))
                 .app_data(web::Data::new(budget_store.clone()))
                 .app_data(web::Data::new(velocity_limiter.clone()))
+                .app_data(web::Data::new(trust_mgr.clone()))
                 .app_data(web::Data::new(notification_service.clone()))
                 .app_data(web::Data::new(event_broadcaster.clone()))
                 .service(
@@ -538,6 +542,7 @@ mod tests {
         let db = sled::Config::new().temporary(true).open().unwrap();
         let budget_store = BudgetStore::new(db);
         let velocity_limiter = VelocityLimiter::default();
+        let trust_mgr = Arc::new(TrustManager::new());
         // Use temporary store for tests
         let store = Arc::new(crate::notifications::NotificationStore::new(
             sled::Config::new().temporary(true).open().unwrap(),
@@ -552,6 +557,7 @@ mod tests {
                 .app_data(web::Data::new(ledger_mgr.clone()))
                 .app_data(web::Data::new(budget_store.clone()))
                 .app_data(web::Data::new(velocity_limiter.clone()))
+                .app_data(web::Data::new(trust_mgr.clone()))
                 .app_data(web::Data::new(notification_service.clone()))
                 .app_data(web::Data::new(event_broadcaster.clone()))
                 .service(
@@ -611,6 +617,7 @@ mod tests {
         let db = sled::Config::new().temporary(true).open().unwrap();
         let budget_store = BudgetStore::new(db);
         let velocity_limiter = VelocityLimiter::default();
+        let trust_mgr = Arc::new(TrustManager::new());
         // Use temporary store for tests
         let store = Arc::new(crate::notifications::NotificationStore::new(
             sled::Config::new().temporary(true).open().unwrap(),
@@ -627,6 +634,7 @@ mod tests {
                 .app_data(web::Data::new(ledger_mgr.clone()))
                 .app_data(web::Data::new(budget_store.clone()))
                 .app_data(web::Data::new(velocity_limiter.clone()))
+                .app_data(web::Data::new(trust_mgr.clone()))
                 .app_data(web::Data::new(notification_service.clone()))
                 .app_data(web::Data::new(event_broadcaster.clone()))
                 .service(web::scope("/ledger").service(create_payment)),
@@ -666,6 +674,7 @@ mod tests {
         let db = sled::Config::new().temporary(true).open().unwrap();
         let budget_store = BudgetStore::new(db);
         let velocity_limiter = VelocityLimiter::default();
+        let trust_mgr = Arc::new(TrustManager::new());
         // Use temporary store for tests
         let store = Arc::new(crate::notifications::NotificationStore::new(
             sled::Config::new().temporary(true).open().unwrap(),
@@ -692,6 +701,7 @@ mod tests {
                 .app_data(web::Data::new(ledger_mgr.clone()))
                 .app_data(web::Data::new(budget_store.clone()))
                 .app_data(web::Data::new(velocity_limiter.clone()))
+                .app_data(web::Data::new(trust_mgr.clone()))
                 .app_data(web::Data::new(notification_service.clone()))
                 .app_data(web::Data::new(event_broadcaster.clone()))
                 .service(
@@ -761,6 +771,7 @@ mod tests {
         let db = sled::Config::new().temporary(true).open().unwrap();
         let budget_store = BudgetStore::new(db);
         let velocity_limiter = VelocityLimiter::default();
+        let trust_mgr = Arc::new(TrustManager::new());
         // Use temporary store for tests
         let store = Arc::new(crate::notifications::NotificationStore::new(
             sled::Config::new().temporary(true).open().unwrap(),
@@ -775,6 +786,7 @@ mod tests {
                 .app_data(web::Data::new(ledger_mgr.clone()))
                 .app_data(web::Data::new(budget_store.clone()))
                 .app_data(web::Data::new(velocity_limiter.clone()))
+                .app_data(web::Data::new(trust_mgr.clone()))
                 .app_data(web::Data::new(notification_service.clone()))
                 .app_data(web::Data::new(event_broadcaster.clone()))
                 .service(web::scope("/ledger").service(create_payment)),
