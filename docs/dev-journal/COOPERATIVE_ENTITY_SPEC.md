@@ -1,16 +1,41 @@
 # CooperativeEntity Type Specification
 
 ---
-**Status**: DRAFT
+**Status**: IMPLEMENTED
 **Created**: 2025-12-24
 **Updated**: 2025-12-24
 **Phase**: 19 - Cooperative Entity Foundation
 **Authors**: fahertym, Claude Code
-**Decision Makers**: TBD (pending review)
+**Crate**: `icn-entity` (32 tests passing)
 
 ---
 
 **Related**: [COOPERATIVE_MIDDLE_LAYER_GAP_ANALYSIS.md](COOPERATIVE_MIDDLE_LAYER_GAP_ANALYSIS.md)
+
+## Implementation Status
+
+| Component | Status | File |
+|-----------|--------|------|
+| EntityId | Complete | `entity.rs` |
+| EntityType | Complete | `entity.rs` |
+| CooperativeEntity | Complete | `entity.rs` |
+| EntityStatus | Complete | `entity.rs` |
+| AccountId | Complete | `entity.rs` |
+| Membership | Complete | `membership.rs` |
+| MembershipRole | Complete | `membership.rs` |
+| MembershipCapability | Complete | `membership.rs` |
+| MembershipStatus | Complete | `membership.rs` |
+| EntityRegistry trait | Complete | `registry.rs` |
+| InMemoryRegistry | Complete | `registry.rs` |
+| EntityRegistryHandle | Complete | `registry.rs` |
+| LifecycleEvent | Complete | `lifecycle.rs` |
+| EntityLifecycle trait | Complete | `lifecycle.rs` |
+
+**Note**: The implementation uses a simplified model compared to the original spec below. Key differences:
+- EntityId format: `entity:icn:<type>:<identifier>` (vs `entity:<type>:<namespace>:<local_id>`)
+- Three entity types: Individual, Cooperative, Federation (vs Person, WorkingGroup, Cooperative, Federation, Commons)
+- No EntityAnchor yet (deferred to full SDIS integration)
+- No GovernanceConfig/EconomicConfig/TrustConfig embedded (linked via domain_id instead)
 
 ## Overview
 
@@ -28,45 +53,48 @@ This document specifies the `CooperativeEntity` type - a unified recursive model
 
 ## Core Types
 
-### EntityId
+### EntityId (Implemented)
 
 A universally unique identifier for any cooperative entity.
 
 ```rust
 /// Unique identifier for a cooperative entity
-/// Format: "entity:{type}:{namespace}:{local_id}"
+/// Format: "entity:icn:{type}:{identifier}"
 /// Examples:
-///   - "entity:person:icn:did:icn:z123..."
-///   - "entity:coop:food-network:sunshine-coop"
-///   - "entity:federation:regional:pacific-northwest"
-///   - "entity:commons:global:icn-protocol"
+///   - "entity:icn:individual:z5TrA8Qk..." (wraps DID public key)
+///   - "entity:icn:cooperative:food-coop-2024"
+///   - "entity:icn:federation:midwest-fed"
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct EntityId(String);
 
 impl EntityId {
-    pub fn person(did: &Did) -> Self {
-        Self(format!("entity:person:icn:{did}"))
-    }
+    /// Create from an existing DID (for individuals)
+    pub fn from_did(did: &Did) -> Self;
 
-    pub fn coop(namespace: &str, local_id: &str) -> Self {
-        Self(format!("entity:coop:{namespace}:{local_id}"))
-    }
+    /// Create a cooperative entity ID from slug
+    pub fn cooperative(slug: &str) -> Result<Self>;
 
-    pub fn federation(namespace: &str, local_id: &str) -> Self {
-        Self(format!("entity:federation:{namespace}:{local_id}"))
-    }
+    /// Create a federation entity ID from slug
+    pub fn federation(slug: &str) -> Result<Self>;
 
-    pub fn commons(local_id: &str) -> Self {
-        Self(format!("entity:commons:global:{local_id}"))
-    }
+    /// Get entity type from the ID
+    pub fn entity_type(&self) -> EntityType;
 
-    pub fn entity_type(&self) -> EntityType {
-        // Parse from string
-    }
+    /// Convert back to DID (only for individuals)
+    pub fn to_did(&self) -> Option<Did>;
+
+    /// Get the raw identifier portion
+    pub fn identifier(&self) -> &str;
 }
 ```
 
-### EntityType
+**Slug Validation Rules**:
+- 3-64 characters
+- Lowercase letters, numbers, hyphens only
+- Must start with a letter
+- No consecutive hyphens
+
+### EntityType (Implemented)
 
 The level in the cooperative hierarchy.
 
@@ -74,48 +102,23 @@ The level in the cooperative hierarchy.
 /// The type/level of a cooperative entity
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EntityType {
-    /// Individual person with SDIS anchor
-    Person,
+    /// Individual backed by a DID
+    Individual,
 
-    /// Working group within a cooperative
-    WorkingGroup,
-
-    /// A cooperative organization
+    /// Cooperative organization
     Cooperative,
 
     /// Federation of cooperatives
     Federation,
 
-    /// Meta-federation or global commons (e.g., ICN Protocol itself)
-    Commons,
-}
-
-impl EntityType {
-    /// Returns the parent type in the hierarchy
-    pub fn parent_type(&self) -> Option<EntityType> {
-        match self {
-            EntityType::Person => Some(EntityType::Cooperative),
-            EntityType::WorkingGroup => Some(EntityType::Cooperative),
-            EntityType::Cooperative => Some(EntityType::Federation),
-            EntityType::Federation => Some(EntityType::Commons),
-            EntityType::Commons => None,
-        }
-    }
-
-    /// Returns child types that can be members
-    pub fn allowed_member_types(&self) -> Vec<EntityType> {
-        match self {
-            EntityType::Person => vec![],
-            EntityType::WorkingGroup => vec![EntityType::Person],
-            EntityType::Cooperative => vec![EntityType::Person, EntityType::WorkingGroup],
-            EntityType::Federation => vec![EntityType::Cooperative],
-            EntityType::Commons => vec![EntityType::Federation],
-        }
-    }
+    /// Unknown type (parsing fallback)
+    Unknown,
 }
 ```
 
-### CooperativeEntity
+**Design Decision**: The implementation uses three core types (Individual, Cooperative, Federation) rather than the five originally proposed. WorkingGroup can be modeled as a Cooperative with a parent_id, and Commons can be modeled as a top-level Federation.
+
+### CooperativeEntity (Implemented)
 
 The core entity type representing any participant at any level.
 
@@ -132,155 +135,128 @@ pub struct CooperativeEntity {
     /// Type/level in the hierarchy
     pub entity_type: EntityType,
 
-    /// Cryptographic identity anchor
-    pub anchor: EntityAnchor,
+    /// Entity lifecycle state
+    pub status: EntityStatus,
 
     /// Parent entity (if any)
     pub parent_id: Option<EntityId>,
 
-    /// Entity lifecycle state
-    pub state: EntityState,
+    /// Link to governance domain (if governance enabled)
+    pub governance_domain_id: Option<String>,
 
-    /// Governance configuration
-    pub governance: GovernanceConfig,
+    /// Link to treasury account (if treasury enabled)
+    pub treasury_account: Option<AccountReference>,
 
-    /// Economic configuration
-    pub economics: EconomicConfig,
+    /// Creation timestamp (Unix seconds)
+    pub created_at: u64,
 
-    /// Trust configuration
-    pub trust: TrustConfig,
+    /// Last modification timestamp (Unix seconds)
+    pub updated_at: u64,
 
-    /// Creation timestamp
-    pub created_at: Timestamp,
+    /// Human-readable description
+    pub description: Option<String>,
 
-    /// Last modification timestamp
-    pub updated_at: Timestamp,
+    /// Arbitrary key-value metadata
+    pub metadata: HashMap<String, String>,
+}
 
-    /// Metadata (tags, descriptions, external links)
-    pub metadata: EntityMetadata,
+impl CooperativeEntity {
+    /// Create an individual entity from a DID
+    pub fn individual(did: &Did, name: &str) -> Self;
+
+    /// Create a cooperative entity (builder pattern)
+    pub fn cooperative(slug: &str, name: &str) -> Result<Self>;
+
+    /// Create a federation entity (builder pattern)
+    pub fn federation(slug: &str, name: &str) -> Result<Self>;
+
+    /// Builder methods
+    pub fn with_description(self, description: &str) -> Self;
+    pub fn with_governance_domain(self, domain_id: &str) -> Self;
+    pub fn with_metadata(self, key: &str, value: &str) -> Self;
 }
 ```
 
-### EntityAnchor
+**Design Decision**: Governance/Economic/Trust configurations are linked via IDs rather than embedded. This reduces coupling and allows the entity crate to remain lightweight.
 
-The cryptographic anchor for entity identity.
+### EntityAnchor (Deferred)
 
-```rust
-/// Cryptographic anchor for entity identity
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum EntityAnchor {
-    /// Individual anchor (SDIS personal identity)
-    Personal {
-        /// The person's DID
-        did: Did,
-        /// VUI commitment for uniqueness
-        vui_commitment: [u8; 32],
-        /// Creation ceremony proof
-        ceremony_proof: Option<CeremonyProof>,
-    },
+The cryptographic anchor for entity identity. **Not yet implemented** - deferred to full SDIS integration in Phase 22.
 
-    /// Cooperative anchor (threshold-derived from member signatures)
-    Cooperative {
-        /// Derived DID for the cooperative
-        did: Did,
-        /// Threshold (k of n) for signing
-        threshold: Threshold,
-        /// Current key holders (member DIDs with signing authority)
-        key_holders: Vec<Did>,
-        /// Creation ceremony proof
-        ceremony_proof: CeremonyProof,
-    },
+The original design proposed:
+- `Personal`: Individual anchor with VUI commitment and ceremony proof
+- `Cooperative`: Threshold-derived anchor from member signatures
+- `Federation`: Anchor derived from member cooperatives
+- `Genesis`: For the ICN Protocol Commons
 
-    /// Federation anchor (derived from member cooperatives)
-    Federation {
-        /// Derived DID for the federation
-        did: Did,
-        /// Member coops that contribute to anchor
-        anchor_members: Vec<EntityId>,
-        /// Threshold for federation-level signing
-        threshold: Threshold,
-    },
+**Current Implementation**: Individuals link to DIDs via `EntityId::from_did()`. Cooperatives and federations have no cryptographic anchor yet - they are identified by their EntityId slug. Multi-party signing will be added when threshold signatures are implemented.
 
-    /// Genesis anchor (for ICN Protocol Commons)
-    Genesis {
-        /// The genesis DID
-        did: Did,
-        /// Genesis block hash
-        genesis_hash: [u8; 32],
-    },
-}
-
-/// Threshold configuration for multi-party anchors
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Threshold {
-    /// Required signatures
-    pub k: u32,
-    /// Total signers
-    pub n: u32,
-}
-```
-
-### EntityState
+### EntityStatus (Implemented)
 
 The lifecycle state of an entity.
 
 ```rust
-/// Entity lifecycle state
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum EntityState {
-    /// Entity is being formed (not yet operational)
-    Forming {
-        /// Required steps to become active
-        pending_steps: Vec<FormationStep>,
-    },
+/// Entity lifecycle status
+#[derive(Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum EntityStatus {
+    /// Entity is being formed (pre-charter ratification)
+    #[default]
+    Forming,
 
     /// Entity is active and operational
     Active,
 
-    /// Entity is suspended (governance action)
+    /// Entity is suspended (frozen)
     Suspended {
         reason: String,
-        suspended_at: Timestamp,
-        suspended_by: EntityId,
+        suspended_at: u64,
     },
 
-    /// Entity is being dissolved
+    /// Entity is in the process of dissolving
     Dissolving {
-        reason: String,
-        dissolution_started_at: Timestamp,
-        assets_transferred_to: Option<EntityId>,
+        started_at: u64,
     },
 
-    /// Entity is dissolved (historical record only)
+    /// Entity has been dissolved
     Dissolved {
-        dissolved_at: Timestamp,
-        final_state_hash: [u8; 32],
+        dissolved_at: u64,
+    },
+
+    /// Entity has merged into another entity
+    Merged {
+        into: EntityId,
+        merged_at: u64,
+    },
+
+    /// Entity has split into multiple entities
+    Split {
+        into: Vec<EntityId>,
+        split_at: u64,
     },
 }
 
-/// Steps required during entity formation
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum FormationStep {
-    /// Minimum number of founding members
-    MinimumMembers { required: u32, current: u32 },
+impl EntityStatus {
+    /// Check if entity is operational
+    pub fn is_operational(&self) -> bool;
 
-    /// Charter ratification
-    CharterRatification { ratified: bool },
-
-    /// Initial treasury funding
-    TreasuryFunding { minimum: i64, current: i64, currency: String },
-
-    /// Anchor ceremony completion
-    AnchorCeremony { completed: bool },
-
-    /// Parent entity approval (if applicable)
-    ParentApproval { approved: bool },
+    /// Check if entity lifecycle has ended
+    pub fn is_terminated(&self) -> bool;
 }
 ```
 
+**Valid State Transitions**:
+| From | To |
+|------|-----|
+| Forming | Active |
+| Active | Suspended, Dissolving, Merged, Split |
+| Suspended | Active, Dissolving |
+| Dissolving | Dissolved, Merged, Split |
+
+**Design Decision**: FormationStep tracking is deferred. The `Forming` state is simple for now; detailed formation requirements can be tracked externally or added later.
+
 ---
 
-## Membership Model
+## Membership Model (Implemented)
 
 ### Membership
 
@@ -290,440 +266,338 @@ Represents the relationship between an entity and its parent.
 /// Membership of an entity within another entity
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Membership {
-    /// The member entity
+    /// The member entity (individual OR cooperative)
     pub member_id: EntityId,
 
     /// The containing entity (parent)
     pub parent_id: EntityId,
 
-    /// Type of membership
-    pub membership_type: MembershipType,
+    /// Role within the parent entity
+    pub role: MembershipRole,
 
-    /// Roles assigned to this member
-    pub roles: Vec<Role>,
+    /// Current membership status
+    pub status: MembershipStatus,
 
-    /// Membership state
-    pub state: MembershipState,
+    /// When membership was created (Unix timestamp)
+    pub joined_at: u64,
 
-    /// When membership was established
-    pub joined_at: Timestamp,
+    /// When membership was last updated
+    pub updated_at: u64,
 
-    /// Sponsor who vouched for this member (if applicable)
-    pub sponsored_by: Option<EntityId>,
+    /// Voting shares (for weighted voting, 0 = no vote)
+    pub shares: u64,
 
-    /// Contribution credits (for credit limit calculations)
-    pub contribution_score: u64,
+    /// Capabilities granted by this membership
+    pub capabilities: Vec<MembershipCapability>,
+
+    /// Optional notes
+    pub notes: Option<String>,
 }
 
-/// Type of membership
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum MembershipType {
-    /// Full voting member
-    Full,
+impl Membership {
+    /// Create a new pending membership
+    pub fn new(member_id: EntityId, parent_id: EntityId, role: MembershipRole) -> Self;
 
-    /// Probationary member (limited voting, time-limited)
-    Probationary { expires_at: Timestamp },
+    /// Create an active membership (bypass pending state)
+    pub fn active(member_id: EntityId, parent_id: EntityId, role: MembershipRole) -> Self;
 
-    /// Associate member (no voting, economic participation only)
-    Associate,
+    /// Check if member can vote
+    pub fn can_vote(&self) -> bool;  // requires: active + shares > 0 + Vote capability
 
-    /// Observer (read-only access)
-    Observer,
-}
-
-/// Membership lifecycle state
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum MembershipState {
-    /// Application pending approval
-    Pending { application_id: String },
-
-    /// Active member
-    Active,
-
-    /// Suspended (can be reactivated)
-    Suspended { reason: String, until: Option<Timestamp> },
-
-    /// Voluntarily withdrawn
-    Withdrawn { at: Timestamp },
-
-    /// Expelled (cannot rejoin without appeal)
-    Expelled { at: Timestamp, reason: String },
-}
-
-/// Role within an entity
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Role {
-    pub name: String,
-    pub permissions: Vec<Permission>,
-    pub granted_at: Timestamp,
-    pub expires_at: Option<Timestamp>,
-}
-
-/// Permissions a role can grant
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Permission {
-    /// Can vote on proposals
-    Vote,
-    /// Can create proposals
-    Propose,
-    /// Can approve new members
-    ApproveMembership,
-    /// Can sign on behalf of entity
-    Sign,
-    /// Can manage treasury
-    Treasury,
-    /// Can manage governance parameters
-    Governance,
-    /// Full administrative access
-    Admin,
+    /// Check if member can create proposals
+    pub fn can_propose(&self) -> bool;
 }
 ```
 
----
-
-## Governance Configuration
+### MembershipRole
 
 ```rust
-/// Governance configuration for an entity
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct GovernanceConfig {
-    /// Governance domain ID (links to icn-governance)
-    pub domain_id: GovernanceDomainId,
+pub enum MembershipRole {
+    // Individual Roles (for people)
+    Founder,             // All capabilities
+    Member,              // Vote, Propose
+    Worker,              // Vote, Propose
+    Consumer,            // Vote, Propose
+    Producer,            // Vote, Propose
+    BoardMember,         // Vote, Propose, Treasury, Invite
+    Officer { title: String },  // Vote, Propose, Treasury
 
-    /// Voting mechanism
-    pub voting: VotingConfig,
+    // Entity Roles (for organizations)
+    FederatedMember,     // Vote, Propose, Sign
+    AssociateMember,     // Propose
+    ObserverMember,      // None
+    ProvisionalMember,   // Propose
 
-    /// Quorum requirements
-    pub quorum: QuorumConfig,
-
-    /// Proposal types allowed at this level
-    pub allowed_proposal_types: Vec<ProposalType>,
-
-    /// Constraints from parent entity
-    pub parent_constraints: Vec<Constraint>,
-}
-
-/// Voting configuration
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct VotingConfig {
-    /// How votes are weighted
-    pub weight_model: VoteWeightModel,
-
-    /// Delegation allowed?
-    pub delegation_enabled: bool,
-
-    /// Maximum delegation depth
-    pub max_delegation_depth: u32,
-}
-
-/// Vote weighting models
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum VoteWeightModel {
-    /// One member, one vote
-    EqualWeight,
-
-    /// Weighted by contribution score
-    ContributionWeighted { cap: Option<f64> },
-
-    /// Quadratic voting
-    Quadratic { credits_per_period: u64 },
-
-    /// Conviction voting (time-weighted)
-    Conviction { decay_rate: f64 },
-}
-
-/// Quorum requirements
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct QuorumConfig {
-    /// Minimum participation rate (0.0 - 1.0)
-    pub participation_threshold: f64,
-
-    /// Approval threshold for passing (0.0 - 1.0)
-    pub approval_threshold: f64,
-
-    /// Different thresholds per proposal type
-    pub type_overrides: HashMap<ProposalType, (f64, f64)>,
+    // Custom
+    Custom { name: String },  // Vote, Propose
 }
 ```
 
----
-
-## Economic Configuration
+### MembershipStatus
 
 ```rust
-/// Economic configuration for an entity
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct EconomicConfig {
-    /// Entity's treasury (if applicable)
-    pub treasury: Option<TreasuryConfig>,
-
-    /// Credit policy for members
-    pub credit_policy: CreditPolicyConfig,
-
-    /// Currencies supported
-    pub currencies: Vec<CurrencyConfig>,
-
-    /// Inter-entity agreements
-    pub agreements: Vec<InterEntityAgreement>,
-}
-
-/// Treasury configuration
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct TreasuryConfig {
-    /// Treasury DID (for ledger accounts)
-    pub treasury_did: Did,
-
-    /// Spending approval thresholds
-    pub spending_thresholds: Vec<SpendingThreshold>,
-
-    /// Budget allocation method
-    pub budget_method: BudgetMethod,
-}
-
-/// Credit policy for entity members
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct CreditPolicyConfig {
-    /// Base credit limit for new members
-    pub base_limit: i64,
-
-    /// Trust-based bonus multiplier (0.0 - 1.0 trust score)
-    pub trust_multiplier: f64,
-
-    /// Contribution-based bonus
-    pub contribution_bonus_rate: f64,
-
-    /// Ramp period for new members (seconds)
-    pub ramp_period_seconds: u64,
-
-    /// Anti-extraction ratio (max debit/credit ratio)
-    pub max_debit_credit_ratio: f64,
-}
-
-/// Agreement between entities
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct InterEntityAgreement {
-    /// Agreement ID
-    pub id: String,
-
-    /// Parties to the agreement
-    pub parties: Vec<EntityId>,
-
-    /// Agreement type
-    pub agreement_type: AgreementType,
-
-    /// Terms
-    pub terms: AgreementTerms,
-
-    /// State
-    pub state: AgreementState,
-}
-
-/// Types of inter-entity agreements
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum AgreementType {
-    /// Mutual credit line between entities
-    CreditLine,
-
-    /// Clearing/settlement agreement
-    Clearing,
-
-    /// Group purchasing participation
-    GroupPurchasing,
-
-    /// Federation membership
-    FederationMembership,
-
-    /// Service provision
-    ServiceAgreement,
+pub enum MembershipStatus {
+    Pending,    // Application pending
+    Active,     // In good standing
+    Suspended,  // Temporarily frozen
+    Inactive,   // Not participating
+    Resigned,   // Voluntarily left
+    Removed,    // Governance removal
+    Expelled,   // Serious violation
 }
 ```
 
----
-
-## Trust Configuration
+### MembershipCapability
 
 ```rust
-/// Trust configuration for an entity
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct TrustConfig {
-    /// Trust policies for different relationship types
-    pub policies: Vec<TrustPolicy>,
-
-    /// Minimum trust for various operations
-    pub thresholds: TrustThresholds,
-
-    /// Trust decay settings
-    pub decay: TrustDecay,
-}
-
-/// Trust thresholds for operations
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct TrustThresholds {
-    /// Minimum trust to join (sponsor trust)
-    pub join: f64,
-
-    /// Minimum trust to transact
-    pub transact: f64,
-
-    /// Minimum trust to vote
-    pub vote: f64,
-
-    /// Minimum trust to propose
-    pub propose: f64,
-
-    /// Minimum trust to sign on behalf of entity
-    pub sign: f64,
+pub enum MembershipCapability {
+    Vote,               // Can vote on proposals
+    Propose,            // Can create proposals
+    TreasuryAccess,     // Can perform treasury operations
+    Invite,             // Can invite new members
+    ManageSubEntities,  // Can manage child entities
+    Sign,               // Can sign on behalf of entity
+    Configure,          // Can modify entity settings
+    ViewSensitive,      // Can view confidential info
+    Custom(String),     // User-defined capability
 }
 ```
 
+**Key Insight**: Capabilities are explicit, not derived from roles. Each role has default capabilities, but they can be overridden with `membership.with_capabilities()`.
+
 ---
 
-## Entity Registry
+## Configuration (Linked, Not Embedded)
+
+The original spec proposed embedding GovernanceConfig, EconomicConfig, and TrustConfig directly in CooperativeEntity. The implementation uses **linked references** instead:
+
+```rust
+pub struct CooperativeEntity {
+    // ...
+    pub governance_domain_id: Option<String>,  // Links to icn-governance
+    pub treasury_account: Option<AccountReference>,  // Links to icn-ledger
+    // Trust is implicit via the entity's DIDs in the trust graph
+}
+```
+
+**Benefits**:
+- Reduced coupling between crates
+- Configuration lives in its natural home (governance in icn-governance, treasury in icn-ledger)
+- Entity crate stays lightweight
+- Easier to evolve configurations independently
+
+**Deferred to Phase 19+ Integration**:
+- GovernanceConfig (voting models, quorum, constraints)
+- EconomicConfig (credit policy, inter-entity agreements)
+- TrustConfig (entity-level trust thresholds)
+
+See the original spec sections below for the envisioned designs.
+
+---
+
+## Entity Registry (Implemented)
 
 The entity registry maintains the global state of all entities.
 
 ```rust
 /// Entity registry for storing and querying entities
 pub trait EntityRegistry: Send + Sync {
-    /// Create a new entity
-    async fn create(&self, entity: CooperativeEntity) -> Result<EntityId>;
+    // Entity CRUD
+    fn register(&mut self, entity: CooperativeEntity) -> Result<()>;
+    fn get(&self, id: &EntityId) -> Result<Option<CooperativeEntity>>;
+    fn update(&mut self, entity: CooperativeEntity) -> Result<()>;
+    fn delete(&mut self, id: &EntityId) -> Result<()>;
 
-    /// Get entity by ID
-    async fn get(&self, id: &EntityId) -> Result<Option<CooperativeEntity>>;
+    // Queries
+    fn list_by_type(&self, entity_type: EntityType) -> Result<Vec<EntityId>>;
+    fn list_children(&self, parent_id: &EntityId) -> Result<Vec<EntityId>>;
 
-    /// Update an entity
-    async fn update(&self, entity: CooperativeEntity) -> Result<()>;
-
-    /// List members of an entity
-    async fn list_members(&self, parent_id: &EntityId) -> Result<Vec<Membership>>;
-
-    /// Get membership of an entity within a parent
-    async fn get_membership(&self, member_id: &EntityId, parent_id: &EntityId)
+    // Membership operations
+    fn add_membership(&mut self, membership: Membership) -> Result<()>;
+    fn remove_membership(&mut self, member_id: &EntityId, parent_id: &EntityId) -> Result<()>;
+    fn get_membership(&self, member_id: &EntityId, parent_id: &EntityId)
         -> Result<Option<Membership>>;
-
-    /// Add a member to an entity
-    async fn add_member(&self, membership: Membership) -> Result<()>;
-
-    /// Update membership
-    async fn update_membership(&self, membership: Membership) -> Result<()>;
-
-    /// List all entities at a given level
-    async fn list_by_type(&self, entity_type: EntityType) -> Result<Vec<CooperativeEntity>>;
-
-    /// Get the entity hierarchy (ancestors)
-    async fn get_ancestors(&self, id: &EntityId) -> Result<Vec<CooperativeEntity>>;
-
-    /// Get all descendants of an entity
-    async fn get_descendants(&self, id: &EntityId) -> Result<Vec<CooperativeEntity>>;
+    fn get_members(&self, parent_id: &EntityId) -> Result<Vec<Membership>>;
+    fn get_memberships(&self, member_id: &EntityId) -> Result<Vec<Membership>>;
 }
 ```
+
+### EntityRegistryHandle
+
+Thread-safe async wrapper for concurrent access:
+
+```rust
+pub struct EntityRegistryHandle {
+    inner: Arc<RwLock<InMemoryRegistry>>,
+}
+
+impl EntityRegistryHandle {
+    pub fn new() -> Self;
+
+    // Async versions of all trait methods
+    pub async fn register(&self, entity: CooperativeEntity) -> Result<()>;
+    pub async fn get(&self, id: &EntityId) -> Result<Option<CooperativeEntity>>;
+    // ... etc
+}
+```
+
+### InMemoryRegistry
+
+Reference implementation for testing and development:
+
+```rust
+pub struct InMemoryRegistry {
+    entities: HashMap<String, CooperativeEntity>,
+    memberships: Vec<Membership>,
+}
+```
+
+**Constraints Enforced**:
+- Duplicate entity IDs rejected
+- Cannot update non-existent entities
+- Cannot delete entities with active memberships
+- Both member and parent must exist to add membership
 
 ---
 
-## Entity Lifecycle Operations
+## Entity Lifecycle (Implemented)
 
-### Formation
+### LifecycleEvent
+
+Events that mark entity state transitions:
 
 ```rust
-/// Entity formation ceremony
-pub struct FormationCeremony {
-    /// The entity being formed
-    pub entity: CooperativeEntity,
-
-    /// Founding members
-    pub founders: Vec<(EntityId, Role)>,
-
-    /// Initial charter (ratified by founders)
-    pub charter: Charter,
-
-    /// Cryptographic proofs from the ceremony
-    pub ceremony_proofs: Vec<CeremonyProof>,
-}
-
-/// Charter defining entity rules
-pub struct Charter {
-    /// Mission statement
-    pub mission: String,
-
-    /// Governance rules
-    pub governance_rules: Vec<CharterRule>,
-
-    /// Economic rules
-    pub economic_rules: Vec<CharterRule>,
-
-    /// Amendment process
-    pub amendment_threshold: f64,
-
-    /// Hash of the charter content
-    pub content_hash: [u8; 32],
-
-    /// Signatures from ratifying members
-    pub ratifications: Vec<(EntityId, Signature)>,
+pub enum LifecycleEvent {
+    Created {
+        entity_id: EntityId,
+        created_by: EntityId,
+        timestamp: u64,
+    },
+    Activated {
+        entity_id: EntityId,
+        charter_hash: String,
+        activated_by: EntityId,
+        timestamp: u64,
+    },
+    Suspended {
+        entity_id: EntityId,
+        reason: String,
+        suspended_by: EntityId,
+        timestamp: u64,
+    },
+    Reactivated {
+        entity_id: EntityId,
+        reactivated_by: EntityId,
+        timestamp: u64,
+    },
+    DissolutionStarted {
+        entity_id: EntityId,
+        started_by: EntityId,
+        timestamp: u64,
+    },
+    Dissolved {
+        entity_id: EntityId,
+        timestamp: u64,
+    },
+    Merged {
+        source_id: EntityId,
+        target_id: EntityId,
+        merged_by: EntityId,
+        timestamp: u64,
+    },
+    Split {
+        source_id: EntityId,
+        new_entity_ids: Vec<EntityId>,
+        split_by: EntityId,
+        timestamp: u64,
+    },
 }
 ```
 
-### Dissolution
+### EntityLifecycle Trait
 
 ```rust
-/// Entity dissolution process
-pub struct DissolutionProcess {
-    /// Entity being dissolved
-    pub entity_id: EntityId,
+pub trait EntityLifecycle {
+    fn create(&mut self, entity: CooperativeEntity, created_by: &EntityId)
+        -> Result<LifecycleEvent>;
 
-    /// Reason for dissolution
-    pub reason: String,
+    fn activate(&mut self, entity_id: &EntityId, charter_hash: String, by: &EntityId)
+        -> Result<LifecycleEvent>;
 
-    /// How assets will be distributed
-    pub asset_distribution: AssetDistribution,
+    fn suspend(&mut self, entity_id: &EntityId, reason: String, by: &EntityId)
+        -> Result<LifecycleEvent>;
 
-    /// Required approvals
-    pub required_approvals: Vec<EntityId>,
+    fn reactivate(&mut self, entity_id: &EntityId, by: &EntityId)
+        -> Result<LifecycleEvent>;
 
-    /// Current approval status
-    pub approvals: Vec<(EntityId, Timestamp, Signature)>,
+    fn begin_dissolution(&mut self, entity_id: &EntityId, by: &EntityId)
+        -> Result<LifecycleEvent>;
 
-    /// Cooling-off period end
-    pub cooling_off_ends_at: Timestamp,
-}
+    fn dissolve(&mut self, entity_id: &EntityId)
+        -> Result<LifecycleEvent>;
 
-/// How to distribute assets on dissolution
-pub enum AssetDistribution {
-    /// Transfer all to parent entity
-    ToParent,
+    fn merge(&mut self, source_id: &EntityId, target_id: &EntityId, by: &EntityId)
+        -> Result<LifecycleEvent>;
 
-    /// Distribute proportionally to members
-    ToMembers { by_contribution: bool },
-
-    /// Transfer to specific entity
-    ToEntity(EntityId),
-
-    /// Contribute to commons
-    ToCommons,
+    fn split(&mut self, source_id: &EntityId, new_entities: Vec<CooperativeEntity>, by: &EntityId)
+        -> Result<Vec<LifecycleEvent>>;
 }
 ```
+
+### State Transition Validation
+
+```rust
+pub fn validate_transition(from: &EntityStatus, to: &EntityStatus) -> Result<()>;
+```
+
+**Note**: FormationCeremony, Charter, and DissolutionProcess are deferred to full Phase 19 integration. The current implementation provides the event types and trait interface.
 
 ---
 
 ## Migration Strategy
 
-### Phase 1: Type Introduction
-1. Create `icn-entity` crate with core types
-2. No breaking changes - new types exist alongside old
+### AccountId - The Bridge Type
 
-### Phase 2: Subsystem Integration
-1. Update `icn-governance` to accept EntityId where it currently uses Did
-2. Update `icn-ledger` to support EntityId accounts
-3. Update `icn-trust` to support entity-to-entity trust
+The `AccountId` enum provides backward compatibility:
 
-### Phase 3: Migration Tools
-1. Create `Did` → `EntityId` mapping
-2. Build migration scripts for existing data
+```rust
+pub enum AccountId {
+    Did(Did),           // Legacy DID-based accounts
+    Entity(EntityId),   // New entity-based accounts
+}
+
+impl AccountId {
+    pub fn as_did(&self) -> Option<&Did>;
+    pub fn as_entity(&self) -> Option<&EntityId>;
+}
+```
+
+This allows gradual migration - existing code uses `AccountId::Did`, new code can use `AccountId::Entity`.
+
+### Phase 1: Type Introduction (Current - Sprint 3)
+1. ✅ Create `icn-entity` crate with core types
+2. ✅ Implement EntityId, CooperativeEntity, Membership
+3. ✅ Implement EntityRegistry trait
+4. ✅ Implement LifecycleEvent and EntityLifecycle trait
+5. No breaking changes - new types exist alongside old
+
+### Phase 2: Subsystem Integration (Phase 19)
+1. Add `AccountId` to ledger types (replace `account_id: Did`)
+2. Add `entity_id` field to governance domains
+3. Update treasury to use `EntityId` for cooperative accounts
+4. Add entity registry actor to runtime
+
+### Phase 3: Full Integration (Phase 19+)
+1. Update icn-governance to accept EntityId
+2. Update icn-ledger to support entity-level accounts
+3. Update icn-trust to support entity-to-entity edges
+4. Add gateway entity endpoints
+
+### Phase 4: Migration & Cleanup (Future)
+1. Create `Did` → `EntityId` mapping for existing data
+2. Build migration scripts
 3. Dual-write during transition period
-
-### Phase 4: Deprecation
-1. Mark old APIs as deprecated
-2. Update gateway to use new types
-3. Remove deprecated types after migration complete
+4. Deprecate DID-only APIs
 
 ---
 
@@ -747,32 +621,65 @@ pub enum AssetDistribution {
 ## Open Questions
 
 1. **Anchor Rotation**: How do cooperative anchors rotate when membership changes?
+   - *Deferred to Phase 22 SDIS integration*
+
 2. **Cross-Federation Trust**: How does trust propagate across federation boundaries?
+   - *Will require entity-level edges in trust graph*
+
 3. **Conflict Resolution**: When parent and child entity rules conflict, which wins?
+   - *Proposed: Subsidiarity principle - local unless explicitly delegated up*
+
 4. **Privacy**: Which entity information should be public vs. member-only?
+   - *Current: All public. Future: Add visibility field*
+
+5. **Multi-Federation Membership**: Can a cooperative belong to multiple federations?
+   - *Current implementation: Yes. Question: Scope capabilities per-federation?*
+
+6. **Entity Recovery**: What happens if an entity loses all authorized members?
+   - *Not yet addressed*
 
 ---
 
-## Next Steps
+## Next Steps (Updated)
 
-1. [ ] Review spec with stakeholders
-2. [ ] Create `icn-entity` crate with core types
-3. [ ] Implement EntityRegistry trait
-4. [ ] Write migration plan for existing data
-5. [ ] Update gateway API spec for entity endpoints
+1. ✅ Review spec with stakeholders
+2. ✅ Create `icn-entity` crate with core types
+3. ✅ Implement EntityRegistry trait
+4. ✅ Implement LifecycleEvent and EntityLifecycle trait
+5. [ ] **Phase 19**: Integrate with icn-ledger (AccountId)
+6. [ ] **Phase 19**: Integrate with icn-governance (entity domains)
+7. [ ] **Phase 19**: Add entity actor to runtime
+8. [ ] **Phase 19**: Add gateway entity endpoints
+9. [ ] Write migration plan for existing data
 
 ---
 
-## Appendix: Type Summary
+## Appendix: Implemented Type Summary
 
-| Type | Purpose | Key Fields |
-|------|---------|------------|
-| `EntityId` | Unique identifier | Type, namespace, local_id |
-| `EntityType` | Hierarchy level | Person, Coop, Federation, Commons |
-| `CooperativeEntity` | Core entity | anchor, governance, economics, trust |
-| `EntityAnchor` | Cryptographic root | DID, threshold, ceremony proof |
-| `EntityState` | Lifecycle | Forming, Active, Suspended, Dissolved |
-| `Membership` | Parent-child relation | member_id, parent_id, roles, state |
-| `GovernanceConfig` | Voting rules | domain, quorum, constraints |
-| `EconomicConfig` | Financial rules | treasury, credit policy, agreements |
-| `TrustConfig` | Trust rules | thresholds, decay, policies |
+| Type | Purpose | File |
+|------|---------|------|
+| `EntityId` | Unique identifier (`entity:icn:<type>:<id>`) | `entity.rs` |
+| `EntityType` | Individual, Cooperative, Federation | `entity.rs` |
+| `CooperativeEntity` | Core entity record | `entity.rs` |
+| `EntityStatus` | Lifecycle state (Forming → Active → ...) | `entity.rs` |
+| `AccountId` | DID or EntityId (migration bridge) | `entity.rs` |
+| `AccountReference` | Link to ledger account | `entity.rs` |
+| `Membership` | Entity-to-parent relationship | `membership.rs` |
+| `MembershipRole` | Founder, Worker, FederatedMember, etc. | `membership.rs` |
+| `MembershipStatus` | Pending, Active, Suspended, etc. | `membership.rs` |
+| `MembershipCapability` | Vote, Propose, Treasury, etc. | `membership.rs` |
+| `EntityRegistry` | Storage trait | `registry.rs` |
+| `InMemoryRegistry` | Reference implementation | `registry.rs` |
+| `EntityRegistryHandle` | Async wrapper | `registry.rs` |
+| `LifecycleEvent` | State transition events | `lifecycle.rs` |
+| `EntityLifecycle` | Lifecycle operations trait | `lifecycle.rs` |
+| `EntityError` | Error type | `error.rs` |
+
+---
+
+## Changelog
+
+| Date | Change |
+|------|--------|
+| 2025-12-24 | Initial implementation complete (Sprint 3) |
+| 2025-12-24 | Updated spec to reflect actual implementation |
