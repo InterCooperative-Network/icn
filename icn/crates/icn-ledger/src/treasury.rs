@@ -1667,14 +1667,20 @@ mod tests {
         assert!(result.is_ok());
 
         // In-memory state should still be 1000 (unchanged)
-        assert_eq!(manager.get_budget(&budget_id).unwrap().allocated_amount, 1000);
+        assert_eq!(
+            manager.get_budget(&budget_id).unwrap().allocated_amount,
+            1000
+        );
 
         // Phase 3: Apply snapshot to in-memory state
         let result = manager.apply_budget_snapshot(budget_clone);
         assert!(result.is_ok());
 
         // Now in-memory state should be 500
-        assert_eq!(manager.get_budget(&budget_id).unwrap().allocated_amount, 500);
+        assert_eq!(
+            manager.get_budget(&budget_id).unwrap().allocated_amount,
+            500
+        );
     }
 
     #[test]
@@ -1707,7 +1713,10 @@ mod tests {
         // Applying snapshot for non-existent budget should fail
         let result = manager.apply_budget_snapshot(fake_budget);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("not found in-memory"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("not found in-memory"));
     }
 
     #[test]

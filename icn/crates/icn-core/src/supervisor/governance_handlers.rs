@@ -1072,7 +1072,10 @@ impl GovernanceEventHandler {
             let mut from_budget_clone = match treasury_guard.get_budget(&from_budget) {
                 Some(b) => b.clone(),
                 None => {
-                    error!("❌ Source budget {} disappeared during transfer", from_budget);
+                    error!(
+                        "❌ Source budget {} disappeared during transfer",
+                        from_budget
+                    );
                     icn_obs::metrics::governance::execution_failures_inc(
                         "treasury_transfer_between_budgets",
                     );
@@ -1082,7 +1085,10 @@ impl GovernanceEventHandler {
             let mut to_budget_clone = match treasury_guard.get_budget(&to_budget) {
                 Some(b) => b.clone(),
                 None => {
-                    error!("❌ Destination budget {} disappeared during transfer", to_budget);
+                    error!(
+                        "❌ Destination budget {} disappeared during transfer",
+                        to_budget
+                    );
                     icn_obs::metrics::governance::execution_failures_inc(
                         "treasury_transfer_between_budgets",
                     );
