@@ -13,10 +13,12 @@
 use actix_web::{get, post, web, HttpRequest, HttpResponse};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::Arc;
 use tracing::info;
 
 use crate::error::{GatewayError, Result};
 use crate::middleware::{require_coop_access, require_scope};
+use crate::treasury_mgr::GatewayTreasuryManager;
 
 // ============================================================================
 // Request/Response Types
@@ -51,7 +53,7 @@ pub struct TreasuryBalanceResponse {
 }
 
 /// Budget summary for list response
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BudgetSummary {
     /// Budget ID
     pub id: String,
@@ -206,33 +208,6 @@ pub struct DepositRequest {
 }
 
 // ============================================================================
-// Treasury Manager (placeholder - will be injected from supervisor)
-// ============================================================================
-
-/// Treasury manager placeholder for API
-/// In production, this will be injected from the supervisor's LedgerServices
-///
-/// NOTE: This is a Phase 1 placeholder. See issue #258 for wiring to real TreasuryManager.
-#[allow(dead_code)]
-pub struct TreasuryApiManager {
-    // Placeholder - in real implementation, this holds Arc<RwLock<TreasuryManager>>
-    _placeholder: (),
-}
-
-impl TreasuryApiManager {
-    /// Create a new placeholder manager
-    pub fn new() -> Self {
-        Self { _placeholder: () }
-    }
-}
-
-impl Default for TreasuryApiManager {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-// ============================================================================
 // API Endpoints
 // ============================================================================
 
@@ -244,20 +219,54 @@ impl Default for TreasuryApiManager {
 pub async fn get_treasury_status(
     req: HttpRequest,
     path: web::Path<String>,
+    treasury_mgr: web::Data<Arc<GatewayTreasuryManager>>,
 ) -> Result<HttpResponse> {
     require_scope(&req, "treasury:read")?;
 
     let coop_id = path.into_inner();
     require_coop_access(&req, &coop_id)?;
 
-    // TODO: Wire to actual TreasuryManager from supervisor
-    // For now, return a placeholder response
     info!(coop_id = %coop_id, "Treasury status requested");
 
-    // Placeholder - will be replaced with actual data when wired to supervisor
-    Err(GatewayError::NotFound(format!(
-        "Treasury not configured for cooperative '{coop_id}'. Register via governance proposal."
-    )))
+    // Get treasury for this cooperative
+    let treasury = treasury_mgr
+        .get_treasury_by_coop(&coop_id)
+        .await
+        .map_err(|e| GatewayError::InternalError(e.to_string()))?;
+
+    let Some(treasury) = treasury else {
+        return Err(GatewayError::NotFound(format!(
+            "Treasury not configured for cooperative '{coop_id}'. Register via governance proposal."
+        )));
+    };
+
+    // Get budgets and spending rules
+    let budgets = treasury_mgr
+        .list_budgets(&treasury.treasury_did)
+        .await
+        .map_err(|e| GatewayError::InternalError(e.to_string()))?;
+
+    let rules = treasury_mgr
+        .list_spending_rules(&treasury.treasury_did)
+        .await
+        .map_err(|e| GatewayError::InternalError(e.to_string()))?;
+
+    let active_budget_count = budgets
+        .iter()
+        .filter(|b| matches!(b.status, icn_ledger::BudgetStatus::Active))
+        .count();
+
+    let response = TreasuryStatusResponse {
+        treasury_did: treasury.treasury_did.to_string(),
+        coop_id: treasury.coop_id,
+        currency: treasury.currency,
+        is_active: treasury.is_active,
+        balance: 0, // TODO: Get actual balance from ledger
+        active_budget_count,
+        spending_rule_count: rules.len(),
+    };
+
+    Ok(HttpResponse::Ok().json(response))
 }
 
 /// GET /treasury/{coop_id}/balance - Get treasury balance
@@ -267,6 +276,7 @@ pub async fn get_treasury_status(
 pub async fn get_treasury_balance(
     req: HttpRequest,
     path: web::Path<String>,
+    treasury_mgr: web::Data<Arc<GatewayTreasuryManager>>,
 ) -> Result<HttpResponse> {
     require_scope(&req, "treasury:read")?;
 
@@ -275,17 +285,37 @@ pub async fn get_treasury_balance(
 
     info!(coop_id = %coop_id, "Treasury balance requested");
 
-    // TODO: Wire to actual TreasuryManager from supervisor
-    Err(GatewayError::NotFound(format!(
-        "Treasury not configured for cooperative '{coop_id}'"
-    )))
+    // Get treasury for this cooperative
+    let treasury = treasury_mgr
+        .get_treasury_by_coop(&coop_id)
+        .await
+        .map_err(|e| GatewayError::InternalError(e.to_string()))?;
+
+    let Some(treasury) = treasury else {
+        return Err(GatewayError::NotFound(format!(
+            "Treasury not configured for cooperative '{coop_id}'"
+        )));
+    };
+
+    // TODO: Get actual balances from ledger
+    // For now, return empty balances
+    let response = TreasuryBalanceResponse {
+        treasury_did: treasury.treasury_did.to_string(),
+        balances: HashMap::new(),
+    };
+
+    Ok(HttpResponse::Ok().json(response))
 }
 
 /// GET /treasury/{coop_id}/budgets - List budgets
 ///
 /// Returns all budgets for the cooperative's treasury.
 #[get("/{coop_id}/budgets")]
-pub async fn list_budgets(req: HttpRequest, path: web::Path<String>) -> Result<HttpResponse> {
+pub async fn list_budgets(
+    req: HttpRequest,
+    path: web::Path<String>,
+    treasury_mgr: web::Data<Arc<GatewayTreasuryManager>>,
+) -> Result<HttpResponse> {
     require_scope(&req, "treasury:read")?;
 
     let coop_id = path.into_inner();
@@ -293,11 +323,46 @@ pub async fn list_budgets(req: HttpRequest, path: web::Path<String>) -> Result<H
 
     info!(coop_id = %coop_id, "Treasury budgets list requested");
 
-    // TODO: Wire to actual TreasuryManager from supervisor
+    // Get treasury for this cooperative
+    let treasury = treasury_mgr
+        .get_treasury_by_coop(&coop_id)
+        .await
+        .map_err(|e| GatewayError::InternalError(e.to_string()))?;
+
+    let Some(treasury) = treasury else {
+        // Return empty list if no treasury configured
+        let response = BudgetListResponse {
+            treasury_did: String::new(),
+            budgets: Vec::new(),
+            total: 0,
+        };
+        return Ok(HttpResponse::Ok().json(response));
+    };
+
+    // Get budgets
+    let budgets = treasury_mgr
+        .list_budgets(&treasury.treasury_did)
+        .await
+        .map_err(|e| GatewayError::InternalError(e.to_string()))?;
+
+    let budget_summaries: Vec<BudgetSummary> = budgets
+        .iter()
+        .map(|b| BudgetSummary {
+            id: b.id.clone(),
+            purpose: b.purpose.clone(),
+            allocated_amount: b.allocated_amount,
+            spent_amount: b.spent_amount,
+            remaining: b.remaining(),
+            percentage_used: b.percentage_used().round().clamp(0.0, 100.0) as u8,
+            status: format!("{:?}", b.status),
+            currency: b.currency.clone(),
+        })
+        .collect();
+
     let response = BudgetListResponse {
-        treasury_did: String::new(),
-        budgets: Vec::new(),
-        total: 0,
+        treasury_did: treasury.treasury_did.to_string(),
+        budgets: budget_summaries.clone(),
+        total: budget_summaries.len(),
     };
 
     Ok(HttpResponse::Ok().json(response))
@@ -310,6 +375,7 @@ pub async fn list_budgets(req: HttpRequest, path: web::Path<String>) -> Result<H
 pub async fn get_budget(
     req: HttpRequest,
     path: web::Path<(String, String)>,
+    treasury_mgr: web::Data<Arc<GatewayTreasuryManager>>,
 ) -> Result<HttpResponse> {
     require_scope(&req, "treasury:read")?;
 
@@ -318,10 +384,38 @@ pub async fn get_budget(
 
     info!(coop_id = %coop_id, budget_id = %budget_id, "Treasury budget details requested");
 
-    // TODO: Wire to actual TreasuryManager from supervisor
-    Err(GatewayError::NotFound(format!(
-        "Budget not found: {budget_id}"
-    )))
+    // Get budget
+    let budget = treasury_mgr
+        .get_budget(&budget_id)
+        .await
+        .map_err(|e| GatewayError::InternalError(e.to_string()))?;
+
+    let Some(budget) = budget else {
+        return Err(GatewayError::NotFound(format!(
+            "Budget not found: {budget_id}"
+        )));
+    };
+
+    let response = BudgetDetailResponse {
+        id: budget.id.clone(),
+        treasury_did: budget.treasury_did.to_string(),
+        purpose: budget.purpose.clone(),
+        allocated_amount: budget.allocated_amount,
+        spent_amount: budget.spent_amount,
+        remaining: budget.remaining(),
+        currency: budget.currency.clone(),
+        period_start: budget.period_start,
+        period_end: budget.period_end,
+        status: format!("{:?}", budget.status),
+        percentage_used: budget.percentage_used().round().clamp(0.0, 100.0) as u8,
+        proposal_id: budget.proposal_id.clone(),
+        created_at: budget.created_at,
+        created_by: budget.created_by.to_string(),
+        notification_thresholds: budget.notification_thresholds.clone(),
+        notified_thresholds: budget.notified_thresholds.clone(),
+    };
+
+    Ok(HttpResponse::Ok().json(response))
 }
 
 /// POST /treasury/{coop_id}/budgets - Create budget (triggers governance proposal)
@@ -403,6 +497,7 @@ pub async fn create_budget(
 pub async fn list_spending_rules(
     req: HttpRequest,
     path: web::Path<String>,
+    treasury_mgr: web::Data<Arc<GatewayTreasuryManager>>,
 ) -> Result<HttpResponse> {
     require_scope(&req, "treasury:read")?;
 
@@ -411,10 +506,41 @@ pub async fn list_spending_rules(
 
     info!(coop_id = %coop_id, "Treasury spending rules requested");
 
-    // TODO: Wire to actual TreasuryManager from supervisor
+    // Get treasury for this cooperative
+    let treasury = treasury_mgr
+        .get_treasury_by_coop(&coop_id)
+        .await
+        .map_err(|e| GatewayError::InternalError(e.to_string()))?;
+
+    let Some(treasury) = treasury else {
+        let response = SpendingRulesResponse {
+            treasury_did: String::new(),
+            rules: Vec::new(),
+        };
+        return Ok(HttpResponse::Ok().json(response));
+    };
+
+    // Get spending rules
+    let rules = treasury_mgr
+        .list_spending_rules(&treasury.treasury_did)
+        .await
+        .map_err(|e| GatewayError::InternalError(e.to_string()))?;
+
+    let rule_summaries: Vec<SpendingRuleSummary> = rules
+        .iter()
+        .map(|r| SpendingRuleSummary {
+            id: r.id.clone(),
+            name: r.name.clone(),
+            threshold_amount: r.threshold_amount,
+            currency: r.currency.clone(),
+            approval_type: format!("{:?}", r.approval_type),
+            is_active: r.is_active,
+        })
+        .collect();
+
     let response = SpendingRulesResponse {
-        treasury_did: String::new(),
-        rules: Vec::new(),
+        treasury_did: treasury.treasury_did.to_string(),
+        rules: rule_summaries,
     };
 
     Ok(HttpResponse::Ok().json(response))
@@ -428,6 +554,7 @@ pub async fn get_audit_trail(
     req: HttpRequest,
     path: web::Path<String>,
     query: web::Query<HashMap<String, String>>,
+    treasury_mgr: web::Data<Arc<GatewayTreasuryManager>>,
 ) -> Result<HttpResponse> {
     require_scope(&req, "treasury:read")?;
 
@@ -447,14 +574,51 @@ pub async fn get_audit_trail(
 
     info!(coop_id = %coop_id, limit = limit, offset = offset, "Treasury audit trail requested");
 
-    // TODO: Wire to actual TreasuryManager from supervisor
+    // Get treasury for this cooperative
+    let treasury = treasury_mgr
+        .get_treasury_by_coop(&coop_id)
+        .await
+        .map_err(|e| GatewayError::InternalError(e.to_string()))?;
+
+    let Some(treasury) = treasury else {
+        let response = AuditTrailResponse {
+            treasury_did: String::new(),
+            records: Vec::new(),
+            total: 0,
+            offset,
+            limit,
+            has_more: false,
+        };
+        return Ok(HttpResponse::Ok().json(response));
+    };
+
+    // Get audit trail
+    let audit_trail = treasury_mgr
+        .get_audit_trail(&treasury.treasury_did, limit, offset)
+        .await
+        .map_err(|e| GatewayError::InternalError(e.to_string()))?;
+
+    let audit_records: Vec<AuditRecordSummary> = audit_trail
+        .records
+        .iter()
+        .map(|r| AuditRecordSummary {
+            id: r.id.clone(),
+            operation_type: format!("{:?}", r.operation),
+            performed_by: r.performed_by.to_string(),
+            performed_at: r.performed_at,
+            balance_after: r.balance_after,
+            proposal_id: r.proposal_id.clone(),
+            notes: r.notes.clone(),
+        })
+        .collect();
+
     let response = AuditTrailResponse {
-        treasury_did: String::new(),
-        records: Vec::new(),
-        total: 0,
-        offset,
-        limit,
-        has_more: false,
+        treasury_did: treasury.treasury_did.to_string(),
+        records: audit_records,
+        total: audit_trail.total,
+        offset: audit_trail.offset,
+        limit: audit_trail.limit,
+        has_more: audit_trail.offset + audit_trail.records.len() < audit_trail.total,
     };
 
     Ok(HttpResponse::Ok().json(response))
@@ -541,11 +705,19 @@ mod tests {
         }
     }
 
+    fn create_test_treasury_manager() -> Arc<GatewayTreasuryManager> {
+        Arc::new(GatewayTreasuryManager::new())
+    }
+
     #[actix_web::test]
     async fn test_get_treasury_status_not_found() {
-        let app =
-            test::init_service(App::new().service(web::scope("/treasury").configure(configure)))
-                .await;
+        let treasury_mgr = create_test_treasury_manager();
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(treasury_mgr))
+                .service(web::scope("/treasury").configure(configure)),
+        )
+        .await;
 
         let req = test::TestRequest::get()
             .uri("/treasury/test-coop")
@@ -558,9 +730,13 @@ mod tests {
 
     #[actix_web::test]
     async fn test_list_budgets_empty() {
-        let app =
-            test::init_service(App::new().service(web::scope("/treasury").configure(configure)))
-                .await;
+        let treasury_mgr = create_test_treasury_manager();
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(treasury_mgr))
+                .service(web::scope("/treasury").configure(configure)),
+        )
+        .await;
 
         let req = test::TestRequest::get()
             .uri("/treasury/test-coop/budgets")
@@ -573,9 +749,13 @@ mod tests {
 
     #[actix_web::test]
     async fn test_cross_coop_access_denied() {
-        let app =
-            test::init_service(App::new().service(web::scope("/treasury").configure(configure)))
-                .await;
+        let treasury_mgr = create_test_treasury_manager();
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(treasury_mgr))
+                .service(web::scope("/treasury").configure(configure)),
+        )
+        .await;
 
         let req = test::TestRequest::get()
             .uri("/treasury/other-coop/budgets")
@@ -589,9 +769,13 @@ mod tests {
 
     #[actix_web::test]
     async fn test_create_budget_requires_write_scope() {
-        let app =
-            test::init_service(App::new().service(web::scope("/treasury").configure(configure)))
-                .await;
+        let treasury_mgr = create_test_treasury_manager();
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(treasury_mgr))
+                .service(web::scope("/treasury").configure(configure)),
+        )
+        .await;
 
         let body = CreateBudgetRequest {
             purpose: "Test budget".to_string(),
@@ -621,9 +805,13 @@ mod tests {
 
     #[actix_web::test]
     async fn test_spending_rules_empty() {
-        let app =
-            test::init_service(App::new().service(web::scope("/treasury").configure(configure)))
-                .await;
+        let treasury_mgr = create_test_treasury_manager();
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(treasury_mgr))
+                .service(web::scope("/treasury").configure(configure)),
+        )
+        .await;
 
         let req = test::TestRequest::get()
             .uri("/treasury/test-coop/spending-rules")
@@ -636,9 +824,13 @@ mod tests {
 
     #[actix_web::test]
     async fn test_audit_trail_pagination() {
-        let app =
-            test::init_service(App::new().service(web::scope("/treasury").configure(configure)))
-                .await;
+        let treasury_mgr = create_test_treasury_manager();
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(treasury_mgr))
+                .service(web::scope("/treasury").configure(configure)),
+        )
+        .await;
 
         let req = test::TestRequest::get()
             .uri("/treasury/test-coop/audit?limit=50&offset=10")

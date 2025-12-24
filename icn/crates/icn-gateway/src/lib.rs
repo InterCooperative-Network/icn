@@ -49,6 +49,7 @@ pub mod rate_limit;
 pub mod security;
 pub mod server;
 pub mod session;
+pub mod treasury_mgr;
 pub mod trust_mgr;
 pub mod validation;
 pub mod websocket;
@@ -75,3 +76,4 @@ pub use rate_limit::{
     RateLimiter, VelocityLimitConfig, VelocityLimiter,
 };
 pub use server::GatewayServer;
+pub use treasury_mgr::{GatewayTreasuryManager, TreasuryHandle};

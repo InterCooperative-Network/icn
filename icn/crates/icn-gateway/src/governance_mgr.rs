@@ -537,9 +537,12 @@ impl GovernanceManager {
     /// - Max delegation depth not exceeded
     /// - No duplicate delegation for same scope
     pub async fn create_delegation(&self, delegation: Delegation) -> Result<()> {
-        // TODO: In actor-backed mode, delegate to GovernanceActor
-        // For now, only standalone mode is supported
+        // Actor-backed mode: delegate to GovernanceActor
+        if let Some(ref handle) = self.governance_handle {
+            return handle.create_delegation(delegation).await;
+        }
 
+        // Standalone mode: use local storage
         // Validate no self-delegation
         if delegation.delegator == delegation.delegate {
             anyhow::bail!("Cannot delegate to yourself");
@@ -581,8 +584,12 @@ impl GovernanceManager {
 
     /// Get a delegation by ID
     pub async fn get_delegation(&self, id: &DelegationId) -> Result<Option<Delegation>> {
-        // TODO: In actor-backed mode, delegate to GovernanceActor
+        // Actor-backed mode: delegate to GovernanceActor
+        if let Some(ref handle) = self.governance_handle {
+            return handle.get_delegation(id).await;
+        }
 
+        // Standalone mode: use local storage
         let delegations = self
             .delegations
             .read()
@@ -593,8 +600,12 @@ impl GovernanceManager {
 
     /// Get all delegations given by a specific DID
     pub async fn get_delegations_from(&self, delegator: &Did) -> Result<Vec<Delegation>> {
-        // TODO: In actor-backed mode, delegate to GovernanceActor
+        // Actor-backed mode: delegate to GovernanceActor
+        if let Some(ref handle) = self.governance_handle {
+            return handle.get_delegations_from(delegator).await;
+        }
 
+        // Standalone mode: use local storage
         let delegations = self
             .delegations
             .read()
@@ -609,8 +620,12 @@ impl GovernanceManager {
 
     /// Get all delegations received by a specific DID
     pub async fn get_delegations_to(&self, delegate: &Did) -> Result<Vec<Delegation>> {
-        // TODO: In actor-backed mode, delegate to GovernanceActor
+        // Actor-backed mode: delegate to GovernanceActor
+        if let Some(ref handle) = self.governance_handle {
+            return handle.get_delegations_to(delegate).await;
+        }
 
+        // Standalone mode: use local storage
         let delegations = self
             .delegations
             .read()
@@ -625,8 +640,12 @@ impl GovernanceManager {
 
     /// Revoke a delegation
     pub async fn revoke_delegation(&self, id: &DelegationId, revoked_at: Timestamp) -> Result<()> {
-        // TODO: In actor-backed mode, delegate to GovernanceActor
+        // Actor-backed mode: delegate to GovernanceActor
+        if let Some(ref handle) = self.governance_handle {
+            return handle.revoke_delegation(id, revoked_at).await;
+        }
 
+        // Standalone mode: use local storage
         let mut delegations = self
             .delegations
             .write()

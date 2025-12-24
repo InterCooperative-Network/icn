@@ -17,10 +17,11 @@ use icn_identity::Did;
 use icn_store::Store;
 
 use icn_governance::{
-    DecisionOutcome, GovernanceConfig, GovernanceDomain, GovernanceDomainId, GovernanceMessage,
-    GovernanceParams, GovernanceProfile, GovernanceProfileId, GovernanceRule, MembershipAction,
-    MembershipConfig, MembershipResolver, MembershipSource, Proposal, ProposalId, ProposalOutcome,
-    ProposalPayload, ProposalState, TallySnapshot, Vote, VoteChoice, VoteTally,
+    DecisionOutcome, Delegation, DelegationId, GovernanceConfig, GovernanceDomain,
+    GovernanceDomainId, GovernanceMessage, GovernanceParams, GovernanceProfile,
+    GovernanceProfileId, GovernanceRule, MembershipAction, MembershipConfig, MembershipResolver,
+    MembershipSource, Proposal, ProposalId, ProposalOutcome, ProposalPayload, ProposalState,
+    TallySnapshot, Timestamp, Vote, VoteChoice, VoteTally,
 };
 
 use crate::events::{EventBus, SystemEvent};
@@ -173,6 +174,31 @@ impl GovernanceHandle {
     pub async fn get_proposal(&self, id: &ProposalId) -> Result<Option<Proposal>> {
         self.inner.read().await.load_proposal(id)
     }
+
+    /// Create a new delegation
+    pub async fn create_delegation(&self, delegation: Delegation) -> Result<()> {
+        self.inner.write().await.create_delegation(delegation)
+    }
+
+    /// Get a delegation by ID
+    pub async fn get_delegation(&self, id: &DelegationId) -> Result<Option<Delegation>> {
+        self.inner.read().await.load_delegation(id)
+    }
+
+    /// Get all delegations from a delegator
+    pub async fn get_delegations_from(&self, delegator: &Did) -> Result<Vec<Delegation>> {
+        self.inner.read().await.list_delegations_from(delegator)
+    }
+
+    /// Get all delegations to a delegate
+    pub async fn get_delegations_to(&self, delegate: &Did) -> Result<Vec<Delegation>> {
+        self.inner.read().await.list_delegations_to(delegate)
+    }
+
+    /// Revoke a delegation
+    pub async fn revoke_delegation(&self, id: &DelegationId, revoked_at: Timestamp) -> Result<()> {
+        self.inner.write().await.revoke_delegation(id, revoked_at)
+    }
 }
 
 /// Implement GovernanceOps trait to allow RPC integration without circular dependencies
@@ -271,6 +297,28 @@ impl icn_governance::GovernanceOps for GovernanceHandle {
     async fn close_proposal(&self, proposal_id: ProposalId) -> Result<()> {
         self.submit(GovernanceCommand::CloseProposal { proposal_id })
             .await
+    }
+
+    // Delegation operations
+
+    async fn create_delegation(&self, delegation: Delegation) -> Result<()> {
+        Self::create_delegation(self, delegation).await
+    }
+
+    async fn get_delegation(&self, id: &DelegationId) -> Result<Option<Delegation>> {
+        Self::get_delegation(self, id).await
+    }
+
+    async fn get_delegations_from(&self, delegator: &Did) -> Result<Vec<Delegation>> {
+        Self::get_delegations_from(self, delegator).await
+    }
+
+    async fn get_delegations_to(&self, delegate: &Did) -> Result<Vec<Delegation>> {
+        Self::get_delegations_to(self, delegate).await
+    }
+
+    async fn revoke_delegation(&self, id: &DelegationId, revoked_at: Timestamp) -> Result<()> {
+        Self::revoke_delegation(self, id, revoked_at).await
     }
 }
 
@@ -881,6 +929,82 @@ impl GovernanceActor {
             .map(|(_k, v)| Ok(serde_json::from_slice::<Vote>(&v)?))
             .collect()
     }
+
+    /// Create a new delegation
+    fn create_delegation(&mut self, delegation: Delegation) -> Result<()> {
+        // Validate no self-delegation
+        if delegation.delegator == delegation.delegate {
+            bail!("Cannot delegate to yourself");
+        }
+
+        // Store the delegation
+        self.store.put(
+            &delegation_key(&delegation.id),
+            &serde_json::to_vec(&delegation)?,
+        )?;
+
+        info!(
+            "✓ Delegation created: {} -> {} (scope: {:?})",
+            delegation.delegator, delegation.delegate, delegation.scope
+        );
+
+        Ok(())
+    }
+
+    /// Load a delegation by ID
+    fn load_delegation(&self, id: &DelegationId) -> Result<Option<Delegation>> {
+        load_json(self.store.as_ref(), &delegation_key(id))
+    }
+
+    /// List all delegations from a delegator
+    fn list_delegations_from(&self, delegator: &Did) -> Result<Vec<Delegation>> {
+        let prefix = delegation_key_prefix();
+        let rows = self.store.scan(prefix)?;
+        rows.into_iter()
+            .filter_map(|(_k, v)| {
+                let d: Delegation = serde_json::from_slice(&v).ok()?;
+                if &d.delegator == delegator && d.revoked_at.is_none() {
+                    Some(Ok(d))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    /// List all delegations to a delegate
+    fn list_delegations_to(&self, delegate: &Did) -> Result<Vec<Delegation>> {
+        let prefix = delegation_key_prefix();
+        let rows = self.store.scan(prefix)?;
+        rows.into_iter()
+            .filter_map(|(_k, v)| {
+                let d: Delegation = serde_json::from_slice(&v).ok()?;
+                if &d.delegate == delegate && d.revoked_at.is_none() {
+                    Some(Ok(d))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    /// Revoke a delegation
+    fn revoke_delegation(&mut self, id: &DelegationId, revoked_at: Timestamp) -> Result<()> {
+        let mut delegation = self
+            .load_delegation(id)?
+            .ok_or_else(|| anyhow::anyhow!("Delegation not found: {}", id.0))?;
+
+        delegation.revoked_at = Some(revoked_at);
+
+        self.store.put(
+            &delegation_key(&delegation.id),
+            &serde_json::to_vec(&delegation)?,
+        )?;
+
+        info!("✓ Delegation revoked: {}", id.0);
+
+        Ok(())
+    }
 }
 
 /// Handle incoming governance messages from gossip
@@ -979,6 +1103,14 @@ fn vote_key(proposal_id: &ProposalId, voter: &Did) -> Vec<u8> {
 
 fn vote_key_prefix(proposal_id: &ProposalId) -> Vec<u8> {
     format!("gov:vote:{}:", proposal_id.0).into_bytes()
+}
+
+fn delegation_key(id: &DelegationId) -> Vec<u8> {
+    format!("gov:delegation:{}", id.0).into_bytes()
+}
+
+fn delegation_key_prefix() -> &'static [u8] {
+    b"gov:delegation:"
 }
 
 // ---- Utility functions ----

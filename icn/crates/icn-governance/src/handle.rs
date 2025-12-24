@@ -2,10 +2,11 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use icn_identity::Did;
 
 use crate::{
-    GovernanceDomain, GovernanceDomainId, GovernanceParams, MembershipConfig, Proposal, ProposalId,
-    ProposalPayload, VoteChoice,
+    Delegation, DelegationId, GovernanceDomain, GovernanceDomainId, GovernanceParams,
+    MembershipConfig, Proposal, ProposalId, ProposalPayload, Timestamp, VoteChoice,
 };
 
 /// Trait for governance operations exposed to RPC layer
@@ -66,4 +67,21 @@ pub trait GovernanceOps: Send + Sync {
 
     /// Close a proposal and evaluate the outcome
     async fn close_proposal(&self, proposal_id: ProposalId) -> Result<()>;
+
+    // Delegation operations
+
+    /// Create a new vote delegation
+    async fn create_delegation(&self, delegation: Delegation) -> Result<()>;
+
+    /// Get a delegation by ID
+    async fn get_delegation(&self, id: &DelegationId) -> Result<Option<Delegation>>;
+
+    /// Get all delegations given by a specific DID
+    async fn get_delegations_from(&self, delegator: &Did) -> Result<Vec<Delegation>>;
+
+    /// Get all delegations received by a specific DID
+    async fn get_delegations_to(&self, delegate: &Did) -> Result<Vec<Delegation>>;
+
+    /// Revoke a delegation
+    async fn revoke_delegation(&self, id: &DelegationId, revoked_at: Timestamp) -> Result<()>;
 }

@@ -126,6 +126,9 @@ impl Supervisor {
             Arc<dyn icn_governance::GovernanceOps + Send + Sync>,
         >;
 
+        // Treasury handle for gateway integration
+        let treasury_handle_for_gateway: Option<icn_gateway::TreasuryHandle>;
+
         // Governance event subscription handles - MUST persist for daemon lifetime
         // Stored at function scope to prevent premature Drop (which would unsubscribe)
         let governance_event_subscription: Option<crate::events::SubscriptionHandle>;
@@ -827,6 +830,9 @@ impl Supervisor {
             // Store governance handle for gateway integration
             governance_handle_for_gateway = Some(Arc::new(governance_handle.clone()));
 
+            // Store treasury handle for gateway integration
+            treasury_handle_for_gateway = Some(treasury_manager_handle.clone());
+
             // Subscribe to governance events for ledger execution
             // CRITICAL: Must store handle to keep subscription alive for daemon lifetime
             governance_event_subscription = Some({
@@ -1070,12 +1076,13 @@ impl Supervisor {
 
             info!("Metrics update task spawned (system metrics only)");
 
-            // No event broadcaster or compute/trust/governance handles without identity
+            // No event broadcaster or compute/trust/governance/treasury handles without identity
             event_broadcaster = None;
             compute_handle_for_gateway = None;
             coop_handle_for_gateway = None;
             trust_graph_handle_for_gateway = None;
             governance_handle_for_gateway = None;
+            treasury_handle_for_gateway = None;
 
             (None, None, None)
         };
@@ -1143,6 +1150,11 @@ impl Supervisor {
                         // Connect governance handle if available
                         if let Some(handle) = governance_handle_for_gateway {
                             gateway_server = gateway_server.with_governance_handle(handle);
+                        }
+
+                        // Connect treasury handle if available
+                        if let Some(handle) = treasury_handle_for_gateway {
+                            gateway_server = gateway_server.with_treasury_handle(handle);
                         }
 
                         if let Err(e) = gateway_server.run().await {
