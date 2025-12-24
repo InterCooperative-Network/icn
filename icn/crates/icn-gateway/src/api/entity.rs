@@ -328,11 +328,22 @@ pub async fn register_entity(
         .map_err(|e| GatewayError::InternalError(format!("Failed to register entity: {e}")))?;
 
     // Add the creator as a founder member
+    // If this fails, clean up the entity to avoid orphaned entities
     let founder_membership =
         Membership::new(creator_id, entity_id.clone(), MembershipRole::Founder);
-    entity_mgr.add_membership(founder_membership).map_err(|e| {
-        GatewayError::InternalError(format!("Failed to add founder membership: {e}"))
-    })?;
+    if let Err(e) = entity_mgr.add_membership(founder_membership) {
+        // Cleanup: remove the entity we just registered
+        if let Err(cleanup_err) = entity_mgr.remove(&entity_id) {
+            tracing::error!(
+                entity_id = %entity_id,
+                error = %cleanup_err,
+                "Failed to cleanup entity after membership failure"
+            );
+        }
+        return Err(GatewayError::InternalError(format!(
+            "Failed to add founder membership: {e}"
+        )));
+    }
 
     let members = entity_mgr.get_members(&entity_id).unwrap_or_default();
     let response = entity_to_response(&entity, members.len());
