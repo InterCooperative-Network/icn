@@ -54,7 +54,9 @@ fn test_concurrent_protocol_change_version_conflict() -> Result<()> {
 
     // Initialize parameter at version 0
     store.set(governance_test_param("concurrent", 100), None, None)?;
-    let initial = store.get("governance.concurrent")?.expect("Parameter should exist");
+    let initial = store
+        .get("governance.concurrent")?
+        .expect("Parameter should exist");
     assert_eq!(initial.version, 0);
     assert_eq!(initial.value, ParameterValue::Integer(100));
 
@@ -126,7 +128,9 @@ fn test_concurrent_protocol_change_version_conflict() -> Result<()> {
     }
 
     // Verify final state is consistent
-    let final_state = store.get("governance.concurrent")?.expect("Parameter should exist");
+    let final_state = store
+        .get("governance.concurrent")?
+        .expect("Parameter should exist");
     assert!(
         final_state.value == ParameterValue::Integer(200)
             || final_state.value == ParameterValue::Integer(300),
