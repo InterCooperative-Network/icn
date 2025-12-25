@@ -54,7 +54,10 @@ fn test_credit_limit_enforcement_rejects_excessive_spending() -> Result<()> {
             .build()?;
 
         let result = ledger.append_entry(entry);
-        assert!(result.is_ok(), "Valid transaction should be accepted: {result:?}");
+        assert!(
+            result.is_ok(),
+            "Valid transaction should be accepted: {result:?}"
+        );
         info!("✓ Valid transaction (50 hours) accepted");
         result.unwrap()
     };
