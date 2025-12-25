@@ -9,7 +9,9 @@
 
 **Status**: **FOUNDATIONAL REVIEW COMPLETE** ✅ - All systems validated (2025-12-16)
 **Foundation**: Phase 18 Complete (Pre-Pilot Hardening), Phase 17 ✅ (Storage Replication), Phase 16 ✅ (Scheduler Evolution), Phase 15 ✅ (Compute), Phase 14 ✅ (Gateway), **Federation Layer ✅**, Phases 11-12 ✅, Tracks B1-B3 ✅, Pilot Tooling ✅, **Track S (SDIS) S1-S6 ✅** (2025-12-10)
+**Economic Safety**: **P2 Complete** ✅ (PR #288 - 2025-12-25) - Server-side credit limits + velocity limiting wired
 **Validation**: [Foundational Review](docs/FOUNDATIONAL_REVIEW_2025-12-16.md) - 1134+ tests passing, zero critical gaps
+**Current Sprint**: P2b Member-Since Tracking (#289) + Protocol Governance Tests (#283) - [Status](docs/status/2025-12-25-sprint-status.md)
 **Next**: Track C1 Pilot Community Selection → Track C2 Pilot MVP → 3-month Pilot Deployment
 
 ## Executive Summary
