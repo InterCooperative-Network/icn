@@ -535,4 +535,18 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn test_no_duplicate_parameter_ids() {
+        use std::collections::HashSet;
+        let params = default_parameters();
+        let mut seen = HashSet::new();
+        for param in params {
+            assert!(
+                seen.insert(param.id.clone()),
+                "Duplicate parameter ID found: {}",
+                param.id
+            );
+        }
+    }
 }

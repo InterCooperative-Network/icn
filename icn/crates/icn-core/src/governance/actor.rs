@@ -219,6 +219,10 @@ impl GovernanceHandle {
     /// Set the protocol parameter store
     ///
     /// This must be called after spawn() to enable protocol parameter operations.
+    ///
+    /// **Note**: This method consumes self and returns a new handle. Any clones made
+    /// before calling this method will NOT have the protocol parameter store configured.
+    /// Always call this before cloning the handle.
     pub fn with_protocol_params(mut self, store: Arc<dyn ProtocolParameterStore>) -> Self {
         self.protocol_params = Some(store);
         self
@@ -227,6 +231,10 @@ impl GovernanceHandle {
     /// Set the entity registry
     ///
     /// This enables validation that entities referenced in parameter scopes actually exist.
+    ///
+    /// **Note**: This method consumes self and returns a new handle. Any clones made
+    /// before calling this method will NOT have the entity registry configured.
+    /// Always call this before cloning the handle.
     pub fn with_entity_registry(mut self, registry: Arc<dyn icn_entity::EntityRegistry>) -> Self {
         self.entity_registry = Some(registry);
         self
@@ -408,11 +416,29 @@ impl icn_governance::GovernanceOps for GovernanceHandle {
             // Validate entity exists if scope references an entity
             if let Some(ref scope) = proposal.scope {
                 if let Some(entity_id) = scope.entity_id() {
-                    // Only validate if entity registry is configured
-                    if let Some(ref registry) = self.entity_registry {
-                        if !registry.exists(entity_id).unwrap_or(false) {
-                            bail!(
-                                "Cannot create ProtocolChange proposal: scope references non-existent entity '{entity_id}'"
+                    match &self.entity_registry {
+                        Some(registry) => {
+                            match registry.exists(entity_id) {
+                                Ok(true) => {} // Entity exists, proceed
+                                Ok(false) => {
+                                    bail!(
+                                        "Cannot create ProtocolChange proposal: scope references non-existent entity '{entity_id}'"
+                                    );
+                                }
+                                Err(e) => {
+                                    bail!(
+                                        "Cannot create ProtocolChange proposal: failed to verify entity '{entity_id}': {e}"
+                                    );
+                                }
+                            }
+                        }
+                        None => {
+                            // Entity registry not configured - warn but allow (for backwards compatibility)
+                            // In production, entity registry should always be configured
+                            warn!(
+                                entity_id = %entity_id,
+                                "Entity registry not configured; cannot validate scoped parameter entity existence. \
+                                 Configure entity registry with with_entity_registry() to enable validation."
                             );
                         }
                     }

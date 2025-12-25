@@ -95,7 +95,7 @@ impl GovernanceEventHandler {
                 error: error.to_string(),
                 failed_at: icn_time::current_timestamp_secs(),
             };
-            // Spawn async emit in the background (fire-and-forget)
+            // Spawn async emit in the background
             tokio::spawn(async move {
                 bus.emit(event).await;
             });
@@ -121,7 +121,7 @@ impl GovernanceEventHandler {
                 changed_by,
                 changed_at: icn_time::current_timestamp_secs(),
             };
-            // Spawn async emit in the background (fire-and-forget)
+            // Spawn async emit in the background
             tokio::spawn(async move {
                 bus.emit(event).await;
             });

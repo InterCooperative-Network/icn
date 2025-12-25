@@ -37,7 +37,7 @@
 //!
 //! # Example
 //!
-//! ```ignore
+//! ```no_run
 //! use icn_governance::protocol::{ProtocolParameter, ParameterValue, ParameterScope};
 //!
 //! let param = ProtocolParameter::new(
