@@ -39,6 +39,7 @@
 
 use crate::protocol::{
     ParameterChange, ParameterScope, ParameterValidationError, ParameterValue, ProtocolParameter,
+    KNOWN_PARAMETER_CATEGORIES,
 };
 use anyhow::Result;
 use icn_entity::EntityId;
@@ -47,10 +48,140 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use tracing::{debug, warn};
 
+// ============================================================================
+// ParameterStoreError
+// ============================================================================
+
+/// Errors that can occur during parameter store operations
+///
+/// This error type categorizes errors to help callers determine appropriate
+/// handling (e.g., retry for transient errors, fail fast for validation errors).
+#[derive(Debug, thiserror::Error)]
+pub enum ParameterStoreError {
+    /// Concurrent modification detected (RETRYABLE)
+    ///
+    /// Another process updated the parameter between read and write.
+    /// Caller should re-read the parameter and retry with the new version.
+    #[error("Concurrent modification detected for parameter '{parameter_id}': expected version {expected_version}, found {actual_version}. Please retry.")]
+    ConcurrentModification {
+        /// The parameter that had a version conflict
+        parameter_id: String,
+        /// The version the caller expected
+        expected_version: u64,
+        /// The actual version in storage
+        actual_version: u64,
+    },
+
+    /// Validation failed (NOT RETRYABLE)
+    ///
+    /// The parameter value violates constraints.
+    /// Caller must fix the input value before retrying.
+    #[error("Validation failed: {0}")]
+    Validation(#[from] ParameterValidationError),
+
+    /// Scope override not allowed (NOT RETRYABLE)
+    ///
+    /// The parameter does not allow overrides at the requested scope.
+    #[error("Parameter '{parameter_id}' does not allow scope overrides")]
+    ScopeOverrideNotAllowed {
+        /// The parameter that cannot be overridden
+        parameter_id: String,
+    },
+
+    /// Storage error (POTENTIALLY RETRYABLE)
+    ///
+    /// An I/O or database error occurred. May be transient (disk full, network issue)
+    /// or permanent (corruption). Check the inner error for details.
+    #[error("Storage error: {message}")]
+    Storage {
+        /// Human-readable error description
+        message: String,
+        /// Whether this error is likely transient and retryable
+        is_transient: bool,
+    },
+
+    /// Lock poisoned (NOT RETRYABLE)
+    ///
+    /// A thread panicked while holding a lock, leaving the store in an
+    /// inconsistent state. This indicates a bug in the application.
+    #[error("Lock poisoned: {0}")]
+    LockPoisoned(String),
+
+    /// Parameter not found (NOT RETRYABLE)
+    ///
+    /// The requested parameter does not exist.
+    #[error("Parameter not found: '{0}'")]
+    NotFound(String),
+}
+
+impl ParameterStoreError {
+    /// Returns true if this error is transient and the operation may succeed on retry
+    ///
+    /// # Retryable errors:
+    /// - `ConcurrentModification`: Re-read and retry with correct version
+    /// - `Storage` with `is_transient: true`: Wait and retry
+    ///
+    /// # Non-retryable errors:
+    /// - `Validation`: Fix the input before retrying
+    /// - `ScopeOverrideNotAllowed`: Cannot override this parameter
+    /// - `LockPoisoned`: Application bug, requires restart
+    /// - `NotFound`: Parameter doesn't exist
+    /// - `Storage` with `is_transient: false`: Likely corruption or config issue
+    pub fn is_retryable(&self) -> bool {
+        match self {
+            Self::ConcurrentModification { .. } => true,
+            Self::Storage { is_transient, .. } => *is_transient,
+            Self::Validation(_) => false,
+            Self::ScopeOverrideNotAllowed { .. } => false,
+            Self::LockPoisoned(_) => false,
+            Self::NotFound(_) => false,
+        }
+    }
+
+    /// Create a storage error from an anyhow error, classifying transience
+    pub fn storage(err: impl std::fmt::Display, is_transient: bool) -> Self {
+        Self::Storage {
+            message: err.to_string(),
+            is_transient,
+        }
+    }
+
+    /// Create a concurrent modification error
+    pub fn concurrent_modification(
+        parameter_id: impl Into<String>,
+        expected_version: u64,
+        actual_version: u64,
+    ) -> Self {
+        Self::ConcurrentModification {
+            parameter_id: parameter_id.into(),
+            expected_version,
+            actual_version,
+        }
+    }
+}
+
 /// Maximum number of history entries to keep per parameter.
 /// This prevents unbounded growth from DoS via repeated parameter changes.
 /// History beyond this limit is automatically pruned on each set() call.
 pub const MAX_HISTORY_ENTRIES_PER_PARAM: usize = 100;
+
+/// Warn if a parameter uses an unknown category
+///
+/// This doesn't prevent the operation but logs a warning to help catch
+/// typos or non-standard parameter naming.
+fn warn_unknown_category(id: &str) {
+    if let Some(category) = id.split('.').next() {
+        if !KNOWN_PARAMETER_CATEGORIES.contains(&category) {
+            warn!(
+                parameter_id = %id,
+                category = %category,
+                known_categories = ?KNOWN_PARAMETER_CATEGORIES,
+                "Parameter uses unknown category. Consider using a known category \
+                 or adding this category to KNOWN_PARAMETER_CATEGORIES if intentional."
+            );
+        }
+    }
+}
 
 /// Warning threshold for total history entries across all parameters.
 /// When exceeded, a warning is logged to alert operators about potential
@@ -95,6 +226,26 @@ pub trait ProtocolParameterStore: Send + Sync {
 
     /// Get change history for a parameter
     fn get_history(&self, id: &str) -> Result<Vec<ParameterChange>>;
+
+    /// Get paginated change history for a parameter
+    ///
+    /// Returns history entries in chronological order (oldest first).
+    /// Use `offset` to skip entries and `limit` to cap the result size.
+    /// Also returns the total count for pagination UI.
+    ///
+    /// # Arguments
+    /// - `id`: Parameter ID
+    /// - `offset`: Number of entries to skip (for pagination)
+    /// - `limit`: Maximum entries to return
+    ///
+    /// # Returns
+    /// Tuple of (entries, total_count)
+    fn get_history_paginated(
+        &self,
+        id: &str,
+        offset: usize,
+        limit: usize,
+    ) -> Result<(Vec<ParameterChange>, usize)>;
 
     /// Prune old history entries, keeping only the last `max_entries` per parameter
     ///
@@ -198,17 +349,20 @@ impl ProtocolParameterStore for InMemoryParameterStore {
 
     fn set(
         &self,
-        param: ProtocolParameter,
+        mut param: ProtocolParameter,
         proposal_id: Option<String>,
         changed_by: Option<String>,
     ) -> Result<()> {
         let id = param.id.clone();
         let scope_key = Self::scope_key(&param.scope);
 
+        // Warn about unknown categories (non-blocking)
+        warn_unknown_category(&id);
+
         // For updates, validate against the STORED parameter's constraints (not the new one's)
         // This prevents constraint bypass attacks where an attacker submits a parameter
         // with modified constraints that allow any value
-        if let Some(stored_param) = self.get(&id)? {
+        let old_value = if let Some(stored_param) = self.get(&id)? {
             stored_param
                 .validate(&param.value)
                 .map_err(|e| anyhow::anyhow!("Parameter validation failed for '{id}': {e}"))?;
@@ -221,24 +375,28 @@ impl ProtocolParameterStore for InMemoryParameterStore {
                     "Parameter '{id}' does not allow scope overrides"
                 ));
             }
+
+            // Optimistic locking: check version matches
+            if param.version != stored_param.version {
+                return Err(anyhow::anyhow!(
+                    "Concurrent modification detected for parameter '{id}': \
+                     expected version {}, found {}. Please retry.",
+                    param.version,
+                    stored_param.version
+                ));
+            }
+
+            // Increment version for the update
+            param.version = stored_param.version + 1;
+            Some(stored_param.value)
         } else {
             // For new parameters (initial setup), validate against the parameter's own constraints
             param
                 .validate(&param.value)
                 .map_err(|e| anyhow::anyhow!("Parameter validation failed for '{id}': {e}"))?;
-        }
-
-        // Get old value for history
-        let old_value = if matches!(param.scope, ParameterScope::Global) {
-            self.get(&id)?.map(|p| p.value)
-        } else {
-            let scoped = self
-                .scoped_params
-                .read()
-                .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-            scoped
-                .get(&(scope_key.clone(), id.clone()))
-                .map(|p| p.value.clone())
+            // New parameter starts at version 0
+            param.version = 0;
+            None
         };
 
         // Store the parameter
@@ -338,6 +496,29 @@ impl ProtocolParameterStore for InMemoryParameterStore {
         // Sort by timestamp (oldest first) for chronological audit trail
         changes.sort_by_key(|c| c.changed_at);
         Ok(changes)
+    }
+
+    fn get_history_paginated(
+        &self,
+        id: &str,
+        offset: usize,
+        limit: usize,
+    ) -> Result<(Vec<ParameterChange>, usize)> {
+        let history = self
+            .history
+            .read()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+
+        let mut changes = history.get(id).cloned().unwrap_or_default();
+        let total = changes.len();
+
+        // Sort by timestamp (oldest first) for chronological audit trail
+        changes.sort_by_key(|c| c.changed_at);
+
+        // Apply pagination
+        let paginated: Vec<_> = changes.into_iter().skip(offset).take(limit).collect();
+
+        Ok((paginated, total))
     }
 
     fn prune_history(&self, id: &str, max_entries: usize) -> Result<usize> {
@@ -556,13 +737,17 @@ impl ProtocolParameterStore for SledParameterStore {
     /// Callers are responsible for ensuring proper authorization before invoking this method.
     fn set(
         &self,
-        param: ProtocolParameter,
+        mut param: ProtocolParameter,
         proposal_id: Option<String>,
         changed_by: Option<String>,
     ) -> Result<()> {
         use sled::transaction::ConflictableTransactionError;
 
         let id = param.id.clone();
+        let provided_version = param.version;
+
+        // Warn about unknown categories (non-blocking)
+        warn_unknown_category(&id);
 
         // For updates, validate against the STORED parameter's constraints (not the new one's)
         // This prevents constraint bypass attacks where an attacker submits a parameter
@@ -582,11 +767,26 @@ impl ProtocolParameterStore for SledParameterStore {
                     "Parameter '{id}' does not allow scope overrides"
                 ));
             }
+
+            // Pre-check version before transaction (will be verified atomically inside)
+            if provided_version != stored_param.version {
+                return Err(anyhow::anyhow!(
+                    "Concurrent modification detected for parameter '{id}': \
+                     expected version {}, found {}. Please retry.",
+                    provided_version,
+                    stored_param.version
+                ));
+            }
+
+            // Increment version for the update
+            param.version = stored_param.version + 1;
         } else {
             // For new parameters (initial setup), validate against the parameter's own constraints
             param
                 .validate(&param.value)
                 .map_err(|e| anyhow::anyhow!("Parameter validation failed for '{id}': {e}"))?;
+            // New parameter starts at version 0
+            param.version = 0;
         }
 
         // Prepare the key for this parameter
@@ -735,6 +935,31 @@ impl ProtocolParameterStore for SledParameterStore {
         // Sort by timestamp (oldest first)
         changes.sort_by_key(|c| c.changed_at);
         Ok(changes)
+    }
+
+    fn get_history_paginated(
+        &self,
+        id: &str,
+        offset: usize,
+        limit: usize,
+    ) -> Result<(Vec<ParameterChange>, usize)> {
+        let prefix = Self::history_prefix(id);
+        let mut changes = Vec::new();
+
+        for item in self.db.scan_prefix(&prefix) {
+            let (_, value) = item?;
+            changes.push(Self::deserialize_change(&value)?);
+        }
+
+        let total = changes.len();
+
+        // Sort by timestamp (oldest first)
+        changes.sort_by_key(|c| c.changed_at);
+
+        // Apply pagination
+        let paginated: Vec<_> = changes.into_iter().skip(offset).take(limit).collect();
+
+        Ok((paginated, total))
     }
 
     fn prune_history(&self, id: &str, max_entries: usize) -> Result<usize> {
@@ -1253,12 +1478,15 @@ mod tests {
         // Create a parameter and update it several times
         store.set(test_param("test.prune", 1), None, None).unwrap();
         for i in 2..=10 {
-            let param = ProtocolParameter::new(
+            // Read current version before updating (optimistic locking pattern)
+            let current = store.get("test.prune").unwrap().unwrap();
+            let mut param = ProtocolParameter::new(
                 "test.prune",
                 "Prune Test",
                 "Test pruning",
                 ParameterValue::Integer(i),
             );
+            param.version = current.version; // Use current version for optimistic locking
             store
                 .set(param, Some(format!("proposal-{i}")), None)
                 .unwrap();
@@ -1284,12 +1512,15 @@ mod tests {
         // Create a parameter and update it several times
         store.set(test_param("test.prune", 1), None, None).unwrap();
         for i in 2..=10 {
-            let param = ProtocolParameter::new(
+            // Read current version before updating (optimistic locking pattern)
+            let current = store.get("test.prune").unwrap().unwrap();
+            let mut param = ProtocolParameter::new(
                 "test.prune",
                 "Prune Test",
                 "Test pruning",
                 ParameterValue::Integer(i),
             );
+            param.version = current.version; // Use current version for optimistic locking
             store
                 .set(param, Some(format!("proposal-{i}")), None)
                 .unwrap();
@@ -1306,6 +1537,95 @@ mod tests {
         // Verify only 5 remain
         let history = store.get_history("test.prune").unwrap();
         assert_eq!(history.len(), 5);
+    }
+
+    // ========================================
+    // Paginated history tests
+    // ========================================
+
+    #[test]
+    fn test_paginated_history_inmemory() {
+        let store = InMemoryParameterStore::new();
+
+        // Create parameter with multiple history entries
+        store.set(test_param("test.page", 1), None, None).unwrap();
+        for i in 2..=10 {
+            let current = store.get("test.page").unwrap().unwrap();
+            let mut param = test_param("test.page", i);
+            param.version = current.version;
+            store.set(param, None, None).unwrap();
+        }
+
+        // Should have 9 history entries total
+        let (all, total) = store.get_history_paginated("test.page", 0, 100).unwrap();
+        assert_eq!(total, 9);
+        assert_eq!(all.len(), 9);
+
+        // Test first page (3 items)
+        let (page1, total) = store.get_history_paginated("test.page", 0, 3).unwrap();
+        assert_eq!(total, 9);
+        assert_eq!(page1.len(), 3);
+        // Oldest entries first (changes from 1->2, 2->3, 3->4)
+        assert_eq!(page1[0].old_value, ParameterValue::Integer(1));
+        assert_eq!(page1[0].new_value, ParameterValue::Integer(2));
+
+        // Test second page (3 items)
+        let (page2, total) = store.get_history_paginated("test.page", 3, 3).unwrap();
+        assert_eq!(total, 9);
+        assert_eq!(page2.len(), 3);
+        // Changes from 4->5, 5->6, 6->7
+        assert_eq!(page2[0].old_value, ParameterValue::Integer(4));
+
+        // Test last page (3 items)
+        let (page3, total) = store.get_history_paginated("test.page", 6, 3).unwrap();
+        assert_eq!(total, 9);
+        assert_eq!(page3.len(), 3);
+        // Changes from 7->8, 8->9, 9->10
+        assert_eq!(page3[2].new_value, ParameterValue::Integer(10));
+
+        // Test beyond end
+        let (empty, total) = store.get_history_paginated("test.page", 100, 10).unwrap();
+        assert_eq!(total, 9);
+        assert!(empty.is_empty());
+
+        // Test nonexistent parameter
+        let (none, total) = store
+            .get_history_paginated("nonexistent.param", 0, 10)
+            .unwrap();
+        assert_eq!(total, 0);
+        assert!(none.is_empty());
+    }
+
+    #[test]
+    fn test_paginated_history_sled() {
+        let store = SledParameterStore::temporary().unwrap();
+
+        // Create parameter with multiple history entries
+        store.set(test_param("test.page", 1), None, None).unwrap();
+        for i in 2..=10 {
+            let current = store.get("test.page").unwrap().unwrap();
+            let mut param = test_param("test.page", i);
+            param.version = current.version;
+            store.set(param, None, None).unwrap();
+        }
+
+        // Should have 9 history entries total
+        let (all, total) = store.get_history_paginated("test.page", 0, 100).unwrap();
+        assert_eq!(total, 9);
+        assert_eq!(all.len(), 9);
+
+        // Test pagination
+        let (page1, total) = store.get_history_paginated("test.page", 0, 3).unwrap();
+        assert_eq!(total, 9);
+        assert_eq!(page1.len(), 3);
+
+        let (page2, _) = store.get_history_paginated("test.page", 3, 3).unwrap();
+        assert_eq!(page2.len(), 3);
+
+        // Test limit larger than remaining
+        let (partial, total) = store.get_history_paginated("test.page", 7, 10).unwrap();
+        assert_eq!(total, 9);
+        assert_eq!(partial.len(), 2); // Only 2 entries remain after offset 7
     }
 
     #[test]
@@ -1512,5 +1832,295 @@ mod tests {
 
         let stored = store.get("test.new_param").unwrap().unwrap();
         assert_eq!(stored.value, ParameterValue::Integer(50));
+    }
+
+    // ========================================
+    // Optimistic locking tests
+    // ========================================
+
+    #[test]
+    fn test_optimistic_locking_inmemory() {
+        let store = InMemoryParameterStore::new();
+
+        // Create initial parameter (version 0)
+        store.set(test_param("test.lock", 100), None, None).unwrap();
+        let stored = store.get("test.lock").unwrap().unwrap();
+        assert_eq!(stored.version, 0);
+
+        // Update with correct version (should succeed, increment to version 1)
+        let mut update1 = test_param("test.lock", 200);
+        update1.version = 0; // Match current version
+        store.set(update1, None, None).unwrap();
+
+        let stored = store.get("test.lock").unwrap().unwrap();
+        assert_eq!(stored.value, ParameterValue::Integer(200));
+        assert_eq!(stored.version, 1);
+
+        // Update with stale version (should fail)
+        let mut stale_update = test_param("test.lock", 300);
+        stale_update.version = 0; // Stale version
+        let result = store.set(stale_update, None, None);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Concurrent modification detected"));
+
+        // Value should be unchanged
+        let stored = store.get("test.lock").unwrap().unwrap();
+        assert_eq!(stored.value, ParameterValue::Integer(200));
+        assert_eq!(stored.version, 1);
+
+        // Update with correct version (should succeed)
+        let mut update2 = test_param("test.lock", 300);
+        update2.version = 1; // Correct version
+        store.set(update2, None, None).unwrap();
+
+        let stored = store.get("test.lock").unwrap().unwrap();
+        assert_eq!(stored.value, ParameterValue::Integer(300));
+        assert_eq!(stored.version, 2);
+    }
+
+    #[test]
+    fn test_optimistic_locking_sled() {
+        let store = SledParameterStore::temporary().unwrap();
+
+        // Create initial parameter (version 0)
+        store.set(test_param("test.lock", 100), None, None).unwrap();
+        let stored = store.get("test.lock").unwrap().unwrap();
+        assert_eq!(stored.version, 0);
+
+        // Update with correct version (should succeed)
+        let mut update1 = test_param("test.lock", 200);
+        update1.version = 0;
+        store.set(update1, None, None).unwrap();
+
+        let stored = store.get("test.lock").unwrap().unwrap();
+        assert_eq!(stored.value, ParameterValue::Integer(200));
+        assert_eq!(stored.version, 1);
+
+        // Update with stale version (should fail)
+        let mut stale_update = test_param("test.lock", 300);
+        stale_update.version = 0; // Stale version
+        let result = store.set(stale_update, None, None);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Concurrent modification detected"));
+
+        // Value should be unchanged
+        let stored = store.get("test.lock").unwrap().unwrap();
+        assert_eq!(stored.value, ParameterValue::Integer(200));
+        assert_eq!(stored.version, 1);
+    }
+
+    #[test]
+    fn test_version_starts_at_zero_for_new_params() {
+        let store = InMemoryParameterStore::new();
+
+        // New parameter should start at version 0
+        store.set(test_param("test.new", 1), None, None).unwrap();
+        let stored = store.get("test.new").unwrap().unwrap();
+        assert_eq!(stored.version, 0);
+    }
+
+    // ========================================
+    // Reverse index cleanup tests
+    // ========================================
+
+    #[test]
+    fn test_sled_reverse_index_cleanup_on_delete() {
+        let store = SledParameterStore::temporary().unwrap();
+
+        let coop_id = EntityId::cooperative("test-coop").unwrap();
+        let fed_id = EntityId::federation("test-fed").unwrap();
+
+        // Set global parameter with scoped overrides
+        store
+            .set(
+                test_param_with_override("test.index_cleanup", 10, true),
+                None,
+                None,
+            )
+            .unwrap();
+
+        let fed_param = ProtocolParameter::new(
+            "test.index_cleanup",
+            "Scoped",
+            "Scoped param",
+            ParameterValue::Integer(20),
+        )
+        .with_scope(ParameterScope::Federation { id: fed_id.clone() });
+        store.set(fed_param, None, None).unwrap();
+
+        let coop_param = ProtocolParameter::new(
+            "test.index_cleanup",
+            "Scoped",
+            "Scoped param",
+            ParameterValue::Integer(30),
+        )
+        .with_scope(ParameterScope::Cooperative {
+            id: coop_id.clone(),
+        });
+        store.set(coop_param, None, None).unwrap();
+
+        // Verify reverse index exists before delete
+        let index_key = SledParameterStore::param_index_key("test.index_cleanup");
+        assert!(
+            store.db.contains_key(&index_key).unwrap(),
+            "Reverse index should exist before delete"
+        );
+
+        // Delete the parameter
+        store.delete("test.index_cleanup").unwrap();
+
+        // Verify reverse index is cleaned up
+        assert!(
+            !store.db.contains_key(&index_key).unwrap(),
+            "Reverse index should be cleaned up after delete"
+        );
+
+        // Also verify scoped parameters are gone by checking raw keys
+        let fed_key = SledParameterStore::scoped_param_key(
+            &ParameterScope::Federation { id: fed_id },
+            "test.index_cleanup",
+        );
+        let coop_key = SledParameterStore::scoped_param_key(
+            &ParameterScope::Cooperative { id: coop_id },
+            "test.index_cleanup",
+        );
+        assert!(
+            !store.db.contains_key(&fed_key).unwrap(),
+            "Federation scoped param should be deleted"
+        );
+        assert!(
+            !store.db.contains_key(&coop_key).unwrap(),
+            "Cooperative scoped param should be deleted"
+        );
+    }
+
+    #[test]
+    fn test_inmemory_reverse_index_cleanup_on_delete() {
+        let store = InMemoryParameterStore::new();
+
+        let coop_id = EntityId::cooperative("test-coop").unwrap();
+        let fed_id = EntityId::federation("test-fed").unwrap();
+
+        // Set global parameter with scoped overrides
+        store
+            .set(
+                test_param_with_override("test.index_cleanup", 10, true),
+                None,
+                None,
+            )
+            .unwrap();
+
+        let fed_param = ProtocolParameter::new(
+            "test.index_cleanup",
+            "Scoped",
+            "Scoped param",
+            ParameterValue::Integer(20),
+        )
+        .with_scope(ParameterScope::Federation { id: fed_id.clone() });
+        store.set(fed_param, None, None).unwrap();
+
+        let coop_param = ProtocolParameter::new(
+            "test.index_cleanup",
+            "Scoped",
+            "Scoped param",
+            ParameterValue::Integer(30),
+        )
+        .with_scope(ParameterScope::Cooperative {
+            id: coop_id.clone(),
+        });
+        store.set(coop_param, None, None).unwrap();
+
+        // Verify reverse index exists before delete
+        {
+            let index = store.scoped_index.read().unwrap();
+            assert!(
+                index.contains_key("test.index_cleanup"),
+                "Reverse index should exist before delete"
+            );
+            assert_eq!(
+                index.get("test.index_cleanup").unwrap().len(),
+                2,
+                "Should have 2 scoped entries in reverse index"
+            );
+        }
+
+        // Delete the parameter
+        store.delete("test.index_cleanup").unwrap();
+
+        // Verify reverse index is cleaned up
+        {
+            let index = store.scoped_index.read().unwrap();
+            assert!(
+                !index.contains_key("test.index_cleanup"),
+                "Reverse index should be cleaned up after delete"
+            );
+        }
+
+        // Verify scoped params are gone
+        {
+            let scoped = store.scoped_params.read().unwrap();
+            assert!(scoped.is_empty(), "All scoped params should be deleted");
+        }
+    }
+
+    // ========================================
+    // Error categorization tests
+    // ========================================
+
+    #[test]
+    fn test_error_retryability() {
+        // Concurrent modification is retryable
+        let err = ParameterStoreError::concurrent_modification("test.param", 0, 1);
+        assert!(err.is_retryable());
+        assert!(err.to_string().contains("Concurrent modification"));
+
+        // Transient storage error is retryable
+        let err = ParameterStoreError::storage("disk full", true);
+        assert!(err.is_retryable());
+
+        // Permanent storage error is not retryable
+        let err = ParameterStoreError::storage("database corrupted", false);
+        assert!(!err.is_retryable());
+
+        // Validation error is not retryable
+        let validation_err = ParameterValidationError::NotFound("test.param".to_string());
+        let err = ParameterStoreError::Validation(validation_err);
+        assert!(!err.is_retryable());
+
+        // Scope override not allowed is not retryable
+        let err = ParameterStoreError::ScopeOverrideNotAllowed {
+            parameter_id: "test.param".to_string(),
+        };
+        assert!(!err.is_retryable());
+
+        // Lock poisoned is not retryable
+        let err = ParameterStoreError::LockPoisoned("mutex poisoned".to_string());
+        assert!(!err.is_retryable());
+
+        // Not found is not retryable
+        let err = ParameterStoreError::NotFound("test.param".to_string());
+        assert!(!err.is_retryable());
+    }
+
+    #[test]
+    fn test_error_display_messages() {
+        let err = ParameterStoreError::concurrent_modification("test.param", 5, 10);
+        let msg = err.to_string();
+        assert!(msg.contains("test.param"));
+        assert!(msg.contains("5"));
+        assert!(msg.contains("10"));
+        assert!(msg.contains("Please retry"));
+
+        let err = ParameterStoreError::ScopeOverrideNotAllowed {
+            parameter_id: "governance.threshold".to_string(),
+        };
+        assert!(err.to_string().contains("governance.threshold"));
+        assert!(err.to_string().contains("scope overrides"));
     }
 }

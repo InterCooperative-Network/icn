@@ -23,6 +23,7 @@ fn param(
         scope: ParameterScope::Global,
         updated_at: current_timestamp_secs(),
         updated_by: None,
+        version: 0,
     }
 }
 

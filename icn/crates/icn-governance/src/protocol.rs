@@ -104,6 +104,14 @@ pub struct ProtocolParameter {
 
     /// Proposal ID that last changed this parameter (if any)
     pub updated_by: Option<String>,
+
+    /// Version for optimistic locking
+    ///
+    /// Incremented on each update to detect concurrent modifications.
+    /// When updating, the caller should provide the version they read;
+    /// if it doesn't match the stored version, the update is rejected.
+    #[serde(default)]
+    pub version: u64,
 }
 
 impl ProtocolParameter {
@@ -195,6 +203,7 @@ impl ProtocolParameter {
             scope: ParameterScope::Global,
             updated_at: icn_time::current_timestamp_secs(),
             updated_by: None,
+            version: 0,
         })
     }
 
@@ -217,6 +226,7 @@ impl ProtocolParameter {
             scope: ParameterScope::Global,
             updated_at: icn_time::current_timestamp_secs(),
             updated_by: None,
+            version: 0,
         }
     }
 
