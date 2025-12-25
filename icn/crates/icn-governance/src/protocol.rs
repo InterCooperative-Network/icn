@@ -437,8 +437,15 @@ impl ParameterValue {
 }
 
 /// Epsilon for float comparisons.
-/// Uses a relative epsilon that scales with the magnitude of the values.
-const FLOAT_COMPARISON_EPSILON: f64 = 1e-9;
+///
+/// Uses 1e-6 (0.0001%) as a practical tolerance for governance parameters.
+/// This is large enough to handle floating-point representation differences
+/// from JSON deserialization (e.g., 66.67% supermajority threshold) while
+/// still being precise enough for governance use cases.
+///
+/// The comparison uses relative epsilon for large values and absolute epsilon
+/// for small values to ensure consistent behavior across the value range.
+const FLOAT_COMPARISON_EPSILON: f64 = 1e-6;
 
 impl ParameterValue {
     /// Compare two floats with epsilon-based tolerance.

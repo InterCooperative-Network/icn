@@ -205,21 +205,27 @@ impl ProtocolParameterStore for InMemoryParameterStore {
         let id = param.id.clone();
         let scope_key = Self::scope_key(&param.scope);
 
-        // Validate the parameter value (prevents NaN, Infinity, and constraint violations)
-        // This is a security check to ensure malformed values cannot bypass governance validation
-        param
-            .validate(&param.value)
-            .map_err(|e| anyhow::anyhow!("Parameter validation failed for '{id}': {e}"))?;
+        // For updates, validate against the STORED parameter's constraints (not the new one's)
+        // This prevents constraint bypass attacks where an attacker submits a parameter
+        // with modified constraints that allow any value
+        if let Some(stored_param) = self.get(&id)? {
+            stored_param
+                .validate(&param.value)
+                .map_err(|e| anyhow::anyhow!("Parameter validation failed for '{id}': {e}"))?;
 
-        // Validate scope override permissions for non-global scopes
-        if !matches!(param.scope, ParameterScope::Global) {
-            if let Some(global_param) = self.get(&id)? {
-                if !global_param.constraints.allow_override {
-                    return Err(anyhow::anyhow!(
-                        "Parameter '{id}' does not allow scope overrides"
-                    ));
-                }
+            // Validate scope override permissions for non-global scopes
+            if !matches!(param.scope, ParameterScope::Global)
+                && !stored_param.constraints.allow_override
+            {
+                return Err(anyhow::anyhow!(
+                    "Parameter '{id}' does not allow scope overrides"
+                ));
             }
+        } else {
+            // For new parameters (initial setup), validate against the parameter's own constraints
+            param
+                .validate(&param.value)
+                .map_err(|e| anyhow::anyhow!("Parameter validation failed for '{id}': {e}"))?;
         }
 
         // Get old value for history
@@ -558,22 +564,29 @@ impl ProtocolParameterStore for SledParameterStore {
 
         let id = param.id.clone();
 
-        // Validate the parameter value (prevents NaN, Infinity, and constraint violations)
-        // This is a security check to ensure malformed values cannot bypass governance validation
-        param
-            .validate(&param.value)
-            .map_err(|e| anyhow::anyhow!("Parameter validation failed for '{id}': {e}"))?;
+        // For updates, validate against the STORED parameter's constraints (not the new one's)
+        // This prevents constraint bypass attacks where an attacker submits a parameter
+        // with modified constraints that allow any value
+        if let Some(stored_param) = self.get(&id)? {
+            stored_param
+                .validate(&param.value)
+                .map_err(|e| anyhow::anyhow!("Parameter validation failed for '{id}': {e}"))?;
 
-        // Validate scope override permissions for non-global scopes (outside transaction for efficiency)
-        // This is safe because allow_override is immutable once set
-        if !matches!(param.scope, ParameterScope::Global) {
-            if let Some(global_param) = self.get(&id)? {
-                if !global_param.constraints.allow_override {
-                    return Err(anyhow::anyhow!(
-                        "Parameter '{id}' does not allow scope overrides"
-                    ));
-                }
+            // Validate scope override permissions for non-global scopes
+            // This check is outside the transaction for efficiency, which is safe because
+            // allow_override is immutable once set
+            if !matches!(param.scope, ParameterScope::Global)
+                && !stored_param.constraints.allow_override
+            {
+                return Err(anyhow::anyhow!(
+                    "Parameter '{id}' does not allow scope overrides"
+                ));
             }
+        } else {
+            // For new parameters (initial setup), validate against the parameter's own constraints
+            param
+                .validate(&param.value)
+                .map_err(|e| anyhow::anyhow!("Parameter validation failed for '{id}': {e}"))?;
         }
 
         // Prepare the key for this parameter
@@ -688,16 +701,15 @@ impl ProtocolParameterStore for SledParameterStore {
     }
 
     fn list(&self) -> Result<Vec<ProtocolParameter>> {
+        // Prefix b"param:" only matches global parameters (param:{id})
+        // It does NOT match scoped parameters (param_scope:{scope}:{id}) or
+        // reverse indexes (param_idx:{id}) because the 6th character differs
         let prefix = b"param:";
         let mut params = Vec::new();
 
         for item in self.db.scan_prefix(prefix) {
-            let (key, value) = item?;
-            // Skip scoped params (they have param_scope: prefix)
-            let key_str = String::from_utf8_lossy(&key);
-            if key_str.starts_with("param:") && !key_str.starts_with("param_scope:") {
-                params.push(Self::deserialize_param(&value)?);
-            }
+            let (_, value) = item?;
+            params.push(Self::deserialize_param(&value)?);
         }
 
         Ok(params)
@@ -821,15 +833,9 @@ impl ProtocolParameterStore for SledParameterStore {
     }
 
     fn count(&self) -> Result<usize> {
+        // Prefix b"param:" only matches global parameters (see list() for details)
         let prefix = b"param:";
-        let mut count = 0;
-        for item in self.db.scan_prefix(prefix) {
-            let (key, _) = item?;
-            let key_str = String::from_utf8_lossy(&key);
-            if key_str.starts_with("param:") && !key_str.starts_with("param_scope:") {
-                count += 1;
-            }
-        }
+        let count = self.db.scan_prefix(prefix).filter(|r| r.is_ok()).count();
         Ok(count)
     }
 
@@ -1431,5 +1437,80 @@ mod tests {
             .get_effective("test.scoped_delete", Some(&coop_id), Some(&fed_id))
             .unwrap()
             .is_none());
+    }
+
+    // ========================================
+    // Security tests: Constraint bypass prevention
+    // ========================================
+
+    #[test]
+    fn test_inmemory_constraint_bypass_prevention() {
+        // This test verifies that attackers cannot bypass constraints by
+        // submitting a parameter with modified constraints
+        let store = InMemoryParameterStore::new();
+
+        // Create a parameter with strict constraints (max = 100)
+        let mut param = test_param("test.constrained", 50);
+        param.constraints.min = Some(ParameterValue::Integer(0));
+        param.constraints.max = Some(ParameterValue::Integer(100));
+        store.set(param, None, None).unwrap();
+
+        // Now try to bypass by submitting a parameter with modified constraints
+        // (attacker sets max = 1000 to allow value 500)
+        let mut attack_param = test_param("test.constrained", 500);
+        attack_param.constraints.min = Some(ParameterValue::Integer(0));
+        attack_param.constraints.max = Some(ParameterValue::Integer(1000)); // Attacker's modified constraint
+
+        // This should FAIL because we validate against the STORED constraints, not the new ones
+        let result = store.set(attack_param, None, None);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("above maximum"));
+
+        // Verify the value is still the original
+        let stored = store.get("test.constrained").unwrap().unwrap();
+        assert_eq!(stored.value, ParameterValue::Integer(50));
+    }
+
+    #[test]
+    fn test_sled_constraint_bypass_prevention() {
+        // Same test for SledParameterStore
+        let store = SledParameterStore::temporary().unwrap();
+
+        // Create a parameter with strict constraints (max = 100)
+        let mut param = test_param("test.constrained", 50);
+        param.constraints.min = Some(ParameterValue::Integer(0));
+        param.constraints.max = Some(ParameterValue::Integer(100));
+        store.set(param, None, None).unwrap();
+
+        // Try constraint bypass attack
+        let mut attack_param = test_param("test.constrained", 500);
+        attack_param.constraints.min = Some(ParameterValue::Integer(0));
+        attack_param.constraints.max = Some(ParameterValue::Integer(1000));
+
+        // Should fail
+        let result = store.set(attack_param, None, None);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("above maximum"));
+
+        // Value unchanged
+        let stored = store.get("test.constrained").unwrap().unwrap();
+        assert_eq!(stored.value, ParameterValue::Integer(50));
+    }
+
+    #[test]
+    fn test_new_param_uses_own_constraints() {
+        // Verify that new parameters (not updates) can use their own constraints
+        let store = InMemoryParameterStore::new();
+
+        // Create a NEW parameter with specific constraints
+        let mut param = test_param("test.new_param", 50);
+        param.constraints.min = Some(ParameterValue::Integer(0));
+        param.constraints.max = Some(ParameterValue::Integer(100));
+
+        // This should succeed because it's a new parameter
+        store.set(param, None, None).unwrap();
+
+        let stored = store.get("test.new_param").unwrap().unwrap();
+        assert_eq!(stored.value, ParameterValue::Integer(50));
     }
 }

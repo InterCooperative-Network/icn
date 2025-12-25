@@ -433,12 +433,13 @@ impl icn_governance::GovernanceOps for GovernanceHandle {
                             }
                         }
                         None => {
-                            // Entity registry not configured - warn but allow (for backwards compatibility)
-                            // In production, entity registry should always be configured
-                            warn!(
-                                entity_id = %entity_id,
-                                "Entity registry not configured; cannot validate scoped parameter entity existence. \
-                                 Configure entity registry with with_entity_registry() to enable validation."
+                            // Entity registry is required for scoped parameter changes
+                            // Without it, we cannot validate that the target entity exists,
+                            // which could allow proposals targeting non-existent entities
+                            bail!(
+                                "Cannot create ProtocolChange proposal with scoped parameter: \
+                                 entity registry not configured. Configure entity registry with \
+                                 with_entity_registry() to enable scoped parameter changes."
                             );
                         }
                     }
