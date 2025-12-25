@@ -11,10 +11,15 @@
 //! - `type:{entity_type}:{id}` -> () (secondary index for list_by_type)
 //! - `member_of:{member_id}:{parent_id}` -> () (secondary index for get_memberships_of)
 //!
-//! # Known Limitations
+//! # Performance Notes
 //!
-//! - **Performance**: `list_by_type()` and `list_children()` load all entities
-//!   into memory. For large datasets, consider adding pagination.
+//! - **list_by_type()** and **list_children()** load all matching entities into memory.
+//!   For large datasets (>100 entities), use the paginated versions:
+//!   - `list_by_type_paginated(entity_type, limit, offset)`
+//!   - `list_children_paginated(parent_id, limit, offset)`
+//!   - `count_by_type(entity_type)` - Get total count for pagination UI
+//!
+//! A warning is logged when non-paginated methods return more than 100 entities.
 //!
 //! # Atomicity
 //!
@@ -29,7 +34,12 @@ use crate::registry::EntityRegistry;
 use sled::transaction::ConflictableTransactionError;
 use sled::Db;
 use std::sync::Arc;
-use tracing::debug;
+use tracing::{debug, warn};
+
+/// Threshold for emitting performance warnings on list operations.
+/// When list_by_type() or list_children() returns more than this many entities,
+/// a warning is logged recommending pagination.
+const LARGE_LIST_WARNING_THRESHOLD: usize = 100;
 
 /// Sled-backed persistent entity registry
 ///
@@ -278,12 +288,15 @@ impl EntityRegistry for SledEntityRegistry {
             .ok_or_else(|| EntityError::NotFound(id.as_str().to_string()))?;
 
         // Check member count before transaction
-        // Note: There's a potential race condition where a concurrent add_membership
-        // could add a member after this check but before the delete. However:
-        // 1. add_membership verifies the parent entity exists inside its transaction
-        // 2. This is a rare edge case in practice
-        // 3. The deletion will still be atomic; the orphaned membership index will
-        //    point to a deleted entity and can be cleaned up by a consistency check
+        // Race condition analysis:
+        // - A concurrent add_membership could add a member after this check
+        // - However, add_membership verifies parent entity exists INSIDE its transaction
+        // - If delete() runs first: add_membership will fail (parent not found)
+        // - If add_membership runs first: this count check will fail (count > 0)
+        // - Sled's optimistic concurrency ensures one transaction will retry if both
+        //   touch the same keys, but since they operate on different keys (entity vs
+        //   membership), both could succeed in the wrong order. The fix is that
+        //   add_membership checks entity existence atomically inside its transaction.
         let member_count = self.member_count(id)?;
         if member_count > 0 {
             return Err(EntityError::RegistryError(
@@ -369,6 +382,16 @@ impl EntityRegistry for SledEntityRegistry {
             }
         }
 
+        // Performance warning for large result sets
+        if ids.len() > LARGE_LIST_WARNING_THRESHOLD {
+            warn!(
+                entity_type = %entity_type,
+                count = ids.len(),
+                "list_by_type() returned {} entities. Consider using list_by_type_paginated() for better performance.",
+                ids.len()
+            );
+        }
+
         Ok(ids)
     }
 
@@ -423,6 +446,16 @@ impl EntityRegistry for SledEntityRegistry {
             }
         }
 
+        // Performance warning for large result sets
+        if children.len() > LARGE_LIST_WARNING_THRESHOLD {
+            warn!(
+                parent_id = %parent_id,
+                count = children.len(),
+                "list_children() returned {} children. Consider using list_children_paginated() for better performance.",
+                children.len()
+            );
+        }
+
         Ok(children)
     }
 
@@ -470,7 +503,7 @@ impl EntityRegistry for SledEntityRegistry {
     }
 
     fn add_membership(&mut self, membership: Membership) -> Result<()> {
-        // Verify both entities exist
+        // Verify both entities exist (pre-check for better error messages)
         let member_entity = self.get(&membership.member_id)?.ok_or_else(|| {
             EntityError::MembershipError(format!(
                 "Member entity not found: {}",
@@ -490,6 +523,7 @@ impl EntityRegistry for SledEntityRegistry {
         // Prepare keys and values for transaction
         let membership_key = Self::membership_key(&membership.parent_id, &membership.member_id);
         let member_of_key = Self::member_of_index_key(&membership.member_id, &membership.parent_id);
+        let parent_entity_key = Self::entity_key(&membership.parent_id);
         let membership_value = Self::serialize_membership(&membership)?;
         let member_id_display = membership.member_id.to_string();
         let parent_id_display = membership.parent_id.to_string();
@@ -497,6 +531,17 @@ impl EntityRegistry for SledEntityRegistry {
         // Use transaction for atomicity
         self.db
             .transaction(|tx| {
+                // CRITICAL: Verify parent entity still exists INSIDE the transaction
+                // This prevents a race condition where delete() could remove the parent
+                // between our pre-check and the membership insertion.
+                if tx.get(&parent_entity_key)?.is_none() {
+                    return Err(ConflictableTransactionError::Abort(
+                        EntityError::MembershipError(format!(
+                            "Parent entity was deleted: {parent_id_display}"
+                        )),
+                    ));
+                }
+
                 // Check if membership already exists
                 if tx.get(&membership_key)?.is_some() {
                     return Err(ConflictableTransactionError::Abort(

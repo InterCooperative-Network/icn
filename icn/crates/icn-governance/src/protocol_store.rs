@@ -24,28 +24,17 @@
 //! - **Delete**: O(k) where k is the number of scoped overrides for that parameter
 //!   (uses reverse index for direct lookup instead of O(n) scan)
 //!
-//! # Known Limitations
+//! # Automatic History Pruning
 //!
-//! - **History Growth**: Parameter history can grow unbounded. Use `prune_history()`
-//!   to limit history entries per parameter. For production deployments, consider
-//!   running `prune_history()` periodically (e.g., keep last 100 entries per parameter)
-//!   or implementing a background cleanup task.
+//! History entries are automatically pruned after each `set()` call to prevent
+//! unbounded growth (DoS mitigation). The maximum entries per parameter is defined
+//! by `MAX_HISTORY_ENTRIES_PER_PARAM` (default: 100).
 //!
-//! # History Pruning
-//!
-//! The `prune_history()` method removes old history entries beyond a specified limit:
+//! The `prune_history()` method can also be called manually if needed:
 //!
 //! ```ignore
-//! // Keep only the last 100 history entries for a parameter
-//! store.prune_history("governance.min_quorum", 100)?;
-//! ```
-//!
-//! For automatic cleanup, consider adding a periodic task that prunes all parameters:
-//!
-//! ```ignore
-//! for param in store.list()? {
-//!     store.prune_history(&param.id, 100)?;
-//! }
+//! // Keep only the last 50 history entries for a specific parameter
+//! store.prune_history("governance.min_quorum", 50)?;
 //! ```
 
 use crate::protocol::{
@@ -57,6 +46,11 @@ use sled::Db;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use tracing::debug;
+
+/// Maximum number of history entries to keep per parameter.
+/// This prevents unbounded growth from DoS via repeated parameter changes.
+/// History beyond this limit is automatically pruned on each set() call.
+pub const MAX_HISTORY_ENTRIES_PER_PARAM: usize = 100;
 
 // ============================================================================
 // ProtocolParameterStore Trait
@@ -201,6 +195,12 @@ impl ProtocolParameterStore for InMemoryParameterStore {
         let id = param.id.clone();
         let scope_key = Self::scope_key(&param.scope);
 
+        // Validate the parameter value (prevents NaN, Infinity, and constraint violations)
+        // This is a security check to ensure malformed values cannot bypass governance validation
+        param
+            .validate(&param.value)
+            .map_err(|e| anyhow::anyhow!("Parameter validation failed for '{id}': {e}"))?;
+
         // Validate scope override permissions for non-global scopes
         if !matches!(param.scope, ParameterScope::Global) {
             if let Some(global_param) = self.get(&id)? {
@@ -266,7 +266,17 @@ impl ProtocolParameterStore for InMemoryParameterStore {
                 .history
                 .write()
                 .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-            history.entry(id).or_default().push(change);
+            let entries = history.entry(id.clone()).or_default();
+            entries.push(change);
+
+            // Auto-prune history to prevent unbounded growth (DoS mitigation)
+            if entries.len() > MAX_HISTORY_ENTRIES_PER_PARAM {
+                // Sort by timestamp descending (newest first)
+                entries.sort_by(|a, b| b.changed_at.cmp(&a.changed_at));
+                let pruned = entries.len() - MAX_HISTORY_ENTRIES_PER_PARAM;
+                entries.truncate(MAX_HISTORY_ENTRIES_PER_PARAM);
+                debug!(parameter_id = %id, pruned_entries = pruned, "Auto-pruned history entries");
+            }
         }
 
         Ok(())
@@ -516,6 +526,12 @@ impl ProtocolParameterStore for SledParameterStore {
 
         let id = param.id.clone();
 
+        // Validate the parameter value (prevents NaN, Infinity, and constraint violations)
+        // This is a security check to ensure malformed values cannot bypass governance validation
+        param
+            .validate(&param.value)
+            .map_err(|e| anyhow::anyhow!("Parameter validation failed for '{id}': {e}"))?;
+
         // Validate scope override permissions for non-global scopes (outside transaction for efficiency)
         // This is safe because allow_override is immutable once set
         if !matches!(param.scope, ParameterScope::Global) {
@@ -613,6 +629,14 @@ impl ProtocolParameterStore for SledParameterStore {
                     anyhow::anyhow!("Transaction storage error: {e}")
                 }
             })?;
+
+        // Auto-prune history to prevent unbounded growth (DoS mitigation)
+        // This runs outside the main transaction for performance, but it's safe
+        // because history pruning is idempotent and doesn't affect correctness
+        let pruned = self.prune_history(&id, MAX_HISTORY_ENTRIES_PER_PARAM)?;
+        if pruned > 0 {
+            debug!(parameter_id = %id, pruned_entries = pruned, "Auto-pruned history entries");
+        }
 
         debug!(parameter_id = %id, "Parameter updated");
         Ok(())
