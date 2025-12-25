@@ -3,6 +3,12 @@
 //! REST API for the ICN Community (Civic Engine).
 //! Communities are non-economic civic organizations that can include
 //! both individuals and cooperatives as members.
+//!
+//! # Security Note
+//!
+//! Current implementation uses scope-based access control (community:read, community:write,
+//! community:admin). Community-scoped authorization (verifying membership/admin status for
+//! specific communities) is planned for Phase 2 governance integration.
 
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
 use icn_community::{CommunityType, MemberType};

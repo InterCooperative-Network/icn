@@ -232,8 +232,10 @@ impl Supervisor {
             )
             .await?;
             icn_obs::metrics::supervisor::actor_spawned_inc("community");
+            // TODO: Wire community_handle into gateway when community routes are enabled
             let _community_handle = community_services.community_handle.clone();
-            let _community_store = community_services.community_store.clone(); // Reserved for gossip sync
+            // TODO: Wire community_store into gossip sync handler
+            let _community_store = community_services.community_store.clone();
 
             // Initialize entity services (persistent storage)
             let entity_services = init_entity::init_entity_services(&self.config)?;
