@@ -7,6 +7,7 @@ use crate::fork_resolution::{
     Fork, ForkDetector, ForkResolution, ForkResolutionStrategy, ForkResolver,
 };
 use crate::freeze::{FreezeManager, FrozenMember};
+use crate::membership::MembershipStore;
 use crate::merge::{MergeDecision, QuarantineItem};
 use crate::quarantine::QuarantineStore;
 use crate::sync::{serialize_sync_message, LedgerSyncMessage};
@@ -126,6 +127,10 @@ pub struct Ledger {
     /// Credit policy manager for enforcing credit limits
     /// When set, entries that would exceed credit limits are rejected.
     credit_policy_manager: Option<CreditPolicyManager>,
+
+    /// Membership store for tracking when members joined
+    /// Used to apply new member credit limit ramping
+    membership_store: Option<Arc<dyn MembershipStore>>,
 }
 
 impl Ledger {
@@ -155,6 +160,7 @@ impl Ledger {
             domain_id: None,             // Set via set_domain_id()
             validation_hook: None,       // Set via set_validation_hook()
             credit_policy_manager: None, // Set via set_credit_policy_manager()
+            membership_store: None,      // Set via set_membership_store()
         };
 
         // Load cached balances from storage
@@ -281,6 +287,19 @@ impl Ledger {
     /// Get the credit policy manager (if set)
     pub fn credit_policy_manager(&self) -> Option<&CreditPolicyManager> {
         self.credit_policy_manager.as_ref()
+    }
+
+    /// Set the membership store for tracking when members joined
+    ///
+    /// When set, credit limits use actual join dates for new member ramping.
+    /// New members start with conservative limits that increase over time.
+    pub fn set_membership_store(&mut self, store: Arc<dyn MembershipStore>) {
+        self.membership_store = Some(store);
+    }
+
+    /// Get the membership store (if set)
+    pub fn membership_store(&self) -> Option<&Arc<dyn MembershipStore>> {
+        self.membership_store.as_ref()
     }
 
     /// Append a journal entry to the ledger
@@ -459,6 +478,31 @@ impl Ledger {
             if let Some(credit) = delta.credit {
                 let key = (delta.account_id.clone(), delta.currency.clone());
                 *self.cleared_volume_index.entry(key).or_insert(0) += credit;
+
+                // Track contribution for new member ramping
+                if let Some(ref membership_store) = self.membership_store {
+                    if let Err(e) = membership_store.add_contribution(&delta.account_id, credit) {
+                        warn!(
+                            account = %delta.account_id,
+                            credit = credit,
+                            error = %e,
+                            "Failed to update member contribution tracking"
+                        );
+                    }
+                }
+            }
+
+            // Register member on first transaction (for new member ramping)
+            if let Some(ref membership_store) = self.membership_store {
+                if let Err(e) = membership_store.register_if_new(&delta.account_id, entry.timestamp)
+                {
+                    warn!(
+                        account = %delta.account_id,
+                        timestamp = entry.timestamp,
+                        error = %e,
+                        "Failed to register new member"
+                    );
+                }
             }
         }
 
@@ -2039,8 +2083,6 @@ impl Ledger {
                     .unwrap_or(0);
 
                 // Calculate credit limit using the policy
-                // For now, we use current_time as member_since (no ramping - gives full limit)
-                // This is conservative: new members get full calculated limit immediately
                 let base_policy = &policy_manager.credit_policy;
 
                 // Calculate: baseline + trust_bonus + history_bonus
@@ -2048,7 +2090,36 @@ impl Ledger {
                     * trust_score
                     * base_policy.trust_multiplier) as i64;
                 let history_bonus = (cleared_volume as f64 * base_policy.history_bonus_rate) as i64;
-                let calculated_limit = base_policy.baseline + trust_bonus + history_bonus;
+                let full_limit = base_policy.baseline + trust_bonus + history_bonus;
+
+                // Apply new member ramping only if membership store is configured
+                // Without membership store, use full calculated limit (backward compatible)
+                let calculated_limit = if let Some(ref membership_store) = self.membership_store {
+                    // Get current time for ramping calculations
+                    let current_time = SystemTime::now()
+                        .duration_since(SystemTime::UNIX_EPOCH)
+                        .map(|d| d.as_secs())
+                        .unwrap_or(0);
+
+                    // Get member_since from store (or current_time if new member)
+                    let member_since = membership_store
+                        .get_member_since(account)
+                        .ok()
+                        .flatten()
+                        .unwrap_or(current_time);
+
+                    // Apply new member ramping
+                    policy_manager.new_member_policy.calculate_effective_limit(
+                        account,
+                        member_since,
+                        current_time,
+                        cleared_volume,
+                        full_limit,
+                    )
+                } else {
+                    // No membership store = no ramping (backward compatible)
+                    full_limit
+                };
 
                 // Check if the new balance would exceed the limit
                 let new_balance = current_balance + transaction_delta;
