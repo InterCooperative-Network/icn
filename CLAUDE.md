@@ -277,6 +277,35 @@ The Claude Code agent **must**:
 - Run required checks before requesting review
 - Explain any skipped checks in the PR description
 
+## Issue Management
+
+See **[.github/ISSUE_POLICY.md](.github/ISSUE_POLICY.md)** for the complete issue taxonomy and triage system.
+
+### Quick Rules for Agents
+
+**Every issue MUST have**:
+- Exactly one `priority:*` label (`priority:critical`, `priority:high`, `priority:medium`, `priority:low`)
+- Exactly one type label (`bug`, `enhancement`, `design`, `documentation`, `testing`, `refactor`)
+- At least one domain label if it touches code (`core`, `identity`, `ledger`, `governance`, `gateway`, etc.)
+
+**Issue Title Format**: `<type>(<domain>): <action>`
+- Examples: `feat(ledger): Add demurrage scheduler`, `fix(gossip): Remove blocking operations`
+
+**Before Creating Issues**:
+1. Search for existing duplicates
+2. If duplicate exists, comment + link instead of creating new
+3. For "future ideas," use `priority:low` + `design`
+
+**Issue Hierarchy**:
+- **Level 0**: Meta/Roadmap (rare, ≤5 total)
+- **Level 1**: Execution Epics (primary control surface, ≤10 sub-issues each)
+- **Level 2**: Atomic Work Items (where code happens, single responsibility)
+
+**Deprecated Labels** (do not use):
+- `critical`, `high`, `medium`, `low` → use `priority:*` instead
+- `P0-critical`, `P1-high` → use `priority:*` instead
+- `tech-debt`, `technical-debt` → use `refactor` instead
+
 ## Security & Production Hardening
 
 **Three-Layer Security**:
