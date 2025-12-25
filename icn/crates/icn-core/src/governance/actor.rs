@@ -306,6 +306,12 @@ impl GovernanceHandle {
             }
             None => {
                 // No registry configured - assume entity exists (best effort)
+                // Log warning to help detect configuration issues
+                warn!(
+                    entity_id = %entity_id,
+                    "Entity registry not configured - skipping entity existence validation. \
+                     Configure with_entity_registry() for proper scoped parameter validation."
+                );
                 Ok(true)
             }
         }
