@@ -2,6 +2,7 @@
 
 pub mod background_tasks;
 pub mod governance_handlers;
+pub mod init_community;
 pub mod init_compute;
 pub mod init_contract_registry;
 pub mod init_coop;
@@ -222,6 +223,17 @@ impl Supervisor {
             icn_obs::metrics::supervisor::actor_spawned_inc("coop");
             let coop_handle = coop_services.coop_handle.clone();
             let coop_store = coop_services.coop_store.clone(); // Used for gossip sync
+
+            // Initialize community services (civic engine)
+            let community_services = init_community::init_community_services(
+                &self.config,
+                gossip_handle.clone(),
+                did.clone(),
+            )
+            .await?;
+            icn_obs::metrics::supervisor::actor_spawned_inc("community");
+            let _community_handle = community_services.community_handle.clone();
+            let _community_store = community_services.community_store.clone(); // Reserved for gossip sync
 
             // Initialize entity services (persistent storage)
             let entity_services = init_entity::init_entity_services(&self.config)?;

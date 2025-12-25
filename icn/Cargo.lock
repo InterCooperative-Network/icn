@@ -2738,8 +2738,10 @@ dependencies = [
 name = "icn-community"
 version = "0.1.0"
 dependencies = [
+ "bincode",
  "chrono",
  "icn-cooperative",
+ "icn-gossip",
  "icn-governance",
  "icn-identity",
  "icn-ledger",
