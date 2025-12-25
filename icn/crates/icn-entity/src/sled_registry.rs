@@ -37,13 +37,26 @@ use std::sync::Arc;
 use tracing::{debug, warn};
 
 /// Threshold for emitting performance warnings on list operations.
+///
 /// When list_by_type() or list_children() returns more than this many entities,
 /// a warning is logged recommending pagination.
+///
+/// Rationale for 100:
+/// - Typical cooperatives have 10-50 members (100 is generous headroom)
+/// - Small enough to detect when pagination should be used
+/// - API responses stay under ~50KB with typical entity sizes
 const LARGE_LIST_WARNING_THRESHOLD: usize = 100;
 
 /// Hard limit for unpaginated list operations to prevent DoS attacks.
+///
 /// Callers attempting to list more entities must use paginated variants.
-/// This prevents memory exhaustion from loading 100k+ entities.
+/// This prevents memory exhaustion from loading very large datasets.
+///
+/// Rationale for 1,000:
+/// - 10x the warning threshold (graceful degradation path)
+/// - 1,000 entities × ~2KB avg size ≈ 2MB max memory per request
+/// - Large enough for most legitimate batch operations
+/// - Small enough to prevent OOM attacks via entity enumeration
 const MAX_UNPAGINATED_LIST_SIZE: usize = 1000;
 
 /// Convert a Sled transaction error to an EntityError with context.
@@ -403,8 +416,14 @@ impl EntityRegistry for SledEntityRegistry {
                 //
                 // Pattern: Read count -> verify zero -> write back zero (registers conflict)
                 // This ensures atomicity with add_membership/remove_membership.
+                //
+                // ROLLBACK BEHAVIOR: When we return ConflictableTransactionError::Abort(err),
+                // sled automatically rolls back all pending writes in this transaction.
+                // No explicit rollback is needed - this is a fundamental sled guarantee.
+                // The transaction is atomic: either all writes succeed or none do.
                 let count = Self::get_member_count_from_key(tx, &id_clone)?;
                 if count > 0 {
+                    // Transaction aborts here - all pending writes are automatically rolled back
                     return Err(ConflictableTransactionError::Abort(
                         EntityError::RegistryError(format!(
                             "Cannot delete entity with {count} active member(s)"

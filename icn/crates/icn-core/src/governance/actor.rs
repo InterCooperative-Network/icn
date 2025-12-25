@@ -7,6 +7,7 @@ use anyhow::{bail, Result};
 use async_trait::async_trait;
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::{mpsc, RwLock};
@@ -289,6 +290,24 @@ impl GovernanceHandle {
         match &self.protocol_params {
             Some(store) => store.set(param, proposal_id, changed_by),
             None => bail!("Protocol parameter store not configured"),
+        }
+    }
+
+    /// Check if an entity exists (for scope validation at execution time)
+    ///
+    /// Returns true if the entity registry is not configured (allowing scoped params
+    /// without entity validation) or if the entity exists in the registry.
+    pub fn entity_exists(&self, entity_id: &str) -> Result<bool> {
+        match &self.entity_registry {
+            Some(registry) => {
+                let parsed_id = icn_entity::EntityId::from_str(entity_id)
+                    .map_err(|e| anyhow::anyhow!("Invalid entity ID '{entity_id}': {e}"))?;
+                registry.exists(&parsed_id).map_err(|e| e.into())
+            }
+            None => {
+                // No registry configured - assume entity exists (best effort)
+                Ok(true)
+            }
         }
     }
 }

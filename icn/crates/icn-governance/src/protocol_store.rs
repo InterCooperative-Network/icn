@@ -183,9 +183,22 @@ impl ParameterStoreError {
     }
 }
 
-/// Maximum number of history entries to keep per parameter.
+/// Maximum number of history entries to keep per parameter ID.
+///
 /// This prevents unbounded growth from DoS via repeated parameter changes.
 /// History beyond this limit is automatically pruned on each set() call.
+///
+/// IMPORTANT: History is shared across ALL scopes for the same parameter ID.
+/// For example, changes to "gossip.fanout" for Global, Federation:A, and
+/// Cooperative:B all share the same 100-entry history pool. This means:
+/// - 24 parameters × 100 entries = 2,400 max entries (not 24 × 100 × N scopes)
+/// - Memory impact: ~2,400 entries × ~200 bytes = ~500KB worst case
+/// - This shared design prevents memory exhaustion from many scoped overrides
+///
+/// Rationale for 100 entries:
+/// - Sufficient for audit trail (typically shows last few months of changes)
+/// - Small enough to prevent memory issues with many parameters
+/// - Matches common governance cadence (quarterly reviews = ~4 changes/year)
 pub const MAX_HISTORY_ENTRIES_PER_PARAM: usize = 100;
 
 /// Warn if a parameter uses an unknown category
@@ -207,8 +220,17 @@ fn warn_unknown_category(id: &str) {
 }
 
 /// Warning threshold for total history entries across all parameters.
+///
 /// When exceeded, a warning is logged to alert operators about potential
-/// accumulation issues (e.g., from scoped overrides across many entities).
+/// accumulation issues. Note that with MAX_HISTORY_ENTRIES_PER_PARAM = 100
+/// and history shared across scopes, reaching 10,000 entries requires:
+/// - ~100 distinct parameters all at their 100-entry limit, OR
+/// - Rapid parameter churn faster than the auto-prune can handle
+///
+/// Rationale for 10,000:
+/// - 4x the expected maximum (24 params × 100 entries = 2,400)
+/// - Provides headroom for future parameter additions
+/// - Triggers investigation before reaching concerning levels (~50KB+ of history)
 pub const GLOBAL_HISTORY_WARNING_THRESHOLD: usize = 10_000;
 
 // ============================================================================
@@ -814,18 +836,18 @@ impl ProtocolParameterStore for SledParameterStore {
         // This prevents constraint bypass attacks where an attacker submits a parameter
         // with modified constraints that allow any value
         //
-        // NOTE: Validation and scope checks are done outside the transaction for efficiency.
-        // These are safe because:
-        // - Constraints are immutable once a parameter is created
-        // - allow_override is immutable once set
-        // The version check IS done inside the transaction to prevent lost updates.
+        // NOTE: Pre-validation is done outside the transaction for efficiency with additional
+        // verification inside the transaction for safety:
+        // - Constraints (including allow_override) are immutable once a parameter is created
+        // - The transaction verifies version hasn't changed, which implicitly verifies constraints
+        // - For scoped parameters, we explicitly verify allow_override inside the transaction
         let global_param = self.get(&id)?;
         if let Some(ref stored_param) = global_param {
             stored_param
                 .validate(&param.value)
                 .map_err(|e| anyhow::anyhow!("Parameter validation failed for '{id}': {e}"))?;
 
-            // Validate scope override permissions for non-global scopes
+            // Pre-check scope override permissions (will be re-verified inside transaction)
             if !matches!(param.scope, ParameterScope::Global)
                 && !stored_param.constraints.allow_override
             {
@@ -956,12 +978,17 @@ impl ProtocolParameterStore for SledParameterStore {
                 // CRITICAL: For scoped parameters, verify the global parameter hasn't changed
                 // since we validated against its constraints. This prevents constraint bypass
                 // where: 1) read global with max=100, 2) admin changes to max=50, 3) submit 75
+                //
+                // Also explicitly verify allow_override is still true (defense-in-depth).
+                // While allow_override is immutable after creation, explicit verification
+                // protects against bugs or future changes that might allow constraint mutation.
                 if is_scoped && global_version_at_validation.is_some() {
                     let current_global = tx.get(&global_key_clone)?;
-                    let current_version = current_global
+                    let current_global_param = current_global
                         .as_ref()
-                        .and_then(|bytes| Self::deserialize_param(bytes).ok())
-                        .map(|p| p.version);
+                        .and_then(|bytes| Self::deserialize_param(bytes).ok());
+
+                    let current_version = current_global_param.as_ref().map(|p| p.version);
 
                     if current_version != global_version_at_validation {
                         return Err(ConflictableTransactionError::Abort(anyhow::anyhow!(
@@ -971,6 +998,17 @@ impl ProtocolParameterStore for SledParameterStore {
                             global_version_at_validation.unwrap_or(0),
                             current_version
                         )));
+                    }
+
+                    // Defense-in-depth: Verify allow_override is still true inside transaction
+                    // This catches any edge cases where constraints might have been modified
+                    if let Some(ref gp) = current_global_param {
+                        if !gp.constraints.allow_override {
+                            return Err(ConflictableTransactionError::Abort(anyhow::anyhow!(
+                                "Parameter '{id_clone}' does not allow scope overrides. \
+                                 Constraint may have changed. Please retry."
+                            )));
+                        }
                     }
                 }
 

@@ -96,6 +96,7 @@ impl GovernanceEventHandler {
                 failed_at: icn_time::current_timestamp_secs(),
             };
             // Spawn async emit in the background
+            // Note: EventBus::emit() is infallible (broadcasts to all subscribers)
             tokio::spawn(async move {
                 bus.emit(event).await;
             });
@@ -122,6 +123,7 @@ impl GovernanceEventHandler {
                 changed_at: icn_time::current_timestamp_secs(),
             };
             // Spawn async emit in the background
+            // Note: EventBus::emit() is infallible (broadcasts to all subscribers)
             tokio::spawn(async move {
                 bus.emit(event).await;
             });
@@ -2432,14 +2434,42 @@ impl GovernanceEventHandler {
                         return;
                     }
 
-                    // NOTE: Entity existence is validated at proposal creation but not re-validated
-                    // here because GovernanceEventHandler doesn't have entity registry access.
-                    // If entity is deleted between approval and execution, the scoped parameter
-                    // will still be created. This is acceptable because:
-                    // 1. Parameters are just configuration - harmless if entity is gone
-                    // 2. Cleanup of orphaned scoped params can be done via maintenance tasks
-                    // 3. Adding entity_registry would require significant refactoring
-                    // TODO: Consider adding entity existence check if orphaned params become an issue
+                    // Re-validate entity existence at execution time (CRITICAL #3)
+                    // Entity may have been deleted between proposal creation and execution.
+                    // This prevents orphaned scoped parameters.
+                    if let Some(entity_id) = scope.entity_id() {
+                        let entity_id_str = entity_id.as_str();
+                        match self.gov_handle.entity_exists(entity_id_str) {
+                            Ok(true) => {
+                                // Entity exists, proceed with scope change
+                            }
+                            Ok(false) => {
+                                let error_msg = format!(
+                                    "Entity '{entity_id_str}' no longer exists. Cannot create scoped parameter."
+                                );
+                                warn!("{} (proposal {})", error_msg, proposal_id_str);
+                                self.emit_execution_failure(
+                                    &proposal_id,
+                                    "protocol_change",
+                                    &error_msg,
+                                );
+                                return;
+                            }
+                            Err(e) => {
+                                let error_msg = format!(
+                                    "Failed to verify entity '{entity_id_str}' existence: {e}"
+                                );
+                                warn!("{} (proposal {})", error_msg, proposal_id_str);
+                                self.emit_execution_failure(
+                                    &proposal_id,
+                                    "protocol_change",
+                                    &error_msg,
+                                );
+                                return;
+                            }
+                        }
+                    }
+
                     param.scope = scope;
                 }
 

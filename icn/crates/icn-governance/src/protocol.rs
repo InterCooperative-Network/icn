@@ -446,15 +446,21 @@ impl ParameterValue {
     }
 }
 
-/// Epsilon for float comparisons.
+/// Epsilon for floating-point comparisons in governance parameters.
 ///
-/// Uses 1e-6 (0.0001%) as a practical tolerance for governance parameters.
-/// This is large enough to handle floating-point representation differences
-/// from JSON deserialization (e.g., 66.67% supermajority threshold) while
-/// still being precise enough for governance use cases.
+/// Uses 1e-6 (0.0001%) as a practical tolerance. The comparison uses
+/// relative epsilon for large values and absolute epsilon for small values:
+/// - epsilon = max(1e-6, value * 1e-6)
 ///
-/// The comparison uses relative epsilon for large values and absolute epsilon
-/// for small values to ensure consistent behavior across the value range.
+/// For a 66.67% threshold: epsilon = 66.67 * 1e-6 ≈ 0.00007 (7 millionths of a percent)
+/// For a 0.1% fee rate: epsilon = 1e-6 (absolute, not relative)
+///
+/// This handles JSON round-trip precision issues while maintaining sufficient
+/// precision for governance use cases.
+///
+/// IMPORTANT: For financial parameters requiring exact precision (e.g., fee rates
+/// in basis points, exchange rates), use Integer type instead of Float/Percentage.
+/// Example: Instead of Float(0.0025) for 0.25%, use Integer(25) for 25 basis points.
 const FLOAT_COMPARISON_EPSILON: f64 = 1e-6;
 
 impl ParameterValue {
