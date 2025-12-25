@@ -2118,11 +2118,14 @@ impl Ledger {
                             )
                         }
                         Ok(None) => {
-                            // New member - use validation time as join date
+                            // New member - use entry timestamp as join date for consistency
+                            // with what gets stored (entry.timestamp at line ~494).
+                            // validation_time is still used as current_time to prevent
+                            // timestamp manipulation attacks.
                             policy_manager.new_member_policy.calculate_effective_limit(
                                 account,
-                                validation_time, // member_since = now (new member)
-                                validation_time,
+                                entry.timestamp, // member_since = entry timestamp
+                                validation_time, // current_time = wall clock (security)
                                 cleared_volume,
                                 full_limit,
                             )

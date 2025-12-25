@@ -370,15 +370,17 @@ fn test_credit_limit_ramping_timeline() -> Result<()> {
     let full_limit = 10_000; // 100 hours in centihours (ramp period = 90 days)
     let one_day_secs: u64 = 24 * 60 * 60;
 
-    // Member joined at epoch 0, testing at various times
-    let member_since = 0_u64;
+    // Use realistic timestamps (Jan 1, 2024 00:00:00 UTC)
+    // This ensures we test with values that could occur in production
+    let base_time: u64 = 1704067200;
+    let member_since = base_time;
     let cleared_volume = 0_i64; // No contribution (won't bypass ramp)
 
     // Day 0: Should get initial limit
     let day0_limit = policy.calculate_effective_limit(
         &dummy_did,
         member_since,
-        0, // current_time = day 0
+        base_time, // current_time = day 0
         cleared_volume,
         full_limit,
     );
@@ -391,7 +393,7 @@ fn test_credit_limit_ramping_timeline() -> Result<()> {
     let day30_limit = policy.calculate_effective_limit(
         &dummy_did,
         member_since,
-        30 * one_day_secs,
+        base_time + 30 * one_day_secs,
         cleared_volume,
         full_limit,
     );
@@ -407,7 +409,7 @@ fn test_credit_limit_ramping_timeline() -> Result<()> {
     let day60_limit = policy.calculate_effective_limit(
         &dummy_did,
         member_since,
-        60 * one_day_secs,
+        base_time + 60 * one_day_secs,
         cleared_volume,
         full_limit,
     );
@@ -422,7 +424,7 @@ fn test_credit_limit_ramping_timeline() -> Result<()> {
     let day90_limit = policy.calculate_effective_limit(
         &dummy_did,
         member_since,
-        90 * one_day_secs,
+        base_time + 90 * one_day_secs,
         cleared_volume,
         full_limit,
     );
@@ -433,7 +435,7 @@ fn test_credit_limit_ramping_timeline() -> Result<()> {
     let day120_limit = policy.calculate_effective_limit(
         &dummy_did,
         member_since,
-        120 * one_day_secs,
+        base_time + 120 * one_day_secs,
         cleared_volume,
         full_limit,
     );

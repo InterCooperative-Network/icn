@@ -36,7 +36,7 @@
 //! For production systems requiring strict atomicity, consider implementing
 //! compare-and-swap at the Store trait level.
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use icn_identity::Did;
 use icn_store::Store;
 use std::sync::Arc;
@@ -100,7 +100,8 @@ impl MembershipStore for SledMembershipStore {
         let key = Self::since_key(did);
         match self.store.get(&key)? {
             Some(bytes) => {
-                let timestamp: u64 = serde_json::from_slice(&bytes)?;
+                let timestamp: u64 = serde_json::from_slice(&bytes)
+                    .with_context(|| format!("Failed to deserialize member_since for {did}"))?;
                 Ok(Some(timestamp))
             }
             None => Ok(None),
@@ -112,7 +113,8 @@ impl MembershipStore for SledMembershipStore {
         // Only set if not already present (preserve original join date)
         // Note: This is not fully atomic. See module docs for race condition details.
         if self.store.get(&key)?.is_none() {
-            let bytes = serde_json::to_vec(&timestamp)?;
+            let bytes = serde_json::to_vec(&timestamp)
+                .with_context(|| format!("Failed to serialize member_since for {did}"))?;
             self.store.put(&key, &bytes)?;
             debug!(did = %did, timestamp, "Registered new member");
         }
