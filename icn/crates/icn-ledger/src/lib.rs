@@ -61,6 +61,7 @@ pub mod fork_resolution;
 pub mod freeze;
 pub mod hash;
 pub mod ledger;
+pub mod membership;
 pub mod merge;
 pub mod quarantine;
 #[allow(missing_docs)]
@@ -76,6 +77,7 @@ pub use fork_resolution::{
 };
 pub use freeze::{FreezeManager, FrozenMember, UnfreezeEvent};
 pub use ledger::Ledger;
+pub use membership::{MembershipStore, SledMembershipStore};
 pub use merge::{ConflictPair, MergeDecision, QuarantineItem};
 pub use quarantine::QuarantineStore;
 pub use sync::{deserialize_sync_message, ledger_topic, serialize_sync_message, LedgerSyncMessage};

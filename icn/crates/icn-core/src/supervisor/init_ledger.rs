@@ -10,7 +10,8 @@ use tracing::info;
 use icn_gossip::GossipActor;
 use icn_identity::Did;
 use icn_ledger::{
-    CreditPolicy, CreditPolicyManager, DisputeManager, Ledger, NewMemberPolicy, TreasuryManager,
+    CreditPolicy, CreditPolicyManager, DisputeManager, Ledger, NewMemberPolicy,
+    SledMembershipStore, TreasuryManager,
 };
 use icn_security::MisbehaviorDetector;
 use icn_store::SledStore;
@@ -68,17 +69,21 @@ pub async fn init_ledger_services(
     ledger.set_misbehavior_detector(deps.misbehavior_detector.clone());
     ledger.set_trust_graph(deps.trust_graph.clone());
 
+    // Initialize membership store for tracking when members joined
+    // Used for new member credit limit ramping
+    let membership_store = Arc::new(SledMembershipStore::new(store.clone()));
+    ledger.set_membership_store(membership_store);
+
+    info!("Membership store initialized for new member tracking");
+
     // Initialize credit policy for server-side credit limit enforcement.
     // Dynamic limits: baseline + trust bonus + history bonus.
     // Note: Using "hours" as the default currency unit for cooperatives.
     let credit_policy = CreditPolicy::conservative("hours".to_string());
 
     // New member protection policy configuration.
-    //
-    // NOTE: As of now, ledger validation (see `ledger.rs`) still uses the base
-    // credit policy without applying new-member ramping; new members effectively
-    // receive the full calculated limit immediately. This NewMemberPolicy is
-    // initialized here for future use when member-since tracking is added.
+    // New members start with 10 hour limit, ramping to full over 90 days.
+    // Members who contribute 50+ hours get full limit regardless of tenure.
     let new_member_policy = NewMemberPolicy::conservative("hours".to_string());
 
     let credit_manager = CreditPolicyManager::new(credit_policy, new_member_policy);
@@ -86,7 +91,7 @@ pub async fn init_ledger_services(
 
     info!(
         "Credit policy manager initialized with conservative policy for 'hours' currency \
-         (new-member ramping pending member-since tracking)"
+         (new members: 10hr initial, 90-day ramp, 50hr contribution threshold)"
     );
 
     let ledger_handle = Arc::new(RwLock::new(ledger));

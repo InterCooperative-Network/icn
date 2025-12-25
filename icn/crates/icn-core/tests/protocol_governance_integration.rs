@@ -404,3 +404,390 @@ fn test_concurrent_parameter_updates_stress() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn test_protocol_change_scope_resolution() -> Result<()> {
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter("info")
+        .with_test_writer()
+        .try_init();
+
+    info!("=== Testing scope resolution (Cooperative > Federation > Global) ===");
+
+    let store = InMemoryParameterStore::new();
+
+    // 1. Set global parameter
+    store.set(governance_test_param("quorum", 50), None, None)?;
+    info!("✓ Global quorum set to 50");
+
+    // 2. Set federation-level override
+    let fed_id = icn_entity::EntityId::federation("workers-fed").unwrap();
+    let mut fed_param = governance_test_param("quorum", 60);
+    fed_param.version = 0; // Start fresh for scoped version
+    fed_param.scope = ParameterScope::Federation { id: fed_id.clone() };
+    store.set(fed_param, None, None)?;
+    info!("✓ Federation 'workers-fed' quorum override set to 60");
+
+    // 3. Set cooperative-level override
+    let coop_id = icn_entity::EntityId::cooperative("tech-coop").unwrap();
+    let mut coop_param = governance_test_param("quorum", 75);
+    coop_param.version = 0; // Start fresh for scoped version
+    coop_param.scope = ParameterScope::Cooperative {
+        id: coop_id.clone(),
+    };
+    store.set(coop_param, None, None)?;
+    info!("✓ Cooperative 'tech-coop' quorum override set to 75");
+
+    // 4. Test scope resolution - no scope (should get global)
+    let global = store.get_effective("governance.quorum", None, None)?;
+    assert_eq!(
+        global.as_ref().map(|p| &p.value),
+        Some(&ParameterValue::Integer(50)),
+        "No scope should return global value"
+    );
+    info!("✓ No scope context -> global value (50)");
+
+    // 5. Test scope resolution - federation only
+    let fed_only = store.get_effective("governance.quorum", None, Some(&fed_id))?;
+    assert_eq!(
+        fed_only.as_ref().map(|p| &p.value),
+        Some(&ParameterValue::Integer(60)),
+        "Federation context should return federation override"
+    );
+    info!("✓ Federation context -> federation override (60)");
+
+    // 6. Test scope resolution - cooperative overrides federation
+    let coop_override = store.get_effective("governance.quorum", Some(&coop_id), Some(&fed_id))?;
+    assert_eq!(
+        coop_override.as_ref().map(|p| &p.value),
+        Some(&ParameterValue::Integer(75)),
+        "Cooperative should override federation"
+    );
+    info!("✓ Cooperative + Federation context -> cooperative override (75)");
+
+    // 7. Test scope resolution - cooperative without federation context
+    let coop_only = store.get_effective("governance.quorum", Some(&coop_id), None)?;
+    assert_eq!(
+        coop_only.as_ref().map(|p| &p.value),
+        Some(&ParameterValue::Integer(75)),
+        "Cooperative context alone should return cooperative override"
+    );
+    info!("✓ Cooperative context alone -> cooperative override (75)");
+
+    // 8. Test scope resolution - unknown cooperative falls back to federation
+    let other_coop = icn_entity::EntityId::cooperative("other-coop").unwrap();
+    let fallback = store.get_effective("governance.quorum", Some(&other_coop), Some(&fed_id))?;
+    assert_eq!(
+        fallback.as_ref().map(|p| &p.value),
+        Some(&ParameterValue::Integer(60)),
+        "Unknown cooperative should fall back to federation"
+    );
+    info!("✓ Unknown coop + Federation -> falls back to federation (60)");
+
+    // 9. Test scope resolution - unknown everything falls back to global
+    let other_fed = icn_entity::EntityId::federation("other-fed").unwrap();
+    let global_fallback =
+        store.get_effective("governance.quorum", Some(&other_coop), Some(&other_fed))?;
+    assert_eq!(
+        global_fallback.as_ref().map(|p| &p.value),
+        Some(&ParameterValue::Integer(50)),
+        "Unknown scopes should fall back to global"
+    );
+    info!("✓ Unknown coop + Unknown fed -> falls back to global (50)");
+
+    info!("✅ Scope resolution test passed");
+    Ok(())
+}
+
+#[test]
+fn test_protocol_change_scope_override_not_allowed() -> Result<()> {
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter("info")
+        .with_test_writer()
+        .try_init();
+
+    info!("=== Testing scope override rejection for non-overridable parameters ===");
+
+    let store = InMemoryParameterStore::new();
+
+    // Create parameter that doesn't allow overrides
+    let param = ProtocolParameter {
+        id: "governance.strict".to_string(),
+        name: "Strict Parameter".to_string(),
+        description: "This parameter cannot be overridden at lower scopes".to_string(),
+        value: ParameterValue::Integer(100),
+        constraints: ParameterConstraints {
+            min: Some(ParameterValue::Integer(0)),
+            max: Some(ParameterValue::Integer(1000)),
+            allowed_values: None,
+            requires_restart: false,
+            allow_override: false, // Key: overrides not allowed
+        },
+        scope: ParameterScope::Global,
+        updated_at: 0,
+        updated_by: None,
+        version: 0,
+    };
+    store.set(param, None, None)?;
+    info!("✓ Created global parameter with allow_override=false");
+
+    // Attempt to create a cooperative override
+    let coop_id = icn_entity::EntityId::cooperative("rebel-coop").unwrap();
+    let mut override_param = ProtocolParameter {
+        id: "governance.strict".to_string(),
+        name: "Strict Parameter".to_string(),
+        description: "Attempted override".to_string(),
+        value: ParameterValue::Integer(999), // Trying to change value
+        constraints: ParameterConstraints {
+            min: Some(ParameterValue::Integer(0)),
+            max: Some(ParameterValue::Integer(1000)),
+            allowed_values: None,
+            requires_restart: false,
+            allow_override: false,
+        },
+        scope: ParameterScope::Cooperative { id: coop_id },
+        updated_at: 0,
+        updated_by: None,
+        version: 0, // Must match stored version for update
+    };
+
+    let result = store.set(
+        override_param.clone(),
+        Some("rogue-proposal".to_string()),
+        None,
+    );
+
+    assert!(
+        result.is_err(),
+        "Scope override should be rejected for non-overridable parameter"
+    );
+    let error_msg = result.unwrap_err().to_string();
+    assert!(
+        error_msg.contains("does not allow scope overrides"),
+        "Error should mention scope override restriction: {error_msg}"
+    );
+    info!("✓ Cooperative override correctly rejected");
+
+    // Attempt federation override - should also be rejected
+    let fed_id = icn_entity::EntityId::federation("rebel-fed").unwrap();
+    override_param.scope = ParameterScope::Federation { id: fed_id };
+
+    let result = store.set(override_param, Some("rogue-proposal-2".to_string()), None);
+
+    assert!(
+        result.is_err(),
+        "Federation override should also be rejected"
+    );
+    info!("✓ Federation override correctly rejected");
+
+    info!("✅ Scope override rejection test passed");
+    Ok(())
+}
+
+#[test]
+fn test_protocol_change_full_lifecycle() -> Result<()> {
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter("info")
+        .with_test_writer()
+        .try_init();
+
+    info!("=== Testing full proposal lifecycle (Create → Store → Execute → Verify) ===");
+
+    let store = InMemoryParameterStore::new();
+
+    // Step 1: Initialize parameter (simulating existing protocol state)
+    store.set(governance_test_param("voting_period", 100), None, None)?;
+    info!("✓ Step 1: Initial parameter set to 100");
+
+    let initial = store
+        .get("governance.voting_period")?
+        .expect("Parameter should exist");
+    assert_eq!(initial.value, ParameterValue::Integer(100));
+    assert_eq!(initial.version, 0);
+
+    // Step 2: Create a ProtocolChangeProposal (simulating governance submission)
+    let proposal = ProtocolChangeProposal::new(
+        "governance.voting_period",
+        ParameterValue::Integer(200),
+        "Increase voting period to allow more participation",
+    );
+
+    info!("✓ Step 2: Created ProtocolChangeProposal");
+    assert_eq!(proposal.parameter_id, "governance.voting_period");
+    assert_eq!(proposal.new_value, ParameterValue::Integer(200));
+
+    // Step 3: Validate proposal constraints (what handle_protocol_change does first)
+    let current = store
+        .get(&proposal.parameter_id)?
+        .expect("Parameter must exist");
+    let validation_result = current.validate(&proposal.new_value);
+    assert!(
+        validation_result.is_ok(),
+        "Proposal value should pass validation: {validation_result:?}"
+    );
+    info!("✓ Step 3: Proposal value validated against constraints");
+
+    // Step 4: Execute proposal (simulating post-vote execution)
+    // In real flow, this happens after voting quorum is reached
+    let mut updated_param = current.clone();
+    updated_param.value = proposal.new_value.clone();
+    updated_param.updated_by = Some("proposal-lifecycle-test".to_string());
+
+    store.set(
+        updated_param,
+        Some("proposal-lifecycle-test".to_string()),
+        Some("governance-executor".to_string()),
+    )?;
+    info!("✓ Step 4: Proposal executed");
+
+    // Step 5: Verify execution result
+    let final_state = store
+        .get("governance.voting_period")?
+        .expect("Parameter should exist");
+
+    assert_eq!(
+        final_state.value,
+        ParameterValue::Integer(200),
+        "Value should be updated"
+    );
+    assert_eq!(final_state.version, 1, "Version should be incremented");
+    assert_eq!(
+        final_state.updated_by,
+        Some("proposal-lifecycle-test".to_string()),
+        "Should track proposal ID"
+    );
+    info!("✓ Step 5: Final state verified");
+    info!(
+        "  Value: {:?}, Version: {}, Updated by: {:?}",
+        final_state.value, final_state.version, final_state.updated_by
+    );
+
+    // Step 6: Verify history was recorded
+    let history = store.get_history("governance.voting_period")?;
+    assert_eq!(history.len(), 1, "Should have one history entry");
+    assert_eq!(history[0].old_value, ParameterValue::Integer(100));
+    assert_eq!(history[0].new_value, ParameterValue::Integer(200));
+    assert_eq!(
+        history[0].proposal_id,
+        Some("proposal-lifecycle-test".to_string())
+    );
+    info!("✓ Step 6: History entry verified");
+
+    info!("✅ Full proposal lifecycle test passed");
+    Ok(())
+}
+
+#[test]
+fn test_protocol_change_rejected_proposal_no_effect() -> Result<()> {
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter("info")
+        .with_test_writer()
+        .try_init();
+
+    info!("=== Testing that rejected proposal doesn't change parameter ===");
+
+    let store = InMemoryParameterStore::new();
+
+    // Initialize parameter
+    store.set(governance_test_param("threshold", 500), None, None)?;
+    info!("✓ Initial parameter value: 500");
+
+    // Create a proposal that violates constraints (value > max of 1000)
+    let invalid_proposal = ProtocolChangeProposal::new(
+        "governance.threshold",
+        ParameterValue::Integer(5000), // Exceeds max constraint
+        "Try to set an invalid value",
+    );
+
+    // Validate the proposal (this is what governance does before voting)
+    let current = store.get(&invalid_proposal.parameter_id)?.unwrap();
+    let validation_result = current.validate(&invalid_proposal.new_value);
+
+    assert!(
+        validation_result.is_err(),
+        "Invalid proposal should fail validation"
+    );
+    info!("✓ Proposal validation correctly rejected");
+
+    // Verify parameter is unchanged
+    let unchanged = store.get("governance.threshold")?.unwrap();
+    assert_eq!(unchanged.value, ParameterValue::Integer(500));
+    assert_eq!(unchanged.version, 0);
+    info!("✓ Parameter remains unchanged at 500, version 0");
+
+    // Verify no history was created for the failed attempt
+    let history = store.get_history("governance.threshold")?;
+    assert!(
+        history.is_empty(),
+        "No history should be recorded for validation failures"
+    );
+    info!("✓ No history entry for rejected proposal");
+
+    info!("✅ Rejected proposal test passed");
+    Ok(())
+}
+
+#[test]
+fn test_protocol_change_percentage_bounds() -> Result<()> {
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter("info")
+        .with_test_writer()
+        .try_init();
+
+    info!("=== Testing percentage parameter bounds validation ===");
+
+    let store = InMemoryParameterStore::new();
+
+    // Create a percentage parameter with bounds
+    let param = ProtocolParameter {
+        id: "governance.approval".to_string(),
+        name: "Approval Threshold".to_string(),
+        description: "Required approval percentage".to_string(),
+        value: ParameterValue::Percentage(50.0),
+        constraints: ParameterConstraints {
+            min: Some(ParameterValue::Percentage(10.0)),
+            max: Some(ParameterValue::Percentage(90.0)),
+            allowed_values: None,
+            requires_restart: false,
+            allow_override: true,
+        },
+        scope: ParameterScope::Global,
+        updated_at: 0,
+        updated_by: None,
+        version: 0,
+    };
+    store.set(param, None, None)?;
+    info!("✓ Created percentage parameter (50%, range 10-90%)");
+
+    // Valid update within bounds
+    let mut valid_update = store.get("governance.approval")?.unwrap();
+    valid_update.value = ParameterValue::Percentage(75.0);
+    store.set(valid_update, Some("valid-proposal".to_string()), None)?;
+    info!("✓ Valid update to 75% accepted");
+
+    // Invalid: below minimum
+    let mut below_min = store.get("governance.approval")?.unwrap();
+    below_min.value = ParameterValue::Percentage(5.0); // Below 10% minimum
+    let result = store.set(below_min, Some("invalid-proposal".to_string()), None);
+    assert!(result.is_err(), "5% should be rejected (below 10% min)");
+    info!("✓ 5% correctly rejected (below minimum)");
+
+    // Invalid: above maximum
+    let mut above_max = store.get("governance.approval")?.unwrap();
+    above_max.value = ParameterValue::Percentage(95.0); // Above 90% maximum
+    let result = store.set(above_max, Some("invalid-proposal".to_string()), None);
+    assert!(result.is_err(), "95% should be rejected (above 90% max)");
+    info!("✓ 95% correctly rejected (above maximum)");
+
+    // Verify final state
+    let final_state = store.get("governance.approval")?.unwrap();
+    assert_eq!(
+        final_state.value,
+        ParameterValue::Percentage(75.0),
+        "Should remain at last valid value"
+    );
+    info!("✓ Final value correctly at 75%");
+
+    info!("✅ Percentage bounds test passed");
+    Ok(())
+}

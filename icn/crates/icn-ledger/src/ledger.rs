@@ -7,6 +7,7 @@ use crate::fork_resolution::{
     Fork, ForkDetector, ForkResolution, ForkResolutionStrategy, ForkResolver,
 };
 use crate::freeze::{FreezeManager, FrozenMember};
+use crate::membership::MembershipStore;
 use crate::merge::{MergeDecision, QuarantineItem};
 use crate::quarantine::QuarantineStore;
 use crate::sync::{serialize_sync_message, LedgerSyncMessage};
@@ -126,6 +127,10 @@ pub struct Ledger {
     /// Credit policy manager for enforcing credit limits
     /// When set, entries that would exceed credit limits are rejected.
     credit_policy_manager: Option<CreditPolicyManager>,
+
+    /// Membership store for tracking when members joined
+    /// Used to apply new member credit limit ramping
+    membership_store: Option<Arc<dyn MembershipStore>>,
 }
 
 impl Ledger {
@@ -155,6 +160,7 @@ impl Ledger {
             domain_id: None,             // Set via set_domain_id()
             validation_hook: None,       // Set via set_validation_hook()
             credit_policy_manager: None, // Set via set_credit_policy_manager()
+            membership_store: None,      // Set via set_membership_store()
         };
 
         // Load cached balances from storage
@@ -281,6 +287,19 @@ impl Ledger {
     /// Get the credit policy manager (if set)
     pub fn credit_policy_manager(&self) -> Option<&CreditPolicyManager> {
         self.credit_policy_manager.as_ref()
+    }
+
+    /// Set the membership store for tracking when members joined
+    ///
+    /// When set, credit limits use actual join dates for new member ramping.
+    /// New members start with conservative limits that increase over time.
+    pub fn set_membership_store(&mut self, store: Arc<dyn MembershipStore>) {
+        self.membership_store = Some(store);
+    }
+
+    /// Get the membership store (if set)
+    pub fn membership_store(&self) -> Option<&Arc<dyn MembershipStore>> {
+        self.membership_store.as_ref()
     }
 
     /// Append a journal entry to the ledger
@@ -456,9 +475,39 @@ impl Ledger {
             });
 
             // Update cleared volume index (track total credits received)
+            // Note: This index is used for credit limit calculation (history bonus).
+            // Contribution tracking in MembershipStore is NOT used for credit limits.
             if let Some(credit) = delta.credit {
                 let key = (delta.account_id.clone(), delta.currency.clone());
                 *self.cleared_volume_index.entry(key).or_insert(0) += credit;
+            }
+        }
+
+        // Register members who appear in this entry (for new member ramping).
+        // Done once per unique DID after the delta loop for efficiency.
+        if let Some(ref membership_store) = self.membership_store {
+            // Collect unique DIDs to avoid repeated storage calls
+            let unique_dids: std::collections::HashSet<_> =
+                entry.accounts.iter().map(|d| &d.account_id).collect();
+
+            for did in unique_dids {
+                match membership_store.register_if_new(did, entry.timestamp) {
+                    Ok(registered_at) if registered_at == entry.timestamp => {
+                        // This was a new member registration
+                        icn_obs::metrics::ledger::new_members_registered_inc();
+                    }
+                    Ok(_) => {
+                        // Existing member, no action needed
+                    }
+                    Err(e) => {
+                        warn!(
+                            account = %did,
+                            timestamp = entry.timestamp,
+                            error = %e,
+                            "Failed to register new member"
+                        );
+                    }
+                }
             }
         }
 
@@ -2010,6 +2059,16 @@ impl Ledger {
         // Enforce credit limits (Issue #164)
         // Check that no account would exceed its credit limit after this entry
         if let Some(ref policy_manager) = self.credit_policy_manager {
+            // PERFORMANCE: Calculate current time once for all deltas in this entry.
+            // This ensures consistent timestamps and reduces syscalls.
+            // SECURITY: Use actual system time for ramping calculation.
+            // This prevents timestamp manipulation attacks where a malicious actor
+            // creates entries with old timestamps to bypass credit limit ramping.
+            let validation_time = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+
             for delta in &entry.accounts {
                 // Only check accounts that are going more negative (spending credit)
                 let transaction_delta = delta.net_change();
@@ -2039,8 +2098,6 @@ impl Ledger {
                     .unwrap_or(0);
 
                 // Calculate credit limit using the policy
-                // For now, we use current_time as member_since (no ramping - gives full limit)
-                // This is conservative: new members get full calculated limit immediately
                 let base_policy = &policy_manager.credit_policy;
 
                 // Calculate: baseline + trust_bonus + history_bonus
@@ -2048,7 +2105,61 @@ impl Ledger {
                     * trust_score
                     * base_policy.trust_multiplier) as i64;
                 let history_bonus = (cleared_volume as f64 * base_policy.history_bonus_rate) as i64;
-                let calculated_limit = base_policy.baseline + trust_bonus + history_bonus;
+                let full_limit = base_policy.baseline + trust_bonus + history_bonus;
+
+                // Apply new member ramping only if membership store is configured
+                // Without membership store, use full calculated limit (backward compatible)
+                let calculated_limit = if let Some(ref membership_store) = self.membership_store {
+                    // Track when members bypass ramping via cleared volume threshold
+                    if cleared_volume >= policy_manager.new_member_policy.cleared_volume_threshold {
+                        icn_obs::metrics::ledger::credit_limit_bypass_via_contribution_inc();
+                    }
+
+                    // Get member_since from store, with proper error handling.
+                    // On storage error, fall back to full_limit (permissive) rather than
+                    // treating established members as new (which would reduce their limit).
+                    // The member_since is stored from their FIRST transaction (immutable),
+                    // and validation_time uses real wall clock time for the ramp calculation.
+                    match membership_store.get_member_since(account) {
+                        Ok(Some(member_since)) => {
+                            // Apply new member ramping
+                            policy_manager.new_member_policy.calculate_effective_limit(
+                                account,
+                                member_since,
+                                validation_time,
+                                cleared_volume,
+                                full_limit,
+                            )
+                        }
+                        Ok(None) => {
+                            // New member - use entry timestamp as join date for consistency
+                            // with what gets stored (entry.timestamp at line ~494).
+                            // validation_time is still used as current_time to prevent
+                            // timestamp manipulation attacks.
+                            policy_manager.new_member_policy.calculate_effective_limit(
+                                account,
+                                entry.timestamp, // member_since = entry timestamp
+                                validation_time, // current_time = wall clock (security)
+                                cleared_volume,
+                                full_limit,
+                            )
+                        }
+                        Err(e) => {
+                            // Storage error - log, track metric, and use full limit
+                            // (permissive fallback to prevent penalizing established members)
+                            warn!(
+                                account = %account,
+                                error = ?e,
+                                "Failed to read member_since; using full credit limit"
+                            );
+                            icn_obs::metrics::ledger::membership_storage_errors_inc();
+                            full_limit
+                        }
+                    }
+                } else {
+                    // No membership store = no ramping (backward compatible)
+                    full_limit
+                };
 
                 // Check if the new balance would exceed the limit
                 let new_balance = current_balance + transaction_delta;

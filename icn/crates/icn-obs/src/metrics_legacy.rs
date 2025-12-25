@@ -1544,6 +1544,20 @@ pub fn init_descriptions() {
         "icn_dispute_resolution_time_seconds",
         "Time taken to resolve disputes in seconds"
     );
+
+    // Ledger membership metrics (PR #293: Member-since tracking)
+    describe_counter!(
+        "icn_ledger_membership_storage_errors_total",
+        "Total number of membership storage errors during credit limit validation"
+    );
+    describe_counter!(
+        "icn_ledger_new_members_registered_total",
+        "Total number of new members registered on first transaction"
+    );
+    describe_counter!(
+        "icn_ledger_credit_limit_bypass_contribution_total",
+        "Total members bypassing credit limit ramping via contribution threshold"
+    );
 }
 
 /// Network metrics
@@ -2031,6 +2045,24 @@ pub mod ledger {
     /// Increment counter when an entry is rejected due to credit limit violation (Issue #164)
     pub fn entries_rejected_credit_limit_inc() {
         counter!("icn_ledger_entries_rejected_credit_limit_total").increment(1);
+    }
+
+    /// Increment counter when membership store lookup fails during credit limit validation.
+    /// High values indicate storage issues that could mask credit limit enforcement.
+    pub fn membership_storage_errors_inc() {
+        counter!("icn_ledger_membership_storage_errors_total").increment(1);
+    }
+
+    /// Increment counter when a new member is registered (first transaction).
+    /// Useful for tracking member onboarding trends.
+    pub fn new_members_registered_inc() {
+        counter!("icn_ledger_new_members_registered_total").increment(1);
+    }
+
+    /// Increment counter when a member bypasses ramping via cleared volume threshold.
+    /// Tracks how many members earn full limits through contribution vs time.
+    pub fn credit_limit_bypass_via_contribution_inc() {
+        counter!("icn_ledger_credit_limit_bypass_contribution_total").increment(1);
     }
 
     /// Increment counter when balance recomputation is aborted due to version mismatch (M7 fix)
