@@ -679,7 +679,11 @@ pub struct ProtocolChangeProposal {
     pub rationale: String,
 
     /// Optional: When the change should take effect (Unix timestamp)
-    /// If None, change is effective immediately upon proposal approval
+    /// If None, change is effective immediately upon proposal approval.
+    ///
+    /// **NOTE**: Delayed execution is not yet implemented. This field must be `None`.
+    /// Setting this field will cause proposal validation to fail.
+    /// See: https://github.com/InterCooperative-Network/icn/issues/282
     pub effective_at: Option<u64>,
 
     /// Optional: Scope override for this change
@@ -704,7 +708,15 @@ impl ProtocolChangeProposal {
     }
 
     /// Set delayed effective date
+    ///
+    /// **NOTE**: Delayed execution is not yet implemented. Using this method
+    /// will cause proposal validation to fail at creation time.
+    /// See: https://github.com/InterCooperative-Network/icn/issues/282
     #[must_use]
+    #[deprecated(
+        since = "0.1.0",
+        note = "Delayed execution not implemented. See issue #282."
+    )]
     pub fn effective_at(mut self, timestamp: u64) -> Self {
         self.effective_at = Some(timestamp);
         self

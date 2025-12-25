@@ -151,6 +151,8 @@ pub struct GovernanceHandle {
     inner: Arc<RwLock<GovernanceActor>>,
     /// Protocol parameter store for governable parameters (Phase 20)
     protocol_params: Option<Arc<dyn ProtocolParameterStore>>,
+    /// Entity registry for validating scope entity existence
+    entity_registry: Option<Arc<dyn icn_entity::EntityRegistry>>,
 }
 
 impl GovernanceHandle {
@@ -219,6 +221,14 @@ impl GovernanceHandle {
     /// This must be called after spawn() to enable protocol parameter operations.
     pub fn with_protocol_params(mut self, store: Arc<dyn ProtocolParameterStore>) -> Self {
         self.protocol_params = Some(store);
+        self
+    }
+
+    /// Set the entity registry
+    ///
+    /// This enables validation that entities referenced in parameter scopes actually exist.
+    pub fn with_entity_registry(mut self, registry: Arc<dyn icn_entity::EntityRegistry>) -> Self {
+        self.entity_registry = Some(registry);
         self
     }
 
@@ -346,12 +356,37 @@ impl icn_governance::GovernanceOps for GovernanceHandle {
             }
 
             // Check if the parameter exists
-            let param = store.get(&proposal.parameter_id)?.ok_or_else(|| {
-                anyhow::anyhow!(
-                    "Cannot create ProtocolChange proposal: parameter '{}' not found",
-                    proposal.parameter_id
-                )
-            })?;
+            let param = match store.get(&proposal.parameter_id)? {
+                Some(p) => p,
+                None => {
+                    // Try to find similar parameter names to suggest
+                    let all_params = store.list().unwrap_or_default();
+                    let similar: Vec<_> = all_params
+                        .iter()
+                        .filter(|p| {
+                            // Simple similarity: shares prefix or contains search term
+                            let id = &p.id;
+                            let search = &proposal.parameter_id;
+                            id.starts_with(search.split('.').next().unwrap_or(""))
+                                || id.contains(search.split('.').next_back().unwrap_or(""))
+                        })
+                        .map(|p| p.id.as_str())
+                        .take(3)
+                        .collect();
+
+                    let suggestion = if similar.is_empty() {
+                        "Use list_protocol_parameters() to see available parameters.".to_string()
+                    } else {
+                        format!("Did you mean: {}?", similar.join(", "))
+                    };
+
+                    bail!(
+                        "Cannot create ProtocolChange proposal: parameter '{}' not found. {}",
+                        proposal.parameter_id,
+                        suggestion
+                    );
+                }
+            };
 
             // Validate the new value against constraints
             param.validate(&proposal.new_value).map_err(|e| {
@@ -368,6 +403,20 @@ impl icn_governance::GovernanceOps for GovernanceHandle {
                     "Cannot create ProtocolChange proposal: parameter '{}' does not allow scope overrides",
                     proposal.parameter_id
                 );
+            }
+
+            // Validate entity exists if scope references an entity
+            if let Some(ref scope) = proposal.scope {
+                if let Some(entity_id) = scope.entity_id() {
+                    // Only validate if entity registry is configured
+                    if let Some(ref registry) = self.entity_registry {
+                        if !registry.exists(entity_id).unwrap_or(false) {
+                            bail!(
+                                "Cannot create ProtocolChange proposal: scope references non-existent entity '{entity_id}'"
+                            );
+                        }
+                    }
+                }
             }
         }
 
@@ -549,6 +598,7 @@ impl GovernanceActor {
         let handle = GovernanceHandle {
             inner: Arc::new(RwLock::new(actor)),
             protocol_params: None,
+            entity_registry: None,
         };
 
         // Spawn background timer task for auto-closing proposals

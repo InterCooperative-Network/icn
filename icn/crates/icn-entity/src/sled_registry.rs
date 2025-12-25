@@ -41,6 +41,23 @@ use tracing::{debug, warn};
 /// a warning is logged recommending pagination.
 const LARGE_LIST_WARNING_THRESHOLD: usize = 100;
 
+/// Convert a Sled transaction error to an EntityError with context.
+///
+/// This helper provides consistent error handling for transactions:
+/// - `Abort` errors are user-caused validation failures (should NOT be retried)
+/// - `Storage` errors are I/O or database issues (NOT typically retriable)
+fn handle_transaction_error(
+    e: sled::transaction::TransactionError<EntityError>,
+    operation: &str,
+) -> EntityError {
+    match e {
+        sled::transaction::TransactionError::Abort(err) => err,
+        sled::transaction::TransactionError::Storage(e) => EntityError::RegistryError(format!(
+            "Storage error during {operation}: {e}. This may indicate database corruption or I/O failure."
+        )),
+    }
+}
+
 /// Sled-backed persistent entity registry
 ///
 /// Provides persistent storage for entities and memberships using Sled.
@@ -206,12 +223,7 @@ impl EntityRegistry for SledEntityRegistry {
 
                 Ok(())
             })
-            .map_err(|e| match e {
-                sled::transaction::TransactionError::Abort(err) => err,
-                sled::transaction::TransactionError::Storage(e) => {
-                    EntityError::RegistryError(format!("Transaction storage error: {e}"))
-                }
-            })?;
+            .map_err(|e| handle_transaction_error(e, "entity registration"))?;
 
         debug!(entity_id = %entity_id_display, "Entity registered");
         Ok(())
@@ -270,12 +282,7 @@ impl EntityRegistry for SledEntityRegistry {
 
                 Ok(())
             })
-            .map_err(|e| match e {
-                sled::transaction::TransactionError::Abort(err) => err,
-                sled::transaction::TransactionError::Storage(e) => {
-                    EntityError::RegistryError(format!("Transaction storage error: {e}"))
-                }
-            })?;
+            .map_err(|e| handle_transaction_error(e, "entity update"))?;
 
         debug!(entity_id = %entity_id_display, "Entity updated");
         Ok(())
@@ -347,12 +354,7 @@ impl EntityRegistry for SledEntityRegistry {
 
                 Ok(())
             })
-            .map_err(|e| match e {
-                sled::transaction::TransactionError::Abort(err) => err,
-                sled::transaction::TransactionError::Storage(e) => {
-                    EntityError::RegistryError(format!("Transaction storage error: {e}"))
-                }
-            })?;
+            .map_err(|e| handle_transaction_error(e, "entity deletion"))?;
 
         debug!(entity_id = %entity_id_display, "Entity deleted");
         Ok(())
@@ -557,12 +559,7 @@ impl EntityRegistry for SledEntityRegistry {
 
                 Ok(())
             })
-            .map_err(|e| match e {
-                sled::transaction::TransactionError::Abort(err) => err,
-                sled::transaction::TransactionError::Storage(e) => {
-                    EntityError::RegistryError(format!("Transaction storage error: {e}"))
-                }
-            })?;
+            .map_err(|e| handle_transaction_error(e, "membership addition"))?;
 
         debug!(
             member_id = %member_id_display,
@@ -645,12 +642,7 @@ impl EntityRegistry for SledEntityRegistry {
                 tx.insert(key.as_slice(), value.as_slice())?;
                 Ok(())
             })
-            .map_err(|e| match e {
-                sled::transaction::TransactionError::Abort(err) => err,
-                sled::transaction::TransactionError::Storage(e) => {
-                    EntityError::RegistryError(format!("Transaction storage error: {e}"))
-                }
-            })?;
+            .map_err(|e| handle_transaction_error(e, "membership update"))?;
 
         debug!(
             member_id = %member_id_display,
@@ -684,12 +676,7 @@ impl EntityRegistry for SledEntityRegistry {
 
                 Ok(())
             })
-            .map_err(|e| match e {
-                sled::transaction::TransactionError::Abort(err) => err,
-                sled::transaction::TransactionError::Storage(e) => {
-                    EntityError::RegistryError(format!("Transaction storage error: {e}"))
-                }
-            })?;
+            .map_err(|e| handle_transaction_error(e, "membership removal"))?;
 
         debug!(
             member_id = %member_id_display,

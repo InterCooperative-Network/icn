@@ -45,12 +45,17 @@ use icn_entity::EntityId;
 use sled::Db;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
-use tracing::debug;
+use tracing::{debug, warn};
 
 /// Maximum number of history entries to keep per parameter.
 /// This prevents unbounded growth from DoS via repeated parameter changes.
 /// History beyond this limit is automatically pruned on each set() call.
 pub const MAX_HISTORY_ENTRIES_PER_PARAM: usize = 100;
+
+/// Warning threshold for total history entries across all parameters.
+/// When exceeded, a warning is logged to alert operators about potential
+/// accumulation issues (e.g., from scoped overrides across many entities).
+pub const GLOBAL_HISTORY_WARNING_THRESHOLD: usize = 10_000;
 
 // ============================================================================
 // ProtocolParameterStore Trait
@@ -104,6 +109,11 @@ pub trait ProtocolParameterStore: Send + Sync {
 
     /// Count total parameters
     fn count(&self) -> Result<usize>;
+
+    /// Count total history entries across all parameters
+    ///
+    /// This is useful for monitoring global history accumulation.
+    fn total_history_count(&self) -> Result<usize>;
 
     /// Validate a new value against a parameter's constraints
     fn validate(
@@ -277,6 +287,17 @@ impl ProtocolParameterStore for InMemoryParameterStore {
                 entries.truncate(MAX_HISTORY_ENTRIES_PER_PARAM);
                 debug!(parameter_id = %id, pruned_entries = pruned, "Auto-pruned history entries");
             }
+
+            // Check global history size and warn if threshold exceeded
+            let total: usize = history.values().map(|v| v.len()).sum();
+            if total > GLOBAL_HISTORY_WARNING_THRESHOLD {
+                warn!(
+                    total_history_entries = total,
+                    threshold = GLOBAL_HISTORY_WARNING_THRESHOLD,
+                    "Global history size exceeds threshold. Consider reviewing parameter \
+                     change frequency or running manual prune_history() on old parameters."
+                );
+            }
         }
 
         Ok(())
@@ -307,7 +328,10 @@ impl ProtocolParameterStore for InMemoryParameterStore {
             .history
             .read()
             .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-        Ok(history.get(id).cloned().unwrap_or_default())
+        let mut changes = history.get(id).cloned().unwrap_or_default();
+        // Sort by timestamp (oldest first) for chronological audit trail
+        changes.sort_by_key(|c| c.changed_at);
+        Ok(changes)
     }
 
     fn prune_history(&self, id: &str, max_entries: usize) -> Result<usize> {
@@ -370,6 +394,14 @@ impl ProtocolParameterStore for InMemoryParameterStore {
             .read()
             .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
         Ok(params.len())
+    }
+
+    fn total_history_count(&self) -> Result<usize> {
+        let history = self
+            .history
+            .read()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        Ok(history.values().map(|v| v.len()).sum())
     }
 
     fn validate(
@@ -625,9 +657,9 @@ impl ProtocolParameterStore for SledParameterStore {
             })
             .map_err(|e| match e {
                 sled::transaction::TransactionError::Abort(err) => err,
-                sled::transaction::TransactionError::Storage(e) => {
-                    anyhow::anyhow!("Transaction storage error: {e}")
-                }
+                sled::transaction::TransactionError::Storage(e) => anyhow::anyhow!(
+                    "Storage error during parameter update: {e}. This may indicate database corruption or I/O failure."
+                ),
             })?;
 
         // Auto-prune history to prevent unbounded growth (DoS mitigation)
@@ -636,6 +668,19 @@ impl ProtocolParameterStore for SledParameterStore {
         let pruned = self.prune_history(&id, MAX_HISTORY_ENTRIES_PER_PARAM)?;
         if pruned > 0 {
             debug!(parameter_id = %id, pruned_entries = pruned, "Auto-pruned history entries");
+        }
+
+        // Check global history size and warn if threshold exceeded
+        // This helps operators detect accumulation from many scoped overrides
+        if let Ok(total) = self.total_history_count() {
+            if total > GLOBAL_HISTORY_WARNING_THRESHOLD {
+                warn!(
+                    total_history_entries = total,
+                    threshold = GLOBAL_HISTORY_WARNING_THRESHOLD,
+                    "Global history size exceeds threshold. Consider reviewing parameter \
+                     change frequency or running manual prune_history() on old parameters."
+                );
+            }
         }
 
         debug!(parameter_id = %id, "Parameter updated");
@@ -761,9 +806,9 @@ impl ProtocolParameterStore for SledParameterStore {
             })
             .map_err(|e| match e {
                 sled::transaction::TransactionError::Abort(err) => err,
-                sled::transaction::TransactionError::Storage(e) => {
-                    anyhow::anyhow!("Transaction storage error: {e}")
-                }
+                sled::transaction::TransactionError::Storage(e) => anyhow::anyhow!(
+                    "Storage error during parameter deletion: {e}. This may indicate database corruption or I/O failure."
+                ),
             })?;
 
         debug!(parameter_id = %id_str, "Parameter deleted");
@@ -784,6 +829,16 @@ impl ProtocolParameterStore for SledParameterStore {
             if key_str.starts_with("param:") && !key_str.starts_with("param_scope:") {
                 count += 1;
             }
+        }
+        Ok(count)
+    }
+
+    fn total_history_count(&self) -> Result<usize> {
+        let prefix = b"history:";
+        let mut count = 0;
+        for item in self.db.scan_prefix(prefix) {
+            let _ = item?;
+            count += 1;
         }
         Ok(count)
     }
