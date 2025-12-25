@@ -890,6 +890,12 @@ impl ProtocolParameterStore for SledParameterStore {
         // If reality differs inside the transaction, we must error to prevent constraint bypass
         let expected_update = global_param.is_some();
 
+        // For scoped parameters, capture the global param's version for TOCTOU detection
+        // We validated against global_param.constraints, so we need to verify it hasn't changed
+        let global_version_at_validation = global_param.as_ref().map(|p| p.version);
+        let global_key = Self::param_key(&id);
+        let global_key_clone = global_key.clone();
+
         // Use transaction to atomically verify version, update parameter, and record history
         self.db
             .transaction(|tx| {
@@ -902,7 +908,10 @@ impl ProtocolParameterStore for SledParameterStore {
                 // 3. State matches expectation → proceed with version check
                 let is_update_now = stored_bytes.is_some();
 
-                let (old_value, new_version) = if let Some(bytes) = &stored_bytes {
+                // Track stored constraints for updates (constraints are immutable after creation)
+                let (old_value, new_version, effective_constraints) = if let Some(bytes) =
+                    &stored_bytes
+                {
                     let stored = Self::deserialize_param(bytes).map_err(|e| {
                         ConflictableTransactionError::Abort(anyhow::anyhow!(
                             "Failed to deserialize stored parameter: {e}"
@@ -921,7 +930,10 @@ impl ProtocolParameterStore for SledParameterStore {
                         )));
                     }
 
-                    (Some(stored.value), stored.version + 1)
+                    // CRITICAL: Use STORED constraints for updates (constraints are immutable)
+                    // This prevents constraint bypass attacks where a malicious update
+                    // tries to relax constraints (e.g., change max from 50 to 100)
+                    (Some(stored.value), stored.version + 1, stored.constraints)
                 } else if expected_update && !is_scoped {
                     // Race condition: We validated against a global parameter that no longer exists
                     // Our validation may have used stale constraints
@@ -937,16 +949,39 @@ impl ProtocolParameterStore for SledParameterStore {
                     )));
                 } else {
                     // New parameter (global or scoped override) starts at version 0
-                    (None, 0)
+                    // For new params, use the submitted constraints
+                    (None, 0, new_constraints.clone())
                 };
 
+                // CRITICAL: For scoped parameters, verify the global parameter hasn't changed
+                // since we validated against its constraints. This prevents constraint bypass
+                // where: 1) read global with max=100, 2) admin changes to max=50, 3) submit 75
+                if is_scoped && global_version_at_validation.is_some() {
+                    let current_global = tx.get(&global_key_clone)?;
+                    let current_version = current_global
+                        .as_ref()
+                        .and_then(|bytes| Self::deserialize_param(bytes).ok())
+                        .map(|p| p.version);
+
+                    if current_version != global_version_at_validation {
+                        return Err(ConflictableTransactionError::Abort(anyhow::anyhow!(
+                            "Global parameter '{}' was modified (version {} -> {:?}). \
+                             Please retry to validate against current constraints.",
+                            id_clone,
+                            global_version_at_validation.unwrap_or(0),
+                            current_version
+                        )));
+                    }
+                }
+
                 // Build the parameter with the correct version (computed inside transaction)
+                // Note: effective_constraints uses STORED constraints for updates to enforce immutability
                 let final_param = ProtocolParameter {
                     id: id_clone.clone(),
                     name: new_name.clone(),
                     description: new_description.clone(),
                     value: new_value.clone(),
-                    constraints: new_constraints.clone(),
+                    constraints: effective_constraints,
                     scope: new_scope.clone(),
                     updated_at: now,
                     updated_by: new_updated_by.clone(),

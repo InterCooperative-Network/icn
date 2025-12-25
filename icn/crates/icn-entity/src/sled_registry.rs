@@ -41,6 +41,11 @@ use tracing::{debug, warn};
 /// a warning is logged recommending pagination.
 const LARGE_LIST_WARNING_THRESHOLD: usize = 100;
 
+/// Hard limit for unpaginated list operations to prevent DoS attacks.
+/// Callers attempting to list more entities must use paginated variants.
+/// This prevents memory exhaustion from loading 100k+ entities.
+const MAX_UNPAGINATED_LIST_SIZE: usize = 1000;
+
 /// Convert a Sled transaction error to an EntityError with context.
 ///
 /// This helper provides consistent error handling for transactions:
@@ -389,9 +394,15 @@ impl EntityRegistry for SledEntityRegistry {
                     )));
                 }
 
-                // CRITICAL: Check member count INSIDE the transaction
-                // This prevents the race condition where add_membership could add a member
-                // between a pre-check and this transaction.
+                // CRITICAL: Check member count INSIDE the transaction with conflict detection
+                //
+                // Sled's optimistic concurrency: tx.get() does NOT register for conflict
+                // detection - only writes do. So we must WRITE to the member_count key
+                // to ensure that if add_membership() modifies it in a parallel transaction,
+                // sled will detect the conflict and retry one of the transactions.
+                //
+                // Pattern: Read count -> verify zero -> write back zero (registers conflict)
+                // This ensures atomicity with add_membership/remove_membership.
                 let count = Self::get_member_count_from_key(tx, &id_clone)?;
                 if count > 0 {
                     return Err(ConflictableTransactionError::Abort(
@@ -400,6 +411,9 @@ impl EntityRegistry for SledEntityRegistry {
                         )),
                     ));
                 }
+                // Write count back to register for conflict detection
+                // (even though we're about to remove it, this ensures atomicity)
+                tx.insert(member_count_key.as_slice(), &0u64.to_le_bytes())?;
 
                 // Remove entity
                 tx.remove(entity_key.as_slice())?;
@@ -448,6 +462,15 @@ impl EntityRegistry for SledEntityRegistry {
                 if let Ok(id) = id_str.parse::<EntityId>() {
                     ids.push(id);
                 }
+            }
+
+            // CRITICAL: Hard limit to prevent DoS via memory exhaustion
+            // Forces callers with large datasets to use paginated variants
+            if ids.len() > MAX_UNPAGINATED_LIST_SIZE {
+                return Err(EntityError::RegistryError(format!(
+                    "Too many entities of type {entity_type} (>{MAX_UNPAGINATED_LIST_SIZE}). \
+                     Use list_by_type_paginated() to iterate in chunks."
+                )));
             }
         }
 
@@ -505,6 +528,16 @@ impl EntityRegistry for SledEntityRegistry {
 
     fn list_children(&self, parent_id: &EntityId) -> Result<Vec<EntityId>> {
         let members = self.get_members(parent_id)?;
+
+        // CRITICAL: Hard limit to prevent DoS via memory exhaustion
+        // Forces callers with large datasets to use paginated variants
+        if members.len() > MAX_UNPAGINATED_LIST_SIZE {
+            return Err(EntityError::RegistryError(format!(
+                "Too many members in {parent_id} (>{MAX_UNPAGINATED_LIST_SIZE}). \
+                 Use list_children_paginated() to iterate in chunks."
+            )));
+        }
+
         let mut children = Vec::new();
 
         for membership in members {
