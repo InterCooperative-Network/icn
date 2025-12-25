@@ -2050,6 +2050,16 @@ impl Ledger {
         // Enforce credit limits (Issue #164)
         // Check that no account would exceed its credit limit after this entry
         if let Some(ref policy_manager) = self.credit_policy_manager {
+            // PERFORMANCE: Calculate current time once for all deltas in this entry.
+            // This ensures consistent timestamps and reduces syscalls.
+            // SECURITY: Use actual system time for ramping calculation.
+            // This prevents timestamp manipulation attacks where a malicious actor
+            // creates entries with old timestamps to bypass credit limit ramping.
+            let validation_time = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+
             for delta in &entry.accounts {
                 // Only check accounts that are going more negative (spending credit)
                 let transaction_delta = delta.net_change();
@@ -2091,36 +2101,28 @@ impl Ledger {
                 // Apply new member ramping only if membership store is configured
                 // Without membership store, use full calculated limit (backward compatible)
                 let calculated_limit = if let Some(ref membership_store) = self.membership_store {
-                    // SECURITY: Use actual system time for ramping calculation.
-                    // This prevents timestamp manipulation attacks where a malicious actor
-                    // creates entries with old timestamps to bypass credit limit ramping.
-                    // The member_since is stored from their FIRST transaction (immutable),
-                    // and current_time uses real wall clock time for the ramp calculation.
-                    let current_time = SystemTime::now()
-                        .duration_since(SystemTime::UNIX_EPOCH)
-                        .map(|d| d.as_secs())
-                        .unwrap_or(0);
-
                     // Get member_since from store, with proper error handling.
                     // On storage error, fall back to full_limit (permissive) rather than
                     // treating established members as new (which would reduce their limit).
+                    // The member_since is stored from their FIRST transaction (immutable),
+                    // and validation_time uses real wall clock time for the ramp calculation.
                     match membership_store.get_member_since(account) {
                         Ok(Some(member_since)) => {
                             // Apply new member ramping
                             policy_manager.new_member_policy.calculate_effective_limit(
                                 account,
                                 member_since,
-                                current_time,
+                                validation_time,
                                 cleared_volume,
                                 full_limit,
                             )
                         }
                         Ok(None) => {
-                            // New member - use current system time as join date
+                            // New member - use validation time as join date
                             policy_manager.new_member_policy.calculate_effective_limit(
                                 account,
-                                current_time, // member_since = now (new member)
-                                current_time,
+                                validation_time, // member_since = now (new member)
+                                validation_time,
                                 cleared_volume,
                                 full_limit,
                             )

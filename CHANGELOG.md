@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - New Member Credit Limit Ramping (2025-12-25)
+
+**Member-Since Tracking for Economic Safety** (PR #293):
+- New members start with conservative 10-hour credit limits that ramp linearly to full over 90 days
+- Members who clear 50+ hours of credits bypass ramping and get full limits immediately
+- Prevents Sybil attacks where new accounts could exploit full credit limits
+
+**Implementation**:
+- `MembershipStore` trait for tracking when members joined (`icn-ledger/src/membership.rs`)
+- `SledMembershipStore` with persistent storage for member join timestamps
+- Integration with `CreditPolicyManager` for automatic limit calculation
+- Backward compatible: existing ledgers without membership store use full limits
+
+**Security**:
+- Uses `SystemTime::now()` for ramping calculation (prevents timestamp manipulation)
+- Graceful fallback to full limits on storage errors (permissive, not punitive)
+- Overflow protection with saturating arithmetic
+
+**Testing**:
+- 6 new integration tests covering ramping timeline, threshold bypass, and edge cases
+- Clock skew handling verified (saturating arithmetic prevents issues)
+- Protocol governance tests for `handle_protocol_change` flow
+
 ### Security - Comprehensive Hardening (2025-12-18)
 
 **Critical Vulnerability Fixes**:

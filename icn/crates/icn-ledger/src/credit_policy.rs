@@ -13,6 +13,12 @@ use icn_trust::TrustGraph;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
+/// Seconds in one day (24 * 60 * 60)
+pub const SECONDS_PER_DAY: u64 = 86_400;
+
+/// Default new member ramp period in days
+pub const DEFAULT_RAMP_DAYS: u64 = 90;
+
 /// Policy for calculating dynamic credit limits
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreditPolicy {
@@ -166,9 +172,9 @@ impl NewMemberPolicy {
     /// Create a conservative policy for protecting communities
     pub fn conservative(currency: String) -> Self {
         Self::new(
-            1_000,                           // 10 hours initial limit
-            Duration::from_secs(90 * 86400), // 90 days
-            5_000,                           // Must clear 50 hours first
+            1_000, // 10 hours initial limit
+            Duration::from_secs(DEFAULT_RAMP_DAYS * SECONDS_PER_DAY),
+            5_000, // Must clear 50 hours first
             currency,
         )
     }
@@ -363,7 +369,10 @@ mod tests {
 
         assert_eq!(policy.initial_limit, 1_000); // 10 hours
         assert_eq!(policy.cleared_volume_threshold, 5_000); // 50 hours
-        assert_eq!(policy.ramp_period.as_secs(), 90 * 86400); // 90 days
+        assert_eq!(
+            policy.ramp_period.as_secs(),
+            DEFAULT_RAMP_DAYS * SECONDS_PER_DAY
+        );
     }
 
     #[test]
@@ -377,7 +386,7 @@ mod tests {
         // Test 1: Below contribution threshold, but time-based ramping applies
         // With < 50 hours cleared, we fall through to time-based ramping
         let cleared = 4_000; // Only 40 hours cleared (< 50 threshold)
-        let current_time = member_since + 30 * 86400; // 30 days later (1/3 of 90 day ramp)
+        let current_time = member_since + 30 * SECONDS_PER_DAY; // 30 days later (1/3 of 90 day ramp)
         let limit = policy.calculate_effective_limit(
             &member,
             member_since,
@@ -396,7 +405,7 @@ mod tests {
         // Test 2: Above contribution threshold - bypasses ramping entirely
         // With >= 50 hours cleared, member gets full limit immediately
         let cleared = 6_000; // 60 hours cleared (>= 50 threshold)
-        let current_time = member_since + 30 * 86400; // 30 days later
+        let current_time = member_since + 30 * SECONDS_PER_DAY; // 30 days later
         let limit = policy.calculate_effective_limit(
             &member,
             member_since,
@@ -408,7 +417,7 @@ mod tests {
 
         // Test 3: Full ramp period complete (time-based path)
         let cleared = 4_000; // Below threshold, so time-based ramping applies
-        let current_time = member_since + 100 * 86400; // 100 days (> 90 day ramp)
+        let current_time = member_since + 100 * SECONDS_PER_DAY; // 100 days (> 90 day ramp)
         let limit = policy.calculate_effective_limit(
             &member,
             member_since,
@@ -429,5 +438,20 @@ mod tests {
             full_limit,
         );
         assert_eq!(limit, policy.initial_limit); // Starts at initial limit
+
+        // Test 5: Clock skew - member_since in the future (saturating_sub handles this)
+        // This could happen if timestamps are from different time zones or clock drift
+        let cleared = 0;
+        let member_since_future = member_since + 1000 * SECONDS_PER_DAY; // "Joined" 1000 days from now
+        let current_time = member_since; // Current time is before member_since
+        let limit = policy.calculate_effective_limit(
+            &member,
+            member_since_future,
+            current_time,
+            cleared,
+            full_limit,
+        );
+        // With negative tenure (saturates to 0), member gets initial limit
+        assert_eq!(limit, policy.initial_limit);
     }
 }
