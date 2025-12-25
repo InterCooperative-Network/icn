@@ -407,12 +407,14 @@ Quantum threat timeline: 10-15 years. Start migration now.
 | Priority | Feature | Effort | Status |
 |----------|---------|--------|--------|
 | **P1** | Amendment voting backend | 1 day | ✅ **Complete** (2025-12-25) |
-| **P2** | Economic safety | 3-5 days | In progress |
+| **P2** | Economic safety | 3-5 days | ✅ **Complete** (2025-12-25) |
 | **P3** | Cooperative lifecycle | 1-2 weeks | Not started |
 | **P4** | Federation | 2-3 weeks | Not started |
 | **P5** | PQ crypto integration | 1 week | PQ crypto exists, not integrated |
 
 ## Immediate Action
-**Current sprint**: Priority 2 (server-side economic safety) - credit limits, budget validation, velocity limits.
+**Next sprint**: Priority 3 (Cooperative lifecycle) - formation, dissolution, member admission/removal.
 
 **P1 Note**: Backend endpoints already existed in `icn-gateway/src/api/constitutional/voting.rs`. Only SDK bug fix was needed (commit 64fc08c9).
+
+**P2 Note**: CreditPolicyManager and VelocityLimiter were already implemented but not wired up. PR #288 initializes them in supervisor and gateway respectively.
