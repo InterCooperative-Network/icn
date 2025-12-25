@@ -411,8 +411,7 @@ impl EntityRegistry for SledEntityRegistry {
 
         // Prepare keys and values for transaction
         let membership_key = Self::membership_key(&membership.parent_id, &membership.member_id);
-        let member_of_key =
-            Self::member_of_index_key(&membership.member_id, &membership.parent_id);
+        let member_of_key = Self::member_of_index_key(&membership.member_id, &membership.parent_id);
         let membership_value = Self::serialize_membership(&membership)?;
         let member_id_display = membership.member_id.to_string();
         let parent_id_display = membership.parent_id.to_string();
