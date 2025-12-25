@@ -93,7 +93,78 @@ pub struct ProtocolParameter {
 }
 
 impl ProtocolParameter {
-    /// Create a new protocol parameter
+    /// Validate that a parameter ID follows the required format.
+    ///
+    /// Valid formats:
+    /// - `category.name` (e.g., "gossip.fanout")
+    /// - `category.subcategory.name` (e.g., "network.peer.timeout")
+    ///
+    /// Requirements:
+    /// - Must contain at least one dot separator
+    /// - Each component must be non-empty
+    /// - Components should use lowercase_snake_case (not enforced, but recommended)
+    pub fn validate_id(id: &str) -> Result<(), ParameterValidationError> {
+        if id.is_empty() {
+            return Err(ParameterValidationError::InvalidParameterId {
+                id: id.to_string(),
+                reason: "parameter ID cannot be empty",
+            });
+        }
+
+        let parts: Vec<&str> = id.split('.').collect();
+        if parts.len() < 2 {
+            return Err(ParameterValidationError::InvalidParameterId {
+                id: id.to_string(),
+                reason: "parameter ID must follow 'category.name' format (missing dot separator)",
+            });
+        }
+
+        for (i, part) in parts.iter().enumerate() {
+            if part.is_empty() {
+                return Err(ParameterValidationError::InvalidParameterId {
+                    id: id.to_string(),
+                    reason: if i == 0 {
+                        "category component cannot be empty"
+                    } else if i == parts.len() - 1 {
+                        "name component cannot be empty"
+                    } else {
+                        "subcategory component cannot be empty"
+                    },
+                });
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Create a new protocol parameter with ID validation.
+    ///
+    /// Returns an error if the ID doesn't follow the `category.name` format.
+    pub fn try_new(
+        id: impl Into<String>,
+        name: impl Into<String>,
+        description: impl Into<String>,
+        value: ParameterValue,
+    ) -> Result<Self, ParameterValidationError> {
+        let id_string = id.into();
+        Self::validate_id(&id_string)?;
+
+        Ok(Self {
+            id: id_string,
+            name: name.into(),
+            description: description.into(),
+            value,
+            constraints: ParameterConstraints::default(),
+            scope: ParameterScope::Global,
+            updated_at: icn_time::current_timestamp_secs(),
+            updated_by: None,
+        })
+    }
+
+    /// Create a new protocol parameter without ID validation.
+    ///
+    /// Prefer `try_new()` for user-provided IDs to ensure format compliance.
+    /// This method is useful for internal code where IDs are known to be valid.
     pub fn new(
         id: impl Into<String>,
         name: impl Into<String>,
@@ -170,6 +241,10 @@ impl ProtocolParameter {
                     value: *f,
                     reason: "percentage must be finite (not NaN or Infinity)",
                 });
+            }
+            // Check percentage range (0.0-100.0)
+            ParameterValue::Percentage(f) if !(*f >= 0.0 && *f <= 100.0) => {
+                return Err(ParameterValidationError::PercentageOutOfRange { value: *f });
             }
             _ => {}
         }
@@ -640,6 +715,22 @@ pub enum ParameterValidationError {
         max: ParameterValue,
     },
 
+    /// Parameter ID format is invalid
+    #[error("Invalid parameter ID '{id}': {reason}")]
+    InvalidParameterId {
+        /// The invalid ID
+        id: String,
+        /// Why the ID is invalid
+        reason: &'static str,
+    },
+
+    /// Percentage value is out of valid range (0.0-100.0)
+    #[error("Percentage {value} is out of range (must be 0.0-100.0)")]
+    PercentageOutOfRange {
+        /// The invalid percentage value
+        value: f64,
+    },
+
     /// Value is not in allowed set
     #[error("Value {value} is not in allowed set: {allowed:?}")]
     NotAllowed {
@@ -786,6 +877,103 @@ mod tests {
         assert!(matches!(
             result,
             Err(ParameterValidationError::InvalidFloatValue { .. })
+        ));
+    }
+
+    #[test]
+    fn test_parameter_id_validation() {
+        // Valid IDs
+        assert!(ProtocolParameter::validate_id("gossip.fanout").is_ok());
+        assert!(ProtocolParameter::validate_id("network.peer.timeout").is_ok());
+        assert!(ProtocolParameter::validate_id("a.b").is_ok());
+        assert!(ProtocolParameter::validate_id("a.b.c.d.e").is_ok());
+
+        // Invalid: no dot separator
+        let result = ProtocolParameter::validate_id("nodot");
+        assert!(matches!(
+            result,
+            Err(ParameterValidationError::InvalidParameterId { .. })
+        ));
+
+        // Invalid: empty string
+        let result = ProtocolParameter::validate_id("");
+        assert!(matches!(
+            result,
+            Err(ParameterValidationError::InvalidParameterId { .. })
+        ));
+
+        // Invalid: empty category
+        let result = ProtocolParameter::validate_id(".name");
+        assert!(matches!(
+            result,
+            Err(ParameterValidationError::InvalidParameterId { .. })
+        ));
+
+        // Invalid: empty name
+        let result = ProtocolParameter::validate_id("category.");
+        assert!(matches!(
+            result,
+            Err(ParameterValidationError::InvalidParameterId { .. })
+        ));
+
+        // Invalid: empty subcategory
+        let result = ProtocolParameter::validate_id("a..c");
+        assert!(matches!(
+            result,
+            Err(ParameterValidationError::InvalidParameterId { .. })
+        ));
+    }
+
+    #[test]
+    fn test_try_new_validates_id() {
+        // Valid ID should work
+        let result = ProtocolParameter::try_new(
+            "gossip.fanout",
+            "Fanout",
+            "Gossip fanout",
+            ParameterValue::Integer(8),
+        );
+        assert!(result.is_ok());
+
+        // Invalid ID should fail
+        let result = ProtocolParameter::try_new(
+            "invalid",
+            "Invalid",
+            "No dot separator",
+            ParameterValue::Integer(1),
+        );
+        assert!(matches!(
+            result,
+            Err(ParameterValidationError::InvalidParameterId { .. })
+        ));
+    }
+
+    #[test]
+    fn test_percentage_range_validation() {
+        let param = ProtocolParameter::new(
+            "test.pct",
+            "Percentage Test",
+            "Test parameter",
+            ParameterValue::Percentage(50.0),
+        );
+
+        // Valid percentages
+        assert!(param.validate(&ParameterValue::Percentage(0.0)).is_ok());
+        assert!(param.validate(&ParameterValue::Percentage(50.0)).is_ok());
+        assert!(param.validate(&ParameterValue::Percentage(100.0)).is_ok());
+
+        // Out of range: negative
+        let result = param.validate(&ParameterValue::Percentage(-1.0));
+        assert!(matches!(
+            result,
+            Err(ParameterValidationError::PercentageOutOfRange { .. })
+        ));
+
+        // Out of range: above 100
+        let result = param.validate(&ParameterValue::Percentage(101.0));
+        assert!(matches!(
+            result,
+            Err(ParameterValidationError::PercentageOutOfRange { .. })
         ));
     }
 
