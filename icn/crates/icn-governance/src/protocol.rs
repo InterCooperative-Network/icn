@@ -194,9 +194,10 @@ impl ProtocolParameter {
             }
         }
 
-        // Check allowed values
+        // Check allowed values (using approximate equality for floats)
         if let Some(ref allowed) = self.constraints.allowed_values {
-            if !allowed.contains(new_value) {
+            let is_allowed = allowed.iter().any(|a| new_value.approximately_eq(a));
+            if !is_allowed {
                 return Err(ParameterValidationError::NotAllowed {
                     value: new_value.clone(),
                     allowed: allowed.clone(),
@@ -323,14 +324,59 @@ impl ParameterValue {
     }
 }
 
+/// Epsilon for float comparisons.
+/// Uses a relative epsilon that scales with the magnitude of the values.
+const FLOAT_COMPARISON_EPSILON: f64 = 1e-9;
+
+impl ParameterValue {
+    /// Compare two floats with epsilon-based tolerance.
+    /// Returns true if the values are approximately equal.
+    fn floats_approximately_equal(a: f64, b: f64) -> bool {
+        if a == b {
+            return true; // Handles infinities and exact equality
+        }
+        let diff = (a - b).abs();
+        let max_abs = a.abs().max(b.abs());
+        // Use relative epsilon for large values, absolute epsilon for small values
+        diff <= FLOAT_COMPARISON_EPSILON.max(max_abs * FLOAT_COMPARISON_EPSILON)
+    }
+
+    /// Compare two floats with epsilon-based tolerance.
+    /// Returns Some(Ordering) based on approximate comparison.
+    fn float_partial_cmp(a: f64, b: f64) -> Option<std::cmp::Ordering> {
+        if Self::floats_approximately_equal(a, b) {
+            Some(std::cmp::Ordering::Equal)
+        } else {
+            a.partial_cmp(&b)
+        }
+    }
+
+    /// Check if this value is approximately equal to another (for float types).
+    /// For non-float types, uses exact equality.
+    pub fn approximately_eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (ParameterValue::Float(a), ParameterValue::Float(b)) => {
+                Self::floats_approximately_equal(*a, *b)
+            }
+            (ParameterValue::Percentage(a), ParameterValue::Percentage(b)) => {
+                Self::floats_approximately_equal(*a, *b)
+            }
+            // For non-float types, use exact equality
+            _ => self == other,
+        }
+    }
+}
+
 impl PartialOrd for ParameterValue {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         match (self, other) {
             (ParameterValue::Integer(a), ParameterValue::Integer(b)) => a.partial_cmp(b),
-            (ParameterValue::Float(a), ParameterValue::Float(b)) => a.partial_cmp(b),
+            (ParameterValue::Float(a), ParameterValue::Float(b)) => Self::float_partial_cmp(*a, *b),
             (ParameterValue::Duration(a), ParameterValue::Duration(b)) => a.partial_cmp(b),
             (ParameterValue::Bytes(a), ParameterValue::Bytes(b)) => a.partial_cmp(b),
-            (ParameterValue::Percentage(a), ParameterValue::Percentage(b)) => a.partial_cmp(b),
+            (ParameterValue::Percentage(a), ParameterValue::Percentage(b)) => {
+                Self::float_partial_cmp(*a, *b)
+            }
             (ParameterValue::String(a), ParameterValue::String(b)) => a.partial_cmp(b),
             // Boolean and cross-type comparisons are not ordered
             _ => None,
@@ -760,6 +806,55 @@ mod tests {
         assert!(ParameterValue::Integer(10) < ParameterValue::Integer(20));
         assert!(ParameterValue::Float(1.5) > ParameterValue::Float(1.0));
         assert!(ParameterValue::Duration(60) == ParameterValue::Duration(60));
+    }
+
+    #[test]
+    fn test_parameter_value_epsilon_comparison() {
+        // Test that nearly-equal floats are treated as equal
+        let a = ParameterValue::Float(50.0);
+        let b = ParameterValue::Float(50.0 + 1e-12); // Very small difference
+        assert!(a.approximately_eq(&b));
+        assert!(a <= b); // Should be equal, so <= is true
+        assert!(a >= b); // Should be equal, so >= is true
+
+        // Test that clearly different floats are not equal
+        let c = ParameterValue::Float(50.0);
+        let d = ParameterValue::Float(51.0);
+        assert!(!c.approximately_eq(&d));
+        assert!(c < d);
+
+        // Test percentages with epsilon
+        let p1 = ParameterValue::Percentage(66.666666666);
+        let p2 = ParameterValue::Percentage(66.666666667);
+        assert!(p1.approximately_eq(&p2));
+
+        // Test that integer comparison is exact (no epsilon)
+        let i1 = ParameterValue::Integer(100);
+        let i2 = ParameterValue::Integer(100);
+        let i3 = ParameterValue::Integer(101);
+        assert!(i1.approximately_eq(&i2));
+        assert!(!i1.approximately_eq(&i3));
+    }
+
+    #[test]
+    fn test_parameter_validation_with_float_epsilon() {
+        // Create a parameter with a float max of 50.0
+        let param = ProtocolParameter::new(
+            "test.float_bounded",
+            "Float Test",
+            "Test float validation",
+            ParameterValue::Float(25.0),
+        )
+        .with_max(ParameterValue::Float(50.0));
+
+        // Value exactly at max should pass
+        assert!(param.validate(&ParameterValue::Float(50.0)).is_ok());
+
+        // Value very slightly above max (within epsilon) should pass
+        assert!(param.validate(&ParameterValue::Float(50.0 + 1e-12)).is_ok());
+
+        // Value clearly above max should fail
+        assert!(param.validate(&ParameterValue::Float(50.1)).is_err());
     }
 
     #[test]

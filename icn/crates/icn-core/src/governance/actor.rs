@@ -337,6 +337,14 @@ impl icn_governance::GovernanceOps for GovernanceHandle {
                 );
             };
 
+            // Reject proposals with effective_at set (delayed execution not yet implemented)
+            if proposal.effective_at.is_some() {
+                bail!(
+                    "Cannot create ProtocolChange proposal: delayed execution (effective_at) is not yet implemented. \
+                     Remove effective_at to apply changes immediately upon approval."
+                );
+            }
+
             // Check if the parameter exists
             let param = store.get(&proposal.parameter_id)?.ok_or_else(|| {
                 anyhow::anyhow!(
@@ -353,6 +361,14 @@ impl icn_governance::GovernanceOps for GovernanceHandle {
                     e
                 )
             })?;
+
+            // Validate scope override is allowed if specified
+            if proposal.scope.is_some() && !param.constraints.allow_override {
+                bail!(
+                    "Cannot create ProtocolChange proposal: parameter '{}' does not allow scope overrides",
+                    proposal.parameter_id
+                );
+            }
         }
 
         // Generate a new proposal ID

@@ -18,13 +18,30 @@
 //!
 //! # Known Limitations
 //!
-//! - **Atomicity**: The `set()` operation performs read-modify-write without
-//!   transactions. Concurrent updates could interleave. A future enhancement
-//!   should use Sled transactions.
 //! - **Delete Performance**: The `delete()` method scans all scoped parameters
-//!   (O(n) complexity). For large parameter sets, consider a reverse index.
-//! - **History Growth**: Parameter history is unbounded. Consider adding a
-//!   cleanup mechanism for very old history entries.
+//!   (O(n) complexity). For large parameter sets, consider adding a reverse index
+//!   mapping `param_id:{id}` -> `[scoped_keys]`.
+//! - **History Growth**: Parameter history can grow unbounded. Use `prune_history()`
+//!   to limit history entries per parameter. For production deployments, consider
+//!   running `prune_history()` periodically (e.g., keep last 100 entries per parameter)
+//!   or implementing a background cleanup task.
+//!
+//! # History Pruning
+//!
+//! The `prune_history()` method removes old history entries beyond a specified limit:
+//!
+//! ```ignore
+//! // Keep only the last 100 history entries for a parameter
+//! store.prune_history("governance.min_quorum", 100)?;
+//! ```
+//!
+//! For automatic cleanup, consider adding a periodic task that prunes all parameters:
+//!
+//! ```ignore
+//! for param in store.list()? {
+//!     store.prune_history(&param.id, 100)?;
+//! }
+//! ```
 
 use crate::protocol::{
     ParameterChange, ParameterScope, ParameterValidationError, ParameterValue, ProtocolParameter,
@@ -437,17 +454,29 @@ impl ProtocolParameterStore for SledParameterStore {
         self.get(id)
     }
 
+    /// Set a protocol parameter value
+    ///
+    /// # Security Warning
+    ///
+    /// This is a privileged operation that directly modifies protocol parameters.
+    /// In production, this method should ONLY be called from:
+    /// - `handle_protocol_change()` after a governance proposal has been approved
+    /// - Initial parameter loading during daemon startup
+    ///
+    /// Callers are responsible for ensuring proper authorization before invoking this method.
     fn set(
         &self,
         param: ProtocolParameter,
         proposal_id: Option<String>,
         changed_by: Option<String>,
     ) -> Result<()> {
+        use sled::transaction::ConflictableTransactionError;
+
         let id = param.id.clone();
 
-        // Validate scope override permissions for non-global scopes
+        // Validate scope override permissions for non-global scopes (outside transaction for efficiency)
+        // This is safe because allow_override is immutable once set
         if !matches!(param.scope, ParameterScope::Global) {
-            // Check if the global parameter allows overrides
             if let Some(global_param) = self.get(&id)? {
                 if !global_param.constraints.allow_override {
                     return Err(anyhow::anyhow!(
@@ -457,52 +486,51 @@ impl ProtocolParameterStore for SledParameterStore {
             }
         }
 
-        // Get old value for history (before transaction)
-        let old_value = if matches!(param.scope, ParameterScope::Global) {
-            self.get(&id)?.map(|p| p.value)
-        } else {
-            let key = Self::scoped_param_key(&param.scope, &id);
-            self.db
-                .get(&key)?
-                .and_then(|bytes| Self::deserialize_param(&bytes).ok())
-                .map(|p| p.value)
-        };
-
-        // Prepare values for transaction
+        // Prepare the key for this parameter
         let param_key = if matches!(param.scope, ParameterScope::Global) {
             Self::param_key(&id)
         } else {
             Self::scoped_param_key(&param.scope, &id)
         };
+
+        // Prepare serialized new parameter value
         let param_value = Self::serialize(&param)?;
 
-        // Prepare history record if we had an old value
-        let history_entry = if let Some(old) = old_value {
-            let now = icn_time::current_timestamp_secs();
-            let nonce = self.db.generate_id()?;
-            let change = ParameterChange {
-                parameter_id: id.clone(),
-                old_value: old,
-                new_value: param.value,
-                changed_at: now,
-                proposal_id,
-                changed_by,
-            };
-            let history_key = Self::history_key(&id, now, nonce);
-            let history_value = Self::serialize(&change)?;
-            Some((history_key, history_value))
-        } else {
-            None
-        };
+        // Generate a unique nonce for history key (must be done before transaction)
+        let nonce = self.db.generate_id()?;
+        let now = icn_time::current_timestamp_secs();
 
-        // Use transaction for atomicity
+        // Clone values needed inside the transaction closure
+        let id_clone = id.clone();
+        let new_value = param.value.clone();
+
+        // Use transaction to atomically read old value and write new value + history
         self.db
             .transaction(|tx| {
-                // Store the parameter
+                // Read old value INSIDE the transaction for atomicity
+                let old_value = tx
+                    .get(&param_key)?
+                    .and_then(|bytes| Self::deserialize_param(&bytes).ok().map(|p| p.value));
+
+                // Store the new parameter
                 tx.insert(param_key.as_slice(), param_value.as_slice())?;
 
                 // Record history if we had an old value
-                if let Some((ref history_key, ref history_value)) = history_entry {
+                if let Some(old) = old_value {
+                    let change = ParameterChange {
+                        parameter_id: id_clone.clone(),
+                        old_value: old,
+                        new_value: new_value.clone(),
+                        changed_at: now,
+                        proposal_id: proposal_id.clone(),
+                        changed_by: changed_by.clone(),
+                    };
+                    let history_key = Self::history_key(&id_clone, now, nonce);
+                    let history_value = Self::serialize(&change).map_err(|e| {
+                        ConflictableTransactionError::Abort(anyhow::anyhow!(
+                            "Failed to serialize history: {e}"
+                        ))
+                    })?;
                     tx.insert(history_key.as_slice(), history_value.as_slice())?;
                 }
 

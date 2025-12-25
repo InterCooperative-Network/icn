@@ -272,18 +272,24 @@ impl EntityRegistry for SledEntityRegistry {
     }
 
     fn delete(&mut self, id: &EntityId) -> Result<()> {
-        // Check if entity has members
+        // Get entity to know its type for index cleanup
+        let entity = self
+            .get(id)?
+            .ok_or_else(|| EntityError::NotFound(id.as_str().to_string()))?;
+
+        // Check member count before transaction
+        // Note: There's a potential race condition where a concurrent add_membership
+        // could add a member after this check but before the delete. However:
+        // 1. add_membership verifies the parent entity exists inside its transaction
+        // 2. This is a rare edge case in practice
+        // 3. The deletion will still be atomic; the orphaned membership index will
+        //    point to a deleted entity and can be cleaned up by a consistency check
         let member_count = self.member_count(id)?;
         if member_count > 0 {
             return Err(EntityError::RegistryError(
                 "Cannot delete entity with active members".into(),
             ));
         }
-
-        // Get entity to know its type for index cleanup
-        let entity = self
-            .get(id)?
-            .ok_or_else(|| EntityError::NotFound(id.as_str().to_string()))?;
 
         // Get all memberships of this entity (for cleanup)
         let memberships = self.get_memberships_of(id)?;
@@ -304,10 +310,10 @@ impl EntityRegistry for SledEntityRegistry {
             })
             .collect();
 
-        // Use transaction for atomicity
+        // Use transaction for atomicity of the delete operations
         self.db
             .transaction(|tx| {
-                // Verify entity still exists
+                // Verify entity still exists (prevents double-delete)
                 if tx.get(&entity_key)?.is_none() {
                     return Err(ConflictableTransactionError::Abort(EntityError::NotFound(
                         entity_id_str.clone(),
@@ -320,7 +326,7 @@ impl EntityRegistry for SledEntityRegistry {
                 // Remove type index
                 tx.remove(type_key.as_slice())?;
 
-                // Remove all memberships and their indexes
+                // Remove all memberships and their indexes (entity's memberships in other orgs)
                 for (membership_key, member_of_key) in &membership_keys {
                     tx.remove(membership_key.as_slice())?;
                     tx.remove(member_of_key.as_slice())?;
@@ -504,25 +510,34 @@ impl EntityRegistry for SledEntityRegistry {
 
     fn update_membership(&mut self, membership: Membership) -> Result<()> {
         let key = Self::membership_key(&membership.parent_id, &membership.member_id);
-
-        // Check if membership exists
-        if !self
-            .db
-            .contains_key(&key)
-            .map_err(|e| EntityError::RegistryError(format!("DB error: {e}")))?
-        {
-            return Err(EntityError::MembershipError("Membership not found".into()));
-        }
-
-        // Store updated membership
         let value = Self::serialize_membership(&membership)?;
+        let member_id_display = membership.member_id.to_string();
+        let parent_id_display = membership.parent_id.to_string();
+
+        // Use transaction to atomically verify existence and update
         self.db
-            .insert(&key, value)
-            .map_err(|e| EntityError::RegistryError(format!("Failed to update membership: {e}")))?;
+            .transaction(|tx| {
+                // Check if membership exists inside transaction
+                if tx.get(&key)?.is_none() {
+                    return Err(ConflictableTransactionError::Abort(
+                        EntityError::MembershipError("Membership not found".into()),
+                    ));
+                }
+
+                // Store updated membership
+                tx.insert(key.as_slice(), value.as_slice())?;
+                Ok(())
+            })
+            .map_err(|e| match e {
+                sled::transaction::TransactionError::Abort(err) => err,
+                sled::transaction::TransactionError::Storage(e) => {
+                    EntityError::RegistryError(format!("Transaction storage error: {e}"))
+                }
+            })?;
 
         debug!(
-            member_id = %membership.member_id,
-            parent_id = %membership.parent_id,
+            member_id = %member_id_display,
+            parent_id = %parent_id_display,
             "Membership updated"
         );
         Ok(())

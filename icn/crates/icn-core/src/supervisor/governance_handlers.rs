@@ -2387,8 +2387,21 @@ impl GovernanceEventHandler {
                 param.updated_at = icn_time::current_timestamp_secs();
                 param.updated_by = Some(proposal_id_str.clone());
 
-                // Update the scope if specified in the proposal
+                // Update the scope if specified in the proposal (with validation)
                 if let Some(scope) = proposal.scope {
+                    // Defense-in-depth: verify scope override is allowed
+                    // (should have been validated at proposal creation)
+                    if !param.constraints.allow_override
+                        && !matches!(scope, icn_governance::ParameterScope::Global)
+                    {
+                        let error_msg = format!(
+                            "Parameter '{}' does not allow scope overrides",
+                            proposal.parameter_id
+                        );
+                        warn!("{} (proposal {})", error_msg, proposal_id_str);
+                        self.emit_execution_failure(&proposal_id, "protocol_change", &error_msg);
+                        return;
+                    }
                     param.scope = scope;
                 }
 
