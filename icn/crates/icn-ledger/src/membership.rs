@@ -3,6 +3,23 @@
 //! This module provides infrastructure for tracking when members joined,
 //! enabling new member credit limit ramping. New members start with conservative
 //! limits that increase over time based on tenure and contribution history.
+//!
+//! # Architecture Note
+//!
+//! The `member_since` timestamp is the primary data used for credit limit ramping.
+//! Contribution tracking methods (`get_total_contributed`, `add_contribution`) are
+//! provided for future use but are NOT currently used in credit limit calculation.
+//! The ledger uses its own `cleared_volume_index` for the history bonus component.
+//!
+//! # Concurrency
+//!
+//! The storage operations use a check-then-write pattern which is not fully atomic.
+//! For `set_member_since`, concurrent registration of the same member may result in
+//! a slightly different timestamp, but the first write wins semantically since we
+//! only write if the key doesn't exist. This is acceptable because:
+//! - Concurrent first transactions for the same DID are rare
+//! - The worst case is a timestamp difference of milliseconds
+//! - The ramping period is 90 days, so small timestamp differences are negligible
 
 use anyhow::Result;
 use icn_identity::Did;
@@ -46,10 +63,14 @@ pub trait MembershipStore: Send + Sync {
 
     /// Get total amount contributed by a member (credits received)
     ///
-    /// This is used to allow high contributors to skip the ramping period.
+    /// **Note:** This method is currently unused. Credit limit calculation uses
+    /// the ledger's `cleared_volume_index` instead. This method is retained for
+    /// potential future use cases (e.g., member reputation, contribution badges).
     fn get_total_contributed(&self, did: &Did) -> Result<i64>;
 
     /// Add to a member's contribution total
+    ///
+    /// **Note:** This method is currently unused. See `get_total_contributed` docs.
     fn add_contribution(&self, did: &Did, amount: i64) -> Result<()>;
 }
 

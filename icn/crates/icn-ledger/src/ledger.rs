@@ -475,29 +475,25 @@ impl Ledger {
             });
 
             // Update cleared volume index (track total credits received)
+            // Note: This index is used for credit limit calculation (history bonus).
+            // Contribution tracking in MembershipStore is NOT used for credit limits.
             if let Some(credit) = delta.credit {
                 let key = (delta.account_id.clone(), delta.currency.clone());
                 *self.cleared_volume_index.entry(key).or_insert(0) += credit;
-
-                // Track contribution for new member ramping
-                if let Some(ref membership_store) = self.membership_store {
-                    if let Err(e) = membership_store.add_contribution(&delta.account_id, credit) {
-                        warn!(
-                            account = %delta.account_id,
-                            credit = credit,
-                            error = %e,
-                            "Failed to update member contribution tracking"
-                        );
-                    }
-                }
             }
+        }
 
-            // Register member on first transaction (for new member ramping)
-            if let Some(ref membership_store) = self.membership_store {
-                if let Err(e) = membership_store.register_if_new(&delta.account_id, entry.timestamp)
-                {
+        // Register members who appear in this entry (for new member ramping).
+        // Done once per unique DID after the delta loop for efficiency.
+        if let Some(ref membership_store) = self.membership_store {
+            // Collect unique DIDs to avoid repeated storage calls
+            let unique_dids: std::collections::HashSet<_> =
+                entry.accounts.iter().map(|d| &d.account_id).collect();
+
+            for did in unique_dids {
+                if let Err(e) = membership_store.register_if_new(did, entry.timestamp) {
                     warn!(
-                        account = %delta.account_id,
+                        account = %did,
                         timestamp = entry.timestamp,
                         error = %e,
                         "Failed to register new member"
@@ -2095,27 +2091,46 @@ impl Ledger {
                 // Apply new member ramping only if membership store is configured
                 // Without membership store, use full calculated limit (backward compatible)
                 let calculated_limit = if let Some(ref membership_store) = self.membership_store {
-                    // Get current time for ramping calculations
-                    let current_time = SystemTime::now()
-                        .duration_since(SystemTime::UNIX_EPOCH)
-                        .map(|d| d.as_secs())
-                        .unwrap_or(0);
+                    // Use entry timestamp for consistency with member registration.
+                    // This prevents manipulation via old entry timestamps.
+                    let current_time = entry.timestamp;
 
-                    // Get member_since from store (or current_time if new member)
-                    let member_since = membership_store
-                        .get_member_since(account)
-                        .ok()
-                        .flatten()
-                        .unwrap_or(current_time);
-
-                    // Apply new member ramping
-                    policy_manager.new_member_policy.calculate_effective_limit(
-                        account,
-                        member_since,
-                        current_time,
-                        cleared_volume,
-                        full_limit,
-                    )
+                    // Get member_since from store, with proper error handling.
+                    // On storage error, fall back to full_limit (permissive) rather than
+                    // treating established members as new (which would reduce their limit).
+                    match membership_store.get_member_since(account) {
+                        Ok(Some(member_since)) => {
+                            // Apply new member ramping
+                            policy_manager.new_member_policy.calculate_effective_limit(
+                                account,
+                                member_since,
+                                current_time,
+                                cleared_volume,
+                                full_limit,
+                            )
+                        }
+                        Ok(None) => {
+                            // New member - use entry timestamp as join date
+                            policy_manager.new_member_policy.calculate_effective_limit(
+                                account,
+                                current_time, // member_since = now (new member)
+                                current_time,
+                                cleared_volume,
+                                full_limit,
+                            )
+                        }
+                        Err(e) => {
+                            // Storage error - log and use full limit (permissive fallback)
+                            // This prevents established members from being penalized
+                            // due to transient storage issues.
+                            warn!(
+                                account = %account,
+                                error = ?e,
+                                "Failed to read member_since; using full credit limit"
+                            );
+                            full_limit
+                        }
+                    }
                 } else {
                     // No membership store = no ramping (backward compatible)
                     full_limit

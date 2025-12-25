@@ -7,8 +7,8 @@
 use anyhow::Result;
 use icn_identity::KeyPair;
 use icn_ledger::{
-    entry::JournalEntryBuilder, CreditPolicy, CreditPolicyManager, Ledger, NewMemberPolicy,
-    SledMembershipStore,
+    entry::JournalEntryBuilder, CreditPolicy, CreditPolicyManager, Ledger, MembershipStore,
+    NewMemberPolicy, SledMembershipStore,
 };
 use icn_store::SledStore;
 use std::sync::Arc;
@@ -245,8 +245,9 @@ fn test_new_member_ramping_enforced() -> Result<()> {
     let store = Arc::new(SledStore::open(&ledger_path)?);
     let mut ledger = Ledger::new(store.clone())?;
 
-    // Set up membership store
+    // Set up membership store (keep reference for verification)
     let membership_store = Arc::new(SledMembershipStore::new(store));
+    let membership_store_ref = membership_store.clone();
     ledger.set_membership_store(membership_store);
 
     // Set up credit policy with conservative limits
@@ -318,7 +319,27 @@ fn test_new_member_ramping_enforced() -> Result<()> {
 
     // Test 4: Verify member-since was recorded
     // The membership store should have tracked when the new member first transacted
-    info!("✓ Member registration tracked automatically on first transaction");
+    {
+        let member_since = membership_store_ref.get_member_since(&new_member)?;
+        assert!(
+            member_since.is_some(),
+            "New member should be registered in membership store"
+        );
+        let timestamp = member_since.unwrap();
+        assert!(timestamp > 0, "Member-since timestamp should be valid");
+        info!(
+            "✓ Member registration verified: new_member registered at timestamp {}",
+            timestamp
+        );
+
+        // Also verify the established member was registered (they receive credits)
+        let established_since = membership_store_ref.get_member_since(&established)?;
+        assert!(
+            established_since.is_some(),
+            "Established member should also be registered"
+        );
+        info!("✓ Both transaction participants registered automatically");
+    }
 
     info!("✅ New member ramping enforcement test passed");
     info!("  New members are correctly limited to initial 10 hour credit limit");
