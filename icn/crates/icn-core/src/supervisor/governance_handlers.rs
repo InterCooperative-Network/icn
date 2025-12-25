@@ -2437,6 +2437,11 @@ impl GovernanceEventHandler {
                     // Re-validate entity existence at execution time (CRITICAL #3)
                     // Entity may have been deleted between proposal creation and execution.
                     // This prevents orphaned scoped parameters.
+                    //
+                    // Note: A narrow TOCTOU window exists between this check and parameter
+                    // persistence below. In practice, entity deletion is governed and
+                    // rate-limited, making this race extremely rare. Orphaned scoped
+                    // parameters can be cleaned up via periodic parameter audit if needed.
                     if let Some(entity_id) = scope.entity_id() {
                         let entity_id_str = entity_id.as_str();
                         match self.gov_handle.entity_exists(entity_id_str) {
