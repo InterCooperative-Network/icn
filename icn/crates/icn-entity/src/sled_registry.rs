@@ -127,6 +127,56 @@ impl SledEntityRegistry {
         format!("member_of:{}:", member_id.as_str()).into_bytes()
     }
 
+    /// Key for storing member count (for atomic checking in transactions)
+    ///
+    /// This count is maintained atomically with membership add/remove operations
+    /// to enable race-free member count checks inside transactions.
+    fn member_count_key(parent_id: &EntityId) -> Vec<u8> {
+        format!("member_count:{}", parent_id.as_str()).into_bytes()
+    }
+
+    /// Get member count from the count key (for use inside transactions)
+    fn get_member_count_from_key(
+        tx: &sled::transaction::TransactionalTree,
+        parent_id: &EntityId,
+    ) -> std::result::Result<u64, sled::transaction::UnabortableTransactionError> {
+        let key = Self::member_count_key(parent_id);
+        match tx.get(&key)? {
+            Some(bytes) => {
+                let count = u64::from_le_bytes(bytes.as_ref().try_into().unwrap_or([0u8; 8]));
+                Ok(count)
+            }
+            None => Ok(0),
+        }
+    }
+
+    /// Increment member count atomically inside a transaction
+    fn increment_member_count(
+        tx: &sled::transaction::TransactionalTree,
+        parent_id: &EntityId,
+    ) -> std::result::Result<(), sled::transaction::UnabortableTransactionError> {
+        let key = Self::member_count_key(parent_id);
+        let current = Self::get_member_count_from_key(tx, parent_id)?;
+        tx.insert(key.as_slice(), &(current + 1).to_le_bytes())?;
+        Ok(())
+    }
+
+    /// Decrement member count atomically inside a transaction
+    fn decrement_member_count(
+        tx: &sled::transaction::TransactionalTree,
+        parent_id: &EntityId,
+    ) -> std::result::Result<(), sled::transaction::UnabortableTransactionError> {
+        let key = Self::member_count_key(parent_id);
+        let current = Self::get_member_count_from_key(tx, parent_id)?;
+        if current > 0 {
+            tx.insert(key.as_slice(), &(current - 1).to_le_bytes())?;
+        } else {
+            // Remove the key if count reaches 0
+            tx.remove(key.as_slice())?;
+        }
+        Ok(())
+    }
+
     // ========================================
     // Serialization helpers
     // ========================================
@@ -297,37 +347,22 @@ impl EntityRegistry for SledEntityRegistry {
         // Get all memberships of this entity (for cleanup of entity's memberships in other orgs)
         let memberships = self.get_memberships_of(id)?;
 
-        // Check member count before transaction
-        //
-        // Race condition mitigation:
-        // While this check is outside the transaction, safety is ensured by:
-        // 1. add_membership() verifies parent entity exists INSIDE its transaction
-        // 2. If delete runs first (entity removed), add_membership fails (parent not found)
-        // 3. If add_membership runs first (member added), this check catches it
-        //
-        // The narrow race window where both could succeed is mitigated by:
-        // - add_membership's entity existence check inside its transaction
-        // - This external check before we start the delete transaction
-        let member_count = self.member_count(id)?;
-        if member_count > 0 {
-            return Err(EntityError::RegistryError(
-                "Cannot delete entity with active members".into(),
-            ));
-        }
-
         // Prepare keys for deletion
         let entity_key = Self::entity_key(id);
         let type_key = Self::type_index_key(entity.entity_type, id);
+        let member_count_key = Self::member_count_key(id);
         let entity_id_str = id.as_str().to_string();
         let entity_id_display = id.to_string();
+        let id_clone = id.clone();
 
-        // Collect membership keys for atomic deletion (entity's memberships in other orgs)
-        let membership_keys: Vec<(Vec<u8>, Vec<u8>)> = memberships
+        // Collect membership keys and parent IDs for atomic deletion
+        // (entity's memberships in other orgs - need to decrement parent counts)
+        let membership_data: Vec<(Vec<u8>, Vec<u8>, EntityId)> = memberships
             .iter()
             .map(|m| {
                 let membership_key = Self::membership_key(&m.parent_id, &m.member_id);
                 let member_of_key = Self::member_of_index_key(&m.member_id, &m.parent_id);
-                (membership_key, member_of_key)
+                (membership_key, member_of_key, m.parent_id.clone())
             })
             .collect();
 
@@ -341,16 +376,34 @@ impl EntityRegistry for SledEntityRegistry {
                     )));
                 }
 
+                // CRITICAL: Check member count INSIDE the transaction
+                // This prevents the race condition where add_membership could add a member
+                // between a pre-check and this transaction.
+                let count = Self::get_member_count_from_key(tx, &id_clone)?;
+                if count > 0 {
+                    return Err(ConflictableTransactionError::Abort(
+                        EntityError::RegistryError(format!(
+                            "Cannot delete entity with {count} active member(s)"
+                        )),
+                    ));
+                }
+
                 // Remove entity
                 tx.remove(entity_key.as_slice())?;
 
                 // Remove type index
                 tx.remove(type_key.as_slice())?;
 
+                // Remove member count key (cleanup)
+                tx.remove(member_count_key.as_slice())?;
+
                 // Remove all memberships and their indexes (entity's memberships in other orgs)
-                for (membership_key, member_of_key) in &membership_keys {
+                // Also decrement the member counts for parent entities
+                for (membership_key, member_of_key, parent_id) in &membership_data {
                     tx.remove(membership_key.as_slice())?;
                     tx.remove(member_of_key.as_slice())?;
+                    // Decrement the parent's member count
+                    Self::decrement_member_count(tx, parent_id)?;
                 }
 
                 Ok(())
@@ -530,6 +583,7 @@ impl EntityRegistry for SledEntityRegistry {
         let membership_value = Self::serialize_membership(&membership)?;
         let member_id_display = membership.member_id.to_string();
         let parent_id_display = membership.parent_id.to_string();
+        let parent_id = membership.parent_id.clone();
 
         // Use transaction for atomicity
         self.db
@@ -557,6 +611,10 @@ impl EntityRegistry for SledEntityRegistry {
 
                 // Add member_of index for reverse lookup
                 tx.insert(member_of_key.as_slice(), &[] as &[u8])?;
+
+                // Atomically increment member count for the parent entity
+                // This enables race-free member count checks in delete()
+                Self::increment_member_count(tx, &parent_id)?;
 
                 Ok(())
             })
@@ -658,6 +716,7 @@ impl EntityRegistry for SledEntityRegistry {
         let member_of_key = Self::member_of_index_key(member_id, parent_id);
         let member_id_display = member_id.to_string();
         let parent_id_display = parent_id.to_string();
+        let parent_id_clone = parent_id.clone();
 
         // Use transaction for atomicity
         self.db
@@ -674,6 +733,9 @@ impl EntityRegistry for SledEntityRegistry {
 
                 // Remove member_of index
                 tx.remove(member_of_key.as_slice())?;
+
+                // Atomically decrement member count for the parent entity
+                Self::decrement_member_count(tx, &parent_id_clone)?;
 
                 Ok(())
             })

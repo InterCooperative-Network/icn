@@ -23,6 +23,9 @@
 //! - **Set**: O(1) with reverse index maintenance
 //! - **Delete**: O(k) where k is the number of scoped overrides for that parameter
 //!   (uses reverse index for direct lookup instead of O(n) scan)
+//! - **History Pagination**: O(h) where h is history count for that parameter.
+//!   All entries are loaded and sorted before pagination is applied. This is
+//!   acceptable because history is bounded by `MAX_HISTORY_ENTRIES_PER_PARAM`.
 //!
 //! # Automatic History Pruning
 //!
@@ -240,6 +243,16 @@ pub trait ProtocolParameterStore: Send + Sync {
     ///
     /// # Returns
     /// Tuple of (entries, total_count)
+    ///
+    /// # Performance Note
+    ///
+    /// Current implementation is O(n) where n is total history entries for the parameter.
+    /// All entries are loaded, sorted, and then paginated. This is acceptable because:
+    /// - Per-parameter history is bounded by `MAX_HISTORY_ENTRIES_PER_PARAM` (100)
+    /// - Auto-pruning on each `set()` prevents unbounded growth
+    ///
+    /// For parameters with high change frequency across many scopes, consider using
+    /// `prune_history()` to reduce history size before pagination.
     fn get_history_paginated(
         &self,
         id: &str,
@@ -250,6 +263,14 @@ pub trait ProtocolParameterStore: Send + Sync {
     /// Prune old history entries, keeping only the last `max_entries` per parameter
     ///
     /// Returns the number of entries removed.
+    ///
+    /// # Arguments
+    /// - `id`: Parameter ID whose history to prune
+    /// - `max_entries`: Minimum entries to keep (must be >= 1 to prevent accidental
+    ///   complete deletion; use `delete()` to remove a parameter entirely)
+    ///
+    /// # Errors
+    /// Returns an error if `max_entries` is 0 to prevent accidental data loss.
     fn prune_history(&self, id: &str, max_entries: usize) -> Result<usize>;
 
     /// Delete a parameter (for testing/admin only)
@@ -522,6 +543,14 @@ impl ProtocolParameterStore for InMemoryParameterStore {
     }
 
     fn prune_history(&self, id: &str, max_entries: usize) -> Result<usize> {
+        // Prevent accidental deletion of all history
+        if max_entries == 0 {
+            return Err(anyhow::anyhow!(
+                "max_entries must be >= 1 to prevent accidental data loss. \
+                 Use delete() to remove a parameter entirely."
+            ));
+        }
+
         let mut history = self
             .history
             .write()
@@ -555,6 +584,18 @@ impl ProtocolParameterStore for InMemoryParameterStore {
             .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
 
         if let Some(scope_keys) = index.remove(id) {
+            // Warn if deleting a parameter with active scoped overrides
+            // This helps operators avoid accidentally removing cooperative customizations
+            if !scope_keys.is_empty() {
+                warn!(
+                    parameter_id = %id,
+                    scoped_overrides = scope_keys.len(),
+                    "Deleting parameter with active scoped overrides. \
+                     This will remove customizations for {} cooperative(s)/federation(s).",
+                    scope_keys.len()
+                );
+            }
+
             let mut scoped = self
                 .scoped_params
                 .write()
@@ -737,7 +778,7 @@ impl ProtocolParameterStore for SledParameterStore {
     /// Callers are responsible for ensuring proper authorization before invoking this method.
     fn set(
         &self,
-        mut param: ProtocolParameter,
+        param: ProtocolParameter,
         proposal_id: Option<String>,
         changed_by: Option<String>,
     ) -> Result<()> {
@@ -752,14 +793,19 @@ impl ProtocolParameterStore for SledParameterStore {
         // For updates, validate against the STORED parameter's constraints (not the new one's)
         // This prevents constraint bypass attacks where an attacker submits a parameter
         // with modified constraints that allow any value
-        if let Some(stored_param) = self.get(&id)? {
+        //
+        // NOTE: Validation and scope checks are done outside the transaction for efficiency.
+        // These are safe because:
+        // - Constraints are immutable once a parameter is created
+        // - allow_override is immutable once set
+        // The version check IS done inside the transaction to prevent lost updates.
+        let global_param = self.get(&id)?;
+        if let Some(ref stored_param) = global_param {
             stored_param
                 .validate(&param.value)
                 .map_err(|e| anyhow::anyhow!("Parameter validation failed for '{id}': {e}"))?;
 
             // Validate scope override permissions for non-global scopes
-            // This check is outside the transaction for efficiency, which is safe because
-            // allow_override is immutable once set
             if !matches!(param.scope, ParameterScope::Global)
                 && !stored_param.constraints.allow_override
             {
@@ -767,26 +813,11 @@ impl ProtocolParameterStore for SledParameterStore {
                     "Parameter '{id}' does not allow scope overrides"
                 ));
             }
-
-            // Pre-check version before transaction (will be verified atomically inside)
-            if provided_version != stored_param.version {
-                return Err(anyhow::anyhow!(
-                    "Concurrent modification detected for parameter '{id}': \
-                     expected version {}, found {}. Please retry.",
-                    provided_version,
-                    stored_param.version
-                ));
-            }
-
-            // Increment version for the update
-            param.version = stored_param.version + 1;
         } else {
             // For new parameters (initial setup), validate against the parameter's own constraints
             param
                 .validate(&param.value)
                 .map_err(|e| anyhow::anyhow!("Parameter validation failed for '{id}': {e}"))?;
-            // New parameter starts at version 0
-            param.version = 0;
         }
 
         // Prepare the key for this parameter
@@ -797,9 +828,6 @@ impl ProtocolParameterStore for SledParameterStore {
             Self::param_key(&id)
         };
 
-        // Prepare serialized new parameter value
-        let param_value = Self::serialize(&param)?;
-
         // Generate a unique nonce for history key (must be done before transaction)
         let nonce = self.db.generate_id()?;
         let now = icn_time::current_timestamp_secs();
@@ -807,6 +835,11 @@ impl ProtocolParameterStore for SledParameterStore {
         // Clone values needed inside the transaction closure
         let id_clone = id.clone();
         let new_value = param.value.clone();
+        let new_constraints = param.constraints.clone();
+        let new_scope = param.scope.clone();
+        let new_name = param.name.clone();
+        let new_description = param.description.clone();
+        let new_updated_by = param.updated_by.clone();
 
         // For scoped parameters, prepare reverse index update
         let (index_key, updated_index) = if is_scoped {
@@ -831,13 +864,64 @@ impl ProtocolParameterStore for SledParameterStore {
             (None, None)
         };
 
-        // Use transaction to atomically read old value and write new value + history + index
+        // Track whether this is an update to a GLOBAL parameter (for detecting deletion race)
+        // For scoped parameters, we don't need this check because a non-existent scoped key
+        // simply means we're creating a new scoped override
+        let is_global_update = !is_scoped && global_param.is_some();
+
+        // Use transaction to atomically verify version, update parameter, and record history
         self.db
             .transaction(|tx| {
-                // Read old value INSIDE the transaction for atomicity
-                let old_value = tx
-                    .get(&param_key)?
-                    .and_then(|bytes| Self::deserialize_param(&bytes).ok().map(|p| p.value));
+                // Read stored parameter INSIDE the transaction for atomic version check
+                let stored_bytes = tx.get(&param_key)?;
+                let (old_value, new_version) = if let Some(bytes) = stored_bytes {
+                    let stored = Self::deserialize_param(&bytes).map_err(|e| {
+                        ConflictableTransactionError::Abort(anyhow::anyhow!(
+                            "Failed to deserialize stored parameter: {e}"
+                        ))
+                    })?;
+
+                    // CRITICAL: Verify version INSIDE the transaction
+                    // This prevents the lost update race condition
+                    if provided_version != stored.version {
+                        return Err(ConflictableTransactionError::Abort(anyhow::anyhow!(
+                            "Concurrent modification detected for parameter '{}': \
+                             expected version {}, found {}. Please retry.",
+                            id_clone,
+                            provided_version,
+                            stored.version
+                        )));
+                    }
+
+                    (Some(stored.value), stored.version + 1)
+                } else if is_global_update {
+                    // Global parameter was deleted between our check and the transaction
+                    return Err(ConflictableTransactionError::Abort(anyhow::anyhow!(
+                        "Parameter '{id_clone}' was deleted. Please retry."
+                    )));
+                } else {
+                    // New parameter (global or scoped override) starts at version 0
+                    (None, 0)
+                };
+
+                // Build the parameter with the correct version (computed inside transaction)
+                let final_param = ProtocolParameter {
+                    id: id_clone.clone(),
+                    name: new_name.clone(),
+                    description: new_description.clone(),
+                    value: new_value.clone(),
+                    constraints: new_constraints.clone(),
+                    scope: new_scope.clone(),
+                    updated_at: now,
+                    updated_by: new_updated_by.clone(),
+                    version: new_version,
+                };
+
+                let param_value = Self::serialize(&final_param).map_err(|e| {
+                    ConflictableTransactionError::Abort(anyhow::anyhow!(
+                        "Failed to serialize parameter: {e}"
+                    ))
+                })?;
 
                 // Store the new parameter
                 tx.insert(param_key.as_slice(), param_value.as_slice())?;
@@ -963,6 +1047,14 @@ impl ProtocolParameterStore for SledParameterStore {
     }
 
     fn prune_history(&self, id: &str, max_entries: usize) -> Result<usize> {
+        // Prevent accidental deletion of all history
+        if max_entries == 0 {
+            return Err(anyhow::anyhow!(
+                "max_entries must be >= 1 to prevent accidental data loss. \
+                 Use delete() to remove a parameter entirely."
+            ));
+        }
+
         let prefix = Self::history_prefix(id);
         let mut entries: Vec<(sled::IVec, u64)> = Vec::new();
 
@@ -996,19 +1088,31 @@ impl ProtocolParameterStore for SledParameterStore {
         let index_key = Self::param_index_key(id);
 
         // Use reverse index for O(1) lookup of scoped keys (instead of O(n) scan)
-        let scoped_keys: Vec<Vec<u8>> = self
+        let (scoped_keys, scope_count): (Vec<Vec<u8>>, usize) = self
             .db
             .get(&index_key)?
             .and_then(|bytes| {
                 let scope_strs: Vec<String> = serde_json::from_slice(&bytes).ok()?;
-                Some(
-                    scope_strs
-                        .into_iter()
-                        .map(|scope_str| format!("param_scope:{scope_str}:{id}").into_bytes())
-                        .collect(),
-                )
+                let count = scope_strs.len();
+                let keys = scope_strs
+                    .into_iter()
+                    .map(|scope_str| format!("param_scope:{scope_str}:{id}").into_bytes())
+                    .collect();
+                Some((keys, count))
             })
             .unwrap_or_default();
+
+        // Warn if deleting a parameter with active scoped overrides
+        // This helps operators avoid accidentally removing cooperative customizations
+        if scope_count > 0 {
+            warn!(
+                parameter_id = %id,
+                scoped_overrides = scope_count,
+                "Deleting parameter with active scoped overrides. \
+                 This will remove customizations for {} cooperative(s)/federation(s).",
+                scope_count
+            );
+        }
 
         // Collect history keys (still O(h) where h is history count, but history is per-parameter)
         let history_prefix = Self::history_prefix(id);
@@ -1537,6 +1641,34 @@ mod tests {
         // Verify only 5 remain
         let history = store.get_history("test.prune").unwrap();
         assert_eq!(history.len(), 5);
+    }
+
+    #[test]
+    fn test_prune_history_zero_entries_rejected_inmemory() {
+        let store = InMemoryParameterStore::new();
+        store.set(test_param("test.prune", 1), None, None).unwrap();
+
+        // Trying to prune to 0 entries should fail to prevent accidental data loss
+        let result = store.prune_history("test.prune", 0);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("max_entries must be >= 1"));
+    }
+
+    #[test]
+    fn test_prune_history_zero_entries_rejected_sled() {
+        let store = SledParameterStore::temporary().unwrap();
+        store.set(test_param("test.prune", 1), None, None).unwrap();
+
+        // Trying to prune to 0 entries should fail to prevent accidental data loss
+        let result = store.prune_history("test.prune", 0);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("max_entries must be >= 1"));
     }
 
     // ========================================

@@ -1138,6 +1138,68 @@ mod tests {
     }
 
     #[test]
+    fn test_parameter_value_json_roundtrip_precision() {
+        // Test that float values remain comparable after JSON serialization
+        // This is critical because JSON can introduce floating point precision issues
+
+        // Test typical percentage values
+        let original = ParameterValue::Percentage(66.67);
+        let json = serde_json::to_string(&original).unwrap();
+        let roundtripped: ParameterValue = serde_json::from_str(&json).unwrap();
+        assert!(
+            original.approximately_eq(&roundtripped),
+            "Percentage 66.67 should be equal after JSON roundtrip"
+        );
+
+        // Test edge case: supermajority threshold
+        let supermajority = ParameterValue::Percentage(66.666666666666667);
+        let json = serde_json::to_string(&supermajority).unwrap();
+        let roundtripped: ParameterValue = serde_json::from_str(&json).unwrap();
+        assert!(
+            supermajority.approximately_eq(&roundtripped),
+            "Supermajority threshold should be equal after JSON roundtrip"
+        );
+
+        // Test Float type
+        let float_val = ParameterValue::Float(3.141592653589793);
+        let json = serde_json::to_string(&float_val).unwrap();
+        let roundtripped: ParameterValue = serde_json::from_str(&json).unwrap();
+        assert!(
+            float_val.approximately_eq(&roundtripped),
+            "Float should be equal after JSON roundtrip"
+        );
+
+        // Test that validation still works after roundtrip
+        let param = ProtocolParameter::new(
+            "test.pct",
+            "Percentage Test",
+            "Test parameter",
+            ParameterValue::Percentage(50.0),
+        )
+        .with_min(ParameterValue::Percentage(0.0))
+        .with_max(ParameterValue::Percentage(100.0));
+
+        // Serialize parameter, deserialize, and validate a value
+        let param_json = serde_json::to_string(&param).unwrap();
+        let param_roundtripped: ProtocolParameter = serde_json::from_str(&param_json).unwrap();
+
+        // Value at 66.67 should validate against both original and roundtripped constraints
+        let test_val = ParameterValue::Percentage(66.67);
+        assert!(param.validate(&test_val).is_ok());
+        assert!(param_roundtripped.validate(&test_val).is_ok());
+
+        // Constraint comparison after roundtrip should work
+        if let Some(max) = &param.constraints.max {
+            if let Some(max_rt) = &param_roundtripped.constraints.max {
+                assert!(
+                    max.approximately_eq(max_rt),
+                    "Max constraint should be equal after JSON roundtrip"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn test_scope_specificity() {
         let global = ParameterScope::Global;
         let fed = ParameterScope::Federation {
