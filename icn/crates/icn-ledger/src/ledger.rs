@@ -491,13 +491,22 @@ impl Ledger {
                 entry.accounts.iter().map(|d| &d.account_id).collect();
 
             for did in unique_dids {
-                if let Err(e) = membership_store.register_if_new(did, entry.timestamp) {
-                    warn!(
-                        account = %did,
-                        timestamp = entry.timestamp,
-                        error = %e,
-                        "Failed to register new member"
-                    );
+                match membership_store.register_if_new(did, entry.timestamp) {
+                    Ok(registered_at) if registered_at == entry.timestamp => {
+                        // This was a new member registration
+                        icn_obs::metrics::ledger::new_members_registered_inc();
+                    }
+                    Ok(_) => {
+                        // Existing member, no action needed
+                    }
+                    Err(e) => {
+                        warn!(
+                            account = %did,
+                            timestamp = entry.timestamp,
+                            error = %e,
+                            "Failed to register new member"
+                        );
+                    }
                 }
             }
         }
@@ -2101,6 +2110,11 @@ impl Ledger {
                 // Apply new member ramping only if membership store is configured
                 // Without membership store, use full calculated limit (backward compatible)
                 let calculated_limit = if let Some(ref membership_store) = self.membership_store {
+                    // Track when members bypass ramping via cleared volume threshold
+                    if cleared_volume >= policy_manager.new_member_policy.cleared_volume_threshold {
+                        icn_obs::metrics::ledger::credit_limit_bypass_via_contribution_inc();
+                    }
+
                     // Get member_since from store, with proper error handling.
                     // On storage error, fall back to full_limit (permissive) rather than
                     // treating established members as new (which would reduce their limit).

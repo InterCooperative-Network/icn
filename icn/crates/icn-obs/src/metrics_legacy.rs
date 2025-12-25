@@ -2039,6 +2039,18 @@ pub mod ledger {
         counter!("icn_ledger_membership_storage_errors_total").increment(1);
     }
 
+    /// Increment counter when a new member is registered (first transaction).
+    /// Useful for tracking member onboarding trends.
+    pub fn new_members_registered_inc() {
+        counter!("icn_ledger_new_members_registered_total").increment(1);
+    }
+
+    /// Increment counter when a member bypasses ramping via cleared volume threshold.
+    /// Tracks how many members earn full limits through contribution vs time.
+    pub fn credit_limit_bypass_via_contribution_inc() {
+        counter!("icn_ledger_credit_limit_bypass_contribution_total").increment(1);
+    }
+
     /// Increment counter when balance recomputation is aborted due to version mismatch (M7 fix)
     pub fn recompute_aborted_version_mismatch_inc() {
         counter!("icn_ledger_recompute_aborted_version_mismatch_total").increment(1);
