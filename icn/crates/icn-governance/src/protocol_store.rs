@@ -7,6 +7,7 @@
 //!
 //! - `param:{id}` -> ProtocolParameter (JSON)
 //! - `param_scope:{scope}:{id}` -> ProtocolParameter (JSON) for scoped overrides
+//! - `param_idx:{id}` -> JSON array of scoped key strings (reverse index for O(1) delete)
 //! - `history:{id}:{timestamp}` -> ParameterChange (JSON)
 //!
 //! # Scope Resolution
@@ -16,11 +17,15 @@
 //! 2. Federation scope
 //! 3. Global scope (default)
 //!
+//! # Performance Characteristics
+//!
+//! - **Get**: O(1) for global, O(1) for scoped lookup
+//! - **Set**: O(1) with reverse index maintenance
+//! - **Delete**: O(k) where k is the number of scoped overrides for that parameter
+//!   (uses reverse index for direct lookup instead of O(n) scan)
+//!
 //! # Known Limitations
 //!
-//! - **Delete Performance**: The `delete()` method scans all scoped parameters
-//!   (O(n) complexity). For large parameter sets, consider adding a reverse index
-//!   mapping `param_id:{id}` -> `[scoped_keys]`.
 //! - **History Growth**: Parameter history can grow unbounded. Use `prune_history()`
 //!   to limit history entries per parameter. For production deployments, consider
 //!   running `prune_history()` periodically (e.g., keep last 100 entries per parameter)
@@ -125,6 +130,8 @@ pub struct InMemoryParameterStore {
     params: Arc<RwLock<HashMap<String, ProtocolParameter>>>,
     /// Scoped parameters: (scope_key, id) -> ProtocolParameter
     scoped_params: Arc<RwLock<HashMap<(String, String), ProtocolParameter>>>,
+    /// Reverse index: parameter_id -> Vec<scope_key> for O(1) delete
+    scoped_index: Arc<RwLock<HashMap<String, Vec<String>>>>,
     /// History: id -> Vec<ParameterChange>
     history: Arc<RwLock<HashMap<String, Vec<ParameterChange>>>>,
 }
@@ -226,11 +233,22 @@ impl ProtocolParameterStore for InMemoryParameterStore {
                 .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
             params.insert(id.clone(), param.clone());
         } else {
+            // Store scoped parameter
             let mut scoped = self
                 .scoped_params
                 .write()
                 .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-            scoped.insert((scope_key, id.clone()), param.clone());
+            scoped.insert((scope_key.clone(), id.clone()), param.clone());
+
+            // Update reverse index for O(1) delete
+            let mut index = self
+                .scoped_index
+                .write()
+                .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+            let scopes = index.entry(id.clone()).or_default();
+            if !scopes.contains(&scope_key) {
+                scopes.push(scope_key);
+            }
         }
 
         // Record history if we had an old value
@@ -302,18 +320,28 @@ impl ProtocolParameterStore for InMemoryParameterStore {
     }
 
     fn delete(&self, id: &str) -> Result<()> {
+        // Remove global parameter
         let mut params = self
             .params
             .write()
             .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
         params.remove(id);
 
-        // Also remove scoped versions
-        let mut scoped = self
-            .scoped_params
+        // Use reverse index for O(1) lookup of scoped keys to remove
+        let mut index = self
+            .scoped_index
             .write()
             .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
-        scoped.retain(|(_, param_id), _| param_id != id);
+
+        if let Some(scope_keys) = index.remove(id) {
+            let mut scoped = self
+                .scoped_params
+                .write()
+                .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+            for scope_key in scope_keys {
+                scoped.remove(&(scope_key, id.to_string()));
+            }
+        }
 
         Ok(())
     }
@@ -403,6 +431,20 @@ impl SledParameterStore {
         format!("history:{id}:").into_bytes()
     }
 
+    /// Reverse index key: maps parameter ID to list of scoped keys
+    fn param_index_key(id: &str) -> Vec<u8> {
+        format!("param_idx:{id}").into_bytes()
+    }
+
+    /// Get the scope string for a scoped parameter key (for reverse index)
+    fn scope_str(scope: &ParameterScope) -> String {
+        match scope {
+            ParameterScope::Global => "global".to_string(),
+            ParameterScope::Federation { id: eid } => format!("fed:{}", eid.as_str()),
+            ParameterScope::Cooperative { id: eid } => format!("coop:{}", eid.as_str()),
+        }
+    }
+
     // Serialization using JSON for flexibility with tagged enums
     fn serialize<T: serde::Serialize>(value: &T) -> Result<Vec<u8>> {
         serde_json::to_vec(value).map_err(|e| anyhow::anyhow!("Serialization failed: {e}"))
@@ -487,10 +529,11 @@ impl ProtocolParameterStore for SledParameterStore {
         }
 
         // Prepare the key for this parameter
-        let param_key = if matches!(param.scope, ParameterScope::Global) {
-            Self::param_key(&id)
-        } else {
+        let is_scoped = !matches!(param.scope, ParameterScope::Global);
+        let param_key = if is_scoped {
             Self::scoped_param_key(&param.scope, &id)
+        } else {
+            Self::param_key(&id)
         };
 
         // Prepare serialized new parameter value
@@ -504,7 +547,30 @@ impl ProtocolParameterStore for SledParameterStore {
         let id_clone = id.clone();
         let new_value = param.value.clone();
 
-        // Use transaction to atomically read old value and write new value + history
+        // For scoped parameters, prepare reverse index update
+        let (index_key, updated_index) = if is_scoped {
+            let scope_str = Self::scope_str(&param.scope);
+            let index_key = Self::param_index_key(&id);
+
+            // Read current reverse index
+            let mut scoped_keys: Vec<String> = self
+                .db
+                .get(&index_key)?
+                .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+                .unwrap_or_default();
+
+            // Add new scope key if not already present
+            if !scoped_keys.contains(&scope_str) {
+                scoped_keys.push(scope_str);
+            }
+
+            let updated_index = Self::serialize(&scoped_keys)?;
+            (Some(index_key), Some(updated_index))
+        } else {
+            (None, None)
+        };
+
+        // Use transaction to atomically read old value and write new value + history + index
         self.db
             .transaction(|tx| {
                 // Read old value INSIDE the transaction for atomicity
@@ -514,6 +580,11 @@ impl ProtocolParameterStore for SledParameterStore {
 
                 // Store the new parameter
                 tx.insert(param_key.as_slice(), param_value.as_slice())?;
+
+                // Update reverse index for scoped parameters
+                if let (Some(ref ikey), Some(ref ivalue)) = (&index_key, &updated_index) {
+                    tx.insert(ikey.as_slice(), ivalue.as_slice())?;
+                }
 
                 // Record history if we had an old value
                 if let Some(old) = old_value {
@@ -616,24 +687,24 @@ impl ProtocolParameterStore for SledParameterStore {
     fn delete(&self, id: &str) -> Result<()> {
         // Collect all keys to delete before transaction
         let global_key = Self::param_key(id);
+        let index_key = Self::param_index_key(id);
 
-        // Collect scoped parameter keys
-        let scoped_prefix = b"param_scope:";
+        // Use reverse index for O(1) lookup of scoped keys (instead of O(n) scan)
         let scoped_keys: Vec<Vec<u8>> = self
             .db
-            .scan_prefix(scoped_prefix)
-            .filter_map(|item| {
-                let (key, _) = item.ok()?;
-                let key_str = String::from_utf8_lossy(&key);
-                if key_str.ends_with(&format!(":{id}")) {
-                    Some(key.to_vec())
-                } else {
-                    None
-                }
+            .get(&index_key)?
+            .and_then(|bytes| {
+                let scope_strs: Vec<String> = serde_json::from_slice(&bytes).ok()?;
+                Some(
+                    scope_strs
+                        .into_iter()
+                        .map(|scope_str| format!("param_scope:{scope_str}:{id}").into_bytes())
+                        .collect(),
+                )
             })
-            .collect();
+            .unwrap_or_default();
 
-        // Collect history keys
+        // Collect history keys (still O(h) where h is history count, but history is per-parameter)
         let history_prefix = Self::history_prefix(id);
         let history_keys: Vec<Vec<u8>> = self
             .db
@@ -649,10 +720,13 @@ impl ProtocolParameterStore for SledParameterStore {
                 // Delete global parameter
                 tx.remove(global_key.as_slice())?;
 
-                // Delete scoped parameters
+                // Delete scoped parameters (using reverse index for direct access)
                 for key in &scoped_keys {
                     tx.remove(key.as_slice())?;
                 }
+
+                // Delete reverse index
+                tx.remove(index_key.as_slice())?;
 
                 // Delete history
                 for key in &history_keys {
@@ -1147,5 +1221,136 @@ mod tests {
         // Verify only 5 remain
         let history = store.get_history("test.prune").unwrap();
         assert_eq!(history.len(), 5);
+    }
+
+    #[test]
+    fn test_sled_delete_with_scoped_overrides() {
+        let store = SledParameterStore::temporary().unwrap();
+
+        let coop_id = EntityId::cooperative("test-coop").unwrap();
+        let fed_id = EntityId::federation("test-fed").unwrap();
+
+        // Set global parameter with allow_override = true
+        store
+            .set(
+                test_param_with_override("test.scoped_delete", 10, true),
+                None,
+                None,
+            )
+            .unwrap();
+
+        // Set federation override
+        let fed_param = ProtocolParameter::new(
+            "test.scoped_delete",
+            "Scoped",
+            "Scoped param",
+            ParameterValue::Integer(20),
+        )
+        .with_scope(ParameterScope::Federation { id: fed_id.clone() });
+        store.set(fed_param, None, None).unwrap();
+
+        // Set cooperative override
+        let coop_param = ProtocolParameter::new(
+            "test.scoped_delete",
+            "Scoped",
+            "Scoped param",
+            ParameterValue::Integer(30),
+        )
+        .with_scope(ParameterScope::Cooperative {
+            id: coop_id.clone(),
+        });
+        store.set(coop_param, None, None).unwrap();
+
+        // Verify all scopes are set
+        assert!(store.exists("test.scoped_delete").unwrap());
+        let global = store
+            .get_effective("test.scoped_delete", None, None)
+            .unwrap()
+            .unwrap();
+        assert_eq!(global.value, ParameterValue::Integer(10));
+        let fed = store
+            .get_effective("test.scoped_delete", None, Some(&fed_id))
+            .unwrap()
+            .unwrap();
+        assert_eq!(fed.value, ParameterValue::Integer(20));
+        let coop = store
+            .get_effective("test.scoped_delete", Some(&coop_id), Some(&fed_id))
+            .unwrap()
+            .unwrap();
+        assert_eq!(coop.value, ParameterValue::Integer(30));
+
+        // Delete the parameter (should delete global + all scoped via reverse index)
+        store.delete("test.scoped_delete").unwrap();
+
+        // Verify all are deleted
+        assert!(!store.exists("test.scoped_delete").unwrap());
+        assert!(store
+            .get_effective("test.scoped_delete", None, None)
+            .unwrap()
+            .is_none());
+        assert!(store
+            .get_effective("test.scoped_delete", None, Some(&fed_id))
+            .unwrap()
+            .is_none());
+        assert!(store
+            .get_effective("test.scoped_delete", Some(&coop_id), Some(&fed_id))
+            .unwrap()
+            .is_none());
+    }
+
+    #[test]
+    fn test_inmemory_delete_with_scoped_overrides() {
+        let store = InMemoryParameterStore::new();
+
+        let coop_id = EntityId::cooperative("test-coop").unwrap();
+        let fed_id = EntityId::federation("test-fed").unwrap();
+
+        // Set global parameter with allow_override = true
+        store
+            .set(
+                test_param_with_override("test.scoped_delete", 10, true),
+                None,
+                None,
+            )
+            .unwrap();
+
+        // Set federation and cooperative overrides
+        let fed_param = ProtocolParameter::new(
+            "test.scoped_delete",
+            "Scoped",
+            "Scoped param",
+            ParameterValue::Integer(20),
+        )
+        .with_scope(ParameterScope::Federation { id: fed_id.clone() });
+        store.set(fed_param, None, None).unwrap();
+
+        let coop_param = ProtocolParameter::new(
+            "test.scoped_delete",
+            "Scoped",
+            "Scoped param",
+            ParameterValue::Integer(30),
+        )
+        .with_scope(ParameterScope::Cooperative {
+            id: coop_id.clone(),
+        });
+        store.set(coop_param, None, None).unwrap();
+
+        // Delete using reverse index
+        store.delete("test.scoped_delete").unwrap();
+
+        // Verify all are deleted
+        assert!(!store.exists("test.scoped_delete").unwrap());
+        assert!(store
+            .get_effective("test.scoped_delete", None, None)
+            .unwrap()
+            .is_none());
+        assert!(store
+            .get_effective("test.scoped_delete", None, Some(&fed_id))
+            .unwrap()
+            .is_none());
+        assert!(store
+            .get_effective("test.scoped_delete", Some(&coop_id), Some(&fed_id))
+            .unwrap()
+            .is_none());
     }
 }

@@ -102,6 +102,32 @@ impl GovernanceEventHandler {
         }
     }
 
+    /// Emit a protocol parameter changed event for audit logging
+    fn emit_parameter_changed(
+        &self,
+        parameter_id: &str,
+        old_value: &str,
+        new_value: &str,
+        proposal_id: Option<String>,
+        changed_by: Option<String>,
+    ) {
+        if let Some(ref bus) = self.event_bus {
+            let bus = bus.clone();
+            let event = crate::events::SystemEvent::ProtocolParameterChanged {
+                parameter_id: parameter_id.to_string(),
+                old_value: old_value.to_string(),
+                new_value: new_value.to_string(),
+                proposal_id,
+                changed_by,
+                changed_at: icn_time::current_timestamp_secs(),
+            };
+            // Spawn async emit in the background (fire-and-forget)
+            tokio::spawn(async move {
+                bus.emit(event).await;
+            });
+        }
+    }
+
     /// Handle a proposal accepted event
     pub fn handle_proposal_accepted(
         &self,
@@ -2371,6 +2397,9 @@ impl GovernanceEventHandler {
         let proposal_id_str = proposal_id.0.clone();
         match param_result {
             Ok(Some(mut param)) => {
+                // Capture old value for audit event (serialize to string for logging)
+                let old_value_str = format!("{:?}", param.value);
+
                 // Validate the new value against parameter constraints
                 if let Err(e) = param.validate(&proposal.new_value) {
                     let error_msg = format!(
@@ -2405,6 +2434,9 @@ impl GovernanceEventHandler {
                     param.scope = scope;
                 }
 
+                // Serialize new value for audit event
+                let new_value_str = format!("{:?}", proposal.new_value);
+
                 // Persist the updated parameter
                 if let Err(e) = self.gov_handle.set_protocol_parameter(
                     param,
@@ -2421,6 +2453,15 @@ impl GovernanceEventHandler {
                     info!(
                         "✓ Protocol parameter {} updated to {:?}",
                         proposal.parameter_id, proposal.new_value
+                    );
+
+                    // Emit audit event for parameter change
+                    self.emit_parameter_changed(
+                        &proposal.parameter_id,
+                        &old_value_str,
+                        &new_value_str,
+                        Some(proposal_id_str.clone()),
+                        None, // changed_by is the proposal, not a specific user
                     );
                 }
             }

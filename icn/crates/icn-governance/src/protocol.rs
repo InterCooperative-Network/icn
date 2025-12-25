@@ -52,6 +52,20 @@ use icn_entity::EntityId;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
+/// Known parameter categories for validation.
+///
+/// These are the standard categories used in ICN protocol parameters.
+/// New categories can be added but should be added here for validation.
+pub const KNOWN_PARAMETER_CATEGORIES: &[&str] = &[
+    "gossip",
+    "network",
+    "ledger",
+    "governance",
+    "trust",
+    "ratelimit",
+    "compute",
+];
+
 // ============================================================================
 // ProtocolParameter
 // ============================================================================
@@ -132,6 +146,29 @@ impl ProtocolParameter {
                     },
                 });
             }
+        }
+
+        Ok(())
+    }
+
+    /// Validate that a parameter ID uses a known category.
+    ///
+    /// This performs format validation via `validate_id()` and additionally
+    /// checks that the category is one of the known categories.
+    ///
+    /// Known categories: gossip, network, ledger, governance, trust, ratelimit, compute
+    ///
+    /// Use this for stricter validation when you want to ensure parameters
+    /// use only standard categories.
+    pub fn validate_known_category(id: &str) -> Result<(), ParameterValidationError> {
+        Self::validate_id(id)?;
+
+        let category = id.split('.').next().unwrap_or("");
+        if !KNOWN_PARAMETER_CATEGORIES.contains(&category) {
+            return Err(ParameterValidationError::InvalidParameterId {
+                id: id.to_string(),
+                reason: "unknown category (must be one of: gossip, network, ledger, governance, trust, ratelimit, compute)",
+            });
         }
 
         Ok(())
@@ -686,10 +723,16 @@ impl ProtocolChangeProposal {
 // ============================================================================
 
 /// Errors that can occur when validating parameter values
+///
+/// These errors provide detailed information about validation failures,
+/// including the specific constraint that was violated and guidance for
+/// valid values.
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum ParameterValidationError {
     /// Value type doesn't match parameter type
-    #[error("Type mismatch: expected {expected}, got {got}")]
+    ///
+    /// Example: Setting an Integer parameter with a String value.
+    #[error("Type mismatch: expected {expected}, got {got}. Ensure the value type matches the parameter definition.")]
     TypeMismatch {
         /// Expected type
         expected: &'static str,
@@ -698,7 +741,9 @@ pub enum ParameterValidationError {
     },
 
     /// Value is below minimum
-    #[error("Value {value} is below minimum {min}")]
+    ///
+    /// Example: Setting `gossip.fanout` to 1 when minimum is 2.
+    #[error("Value {value} is below minimum {min}. Provide a value >= {min}.")]
     BelowMinimum {
         /// The value that was provided
         value: ParameterValue,
@@ -707,7 +752,9 @@ pub enum ParameterValidationError {
     },
 
     /// Value is above maximum
-    #[error("Value {value} is above maximum {max}")]
+    ///
+    /// Example: Setting `network.max_connections` to 10000 when maximum is 1000.
+    #[error("Value {value} is above maximum {max}. Provide a value <= {max}.")]
     AboveMaximum {
         /// The value that was provided
         value: ParameterValue,
@@ -716,7 +763,12 @@ pub enum ParameterValidationError {
     },
 
     /// Parameter ID format is invalid
-    #[error("Invalid parameter ID '{id}': {reason}")]
+    ///
+    /// Valid format: `category.name` or `category.subcategory.name`
+    /// Examples: "gossip.fanout", "network.peer.timeout"
+    #[error(
+        "Invalid parameter ID '{id}': {reason}. Use format: category.name (e.g., 'gossip.fanout')."
+    )]
     InvalidParameterId {
         /// The invalid ID
         id: String,
@@ -725,14 +777,18 @@ pub enum ParameterValidationError {
     },
 
     /// Percentage value is out of valid range (0.0-100.0)
-    #[error("Percentage {value} is out of range (must be 0.0-100.0)")]
+    ///
+    /// Percentages are represented as 0.0 to 100.0, not as decimals.
+    #[error("Percentage {value} is out of range (must be 0.0-100.0). Use 50.0 for 50%, not 0.5.")]
     PercentageOutOfRange {
         /// The invalid percentage value
         value: f64,
     },
 
     /// Value is not in allowed set
-    #[error("Value {value} is not in allowed set: {allowed:?}")]
+    ///
+    /// Some parameters only accept specific values from a predefined list.
+    #[error("Value {value} is not in allowed set. Valid values: {allowed:?}")]
     NotAllowed {
         /// The value that was provided
         value: ParameterValue,
@@ -741,7 +797,9 @@ pub enum ParameterValidationError {
     },
 
     /// Invalid floating-point value (NaN or Infinity)
-    #[error("Invalid float value {value}: {reason}")]
+    ///
+    /// Floating-point values must be finite numbers.
+    #[error("Invalid float value {value}: {reason}. Use a finite number.")]
     InvalidFloatValue {
         /// The invalid value
         value: f64,
@@ -750,11 +808,16 @@ pub enum ParameterValidationError {
     },
 
     /// Parameter not found
-    #[error("Parameter not found: {0}")]
+    ///
+    /// The parameter ID does not exist in the parameter store.
+    #[error("Parameter not found: '{0}'. Use list_parameters() to see available parameters.")]
     NotFound(String),
 
     /// Parameter cannot be modified at this scope
-    #[error("Parameter {parameter_id} cannot be overridden at scope {scope}")]
+    ///
+    /// Some parameters can only be set at Global scope and cannot be overridden
+    /// by Federations or Cooperatives.
+    #[error("Parameter '{parameter_id}' cannot be overridden at {scope} scope. Check constraints.allow_override.")]
     ScopeNotAllowed {
         /// The parameter ID
         parameter_id: String,
@@ -1121,5 +1184,34 @@ mod tests {
         // Cross-type accessors should return None
         assert_eq!(ParameterValue::Integer(42).as_string(), None);
         assert_eq!(ParameterValue::String("hello".into()).as_integer(), None);
+    }
+
+    #[test]
+    fn test_known_category_validation() {
+        // Known categories should pass
+        assert!(ProtocolParameter::validate_known_category("gossip.fanout").is_ok());
+        assert!(ProtocolParameter::validate_known_category("network.timeout").is_ok());
+        assert!(ProtocolParameter::validate_known_category("ledger.credit_limit").is_ok());
+        assert!(ProtocolParameter::validate_known_category("governance.quorum").is_ok());
+        assert!(ProtocolParameter::validate_known_category("trust.decay").is_ok());
+        assert!(ProtocolParameter::validate_known_category("ratelimit.max").is_ok());
+        assert!(ProtocolParameter::validate_known_category("compute.timeout").is_ok());
+
+        // Subcategories should work
+        assert!(ProtocolParameter::validate_known_category("gossip.anti_entropy.interval").is_ok());
+
+        // Unknown categories should fail
+        let result = ProtocolParameter::validate_known_category("custom.parameter");
+        assert!(matches!(
+            result,
+            Err(ParameterValidationError::InvalidParameterId { .. })
+        ));
+
+        // Invalid format should still fail
+        let result = ProtocolParameter::validate_known_category("nodot");
+        assert!(matches!(
+            result,
+            Err(ParameterValidationError::InvalidParameterId { .. })
+        ));
     }
 }

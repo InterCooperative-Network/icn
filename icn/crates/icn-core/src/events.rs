@@ -83,6 +83,22 @@ pub enum SystemEvent {
         /// Unix timestamp when the store was loaded
         loaded_at: u64,
     },
+
+    /// A protocol parameter was changed (for audit logging)
+    ProtocolParameterChanged {
+        /// Parameter ID that was changed
+        parameter_id: String,
+        /// Old value (serialized as string for logging)
+        old_value: String,
+        /// New value (serialized as string for logging)
+        new_value: String,
+        /// Proposal ID that authorized the change (if any)
+        proposal_id: Option<String>,
+        /// DID of the actor who made the change
+        changed_by: Option<String>,
+        /// Unix timestamp when the change occurred
+        changed_at: u64,
+    },
 }
 
 /// Callback function for event subscribers
@@ -177,6 +193,7 @@ impl EventBus {
             SystemEvent::ProposalExecutionFailed { .. } => "ProposalExecutionFailed",
             SystemEvent::ProtocolParametersInitialized { .. } => "ProtocolParametersInitialized",
             SystemEvent::ProtocolParametersLoaded { .. } => "ProtocolParametersLoaded",
+            SystemEvent::ProtocolParameterChanged { .. } => "ProtocolParameterChanged",
         };
 
         debug!(

@@ -372,6 +372,45 @@ impl EntityRegistry for SledEntityRegistry {
         Ok(ids)
     }
 
+    fn list_by_type_paginated(
+        &self,
+        entity_type: EntityType,
+        limit: usize,
+        offset: usize,
+    ) -> Result<Vec<EntityId>> {
+        let prefix = Self::type_index_prefix(entity_type);
+        let mut ids = Vec::new();
+        let mut skipped = 0;
+
+        for item in self.db.scan_prefix(&prefix) {
+            let (key, _) =
+                item.map_err(|e| EntityError::RegistryError(format!("Failed to scan: {e}")))?;
+
+            // Key format: type:{entity_type}:{id}
+            let key_str = String::from_utf8_lossy(&key);
+            if let Some(id_str) = key_str.strip_prefix(&format!("type:{entity_type}:")) {
+                if let Ok(id) = id_str.parse::<EntityId>() {
+                    if skipped < offset {
+                        skipped += 1;
+                        continue;
+                    }
+                    ids.push(id);
+                    if ids.len() >= limit {
+                        break;
+                    }
+                }
+            }
+        }
+
+        Ok(ids)
+    }
+
+    fn count_by_type(&self, entity_type: EntityType) -> Result<usize> {
+        let prefix = Self::type_index_prefix(entity_type);
+        let count = self.db.scan_prefix(&prefix).filter(|r| r.is_ok()).count();
+        Ok(count)
+    }
+
     fn list_children(&self, parent_id: &EntityId) -> Result<Vec<EntityId>> {
         let members = self.get_members(parent_id)?;
         let mut children = Vec::new();
@@ -380,6 +419,39 @@ impl EntityRegistry for SledEntityRegistry {
             if let Some(entity) = self.get(&membership.member_id)? {
                 if entity.id.is_organization() {
                     children.push(entity.id);
+                }
+            }
+        }
+
+        Ok(children)
+    }
+
+    fn list_children_paginated(
+        &self,
+        parent_id: &EntityId,
+        limit: usize,
+        offset: usize,
+    ) -> Result<Vec<EntityId>> {
+        // For efficiency, we use the membership prefix to iterate with skip/take
+        let prefix = Self::membership_prefix(parent_id);
+        let mut children = Vec::new();
+        let mut skipped = 0;
+
+        for item in self.db.scan_prefix(&prefix) {
+            let (_, value) =
+                item.map_err(|e| EntityError::RegistryError(format!("Failed to scan: {e}")))?;
+            let membership = Self::deserialize_membership(&value)?;
+
+            if let Some(entity) = self.get(&membership.member_id)? {
+                if entity.id.is_organization() {
+                    if skipped < offset {
+                        skipped += 1;
+                        continue;
+                    }
+                    children.push(entity.id);
+                    if children.len() >= limit {
+                        break;
+                    }
                 }
             }
         }
