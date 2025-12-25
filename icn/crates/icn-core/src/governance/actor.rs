@@ -1171,7 +1171,16 @@ impl GovernanceActor {
         Ok(votes.into_iter().map(|v| v.voter).collect())
     }
 
-    /// Maximum depth for transitive delegations
+    /// Maximum depth for transitive delegations (number of hops allowed)
+    ///
+    /// With MAX_DELEGATION_DEPTH=3, a delegation chain can have at most 3 hops:
+    /// A -> B -> C -> D (3 hops from A to D)
+    ///
+    /// Semantics:
+    /// - `create_delegation` checks `incoming_depth >= MAX_DELEGATION_DEPTH` (exclusive)
+    ///   So incoming_depth 0, 1, 2 allows creating the delegation
+    /// - `detect_cycle` uses `0..=MAX_DELEGATION_DEPTH` (4 iterations) to check
+    ///   delegator + delegate + up to 3 more hops for cycle detection
     const MAX_DELEGATION_DEPTH: usize = 3;
 
     /// Create a new delegation

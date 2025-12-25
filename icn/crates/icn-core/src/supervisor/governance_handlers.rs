@@ -2431,6 +2431,15 @@ impl GovernanceEventHandler {
                         self.emit_execution_failure(&proposal_id, "protocol_change", &error_msg);
                         return;
                     }
+
+                    // NOTE: Entity existence is validated at proposal creation but not re-validated
+                    // here because GovernanceEventHandler doesn't have entity registry access.
+                    // If entity is deleted between approval and execution, the scoped parameter
+                    // will still be created. This is acceptable because:
+                    // 1. Parameters are just configuration - harmless if entity is gone
+                    // 2. Cleanup of orphaned scoped params can be done via maintenance tasks
+                    // 3. Adding entity_registry would require significant refactoring
+                    // TODO: Consider adding entity existence check if orphaned params become an issue
                     param.scope = scope;
                 }
 

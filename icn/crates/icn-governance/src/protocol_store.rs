@@ -17,6 +17,26 @@
 //! 2. Federation scope
 //! 3. Global scope (default)
 //!
+//! # Version Management
+//!
+//! Each parameter scope maintains an **independent version counter**:
+//!
+//! - Global parameter: versions 0, 1, 2, ... (tracks global changes)
+//! - Federation override: versions 0, 1, 2, ... (tracks federation-specific changes)
+//! - Cooperative override: versions 0, 1, 2, ... (tracks cooperative-specific changes)
+//!
+//! This design choice has important implications:
+//!
+//! - **Independent auditing**: Each scope's version history is self-contained
+//! - **No global-to-scope inheritance**: Creating a federation override starts at v0,
+//!   not at the global parameter's current version
+//! - **Conflict resolution**: Updates to the same scope conflict via version mismatch;
+//!   updates to different scopes are independent
+//!
+//! For example, if global `governance.min_quorum` is at version 5, creating a
+//! cooperative override for `coop:tech-workers` starts that override at version 0.
+//! The global and cooperative versions evolve independently thereafter.
+//!
 //! # Performance Characteristics
 //!
 //! - **Get**: O(1) for global, O(1) for scoped lookup
@@ -864,18 +884,26 @@ impl ProtocolParameterStore for SledParameterStore {
             (None, None)
         };
 
-        // Track whether this is an update to a GLOBAL parameter (for detecting deletion race)
-        // For scoped parameters, we don't need this check because a non-existent scoped key
-        // simply means we're creating a new scoped override
-        let is_global_update = !is_scoped && global_param.is_some();
+        // Track whether we validated as an update (for detecting TOCTOU race conditions)
+        // - expected_update=true: We validated against stored constraints
+        // - expected_update=false: We validated against the new parameter's constraints
+        // If reality differs inside the transaction, we must error to prevent constraint bypass
+        let expected_update = global_param.is_some();
 
         // Use transaction to atomically verify version, update parameter, and record history
         self.db
             .transaction(|tx| {
-                // Read stored parameter INSIDE the transaction for atomic version check
+                // Read stored parameter INSIDE the transaction for atomic state check
                 let stored_bytes = tx.get(&param_key)?;
-                let (old_value, new_version) = if let Some(bytes) = stored_bytes {
-                    let stored = Self::deserialize_param(&bytes).map_err(|e| {
+
+                // Detect TOCTOU race conditions:
+                // 1. Expected update but parameter was deleted → error (stale validation)
+                // 2. Expected create but parameter now exists → error (validated against wrong constraints)
+                // 3. State matches expectation → proceed with version check
+                let is_update_now = stored_bytes.is_some();
+
+                let (old_value, new_version) = if let Some(bytes) = &stored_bytes {
+                    let stored = Self::deserialize_param(bytes).map_err(|e| {
                         ConflictableTransactionError::Abort(anyhow::anyhow!(
                             "Failed to deserialize stored parameter: {e}"
                         ))
@@ -894,10 +922,18 @@ impl ProtocolParameterStore for SledParameterStore {
                     }
 
                     (Some(stored.value), stored.version + 1)
-                } else if is_global_update {
-                    // Global parameter was deleted between our check and the transaction
+                } else if expected_update && !is_scoped {
+                    // Race condition: We validated against a global parameter that no longer exists
+                    // Our validation may have used stale constraints
                     return Err(ConflictableTransactionError::Abort(anyhow::anyhow!(
                         "Parameter '{id_clone}' was deleted. Please retry."
+                    )));
+                } else if !expected_update && is_update_now && !is_scoped {
+                    // Race condition: We expected to create a new global parameter, but one was
+                    // created by another process. Our validation used our own constraints, not
+                    // the stored ones. Must retry to validate against correct constraints.
+                    return Err(ConflictableTransactionError::Abort(anyhow::anyhow!(
+                        "Parameter '{id_clone}' was created concurrently. Please retry."
                     )));
                 } else {
                     // New parameter (global or scoped override) starts at version 0

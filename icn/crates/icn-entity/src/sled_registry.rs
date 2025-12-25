@@ -143,7 +143,20 @@ impl SledEntityRegistry {
         let key = Self::member_count_key(parent_id);
         match tx.get(&key)? {
             Some(bytes) => {
-                let count = u64::from_le_bytes(bytes.as_ref().try_into().unwrap_or([0u8; 8]));
+                // CRITICAL: Don't silently mask corruption - if bytes aren't exactly 8 bytes,
+                // the data is corrupted and we should error rather than return 0
+                let count = u64::from_le_bytes(bytes.as_ref().try_into().map_err(|_| {
+                    sled::transaction::UnabortableTransactionError::Storage(sled::Error::Io(
+                        std::io::Error::new(
+                            std::io::ErrorKind::InvalidData,
+                            format!(
+                                "Corrupted member count for {}: expected 8 bytes, got {}",
+                                parent_id,
+                                bytes.len()
+                            ),
+                        ),
+                    ))
+                })?);
                 Ok(count)
             }
             None => Ok(0),
