@@ -15,6 +15,10 @@ use std::sync::Arc;
 use tempfile::TempDir;
 use tracing::info;
 
+/// Test base timestamp: Jan 1, 2024 00:00:00 UTC
+/// Using realistic timestamps catches edge cases that small integers might miss.
+const TEST_BASE_TIME: u64 = 1704067200;
+
 #[test]
 fn test_credit_limit_enforcement_rejects_excessive_spending() -> Result<()> {
     let _ = tracing_subscriber::fmt()
@@ -370,9 +374,8 @@ fn test_credit_limit_ramping_timeline() -> Result<()> {
     let full_limit = 10_000; // 100 hours in centihours (ramp period = 90 days)
     let one_day_secs: u64 = 24 * 60 * 60;
 
-    // Use realistic timestamps (Jan 1, 2024 00:00:00 UTC)
-    // This ensures we test with values that could occur in production
-    let base_time: u64 = 1704067200;
+    // Use realistic timestamps to catch edge cases
+    let base_time = TEST_BASE_TIME;
     let member_since = base_time;
     let cleared_volume = 0_i64; // No contribution (won't bypass ramp)
 

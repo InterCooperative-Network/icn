@@ -1544,6 +1544,20 @@ pub fn init_descriptions() {
         "icn_dispute_resolution_time_seconds",
         "Time taken to resolve disputes in seconds"
     );
+
+    // Ledger membership metrics (PR #293: Member-since tracking)
+    describe_counter!(
+        "icn_ledger_membership_storage_errors_total",
+        "Total number of membership storage errors during credit limit validation"
+    );
+    describe_counter!(
+        "icn_ledger_new_members_registered_total",
+        "Total number of new members registered on first transaction"
+    );
+    describe_counter!(
+        "icn_ledger_credit_limit_bypass_contribution_total",
+        "Total members bypassing credit limit ramping via contribution threshold"
+    );
 }
 
 /// Network metrics
