@@ -30,7 +30,9 @@ use crate::notification_processor::{NotificationProcessor, ProcessorConfig};
 use crate::notification_queue::NotificationQueue;
 use crate::notification_triggers::{GovernanceNotificationTrigger, LedgerNotificationTrigger};
 use crate::notifications::NotificationService;
-use crate::rate_limit::{IpRateLimiter, RateLimitConfig, RateLimiter};
+use crate::rate_limit::{
+    IpRateLimiter, RateLimitConfig, RateLimiter, VelocityLimitConfig, VelocityLimiter,
+};
 use crate::security::{configure_cors, SecurityConfig, SecurityHeaders};
 use crate::treasury_mgr::{GatewayTreasuryManager, LedgerHandle, TreasuryHandle};
 use crate::trust_mgr::{TrustGraphHandle, TrustManager};
@@ -391,6 +393,11 @@ impl GatewayServer {
         // Create IP-based rate limiter for auth endpoints (more aggressive limits)
         let ip_rate_limiter = Arc::new(IpRateLimiter::new_for_auth());
 
+        // Create trust-gated velocity limiter for transaction rate limiting
+        // Limits: Isolated=10, Known=50, Partner=100, Federated=200 tx/hour
+        let velocity_limiter = Arc::new(VelocityLimiter::new(VelocityLimitConfig::default()));
+        info!("Velocity limiter initialized (trust-gated: 10-200 tx/hour by trust class)");
+
         // Create persistent notification store
         let notification_store = Arc::new(crate::notifications::NotificationStore::new(db.clone()));
         info!("Persistent notification store initialized");
@@ -454,6 +461,7 @@ impl GatewayServer {
             let auth_manager_clone = auth_manager.clone();
             let rate_limiter_clone = rate_limiter.clone();
             let ip_rate_limiter_clone = ip_rate_limiter.clone();
+            let velocity_limiter_clone = velocity_limiter.clone();
             let event_broadcaster_clone = event_broadcaster.clone();
             let coop_manager_clone = coop_manager.clone();
             let mut shutdown_signal = shutdown_tx.subscribe();
@@ -480,6 +488,12 @@ impl GatewayServer {
                             let removed = ip_rate_limiter_clone.cleanup_inactive_buckets(Duration::from_secs(600));
                             if removed > 0 {
                                 info!("Cleaned up {} inactive IP rate limiter buckets", removed);
+                            }
+
+                            // Clean up expired velocity limiter windows (2 hour expiry for 1 hour windows)
+                            let removed = velocity_limiter_clone.cleanup_inactive(Duration::from_secs(7200));
+                            if removed > 0 {
+                                info!("Cleaned up {} expired velocity limiter windows", removed);
                             }
 
                             // Clean up dead WebSocket channels for all cooperatives
@@ -560,6 +574,7 @@ impl GatewayServer {
                 .app_data(web::Data::new(budget_store.clone()))
                 .app_data(web::Data::new(rate_limiter.clone()))
                 .app_data(web::Data::new(ip_rate_limiter.clone()))
+                .app_data(web::Data::new(velocity_limiter.clone()))
                 // Contract registry (optional - for contract management API)
                 .app_data(web::Data::new(contract_registry.clone()))
                 // JSON payload size limit (256KB - we're not handling file uploads)

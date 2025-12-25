@@ -189,8 +189,7 @@ fn test_protocol_change_proposal_validation() -> Result<()> {
             .unwrap_err()
             .to_string()
             .contains("validation failed"),
-        "Error should mention validation: {:?}",
-        result
+        "Error should mention validation: {result:?}"
     );
 
     info!("✓ Invalid update (5000 > max 1000) correctly rejected");
@@ -245,8 +244,7 @@ fn test_protocol_change_proposal_history() -> Result<()> {
         assert_eq!(
             change.proposal_id,
             Some(format!("proposal-{}", i + 1)),
-            "History entry {} should have correct proposal ID",
-            i
+            "History entry {i} should have correct proposal ID"
         );
     }
 

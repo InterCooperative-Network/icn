@@ -9,7 +9,9 @@ use tracing::info;
 
 use icn_gossip::GossipActor;
 use icn_identity::Did;
-use icn_ledger::{DisputeManager, Ledger, TreasuryManager};
+use icn_ledger::{
+    CreditPolicy, CreditPolicyManager, DisputeManager, Ledger, NewMemberPolicy, TreasuryManager,
+};
 use icn_security::MisbehaviorDetector;
 use icn_store::SledStore;
 use icn_trust::TrustGraph;
@@ -65,6 +67,20 @@ pub async fn init_ledger_services(
     ledger.set_gossip(deps.gossip_handle.clone());
     ledger.set_misbehavior_detector(deps.misbehavior_detector.clone());
     ledger.set_trust_graph(deps.trust_graph.clone());
+
+    // Initialize credit policy for server-side credit limit enforcement
+    // Dynamic limits: baseline + trust bonus + history bonus
+    // Note: Using "hours" as the default currency unit for cooperatives
+    let credit_policy = CreditPolicy::conservative("hours".to_string());
+
+    // New member protection: conservative initial limits with ramp-up
+    let new_member_policy = NewMemberPolicy::conservative("hours".to_string());
+
+    let credit_manager = CreditPolicyManager::new(credit_policy, new_member_policy);
+    ledger.set_credit_policy_manager(credit_manager);
+
+    info!("Credit policy manager initialized with conservative policy for 'hours' currency");
+
     let ledger_handle = Arc::new(RwLock::new(ledger));
 
     info!("Ledger initialized at {}", store_path.display());
