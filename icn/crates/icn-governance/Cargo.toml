@@ -5,18 +5,14 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 
-[features]
-default = []
-governance_sled = ["sled"]
-
 [dependencies]
-sled = { version = "0.34", optional = true }
+sled.workspace = true
 anyhow.workspace = true
 async-trait = "0.1"
 serde = { workspace = true, features = ["derive"] }
 serde_json = "1.0"
-icn-identity = { path = "../icn-identity" }
 icn-entity = { path = "../icn-entity" }
+icn-identity = { path = "../icn-identity" }
 icn-trust = { path = "../icn-trust" }
 icn-time.workspace = true
 thiserror.workspace = true
@@ -29,6 +25,7 @@ tracing.workspace = true
 
 [dev-dependencies]
 icn-store = { path = "../icn-store" }
+tempfile = "3"
 
 [lints]
 workspace = true

@@ -18,8 +18,11 @@ anyhow.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 tokio.workspace = true
+sled.workspace = true
+bincode.workspace = true
 
 [dev-dependencies]
+tempfile = "3"
 
 [lints]
 workspace = true

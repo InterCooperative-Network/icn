@@ -29,6 +29,9 @@ pub type DisputeManagerHandle = Arc<RwLock<DisputeManager>>;
 /// Type alias for the treasury manager handle
 pub type TreasuryManagerHandle = Arc<RwLock<TreasuryManager>>;
 
+/// Type alias for the event bus
+pub type EventBus = Arc<crate::events::EventBus>;
+
 /// Handler for governance proposal events
 ///
 /// Encapsulates all dependencies needed to execute governance proposals,
@@ -49,6 +52,8 @@ pub struct GovernanceEventHandler {
     treasury_manager: TreasuryManagerHandle,
     /// Treasury DID for budget payouts
     treasury_did: Did,
+    /// Event bus for emitting system events
+    event_bus: Option<EventBus>,
 }
 
 impl GovernanceEventHandler {
@@ -70,6 +75,58 @@ impl GovernanceEventHandler {
             dispute_manager,
             treasury_manager,
             treasury_did,
+            event_bus: None,
+        }
+    }
+
+    /// Set the event bus for error reporting
+    pub fn with_event_bus(mut self, event_bus: EventBus) -> Self {
+        self.event_bus = Some(event_bus);
+        self
+    }
+
+    /// Emit a proposal execution failure event
+    fn emit_execution_failure(&self, proposal_id: &ProposalId, proposal_type: &str, error: &str) {
+        if let Some(ref bus) = self.event_bus {
+            let bus = bus.clone();
+            let event = crate::events::SystemEvent::ProposalExecutionFailed {
+                proposal_id: proposal_id.clone(),
+                proposal_type: proposal_type.to_string(),
+                error: error.to_string(),
+                failed_at: icn_time::current_timestamp_secs(),
+            };
+            // Spawn async emit in the background
+            // Note: EventBus::emit() is infallible (broadcasts to all subscribers)
+            tokio::spawn(async move {
+                bus.emit(event).await;
+            });
+        }
+    }
+
+    /// Emit a protocol parameter changed event for audit logging
+    fn emit_parameter_changed(
+        &self,
+        parameter_id: &str,
+        old_value: &str,
+        new_value: &str,
+        proposal_id: Option<String>,
+        changed_by: Option<String>,
+    ) {
+        if let Some(ref bus) = self.event_bus {
+            let bus = bus.clone();
+            let event = crate::events::SystemEvent::ProtocolParameterChanged {
+                parameter_id: parameter_id.to_string(),
+                old_value: old_value.to_string(),
+                new_value: new_value.to_string(),
+                proposal_id,
+                changed_by,
+                changed_at: icn_time::current_timestamp_secs(),
+            };
+            // Spawn async emit in the background
+            // Note: EventBus::emit() is infallible (broadcasts to all subscribers)
+            tokio::spawn(async move {
+                bus.emit(event).await;
+            });
         }
     }
 
@@ -179,6 +236,9 @@ impl GovernanceEventHandler {
             }
             ProposalPayload::Treasury { operation } => {
                 self.handle_treasury_proposal(proposal_id, operation, decided_at);
+            }
+            ProposalPayload::ProtocolChange { proposal } => {
+                self.handle_protocol_change(proposal_id, proposal);
             }
         }
     }
@@ -2319,6 +2379,153 @@ impl GovernanceEventHandler {
         }
 
         icn_obs::metrics::governance::proposals_executed_inc("protocol_upgrade");
+    }
+
+    /// Handle a protocol parameter change proposal (Phase 20)
+    fn handle_protocol_change(
+        &self,
+        proposal_id: ProposalId,
+        proposal: icn_governance::ProtocolChangeProposal,
+    ) {
+        info!(
+            "⚙️  Protocol change proposal {} accepted: {} -> {:?}",
+            proposal_id.0, proposal.parameter_id, proposal.new_value
+        );
+
+        // Get the protocol parameter store through the governance handle
+        let param_result = self
+            .gov_handle
+            .get_protocol_parameter(&proposal.parameter_id);
+        let proposal_id_str = proposal_id.0.clone();
+        match param_result {
+            Ok(Some(mut param)) => {
+                // Capture old value for audit event (serialize to string for logging)
+                let old_value_str = format!("{:?}", param.value);
+
+                // Validate the new value against parameter constraints
+                if let Err(e) = param.validate(&proposal.new_value) {
+                    let error_msg = format!(
+                        "Validation failed for parameter '{}': {}",
+                        proposal.parameter_id, e
+                    );
+                    warn!("{} (proposal {})", error_msg, proposal_id_str);
+                    self.emit_execution_failure(&proposal_id, "protocol_change", &error_msg);
+                    return;
+                }
+
+                // Update the parameter with the new value
+                param.value = proposal.new_value.clone();
+                param.updated_at = icn_time::current_timestamp_secs();
+                param.updated_by = Some(proposal_id_str.clone());
+
+                // Update the scope if specified in the proposal (with validation)
+                if let Some(scope) = proposal.scope {
+                    // Defense-in-depth: verify scope override is allowed
+                    // (should have been validated at proposal creation)
+                    if !param.constraints.allow_override
+                        && !matches!(scope, icn_governance::ParameterScope::Global)
+                    {
+                        let error_msg = format!(
+                            "Parameter '{}' does not allow scope overrides",
+                            proposal.parameter_id
+                        );
+                        warn!("{} (proposal {})", error_msg, proposal_id_str);
+                        self.emit_execution_failure(&proposal_id, "protocol_change", &error_msg);
+                        return;
+                    }
+
+                    // Re-validate entity existence at execution time (CRITICAL #3)
+                    // Entity may have been deleted between proposal creation and execution.
+                    // This prevents orphaned scoped parameters.
+                    //
+                    // Note: A narrow TOCTOU window exists between this check and parameter
+                    // persistence below. In practice, entity deletion is governed and
+                    // rate-limited, making this race extremely rare. Orphaned scoped
+                    // parameters can be cleaned up via periodic parameter audit if needed.
+                    if let Some(entity_id) = scope.entity_id() {
+                        let entity_id_str = entity_id.as_str();
+                        match self.gov_handle.entity_exists(entity_id_str) {
+                            Ok(true) => {
+                                // Entity exists, proceed with scope change
+                            }
+                            Ok(false) => {
+                                let error_msg = format!(
+                                    "Entity '{entity_id_str}' no longer exists. Cannot create scoped parameter."
+                                );
+                                warn!("{} (proposal {})", error_msg, proposal_id_str);
+                                self.emit_execution_failure(
+                                    &proposal_id,
+                                    "protocol_change",
+                                    &error_msg,
+                                );
+                                return;
+                            }
+                            Err(e) => {
+                                let error_msg = format!(
+                                    "Failed to verify entity '{entity_id_str}' existence: {e}"
+                                );
+                                warn!("{} (proposal {})", error_msg, proposal_id_str);
+                                self.emit_execution_failure(
+                                    &proposal_id,
+                                    "protocol_change",
+                                    &error_msg,
+                                );
+                                return;
+                            }
+                        }
+                    }
+
+                    param.scope = scope;
+                }
+
+                // Serialize new value for audit event
+                let new_value_str = format!("{:?}", proposal.new_value);
+
+                // Persist the updated parameter
+                if let Err(e) = self.gov_handle.set_protocol_parameter(
+                    param,
+                    Some(proposal_id_str.clone()),
+                    None,
+                ) {
+                    let error_msg = format!(
+                        "Failed to persist parameter '{}': {}",
+                        proposal.parameter_id, e
+                    );
+                    warn!("{} (proposal {})", error_msg, proposal_id_str);
+                    self.emit_execution_failure(&proposal_id, "protocol_change", &error_msg);
+                } else {
+                    info!(
+                        "✓ Protocol parameter {} updated to {:?}",
+                        proposal.parameter_id, proposal.new_value
+                    );
+
+                    // Emit audit event for parameter change
+                    self.emit_parameter_changed(
+                        &proposal.parameter_id,
+                        &old_value_str,
+                        &new_value_str,
+                        Some(proposal_id_str.clone()),
+                        None, // changed_by is the proposal, not a specific user
+                    );
+                }
+            }
+            Ok(None) => {
+                let error_msg = format!(
+                    "Parameter '{}' not found, cannot apply change",
+                    proposal.parameter_id
+                );
+                warn!("{} (proposal {})", error_msg, proposal_id_str);
+                self.emit_execution_failure(&proposal_id, "protocol_change", &error_msg);
+            }
+            Err(e) => {
+                let error_msg =
+                    format!("Failed to get parameter '{}': {}", proposal.parameter_id, e);
+                warn!("{} (proposal {})", error_msg, proposal_id_str);
+                self.emit_execution_failure(&proposal_id, "protocol_change", &error_msg);
+            }
+        }
+
+        icn_obs::metrics::governance::proposals_executed_inc("protocol_change");
     }
 }
 

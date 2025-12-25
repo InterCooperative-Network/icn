@@ -7,6 +7,7 @@ use anyhow::{bail, Result};
 use async_trait::async_trait;
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::{mpsc, RwLock};
@@ -16,12 +17,14 @@ use icn_gossip::GossipActor;
 use icn_identity::Did;
 use icn_store::Store;
 
+use icn_entity::EntityId;
 use icn_governance::{
     DecisionOutcome, Delegation, DelegationId, GovernanceConfig, GovernanceDomain,
     GovernanceDomainId, GovernanceMessage, GovernanceParams, GovernanceProfile,
     GovernanceProfileId, GovernanceRule, MembershipAction, MembershipConfig, MembershipResolver,
-    MembershipSource, Proposal, ProposalId, ProposalOutcome, ProposalPayload, ProposalState,
-    TallySnapshot, Timestamp, Vote, VoteChoice, VoteTally,
+    MembershipSource, ParameterChange, Proposal, ProposalId, ProposalOutcome, ProposalPayload,
+    ProposalState, ProtocolParameter, ProtocolParameterStore, TallySnapshot, Timestamp, Vote,
+    VoteChoice, VoteTally,
 };
 
 use crate::events::{EventBus, SystemEvent};
@@ -147,6 +150,10 @@ pub enum GovernanceCommand {
 #[derive(Clone)]
 pub struct GovernanceHandle {
     inner: Arc<RwLock<GovernanceActor>>,
+    /// Protocol parameter store for governable parameters (Phase 20)
+    protocol_params: Option<Arc<dyn ProtocolParameterStore>>,
+    /// Entity registry for validating scope entity existence
+    entity_registry: Option<Arc<dyn icn_entity::EntityRegistry>>,
 }
 
 impl GovernanceHandle {
@@ -209,6 +216,106 @@ impl GovernanceHandle {
     pub async fn get_voter_dids(&self, proposal_id: &ProposalId) -> Result<Vec<Did>> {
         self.inner.read().await.get_voter_dids(proposal_id)
     }
+
+    /// Set the protocol parameter store
+    ///
+    /// This must be called after spawn() to enable protocol parameter operations.
+    ///
+    /// **Note**: This method consumes self and returns a new handle. Any clones made
+    /// before calling this method will NOT have the protocol parameter store configured.
+    /// Always call this before cloning the handle.
+    pub fn with_protocol_params(mut self, store: Arc<dyn ProtocolParameterStore>) -> Self {
+        self.protocol_params = Some(store);
+        self
+    }
+
+    /// Set the entity registry
+    ///
+    /// This enables validation that entities referenced in parameter scopes actually exist.
+    ///
+    /// **Note**: This method consumes self and returns a new handle. Any clones made
+    /// before calling this method will NOT have the entity registry configured.
+    /// Always call this before cloning the handle.
+    pub fn with_entity_registry(mut self, registry: Arc<dyn icn_entity::EntityRegistry>) -> Self {
+        self.entity_registry = Some(registry);
+        self
+    }
+
+    /// List all protocol parameters
+    pub fn list_protocol_parameters(&self) -> Result<Vec<ProtocolParameter>> {
+        match &self.protocol_params {
+            Some(store) => store.list(),
+            None => bail!("Protocol parameter store not configured"),
+        }
+    }
+
+    /// Get a specific protocol parameter by ID
+    pub fn get_protocol_parameter(&self, id: &str) -> Result<Option<ProtocolParameter>> {
+        match &self.protocol_params {
+            Some(store) => store.get(id),
+            None => bail!("Protocol parameter store not configured"),
+        }
+    }
+
+    /// Get the effective value of a protocol parameter with scope resolution
+    pub fn get_effective_protocol_parameter(
+        &self,
+        id: &str,
+        coop_id: Option<&EntityId>,
+        fed_id: Option<&EntityId>,
+    ) -> Result<Option<ProtocolParameter>> {
+        match &self.protocol_params {
+            Some(store) => store.get_effective(id, coop_id, fed_id),
+            None => bail!("Protocol parameter store not configured"),
+        }
+    }
+
+    /// Get the change history for a protocol parameter
+    pub fn get_protocol_parameter_history(&self, id: &str) -> Result<Vec<ParameterChange>> {
+        match &self.protocol_params {
+            Some(store) => store.get_history(id),
+            None => bail!("Protocol parameter store not configured"),
+        }
+    }
+
+    /// Set a protocol parameter value
+    ///
+    /// Used to persist approved ProtocolChange proposals.
+    pub fn set_protocol_parameter(
+        &self,
+        param: ProtocolParameter,
+        proposal_id: Option<String>,
+        changed_by: Option<String>,
+    ) -> Result<()> {
+        match &self.protocol_params {
+            Some(store) => store.set(param, proposal_id, changed_by),
+            None => bail!("Protocol parameter store not configured"),
+        }
+    }
+
+    /// Check if an entity exists (for scope validation at execution time)
+    ///
+    /// Returns true if the entity registry is not configured (allowing scoped params
+    /// without entity validation) or if the entity exists in the registry.
+    pub fn entity_exists(&self, entity_id: &str) -> Result<bool> {
+        match &self.entity_registry {
+            Some(registry) => {
+                let parsed_id = icn_entity::EntityId::from_str(entity_id)
+                    .map_err(|e| anyhow::anyhow!("Invalid entity ID '{entity_id}': {e}"))?;
+                registry.exists(&parsed_id).map_err(|e| e.into())
+            }
+            None => {
+                // No registry configured - assume entity exists (best effort)
+                // Log warning to help detect configuration issues
+                warn!(
+                    entity_id = %entity_id,
+                    "Entity registry not configured - skipping entity existence validation. \
+                     Configure with_entity_registry() for proper scoped parameter validation."
+                );
+                Ok(true)
+            }
+        }
+    }
 }
 
 /// Implement GovernanceOps trait to allow RPC integration without circular dependencies
@@ -263,6 +370,108 @@ impl icn_governance::GovernanceOps for GovernanceHandle {
         description: String,
         payload: icn_governance::ProposalPayload,
     ) -> Result<ProposalId> {
+        // Pre-validate ProtocolChange proposals to catch invalid parameters early
+        // This prevents wasted governance cycles on proposals that would fail at execution
+        if let ProposalPayload::ProtocolChange { ref proposal } = payload {
+            // Check if protocol parameter store is configured
+            let Some(ref store) = self.protocol_params else {
+                bail!(
+                    "Cannot create ProtocolChange proposal: protocol parameter store not configured"
+                );
+            };
+
+            // Reject proposals with effective_at set (delayed execution not yet implemented)
+            if proposal.effective_at.is_some() {
+                bail!(
+                    "Cannot create ProtocolChange proposal: delayed execution (effective_at) is not yet implemented. \
+                     Remove effective_at to apply changes immediately upon approval."
+                );
+            }
+
+            // Check if the parameter exists
+            let param = match store.get(&proposal.parameter_id)? {
+                Some(p) => p,
+                None => {
+                    // Try to find similar parameter names to suggest
+                    let all_params = store.list().unwrap_or_default();
+                    let similar: Vec<_> = all_params
+                        .iter()
+                        .filter(|p| {
+                            // Simple similarity: shares prefix or contains search term
+                            let id = &p.id;
+                            let search = &proposal.parameter_id;
+                            id.starts_with(search.split('.').next().unwrap_or(""))
+                                || id.contains(search.split('.').next_back().unwrap_or(""))
+                        })
+                        .map(|p| p.id.as_str())
+                        .take(3)
+                        .collect();
+
+                    let suggestion = if similar.is_empty() {
+                        "Use list_protocol_parameters() to see available parameters.".to_string()
+                    } else {
+                        format!("Did you mean: {}?", similar.join(", "))
+                    };
+
+                    bail!(
+                        "Cannot create ProtocolChange proposal: parameter '{}' not found. {}",
+                        proposal.parameter_id,
+                        suggestion
+                    );
+                }
+            };
+
+            // Validate the new value against constraints
+            param.validate(&proposal.new_value).map_err(|e| {
+                anyhow::anyhow!(
+                    "Cannot create ProtocolChange proposal: validation failed for parameter '{}': {}",
+                    proposal.parameter_id,
+                    e
+                )
+            })?;
+
+            // Validate scope override is allowed if specified
+            if proposal.scope.is_some() && !param.constraints.allow_override {
+                bail!(
+                    "Cannot create ProtocolChange proposal: parameter '{}' does not allow scope overrides",
+                    proposal.parameter_id
+                );
+            }
+
+            // Validate entity exists if scope references an entity
+            if let Some(ref scope) = proposal.scope {
+                if let Some(entity_id) = scope.entity_id() {
+                    match &self.entity_registry {
+                        Some(registry) => {
+                            match registry.exists(entity_id) {
+                                Ok(true) => {} // Entity exists, proceed
+                                Ok(false) => {
+                                    bail!(
+                                        "Cannot create ProtocolChange proposal: scope references non-existent entity '{entity_id}'"
+                                    );
+                                }
+                                Err(e) => {
+                                    bail!(
+                                        "Cannot create ProtocolChange proposal: failed to verify entity '{entity_id}': {e}"
+                                    );
+                                }
+                            }
+                        }
+                        None => {
+                            // Entity registry is required for scoped parameter changes
+                            // Without it, we cannot validate that the target entity exists,
+                            // which could allow proposals targeting non-existent entities
+                            bail!(
+                                "Cannot create ProtocolChange proposal with scoped parameter: \
+                                 entity registry not configured. Configure entity registry with \
+                                 with_entity_registry() to enable scoped parameter changes."
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
         // Generate a new proposal ID
         let proposal_id = ProposalId::generate();
 
@@ -339,6 +548,29 @@ impl icn_governance::GovernanceOps for GovernanceHandle {
 
     async fn get_voter_dids(&self, proposal_id: &ProposalId) -> Result<Vec<Did>> {
         Self::get_voter_dids(self, proposal_id).await
+    }
+
+    // Protocol parameter operations (Phase 20)
+
+    async fn list_protocol_parameters(&self) -> Result<Vec<ProtocolParameter>> {
+        Self::list_protocol_parameters(self)
+    }
+
+    async fn get_protocol_parameter(&self, id: &str) -> Result<Option<ProtocolParameter>> {
+        Self::get_protocol_parameter(self, id)
+    }
+
+    async fn get_effective_protocol_parameter(
+        &self,
+        id: &str,
+        coop_id: Option<&EntityId>,
+        fed_id: Option<&EntityId>,
+    ) -> Result<Option<ProtocolParameter>> {
+        Self::get_effective_protocol_parameter(self, id, coop_id, fed_id)
+    }
+
+    async fn get_protocol_parameter_history(&self, id: &str) -> Result<Vec<ParameterChange>> {
+        Self::get_protocol_parameter_history(self, id)
     }
 }
 
@@ -417,6 +649,8 @@ impl GovernanceActor {
 
         let handle = GovernanceHandle {
             inner: Arc::new(RwLock::new(actor)),
+            protocol_params: None,
+            entity_registry: None,
         };
 
         // Spawn background timer task for auto-closing proposals
@@ -962,7 +1196,16 @@ impl GovernanceActor {
         Ok(votes.into_iter().map(|v| v.voter).collect())
     }
 
-    /// Maximum depth for transitive delegations
+    /// Maximum depth for transitive delegations (number of hops allowed)
+    ///
+    /// With MAX_DELEGATION_DEPTH=3, a delegation chain can have at most 3 hops:
+    /// A -> B -> C -> D (3 hops from A to D)
+    ///
+    /// Semantics:
+    /// - `create_delegation` checks `incoming_depth >= MAX_DELEGATION_DEPTH` (exclusive)
+    ///   So incoming_depth 0, 1, 2 allows creating the delegation
+    /// - `detect_cycle` uses `0..=MAX_DELEGATION_DEPTH` (4 iterations) to check
+    ///   delegator + delegate + up to 3 more hops for cycle detection
     const MAX_DELEGATION_DEPTH: usize = 3;
 
     /// Create a new delegation

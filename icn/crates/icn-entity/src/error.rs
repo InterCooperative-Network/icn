@@ -3,45 +3,68 @@
 use thiserror::Error;
 
 /// Errors that can occur in entity operations
+///
+/// These errors provide context about what operation failed and why,
+/// with suggestions for resolution where applicable.
 #[derive(Error, Debug)]
 pub enum EntityError {
     /// Invalid entity ID format
-    #[error("Invalid entity ID format: {0}")]
+    ///
+    /// Entity IDs must follow a specific format (e.g., UUID or DID).
+    #[error("Invalid entity ID format: '{0}'. Expected a valid UUID or DID.")]
     InvalidFormat(String),
 
     /// Entity not found
-    #[error("Entity not found: {0}")]
+    ///
+    /// The requested entity does not exist in the registry.
+    #[error("Entity not found: '{0}'. Verify the ID is correct and the entity was created.")]
     NotFound(String),
 
     /// Entity already exists
-    #[error("Entity already exists: {0}")]
+    ///
+    /// Cannot create an entity with an ID that is already in use.
+    #[error("Entity already exists: '{0}'. Use update operations to modify existing entities.")]
     AlreadyExists(String),
 
     /// Invalid entity type
-    #[error("Invalid entity type: {0}")]
+    ///
+    /// The entity type is not recognized or cannot be used in this context.
+    #[error(
+        "Invalid entity type: '{0}'. Valid types: Cooperative, Federation, Community, Member."
+    )]
     InvalidType(String),
 
     /// Invalid state transition
-    #[error("Invalid state transition from {from:?} to {to:?}")]
+    ///
+    /// Entity lifecycle transitions must follow valid paths (e.g., Pending -> Active -> Suspended).
+    #[error("Invalid state transition from {from:?} to {to:?}. Check allowed state machine transitions.")]
     InvalidStateTransition {
         from: crate::EntityStatus,
         to: crate::EntityStatus,
     },
 
     /// Membership error
+    ///
+    /// Error related to entity membership operations (join, leave, member limits).
     #[error("Membership error: {0}")]
     MembershipError(String),
 
     /// Registry error
+    ///
+    /// Error from the underlying storage layer.
     #[error("Registry error: {0}")]
     RegistryError(String),
 
     /// Serialization error
-    #[error("Serialization error: {0}")]
+    ///
+    /// Failed to serialize or deserialize entity data.
+    #[error("Serialization error: {0}. Check entity data format.")]
     SerializationError(#[from] serde_json::Error),
 
     /// Internal error
-    #[error("Internal error: {0}")]
+    ///
+    /// An unexpected internal error occurred.
+    #[error("Internal error: {0}. Please report this issue.")]
     Internal(#[from] anyhow::Error),
 }
 

@@ -18,8 +18,10 @@ ed25519-dalek.workspace = true
 async-trait = "0.1"
 hex = "0.4"
 bincode = { version = "2.0", features = ["serde"] }
+sled.workspace = true
 
 # ICN crates
+icn-entity = { path = "../icn-entity" }
 icn-identity.workspace = true
 icn-store.workspace = true
 icn-trust.workspace = true
@@ -40,7 +42,6 @@ icn-steward.workspace = true
 icn-coop = { path = "../icn-coop" }
 icn-cooperative = { path = "../icn-cooperative" }
 icn-community = { path = "../icn-community" }
-icn-entity = { path = "../icn-entity" }
 
 [dev-dependencies]
 rustls.workspace = true

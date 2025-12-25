@@ -49,10 +49,40 @@ pub trait EntityRegistry: Send + Sync {
     fn exists(&self, id: &EntityId) -> Result<bool>;
 
     /// List all entities of a given type
+    ///
+    /// Note: For large datasets, prefer `list_by_type_paginated()` to avoid
+    /// loading all entities into memory at once.
     fn list_by_type(&self, entity_type: EntityType) -> Result<Vec<EntityId>>;
 
+    /// List entities of a given type with pagination
+    ///
+    /// Returns up to `limit` entities starting from `offset`.
+    /// Use `count_by_type()` to determine total count for pagination UI.
+    fn list_by_type_paginated(
+        &self,
+        entity_type: EntityType,
+        limit: usize,
+        offset: usize,
+    ) -> Result<Vec<EntityId>>;
+
+    /// Count entities of a given type (efficient for pagination)
+    fn count_by_type(&self, entity_type: EntityType) -> Result<usize>;
+
     /// List child entities (direct members that are themselves entities)
+    ///
+    /// Note: For large datasets, prefer `list_children_paginated()` to avoid
+    /// loading all entities into memory at once.
     fn list_children(&self, parent_id: &EntityId) -> Result<Vec<EntityId>>;
+
+    /// List child entities with pagination
+    ///
+    /// Returns up to `limit` children starting from `offset`.
+    fn list_children_paginated(
+        &self,
+        parent_id: &EntityId,
+        limit: usize,
+        offset: usize,
+    ) -> Result<Vec<EntityId>>;
 
     /// Get the parent entity (if any)
     fn get_parent(&self, entity_id: &EntityId) -> Result<Option<EntityId>>;
@@ -180,6 +210,30 @@ impl EntityRegistry for InMemoryRegistry {
             .collect())
     }
 
+    fn list_by_type_paginated(
+        &self,
+        entity_type: EntityType,
+        limit: usize,
+        offset: usize,
+    ) -> Result<Vec<EntityId>> {
+        Ok(self
+            .entities
+            .values()
+            .filter(|e| e.entity_type == entity_type)
+            .skip(offset)
+            .take(limit)
+            .map(|e| e.id.clone())
+            .collect())
+    }
+
+    fn count_by_type(&self, entity_type: EntityType) -> Result<usize> {
+        Ok(self
+            .entities
+            .values()
+            .filter(|e| e.entity_type == entity_type)
+            .count())
+    }
+
     fn list_children(&self, parent_id: &EntityId) -> Result<Vec<EntityId>> {
         let parent_str = parent_id.as_str();
         Ok(self
@@ -195,6 +249,31 @@ impl EntityRegistry for InMemoryRegistry {
                     }
                 })
             })
+            .collect())
+    }
+
+    fn list_children_paginated(
+        &self,
+        parent_id: &EntityId,
+        limit: usize,
+        offset: usize,
+    ) -> Result<Vec<EntityId>> {
+        let parent_str = parent_id.as_str();
+        Ok(self
+            .memberships
+            .iter()
+            .filter(|((_, parent), _)| parent == parent_str)
+            .filter_map(|((member, _), _)| {
+                self.entities.get(member).and_then(|e| {
+                    if e.id.is_organization() {
+                        Some(e.id.clone())
+                    } else {
+                        None
+                    }
+                })
+            })
+            .skip(offset)
+            .take(limit)
             .collect())
     }
 

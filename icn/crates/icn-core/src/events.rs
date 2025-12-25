@@ -55,6 +55,50 @@ pub enum SystemEvent {
         /// Execution outcome as JSON
         outcome: serde_json::Value,
     },
+
+    /// A proposal execution failed (proposal was accepted but could not be applied)
+    ProposalExecutionFailed {
+        /// Unique identifier for the proposal
+        proposal_id: ProposalId,
+        /// Type of the proposal (e.g., "protocol_change", "treasury")
+        proposal_type: String,
+        /// Human-readable error message
+        error: String,
+        /// Unix timestamp when the failure occurred
+        failed_at: u64,
+    },
+
+    /// Protocol parameters were initialized (first run)
+    ProtocolParametersInitialized {
+        /// Number of parameters initialized
+        count: usize,
+        /// Unix timestamp when the initialization occurred
+        initialized_at: u64,
+    },
+
+    /// Protocol parameter store was loaded (existing parameters)
+    ProtocolParametersLoaded {
+        /// Number of parameters loaded
+        count: usize,
+        /// Unix timestamp when the store was loaded
+        loaded_at: u64,
+    },
+
+    /// A protocol parameter was changed (for audit logging)
+    ProtocolParameterChanged {
+        /// Parameter ID that was changed
+        parameter_id: String,
+        /// Old value (serialized as string for logging)
+        old_value: String,
+        /// New value (serialized as string for logging)
+        new_value: String,
+        /// Proposal ID that authorized the change (if any)
+        proposal_id: Option<String>,
+        /// DID of the actor who made the change
+        changed_by: Option<String>,
+        /// Unix timestamp when the change occurred
+        changed_at: u64,
+    },
 }
 
 /// Callback function for event subscribers
@@ -146,6 +190,10 @@ impl EventBus {
             SystemEvent::ProposalRejected { .. } => "ProposalRejected",
             SystemEvent::TransactionExecuted { .. } => "TransactionExecuted",
             SystemEvent::ContractExecuted { .. } => "ContractExecuted",
+            SystemEvent::ProposalExecutionFailed { .. } => "ProposalExecutionFailed",
+            SystemEvent::ProtocolParametersInitialized { .. } => "ProtocolParametersInitialized",
+            SystemEvent::ProtocolParametersLoaded { .. } => "ProtocolParametersLoaded",
+            SystemEvent::ProtocolParameterChanged { .. } => "ProtocolParameterChanged",
         };
 
         debug!(
