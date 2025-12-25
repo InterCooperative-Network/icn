@@ -1457,13 +1457,13 @@ export class ICNMobileClient extends ICNClient {
     comment?: string
   ): Promise<import('./constitutional-hooks').AmendmentVote> {
     const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
-    const response = await fetch(`${baseUrl}/v1/constitutional/amendments/${amendmentId}/vote`, {
+    const response = await fetch(`${baseUrl}/v1/constitutional/amendments/${amendmentId}/votes`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...(this.hasToken() ? { Authorization: `Bearer ${this.getToken()}` } : {}),
       },
-      body: JSON.stringify({ choice, comment }),
+      body: JSON.stringify({ vote: choice, comment }),
     });
 
     if (!response.ok) {
