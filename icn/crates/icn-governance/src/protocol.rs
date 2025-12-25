@@ -1151,8 +1151,8 @@ mod tests {
             "Percentage 66.67 should be equal after JSON roundtrip"
         );
 
-        // Test edge case: supermajority threshold
-        let supermajority = ParameterValue::Percentage(66.666666666666667);
+        // Test edge case: supermajority threshold (2/3 as percentage)
+        let supermajority = ParameterValue::Percentage(2.0 / 3.0 * 100.0);
         let json = serde_json::to_string(&supermajority).unwrap();
         let roundtripped: ParameterValue = serde_json::from_str(&json).unwrap();
         assert!(
@@ -1160,8 +1160,8 @@ mod tests {
             "Supermajority threshold should be equal after JSON roundtrip"
         );
 
-        // Test Float type
-        let float_val = ParameterValue::Float(3.141592653589793);
+        // Test Float type with a precise value
+        let float_val = ParameterValue::Float(std::f64::consts::PI);
         let json = serde_json::to_string(&float_val).unwrap();
         let roundtripped: ParameterValue = serde_json::from_str(&json).unwrap();
         assert!(
