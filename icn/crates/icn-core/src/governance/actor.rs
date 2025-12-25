@@ -327,6 +327,34 @@ impl icn_governance::GovernanceOps for GovernanceHandle {
         description: String,
         payload: icn_governance::ProposalPayload,
     ) -> Result<ProposalId> {
+        // Pre-validate ProtocolChange proposals to catch invalid parameters early
+        // This prevents wasted governance cycles on proposals that would fail at execution
+        if let ProposalPayload::ProtocolChange { ref proposal } = payload {
+            // Check if protocol parameter store is configured
+            let Some(ref store) = self.protocol_params else {
+                bail!(
+                    "Cannot create ProtocolChange proposal: protocol parameter store not configured"
+                );
+            };
+
+            // Check if the parameter exists
+            let param = store.get(&proposal.parameter_id)?.ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Cannot create ProtocolChange proposal: parameter '{}' not found",
+                    proposal.parameter_id
+                )
+            })?;
+
+            // Validate the new value against constraints
+            param.validate(&proposal.new_value).map_err(|e| {
+                anyhow::anyhow!(
+                    "Cannot create ProtocolChange proposal: validation failed for parameter '{}': {}",
+                    proposal.parameter_id,
+                    e
+                )
+            })?;
+        }
+
         // Generate a new proposal ID
         let proposal_id = ProposalId::generate();
 

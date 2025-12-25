@@ -13,6 +13,18 @@
 //! - Governance thresholds (quorum, approval percentages)
 //! - Trust graph parameters
 //!
+//! # Parameter ID Naming Convention
+//!
+//! Parameter IDs use dot-separated hierarchical naming:
+//! `<category>.<subcategory>.<name>` or `<category>.<name>`
+//!
+//! Examples:
+//! - `gossip.max_message_size` - Gossip category, max message size
+//! - `governance.min_quorum` - Governance category, minimum quorum
+//! - `ledger.default_credit_limit` - Ledger category, default credit limit
+//!
+//! The category can be extracted using `ProtocolParameter::category()`.
+//!
 //! # Scope Resolution
 //!
 //! Parameters can be defined at different scopes with cascading override:
@@ -196,6 +208,22 @@ impl ProtocolParameter {
     }
 
     /// Get the parameter category (first part of ID before the dot)
+    ///
+    /// Parameter IDs follow a dot-separated naming convention:
+    /// `<category>.<subcategory>.<name>` (e.g., "gossip.max_message_size")
+    ///
+    /// The category is the first component before the first dot.
+    /// If there is no dot, the entire ID is returned as the category.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let param = ProtocolParameter::new("gossip.max_message_size", ...);
+    /// assert_eq!(param.category(), "gossip");
+    ///
+    /// let param = ProtocolParameter::new("simple_param", ...);
+    /// assert_eq!(param.category(), "simple_param");
+    /// ```
     pub fn category(&self) -> &str {
         self.id.split('.').next().unwrap_or(&self.id)
     }

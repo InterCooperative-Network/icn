@@ -13,17 +13,20 @@
 //!
 //! # Known Limitations
 //!
-//! - **Atomicity**: Multi-key operations (register, delete, update with type change)
-//!   do not use Sled transactions. In rare cases of process crash mid-operation,
-//!   secondary indexes could become inconsistent. A future enhancement should
-//!   use `Tree::transaction()` for these operations.
 //! - **Performance**: `list_by_type()` and `list_children()` load all entities
 //!   into memory. For large datasets, consider adding pagination.
+//!
+//! # Atomicity
+//!
+//! All multi-key operations (register, update, delete, add_membership, remove_membership)
+//! use Sled transactions to ensure atomicity. If a process crash occurs mid-transaction,
+//! Sled will roll back incomplete operations on restart.
 
 use crate::entity::{CooperativeEntity, EntityId, EntityType};
 use crate::error::{EntityError, Result};
 use crate::membership::Membership;
 use crate::registry::EntityRegistry;
+use sled::transaction::ConflictableTransactionError;
 use sled::Db;
 use std::sync::Arc;
 use tracing::debug;
@@ -167,30 +170,40 @@ impl SledEntityRegistry {
 
 impl EntityRegistry for SledEntityRegistry {
     fn register(&mut self, entity: CooperativeEntity) -> Result<()> {
-        let key = Self::entity_key(&entity.id);
-
-        // Check if entity already exists
-        if self
-            .db
-            .contains_key(&key)
-            .map_err(|e| EntityError::RegistryError(format!("DB error: {e}")))?
-        {
-            return Err(EntityError::AlreadyExists(entity.id.as_str().to_string()));
-        }
-
-        // Serialize and store entity
-        let value = Self::serialize_entity(&entity)?;
-        self.db
-            .insert(&key, value)
-            .map_err(|e| EntityError::RegistryError(format!("Failed to insert entity: {e}")))?;
-
-        // Add type index
+        let entity_key = Self::entity_key(&entity.id);
         let type_key = Self::type_index_key(entity.entity_type, &entity.id);
-        self.db
-            .insert(&type_key, &[])
-            .map_err(|e| EntityError::RegistryError(format!("Failed to insert type index: {e}")))?;
 
-        debug!(entity_id = %entity.id, "Entity registered");
+        // Serialize entity before transaction to avoid closure issues
+        let entity_value = Self::serialize_entity(&entity)?;
+        let entity_id_str = entity.id.as_str().to_string();
+        let entity_id_display = entity.id.to_string();
+
+        // Use transaction for atomicity
+        self.db
+            .transaction(|tx| {
+                // Check if entity already exists
+                if tx.get(&entity_key)?.is_some() {
+                    return Err(ConflictableTransactionError::Abort(
+                        EntityError::AlreadyExists(entity_id_str.clone()),
+                    ));
+                }
+
+                // Store entity
+                tx.insert(entity_key.as_slice(), entity_value.as_slice())?;
+
+                // Add type index
+                tx.insert(type_key.as_slice(), &[] as &[u8])?;
+
+                Ok(())
+            })
+            .map_err(|e| match e {
+                sled::transaction::TransactionError::Abort(err) => err,
+                sled::transaction::TransactionError::Storage(e) => {
+                    EntityError::RegistryError(format!("Transaction storage error: {e}"))
+                }
+            })?;
+
+        debug!(entity_id = %entity_id_display, "Entity registered");
         Ok(())
     }
 
@@ -208,41 +221,53 @@ impl EntityRegistry for SledEntityRegistry {
     }
 
     fn update(&mut self, mut entity: CooperativeEntity) -> Result<()> {
-        let key = Self::entity_key(&entity.id);
+        let entity_key = Self::entity_key(&entity.id);
 
-        // Check if entity exists
-        let old_entity = self.get(&entity.id)?;
-        if old_entity.is_none() {
-            return Err(EntityError::NotFound(entity.id.as_str().to_string()));
-        }
-        let old_entity = old_entity
-            .ok_or_else(|| EntityError::RegistryError("Entity disappeared during update".into()))?;
+        // Check if entity exists and get old type
+        let old_entity = self
+            .get(&entity.id)?
+            .ok_or_else(|| EntityError::NotFound(entity.id.as_str().to_string()))?;
 
         // Update the updated_at timestamp
         entity.updated_at = icn_time::current_timestamp_secs();
 
-        // If entity type changed, update the type index
-        if old_entity.entity_type != entity.entity_type {
-            // Remove old type index
-            let old_type_key = Self::type_index_key(old_entity.entity_type, &entity.id);
-            self.db.remove(&old_type_key).map_err(|e| {
-                EntityError::RegistryError(format!("Failed to remove old type index: {e}"))
-            })?;
+        // Prepare for transaction
+        let entity_id_str = entity.id.as_str().to_string();
+        let entity_id_display = entity.id.to_string();
+        let entity_value = Self::serialize_entity(&entity)?;
+        let type_changed = old_entity.entity_type != entity.entity_type;
+        let old_type_key = Self::type_index_key(old_entity.entity_type, &entity.id);
+        let new_type_key = Self::type_index_key(entity.entity_type, &entity.id);
 
-            // Add new type index
-            let new_type_key = Self::type_index_key(entity.entity_type, &entity.id);
-            self.db.insert(&new_type_key, &[]).map_err(|e| {
-                EntityError::RegistryError(format!("Failed to insert new type index: {e}"))
-            })?;
-        }
-
-        // Store updated entity
-        let value = Self::serialize_entity(&entity)?;
+        // Use transaction for atomicity
         self.db
-            .insert(&key, value)
-            .map_err(|e| EntityError::RegistryError(format!("Failed to update entity: {e}")))?;
+            .transaction(|tx| {
+                // Verify entity still exists (check-and-update atomically)
+                if tx.get(&entity_key)?.is_none() {
+                    return Err(ConflictableTransactionError::Abort(EntityError::NotFound(
+                        entity_id_str.clone(),
+                    )));
+                }
 
-        debug!(entity_id = %entity.id, "Entity updated");
+                // If entity type changed, update the type index
+                if type_changed {
+                    tx.remove(old_type_key.as_slice())?;
+                    tx.insert(new_type_key.as_slice(), &[] as &[u8])?;
+                }
+
+                // Store updated entity
+                tx.insert(entity_key.as_slice(), entity_value.as_slice())?;
+
+                Ok(())
+            })
+            .map_err(|e| match e {
+                sled::transaction::TransactionError::Abort(err) => err,
+                sled::transaction::TransactionError::Storage(e) => {
+                    EntityError::RegistryError(format!("Transaction storage error: {e}"))
+                }
+            })?;
+
+        debug!(entity_id = %entity_id_display, "Entity updated");
         Ok(())
     }
 
@@ -256,32 +281,61 @@ impl EntityRegistry for SledEntityRegistry {
         }
 
         // Get entity to know its type for index cleanup
-        let entity = self.get(id)?;
-        if entity.is_none() {
-            return Err(EntityError::NotFound(id.as_str().to_string()));
-        }
-        let entity =
-            entity.ok_or_else(|| EntityError::RegistryError("Entity disappeared".into()))?;
+        let entity = self
+            .get(id)?
+            .ok_or_else(|| EntityError::NotFound(id.as_str().to_string()))?;
 
-        // Remove entity
-        let key = Self::entity_key(id);
-        self.db
-            .remove(&key)
-            .map_err(|e| EntityError::RegistryError(format!("Failed to delete entity: {e}")))?;
-
-        // Remove type index
-        let type_key = Self::type_index_key(entity.entity_type, id);
-        self.db
-            .remove(&type_key)
-            .map_err(|e| EntityError::RegistryError(format!("Failed to remove type index: {e}")))?;
-
-        // Remove any memberships where this entity is a member
+        // Get all memberships of this entity (for cleanup)
         let memberships = self.get_memberships_of(id)?;
-        for membership in memberships {
-            self.remove_membership(&membership.member_id, &membership.parent_id)?;
-        }
 
-        debug!(entity_id = %id, "Entity deleted");
+        // Prepare keys for deletion
+        let entity_key = Self::entity_key(id);
+        let type_key = Self::type_index_key(entity.entity_type, id);
+        let entity_id_str = id.as_str().to_string();
+        let entity_id_display = id.to_string();
+
+        // Collect membership keys for atomic deletion
+        let membership_keys: Vec<(Vec<u8>, Vec<u8>)> = memberships
+            .iter()
+            .map(|m| {
+                let membership_key = Self::membership_key(&m.parent_id, &m.member_id);
+                let member_of_key = Self::member_of_index_key(&m.member_id, &m.parent_id);
+                (membership_key, member_of_key)
+            })
+            .collect();
+
+        // Use transaction for atomicity
+        self.db
+            .transaction(|tx| {
+                // Verify entity still exists
+                if tx.get(&entity_key)?.is_none() {
+                    return Err(ConflictableTransactionError::Abort(EntityError::NotFound(
+                        entity_id_str.clone(),
+                    )));
+                }
+
+                // Remove entity
+                tx.remove(entity_key.as_slice())?;
+
+                // Remove type index
+                tx.remove(type_key.as_slice())?;
+
+                // Remove all memberships and their indexes
+                for (membership_key, member_of_key) in &membership_keys {
+                    tx.remove(membership_key.as_slice())?;
+                    tx.remove(member_of_key.as_slice())?;
+                }
+
+                Ok(())
+            })
+            .map_err(|e| match e {
+                sled::transaction::TransactionError::Abort(err) => err,
+                sled::transaction::TransactionError::Storage(e) => {
+                    EntityError::RegistryError(format!("Transaction storage error: {e}"))
+                }
+            })?;
+
+        debug!(entity_id = %entity_id_display, "Entity deleted");
         Ok(())
     }
 
@@ -355,33 +409,42 @@ impl EntityRegistry for SledEntityRegistry {
         // Validate relationship
         self.validate_membership_relationship(&parent_entity, &member_entity)?;
 
-        // Check if membership already exists
-        let key = Self::membership_key(&membership.parent_id, &membership.member_id);
-        if self
-            .db
-            .contains_key(&key)
-            .map_err(|e| EntityError::RegistryError(format!("DB error: {e}")))?
-        {
-            return Err(EntityError::MembershipError(
-                "Membership already exists".into(),
-            ));
-        }
+        // Prepare keys and values for transaction
+        let membership_key = Self::membership_key(&membership.parent_id, &membership.member_id);
+        let member_of_key =
+            Self::member_of_index_key(&membership.member_id, &membership.parent_id);
+        let membership_value = Self::serialize_membership(&membership)?;
+        let member_id_display = membership.member_id.to_string();
+        let parent_id_display = membership.parent_id.to_string();
 
-        // Store membership
-        let value = Self::serialize_membership(&membership)?;
+        // Use transaction for atomicity
         self.db
-            .insert(&key, value)
-            .map_err(|e| EntityError::RegistryError(format!("Failed to insert membership: {e}")))?;
+            .transaction(|tx| {
+                // Check if membership already exists
+                if tx.get(&membership_key)?.is_some() {
+                    return Err(ConflictableTransactionError::Abort(
+                        EntityError::MembershipError("Membership already exists".into()),
+                    ));
+                }
 
-        // Add member_of index for reverse lookup
-        let member_of_key = Self::member_of_index_key(&membership.member_id, &membership.parent_id);
-        self.db.insert(&member_of_key, &[]).map_err(|e| {
-            EntityError::RegistryError(format!("Failed to insert member_of index: {e}"))
-        })?;
+                // Store membership
+                tx.insert(membership_key.as_slice(), membership_value.as_slice())?;
+
+                // Add member_of index for reverse lookup
+                tx.insert(member_of_key.as_slice(), &[] as &[u8])?;
+
+                Ok(())
+            })
+            .map_err(|e| match e {
+                sled::transaction::TransactionError::Abort(err) => err,
+                sled::transaction::TransactionError::Storage(e) => {
+                    EntityError::RegistryError(format!("Transaction storage error: {e}"))
+                }
+            })?;
 
         debug!(
-            member_id = %membership.member_id,
-            parent_id = %membership.parent_id,
+            member_id = %member_id_display,
+            parent_id = %parent_id_display,
             "Membership added"
         );
         Ok(())
@@ -467,27 +530,39 @@ impl EntityRegistry for SledEntityRegistry {
     }
 
     fn remove_membership(&mut self, member_id: &EntityId, parent_id: &EntityId) -> Result<()> {
-        let key = Self::membership_key(parent_id, member_id);
-
-        // Check if membership exists
-        if self
-            .db
-            .remove(&key)
-            .map_err(|e| EntityError::RegistryError(format!("DB error: {e}")))?
-            .is_none()
-        {
-            return Err(EntityError::MembershipError("Membership not found".into()));
-        }
-
-        // Remove member_of index
+        let membership_key = Self::membership_key(parent_id, member_id);
         let member_of_key = Self::member_of_index_key(member_id, parent_id);
+        let member_id_display = member_id.to_string();
+        let parent_id_display = parent_id.to_string();
+
+        // Use transaction for atomicity
         self.db
-            .remove(&member_of_key)
-            .map_err(|e| EntityError::RegistryError(format!("Failed to remove index: {e}")))?;
+            .transaction(|tx| {
+                // Check if membership exists
+                if tx.get(&membership_key)?.is_none() {
+                    return Err(ConflictableTransactionError::Abort(
+                        EntityError::MembershipError("Membership not found".into()),
+                    ));
+                }
+
+                // Remove membership
+                tx.remove(membership_key.as_slice())?;
+
+                // Remove member_of index
+                tx.remove(member_of_key.as_slice())?;
+
+                Ok(())
+            })
+            .map_err(|e| match e {
+                sled::transaction::TransactionError::Abort(err) => err,
+                sled::transaction::TransactionError::Storage(e) => {
+                    EntityError::RegistryError(format!("Transaction storage error: {e}"))
+                }
+            })?;
 
         debug!(
-            member_id = %member_id,
-            parent_id = %parent_id,
+            member_id = %member_id_display,
+            parent_id = %parent_id_display,
             "Membership removed"
         );
         Ok(())

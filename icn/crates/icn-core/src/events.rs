@@ -67,6 +67,22 @@ pub enum SystemEvent {
         /// Unix timestamp when the failure occurred
         failed_at: u64,
     },
+
+    /// Protocol parameters were initialized (first run)
+    ProtocolParametersInitialized {
+        /// Number of parameters initialized
+        count: usize,
+        /// Unix timestamp when the initialization occurred
+        initialized_at: u64,
+    },
+
+    /// Protocol parameter store was loaded (existing parameters)
+    ProtocolParametersLoaded {
+        /// Number of parameters loaded
+        count: usize,
+        /// Unix timestamp when the store was loaded
+        loaded_at: u64,
+    },
 }
 
 /// Callback function for event subscribers
@@ -159,6 +175,8 @@ impl EventBus {
             SystemEvent::TransactionExecuted { .. } => "TransactionExecuted",
             SystemEvent::ContractExecuted { .. } => "ContractExecuted",
             SystemEvent::ProposalExecutionFailed { .. } => "ProposalExecutionFailed",
+            SystemEvent::ProtocolParametersInitialized { .. } => "ProtocolParametersInitialized",
+            SystemEvent::ProtocolParametersLoaded { .. } => "ProtocolParametersLoaded",
         };
 
         debug!(

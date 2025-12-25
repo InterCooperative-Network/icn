@@ -457,7 +457,7 @@ impl ProtocolParameterStore for SledParameterStore {
             }
         }
 
-        // Get old value for history
+        // Get old value for history (before transaction)
         let old_value = if matches!(param.scope, ParameterScope::Global) {
             self.get(&id)?.map(|p| p.value)
         } else {
@@ -468,18 +468,16 @@ impl ProtocolParameterStore for SledParameterStore {
                 .map(|p| p.value)
         };
 
-        // Store the parameter
-        let value = Self::serialize(&param)?;
-        if matches!(param.scope, ParameterScope::Global) {
-            let key = Self::param_key(&id);
-            self.db.insert(&key, value)?;
+        // Prepare values for transaction
+        let param_key = if matches!(param.scope, ParameterScope::Global) {
+            Self::param_key(&id)
         } else {
-            let key = Self::scoped_param_key(&param.scope, &id);
-            self.db.insert(&key, value)?;
-        }
+            Self::scoped_param_key(&param.scope, &id)
+        };
+        let param_value = Self::serialize(&param)?;
 
-        // Record history if we had an old value
-        if let Some(old) = old_value {
+        // Prepare history record if we had an old value
+        let history_entry = if let Some(old) = old_value {
             let now = icn_time::current_timestamp_secs();
             let nonce = self.db.generate_id()?;
             let change = ParameterChange {
@@ -490,11 +488,32 @@ impl ProtocolParameterStore for SledParameterStore {
                 proposal_id,
                 changed_by,
             };
-
             let history_key = Self::history_key(&id, now, nonce);
             let history_value = Self::serialize(&change)?;
-            self.db.insert(&history_key, history_value)?;
-        }
+            Some((history_key, history_value))
+        } else {
+            None
+        };
+
+        // Use transaction for atomicity
+        self.db
+            .transaction(|tx| {
+                // Store the parameter
+                tx.insert(param_key.as_slice(), param_value.as_slice())?;
+
+                // Record history if we had an old value
+                if let Some((ref history_key, ref history_value)) = history_entry {
+                    tx.insert(history_key.as_slice(), history_value.as_slice())?;
+                }
+
+                Ok(())
+            })
+            .map_err(|e| match e {
+                sled::transaction::TransactionError::Abort(err) => err,
+                sled::transaction::TransactionError::Storage(e) => {
+                    anyhow::anyhow!("Transaction storage error: {e}")
+                }
+            })?;
 
         debug!(parameter_id = %id, "Parameter updated");
         Ok(())
@@ -567,28 +586,61 @@ impl ProtocolParameterStore for SledParameterStore {
     }
 
     fn delete(&self, id: &str) -> Result<()> {
-        // Delete global parameter
-        let key = Self::param_key(id);
-        self.db.remove(&key)?;
+        // Collect all keys to delete before transaction
+        let global_key = Self::param_key(id);
 
-        // Delete scoped parameters
+        // Collect scoped parameter keys
         let scoped_prefix = b"param_scope:";
-        for item in self.db.scan_prefix(scoped_prefix) {
-            let (key, _) = item?;
-            let key_str = String::from_utf8_lossy(&key);
-            if key_str.ends_with(&format!(":{id}")) {
-                self.db.remove(&key)?;
-            }
-        }
+        let scoped_keys: Vec<Vec<u8>> = self
+            .db
+            .scan_prefix(scoped_prefix)
+            .filter_map(|item| {
+                let (key, _) = item.ok()?;
+                let key_str = String::from_utf8_lossy(&key);
+                if key_str.ends_with(&format!(":{id}")) {
+                    Some(key.to_vec())
+                } else {
+                    None
+                }
+            })
+            .collect();
 
-        // Delete history
+        // Collect history keys
         let history_prefix = Self::history_prefix(id);
-        for item in self.db.scan_prefix(&history_prefix) {
-            let (key, _) = item?;
-            self.db.remove(&key)?;
-        }
+        let history_keys: Vec<Vec<u8>> = self
+            .db
+            .scan_prefix(&history_prefix)
+            .filter_map(|item| item.ok().map(|(key, _)| key.to_vec()))
+            .collect();
 
-        debug!(parameter_id = %id, "Parameter deleted");
+        let id_str = id.to_string();
+
+        // Use transaction for atomicity
+        self.db
+            .transaction(|tx| {
+                // Delete global parameter
+                tx.remove(global_key.as_slice())?;
+
+                // Delete scoped parameters
+                for key in &scoped_keys {
+                    tx.remove(key.as_slice())?;
+                }
+
+                // Delete history
+                for key in &history_keys {
+                    tx.remove(key.as_slice())?;
+                }
+
+                Ok(())
+            })
+            .map_err(|e| match e {
+                sled::transaction::TransactionError::Abort(err) => err,
+                sled::transaction::TransactionError::Storage(e) => {
+                    anyhow::anyhow!("Transaction storage error: {e}")
+                }
+            })?;
+
+        debug!(parameter_id = %id_str, "Parameter deleted");
         Ok(())
     }
 

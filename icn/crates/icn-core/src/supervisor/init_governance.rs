@@ -137,11 +137,23 @@ pub async fn init_governance_services(
                 protocol_parameter_store.set(param, None, None)?;
             }
             info!("✓ {} default protocol parameters initialized", count);
+
+            // Emit event for observability
+            let event = crate::events::SystemEvent::ProtocolParametersInitialized {
+                count,
+                initialized_at: icn_time::current_timestamp_secs(),
+            };
+            deps.event_bus.emit(event).await;
         } else {
-            info!(
-                "✓ Protocol parameter store loaded ({} parameters)",
-                existing.len()
-            );
+            let count = existing.len();
+            info!("✓ Protocol parameter store loaded ({} parameters)", count);
+
+            // Emit event for observability
+            let event = crate::events::SystemEvent::ProtocolParametersLoaded {
+                count,
+                loaded_at: icn_time::current_timestamp_secs(),
+            };
+            deps.event_bus.emit(event).await;
         }
     }
 
