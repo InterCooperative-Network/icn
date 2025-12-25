@@ -350,3 +350,181 @@ fn test_new_member_ramping_enforced() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn test_credit_limit_ramping_timeline() -> Result<()> {
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter("info")
+        .with_test_writer()
+        .try_init();
+
+    info!("=== Testing credit limit ramping over time ===");
+
+    // Test the NewMemberPolicy ramping calculation directly
+    let policy = NewMemberPolicy::conservative("hours".to_string());
+    let dummy_did = KeyPair::generate()?.did().clone();
+
+    // Constants from conservative policy
+    let initial_limit = 1_000; // 10 hours in centihours
+    let full_limit = 10_000; // 100 hours in centihours (ramp period = 90 days)
+    let one_day_secs: u64 = 24 * 60 * 60;
+
+    // Member joined at epoch 0, testing at various times
+    let member_since = 0_u64;
+    let cleared_volume = 0_i64; // No contribution (won't bypass ramp)
+
+    // Day 0: Should get initial limit
+    let day0_limit = policy.calculate_effective_limit(
+        &dummy_did,
+        member_since,
+        0, // current_time = day 0
+        cleared_volume,
+        full_limit,
+    );
+    assert_eq!(day0_limit, initial_limit, "Day 0: should get initial limit");
+    info!("✓ Day 0: {} centihours (initial limit)", day0_limit);
+
+    // Day 30 (1/3 through): Should get ~40 hours (initial + 1/3 of range)
+    // Range = 10000 - 1000 = 9000
+    // Expected = 1000 + (9000 * 30/90) = 1000 + 3000 = 4000
+    let day30_limit = policy.calculate_effective_limit(
+        &dummy_did,
+        member_since,
+        30 * one_day_secs,
+        cleared_volume,
+        full_limit,
+    );
+    let expected_day30 = initial_limit + ((full_limit - initial_limit) * 30 / 90);
+    assert!(
+        (day30_limit - expected_day30).abs() <= 1,
+        "Day 30: expected ~{expected_day30}, got {day30_limit}"
+    );
+    info!("✓ Day 30: {} centihours (~40 hours)", day30_limit);
+
+    // Day 60 (2/3 through): Should get ~70 hours
+    // Expected = 1000 + (9000 * 60/90) = 1000 + 6000 = 7000
+    let day60_limit = policy.calculate_effective_limit(
+        &dummy_did,
+        member_since,
+        60 * one_day_secs,
+        cleared_volume,
+        full_limit,
+    );
+    let expected_day60 = initial_limit + ((full_limit - initial_limit) * 60 / 90);
+    assert!(
+        (day60_limit - expected_day60).abs() <= 1,
+        "Day 60: expected ~{expected_day60}, got {day60_limit}"
+    );
+    info!("✓ Day 60: {} centihours (~70 hours)", day60_limit);
+
+    // Day 90 (100%): Should get full limit
+    let day90_limit = policy.calculate_effective_limit(
+        &dummy_did,
+        member_since,
+        90 * one_day_secs,
+        cleared_volume,
+        full_limit,
+    );
+    assert_eq!(day90_limit, full_limit, "Day 90: should get full limit");
+    info!("✓ Day 90: {} centihours (full limit)", day90_limit);
+
+    // Day 120 (past ramp period): Should still get full limit
+    let day120_limit = policy.calculate_effective_limit(
+        &dummy_did,
+        member_since,
+        120 * one_day_secs,
+        cleared_volume,
+        full_limit,
+    );
+    assert_eq!(
+        day120_limit, full_limit,
+        "Day 120: should still get full limit"
+    );
+    info!(
+        "✓ Day 120: {} centihours (full limit maintained)",
+        day120_limit
+    );
+
+    info!("✅ Credit limit ramping timeline test passed");
+    Ok(())
+}
+
+#[test]
+fn test_contribution_threshold_grants_full_limit() -> Result<()> {
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter("info")
+        .with_test_writer()
+        .try_init();
+
+    info!("=== Testing contribution threshold bypass ===");
+
+    let policy = NewMemberPolicy::conservative("hours".to_string());
+    let dummy_did = KeyPair::generate()?.did().clone();
+
+    let full_limit = 10_000; // 100 hours
+    let contribution_threshold = 5_000; // 50 hours
+
+    // Member joined today (tenure = 0)
+    let member_since = 1000000_u64;
+    let current_time = member_since; // Same as join time = 0 tenure
+
+    // Without sufficient contribution: should get initial limit
+    let low_contribution = contribution_threshold - 1; // 49.99 hours
+    let limit_without_contribution = policy.calculate_effective_limit(
+        &dummy_did,
+        member_since,
+        current_time,
+        low_contribution,
+        full_limit,
+    );
+    assert_eq!(
+        limit_without_contribution, 1_000,
+        "Without 50 hours, should get initial limit"
+    );
+    info!(
+        "✓ Member with {} centihours contribution: {} limit (initial)",
+        low_contribution, limit_without_contribution
+    );
+
+    // With sufficient contribution: should get full limit immediately
+    let high_contribution = contribution_threshold; // Exactly 50 hours
+    let limit_with_contribution = policy.calculate_effective_limit(
+        &dummy_did,
+        member_since,
+        current_time,
+        high_contribution,
+        full_limit,
+    );
+    assert_eq!(
+        limit_with_contribution, full_limit,
+        "With 50+ hours, should get full limit immediately"
+    );
+    info!(
+        "✓ Member with {} centihours contribution: {} limit (FULL!)",
+        high_contribution, limit_with_contribution
+    );
+
+    // With MORE than threshold: still full limit
+    let very_high_contribution = contribution_threshold * 2; // 100 hours
+    let limit_very_high = policy.calculate_effective_limit(
+        &dummy_did,
+        member_since,
+        current_time,
+        very_high_contribution,
+        full_limit,
+    );
+    assert_eq!(
+        limit_very_high, full_limit,
+        "With high contribution, should get full limit"
+    );
+    info!(
+        "✓ Member with {} centihours contribution: {} limit (FULL!)",
+        very_high_contribution, limit_very_high
+    );
+
+    info!("✅ Contribution threshold bypass test passed");
+    info!("  Members with 50+ hours contribution get full limits immediately");
+    info!("  This rewards active cooperative participation");
+
+    Ok(())
+}

@@ -188,9 +188,10 @@ impl NewMemberPolicy {
         cleared_volume: i64,
         full_limit: i64, // The limit they'll eventually reach
     ) -> i64 {
-        // If hasn't met contribution threshold, use initial limit
-        if cleared_volume < self.contribution_threshold {
-            return self.initial_limit;
+        // High contributors bypass the ramping period entirely.
+        // This rewards members who actively contribute to the cooperative.
+        if cleared_volume >= self.contribution_threshold {
+            return full_limit;
         }
 
         // Calculate tenure (how long they've been a member)
@@ -202,7 +203,7 @@ impl NewMemberPolicy {
             return full_limit;
         }
 
-        // Linear ramp from initial_limit to full_limit
+        // Linear ramp from initial_limit to full_limit based on tenure
         let ramp_progress = tenure_secs as f64 / ramp_period_secs as f64;
         let limit_range = full_limit - self.initial_limit;
         let ramped_bonus = (limit_range as f64 * ramp_progress) as i64;

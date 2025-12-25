@@ -2033,6 +2033,12 @@ pub mod ledger {
         counter!("icn_ledger_entries_rejected_credit_limit_total").increment(1);
     }
 
+    /// Increment counter when membership store lookup fails during credit limit validation.
+    /// High values indicate storage issues that could mask credit limit enforcement.
+    pub fn membership_storage_errors_inc() {
+        counter!("icn_ledger_membership_storage_errors_total").increment(1);
+    }
+
     /// Increment counter when balance recomputation is aborted due to version mismatch (M7 fix)
     pub fn recompute_aborted_version_mismatch_inc() {
         counter!("icn_ledger_recompute_aborted_version_mismatch_total").increment(1);

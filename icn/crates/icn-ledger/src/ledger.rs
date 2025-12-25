@@ -2091,9 +2091,15 @@ impl Ledger {
                 // Apply new member ramping only if membership store is configured
                 // Without membership store, use full calculated limit (backward compatible)
                 let calculated_limit = if let Some(ref membership_store) = self.membership_store {
-                    // Use entry timestamp for consistency with member registration.
-                    // This prevents manipulation via old entry timestamps.
-                    let current_time = entry.timestamp;
+                    // SECURITY: Use actual system time for ramping calculation.
+                    // This prevents timestamp manipulation attacks where a malicious actor
+                    // creates entries with old timestamps to bypass credit limit ramping.
+                    // The member_since is stored from their FIRST transaction (immutable),
+                    // and current_time uses real wall clock time for the ramp calculation.
+                    let current_time = SystemTime::now()
+                        .duration_since(SystemTime::UNIX_EPOCH)
+                        .map(|d| d.as_secs())
+                        .unwrap_or(0);
 
                     // Get member_since from store, with proper error handling.
                     // On storage error, fall back to full_limit (permissive) rather than
@@ -2110,7 +2116,7 @@ impl Ledger {
                             )
                         }
                         Ok(None) => {
-                            // New member - use entry timestamp as join date
+                            // New member - use current system time as join date
                             policy_manager.new_member_policy.calculate_effective_limit(
                                 account,
                                 current_time, // member_since = now (new member)
@@ -2120,14 +2126,14 @@ impl Ledger {
                             )
                         }
                         Err(e) => {
-                            // Storage error - log and use full limit (permissive fallback)
-                            // This prevents established members from being penalized
-                            // due to transient storage issues.
+                            // Storage error - log, track metric, and use full limit
+                            // (permissive fallback to prevent penalizing established members)
                             warn!(
                                 account = %account,
                                 error = ?e,
                                 "Failed to read member_since; using full credit limit"
                             );
+                            icn_obs::metrics::ledger::membership_storage_errors_inc();
                             full_limit
                         }
                     }
