@@ -7,8 +7,17 @@
 //! # Credit Limit Ramping
 //!
 //! New members start with a 10-hour credit limit that ramps linearly to the
-//! full calculated limit over 90 days. Members who contribute 50+ hours
+//! full calculated limit over 90 days. Members who have cleared 50+ hours
 //! (tracked via the ledger's `cleared_volume_index`) get full limits immediately.
+//!
+//! "Cleared volume" = total credits RECEIVED for services/goods provided.
+//!
+//! # Timestamp Assumptions
+//!
+//! Member registration timestamps use Unix seconds (u64). The system expects:
+//! - Timestamps are reasonably accurate (within seconds of actual time)
+//! - The ramping calculation uses `SystemTime::now()` for current time
+//! - Member-since timestamps are set once on first transaction and never updated
 //!
 //! # Concurrency
 //!

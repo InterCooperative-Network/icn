@@ -121,6 +121,13 @@ impl CreditPolicy {
 }
 
 /// Policy for throttling new members
+///
+/// New members start with conservative credit limits that increase via two paths:
+/// 1. **Time-based ramping**: Limits increase linearly over the ramp period
+/// 2. **Cleared volume bypass**: Members who clear enough credits get full limits immediately
+///
+/// "Cleared volume" = total credits RECEIVED for services/goods provided.
+/// This measures economic contribution to the cooperative (not credits spent).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NewMemberPolicy {
     /// Initial credit limit for brand new members
@@ -130,9 +137,11 @@ pub struct NewMemberPolicy {
     /// Time period over which credit ramps to full limit
     pub ramp_period: Duration,
 
-    /// Minimum cleared contributions before ramping starts
-    /// Example: Must clear 50 hours of contributions
-    pub contribution_threshold: i64,
+    /// Minimum cleared volume (credits received) to bypass time-based ramping.
+    /// Members who have received this many credits for their contributions
+    /// get full credit limits immediately, regardless of tenure.
+    /// Example: 5000 = 50 hours (with 2 decimals)
+    pub cleared_volume_threshold: i64,
 
     /// Currency this policy applies to
     pub currency: String,
@@ -143,13 +152,13 @@ impl NewMemberPolicy {
     pub fn new(
         initial_limit: i64,
         ramp_period: Duration,
-        contribution_threshold: i64,
+        cleared_volume_threshold: i64,
         currency: String,
     ) -> Self {
         NewMemberPolicy {
             initial_limit,
             ramp_period,
-            contribution_threshold,
+            cleared_volume_threshold,
             currency,
         }
     }
@@ -164,15 +173,15 @@ impl NewMemberPolicy {
         )
     }
 
-    /// Calculate effective credit limit for a member based on tenure and contributions
+    /// Calculate effective credit limit for a member based on tenure and cleared volume
     ///
-    /// Logic:
-    /// 1. If cleared < contribution_threshold: use initial_limit
-    /// 2. Otherwise: ramp linearly from initial_limit to full_limit over ramp_period
+    /// Two paths to full credit limit:
+    /// 1. **Cleared volume bypass**: If cleared_volume >= threshold → full limit immediately
+    /// 2. **Time-based ramping**: Linear ramp from initial_limit to full_limit over ramp_period
     ///
-    /// Example:
+    /// Example (time-based path):
     /// - member joined 30 days ago
-    /// - has cleared 60 hours (exceeds 50 hour threshold)
+    /// - has cleared 40 hours (below 50 hour threshold)
     /// - ramp period is 90 days
     /// - initial_limit = 10 hours, full_limit = 100 hours
     ///
@@ -190,7 +199,7 @@ impl NewMemberPolicy {
     ) -> i64 {
         // High contributors bypass the ramping period entirely.
         // This rewards members who actively contribute to the cooperative.
-        if cleared_volume >= self.contribution_threshold {
+        if cleared_volume >= self.cleared_volume_threshold {
             return full_limit;
         }
 
@@ -204,11 +213,15 @@ impl NewMemberPolicy {
         }
 
         // Linear ramp from initial_limit to full_limit based on tenure
+        // Use saturating arithmetic to prevent overflow with malformed policy values
         let ramp_progress = tenure_secs as f64 / ramp_period_secs as f64;
-        let limit_range = full_limit - self.initial_limit;
+        let limit_range = full_limit.saturating_sub(self.initial_limit).max(0);
         let ramped_bonus = (limit_range as f64 * ramp_progress) as i64;
 
-        self.initial_limit + ramped_bonus
+        // Clamp result between initial_limit and full_limit
+        self.initial_limit
+            .saturating_add(ramped_bonus)
+            .clamp(self.initial_limit, full_limit)
     }
 }
 
@@ -349,7 +362,7 @@ mod tests {
         let policy = NewMemberPolicy::conservative("hours".to_string());
 
         assert_eq!(policy.initial_limit, 1_000); // 10 hours
-        assert_eq!(policy.contribution_threshold, 5_000); // 50 hours
+        assert_eq!(policy.cleared_volume_threshold, 5_000); // 50 hours
         assert_eq!(policy.ramp_period.as_secs(), 90 * 86400); // 90 days
     }
 
@@ -361,9 +374,10 @@ mod tests {
         let member_since = 1000;
         let full_limit = 10_000; // 100 hours
 
-        // Test 1: Not enough cleared volume yet
+        // Test 1: Below contribution threshold, but time-based ramping applies
+        // With < 50 hours cleared, we fall through to time-based ramping
         let cleared = 4_000; // Only 40 hours cleared (< 50 threshold)
-        let current_time = member_since + 30 * 86400; // 30 days later
+        let current_time = member_since + 30 * 86400; // 30 days later (1/3 of 90 day ramp)
         let limit = policy.calculate_effective_limit(
             &member,
             member_since,
@@ -371,29 +385,29 @@ mod tests {
             cleared,
             full_limit,
         );
-        assert_eq!(limit, policy.initial_limit); // Still at initial limit
-
-        // Test 2: Cleared enough, 30 days in (1/3 of 90 day ramp)
-        let cleared = 6_000; // 60 hours cleared (> 50 threshold)
-        let current_time = member_since + 30 * 86400; // 30 days later
-        let limit = policy.calculate_effective_limit(
-            &member,
-            member_since,
-            current_time,
-            cleared,
-            full_limit,
-        );
-
         // Expected: 1,000 + ((10,000 - 1,000) * (30/90))
         //         = 1,000 + (9,000 * 0.333...)
         //         = 1,000 + 3,000
         //         = 4,000
         assert!(limit > policy.initial_limit);
         assert!(limit < full_limit);
-        assert!((3_000..=4_000).contains(&limit)); // Approximate due to rounding
+        assert!((3_000..=4_000).contains(&limit)); // Ramped based on time
 
-        // Test 3: Full ramp period complete
-        let cleared = 10_000;
+        // Test 2: Above contribution threshold - bypasses ramping entirely
+        // With >= 50 hours cleared, member gets full limit immediately
+        let cleared = 6_000; // 60 hours cleared (>= 50 threshold)
+        let current_time = member_since + 30 * 86400; // 30 days later
+        let limit = policy.calculate_effective_limit(
+            &member,
+            member_since,
+            current_time,
+            cleared,
+            full_limit,
+        );
+        assert_eq!(limit, full_limit); // Contribution threshold grants full limit
+
+        // Test 3: Full ramp period complete (time-based path)
+        let cleared = 4_000; // Below threshold, so time-based ramping applies
         let current_time = member_since + 100 * 86400; // 100 days (> 90 day ramp)
         let limit = policy.calculate_effective_limit(
             &member,
@@ -402,6 +416,18 @@ mod tests {
             cleared,
             full_limit,
         );
-        assert_eq!(limit, full_limit); // Should be at full limit now
+        assert_eq!(limit, full_limit); // Full limit via time completion
+
+        // Test 4: Brand new member with no contributions
+        let cleared = 0;
+        let current_time = member_since; // Just joined
+        let limit = policy.calculate_effective_limit(
+            &member,
+            member_since,
+            current_time,
+            cleared,
+            full_limit,
+        );
+        assert_eq!(limit, policy.initial_limit); // Starts at initial limit
     }
 }

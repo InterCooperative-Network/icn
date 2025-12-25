@@ -188,10 +188,11 @@ fn test_new_member_policy_values() -> Result<()> {
         "Initial limit should be 1,000 centihours"
     );
 
-    // Contribution threshold: 5,000 centihours (50 hours)
+    // Cleared volume threshold: 5,000 centihours (50 hours)
+    // This is the amount of credits RECEIVED that grants immediate full limit
     assert_eq!(
-        policy.contribution_threshold, 5_000,
-        "Contribution threshold should be 5,000 centihours"
+        policy.cleared_volume_threshold, 5_000,
+        "Cleared volume threshold should be 5,000 centihours"
     );
 
     // Ramp period: 90 days
@@ -209,9 +210,9 @@ fn test_new_member_policy_values() -> Result<()> {
         policy.initial_limit / 100
     );
     info!(
-        "  Contribution threshold: {} centihours ({} hours)",
-        policy.contribution_threshold,
-        policy.contribution_threshold / 100
+        "  Cleared volume threshold: {} centihours ({} hours)",
+        policy.cleared_volume_threshold,
+        policy.cleared_volume_threshold / 100
     );
     info!(
         "  Ramp period: {} days",
@@ -450,80 +451,81 @@ fn test_credit_limit_ramping_timeline() -> Result<()> {
 }
 
 #[test]
-fn test_contribution_threshold_grants_full_limit() -> Result<()> {
+fn test_cleared_volume_threshold_grants_full_limit() -> Result<()> {
     let _ = tracing_subscriber::fmt()
         .with_env_filter("info")
         .with_test_writer()
         .try_init();
 
-    info!("=== Testing contribution threshold bypass ===");
+    info!("=== Testing cleared volume bypass ===");
+    info!("  'Cleared volume' = credits RECEIVED for services/goods provided");
 
     let policy = NewMemberPolicy::conservative("hours".to_string());
     let dummy_did = KeyPair::generate()?.did().clone();
 
     let full_limit = 10_000; // 100 hours
-    let contribution_threshold = 5_000; // 50 hours
+    let cleared_volume_threshold = 5_000; // 50 hours
 
     // Member joined today (tenure = 0)
     let member_since = 1000000_u64;
     let current_time = member_since; // Same as join time = 0 tenure
 
-    // Without sufficient contribution: should get initial limit
-    let low_contribution = contribution_threshold - 1; // 49.99 hours
-    let limit_without_contribution = policy.calculate_effective_limit(
+    // Without sufficient cleared volume: should get initial limit
+    let low_cleared_volume = cleared_volume_threshold - 1; // 49.99 hours
+    let limit_without = policy.calculate_effective_limit(
         &dummy_did,
         member_since,
         current_time,
-        low_contribution,
+        low_cleared_volume,
         full_limit,
     );
     assert_eq!(
-        limit_without_contribution, 1_000,
-        "Without 50 hours, should get initial limit"
+        limit_without, 1_000,
+        "Without 50 hours cleared, should get initial limit"
     );
     info!(
-        "✓ Member with {} centihours contribution: {} limit (initial)",
-        low_contribution, limit_without_contribution
+        "✓ Member with {} centihours cleared: {} limit (initial)",
+        low_cleared_volume, limit_without
     );
 
-    // With sufficient contribution: should get full limit immediately
-    let high_contribution = contribution_threshold; // Exactly 50 hours
-    let limit_with_contribution = policy.calculate_effective_limit(
+    // With sufficient cleared volume: should get full limit immediately
+    let high_cleared_volume = cleared_volume_threshold; // Exactly 50 hours
+    let limit_with = policy.calculate_effective_limit(
         &dummy_did,
         member_since,
         current_time,
-        high_contribution,
+        high_cleared_volume,
         full_limit,
     );
     assert_eq!(
-        limit_with_contribution, full_limit,
-        "With 50+ hours, should get full limit immediately"
+        limit_with, full_limit,
+        "With 50+ hours cleared, should get full limit immediately"
     );
     info!(
-        "✓ Member with {} centihours contribution: {} limit (FULL!)",
-        high_contribution, limit_with_contribution
+        "✓ Member with {} centihours cleared: {} limit (FULL!)",
+        high_cleared_volume, limit_with
     );
 
     // With MORE than threshold: still full limit
-    let very_high_contribution = contribution_threshold * 2; // 100 hours
+    let very_high_cleared_volume = cleared_volume_threshold * 2; // 100 hours
     let limit_very_high = policy.calculate_effective_limit(
         &dummy_did,
         member_since,
         current_time,
-        very_high_contribution,
+        very_high_cleared_volume,
         full_limit,
     );
     assert_eq!(
         limit_very_high, full_limit,
-        "With high contribution, should get full limit"
+        "With high cleared volume, should get full limit"
     );
     info!(
-        "✓ Member with {} centihours contribution: {} limit (FULL!)",
-        very_high_contribution, limit_very_high
+        "✓ Member with {} centihours cleared: {} limit (FULL!)",
+        very_high_cleared_volume, limit_very_high
     );
 
-    info!("✅ Contribution threshold bypass test passed");
-    info!("  Members with 50+ hours contribution get full limits immediately");
+    info!("✅ Cleared volume bypass test passed");
+    info!("  Members with 50+ hours cleared get full limits immediately");
     info!("  This rewards active cooperative participation");
 
     Ok(())
