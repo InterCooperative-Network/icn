@@ -363,6 +363,47 @@ impl<S: CommonsStoreBackend> CommonsManager<S> {
         self.store.get_holder_by_did(&did_str)
     }
 
+    /// Get or create a CommonsHolderRecord (idempotent)
+    ///
+    /// This method provides create-or-get semantics for holders:
+    /// - If a holder already exists for this anchor, returns it
+    /// - If no holder exists, creates a new one
+    ///
+    /// This is critical for enrollment idempotency: calling this method
+    /// multiple times with the same anchor_id returns the same holder.
+    ///
+    /// # Arguments
+    /// * `anchor_id` - Hex-encoded anchor ID
+    /// * `did` - The DID for the holder
+    /// * `display_name` - Optional display name (only used if creating new)
+    ///
+    /// # Returns
+    /// The existing or newly created CommonsHolderRecord
+    pub async fn get_or_create_holder(
+        &self,
+        anchor_id: &str,
+        did: &Did,
+        display_name: Option<String>,
+    ) -> Result<CommonsHolderRecord> {
+        // First, try to find existing holder by anchor ID
+        if let Some(holder) = self.store.get_holder_by_anchor(anchor_id)? {
+            info!(
+                target: "commons_audit",
+                action = "holder_get_or_create_existing",
+                holder_id = %hex::encode(holder.id()),
+                anchor_id = %anchor_id,
+                "Returning existing holder for anchor"
+            );
+            return Ok(holder);
+        }
+
+        // No existing holder, create new one
+        // This delegates to create_holder_from_anchor_with_name which handles
+        // anchor validation, metrics, and audit logging
+        self.create_holder_from_anchor_with_name(anchor_id, did, display_name)
+            .await
+    }
+
     /// Update holder status
     pub async fn update_holder_status(&self, holder_id: &str, status: HolderStatus) -> Result<()> {
         let mut holder = self
