@@ -16,11 +16,13 @@
 //! When created with `new()`, it uses in-memory storage (suitable for testing only).
 
 use anyhow::Result;
+use icn_entity::EntityId;
 use icn_identity::Did;
 use icn_ledger::{
     ApprovalType, Ledger, PaginatedAuditTrail, SpendingRule, Treasury, TreasuryAuditRecord,
     TreasuryBudget, TreasuryManager as LedgerTreasuryManager, TreasuryOperation,
 };
+use icn_obs::metrics::treasury as treasury_metrics;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -135,7 +137,9 @@ impl GatewayTreasuryManager {
         Ok(None)
     }
 
-    /// Register a new treasury for a cooperative
+    /// Register a new treasury for a cooperative (legacy API)
+    ///
+    /// **Deprecated**: Use `register_treasury_with_entity()` for type-safe entity references.
     pub async fn register_treasury(
         &self,
         treasury_did: Did,
@@ -150,6 +154,40 @@ impl GatewayTreasuryManager {
         }
 
         anyhow::bail!("Treasury registration not supported in standalone mode")
+    }
+
+    /// Register a new treasury for an entity (preferred API)
+    ///
+    /// Uses type-safe `EntityId` instead of string `coop_id`.
+    /// The `coop_id` is automatically derived from `entity_id.identifier()`.
+    pub async fn register_treasury_with_entity(
+        &self,
+        treasury_did: Did,
+        entity_id: EntityId,
+        currency: String,
+        created_by: Did,
+        description: Option<String>,
+    ) -> Result<Treasury> {
+        if let Some(ref handle) = self.treasury_handle {
+            let mut mgr = handle.write().await;
+            return mgr.register_treasury_with_entity(
+                treasury_did,
+                entity_id,
+                currency,
+                created_by,
+                description,
+            );
+        }
+
+        anyhow::bail!("Treasury registration not supported in standalone mode")
+    }
+
+    /// Get treasury by entity ID
+    ///
+    /// Looks up a treasury using its associated entity ID.
+    pub async fn get_treasury_by_entity(&self, entity_id: &EntityId) -> Result<Option<Treasury>> {
+        // Entity ID's identifier matches the coop_id
+        self.get_treasury_by_coop(entity_id.identifier()).await
     }
 
     // ============================================================================
@@ -404,6 +442,9 @@ impl GatewayTreasuryManager {
             ledger.get_balance(treasury_did, &currency)
         };
 
+        // Capture currency for metrics before moving into operation
+        let currency_for_metrics = currency.clone();
+
         // Record audit trail if treasury handle is available
         if self.treasury_handle.is_some() {
             let operation = TreasuryOperation::Deposit {
@@ -423,6 +464,15 @@ impl GatewayTreasuryManager {
             )
             .await?;
         }
+
+        // Emit metrics
+        treasury_metrics::deposit_processed_inc();
+        treasury_metrics::deposit_by_currency_inc(&currency_for_metrics);
+        treasury_metrics::balance_set(
+            &treasury_did.to_string(),
+            &currency_for_metrics,
+            new_balance,
+        );
 
         debug!(
             treasury = %treasury_did,

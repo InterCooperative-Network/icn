@@ -609,6 +609,68 @@ pub fn init_descriptions() {
         "Total number of ledger operations from contract execution"
     );
 
+    // Treasury metrics
+    describe_counter!(
+        "icn_treasury_deposits_total",
+        "Total number of treasury deposits"
+    );
+    describe_counter!(
+        "icn_treasury_deposits_by_currency_total",
+        "Total number of treasury deposits by currency"
+    );
+    describe_counter!(
+        "icn_treasury_withdrawals_total",
+        "Total number of treasury withdrawals"
+    );
+    describe_counter!(
+        "icn_treasury_withdrawals_by_currency_total",
+        "Total number of treasury withdrawals by currency"
+    );
+    describe_gauge!(
+        "icn_treasury_balance_amount",
+        "Current treasury balance by treasury DID and currency"
+    );
+    describe_counter!(
+        "icn_treasury_budget_spending_total",
+        "Total budget spending by budget ID"
+    );
+    describe_gauge!(
+        "icn_treasury_budget_remaining_amount",
+        "Remaining budget amount by budget ID"
+    );
+    describe_counter!(
+        "icn_treasury_approval_required_total",
+        "Total number of operations requiring governance approval"
+    );
+    describe_counter!(
+        "icn_treasury_validation_success_total",
+        "Total number of successful treasury validations"
+    );
+    describe_counter!(
+        "icn_treasury_validation_failed_total",
+        "Total number of failed treasury validations"
+    );
+    describe_counter!(
+        "icn_treasury_validation_lock_contention_total",
+        "Total number of treasury validation lock contentions"
+    );
+    describe_counter!(
+        "icn_treasury_budgets_created_total",
+        "Total number of budgets created"
+    );
+    describe_counter!(
+        "icn_treasury_budget_allocations_total",
+        "Total number of budget allocations"
+    );
+    describe_counter!(
+        "icn_treasury_threshold_notifications_total",
+        "Total number of budget threshold notifications (50%, 80%, 100%)"
+    );
+    describe_counter!(
+        "icn_treasury_velocity_limit_exceeded_total",
+        "Total number of operations blocked by velocity limits"
+    );
+
     // System metrics
     describe_gauge!("icn_system_uptime_seconds", "System uptime in seconds");
     describe_gauge!("icn_system_actors_active", "Number of active actors");
@@ -3966,7 +4028,7 @@ pub mod commons {
 
 /// Treasury metrics
 pub mod treasury {
-    use metrics::counter;
+    use metrics::{counter, gauge};
 
     /// Increment when treasury validation succeeds
     pub fn validation_success_inc() {
@@ -3989,9 +4051,31 @@ pub mod treasury {
         counter!("icn_treasury_deposits_total").increment(1);
     }
 
+    /// Increment when a deposit is processed, labeled by currency
+    pub fn deposit_by_currency_inc(currency: &str) {
+        counter!("icn_treasury_deposits_by_currency_total", "currency" => currency.to_string())
+            .increment(1);
+    }
+
     /// Increment when a withdrawal is processed
     pub fn withdrawal_processed_inc() {
         counter!("icn_treasury_withdrawals_total").increment(1);
+    }
+
+    /// Increment when a withdrawal is processed, labeled by currency
+    pub fn withdrawal_by_currency_inc(currency: &str) {
+        counter!("icn_treasury_withdrawals_by_currency_total", "currency" => currency.to_string())
+            .increment(1);
+    }
+
+    /// Set current treasury balance for a treasury/currency pair
+    pub fn balance_set(treasury_did: &str, currency: &str, balance: i64) {
+        gauge!(
+            "icn_treasury_balance_amount",
+            "treasury_did" => treasury_did.to_string(),
+            "currency" => currency.to_string()
+        )
+        .set(balance as f64);
     }
 
     /// Increment when a budget is created
@@ -4002,5 +4086,47 @@ pub mod treasury {
     /// Increment when a budget allocation is made
     pub fn budget_allocated_inc() {
         counter!("icn_treasury_budget_allocations_total").increment(1);
+    }
+
+    /// Increment budget spending counter
+    pub fn budget_spending_inc(budget_id: &str) {
+        counter!("icn_treasury_budget_spending_total", "budget_id" => budget_id.to_string())
+            .increment(1);
+    }
+
+    /// Set remaining budget amount
+    pub fn budget_remaining_set(budget_id: &str, remaining: i64) {
+        gauge!(
+            "icn_treasury_budget_remaining_amount",
+            "budget_id" => budget_id.to_string()
+        )
+        .set(remaining as f64);
+    }
+
+    /// Increment when an operation requires governance approval
+    pub fn approval_required_inc(approval_type: &str) {
+        counter!(
+            "icn_treasury_approval_required_total",
+            "approval_type" => approval_type.to_string()
+        )
+        .increment(1);
+    }
+
+    /// Increment when a budget threshold is crossed (50%, 80%, 100%)
+    pub fn threshold_notification_inc(threshold: &str) {
+        counter!(
+            "icn_treasury_threshold_notifications_total",
+            "threshold" => threshold.to_string()
+        )
+        .increment(1);
+    }
+
+    /// Increment when an operation is blocked by velocity limits
+    pub fn velocity_limit_exceeded_inc(currency: &str) {
+        counter!(
+            "icn_treasury_velocity_limit_exceeded_total",
+            "currency" => currency.to_string()
+        )
+        .increment(1);
     }
 }
