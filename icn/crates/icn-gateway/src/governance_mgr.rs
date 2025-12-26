@@ -646,7 +646,7 @@ impl GovernanceManager {
         let max_depth = DEFAULT_MAX_DELEGATION_DEPTH;
         if incoming_depth >= max_depth {
             anyhow::bail!(
-                "Maximum delegation depth ({max_depth}) exceeded. The delegation chain is too long.",
+                "Maximum delegation depth exceeded: computed depth {incoming_depth} >= max {max_depth}. The delegation chain is too long.",
             );
         }
 
