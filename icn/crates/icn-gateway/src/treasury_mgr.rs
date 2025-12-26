@@ -22,6 +22,7 @@ use icn_ledger::{
     ApprovalType, Ledger, PaginatedAuditTrail, SpendingRule, Treasury, TreasuryAuditRecord,
     TreasuryBudget, TreasuryManager as LedgerTreasuryManager, TreasuryOperation,
 };
+use icn_obs::metrics::treasury as treasury_metrics;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -441,6 +442,9 @@ impl GatewayTreasuryManager {
             ledger.get_balance(treasury_did, &currency)
         };
 
+        // Capture currency for metrics before moving into operation
+        let currency_for_metrics = currency.clone();
+
         // Record audit trail if treasury handle is available
         if self.treasury_handle.is_some() {
             let operation = TreasuryOperation::Deposit {
@@ -460,6 +464,11 @@ impl GatewayTreasuryManager {
             )
             .await?;
         }
+
+        // Emit metrics
+        treasury_metrics::deposit_processed_inc();
+        treasury_metrics::deposit_by_currency_inc(&currency_for_metrics);
+        treasury_metrics::balance_set(&treasury_did.to_string(), &currency_for_metrics, new_balance);
 
         debug!(
             treasury = %treasury_did,

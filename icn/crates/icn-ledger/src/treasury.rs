@@ -60,6 +60,7 @@ use crate::types::{ContentHash, JournalEntry};
 use anyhow::{bail, Result};
 use icn_entity::EntityId;
 use icn_identity::Did;
+use icn_obs::metrics::treasury as treasury_metrics;
 use icn_store::Store;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -917,6 +918,10 @@ impl TreasuryManager {
             self.persist_budget_index(&treasury_did, &budget_id, store)?;
         }
 
+        // Emit metrics
+        treasury_metrics::budget_created_inc();
+        treasury_metrics::budget_remaining_set(&budget_id, amount);
+
         Ok(budget)
     }
 
@@ -1132,10 +1137,24 @@ impl TreasuryManager {
         }
 
         // Only return if it requires some approval
-        match highest_approval {
+        let result = match highest_approval {
             Some(ApprovalType::None) => None,
             other => other,
+        };
+
+        // Emit metric if approval is required
+        if let Some(ref approval_type) = result {
+            let type_str = match approval_type {
+                ApprovalType::None => "none",
+                ApprovalType::SimpleMajority => "simple_majority",
+                ApprovalType::SuperMajority => "super_majority",
+                ApprovalType::BoardOnly => "board_only",
+                ApprovalType::Emergency => "emergency",
+            };
+            treasury_metrics::approval_required_inc(type_str);
         }
+
+        result
     }
 
     /// List spending rules for a treasury
@@ -1264,6 +1283,8 @@ impl TreasuryManager {
                     .or_default();
 
                 if window.would_exceed(limit.window_seconds, limit.max_amount, amount) {
+                    // Emit metric for velocity limit exceeded
+                    treasury_metrics::velocity_limit_exceeded_inc(currency);
                     // Return the limit that would be violated
                     return self.velocity_limits.get(limit_id);
                 }
