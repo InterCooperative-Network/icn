@@ -60,6 +60,8 @@ pub struct GatewayServer {
     ledger_handle: Option<LedgerHandle>,
     /// Optional handle to daemon's EntityRegistry (for entity management)
     entity_handle: Option<EntityHandle>,
+    /// Optional handle to daemon's CommunityActor (for civic engine)
+    community_handle: Option<icn_community::CommunityHandle>,
 }
 
 impl GatewayServer {
@@ -80,6 +82,7 @@ impl GatewayServer {
             treasury_handle: None,
             ledger_handle: None,
             entity_handle: None,
+            community_handle: None,
         }
     }
 
@@ -104,6 +107,7 @@ impl GatewayServer {
             treasury_handle: None,
             ledger_handle: None,
             entity_handle: None,
+            community_handle: None,
         }
     }
 
@@ -129,6 +133,7 @@ impl GatewayServer {
             treasury_handle: None,
             ledger_handle: None,
             entity_handle: None,
+            community_handle: None,
         }
     }
 
@@ -147,6 +152,15 @@ impl GatewayServer {
     /// Set cooperative handle for daemon integration
     pub fn with_coop_handle(mut self, handle: icn_coop::CoopHandle) -> Self {
         self.coop_handle = Some(handle);
+        self
+    }
+
+    /// Set community handle for daemon integration
+    ///
+    /// When set, the CommunityManager will delegate all operations to the daemon's
+    /// CommunityActor, ensuring persistence and gossip synchronization.
+    pub fn with_community_handle(mut self, handle: icn_community::CommunityHandle) -> Self {
+        self.community_handle = Some(handle);
         self
     }
 
@@ -247,6 +261,18 @@ impl GatewayServer {
             info!("Cooperative manager running standalone (in-memory only)");
             Arc::new(CoopManager::new())
         };
+
+        // Create community manager (requires CommunityActor handle)
+        let community_manager: Option<Arc<crate::community_mgr::CommunityManager>> =
+            if let Some(handle) = self.community_handle {
+                info!("Community manager connected to daemon (using CommunityActor)");
+                Some(Arc::new(crate::community_mgr::CommunityManager::new(
+                    handle,
+                )))
+            } else {
+                info!("Community manager not configured (community API disabled)");
+                None
+            };
 
         // Create governance manager (uses actor if handle available, otherwise in-memory)
         let governance_manager: Arc<GovernanceManager> =
@@ -551,6 +577,7 @@ impl GatewayServer {
                 // Shared state
                 .app_data(web::Data::new(auth_manager.clone()))
                 .app_data(web::Data::new(coop_manager.clone()))
+                .app_data(web::Data::new(community_manager.clone()))
                 .app_data(web::Data::new(governance_manager.clone()))
                 .app_data(web::Data::new(invite_manager.clone()))
                 .app_data(web::Data::new(session_manager.clone()))

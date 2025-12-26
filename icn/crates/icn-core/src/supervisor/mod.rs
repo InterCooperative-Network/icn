@@ -118,6 +118,9 @@ impl Supervisor {
         // Cooperative handle for gateway integration
         let coop_handle_for_gateway: Option<icn_coop::CoopHandle>;
 
+        // Community handle for gateway integration
+        let community_handle_for_gateway: Option<icn_community::CommunityHandle>;
+
         // Trust graph handle for gateway integration
         let trust_graph_handle_for_gateway: Option<
             Arc<tokio::sync::RwLock<icn_trust::TrustGraph>>,
@@ -232,9 +235,7 @@ impl Supervisor {
             )
             .await?;
             icn_obs::metrics::supervisor::actor_spawned_inc("community");
-            // TODO: Wire community_handle into gateway when community routes are enabled
-            let _community_handle = community_services.community_handle.clone();
-            // TODO: Wire community_store into gossip sync handler
+            // TODO: Wire community_store into gossip sync handler for incoming updates
             let _community_store = community_services.community_store.clone();
 
             // Initialize entity services (persistent storage)
@@ -243,6 +244,7 @@ impl Supervisor {
 
             // Store handles for gateway integration (outside of identity_bundle scope)
             coop_handle_for_gateway = Some(coop_handle);
+            community_handle_for_gateway = Some(community_services.community_handle);
             trust_graph_handle_for_gateway = Some(trust_graph_handle.clone());
             entity_handle_for_gateway = Some(entity_services.entity_handle);
 
@@ -1105,10 +1107,11 @@ impl Supervisor {
 
             info!("Metrics update task spawned (system metrics only)");
 
-            // No event broadcaster or compute/trust/governance/treasury/ledger/entity handles without identity
+            // No event broadcaster or compute/trust/governance/treasury/ledger/entity/community handles without identity
             event_broadcaster = None;
             compute_handle_for_gateway = None;
             coop_handle_for_gateway = None;
+            community_handle_for_gateway = None;
             trust_graph_handle_for_gateway = None;
             governance_handle_for_gateway = None;
             treasury_handle_for_gateway = None;
@@ -1171,6 +1174,11 @@ impl Supervisor {
                         // Connect cooperative handle if available
                         if let Some(handle) = coop_handle_for_gateway {
                             gateway_server = gateway_server.with_coop_handle(handle);
+                        }
+
+                        // Connect community handle if available
+                        if let Some(handle) = community_handle_for_gateway {
+                            gateway_server = gateway_server.with_community_handle(handle);
                         }
 
                         // Connect trust graph handle if available

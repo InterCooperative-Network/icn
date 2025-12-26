@@ -47,14 +47,22 @@ pub async fn init_community_services(
     let store_path = config.store_path().join("community");
     let sled_store: Arc<dyn icn_store::Store> = Arc::new(SledStore::open(&store_path)?);
 
-    // CommunityStore uses the generic Store trait
-    let community_store = CommunityStore::new(sled_store.clone());
-    let community_store_for_gateway = Arc::new(CommunityStore::new(sled_store));
+    // Create CommunityStore instances that share the same underlying SledStore
+    // One for the actor, one for the gateway (both reference the same data)
+    let store_for_actor = CommunityStore::new(Arc::clone(&sled_store));
+    let community_store = Arc::new(CommunityStore::new(sled_store));
 
     info!("Community store initialized at {:?}", store_path);
 
     // Subscribe to gossip topic for distributed community updates
     // This allows communities created on one node to sync to others
+    //
+    // TODO(Phase 2): Implement gossip notification handler to process incoming
+    // community updates from other nodes. The handler should:
+    // 1. Deserialize incoming Community updates
+    // 2. Merge with local store (last-write-wins based on updated_at)
+    // 3. Handle conflicts for concurrent member operations
+    // See icn-coop/src/gossip.rs for the cooperative sync pattern
     {
         let mut gossip = gossip_handle.write().await;
         if let Err(e) = gossip.subscribe(COMMUNITY_TOPIC, node_did) {
@@ -65,13 +73,13 @@ pub async fn init_community_services(
     }
 
     // Spawn CommunityActor with store and gossip handle for distributed sync
-    let tx = CommunityActor::spawn(community_store, Some(gossip_handle));
+    let tx = CommunityActor::spawn(store_for_actor, Some(gossip_handle));
     let community_handle = CommunityHandle::new(tx);
 
     info!("✓ Community actor spawned (civic engine)");
 
     Ok(CommunityServices {
         community_handle,
-        community_store: community_store_for_gateway,
+        community_store,
     })
 }

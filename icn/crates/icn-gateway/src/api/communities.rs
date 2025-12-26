@@ -16,8 +16,17 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use crate::community_mgr::CommunityManager;
-use crate::error::Result;
+use crate::error::{GatewayError, Result};
 use crate::middleware::require_scope;
+
+/// Extract the CommunityManager from optional app data
+fn get_community_mgr(
+    mgr: &web::Data<Option<Arc<CommunityManager>>>,
+) -> Result<&Arc<CommunityManager>> {
+    mgr.as_ref()
+        .as_ref()
+        .ok_or_else(|| GatewayError::ServiceUnavailable("Community service not configured".into()))
+}
 
 /// Request to create a new community
 #[derive(Debug, Deserialize, Serialize)]
@@ -28,6 +37,8 @@ pub struct CreateCommunityRequest {
     pub name: String,
     /// Community type
     pub community_type: String,
+    /// Founder type: "individual" (default) or "cooperative"
+    pub founder_type: Option<String>,
     /// Charter content (CCL)
     #[serde(default)]
     pub charter: String,
@@ -88,27 +99,33 @@ fn parse_member_type(type_str: &str, member_id: &str) -> Result<MemberType> {
 #[post("")]
 pub async fn create_community(
     http_req: HttpRequest,
-    community_mgr: web::Data<Arc<CommunityManager>>,
+    community_mgr: web::Data<Option<Arc<CommunityManager>>>,
     req: web::Json<CreateCommunityRequest>,
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "community:write")?;
+    let mgr = get_community_mgr(&community_mgr)?;
 
     // Get founder from authenticated token
     use crate::middleware::get_claims;
-    let claims = get_claims(&http_req).ok_or_else(|| {
-        crate::error::GatewayError::AuthenticationFailed("No claims found".to_string())
-    })?;
+    let claims = get_claims(&http_req)
+        .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
 
     let founder_id = claims.sub.clone();
     let community_type = parse_community_type(&req.community_type)?;
 
-    let community = community_mgr
+    // Parse founder type (defaults to Individual if not specified)
+    let founder_type = match req.founder_type.as_deref() {
+        Some("cooperative") => MemberType::Cooperative(founder_id.clone()),
+        _ => MemberType::Individual(founder_id.clone()),
+    };
+
+    let community = mgr
         .create_community(
             req.id.clone(),
             req.name.clone(),
             community_type,
-            founder_id.clone(),
-            MemberType::Individual(founder_id),
+            founder_id,
+            founder_type,
             req.charter.clone(),
         )
         .await?;
@@ -120,11 +137,12 @@ pub async fn create_community(
 #[get("")]
 pub async fn list_communities(
     http_req: HttpRequest,
-    community_mgr: web::Data<Arc<CommunityManager>>,
+    community_mgr: web::Data<Option<Arc<CommunityManager>>>,
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "community:read")?;
+    let mgr = get_community_mgr(&community_mgr)?;
 
-    let communities = community_mgr.list_communities().await?;
+    let communities = mgr.list_communities().await?;
     Ok(HttpResponse::Ok().json(communities))
 }
 
@@ -132,12 +150,13 @@ pub async fn list_communities(
 #[get("/{id}")]
 pub async fn get_community(
     http_req: HttpRequest,
-    community_mgr: web::Data<Arc<CommunityManager>>,
+    community_mgr: web::Data<Option<Arc<CommunityManager>>>,
     id: web::Path<String>,
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "community:read")?;
+    let mgr = get_community_mgr(&community_mgr)?;
 
-    let community = community_mgr.get_community(&id).await?;
+    let community = mgr.get_community(&id).await?;
     Ok(HttpResponse::Ok().json(community))
 }
 
@@ -145,13 +164,14 @@ pub async fn get_community(
 #[put("/{id}")]
 pub async fn update_community(
     http_req: HttpRequest,
-    community_mgr: web::Data<Arc<CommunityManager>>,
+    community_mgr: web::Data<Option<Arc<CommunityManager>>>,
     id: web::Path<String>,
     req: web::Json<UpdateCommunityRequest>,
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "community:admin")?;
+    let mgr = get_community_mgr(&community_mgr)?;
 
-    let community = community_mgr
+    let community = mgr
         .update_community(&id, req.name.clone(), req.metadata.clone())
         .await?;
 
@@ -162,12 +182,13 @@ pub async fn update_community(
 #[post("/{id}/activate")]
 pub async fn activate_community(
     http_req: HttpRequest,
-    community_mgr: web::Data<Arc<CommunityManager>>,
+    community_mgr: web::Data<Option<Arc<CommunityManager>>>,
     id: web::Path<String>,
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "community:admin")?;
+    let mgr = get_community_mgr(&community_mgr)?;
 
-    let community = community_mgr.activate_community(&id).await?;
+    let community = mgr.activate_community(&id).await?;
     Ok(HttpResponse::Ok().json(community))
 }
 
@@ -175,12 +196,13 @@ pub async fn activate_community(
 #[delete("/{id}")]
 pub async fn dissolve_community(
     http_req: HttpRequest,
-    community_mgr: web::Data<Arc<CommunityManager>>,
+    community_mgr: web::Data<Option<Arc<CommunityManager>>>,
     id: web::Path<String>,
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "community:admin")?;
+    let mgr = get_community_mgr(&community_mgr)?;
 
-    let community = community_mgr.dissolve_community(&id).await?;
+    let community = mgr.dissolve_community(&id).await?;
     Ok(HttpResponse::Ok().json(community))
 }
 
@@ -188,15 +210,16 @@ pub async fn dissolve_community(
 #[post("/{id}/members")]
 pub async fn join_community(
     http_req: HttpRequest,
-    community_mgr: web::Data<Arc<CommunityManager>>,
+    community_mgr: web::Data<Option<Arc<CommunityManager>>>,
     id: web::Path<String>,
     req: web::Json<JoinCommunityRequest>,
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "community:write")?;
+    let mgr = get_community_mgr(&community_mgr)?;
 
     let member_type = parse_member_type(&req.member_type, &req.member_id)?;
 
-    let community = community_mgr
+    let community = mgr
         .join_community(&id, req.member_id.clone(), member_type)
         .await?;
 
@@ -207,16 +230,15 @@ pub async fn join_community(
 #[delete("/{id}/members/{member_id}")]
 pub async fn leave_community(
     http_req: HttpRequest,
-    community_mgr: web::Data<Arc<CommunityManager>>,
+    community_mgr: web::Data<Option<Arc<CommunityManager>>>,
     path: web::Path<(String, String)>,
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "community:write")?;
+    let mgr = get_community_mgr(&community_mgr)?;
 
     let (community_id, member_id) = path.into_inner();
 
-    let community = community_mgr
-        .leave_community(&community_id, &member_id)
-        .await?;
+    let community = mgr.leave_community(&community_id, &member_id).await?;
 
     Ok(HttpResponse::Ok().json(community))
 }
@@ -225,12 +247,13 @@ pub async fn leave_community(
 #[get("/{id}/members")]
 pub async fn list_members(
     http_req: HttpRequest,
-    community_mgr: web::Data<Arc<CommunityManager>>,
+    community_mgr: web::Data<Option<Arc<CommunityManager>>>,
     id: web::Path<String>,
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "community:read")?;
+    let mgr = get_community_mgr(&community_mgr)?;
 
-    let members = community_mgr.list_members(&id).await?;
+    let members = mgr.list_members(&id).await?;
     Ok(HttpResponse::Ok().json(members))
 }
 
@@ -238,13 +261,14 @@ pub async fn list_members(
 #[post("/{id}/resources")]
 pub async fn allocate_resource(
     http_req: HttpRequest,
-    community_mgr: web::Data<Arc<CommunityManager>>,
+    community_mgr: web::Data<Option<Arc<CommunityManager>>>,
     id: web::Path<String>,
     req: web::Json<AllocateResourceRequest>,
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "community:admin")?;
+    let mgr = get_community_mgr(&community_mgr)?;
 
-    let community = community_mgr
+    let community = mgr
         .allocate_resource(
             &id,
             req.pool_name.clone(),
@@ -260,12 +284,13 @@ pub async fn allocate_resource(
 #[get("/{id}/resources")]
 pub async fn get_resource_pools(
     http_req: HttpRequest,
-    community_mgr: web::Data<Arc<CommunityManager>>,
+    community_mgr: web::Data<Option<Arc<CommunityManager>>>,
     id: web::Path<String>,
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "community:read")?;
+    let mgr = get_community_mgr(&community_mgr)?;
 
-    let pools = community_mgr.get_resource_pools(&id).await?;
+    let pools = mgr.get_resource_pools(&id).await?;
     Ok(HttpResponse::Ok().json(pools))
 }
 
