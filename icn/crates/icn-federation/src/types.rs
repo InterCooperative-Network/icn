@@ -451,9 +451,13 @@ impl RepresentativeAuth {
         self.capabilities.iter().any(|c| {
             matches!(
                 (c, capability),
-                (FederationCapability::Vote { .. }, FederationCapability::Vote { .. })
-                    | (FederationCapability::Sign { .. }, FederationCapability::Sign { .. })
-                    | (FederationCapability::Propose, FederationCapability::Propose)
+                (
+                    FederationCapability::Vote { .. },
+                    FederationCapability::Vote { .. }
+                ) | (
+                    FederationCapability::Sign { .. },
+                    FederationCapability::Sign { .. }
+                ) | (FederationCapability::Propose, FederationCapability::Propose)
                     | (FederationCapability::Observe, FederationCapability::Observe)
             )
         })
