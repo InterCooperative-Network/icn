@@ -83,7 +83,7 @@ pub use quarantine::QuarantineStore;
 pub use sync::{deserialize_sync_message, ledger_topic, serialize_sync_message, LedgerSyncMessage};
 pub use treasury::{
     ApprovalType, BudgetStatus, PaginatedAuditTrail, SpendingRule, Treasury, TreasuryAuditRecord,
-    TreasuryBudget, TreasuryManager, TreasuryOperation,
+    TreasuryBudget, TreasuryManager, TreasuryOperation, VelocityLimit, VelocityWindow,
 };
 pub use types::{
     AccountBalances, AccountDelta, ContentHash, CreditLimit, Currency, Dispute, DisputeOutcome,
