@@ -24,6 +24,11 @@ impl MembershipManager {
         member_type: MemberType,
         voting_weight: u32,
     ) -> Result<()> {
+        // Check for duplicate membership to prevent data overwrite
+        if community.members.contains_key(&member_id) {
+            return Err(CommunityError::MemberAlreadyExists(member_id));
+        }
+
         let member = Member {
             id: member_id.clone(),
             member_type,

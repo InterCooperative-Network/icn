@@ -19,6 +19,13 @@ use uuid::Uuid;
 /// Gossip topic for community state updates
 pub const COMMUNITY_TOPIC: &str = "community:updates";
 
+// TODO(Phase 2): Add gossip subscription handler to receive remote community updates.
+// Currently only publishes updates; receiving and merging remote state is Phase 2.
+// This will require:
+// - Subscribe to COMMUNITY_TOPIC on startup
+// - Handle incoming Community state messages
+// - Merge strategy for conflicting updates (last-write-wins or CRDT)
+
 /// Actor message channel buffer size
 const ACTOR_CHANNEL_SIZE: usize = 100;
 
@@ -619,5 +626,57 @@ mod tests {
 
         let community = rx.await.unwrap().unwrap();
         assert_eq!(community.active_member_count(), 1); // Member marked inactive
+    }
+
+    #[tokio::test]
+    async fn test_duplicate_join_rejected() {
+        let store: Arc<dyn icn_store::Store> = Arc::new(SledStore::temporary().unwrap());
+        let comm_store = CommunityStore::new(store);
+        let tx = CommunityActor::spawn(comm_store, None);
+
+        // Create community
+        let (reply, rx) = oneshot::channel();
+        tx.send(CommunityMessage::Create {
+            id: Some("dup-test".to_string()),
+            name: "Duplicate Test".to_string(),
+            community_type: CommunityType::Interest,
+            founder_id: "did:icn:founder".to_string(),
+            founder_type: MemberType::Individual("did:icn:founder".to_string()),
+            charter: "".to_string(),
+            reply,
+        })
+        .await
+        .unwrap();
+        rx.await.unwrap().unwrap();
+
+        // Join community
+        let (reply, rx) = oneshot::channel();
+        tx.send(CommunityMessage::Join {
+            community_id: "dup-test".to_string(),
+            member_id: "did:icn:member1".to_string(),
+            member_type: MemberType::Individual("did:icn:member1".to_string()),
+            reply,
+        })
+        .await
+        .unwrap();
+        rx.await.unwrap().unwrap();
+
+        // Try to join again - should fail
+        let (reply, rx) = oneshot::channel();
+        tx.send(CommunityMessage::Join {
+            community_id: "dup-test".to_string(),
+            member_id: "did:icn:member1".to_string(),
+            member_type: MemberType::Individual("did:icn:member1".to_string()),
+            reply,
+        })
+        .await
+        .unwrap();
+
+        let result = rx.await.unwrap();
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            CommunityError::MemberAlreadyExists(_)
+        ));
     }
 }

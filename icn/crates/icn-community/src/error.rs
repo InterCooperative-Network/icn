@@ -8,6 +8,9 @@ pub enum CommunityError {
     #[error("Member/cooperative not found: {0}")]
     MemberNotFound(String),
 
+    #[error("Member already exists: {0}")]
+    MemberAlreadyExists(String),
+
     #[error("Insufficient resources: need {required}, have {available}")]
     InsufficientResources { required: u64, available: u64 },
 
