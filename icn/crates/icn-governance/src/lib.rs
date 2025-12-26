@@ -67,6 +67,10 @@ pub mod store;
 pub mod tally;
 pub mod vote;
 
+// Orphan cleanup (Phase 21)
+#[allow(missing_docs)]
+pub mod orphan_cleanup;
+
 pub use amendment::{
     Amendment, AmendmentChange, AmendmentId, AmendmentScope, AmendmentStatus, AmendmentType,
     ChangeTarget, ChangeType, Ratification, RatificationRequirements, RatificationResult,
@@ -122,6 +126,12 @@ pub use protocol::{
 pub use protocol_defaults::{default_parameters, get_default_parameter, ParameterCategory};
 pub use protocol_store::{
     InMemoryParameterStore, ParameterStoreError, ProtocolParameterStore, SledParameterStore,
+};
+
+// Orphan cleanup types (Phase 21)
+pub use orphan_cleanup::{
+    cleanup_orphan_parameters, cleanup_orphan_parameters_sync, count_orphan_parameters,
+    OrphanCleanupConfig, OrphanCleanupResult, OrphanDetail,
 };
 
 /// Unix timestamp in seconds
