@@ -22,6 +22,35 @@ use crate::error::{GatewayError, Result};
 use crate::steward_mgr::StewardManager;
 use crate::trust_mgr::TrustManager;
 
+// ============================================================================
+// VUI Helpers
+// ============================================================================
+
+/// Compute temporary VUI hash from DID.
+///
+/// # Security Note
+/// This is a TEMPORARY implementation using SHA256(DID). In full SDIS, VUI comes
+/// from threshold PRF computation over biometric/identity data, providing true
+/// sybil resistance. The DID-based approach is a placeholder.
+///
+/// TODO(#XXX): Replace with threshold PRF computation when SDIS is fully implemented.
+fn compute_temporary_vui(did: &Did) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(did.to_string().as_bytes());
+    hasher.finalize().into()
+}
+
+/// Hash a DID for privacy-preserving audit logging.
+/// Returns first 8 hex characters of SHA256(DID) - enough for correlation, not identification.
+fn hash_did_for_audit(did: &Did) -> String {
+    let hash: [u8; 32] = {
+        let mut hasher = Sha256::new();
+        hasher.update(did.to_string().as_bytes());
+        hasher.finalize().into()
+    };
+    hex::encode(&hash[..4]) // First 4 bytes = 8 hex chars
+}
+
 /// Enrollment state store with optional persistence
 pub struct EnrollmentStore {
     enrollments: RwLock<std::collections::HashMap<String, EnrollmentSession>>,
@@ -496,17 +525,14 @@ pub async fn complete_enrollment(
     // NOTE: Currently using SHA256(DID) as temporary VUI. In full SDIS, VUI comes from
     // threshold PRF computation over biometric/identity data, providing true sybil resistance.
     // The DID-based approach is a placeholder that enables the API contract to stabilize.
+    let vui_hash = compute_temporary_vui(&ephemeral_did);
+
     if let Some(ref mgr) = steward_mgr.as_ref() {
-        // TEMPORARY: Using hash of DID as VUI placeholder
-        // TODO(SDIS): Replace with threshold PRF computation
-        tracing::warn!(
-            "Using temporary DID-based VUI for {} (full PRF not yet implemented)",
+        // Log that we're using temporary VUI (once per enrollment, at debug level after initial warning)
+        tracing::debug!(
+            "VUI check for {} using temporary DID-based hash (full PRF not yet implemented)",
             ephemeral_did
         );
-
-        let mut hasher = Sha256::new();
-        hasher.update(ephemeral_did.to_string().as_bytes());
-        let vui_hash: [u8; 32] = hasher.finalize().into();
 
         match mgr.check_vui(vui_hash).await {
             Ok(icn_steward::LocalCheckResult::NotRegistered) => {
@@ -514,13 +540,13 @@ pub async fn complete_enrollment(
                 tracing::debug!("VUI uniqueness check passed for {}", ephemeral_did);
             }
             Ok(icn_steward::LocalCheckResult::Registered(registration)) => {
-                // VUI already exists. `registration.registered_by` is the DID that previously
-                // registered this VUI on this steward node. For privacy, we do not expose it
-                // to the caller, but we log it for security auditing and potential dispute resolution.
+                // VUI collision detected. For privacy, we hash the original registrant's DID
+                // before logging - this allows audit correlation without exposing identity.
+                let audit_hash = hash_did_for_audit(&registration.registered_by);
                 tracing::warn!(
-                    "VUI collision for {}: VUI already registered to {} at timestamp {}",
+                    "VUI collision for {}: already registered (audit_hash={}, timestamp={})",
                     ephemeral_did,
-                    registration.registered_by,
+                    audit_hash,
                     registration.registered_at
                 );
                 return Err(GatewayError::BadRequest(
@@ -528,19 +554,28 @@ pub async fn complete_enrollment(
                 ));
             }
             Ok(icn_steward::LocalCheckResult::PossiblyRegistered) => {
-                // Bloom filter match - possible duplicate, but could be false positive
-                // In production, this would trigger a distributed check across stewards
+                // Bloom filter match - could be false positive, but we reject to be safe.
+                // False positives are preferable to allowing real duplicates through.
+                // TODO(#XXX): Implement distributed check across stewards for contested cases.
                 tracing::warn!(
-                    "Possible VUI collision for {} (Bloom filter match) - proceeding with caution",
+                    "Possible VUI collision for {} (Bloom filter match) - rejecting enrollment",
                     ephemeral_did
                 );
+                return Err(GatewayError::BadRequest(
+                    "Possible duplicate enrollment detected - please contact support".to_string(),
+                ));
             }
             Err(e) => {
-                // VUI check failed - log and continue (best-effort for now)
-                tracing::warn!(
-                    "VUI uniqueness check failed: {} - proceeding with enrollment",
+                // VUI check failed - this is a critical error, fail the enrollment
+                // to prevent potential duplicates from slipping through.
+                tracing::error!(
+                    "VUI uniqueness check failed for {}: {} - rejecting enrollment",
+                    ephemeral_did,
                     e
                 );
+                return Err(GatewayError::InternalError(
+                    "Identity verification temporarily unavailable".to_string(),
+                ));
             }
         }
     }
@@ -644,16 +679,30 @@ pub async fn complete_enrollment(
     // =========================================================================
     // Uniqueness was already verified above. Now register the VUI to prevent
     // future duplicate enrollments with the same identity.
+    //
+    // IMPORTANT: VUI registration failure is treated as a critical error.
+    // If registration fails, the enrollment is incomplete and could allow
+    // the same identity to enroll again. We fail the request rather than
+    // leave the system in an inconsistent state.
     if let Some(ref mgr) = steward_mgr.as_ref() {
-        let mut hasher = Sha256::new();
-        hasher.update(ephemeral_did.to_string().as_bytes());
-        let vui_hash: [u8; 32] = hasher.finalize().into();
-
-        if let Err(e) = mgr.register_vui(vui_hash, ephemeral_did.clone()).await {
-            tracing::warn!("Failed to register VUI in steward registry: {}", e);
-            // Continue - registration is best-effort for now
-        } else {
-            tracing::info!("Registered VUI for {} in steward registry", ephemeral_did);
+        // Reuse vui_hash computed earlier (same value, no need to recompute)
+        match mgr.register_vui(vui_hash, ephemeral_did.clone()).await {
+            Ok(()) => {
+                tracing::info!("Registered VUI for {} in steward registry", ephemeral_did);
+            }
+            Err(e) => {
+                // Critical error: enrollment succeeded but VUI wasn't registered.
+                // This could allow duplicate enrollments. Log as error and fail.
+                tracing::error!(
+                    "CRITICAL: VUI registration failed after enrollment for {}: {}",
+                    ephemeral_did,
+                    e
+                );
+                // TODO: Consider compensating transaction to rollback anchor/holder
+                return Err(GatewayError::InternalError(
+                    "Enrollment failed during finalization - please retry".to_string(),
+                ));
+            }
         }
     }
 
@@ -1395,5 +1444,111 @@ mod tests {
         let query: HistoryQuery = serde_json::from_str(json).unwrap();
         assert_eq!(query.limit, Some(10));
         assert_eq!(query.offset, Some(5));
+    }
+
+    // =========================================================================
+    // VUI Helper Tests
+    // =========================================================================
+
+    /// Generate a test DID from a keypair
+    fn test_did(seed: u8) -> Did {
+        use ed25519_dalek::SigningKey;
+        let mut bytes = [0u8; 32];
+        bytes[0] = seed;
+        let signing_key = SigningKey::from_bytes(&bytes);
+        Did::from_public_key(&signing_key.verifying_key())
+    }
+
+    #[test]
+    fn test_compute_temporary_vui_deterministic() {
+        // Same DID should always produce same VUI hash
+        let did1 = test_did(1);
+        let did2 = test_did(1);
+
+        let vui1 = compute_temporary_vui(&did1);
+        let vui2 = compute_temporary_vui(&did2);
+
+        assert_eq!(vui1, vui2, "Same DID should produce same VUI hash");
+    }
+
+    #[test]
+    fn test_compute_temporary_vui_different_dids() {
+        // Different DIDs should produce different VUI hashes
+        let did1 = test_did(1);
+        let did2 = test_did(2);
+
+        let vui1 = compute_temporary_vui(&did1);
+        let vui2 = compute_temporary_vui(&did2);
+
+        assert_ne!(
+            vui1, vui2,
+            "Different DIDs should produce different VUI hashes"
+        );
+    }
+
+    #[test]
+    fn test_compute_temporary_vui_is_32_bytes() {
+        let did = test_did(42);
+        let vui = compute_temporary_vui(&did);
+
+        assert_eq!(vui.len(), 32, "VUI hash should be 32 bytes (SHA256)");
+    }
+
+    #[test]
+    fn test_hash_did_for_audit_is_8_chars() {
+        let did = test_did(100);
+        let audit_hash = hash_did_for_audit(&did);
+
+        assert_eq!(
+            audit_hash.len(),
+            8,
+            "Audit hash should be 8 hex characters (4 bytes)"
+        );
+        // Should be valid hex
+        assert!(
+            audit_hash.chars().all(|c| c.is_ascii_hexdigit()),
+            "Audit hash should be valid hex"
+        );
+    }
+
+    #[test]
+    fn test_hash_did_for_audit_deterministic() {
+        let did1 = test_did(50);
+        let did2 = test_did(50);
+
+        let hash1 = hash_did_for_audit(&did1);
+        let hash2 = hash_did_for_audit(&did2);
+
+        assert_eq!(hash1, hash2, "Same DID should produce same audit hash");
+    }
+
+    #[test]
+    fn test_hash_did_for_audit_different_dids() {
+        let did1 = test_did(10);
+        let did2 = test_did(20);
+
+        let hash1 = hash_did_for_audit(&did1);
+        let hash2 = hash_did_for_audit(&did2);
+
+        assert_ne!(
+            hash1, hash2,
+            "Different DIDs should produce different audit hashes"
+        );
+    }
+
+    #[test]
+    fn test_hash_did_for_audit_privacy_preserving() {
+        // The audit hash should be short enough that it can't be reversed
+        // but long enough for correlation (4 bytes = ~4 billion combinations)
+        let did = test_did(99);
+        let audit_hash = hash_did_for_audit(&did);
+
+        // 8 hex chars = 4 bytes = 32 bits of entropy
+        // This provides ~4 billion combinations - enough for correlation,
+        // but not enough to reverse engineer the original DID
+        assert_eq!(audit_hash.len(), 8);
+
+        // The hash should be hex only (no DID components)
+        assert!(audit_hash.chars().all(|c| c.is_ascii_hexdigit()));
     }
 }
