@@ -83,8 +83,11 @@ fn max_audit_limit_raw() -> usize {
 pub struct TreasuryStatusResponse {
     /// Treasury DID
     pub treasury_did: String,
-    /// Cooperative ID
+    /// Cooperative ID (derived from entity_id if present)
     pub coop_id: String,
+    /// Entity ID (type-safe entity reference, preferred over coop_id)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub entity_id: Option<String>,
     /// Primary currency
     pub currency: String,
     /// Whether treasury is active
@@ -319,7 +322,8 @@ pub async fn get_treasury_status(
 
     let response = TreasuryStatusResponse {
         treasury_did: treasury.treasury_did.to_string(),
-        coop_id: treasury.coop_id,
+        coop_id: treasury.coop_id.clone(),
+        entity_id: treasury.entity_id().map(|e| e.to_string()),
         currency: treasury.currency,
         is_active: treasury.is_active,
         balance,
