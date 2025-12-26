@@ -1416,8 +1416,16 @@ impl ProtocolParameterStore for SledParameterStore {
 
                 // Update reverse index
                 if let Some(index_bytes) = tx.get(&index_key)? {
-                    let mut scope_strs: Vec<String> =
-                        serde_json::from_slice(&index_bytes).unwrap_or_default();
+                    let mut scope_strs: Vec<String> = serde_json::from_slice(&index_bytes)
+                        .unwrap_or_else(|e| {
+                            // Log warning for corrupted index but continue with empty list
+                            // This allows cleanup to proceed even with corrupted state
+                            warn!(
+                                error = %e,
+                                "Failed to deserialize scope index, treating as empty"
+                            );
+                            Vec::new()
+                        });
                     scope_strs.retain(|s| s != &scope_str);
 
                     if scope_strs.is_empty() {
