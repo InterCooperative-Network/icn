@@ -166,6 +166,34 @@ pub trait Store: Send + Sync {
         Ok((paginated, total))
     }
 
+    /// Scan entries in reverse key order with pagination support
+    ///
+    /// Returns entries in reverse key order (most recent first for timestamp-keyed data),
+    /// starting at `offset` with a maximum of `limit` entries.
+    /// This is efficient for audit trails where keys include timestamps.
+    ///
+    /// # Arguments
+    /// * `prefix` - Key prefix to scan
+    /// * `offset` - Number of entries to skip
+    /// * `limit` - Maximum number of entries to return
+    ///
+    /// # Returns
+    /// Tuple of (entries, total_count) where entries are in reverse key order
+    #[allow(clippy::type_complexity)]
+    fn scan_reverse_paginated(
+        &self,
+        prefix: &[u8],
+        offset: usize,
+        limit: usize,
+    ) -> Result<(Vec<(Vec<u8>, Vec<u8>)>, usize)> {
+        // Default implementation - backends can override for efficiency
+        // For Sled, this can use .rev() on the iterator for true efficiency
+        let all = self.scan(prefix)?;
+        let total = all.len();
+        let paginated = all.into_iter().rev().skip(offset).take(limit).collect();
+        Ok((paginated, total))
+    }
+
     // Replica tracking operations (Phase 17)
     /// Get replica metadata for a content hash
     fn get_replica_metadata(&self, content_hash: &ContentHash) -> Result<Option<ReplicaMetadata>>;
@@ -284,6 +312,26 @@ impl Store for SledStore {
         // Then get paginated results
         let mut results = Vec::with_capacity(limit.min(total.saturating_sub(offset)));
         for item in self.db.scan_prefix(prefix).skip(offset).take(limit) {
+            let (k, v) = item?;
+            results.push((k.to_vec(), v.to_vec()));
+        }
+
+        Ok((results, total))
+    }
+
+    fn scan_reverse_paginated(
+        &self,
+        prefix: &[u8],
+        offset: usize,
+        limit: usize,
+    ) -> Result<(Vec<(Vec<u8>, Vec<u8>)>, usize)> {
+        // First get total count efficiently (without loading values)
+        let total = self.db.scan_prefix(prefix).count();
+
+        // Then get paginated results in reverse order
+        // Sled's scan_prefix().rev() efficiently iterates in reverse
+        let mut results = Vec::with_capacity(limit.min(total.saturating_sub(offset)));
+        for item in self.db.scan_prefix(prefix).rev().skip(offset).take(limit) {
             let (k, v) = item?;
             results.push((k.to_vec(), v.to_vec()));
         }

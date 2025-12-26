@@ -1164,6 +1164,12 @@ impl TreasuryManager {
     /// Get audit trail for a treasury with pagination
     ///
     /// Returns a `PaginatedAuditTrail` containing records and total count for UI pagination.
+    /// Uses reverse iteration for efficiency - only loads the requested records instead
+    /// of loading all records into memory for sorting.
+    ///
+    /// Note: Records are returned most recent first, based on key ordering
+    /// (keys include timestamps in ascending order, so reverse iteration
+    /// yields most recent first).
     pub fn get_audit_trail(
         &self,
         treasury_did: &Did,
@@ -1180,25 +1186,18 @@ impl TreasuryManager {
         };
 
         let prefix = format!("{TREASURY_AUDIT_PREFIX}{treasury_did}");
-        let pairs = store.scan(prefix.as_bytes())?;
 
-        let mut records: Vec<TreasuryAuditRecord> = pairs
+        // Use optimized reverse pagination - only loads requested records
+        // Keys are ordered by timestamp, so reverse gives most recent first
+        let (pairs, total) = store.scan_reverse_paginated(prefix.as_bytes(), offset, limit)?;
+
+        let records: Vec<TreasuryAuditRecord> = pairs
             .into_iter()
             .filter_map(|(_, value)| serde_json::from_slice(&value).ok())
             .collect();
 
-        // Sort by timestamp descending (most recent first)
-        records.sort_by(|a, b| b.performed_at.cmp(&a.performed_at));
-
-        // Get total count before pagination
-        let total = records.len();
-
-        // Apply pagination
-        let paginated_records: Vec<TreasuryAuditRecord> =
-            records.into_iter().skip(offset).take(limit).collect();
-
         Ok(PaginatedAuditTrail {
-            records: paginated_records,
+            records,
             total,
             offset,
             limit,
