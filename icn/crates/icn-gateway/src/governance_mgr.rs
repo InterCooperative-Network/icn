@@ -789,9 +789,17 @@ fn find_delegation_cycle(
     // Use inclusive range to detect cycles at the depth boundary
     // With MAX_DELEGATION_DEPTH=3: 0..=3 checks 4 positions (delegate + 3 hops)
     for _ in 0..=DEFAULT_MAX_DELEGATION_DEPTH {
+        // Only report a cycle if it leads back to the original delegator.
+        // If we encounter a node visited earlier in THIS walk but it's not
+        // the delegator, that's an existing cycle in the graph (e.g., B→C→B)
+        // which shouldn't block the new delegation A→B.
         if visited.contains(&current) {
-            // Found a cycle - current is already in our path
-            return Some(path);
+            if current == *delegator {
+                // True cycle back to origin delegator
+                return Some(path);
+            }
+            // Existing cycle in graph, but doesn't affect this delegation
+            return None;
         }
         visited.insert(current.clone());
 
@@ -836,6 +844,16 @@ fn compute_incoming_depth(
     compute_incoming_depth_recursive(delegate, scope, delegations, proposals, now, &mut visited)
 }
 
+/// Recursive helper for computing incoming delegation depth.
+///
+/// The visited set is shared across all recursive branches to:
+/// 1. Prevent infinite loops on cyclic delegation graphs
+/// 2. Avoid redundant computation when multiple paths lead to the same node
+///
+/// For diamond patterns (A→C, B→C, D→A, D→B), sharing the visited set means
+/// we only compute C's depth once. This is safe because depth is the maximum
+/// chain length, and once we've computed a node's contribution, we don't need
+/// to recompute it from a different path.
 fn compute_incoming_depth_recursive(
     delegate: &Did,
     scope: &DelegationScope,
@@ -844,13 +862,15 @@ fn compute_incoming_depth_recursive(
     now: Timestamp,
     visited: &mut HashSet<Did>,
 ) -> usize {
-    // Prevent infinite recursion
+    // Prevent infinite recursion on cyclic graphs
     if visited.contains(delegate) {
         return 0;
     }
     visited.insert(delegate.clone());
 
-    // Safety limit
+    // Safety limit: MAX_DELEGATION_DEPTH + 10 provides margin for edge cases
+    // like diamond patterns where we may visit more unique nodes than the
+    // strict chain depth. This is a defensive guard, not the primary limit.
     if visited.len() > DEFAULT_MAX_DELEGATION_DEPTH + 10 {
         return 0;
     }
