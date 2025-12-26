@@ -13,10 +13,13 @@ use crate::{
 use icn_gossip::GossipActor;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot, RwLock};
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info};
 
 /// Gossip topic for community state updates
 pub const COMMUNITY_TOPIC: &str = "community:updates";
+
+/// Actor message channel buffer size
+const ACTOR_CHANNEL_SIZE: usize = 100;
 
 /// Handle type for gossip actor
 pub type GossipHandle = Arc<RwLock<GossipActor>>;
@@ -97,7 +100,7 @@ impl CommunityActor {
         store: CommunityStore,
         gossip: Option<GossipHandle>,
     ) -> mpsc::Sender<CommunityMessage> {
-        let (tx, rx) = mpsc::channel(100);
+        let (tx, rx) = mpsc::channel(ACTOR_CHANNEL_SIZE);
 
         let lifecycle = CommunityLifecycle::new(1); // At least 1 founder
         let membership = MembershipManager::new();
@@ -229,6 +232,35 @@ impl CommunityActor {
             .ok_or_else(|| CommunityError::NotFound(community_id.to_string()))
     }
 
+    /// Validate community ID format
+    fn validate_community_id(id: &str) -> Result<()> {
+        // Max length check
+        if id.len() > 128 {
+            return Err(CommunityError::Validation(
+                "Community ID must be 128 characters or less".into(),
+            ));
+        }
+
+        // Min length check
+        if id.is_empty() {
+            return Err(CommunityError::Validation(
+                "Community ID cannot be empty".into(),
+            ));
+        }
+
+        // Character validation: alphanumeric, hyphens, underscores, colons
+        if !id
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c == ':')
+        {
+            return Err(CommunityError::Validation(
+                "Community ID can only contain alphanumeric characters, hyphens, underscores, and colons".into(),
+            ));
+        }
+
+        Ok(())
+    }
+
     async fn handle_create(
         &mut self,
         id: Option<String>,
@@ -238,9 +270,26 @@ impl CommunityActor {
         founder_type: MemberType,
         charter: String,
     ) -> Result<Community> {
-        // Generate ID if not provided
-        let community_id =
-            id.unwrap_or_else(|| format!("community:{}", name.replace(' ', "-").to_lowercase()));
+        // Generate or validate ID
+        let community_id = match id {
+            Some(provided_id) => {
+                // Validate provided ID format
+                Self::validate_community_id(&provided_id)?;
+                provided_id
+            }
+            None => {
+                // Auto-generate from name
+                format!("community:{}", name.replace(' ', "-").to_lowercase())
+            }
+        };
+
+        // Check for duplicate ID
+        if self.store.get(&community_id)?.is_some() {
+            return Err(CommunityError::Validation(format!(
+                "Community with ID '{}' already exists",
+                community_id
+            )));
+        }
 
         // Create the community using lifecycle
         let request = crate::FormationRequest {
@@ -250,7 +299,8 @@ impl CommunityActor {
             charter_ccl: charter,
         };
 
-        // Form the community (generates a new ID, so we override it)
+        // Form the community with our validated ID
+        // Note: lifecycle.form() generates internal gov_id, but we use our validated community_id
         let mut community = self
             .lifecycle
             .form(request, format!("gov:{community_id}"))?;
@@ -374,9 +424,7 @@ impl CommunityActor {
         }
 
         if let Some(new_metadata) = metadata {
-            for (key, value) in new_metadata {
-                community.metadata.insert(key, value);
-            }
+            community.metadata.extend(new_metadata);
         }
 
         community.updated_at = chrono::Utc::now();
@@ -402,16 +450,16 @@ impl CommunityActor {
                             );
                         }
                         Err(e) => {
-                            warn!(
+                            error!(
                                 community_id = %community.id,
                                 error = %e,
-                                "Failed to publish community update to gossip"
+                                "Failed to publish community update to gossip - state may diverge"
                             );
                         }
                     }
                 }
                 Err(e) => {
-                    warn!(
+                    error!(
                         community_id = %community.id,
                         error = %e,
                         "Failed to serialize community for gossip"
