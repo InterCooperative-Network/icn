@@ -786,7 +786,9 @@ fn find_delegation_cycle(
     visited.insert(delegator.clone());
     let mut current = delegate.clone();
 
-    for _ in 0..DEFAULT_MAX_DELEGATION_DEPTH {
+    // Use inclusive range to detect cycles at the depth boundary
+    // With MAX_DELEGATION_DEPTH=3: 0..=3 checks 4 positions (delegate + 3 hops)
+    for _ in 0..=DEFAULT_MAX_DELEGATION_DEPTH {
         if visited.contains(&current) {
             // Found a cycle - current is already in our path
             return Some(path);
