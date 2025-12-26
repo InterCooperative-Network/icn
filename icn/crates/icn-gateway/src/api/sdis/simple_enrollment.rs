@@ -18,6 +18,7 @@ use uuid::Uuid;
 
 use crate::auth::AuthManager;
 use crate::error::{GatewayError, Result};
+use crate::steward_mgr::StewardManager;
 use crate::trust_mgr::TrustManager;
 
 /// Enrollment state store with optional persistence
@@ -430,6 +431,7 @@ pub async fn complete_enrollment(
     auth: web::Data<Arc<AuthManager>>,
     trust_mgr: web::Data<Arc<TrustManager>>,
     commons_mgr: web::Data<Arc<crate::commons_mgr::CommonsManager>>,
+    steward_mgr: web::Data<Option<Arc<StewardManager>>>,
     req: web::Json<CompleteEnrollmentRequest>,
 ) -> Result<HttpResponse> {
     let mut enrollments = store.enrollments.write().await;
@@ -577,6 +579,52 @@ pub async fn complete_enrollment(
 
     // Capture coop_id before dropping session
     let coop_id = session.coop_id.clone();
+
+    // Register VUI with StewardActor (if available) to prevent duplicate enrollments
+    // For now, we use a hash of the DID as the VUI until full PRF-based computation is implemented
+    if let Some(ref mgr) = steward_mgr.as_ref() {
+        // Compute a simple VUI hash from the DID
+        // In full SDIS, this would come from threshold PRF computation
+        use sha2::{Digest, Sha256};
+        let mut hasher = Sha256::new();
+        hasher.update(ephemeral_did.to_string().as_bytes());
+        let vui_hash: [u8; 32] = hasher.finalize().into();
+
+        // Check VUI uniqueness first
+        match mgr.check_vui(vui_hash).await {
+            Ok(icn_steward::LocalCheckResult::NotRegistered) => {
+                // VUI is unique, register it
+                if let Err(e) = mgr.register_vui(vui_hash, ephemeral_did.clone()).await {
+                    tracing::warn!("Failed to register VUI in steward registry: {}", e);
+                    // Continue - registration is best-effort for now
+                } else {
+                    tracing::info!("Registered VUI for {} in steward registry", ephemeral_did);
+                }
+            }
+            Ok(icn_steward::LocalCheckResult::Registered(_)) => {
+                // VUI already exists - this identity was already enrolled
+                return Err(GatewayError::BadRequest(
+                    "This identity has already been enrolled (VUI collision)".to_string(),
+                ));
+            }
+            Ok(icn_steward::LocalCheckResult::PossiblyRegistered) => {
+                // Bloom filter match - possible duplicate, but could be false positive
+                // For now, allow with warning (in production, would trigger distributed check)
+                tracing::warn!(
+                    "Possible VUI match for {} - proceeding with enrollment",
+                    ephemeral_did
+                );
+                // Try to register anyway
+                if let Err(e) = mgr.register_vui(vui_hash, ephemeral_did.clone()).await {
+                    tracing::warn!("Failed to register VUI: {}", e);
+                }
+            }
+            Err(e) => {
+                tracing::warn!("VUI check failed: {} - proceeding with enrollment", e);
+                // Continue - VUI check is best-effort for now
+            }
+        }
+    }
 
     // Issue auth token for the new identity
     let auth_token = auth.issue_token(

@@ -62,6 +62,8 @@ pub struct GatewayServer {
     entity_handle: Option<EntityHandle>,
     /// Optional handle to daemon's CommunityActor (for civic engine)
     community_handle: Option<icn_community::CommunityHandle>,
+    /// Optional handle to daemon's StewardActor (for SDIS ceremonies)
+    steward_handle: Option<icn_steward::StewardHandle>,
 }
 
 impl GatewayServer {
@@ -83,6 +85,7 @@ impl GatewayServer {
             ledger_handle: None,
             entity_handle: None,
             community_handle: None,
+            steward_handle: None,
         }
     }
 
@@ -108,6 +111,7 @@ impl GatewayServer {
             ledger_handle: None,
             entity_handle: None,
             community_handle: None,
+            steward_handle: None,
         }
     }
 
@@ -134,6 +138,7 @@ impl GatewayServer {
             ledger_handle: None,
             entity_handle: None,
             community_handle: None,
+            steward_handle: None,
         }
     }
 
@@ -161,6 +166,16 @@ impl GatewayServer {
     /// CommunityActor, ensuring persistence and gossip synchronization.
     pub fn with_community_handle(mut self, handle: icn_community::CommunityHandle) -> Self {
         self.community_handle = Some(handle);
+        self
+    }
+
+    /// Set steward handle for daemon integration
+    ///
+    /// When set, the StewardManager will delegate all operations to the daemon's
+    /// StewardActor, enabling SDIS enrollment and recovery ceremonies with
+    /// threshold PRF computation and VUI uniqueness checking.
+    pub fn with_steward_handle(mut self, handle: icn_steward::StewardHandle) -> Self {
+        self.steward_handle = Some(handle);
         self
     }
 
@@ -271,6 +286,16 @@ impl GatewayServer {
                 )))
             } else {
                 info!("Community manager not configured (community API disabled)");
+                None
+            };
+
+        // Create steward manager (requires StewardActor handle)
+        let steward_manager: Option<Arc<crate::steward_mgr::StewardManager>> =
+            if let Some(handle) = self.steward_handle {
+                info!("Steward manager connected to daemon (using StewardActor)");
+                Some(Arc::new(crate::steward_mgr::StewardManager::new(handle)))
+            } else {
+                info!("Steward manager not configured (SDIS ceremony API disabled)");
                 None
             };
 
@@ -578,6 +603,7 @@ impl GatewayServer {
                 .app_data(web::Data::new(auth_manager.clone()))
                 .app_data(web::Data::new(coop_manager.clone()))
                 .app_data(web::Data::new(community_manager.clone()))
+                .app_data(web::Data::new(steward_manager.clone()))
                 .app_data(web::Data::new(governance_manager.clone()))
                 .app_data(web::Data::new(invite_manager.clone()))
                 .app_data(web::Data::new(session_manager.clone()))

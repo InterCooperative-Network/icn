@@ -51,6 +51,7 @@ pub mod rate_limit;
 pub mod security;
 pub mod server;
 pub mod session;
+pub mod steward_mgr;
 pub mod treasury_mgr;
 pub mod trust_mgr;
 pub mod validation;
@@ -80,4 +81,5 @@ pub use rate_limit::{
     RateLimiter, VelocityLimitConfig, VelocityLimiter,
 };
 pub use server::GatewayServer;
+pub use steward_mgr::{StewardHandleType, StewardManager};
 pub use treasury_mgr::{GatewayTreasuryManager, LedgerHandle, TreasuryHandle};
