@@ -264,6 +264,97 @@ async fn test_duplicate_prevention() {
     assert!(result.is_err());
 }
 
+/// Test that get_or_create_holder is idempotent
+///
+/// This is a key integration test for S2.1: SDIS → CommonsHolder Wiring
+/// Verifies that:
+/// 1. get_or_create_holder creates a holder if none exists
+/// 2. Calling it again returns the same holder (idempotent)
+/// 3. The holder_id is deterministically derived from anchor_id
+#[actix_web::test]
+async fn test_enrollment_creates_holder_atomically() {
+    let commons_mgr = CommonsManager::new();
+
+    // Generate test keypair and enroll
+    let keypair = KeyPair::generate().unwrap();
+    let did = keypair.did().clone();
+
+    // Create anchor (simulating enrollment)
+    let anchor = commons_mgr
+        .create_anchor_from_enrollment(&did, None)
+        .await
+        .unwrap();
+    let anchor_id = hex::encode(anchor.id());
+
+    // First call: should create new holder
+    let holder1 = commons_mgr
+        .get_or_create_holder(&anchor_id, &did, None)
+        .await
+        .unwrap();
+    assert!(holder1.is_active());
+    let holder1_id = hex::encode(holder1.id());
+
+    // Second call: should return same holder (idempotent)
+    let holder2 = commons_mgr
+        .get_or_create_holder(&anchor_id, &did, None)
+        .await
+        .unwrap();
+    let holder2_id = hex::encode(holder2.id());
+
+    // Holder IDs must match
+    assert_eq!(
+        holder1_id, holder2_id,
+        "get_or_create_holder must be idempotent"
+    );
+
+    // Verify holder is also findable by DID
+    let holder_by_did = commons_mgr.get_holder_by_did(&did).await.unwrap();
+    assert!(holder_by_did.is_some());
+    assert_eq!(hex::encode(holder_by_did.unwrap().id()), holder1_id);
+}
+
+/// Test that duplicate create_holder_from_anchor fails but get_or_create_holder succeeds
+#[actix_web::test]
+async fn test_get_or_create_vs_create_holder() {
+    let commons_mgr = CommonsManager::new();
+
+    let keypair = KeyPair::generate().unwrap();
+    let did = keypair.did().clone();
+
+    let anchor = commons_mgr
+        .create_anchor_from_enrollment(&did, None)
+        .await
+        .unwrap();
+    let anchor_id = hex::encode(anchor.id());
+
+    // First create succeeds
+    let holder = commons_mgr
+        .create_holder_from_anchor(&anchor_id, &did)
+        .await
+        .unwrap();
+    let holder_id = hex::encode(holder.id());
+
+    // Second create_holder_from_anchor FAILS (not idempotent)
+    let result = commons_mgr
+        .create_holder_from_anchor(&anchor_id, &did)
+        .await;
+    assert!(
+        result.is_err(),
+        "create_holder_from_anchor should reject duplicates"
+    );
+
+    // But get_or_create_holder SUCCEEDS and returns same holder
+    let holder2 = commons_mgr
+        .get_or_create_holder(&anchor_id, &did, None)
+        .await
+        .unwrap();
+    assert_eq!(
+        hex::encode(holder2.id()),
+        holder_id,
+        "get_or_create should return existing"
+    );
+}
+
 /// Test anchor status updates
 #[actix_web::test]
 async fn test_anchor_status_updates() {

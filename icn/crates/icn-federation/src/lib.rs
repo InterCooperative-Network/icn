@@ -68,7 +68,9 @@ pub use resolver::{CachedDidResolution, FederatedDidResolver};
 pub use router::FederatedGossipRouter;
 pub use router::GossipScope;
 pub use types::{
-    CooperativeInfo, CurrencyInfo, FederationMessage, FederationPolicy, PolicyResult, Vouch,
+    CommunityInfo, CooperativeInfo, CurrencyInfo, EntityType, FederationCapability,
+    FederationMember, FederationMessage, FederationPolicy, PolicyResult, RepresentativeAuth,
+    SigningScope, Vouch,
 };
 
 /// Topic constants for federation gossip (re-exported at crate level)

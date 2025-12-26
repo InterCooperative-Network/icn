@@ -8,6 +8,9 @@ pub enum CommunityError {
     #[error("Member/cooperative not found: {0}")]
     MemberNotFound(String),
 
+    #[error("Member already exists: {0}")]
+    MemberAlreadyExists(String),
+
     #[error("Insufficient resources: need {required}, have {available}")]
     InsufficientResources { required: u64, available: u64 },
 
@@ -28,6 +31,9 @@ pub enum CommunityError {
 
     #[error("Serialization error: {0}")]
     Serialization(String),
+
+    #[error("Validation error: {0}")]
+    Validation(String),
 }
 
 pub type Result<T> = std::result::Result<T, CommunityError>;

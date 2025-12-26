@@ -9,14 +9,17 @@ repository.workspace = true
 icn-identity = { path = "../icn-identity" }
 icn-cooperative = { path = "../icn-cooperative" }
 icn-governance = { path = "../icn-governance" }
+icn-gossip = { path = "../icn-gossip" }
 icn-ledger = { path = "../icn-ledger" }
 icn-store = { path = "../icn-store" }
+bincode = { version = "2.0", features = ["serde"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.0", features = ["v4"] }
 
 [lints]
 workspace = true
