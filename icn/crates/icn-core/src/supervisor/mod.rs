@@ -140,6 +140,9 @@ impl Supervisor {
         // Entity handle for gateway integration
         let entity_handle_for_gateway: Option<init_entity::EntityHandle>;
 
+        // Steward handle for gateway integration
+        let steward_handle_for_gateway: Option<icn_steward::StewardHandle>;
+
         // Governance event subscription handles - MUST persist for daemon lifetime
         // Stored at function scope to prevent premature Drop (which would unsubscribe)
         let governance_event_subscription: Option<crate::events::SubscriptionHandle>;
@@ -1032,7 +1035,7 @@ impl Supervisor {
             info!("Clock sync background task spawned (interval: 10 minutes)");
 
             // Spawn steward actor if enabled (SDIS Phase S3)
-            let _steward_services = init_steward::init_steward_services(
+            let steward_services = init_steward::init_steward_services(
                 &self.config.steward,
                 init_steward::StewardDeps {
                     gossip_handle: gossip_handle.clone(),
@@ -1044,6 +1047,9 @@ impl Supervisor {
             )
             .await
             .ok();
+
+            // Extract steward handle for gateway integration
+            steward_handle_for_gateway = steward_services.and_then(|s| s.steward_handle);
 
             // Spawn metrics update task
             let _metrics_handle = background_tasks::spawn_metrics_update_task(
@@ -1107,11 +1113,12 @@ impl Supervisor {
 
             info!("Metrics update task spawned (system metrics only)");
 
-            // No event broadcaster or compute/trust/governance/treasury/ledger/entity/community handles without identity
+            // No event broadcaster or compute/trust/governance/treasury/ledger/entity/community/steward handles without identity
             event_broadcaster = None;
             compute_handle_for_gateway = None;
             coop_handle_for_gateway = None;
             community_handle_for_gateway = None;
+            steward_handle_for_gateway = None;
             trust_graph_handle_for_gateway = None;
             governance_handle_for_gateway = None;
             treasury_handle_for_gateway = None;
@@ -1204,6 +1211,11 @@ impl Supervisor {
                         // Connect entity handle for entity management
                         if let Some(handle) = entity_handle_for_gateway {
                             gateway_server = gateway_server.with_entity_handle(handle);
+                        }
+
+                        // Connect steward handle for SDIS ceremonies
+                        if let Some(handle) = steward_handle_for_gateway {
+                            gateway_server = gateway_server.with_steward_handle(handle);
                         }
 
                         if let Err(e) = gateway_server.run().await {
