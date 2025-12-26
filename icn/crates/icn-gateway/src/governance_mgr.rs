@@ -589,6 +589,11 @@ impl GovernanceManager {
             anyhow::anyhow!("Delegations storage lock poisoned (concurrent panic?): {e}")
         })?;
 
+        // Get proposals for precise scope overlap checking
+        let proposals = self.proposals.read().map_err(|e| {
+            anyhow::anyhow!("Proposals storage lock poisoned (concurrent panic?): {e}")
+        })?;
+
         // Check for duplicate delegation ID
         if delegations.contains_key(&delegation.id) {
             anyhow::bail!(
@@ -616,6 +621,7 @@ impl GovernanceManager {
             &delegation.delegate,
             &delegation.scope,
             &delegations,
+            &proposals,
             now,
         );
         if let Some(path) = cycle_path {
@@ -630,14 +636,22 @@ impl GovernanceManager {
         }
 
         // Check max delegation depth: count how many hops lead TO the delegator
-        let incoming_depth =
-            compute_incoming_depth(&delegation.delegator, &delegation.scope, &delegations, now);
+        let incoming_depth = compute_incoming_depth(
+            &delegation.delegator,
+            &delegation.scope,
+            &delegations,
+            &proposals,
+            now,
+        );
         let max_depth = DEFAULT_MAX_DELEGATION_DEPTH;
         if incoming_depth >= max_depth {
             anyhow::bail!(
                 "Maximum delegation depth ({max_depth}) exceeded. The delegation chain is too long.",
             );
         }
+
+        // Release proposals lock before inserting
+        drop(proposals);
 
         delegations.insert(delegation.id.clone(), delegation);
         Ok(())
@@ -733,14 +747,24 @@ impl Default for GovernanceManager {
 /// Check if two delegation scopes overlap (for cycle detection)
 ///
 /// Returns true if delegations with these scopes could conflict.
-/// Conservative: assumes overlap when uncertain to prevent potential cycles.
-fn scopes_overlap(a: &DelegationScope, b: &DelegationScope) -> bool {
+/// Uses proposal domain lookup for precise Domain/Proposal overlap checking.
+fn scopes_overlap(
+    a: &DelegationScope,
+    b: &DelegationScope,
+    proposals: &HashMap<ProposalId, Proposal>,
+) -> bool {
     match (a, b) {
         (DelegationScope::Blanket, _) | (_, DelegationScope::Blanket) => true,
         (DelegationScope::Domain(d1), DelegationScope::Domain(d2)) => d1 == d2,
-        // Conservative: assume domain/proposal overlap since we can't verify membership
-        (DelegationScope::Domain(_), DelegationScope::Proposal(_))
-        | (DelegationScope::Proposal(_), DelegationScope::Domain(_)) => true,
+        (DelegationScope::Domain(d), DelegationScope::Proposal(p))
+        | (DelegationScope::Proposal(p), DelegationScope::Domain(d)) => {
+            // Use proposal lookup for precise domain checking
+            match proposals.get(p) {
+                Some(proposal) => &proposal.domain_id == d,
+                // Conservative fallback: assume overlap if proposal not found
+                None => true,
+            }
+        }
         (DelegationScope::Proposal(p1), DelegationScope::Proposal(p2)) => p1 == p2,
     }
 }
@@ -754,6 +778,7 @@ fn find_delegation_cycle(
     delegate: &Did,
     scope: &DelegationScope,
     delegations: &HashMap<DelegationId, Delegation>,
+    proposals: &HashMap<ProposalId, Proposal>,
     now: Timestamp,
 ) -> Option<Vec<Did>> {
     let mut path = vec![delegator.clone(), delegate.clone()];
@@ -771,7 +796,11 @@ fn find_delegation_cycle(
         // Find any active delegation from current that matches scope
         let next = delegations
             .values()
-            .find(|d| d.delegator == current && d.is_active(now) && scopes_overlap(&d.scope, scope))
+            .find(|d| {
+                d.delegator == current
+                    && d.is_active(now)
+                    && scopes_overlap(&d.scope, scope, proposals)
+            })
             .map(|d| d.delegate.clone());
 
         match next {
@@ -798,16 +827,18 @@ fn compute_incoming_depth(
     delegate: &Did,
     scope: &DelegationScope,
     delegations: &HashMap<DelegationId, Delegation>,
+    proposals: &HashMap<ProposalId, Proposal>,
     now: Timestamp,
 ) -> usize {
     let mut visited = HashSet::new();
-    compute_incoming_depth_recursive(delegate, scope, delegations, now, &mut visited)
+    compute_incoming_depth_recursive(delegate, scope, delegations, proposals, now, &mut visited)
 }
 
 fn compute_incoming_depth_recursive(
     delegate: &Did,
     scope: &DelegationScope,
     delegations: &HashMap<DelegationId, Delegation>,
+    proposals: &HashMap<ProposalId, Proposal>,
     now: Timestamp,
     visited: &mut HashSet<Did>,
 ) -> usize {
@@ -825,7 +856,11 @@ fn compute_incoming_depth_recursive(
     // Find all delegators who have delegated to this delegate with overlapping scope
     let delegators: Vec<Did> = delegations
         .values()
-        .filter(|d| d.delegate == *delegate && d.is_active(now) && scopes_overlap(&d.scope, scope))
+        .filter(|d| {
+            d.delegate == *delegate
+                && d.is_active(now)
+                && scopes_overlap(&d.scope, scope, proposals)
+        })
         .map(|d| d.delegator.clone())
         .collect();
 
@@ -836,7 +871,9 @@ fn compute_incoming_depth_recursive(
     // Recursively find the maximum depth
     delegators
         .into_iter()
-        .map(|d| 1 + compute_incoming_depth_recursive(&d, scope, delegations, now, visited))
+        .map(|d| {
+            1 + compute_incoming_depth_recursive(&d, scope, delegations, proposals, now, visited)
+        })
         .max()
         .unwrap_or(0)
 }
@@ -1035,6 +1072,126 @@ mod tests {
             DelegationScope::Domain(domain.clone()),
         );
         let result = mgr.create_delegation(d2).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("cycle"));
+    }
+
+    #[tokio::test]
+    async fn test_precise_scope_overlap_no_cycle_different_domains() {
+        let mgr = GovernanceManager::new();
+        let alice = test_did(1);
+        let bob = test_did(2);
+
+        let domain_a = GovernanceDomainId::new("domain-a");
+        let domain_b = GovernanceDomainId::new("domain-b");
+        let membership = MembershipConfig {
+            source: MembershipSource::StaticList(vec![alice.clone(), bob.clone()]),
+        };
+        let params = GovernanceParams::new(50, 50, 86400);
+
+        // Create domain B
+        mgr.create_domain(
+            domain_b.clone(),
+            "Domain B".to_string(),
+            "cooperative_default".to_string(),
+            params.clone(),
+            membership.clone(),
+        )
+        .await
+        .unwrap();
+
+        // Create a proposal in domain B
+        let proposal_id = ProposalId::generate();
+        mgr.create_proposal(
+            proposal_id.clone(),
+            domain_b.clone(),
+            alice.clone(),
+            "Test Proposal".to_string(),
+            "Description".to_string(),
+            ProposalPayload::Text {
+                body: "test".to_string(),
+            },
+        )
+        .await
+        .unwrap();
+
+        // Alice delegates domain A to Bob
+        mgr.create_delegation(Delegation::new(
+            alice.clone(),
+            bob.clone(),
+            DelegationScope::Domain(domain_a.clone()),
+        ))
+        .await
+        .unwrap();
+
+        // Bob delegates proposal (in domain B) to Alice
+        // This should SUCCEED because domain A != domain B (no cycle with precise checking)
+        let result = mgr
+            .create_delegation(Delegation::new(
+                bob.clone(),
+                alice.clone(),
+                DelegationScope::Proposal(proposal_id),
+            ))
+            .await;
+        assert!(result.is_ok(), "Expected no cycle but got: {result:?}");
+    }
+
+    #[tokio::test]
+    async fn test_precise_scope_overlap_cycle_same_domain() {
+        let mgr = GovernanceManager::new();
+        let alice = test_did(1);
+        let bob = test_did(2);
+
+        let domain_a = GovernanceDomainId::new("domain-a");
+        let membership = MembershipConfig {
+            source: MembershipSource::StaticList(vec![alice.clone(), bob.clone()]),
+        };
+        let params = GovernanceParams::new(50, 50, 86400);
+
+        // Create domain A
+        mgr.create_domain(
+            domain_a.clone(),
+            "Domain A".to_string(),
+            "cooperative_default".to_string(),
+            params.clone(),
+            membership.clone(),
+        )
+        .await
+        .unwrap();
+
+        // Create a proposal in domain A
+        let proposal_id = ProposalId::generate();
+        mgr.create_proposal(
+            proposal_id.clone(),
+            domain_a.clone(),
+            alice.clone(),
+            "Test Proposal".to_string(),
+            "Description".to_string(),
+            ProposalPayload::Text {
+                body: "test".to_string(),
+            },
+        )
+        .await
+        .unwrap();
+
+        // Alice delegates domain A to Bob
+        mgr.create_delegation(Delegation::new(
+            alice.clone(),
+            bob.clone(),
+            DelegationScope::Domain(domain_a.clone()),
+        ))
+        .await
+        .unwrap();
+
+        // Bob delegates proposal (in domain A) to Alice
+        // This should FAIL because proposal is in domain A (cycle detected)
+        let result = mgr
+            .create_delegation(Delegation::new(
+                bob.clone(),
+                alice.clone(),
+                DelegationScope::Proposal(proposal_id),
+            ))
+            .await;
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("cycle"));
     }
