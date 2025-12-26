@@ -11,6 +11,7 @@ use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use icn_identity::commons::{JurisdictionId, MembershipCapability};
 use icn_identity::Did;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use utoipa::ToSchema;
@@ -486,6 +487,64 @@ pub async fn complete_enrollment(
             )
         })?;
 
+    // =========================================================================
+    // VUI Uniqueness Check (BEFORE any state changes)
+    // =========================================================================
+    // Check VUI uniqueness FIRST before creating any records.
+    // This prevents orphaned PersonhoodAnchor/CommonsHolderRecord if VUI collision detected.
+    //
+    // NOTE: Currently using SHA256(DID) as temporary VUI. In full SDIS, VUI comes from
+    // threshold PRF computation over biometric/identity data, providing true sybil resistance.
+    // The DID-based approach is a placeholder that enables the API contract to stabilize.
+    if let Some(ref mgr) = steward_mgr.as_ref() {
+        // TEMPORARY: Using hash of DID as VUI placeholder
+        // TODO(SDIS): Replace with threshold PRF computation
+        tracing::warn!(
+            "Using temporary DID-based VUI for {} (full PRF not yet implemented)",
+            ephemeral_did
+        );
+
+        let mut hasher = Sha256::new();
+        hasher.update(ephemeral_did.to_string().as_bytes());
+        let vui_hash: [u8; 32] = hasher.finalize().into();
+
+        match mgr.check_vui(vui_hash).await {
+            Ok(icn_steward::LocalCheckResult::NotRegistered) => {
+                // VUI is unique - proceed with enrollment
+                tracing::debug!("VUI uniqueness check passed for {}", ephemeral_did);
+            }
+            Ok(icn_steward::LocalCheckResult::Registered(registration)) => {
+                // VUI already exists. `registration.registered_by` is the DID that previously
+                // registered this VUI on this steward node. For privacy, we do not expose it
+                // to the caller, but we log it for security auditing and potential dispute resolution.
+                tracing::warn!(
+                    "VUI collision for {}: VUI already registered to {} at timestamp {}",
+                    ephemeral_did,
+                    registration.registered_by,
+                    registration.registered_at
+                );
+                return Err(GatewayError::BadRequest(
+                    "This identity has already been enrolled (VUI collision)".to_string(),
+                ));
+            }
+            Ok(icn_steward::LocalCheckResult::PossiblyRegistered) => {
+                // Bloom filter match - possible duplicate, but could be false positive
+                // In production, this would trigger a distributed check across stewards
+                tracing::warn!(
+                    "Possible VUI collision for {} (Bloom filter match) - proceeding with caution",
+                    ephemeral_did
+                );
+            }
+            Err(e) => {
+                // VUI check failed - log and continue (best-effort for now)
+                tracing::warn!(
+                    "VUI uniqueness check failed: {} - proceeding with enrollment",
+                    e
+                );
+            }
+        }
+    }
+
     // The DID is the ephemeral_did - in SDIS, keys are created on the device
     let did = req.ephemeral_did.clone();
 
@@ -580,49 +639,21 @@ pub async fn complete_enrollment(
     // Capture coop_id before dropping session
     let coop_id = session.coop_id.clone();
 
-    // Register VUI with StewardActor (if available) to prevent duplicate enrollments
-    // For now, we use a hash of the DID as the VUI until full PRF-based computation is implemented
+    // =========================================================================
+    // VUI Registration (AFTER state changes succeed)
+    // =========================================================================
+    // Uniqueness was already verified above. Now register the VUI to prevent
+    // future duplicate enrollments with the same identity.
     if let Some(ref mgr) = steward_mgr.as_ref() {
-        // Compute a simple VUI hash from the DID
-        // In full SDIS, this would come from threshold PRF computation
-        use sha2::{Digest, Sha256};
         let mut hasher = Sha256::new();
         hasher.update(ephemeral_did.to_string().as_bytes());
         let vui_hash: [u8; 32] = hasher.finalize().into();
 
-        // Check VUI uniqueness first
-        match mgr.check_vui(vui_hash).await {
-            Ok(icn_steward::LocalCheckResult::NotRegistered) => {
-                // VUI is unique, register it
-                if let Err(e) = mgr.register_vui(vui_hash, ephemeral_did.clone()).await {
-                    tracing::warn!("Failed to register VUI in steward registry: {}", e);
-                    // Continue - registration is best-effort for now
-                } else {
-                    tracing::info!("Registered VUI for {} in steward registry", ephemeral_did);
-                }
-            }
-            Ok(icn_steward::LocalCheckResult::Registered(_)) => {
-                // VUI already exists - this identity was already enrolled
-                return Err(GatewayError::BadRequest(
-                    "This identity has already been enrolled (VUI collision)".to_string(),
-                ));
-            }
-            Ok(icn_steward::LocalCheckResult::PossiblyRegistered) => {
-                // Bloom filter match - possible duplicate, but could be false positive
-                // For now, allow with warning (in production, would trigger distributed check)
-                tracing::warn!(
-                    "Possible VUI match for {} - proceeding with enrollment",
-                    ephemeral_did
-                );
-                // Try to register anyway
-                if let Err(e) = mgr.register_vui(vui_hash, ephemeral_did.clone()).await {
-                    tracing::warn!("Failed to register VUI: {}", e);
-                }
-            }
-            Err(e) => {
-                tracing::warn!("VUI check failed: {} - proceeding with enrollment", e);
-                // Continue - VUI check is best-effort for now
-            }
+        if let Err(e) = mgr.register_vui(vui_hash, ephemeral_did.clone()).await {
+            tracing::warn!("Failed to register VUI in steward registry: {}", e);
+            // Continue - registration is best-effort for now
+        } else {
+            tracing::info!("Registered VUI for {} in steward registry", ephemeral_did);
         }
     }
 
