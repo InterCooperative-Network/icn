@@ -468,7 +468,11 @@ impl GatewayTreasuryManager {
         // Emit metrics
         treasury_metrics::deposit_processed_inc();
         treasury_metrics::deposit_by_currency_inc(&currency_for_metrics);
-        treasury_metrics::balance_set(&treasury_did.to_string(), &currency_for_metrics, new_balance);
+        treasury_metrics::balance_set(
+            &treasury_did.to_string(),
+            &currency_for_metrics,
+            new_balance,
+        );
 
         debug!(
             treasury = %treasury_did,

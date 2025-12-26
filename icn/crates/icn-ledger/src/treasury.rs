@@ -1277,10 +1277,7 @@ impl TreasuryManager {
 
                 // Get or create velocity window for this treasury/currency pair
                 let window_key = (treasury_did.clone(), currency.to_string());
-                let window = self
-                    .velocity_windows
-                    .entry(window_key)
-                    .or_default();
+                let window = self.velocity_windows.entry(window_key).or_default();
 
                 if window.would_exceed(limit.window_seconds, limit.max_amount, amount) {
                     // Emit metric for velocity limit exceeded
@@ -1297,7 +1294,12 @@ impl TreasuryManager {
     /// Record a withdrawal for velocity tracking
     ///
     /// Call this after a successful withdrawal to update the velocity window.
-    pub fn record_withdrawal_for_velocity(&mut self, treasury_did: &Did, amount: i64, currency: &str) {
+    pub fn record_withdrawal_for_velocity(
+        &mut self,
+        treasury_did: &Did,
+        amount: i64,
+        currency: &str,
+    ) {
         let window_key = (treasury_did.clone(), currency.to_string());
         let window = self.velocity_windows.entry(window_key).or_default();
         window.record_withdrawal(amount);
