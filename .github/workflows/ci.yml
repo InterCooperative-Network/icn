@@ -70,20 +70,10 @@ jobs:
     name: Clippy
     runs-on: ubuntu-latest
     steps:
-      - name: Free disk space
-        run: |
-          echo "Removing preinstalled software to free space..."
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
-          sudo rm -rf /usr/local/share/powershell
-          sudo rm -rf /usr/share/swift
-          sudo rm -rf /usr/local/.ghcup
-          sudo rm -rf /usr/lib/jvm
-          docker system prune -af || true
-
       - uses: actions/checkout@v6
+
+      - name: Free disk space
+        uses: ./.github/actions/free-disk-space
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -101,34 +91,12 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     steps:
-      - name: Free disk space
-        run: |
-          echo "Disk space before cleanup:"
-          df -h /
-          echo "Removing preinstalled software to free space..."
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
-          sudo rm -rf /usr/local/share/powershell
-          sudo rm -rf /usr/share/swift
-          sudo rm -rf /usr/local/.ghcup
-          sudo rm -rf /usr/lib/jvm
-          sudo rm -rf /opt/microsoft
-          sudo rm -rf /opt/hostedtoolcache/go
-          sudo rm -rf /opt/hostedtoolcache/node
-          sudo rm -rf /opt/hostedtoolcache/Python
-          sudo rm -rf /opt/hostedtoolcache/Ruby
-          sudo rm -rf /usr/local/share/chromium
-          sudo rm -rf /usr/local/share/vcpkg
-          sudo rm -rf /usr/share/miniconda
-          sudo rm -rf /imagegeneration
-          docker system prune -af || true
-          sudo apt-get clean || true
-          echo "Disk space after cleanup:"
-          df -h /
-
       - uses: actions/checkout@v6
+
+      - name: Free disk space
+        uses: ./.github/actions/free-disk-space
+        with:
+          verbose: 'true'
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -148,20 +116,10 @@ jobs:
     name: Test Coverage
     runs-on: ubuntu-latest
     steps:
-      - name: Free disk space
-        run: |
-          echo "Removing preinstalled software to free space..."
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
-          sudo rm -rf /usr/local/share/powershell
-          sudo rm -rf /usr/share/swift
-          sudo rm -rf /usr/local/.ghcup
-          sudo rm -rf /usr/lib/jvm
-          docker system prune -af || true
-
       - uses: actions/checkout@v6
+
+      - name: Free disk space
+        uses: ./.github/actions/free-disk-space
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -207,20 +165,10 @@ jobs:
     name: Build Release
     runs-on: ubuntu-latest
     steps:
-      - name: Free disk space
-        run: |
-          echo "Removing preinstalled software to free space..."
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
-          sudo rm -rf /usr/local/share/powershell
-          sudo rm -rf /usr/share/swift
-          sudo rm -rf /usr/local/.ghcup
-          sudo rm -rf /usr/lib/jvm
-          docker system prune -af || true
-
       - uses: actions/checkout@v6
+
+      - name: Free disk space
+        uses: ./.github/actions/free-disk-space
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -248,16 +196,10 @@ jobs:
       run:
         working-directory: ./sdk/typescript
     steps:
-      - name: Free disk space
-        run: |
-          echo "Removing preinstalled SDKs to free space..."
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          docker system prune -af || true
-        working-directory: .
-
       - uses: actions/checkout@v6
+
+      - name: Free disk space
+        uses: ./.github/actions/free-disk-space
 
       - uses: actions/setup-node@v6
         with:
@@ -282,16 +224,10 @@ jobs:
       run:
         working-directory: ./web/pilot-ui
     steps:
-      - name: Free disk space
-        run: |
-          echo "Removing preinstalled SDKs to free space..."
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          docker system prune -af || true
-        working-directory: .
-
       - uses: actions/checkout@v6
+
+      - name: Free disk space
+        uses: ./.github/actions/free-disk-space
 
       - uses: actions/setup-node@v6
         with:
