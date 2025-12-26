@@ -207,6 +207,11 @@ pub async fn dissolve_community(
 }
 
 /// POST /communities/{id}/members - Join a community
+///
+/// # Authorization
+///
+/// Users can only join themselves to a community. To join someone else,
+/// the `community:admin` scope is required to prevent unauthorized proxy joins.
 #[post("/{id}/members")]
 pub async fn join_community(
     http_req: HttpRequest,
@@ -216,6 +221,19 @@ pub async fn join_community(
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "community:write")?;
     let mgr = get_community_mgr(&community_mgr)?;
+
+    // Get authenticated user's DID
+    use crate::middleware::{get_claims, has_scope};
+    let claims = get_claims(&http_req)
+        .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
+
+    // Security: Only allow joining yourself unless you have admin scope
+    // This prevents unauthorized proxy joins (attacker joining victim to communities)
+    if claims.sub != req.member_id && !has_scope(&http_req, "community:admin") {
+        return Err(GatewayError::AuthorizationFailed(
+            "Cannot join on behalf of others without community:admin scope".to_string(),
+        ));
+    }
 
     let member_type = parse_member_type(&req.member_type, &req.member_id)?;
 
@@ -227,6 +245,11 @@ pub async fn join_community(
 }
 
 /// DELETE /communities/{id}/members/{member_id} - Leave a community
+///
+/// # Authorization
+///
+/// Users can only remove themselves from a community. To remove someone else,
+/// the `community:admin` scope is required.
 #[delete("/{id}/members/{member_id}")]
 pub async fn leave_community(
     http_req: HttpRequest,
@@ -237,6 +260,19 @@ pub async fn leave_community(
     let mgr = get_community_mgr(&community_mgr)?;
 
     let (community_id, member_id) = path.into_inner();
+
+    // Get authenticated user's DID
+    use crate::middleware::{get_claims, has_scope};
+    let claims = get_claims(&http_req)
+        .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
+
+    // Security: Only allow leaving yourself unless you have admin scope
+    // This prevents unauthorized removal of members by malicious actors
+    if claims.sub != member_id && !has_scope(&http_req, "community:admin") {
+        return Err(GatewayError::AuthorizationFailed(
+            "Cannot remove others from community without community:admin scope".to_string(),
+        ));
+    }
 
     let community = mgr.leave_community(&community_id, &member_id).await?;
 

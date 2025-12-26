@@ -61,6 +61,16 @@ pub fn require_scope(req: &HttpRequest, required_scope: &str) -> Result<(), Gate
     Ok(())
 }
 
+/// Check if request has a scope (non-erroring version)
+///
+/// Returns true if the authenticated user has the given scope, false otherwise.
+/// If no claims are present or the user is not authenticated, returns false.
+pub fn has_scope(req: &HttpRequest, scope: &str) -> bool {
+    get_claims(req)
+        .map(|claims| claims.scopes.contains(&scope.to_string()))
+        .unwrap_or(false)
+}
+
 /// Check if authenticated user has access to the requested cooperative
 /// CRITICAL: Prevents cross-cooperative authorization bypass
 pub fn require_coop_access(req: &HttpRequest, coop_id: &str) -> Result<(), GatewayError> {
