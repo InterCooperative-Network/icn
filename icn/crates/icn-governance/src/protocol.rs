@@ -862,6 +862,161 @@ pub enum ParameterValidationError {
 }
 
 // ============================================================================
+// PendingParameterChange (for delayed execution)
+// ============================================================================
+
+/// Unique identifier for a pending parameter change
+pub type PendingChangeId = String;
+
+/// Status of a pending parameter change
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PendingChangeStatus {
+    /// Change is scheduled but not yet applied
+    Pending,
+
+    /// Change was successfully applied at the effective time
+    Applied,
+
+    /// Change was cancelled before it took effect
+    Cancelled,
+
+    /// Change was superseded by a newer change to the same parameter
+    Superseded,
+}
+
+impl fmt::Display for PendingChangeStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PendingChangeStatus::Pending => write!(f, "pending"),
+            PendingChangeStatus::Applied => write!(f, "applied"),
+            PendingChangeStatus::Cancelled => write!(f, "cancelled"),
+            PendingChangeStatus::Superseded => write!(f, "superseded"),
+        }
+    }
+}
+
+/// A scheduled parameter change waiting to take effect
+///
+/// When a protocol change proposal with `effective_at` is approved,
+/// a `PendingParameterChange` is created and stored. The background
+/// scheduler periodically checks for due changes and applies them.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PendingParameterChange {
+    /// Unique identifier for this pending change
+    pub id: PendingChangeId,
+
+    /// ID of the parameter being changed
+    pub parameter_id: String,
+
+    /// The new value to apply
+    pub new_value: ParameterValue,
+
+    /// Unix timestamp when this change should take effect
+    pub effective_at: u64,
+
+    /// Scope where this change applies
+    pub scope: ParameterScope,
+
+    /// ID of the proposal that authorized this change
+    pub proposal_id: String,
+
+    /// Unix timestamp when this pending change was created
+    pub created_at: u64,
+
+    /// Current status of this pending change
+    pub status: PendingChangeStatus,
+
+    /// Rationale for the change (copied from proposal)
+    pub rationale: String,
+
+    /// If superseded, the ID of the change that superseded this one
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub superseded_by: Option<PendingChangeId>,
+
+    /// If applied, the timestamp when it was applied
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub applied_at: Option<u64>,
+
+    /// If cancelled, the reason for cancellation
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cancellation_reason: Option<String>,
+}
+
+impl PendingParameterChange {
+    /// Create a new pending parameter change
+    pub fn new(
+        id: impl Into<String>,
+        parameter_id: impl Into<String>,
+        new_value: ParameterValue,
+        effective_at: u64,
+        scope: ParameterScope,
+        proposal_id: impl Into<String>,
+        rationale: impl Into<String>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            parameter_id: parameter_id.into(),
+            new_value,
+            effective_at,
+            scope,
+            proposal_id: proposal_id.into(),
+            created_at: icn_time::current_timestamp_secs(),
+            status: PendingChangeStatus::Pending,
+            rationale: rationale.into(),
+            superseded_by: None,
+            applied_at: None,
+            cancellation_reason: None,
+        }
+    }
+
+    /// Generate a unique ID for a pending change
+    ///
+    /// Format: `pending:{parameter_id}:{timestamp}:{counter}`
+    /// Uses an atomic counter for uniqueness when multiple changes are created in the same second.
+    pub fn generate_id(parameter_id: &str) -> String {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static COUNTER: AtomicU64 = AtomicU64::new(0);
+
+        let timestamp = icn_time::current_timestamp_secs();
+        let counter = COUNTER.fetch_add(1, Ordering::Relaxed);
+        format!("pending:{parameter_id}:{timestamp}:{counter:08x}")
+    }
+
+    /// Check if this change is due (effective_at <= current time)
+    pub fn is_due(&self, current_time: u64) -> bool {
+        self.status == PendingChangeStatus::Pending && self.effective_at <= current_time
+    }
+
+    /// Mark this change as applied
+    pub fn mark_applied(&mut self) {
+        self.status = PendingChangeStatus::Applied;
+        self.applied_at = Some(icn_time::current_timestamp_secs());
+    }
+
+    /// Mark this change as cancelled
+    pub fn mark_cancelled(&mut self, reason: impl Into<String>) {
+        self.status = PendingChangeStatus::Cancelled;
+        self.cancellation_reason = Some(reason.into());
+    }
+
+    /// Mark this change as superseded by another change
+    pub fn mark_superseded(&mut self, superseded_by: impl Into<String>) {
+        self.status = PendingChangeStatus::Superseded;
+        self.superseded_by = Some(superseded_by.into());
+    }
+
+    /// Time until this change takes effect (in seconds), or None if already due
+    pub fn time_until_effective(&self, current_time: u64) -> Option<u64> {
+        if self.effective_at > current_time {
+            Some(self.effective_at - current_time)
+        } else {
+            None
+        }
+    }
+}
+
+// ============================================================================
 // Tests
 // ============================================================================
 
@@ -1310,5 +1465,190 @@ mod tests {
             result,
             Err(ParameterValidationError::InvalidParameterId { .. })
         ));
+    }
+
+    // ============================================================================
+    // PendingParameterChange tests
+    // ============================================================================
+
+    #[test]
+    fn test_pending_change_creation() {
+        let change = PendingParameterChange::new(
+            "pending:governance.quorum:12345:abc",
+            "governance.quorum",
+            ParameterValue::Percentage(60.0),
+            1700000000,
+            ParameterScope::Global,
+            "prop-123",
+            "Increase quorum for better participation",
+        );
+
+        assert_eq!(change.parameter_id, "governance.quorum");
+        assert_eq!(change.effective_at, 1700000000);
+        assert_eq!(change.status, PendingChangeStatus::Pending);
+        assert!(change.applied_at.is_none());
+        assert!(change.superseded_by.is_none());
+        assert!(change.cancellation_reason.is_none());
+    }
+
+    #[test]
+    fn test_pending_change_generate_id() {
+        let id1 = PendingParameterChange::generate_id("governance.quorum");
+        let id2 = PendingParameterChange::generate_id("governance.quorum");
+
+        // IDs should start with expected prefix
+        assert!(id1.starts_with("pending:governance.quorum:"));
+        assert!(id2.starts_with("pending:governance.quorum:"));
+
+        // IDs should be unique due to random component
+        assert_ne!(id1, id2);
+    }
+
+    #[test]
+    fn test_pending_change_is_due() {
+        let change = PendingParameterChange::new(
+            "test-id",
+            "governance.quorum",
+            ParameterValue::Percentage(60.0),
+            1700000000,
+            ParameterScope::Global,
+            "prop-123",
+            "Test",
+        );
+
+        // Not yet due
+        assert!(!change.is_due(1699999999));
+
+        // Exactly due
+        assert!(change.is_due(1700000000));
+
+        // Past due
+        assert!(change.is_due(1700000001));
+    }
+
+    #[test]
+    fn test_pending_change_mark_applied() {
+        let mut change = PendingParameterChange::new(
+            "test-id",
+            "governance.quorum",
+            ParameterValue::Percentage(60.0),
+            1700000000,
+            ParameterScope::Global,
+            "prop-123",
+            "Test",
+        );
+
+        change.mark_applied();
+
+        assert_eq!(change.status, PendingChangeStatus::Applied);
+        assert!(change.applied_at.is_some());
+    }
+
+    #[test]
+    fn test_pending_change_mark_cancelled() {
+        let mut change = PendingParameterChange::new(
+            "test-id",
+            "governance.quorum",
+            ParameterValue::Percentage(60.0),
+            1700000000,
+            ParameterScope::Global,
+            "prop-123",
+            "Test",
+        );
+
+        change.mark_cancelled("Governance override");
+
+        assert_eq!(change.status, PendingChangeStatus::Cancelled);
+        assert_eq!(
+            change.cancellation_reason,
+            Some("Governance override".to_string())
+        );
+    }
+
+    #[test]
+    fn test_pending_change_mark_superseded() {
+        let mut change = PendingParameterChange::new(
+            "test-id",
+            "governance.quorum",
+            ParameterValue::Percentage(60.0),
+            1700000000,
+            ParameterScope::Global,
+            "prop-123",
+            "Test",
+        );
+
+        change.mark_superseded("newer-change-id");
+
+        assert_eq!(change.status, PendingChangeStatus::Superseded);
+        assert_eq!(change.superseded_by, Some("newer-change-id".to_string()));
+    }
+
+    #[test]
+    fn test_pending_change_time_until_effective() {
+        let change = PendingParameterChange::new(
+            "test-id",
+            "governance.quorum",
+            ParameterValue::Percentage(60.0),
+            1700000000,
+            ParameterScope::Global,
+            "prop-123",
+            "Test",
+        );
+
+        // Before effective time
+        assert_eq!(change.time_until_effective(1699999000), Some(1000));
+
+        // Exactly at effective time
+        assert_eq!(change.time_until_effective(1700000000), None);
+
+        // After effective time
+        assert_eq!(change.time_until_effective(1700000100), None);
+    }
+
+    #[test]
+    fn test_pending_change_status_display() {
+        assert_eq!(PendingChangeStatus::Pending.to_string(), "pending");
+        assert_eq!(PendingChangeStatus::Applied.to_string(), "applied");
+        assert_eq!(PendingChangeStatus::Cancelled.to_string(), "cancelled");
+        assert_eq!(PendingChangeStatus::Superseded.to_string(), "superseded");
+    }
+
+    #[test]
+    fn test_pending_change_serialization() {
+        let change = PendingParameterChange::new(
+            "test-id",
+            "governance.quorum",
+            ParameterValue::Percentage(60.0),
+            1700000000,
+            ParameterScope::Global,
+            "prop-123",
+            "Test rationale",
+        );
+
+        let json = serde_json::to_string(&change).unwrap();
+        let parsed: PendingParameterChange = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(parsed.id, change.id);
+        assert_eq!(parsed.parameter_id, change.parameter_id);
+        assert_eq!(parsed.effective_at, change.effective_at);
+        assert_eq!(parsed.status, change.status);
+    }
+
+    #[test]
+    fn test_pending_change_cancelled_not_due() {
+        let mut change = PendingParameterChange::new(
+            "test-id",
+            "governance.quorum",
+            ParameterValue::Percentage(60.0),
+            1700000000,
+            ParameterScope::Global,
+            "prop-123",
+            "Test",
+        );
+
+        change.mark_cancelled("Cancelled by governance");
+
+        // Even though time has passed, cancelled changes are not due
+        assert!(!change.is_due(1700000001));
     }
 }

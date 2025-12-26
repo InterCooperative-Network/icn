@@ -293,6 +293,32 @@ impl GovernanceHandle {
         }
     }
 
+    /// Schedule a pending parameter change for delayed execution
+    ///
+    /// Used when a ProtocolChange proposal has `effective_at` set.
+    /// The change will be applied by the background scheduler when the time comes.
+    pub fn schedule_pending_change(
+        &self,
+        change: icn_governance::PendingParameterChange,
+    ) -> Result<()> {
+        match &self.protocol_params {
+            Some(store) => {
+                store.add_pending_change(change)?;
+                icn_obs::metrics::protocol::pending_parameter_changes_scheduled_inc();
+                Ok(())
+            }
+            None => bail!("Protocol parameter store not configured"),
+        }
+    }
+
+    /// Get the current count of active pending parameter changes
+    pub fn count_pending_changes(&self) -> Result<usize> {
+        match &self.protocol_params {
+            Some(store) => store.count_pending_changes(),
+            None => Ok(0),
+        }
+    }
+
     /// Check if an entity exists (for scope validation at execution time)
     ///
     /// Returns true if the entity registry is not configured (allowing scoped params
@@ -380,12 +406,24 @@ impl icn_governance::GovernanceOps for GovernanceHandle {
                 );
             };
 
-            // Reject proposals with effective_at set (delayed execution not yet implemented)
-            if proposal.effective_at.is_some() {
-                bail!(
-                    "Cannot create ProtocolChange proposal: delayed execution (effective_at) is not yet implemented. \
-                     Remove effective_at to apply changes immediately upon approval."
-                );
+            // Validate effective_at if set (delayed execution)
+            if let Some(effective_at) = proposal.effective_at {
+                let now = icn_time::current_timestamp_secs();
+
+                // effective_at must be in the future
+                if effective_at <= now {
+                    bail!(
+                        "Cannot create ProtocolChange proposal: effective_at ({effective_at}) must be in the future (current time: {now})"
+                    );
+                }
+
+                // Optional: max delay limit (1 year = 365 * 24 * 60 * 60 = 31536000 seconds)
+                const MAX_DELAY_SECONDS: u64 = 31536000;
+                if effective_at > now + MAX_DELAY_SECONDS {
+                    bail!(
+                        "Cannot create ProtocolChange proposal: effective_at is too far in the future (max: 1 year)"
+                    );
+                }
             }
 
             // Check if the parameter exists

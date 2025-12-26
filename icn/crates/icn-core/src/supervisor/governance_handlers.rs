@@ -2387,6 +2387,14 @@ impl GovernanceEventHandler {
         proposal_id: ProposalId,
         proposal: icn_governance::ProtocolChangeProposal,
     ) {
+        let proposal_id_str = proposal_id.0.clone();
+
+        // Check if this is a delayed execution
+        if let Some(effective_at) = proposal.effective_at {
+            self.handle_delayed_protocol_change(proposal_id, proposal, effective_at);
+            return;
+        }
+
         info!(
             "⚙️  Protocol change proposal {} accepted: {} -> {:?}",
             proposal_id.0, proposal.parameter_id, proposal.new_value
@@ -2396,7 +2404,6 @@ impl GovernanceEventHandler {
         let param_result = self
             .gov_handle
             .get_protocol_parameter(&proposal.parameter_id);
-        let proposal_id_str = proposal_id.0.clone();
         match param_result {
             Ok(Some(mut param)) => {
                 // Capture old value for audit event (serialize to string for logging)
@@ -2526,6 +2533,67 @@ impl GovernanceEventHandler {
         }
 
         icn_obs::metrics::governance::proposals_executed_inc("protocol_change");
+    }
+
+    /// Handle a protocol parameter change with delayed execution
+    fn handle_delayed_protocol_change(
+        &self,
+        proposal_id: ProposalId,
+        proposal: icn_governance::ProtocolChangeProposal,
+        effective_at: u64,
+    ) {
+        let proposal_id_str = proposal_id.0.clone();
+
+        // Calculate delay for logging
+        let now = icn_time::current_timestamp_secs();
+        let delay_secs = effective_at.saturating_sub(now);
+        let delay_human = if delay_secs < 3600 {
+            format!("{} minutes", delay_secs / 60)
+        } else if delay_secs < 86400 {
+            format!("{} hours", delay_secs / 3600)
+        } else {
+            format!("{} days", delay_secs / 86400)
+        };
+
+        info!(
+            "⏰ Protocol change proposal {} scheduled for delayed execution: {} -> {:?} (effective in {})",
+            proposal_id.0, proposal.parameter_id, proposal.new_value, delay_human
+        );
+
+        // Determine the scope for the pending change
+        let scope = proposal
+            .scope
+            .clone()
+            .unwrap_or(icn_governance::ParameterScope::Global);
+
+        // Create the pending change
+        let pending_change = icn_governance::PendingParameterChange::new(
+            icn_governance::PendingParameterChange::generate_id(&proposal.parameter_id),
+            &proposal.parameter_id,
+            proposal.new_value.clone(),
+            effective_at,
+            scope,
+            &proposal_id_str,
+            &proposal.rationale,
+        );
+
+        // Store the pending change
+        if let Err(e) = self.gov_handle.schedule_pending_change(pending_change) {
+            let error_msg = format!(
+                "Failed to schedule delayed parameter change for '{}': {}",
+                proposal.parameter_id, e
+            );
+            warn!("{} (proposal {})", error_msg, proposal_id_str);
+            self.emit_execution_failure(&proposal_id, "protocol_change", &error_msg);
+            return;
+        }
+
+        info!(
+            "✓ Protocol parameter change {} scheduled (effective_at: {})",
+            proposal.parameter_id, effective_at
+        );
+
+        icn_obs::metrics::governance::proposals_executed_inc("protocol_change_scheduled");
     }
 }
 

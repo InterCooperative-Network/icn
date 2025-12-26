@@ -61,8 +61,8 @@
 //! ```
 
 use crate::protocol::{
-    ParameterChange, ParameterScope, ParameterValidationError, ParameterValue, ProtocolParameter,
-    KNOWN_PARAMETER_CATEGORIES,
+    ParameterChange, ParameterScope, ParameterValidationError, ParameterValue, PendingChangeId,
+    PendingChangeStatus, PendingParameterChange, ProtocolParameter, KNOWN_PARAMETER_CATEGORIES,
 };
 use anyhow::Result;
 use icn_entity::EntityId;
@@ -335,6 +335,45 @@ pub trait ProtocolParameterStore: Send + Sync {
         id: &str,
         new_value: &ParameterValue,
     ) -> Result<(), ParameterValidationError>;
+
+    // ========================================
+    // Pending Change Methods (Delayed Execution)
+    // ========================================
+
+    /// Add a pending parameter change for delayed execution
+    ///
+    /// The change will be stored and applied when the scheduler runs
+    /// after `effective_at` timestamp.
+    fn add_pending_change(&self, change: PendingParameterChange) -> Result<()>;
+
+    /// Get a pending change by ID
+    fn get_pending_change(&self, id: &PendingChangeId) -> Result<Option<PendingParameterChange>>;
+
+    /// List all pending changes (all statuses)
+    fn list_pending_changes(&self) -> Result<Vec<PendingParameterChange>>;
+
+    /// List pending changes for a specific parameter
+    fn list_pending_changes_for_parameter(
+        &self,
+        parameter_id: &str,
+    ) -> Result<Vec<PendingParameterChange>>;
+
+    /// Get all pending changes that are due (effective_at <= timestamp)
+    ///
+    /// Returns only changes with status `Pending` that should be applied.
+    /// Results are ordered by `effective_at` (earliest first) for consistent processing.
+    fn get_changes_due_before(&self, timestamp: u64) -> Result<Vec<PendingParameterChange>>;
+
+    /// Update a pending change (e.g., mark as applied, superseded)
+    fn update_pending_change(&self, change: PendingParameterChange) -> Result<()>;
+
+    /// Cancel a pending change
+    ///
+    /// Sets the status to `Cancelled` and records the reason.
+    fn cancel_pending_change(&self, id: &PendingChangeId, reason: &str) -> Result<()>;
+
+    /// Get count of active pending changes (status = Pending)
+    fn count_pending_changes(&self) -> Result<usize>;
 }
 
 // ============================================================================
@@ -352,6 +391,8 @@ pub struct InMemoryParameterStore {
     scoped_index: Arc<RwLock<HashMap<String, Vec<String>>>>,
     /// History: id -> Vec<ParameterChange>
     history: Arc<RwLock<HashMap<String, Vec<ParameterChange>>>>,
+    /// Pending changes for delayed execution: pending_change_id -> PendingParameterChange
+    pending_changes: Arc<RwLock<HashMap<PendingChangeId, PendingParameterChange>>>,
 }
 
 impl InMemoryParameterStore {
@@ -690,6 +731,147 @@ impl ProtocolParameterStore for InMemoryParameterStore {
 
         param.validate(new_value)
     }
+
+    // ========================================
+    // Pending Change Methods (Delayed Execution)
+    // ========================================
+
+    fn add_pending_change(&self, change: PendingParameterChange) -> Result<()> {
+        let mut pending = self
+            .pending_changes
+            .write()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+
+        if pending.contains_key(&change.id) {
+            return Err(anyhow::anyhow!(
+                "Pending change with ID '{}' already exists",
+                change.id
+            ));
+        }
+
+        debug!(
+            pending_change_id = %change.id,
+            parameter_id = %change.parameter_id,
+            effective_at = change.effective_at,
+            "Adding pending parameter change"
+        );
+
+        pending.insert(change.id.clone(), change);
+        Ok(())
+    }
+
+    fn get_pending_change(&self, id: &PendingChangeId) -> Result<Option<PendingParameterChange>> {
+        let pending = self
+            .pending_changes
+            .read()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        Ok(pending.get(id).cloned())
+    }
+
+    fn list_pending_changes(&self) -> Result<Vec<PendingParameterChange>> {
+        let pending = self
+            .pending_changes
+            .read()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        let mut changes: Vec<_> = pending.values().cloned().collect();
+        // Sort by effective_at for consistent ordering
+        changes.sort_by_key(|c| c.effective_at);
+        Ok(changes)
+    }
+
+    fn list_pending_changes_for_parameter(
+        &self,
+        parameter_id: &str,
+    ) -> Result<Vec<PendingParameterChange>> {
+        let pending = self
+            .pending_changes
+            .read()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        let mut changes: Vec<_> = pending
+            .values()
+            .filter(|c| c.parameter_id == parameter_id)
+            .cloned()
+            .collect();
+        changes.sort_by_key(|c| c.effective_at);
+        Ok(changes)
+    }
+
+    fn get_changes_due_before(&self, timestamp: u64) -> Result<Vec<PendingParameterChange>> {
+        let pending = self
+            .pending_changes
+            .read()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        let mut due: Vec<_> = pending
+            .values()
+            .filter(|c| c.status == PendingChangeStatus::Pending && c.effective_at <= timestamp)
+            .cloned()
+            .collect();
+        // Sort by effective_at (earliest first) for consistent processing order
+        due.sort_by_key(|c| c.effective_at);
+        Ok(due)
+    }
+
+    fn update_pending_change(&self, change: PendingParameterChange) -> Result<()> {
+        let mut pending = self
+            .pending_changes
+            .write()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+
+        if !pending.contains_key(&change.id) {
+            return Err(anyhow::anyhow!(
+                "Pending change with ID '{}' not found",
+                change.id
+            ));
+        }
+
+        debug!(
+            pending_change_id = %change.id,
+            status = %change.status,
+            "Updating pending parameter change"
+        );
+
+        pending.insert(change.id.clone(), change);
+        Ok(())
+    }
+
+    fn cancel_pending_change(&self, id: &PendingChangeId, reason: &str) -> Result<()> {
+        let mut pending = self
+            .pending_changes
+            .write()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+
+        let change = pending
+            .get_mut(id)
+            .ok_or_else(|| anyhow::anyhow!("Pending change with ID '{id}' not found"))?;
+
+        if change.status != PendingChangeStatus::Pending {
+            return Err(anyhow::anyhow!(
+                "Cannot cancel pending change '{}' with status '{}'",
+                id,
+                change.status
+            ));
+        }
+
+        debug!(
+            pending_change_id = %id,
+            reason = %reason,
+            "Cancelling pending parameter change"
+        );
+
+        change.mark_cancelled(reason);
+        Ok(())
+    }
+
+    fn count_pending_changes(&self) -> Result<usize> {
+        let pending = self
+            .pending_changes
+            .read()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        Ok(pending
+            .values()
+            .filter(|c| c.status == PendingChangeStatus::Pending)
+            .count())
+    }
 }
 
 // ============================================================================
@@ -768,6 +950,33 @@ impl SledParameterStore {
 
     fn deserialize_change(bytes: &[u8]) -> Result<ParameterChange> {
         serde_json::from_slice(bytes).map_err(|e| anyhow::anyhow!("Deserialization failed: {e}"))
+    }
+
+    // Pending change key generation
+    // Key schema:
+    // - `pending:{id}` - main storage
+    // - `pending_idx:{effective_at:020}:{id}` - time-sorted index for scheduler
+
+    fn pending_key(id: &str) -> Vec<u8> {
+        format!("pending:{id}").into_bytes()
+    }
+
+    fn pending_prefix() -> Vec<u8> {
+        b"pending:".to_vec()
+    }
+
+    fn pending_time_index_key(effective_at: u64, id: &str) -> Vec<u8> {
+        // Use zero-padded timestamp for lexicographic ordering
+        format!("pending_idx:{effective_at:020}:{id}").into_bytes()
+    }
+
+    fn pending_time_index_prefix() -> Vec<u8> {
+        b"pending_idx:".to_vec()
+    }
+
+    fn deserialize_pending_change(bytes: &[u8]) -> Result<PendingParameterChange> {
+        serde_json::from_slice(bytes)
+            .map_err(|e| anyhow::anyhow!("Deserialization of pending change failed: {e}"))
     }
 }
 
@@ -1298,6 +1507,192 @@ impl ProtocolParameterStore for SledParameterStore {
             .ok_or_else(|| ParameterValidationError::NotFound(id.to_string()))?;
 
         param.validate(new_value)
+    }
+
+    // ========================================
+    // Pending Change Methods (Delayed Execution)
+    // ========================================
+
+    fn add_pending_change(&self, change: PendingParameterChange) -> Result<()> {
+        let pending_key = Self::pending_key(&change.id);
+        let index_key = Self::pending_time_index_key(change.effective_at, &change.id);
+
+        // Check if already exists
+        if self.db.contains_key(&pending_key)? {
+            return Err(anyhow::anyhow!(
+                "Pending change with ID '{}' already exists",
+                change.id
+            ));
+        }
+
+        let pending_value = Self::serialize(&change)?;
+
+        debug!(
+            pending_change_id = %change.id,
+            parameter_id = %change.parameter_id,
+            effective_at = change.effective_at,
+            "Adding pending parameter change"
+        );
+
+        // Use transaction to atomically insert both keys
+        self.db
+            .transaction(|tx| {
+                tx.insert(pending_key.as_slice(), pending_value.as_slice())?;
+                // Store only the ID in the index (the full data is in pending_key)
+                tx.insert(index_key.as_slice(), change.id.as_bytes())?;
+                Ok(())
+            })
+            .map_err(|e| match e {
+                sled::transaction::TransactionError::Abort(err) => err,
+                sled::transaction::TransactionError::Storage(e) => {
+                    anyhow::anyhow!("Storage error adding pending change: {e}")
+                }
+            })?;
+
+        Ok(())
+    }
+
+    fn get_pending_change(&self, id: &PendingChangeId) -> Result<Option<PendingParameterChange>> {
+        let key = Self::pending_key(id);
+        match self.db.get(&key)? {
+            Some(bytes) => Ok(Some(Self::deserialize_pending_change(&bytes)?)),
+            None => Ok(None),
+        }
+    }
+
+    fn list_pending_changes(&self) -> Result<Vec<PendingParameterChange>> {
+        let prefix = Self::pending_prefix();
+        let mut changes = Vec::new();
+
+        for item in self.db.scan_prefix(&prefix) {
+            let (_, value) = item?;
+            changes.push(Self::deserialize_pending_change(&value)?);
+        }
+
+        // Sort by effective_at for consistent ordering
+        changes.sort_by_key(|c| c.effective_at);
+        Ok(changes)
+    }
+
+    fn list_pending_changes_for_parameter(
+        &self,
+        parameter_id: &str,
+    ) -> Result<Vec<PendingParameterChange>> {
+        let prefix = Self::pending_prefix();
+        let mut changes = Vec::new();
+
+        for item in self.db.scan_prefix(&prefix) {
+            let (_, value) = item?;
+            let change = Self::deserialize_pending_change(&value)?;
+            if change.parameter_id == parameter_id {
+                changes.push(change);
+            }
+        }
+
+        changes.sort_by_key(|c| c.effective_at);
+        Ok(changes)
+    }
+
+    fn get_changes_due_before(&self, timestamp: u64) -> Result<Vec<PendingParameterChange>> {
+        // Use the time-sorted index for efficient lookup
+        // Keys are formatted as pending_idx:{effective_at:020}:{id}
+        // Lexicographic scan stops at the timestamp boundary
+        let prefix = Self::pending_time_index_prefix();
+        let max_key = format!("pending_idx:{:020}:", timestamp + 1).into_bytes();
+
+        let mut due = Vec::new();
+
+        for item in self.db.scan_prefix(&prefix) {
+            let (key, value) = item?;
+
+            // Stop scanning once we're past the timestamp
+            if key.as_ref() >= max_key.as_slice() {
+                break;
+            }
+
+            // The index stores the pending change ID
+            let id = String::from_utf8_lossy(&value).to_string();
+
+            // Fetch the actual change
+            if let Some(change) = self.get_pending_change(&id)? {
+                // Only include pending changes
+                if change.status == PendingChangeStatus::Pending {
+                    due.push(change);
+                }
+            }
+        }
+
+        // Already sorted by effective_at due to index key ordering
+        Ok(due)
+    }
+
+    fn update_pending_change(&self, change: PendingParameterChange) -> Result<()> {
+        let pending_key = Self::pending_key(&change.id);
+
+        // Check if exists
+        if !self.db.contains_key(&pending_key)? {
+            return Err(anyhow::anyhow!(
+                "Pending change with ID '{}' not found",
+                change.id
+            ));
+        }
+
+        debug!(
+            pending_change_id = %change.id,
+            status = %change.status,
+            "Updating pending parameter change"
+        );
+
+        let pending_value = Self::serialize(&change)?;
+        self.db.insert(&pending_key, pending_value)?;
+
+        Ok(())
+    }
+
+    fn cancel_pending_change(&self, id: &PendingChangeId, reason: &str) -> Result<()> {
+        let pending_key = Self::pending_key(id);
+
+        let bytes = self
+            .db
+            .get(&pending_key)?
+            .ok_or_else(|| anyhow::anyhow!("Pending change with ID '{id}' not found"))?;
+
+        let mut change = Self::deserialize_pending_change(&bytes)?;
+
+        if change.status != PendingChangeStatus::Pending {
+            return Err(anyhow::anyhow!(
+                "Cannot cancel pending change '{}' with status '{}'",
+                id,
+                change.status
+            ));
+        }
+
+        debug!(
+            pending_change_id = %id,
+            reason = %reason,
+            "Cancelling pending parameter change"
+        );
+
+        change.mark_cancelled(reason);
+        let pending_value = Self::serialize(&change)?;
+        self.db.insert(&pending_key, pending_value)?;
+
+        Ok(())
+    }
+
+    fn count_pending_changes(&self) -> Result<usize> {
+        let prefix = Self::pending_prefix();
+        let mut count = 0;
+
+        for item in self.db.scan_prefix(&prefix) {
+            let (_, value) = item?;
+            let change = Self::deserialize_pending_change(&value)?;
+            if change.status == PendingChangeStatus::Pending {
+                count += 1;
+            }
+        }
+
+        Ok(count)
     }
 }
 
@@ -2363,5 +2758,301 @@ mod tests {
         };
         assert!(err.to_string().contains("governance.threshold"));
         assert!(err.to_string().contains("scope overrides"));
+    }
+
+    // ========================================
+    // PendingParameterChange tests (InMemory)
+    // ========================================
+
+    fn test_pending_change(param_id: &str, effective_at: u64) -> PendingParameterChange {
+        PendingParameterChange::new(
+            format!("pending:{param_id}:{effective_at}"),
+            param_id,
+            ParameterValue::Integer(100),
+            effective_at,
+            ParameterScope::Global,
+            "proposal-123",
+            "Test rationale",
+        )
+    }
+
+    #[test]
+    fn test_inmemory_pending_change_add_and_get() {
+        let store = InMemoryParameterStore::new();
+
+        let change = test_pending_change("test.param", 1700000000);
+        store.add_pending_change(change.clone()).unwrap();
+
+        let retrieved = store.get_pending_change(&change.id).unwrap().unwrap();
+        assert_eq!(retrieved.parameter_id, "test.param");
+        assert_eq!(retrieved.effective_at, 1700000000);
+        assert_eq!(retrieved.status, PendingChangeStatus::Pending);
+    }
+
+    #[test]
+    fn test_inmemory_pending_change_duplicate_rejected() {
+        let store = InMemoryParameterStore::new();
+
+        let change = test_pending_change("test.param", 1700000000);
+        store.add_pending_change(change.clone()).unwrap();
+
+        // Trying to add same ID again should fail
+        let result = store.add_pending_change(change);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_inmemory_pending_change_list() {
+        let store = InMemoryParameterStore::new();
+
+        store
+            .add_pending_change(test_pending_change("param.a", 1700000100))
+            .unwrap();
+        store
+            .add_pending_change(test_pending_change("param.b", 1700000000))
+            .unwrap();
+        store
+            .add_pending_change(test_pending_change("param.c", 1700000200))
+            .unwrap();
+
+        let all = store.list_pending_changes().unwrap();
+        assert_eq!(all.len(), 3);
+        // Should be sorted by effective_at
+        assert_eq!(all[0].parameter_id, "param.b");
+        assert_eq!(all[1].parameter_id, "param.a");
+        assert_eq!(all[2].parameter_id, "param.c");
+    }
+
+    #[test]
+    fn test_inmemory_pending_change_list_for_parameter() {
+        let store = InMemoryParameterStore::new();
+
+        store
+            .add_pending_change(test_pending_change("param.a", 1700000100))
+            .unwrap();
+        store
+            .add_pending_change(test_pending_change("param.a", 1700000200))
+            .unwrap();
+        store
+            .add_pending_change(test_pending_change("param.b", 1700000000))
+            .unwrap();
+
+        let a_changes = store.list_pending_changes_for_parameter("param.a").unwrap();
+        assert_eq!(a_changes.len(), 2);
+        assert!(a_changes.iter().all(|c| c.parameter_id == "param.a"));
+    }
+
+    #[test]
+    fn test_inmemory_pending_change_get_due() {
+        let store = InMemoryParameterStore::new();
+
+        store
+            .add_pending_change(test_pending_change("param.a", 1700000100))
+            .unwrap();
+        store
+            .add_pending_change(test_pending_change("param.b", 1700000200))
+            .unwrap();
+        store
+            .add_pending_change(test_pending_change("param.c", 1700000300))
+            .unwrap();
+
+        // Get changes due before 1700000150
+        let due = store.get_changes_due_before(1700000150).unwrap();
+        assert_eq!(due.len(), 1);
+        assert_eq!(due[0].parameter_id, "param.a");
+
+        // Get changes due before 1700000250
+        let due = store.get_changes_due_before(1700000250).unwrap();
+        assert_eq!(due.len(), 2);
+    }
+
+    #[test]
+    fn test_inmemory_pending_change_cancel() {
+        let store = InMemoryParameterStore::new();
+
+        let change = test_pending_change("test.param", 1700000000);
+        store.add_pending_change(change.clone()).unwrap();
+
+        store
+            .cancel_pending_change(&change.id, "Cancelled by admin")
+            .unwrap();
+
+        let retrieved = store.get_pending_change(&change.id).unwrap().unwrap();
+        assert_eq!(retrieved.status, PendingChangeStatus::Cancelled);
+        assert_eq!(
+            retrieved.cancellation_reason,
+            Some("Cancelled by admin".to_string())
+        );
+    }
+
+    #[test]
+    fn test_inmemory_pending_change_count() {
+        let store = InMemoryParameterStore::new();
+
+        store
+            .add_pending_change(test_pending_change("param.a", 1700000000))
+            .unwrap();
+        store
+            .add_pending_change(test_pending_change("param.b", 1700000100))
+            .unwrap();
+
+        assert_eq!(store.count_pending_changes().unwrap(), 2);
+
+        // Cancel one
+        store
+            .cancel_pending_change(&"pending:param.a:1700000000".to_string(), "test")
+            .unwrap();
+
+        // Count should now be 1
+        assert_eq!(store.count_pending_changes().unwrap(), 1);
+    }
+
+    // ========================================
+    // PendingParameterChange tests (Sled)
+    // ========================================
+
+    #[test]
+    fn test_sled_pending_change_add_and_get() {
+        let store = SledParameterStore::temporary().unwrap();
+
+        let change = test_pending_change("test.param", 1700000000);
+        store.add_pending_change(change.clone()).unwrap();
+
+        let retrieved = store.get_pending_change(&change.id).unwrap().unwrap();
+        assert_eq!(retrieved.parameter_id, "test.param");
+        assert_eq!(retrieved.effective_at, 1700000000);
+        assert_eq!(retrieved.status, PendingChangeStatus::Pending);
+    }
+
+    #[test]
+    fn test_sled_pending_change_duplicate_rejected() {
+        let store = SledParameterStore::temporary().unwrap();
+
+        let change = test_pending_change("test.param", 1700000000);
+        store.add_pending_change(change.clone()).unwrap();
+
+        // Trying to add same ID again should fail
+        let result = store.add_pending_change(change);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_sled_pending_change_list() {
+        let store = SledParameterStore::temporary().unwrap();
+
+        store
+            .add_pending_change(test_pending_change("param.a", 1700000100))
+            .unwrap();
+        store
+            .add_pending_change(test_pending_change("param.b", 1700000000))
+            .unwrap();
+        store
+            .add_pending_change(test_pending_change("param.c", 1700000200))
+            .unwrap();
+
+        let all = store.list_pending_changes().unwrap();
+        assert_eq!(all.len(), 3);
+        // Should be sorted by effective_at
+        assert_eq!(all[0].parameter_id, "param.b");
+        assert_eq!(all[1].parameter_id, "param.a");
+        assert_eq!(all[2].parameter_id, "param.c");
+    }
+
+    #[test]
+    fn test_sled_pending_change_get_due() {
+        let store = SledParameterStore::temporary().unwrap();
+
+        store
+            .add_pending_change(test_pending_change("param.a", 1700000100))
+            .unwrap();
+        store
+            .add_pending_change(test_pending_change("param.b", 1700000200))
+            .unwrap();
+        store
+            .add_pending_change(test_pending_change("param.c", 1700000300))
+            .unwrap();
+
+        // Get changes due before 1700000150
+        let due = store.get_changes_due_before(1700000150).unwrap();
+        assert_eq!(due.len(), 1);
+        assert_eq!(due[0].parameter_id, "param.a");
+
+        // Get changes due before 1700000250
+        let due = store.get_changes_due_before(1700000250).unwrap();
+        assert_eq!(due.len(), 2);
+    }
+
+    #[test]
+    fn test_sled_pending_change_cancel() {
+        let store = SledParameterStore::temporary().unwrap();
+
+        let change = test_pending_change("test.param", 1700000000);
+        store.add_pending_change(change.clone()).unwrap();
+
+        store
+            .cancel_pending_change(&change.id, "Cancelled by admin")
+            .unwrap();
+
+        let retrieved = store.get_pending_change(&change.id).unwrap().unwrap();
+        assert_eq!(retrieved.status, PendingChangeStatus::Cancelled);
+        assert_eq!(
+            retrieved.cancellation_reason,
+            Some("Cancelled by admin".to_string())
+        );
+    }
+
+    #[test]
+    fn test_sled_pending_change_update() {
+        let store = SledParameterStore::temporary().unwrap();
+
+        let mut change = test_pending_change("test.param", 1700000000);
+        store.add_pending_change(change.clone()).unwrap();
+
+        // Mark as applied
+        change.mark_applied();
+        store.update_pending_change(change.clone()).unwrap();
+
+        let retrieved = store.get_pending_change(&change.id).unwrap().unwrap();
+        assert_eq!(retrieved.status, PendingChangeStatus::Applied);
+        assert!(retrieved.applied_at.is_some());
+    }
+
+    #[test]
+    fn test_sled_pending_change_count() {
+        let store = SledParameterStore::temporary().unwrap();
+
+        store
+            .add_pending_change(test_pending_change("param.a", 1700000000))
+            .unwrap();
+        store
+            .add_pending_change(test_pending_change("param.b", 1700000100))
+            .unwrap();
+
+        assert_eq!(store.count_pending_changes().unwrap(), 2);
+
+        // Cancel one
+        store
+            .cancel_pending_change(&"pending:param.a:1700000000".to_string(), "test")
+            .unwrap();
+
+        // Count should now be 1
+        assert_eq!(store.count_pending_changes().unwrap(), 1);
+    }
+
+    #[test]
+    fn test_sled_pending_change_cancelled_not_due() {
+        let store = SledParameterStore::temporary().unwrap();
+
+        let change = test_pending_change("test.param", 1700000000);
+        store.add_pending_change(change.clone()).unwrap();
+
+        // Cancel it
+        store
+            .cancel_pending_change(&change.id, "Cancelled")
+            .unwrap();
+
+        // It should not be returned as due
+        let due = store.get_changes_due_before(1800000000).unwrap();
+        assert!(due.is_empty());
     }
 }

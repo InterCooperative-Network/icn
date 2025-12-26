@@ -857,6 +857,7 @@ impl Supervisor {
             let _version_tracker = governance_services.version_tracker;
             let dead_letter_queue = governance_services.dead_letter_queue;
             let gov_store = governance_services.governance_store;
+            let protocol_parameter_store = governance_services.protocol_parameter_store;
 
             // Store governance handle for gateway integration
             governance_handle_for_gateway = Some(Arc::new(governance_handle.clone()));
@@ -1061,6 +1062,15 @@ impl Supervisor {
             );
 
             info!("Metrics update task spawned");
+
+            // Spawn parameter scheduler task for delayed execution (Phase 20)
+            let _parameter_scheduler_handle = background_tasks::spawn_parameter_scheduler_task(
+                background_tasks::ParameterSchedulerConfig::default(),
+                protocol_parameter_store,
+                self.shutdown_tx.subscribe(),
+            );
+
+            info!("Parameter scheduler task spawned (interval: 10 seconds)");
 
             // Activate node profile now that all actors are initialized (Phase 17)
             {
