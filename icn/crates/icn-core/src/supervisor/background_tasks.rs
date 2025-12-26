@@ -351,6 +351,11 @@ async fn process_due_changes(
             continue;
         }
 
+        // Mark this parameter as processed BEFORE attempting to apply.
+        // This ensures that if apply_pending_change() fails, any subsequent changes
+        // for the same parameter are still marked as superseded (not attempted).
+        processed_params.insert(change.parameter_id.clone());
+
         // Apply the change
         match apply_pending_change(store, &change).await {
             ParameterApplyResult::Applied => {
@@ -361,7 +366,6 @@ async fn process_due_changes(
                     "Applied delayed parameter change"
                 );
                 icn_obs::metrics::protocol::pending_parameter_changes_applied_inc();
-                processed_params.insert(change.parameter_id.clone());
             }
             ParameterApplyResult::Skipped { reason } => {
                 warn!(
@@ -415,6 +419,25 @@ async fn apply_pending_change(
             };
         }
     };
+
+    // Validate scope consistency: the pending change's scope must match the parameter's scope.
+    // This prevents a cooperative-scoped pending change from modifying a global parameter.
+    if current_param.scope != change.scope {
+        let mut updated = change.clone();
+        updated.mark_cancelled(format!(
+            "Scope mismatch: pending change has scope {:?} but parameter has scope {:?}",
+            change.scope, current_param.scope
+        ));
+        if store.update_pending_change(updated).is_ok() {
+            icn_obs::metrics::protocol::pending_parameter_changes_cancelled_inc();
+        }
+        return ParameterApplyResult::Skipped {
+            reason: format!(
+                "Scope mismatch: expected {:?}, found {:?}",
+                change.scope, current_param.scope
+            ),
+        };
+    }
 
     // Note: Superseding of later changes for the same parameter is handled
     // in process_due_changes() at the batch level, not here.
