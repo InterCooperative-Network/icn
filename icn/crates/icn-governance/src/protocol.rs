@@ -1500,7 +1500,7 @@ mod tests {
         assert!(id1.starts_with("pending:governance.quorum:"));
         assert!(id2.starts_with("pending:governance.quorum:"));
 
-        // IDs should be unique due to random component
+        // IDs should be unique due to atomic counter
         assert_ne!(id1, id2);
     }
 

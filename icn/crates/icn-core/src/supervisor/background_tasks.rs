@@ -334,16 +334,19 @@ async fn process_due_changes(
 
     for change in due_changes {
         // If we've already processed a change for this parameter in this batch,
-        // this older change should be superseded
+        // this later change should be superseded (since get_changes_due_before returns
+        // changes ordered by effective_at ascending, earlier changes are processed first)
         if processed_params.contains(&change.parameter_id) {
             let mut updated = change.clone();
-            updated.mark_superseded("Superseded by earlier change in batch");
+            updated.mark_superseded("Superseded by change with earlier effective time");
             if let Err(e) = store.update_pending_change(updated) {
                 warn!(
                     pending_change_id = %change.id,
                     error = %e,
                     "Failed to mark pending change as superseded"
                 );
+            } else {
+                icn_obs::metrics::protocol::pending_parameter_changes_superseded_inc();
             }
             continue;
         }
@@ -379,6 +382,11 @@ async fn process_due_changes(
         }
     }
 
+    // Update the active pending changes gauge
+    if let Ok(active_count) = store.count_pending_changes() {
+        icn_obs::metrics::protocol::pending_parameter_changes_active_set(active_count as u64);
+    }
+
     Ok(())
 }
 
@@ -394,7 +402,9 @@ async fn apply_pending_change(
             // Parameter no longer exists, mark as cancelled
             let mut updated = change.clone();
             updated.mark_cancelled("Parameter no longer exists");
-            let _ = store.update_pending_change(updated);
+            if store.update_pending_change(updated).is_ok() {
+                icn_obs::metrics::protocol::pending_parameter_changes_cancelled_inc();
+            }
             return ParameterApplyResult::Skipped {
                 reason: "Parameter no longer exists".to_string(),
             };
@@ -406,27 +416,8 @@ async fn apply_pending_change(
         }
     };
 
-    // Check for existing pending changes for the same parameter that are older
-    // and should be superseded
-    if let Ok(pending_for_param) = store.list_pending_changes_for_parameter(&change.parameter_id) {
-        for other in pending_for_param {
-            if other.id != change.id
-                && other.status == icn_governance::PendingChangeStatus::Pending
-                && other.effective_at <= change.effective_at
-            {
-                // Supersede the older change
-                let mut superseded = other.clone();
-                superseded.mark_superseded(&change.id);
-                if let Err(e) = store.update_pending_change(superseded) {
-                    debug!(
-                        superseded_id = %other.id,
-                        error = %e,
-                        "Failed to mark older change as superseded"
-                    );
-                }
-            }
-        }
-    }
+    // Note: Superseding of later changes for the same parameter is handled
+    // in process_due_changes() at the batch level, not here.
 
     // Create updated parameter with new value
     let mut updated_param = current_param.clone();
