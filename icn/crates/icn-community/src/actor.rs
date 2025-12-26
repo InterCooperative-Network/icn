@@ -14,12 +14,19 @@ use icn_gossip::GossipActor;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot, RwLock};
 use tracing::{debug, error, info};
+use uuid::Uuid;
 
 /// Gossip topic for community state updates
 pub const COMMUNITY_TOPIC: &str = "community:updates";
 
 /// Actor message channel buffer size
 const ACTOR_CHANNEL_SIZE: usize = 100;
+
+/// Maximum total size of metadata in bytes (1KB)
+const MAX_METADATA_SIZE: usize = 1024;
+
+/// Maximum number of metadata entries
+const MAX_METADATA_ENTRIES: usize = 50;
 
 /// Handle type for gossip actor
 pub type GossipHandle = Arc<RwLock<GossipActor>>;
@@ -82,6 +89,8 @@ pub enum CommunityMessage {
         metadata: Option<std::collections::HashMap<String, String>>,
         reply: oneshot::Sender<Result<Community>>,
     },
+    /// Graceful shutdown request
+    Shutdown { reply: oneshot::Sender<()> },
 }
 
 /// Async actor for community management
@@ -220,6 +229,11 @@ impl CommunityActor {
                     let result = self.handle_update(&community_id, name, metadata).await;
                     let _ = reply.send(result);
                 }
+                CommunityMessage::Shutdown { reply } => {
+                    info!("CommunityActor received shutdown request");
+                    let _ = reply.send(());
+                    break;
+                }
             }
         }
 
@@ -261,6 +275,49 @@ impl CommunityActor {
         Ok(())
     }
 
+    /// Validate metadata size limits to prevent DoS
+    fn validate_metadata(
+        existing: &std::collections::HashMap<String, String>,
+        new: &std::collections::HashMap<String, String>,
+    ) -> Result<()> {
+        // Calculate total entries after merge
+        let mut merged_count = existing.len();
+        for key in new.keys() {
+            if !existing.contains_key(key) {
+                merged_count += 1;
+            }
+        }
+
+        if merged_count > MAX_METADATA_ENTRIES {
+            return Err(CommunityError::Validation(format!(
+                "Metadata exceeds maximum of {MAX_METADATA_ENTRIES} entries (would have {merged_count})"
+            )));
+        }
+
+        // Calculate total size after merge
+        let mut total_size: usize = 0;
+
+        // Add existing entries (that won't be overwritten)
+        for (key, value) in existing {
+            if !new.contains_key(key) {
+                total_size += key.len() + value.len();
+            }
+        }
+
+        // Add all new entries
+        for (key, value) in new {
+            total_size += key.len() + value.len();
+        }
+
+        if total_size > MAX_METADATA_SIZE {
+            return Err(CommunityError::Validation(format!(
+                "Metadata exceeds maximum size of {MAX_METADATA_SIZE} bytes (would be {total_size} bytes)"
+            )));
+        }
+
+        Ok(())
+    }
+
     async fn handle_create(
         &mut self,
         id: Option<String>,
@@ -278,16 +335,17 @@ impl CommunityActor {
                 provided_id
             }
             None => {
-                // Auto-generate from name
-                format!("community:{}", name.replace(' ', "-").to_lowercase())
+                // Auto-generate from name with UUID suffix to prevent collisions
+                let slug = name.replace(' ', "-").to_lowercase();
+                let short_uuid = &Uuid::new_v4().to_string()[..8];
+                format!("community:{slug}-{short_uuid}")
             }
         };
 
         // Check for duplicate ID
         if self.store.get(&community_id)?.is_some() {
             return Err(CommunityError::Validation(format!(
-                "Community with ID '{}' already exists",
-                community_id
+                "Community with ID '{community_id}' already exists"
             )));
         }
 
@@ -424,6 +482,8 @@ impl CommunityActor {
         }
 
         if let Some(new_metadata) = metadata {
+            // Validate metadata size limits
+            Self::validate_metadata(&community.metadata, &new_metadata)?;
             community.metadata.extend(new_metadata);
         }
 

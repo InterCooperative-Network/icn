@@ -207,4 +207,19 @@ impl CommunityHandle {
         rx.await
             .map_err(|_| CommunityError::Governance("Reply failed".into()))?
     }
+
+    /// Gracefully shutdown the actor
+    ///
+    /// Sends a shutdown message to the actor and waits for confirmation.
+    /// This allows the actor to complete any in-flight operations before stopping.
+    pub async fn shutdown(&self) -> Result<()> {
+        let (reply, rx) = oneshot::channel();
+        self.tx
+            .send(CommunityMessage::Shutdown { reply })
+            .await
+            .map_err(|_| CommunityError::Governance("Actor already stopped".into()))?;
+        rx.await
+            .map_err(|_| CommunityError::Governance("Shutdown confirmation failed".into()))?;
+        Ok(())
+    }
 }
