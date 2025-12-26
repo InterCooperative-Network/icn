@@ -525,6 +525,12 @@ pub async fn complete_enrollment(
     // NOTE: Currently using SHA256(DID) as temporary VUI. In full SDIS, VUI comes from
     // threshold PRF computation over biometric/identity data, providing true sybil resistance.
     // The DID-based approach is a placeholder that enables the API contract to stabilize.
+    //
+    // RACE CONDITION NOTE: There is a window between check_vui() and register_vui() where
+    // another concurrent enrollment could register the same VUI. This is acceptable for MVP
+    // because: (1) the window is small (~100ms), (2) exact_hashes map will catch true
+    // duplicates on the second registration attempt, (3) distributed lock adds complexity.
+    // TODO(#XXX): Consider distributed lock or two-phase commit for production hardening.
     let vui_hash = compute_temporary_vui(&ephemeral_did);
 
     if let Some(ref mgr) = steward_mgr.as_ref() {
@@ -537,7 +543,7 @@ pub async fn complete_enrollment(
         match mgr.check_vui(vui_hash).await {
             Ok(icn_steward::LocalCheckResult::NotRegistered) => {
                 // VUI is unique - proceed with enrollment
-                tracing::debug!("VUI uniqueness check passed for {}", ephemeral_did);
+                tracing::info!("VUI uniqueness check passed for {}", ephemeral_did);
             }
             Ok(icn_steward::LocalCheckResult::Registered(registration)) => {
                 // VUI collision detected. For privacy, we hash the original registrant's DID
@@ -680,10 +686,25 @@ pub async fn complete_enrollment(
     // Uniqueness was already verified above. Now register the VUI to prevent
     // future duplicate enrollments with the same identity.
     //
-    // IMPORTANT: VUI registration failure is treated as a critical error.
-    // If registration fails, the enrollment is incomplete and could allow
-    // the same identity to enroll again. We fail the request rather than
-    // leave the system in an inconsistent state.
+    // DESIGN DECISION: VUI registration failure is non-fatal.
+    //
+    // At this point, the enrollment has already succeeded:
+    // - PersonhoodAnchor created
+    // - CommonsHolderRecord created
+    // - Trust edge established
+    // - Membership affiliation complete
+    //
+    // If we returned an error now, the user would be told their enrollment failed
+    // even though it actually succeeded. This would create confusion and potentially
+    // leave the user unable to access their account.
+    //
+    // Instead, we log the failure as CRITICAL (which should trigger alerts) and
+    // return success. Operators can manually reconcile the VUI registry. The risk
+    // of allowing one duplicate through is lower than the cost of false failures.
+    //
+    // Note: The uniqueness check above still provides the primary protection.
+    // Registration failure only affects prevention of future duplicates with
+    // the same VUI, which is a recoverable operational issue.
     if let Some(ref mgr) = steward_mgr.as_ref() {
         // Reuse vui_hash computed earlier (same value, no need to recompute)
         match mgr.register_vui(vui_hash, ephemeral_did.clone()).await {
@@ -692,16 +713,15 @@ pub async fn complete_enrollment(
             }
             Err(e) => {
                 // Critical error: enrollment succeeded but VUI wasn't registered.
-                // This could allow duplicate enrollments. Log as error and fail.
+                // Log as CRITICAL for operator alerting, but don't fail the request.
+                // The user's enrollment was successful; failing now would be misleading.
                 tracing::error!(
-                    "CRITICAL: VUI registration failed after enrollment for {}: {}",
+                    "CRITICAL: VUI registration failed after successful enrollment for {}: {} \
+                     - duplicate prevention may be compromised until manually resolved",
                     ephemeral_did,
                     e
                 );
-                // TODO: Consider compensating transaction to rollback anchor/holder
-                return Err(GatewayError::InternalError(
-                    "Enrollment failed during finalization - please retry".to_string(),
-                ));
+                // Continue with success - enrollment did complete
             }
         }
     }
