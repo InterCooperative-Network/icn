@@ -2729,6 +2729,18 @@ pub mod gateway {
     pub fn entity_audit_query_duration(duration_secs: f64) {
         histogram!("icn_gateway_entity_audit_query_duration_seconds").record(duration_secs);
     }
+
+    /// Increment audit rollback failure counter
+    ///
+    /// Tracks cases where both audit logging and subsequent rollback failed,
+    /// indicating potential data inconsistency requiring operator attention.
+    pub fn entity_audit_rollback_failure_inc(endpoint: &str) {
+        counter!(
+            "icn_gateway_entity_audit_rollback_failures_total",
+            "endpoint" => endpoint.to_string()
+        )
+        .increment(1);
+    }
 }
 
 /// NAT traversal metrics

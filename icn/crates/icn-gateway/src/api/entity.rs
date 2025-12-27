@@ -10,6 +10,7 @@
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
 use icn_entity::{CooperativeEntity, EntityId, EntityType, Membership, MembershipRole};
 use icn_identity::Did;
+use icn_obs::metrics::gateway as gateway_metrics;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::{info, warn};
@@ -368,7 +369,10 @@ pub async fn register_entity(
             "Failed to record entity registration audit - rolling back"
         );
         // Cleanup: remove membership first, then entity
+        // Track rollback failures for operational alerting
+        let mut rollback_errors = Vec::new();
         if let Err(cleanup_err) = entity_mgr.remove_membership(&entity_id, &creator_id) {
+            rollback_errors.push(format!("membership: {cleanup_err}"));
             tracing::error!(
                 entity_id = %entity_id,
                 member_id = %creator_id,
@@ -377,11 +381,20 @@ pub async fn register_entity(
             );
         }
         if let Err(cleanup_err) = entity_mgr.remove(&entity_id) {
+            rollback_errors.push(format!("entity: {cleanup_err}"));
             tracing::error!(
                 entity_id = %entity_id,
                 error = %cleanup_err,
                 "Failed to cleanup entity after audit failure"
             );
+        }
+        // Record metric if any rollback failed
+        if !rollback_errors.is_empty() {
+            gateway_metrics::entity_audit_rollback_failure_inc("register_entity");
+            return Err(GatewayError::InternalError(format!(
+                "Failed to record audit: {e}. CRITICAL: Rollback also failed: [{}]. Entity may be in inconsistent state.",
+                rollback_errors.join(", ")
+            )));
         }
         return Err(GatewayError::InternalError(format!(
             "Failed to record audit: {e}"
@@ -511,11 +524,15 @@ pub async fn update_entity(
         // Attempt compensation: restore previous state
         if let Some(prev) = previous_entity {
             if let Err(rollback_err) = entity_mgr.update(prev) {
+                gateway_metrics::entity_audit_rollback_failure_inc("update_entity");
                 tracing::error!(
                     entity_id = %entity_id,
                     error = %rollback_err,
                     "Failed to rollback entity after audit failure - entity in inconsistent state"
                 );
+                return Err(GatewayError::InternalError(format!(
+                    "Failed to record audit: {e}. CRITICAL: Rollback also failed: {rollback_err}. Entity may be in inconsistent state."
+                )));
             }
         }
         return Err(GatewayError::InternalError(format!(
@@ -588,11 +605,15 @@ pub async fn delete_entity(
         );
         // Attempt compensation: re-register the entity
         if let Err(restore_err) = entity_mgr.register(entity.clone()) {
+            gateway_metrics::entity_audit_rollback_failure_inc("delete_entity");
             tracing::error!(
                 entity_id = %entity_id,
                 error = %restore_err,
                 "Failed to restore entity after audit failure - data loss occurred"
             );
+            return Err(GatewayError::InternalError(format!(
+                "Failed to record audit: {e}. CRITICAL: Restoration also failed: {restore_err}. Entity data lost."
+            )));
         }
         return Err(GatewayError::InternalError(format!(
             "Failed to record audit: {e}"
@@ -716,12 +737,16 @@ pub async fn add_membership(
         );
         // Rollback: remove the membership we just added
         if let Err(rollback_err) = entity_mgr.remove_membership(&entity_id, &member_id) {
+            gateway_metrics::entity_audit_rollback_failure_inc("add_membership");
             tracing::error!(
                 entity_id = %entity_id,
                 member_id = %member_id,
                 error = %rollback_err,
                 "Failed to rollback membership after audit failure - inconsistent state"
             );
+            return Err(GatewayError::InternalError(format!(
+                "Failed to record audit: {e}. CRITICAL: Rollback also failed: {rollback_err}. Membership may be in inconsistent state."
+            )));
         }
         return Err(GatewayError::InternalError(format!(
             "Failed to record audit: {e}"
@@ -845,12 +870,16 @@ pub async fn remove_membership(
         // Rollback: restore the membership we just removed
         if let Some(membership) = removed_membership {
             if let Err(rollback_err) = entity_mgr.add_membership(membership) {
+                gateway_metrics::entity_audit_rollback_failure_inc("remove_membership");
                 tracing::error!(
                     entity_id = %entity_id,
                     member_id = %member_id,
                     error = %rollback_err,
                     "Failed to rollback membership removal - member lost from entity"
                 );
+                return Err(GatewayError::InternalError(format!(
+                    "Failed to record audit: {e}. CRITICAL: Rollback also failed: {rollback_err}. Member may have been lost."
+                )));
             }
         }
         return Err(GatewayError::InternalError(format!(

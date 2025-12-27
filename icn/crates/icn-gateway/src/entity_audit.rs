@@ -143,14 +143,20 @@ pub struct EntityAuditRecord {
 
 impl EntityAuditRecord {
     /// Create a new audit record
+    ///
+    /// Uses millisecond-precision timestamps to avoid ordering ambiguity
+    /// when multiple operations occur within the same second.
     pub fn new(entity_id: EntityId, operation: EntityOperation, performed_by: EntityId) -> Self {
-        let now = icn_time::current_timestamp_secs();
+        // Use milliseconds for better ordering precision in high-throughput scenarios
+        let now_millis = icn_time::current_timestamp_millis();
         Self {
-            id: format!("audit-{}-{}", now, uuid::Uuid::new_v4().simple()),
+            // Include millis in ID for uniqueness even without UUID in extreme cases
+            id: format!("audit-{}-{}", now_millis, uuid::Uuid::new_v4().simple()),
             entity_id,
             operation,
             performed_by,
-            performed_at: now,
+            // Store as millis for proper ordering in reverse pagination
+            performed_at: now_millis,
             proposal_id: None,
             notes: None,
         }
