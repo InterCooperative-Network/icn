@@ -350,23 +350,26 @@ pub async fn register_entity(
         )));
     }
 
-    // Record audit trail
-    if let Err(e) = audit_mgr.record_audit(
-        &entity_id,
-        EntityOperation::Registered {
-            entity_type: format!("{entity_type:?}").to_lowercase(),
-            name: body.name.clone(),
-        },
-        &creator_id,
-        None,
-        None,
-    ) {
-        warn!(
-            entity_id = %entity_id,
-            error = %e,
-            "Failed to record entity registration audit"
-        );
-    }
+    // Record audit trail - fail the request if audit logging fails for compliance
+    audit_mgr
+        .record_audit(
+            &entity_id,
+            EntityOperation::Registered {
+                entity_type: format_entity_type(&entity_type).to_string(),
+                name: body.name.clone(),
+            },
+            &creator_id,
+            None,
+            None,
+        )
+        .map_err(|e| {
+            warn!(
+                entity_id = %entity_id,
+                error = %e,
+                "Failed to record entity registration audit"
+            );
+            GatewayError::InternalError(format!("Failed to record audit: {e}"))
+        })?;
 
     let members = entity_mgr.get_members(&entity_id).unwrap_or_default();
     let response = entity_to_response(&entity, members.len());
@@ -467,20 +470,23 @@ pub async fn update_entity(
         .update(entity.clone())
         .map_err(|e| GatewayError::InternalError(format!("Failed to update entity: {e}")))?;
 
-    // Record audit trail
-    if let Err(e) = audit_mgr.record_audit(
-        &entity_id,
-        EntityOperation::Updated { changed_fields },
-        &caller_id,
-        None,
-        None,
-    ) {
-        warn!(
-            entity_id = %entity_id,
-            error = %e,
-            "Failed to record entity update audit"
-        );
-    }
+    // Record audit trail - fail the request if audit logging fails for compliance
+    audit_mgr
+        .record_audit(
+            &entity_id,
+            EntityOperation::Updated { changed_fields },
+            &caller_id,
+            None,
+            None,
+        )
+        .map_err(|e| {
+            warn!(
+                entity_id = %entity_id,
+                error = %e,
+                "Failed to record entity update audit"
+            );
+            GatewayError::InternalError(format!("Failed to record audit: {e}"))
+        })?;
 
     let members = entity_mgr.get_members(&entity_id).unwrap_or_default();
     let response = entity_to_response(&entity, members.len());
@@ -534,16 +540,17 @@ pub async fn delete_entity(
         }
     })?;
 
-    // Record audit trail
-    if let Err(e) =
-        audit_mgr.record_audit(&entity_id, EntityOperation::Deleted, &caller_id, None, None)
-    {
-        warn!(
-            entity_id = %entity_id,
-            error = %e,
-            "Failed to record entity deletion audit"
-        );
-    }
+    // Record audit trail - fail the request if audit logging fails for compliance
+    audit_mgr
+        .record_audit(&entity_id, EntityOperation::Deleted, &caller_id, None, None)
+        .map_err(|e| {
+            warn!(
+                entity_id = %entity_id,
+                error = %e,
+                "Failed to record entity deletion audit"
+            );
+            GatewayError::InternalError(format!("Failed to record audit: {e}"))
+        })?;
 
     Ok(HttpResponse::NoContent().finish())
 }
@@ -642,24 +649,27 @@ pub async fn add_membership(
         .add_membership(membership.clone())
         .map_err(|e| GatewayError::InternalError(format!("Failed to add membership: {e}")))?;
 
-    // Record audit trail
-    if let Err(e) = audit_mgr.record_audit(
-        &entity_id,
-        EntityOperation::MemberAdded {
-            member_id: member_id.clone(),
-            role,
-        },
-        &caller_id,
-        None,
-        None,
-    ) {
-        warn!(
-            entity_id = %entity_id,
-            member_id = %member_id,
-            error = %e,
-            "Failed to record member addition audit"
-        );
-    }
+    // Record audit trail - fail the request if audit logging fails for compliance
+    audit_mgr
+        .record_audit(
+            &entity_id,
+            EntityOperation::MemberAdded {
+                member_id: member_id.clone(),
+                role,
+            },
+            &caller_id,
+            None,
+            None,
+        )
+        .map_err(|e| {
+            warn!(
+                entity_id = %entity_id,
+                member_id = %member_id,
+                error = %e,
+                "Failed to record member addition audit"
+            );
+            GatewayError::InternalError(format!("Failed to record audit: {e}"))
+        })?;
 
     let response = membership_to_response(&membership);
 
@@ -749,29 +759,32 @@ pub async fn remove_membership(
         .remove_membership(&entity_id, &member_id)
         .map_err(|e| GatewayError::InternalError(format!("Failed to remove membership: {e}")))?;
 
-    // Record audit trail
+    // Record audit trail - fail the request if audit logging fails for compliance
     let reason = if is_self_removal {
         Some("Self-removal".to_string())
     } else {
         None
     };
-    if let Err(e) = audit_mgr.record_audit(
-        &entity_id,
-        EntityOperation::MemberRemoved {
-            member_id: member_id.clone(),
-            reason,
-        },
-        &caller_id,
-        None,
-        None,
-    ) {
-        warn!(
-            entity_id = %entity_id,
-            member_id = %member_id,
-            error = %e,
-            "Failed to record member removal audit"
-        );
-    }
+    audit_mgr
+        .record_audit(
+            &entity_id,
+            EntityOperation::MemberRemoved {
+                member_id: member_id.clone(),
+                reason,
+            },
+            &caller_id,
+            None,
+            None,
+        )
+        .map_err(|e| {
+            warn!(
+                entity_id = %entity_id,
+                member_id = %member_id,
+                error = %e,
+                "Failed to record member removal audit"
+            );
+            GatewayError::InternalError(format!("Failed to record audit: {e}"))
+        })?;
 
     Ok(HttpResponse::NoContent().finish())
 }
@@ -786,9 +799,14 @@ pub struct AuditQueryParams {
 }
 
 /// GET /entities/:id/audit - Get entity audit trail
+///
+/// Requires the caller to either:
+/// - Be a member of the entity, or
+/// - Have "entity:audit" scope (for admin access)
 #[get("/{id}/audit")]
 pub async fn get_entity_audit(
     req: HttpRequest,
+    entity_mgr: web::Data<Arc<EntityManager>>,
     audit_mgr: web::Data<Arc<EntityAuditManager>>,
     path: web::Path<String>,
     query: web::Query<AuditQueryParams>,
@@ -799,6 +817,42 @@ pub async fn get_entity_audit(
     let entity_id: EntityId = entity_id_str
         .parse()
         .map_err(|e| GatewayError::BadRequest(format!("Invalid entity ID: {e}")))?;
+
+    // Verify entity exists
+    let _entity = entity_mgr
+        .get(&entity_id)
+        .map_err(|e| GatewayError::InternalError(format!("Failed to get entity: {e}")))?
+        .ok_or_else(|| GatewayError::NotFound(format!("Entity not found: {entity_id}")))?;
+
+    // Authorization: caller must be a member of the entity OR have entity:audit scope
+    let claims = get_claims(&req)
+        .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
+
+    // Check for admin audit scope (allows viewing any entity's audit trail)
+    let has_audit_scope = claims
+        .scopes
+        .iter()
+        .any(|s| s == "entity:audit" || s == "admin");
+
+    if !has_audit_scope {
+        // If no admin scope, must be a member of the entity
+        let caller_did: Did = claims
+            .sub
+            .parse()
+            .map_err(|e| GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
+        let caller_id = EntityId::from_did(&caller_did);
+
+        let members = entity_mgr
+            .get_members(&entity_id)
+            .map_err(|e| GatewayError::InternalError(format!("Failed to get members: {e}")))?;
+
+        let is_member = members.iter().any(|m| m.member_id == caller_id);
+        if !is_member {
+            return Err(GatewayError::Forbidden(
+                "You must be a member of the entity to view its audit trail".to_string(),
+            ));
+        }
+    }
 
     let limit = query.limit.unwrap_or(50).min(100);
     let offset = query.offset.unwrap_or(0);
