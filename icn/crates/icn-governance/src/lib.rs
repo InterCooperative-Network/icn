@@ -68,7 +68,6 @@ pub mod tally;
 pub mod vote;
 
 // Orphan cleanup (Phase 21)
-#[allow(missing_docs)]
 pub mod orphan_cleanup;
 
 pub use amendment::{

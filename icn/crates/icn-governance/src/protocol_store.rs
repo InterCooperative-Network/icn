@@ -1403,14 +1403,16 @@ impl ProtocolParameterStore for SledParameterStore {
         let index_key = Self::param_index_key(id);
         let scope_str = Self::scope_str(scope);
 
-        // Check if the parameter exists
-        if !self.db.contains_key(&scoped_key)? {
-            return Ok(false);
-        }
-
-        // Use transaction for atomicity
-        self.db
+        // Use transaction for atomicity - existence check is inside transaction
+        // to avoid TOCTOU race conditions
+        let existed = self
+            .db
             .transaction(|tx| {
+                // Check if the parameter exists inside the transaction
+                if tx.get(&scoped_key)?.is_none() {
+                    return Ok(false);
+                }
+
                 // Remove the scoped parameter
                 tx.remove(scoped_key.as_slice())?;
 
@@ -1442,7 +1444,7 @@ impl ProtocolParameterStore for SledParameterStore {
                     }
                 }
 
-                Ok(())
+                Ok(true)
             })
             .map_err(|e| match e {
                 sled::transaction::TransactionError::Abort(err) => err,
@@ -1451,13 +1453,15 @@ impl ProtocolParameterStore for SledParameterStore {
                 }
             })?;
 
-        debug!(
-            parameter_id = %id,
-            scope = ?scope,
-            "Deleted scoped parameter"
-        );
+        if existed {
+            debug!(
+                parameter_id = %id,
+                scope = ?scope,
+                "Deleted scoped parameter"
+            );
+        }
 
-        Ok(true)
+        Ok(existed)
     }
 }
 
