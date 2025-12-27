@@ -3037,6 +3037,7 @@ dependencies = [
  "hex",
  "icn-entity",
  "icn-identity",
+ "icn-obs",
  "icn-store",
  "icn-time",
  "icn-trust",

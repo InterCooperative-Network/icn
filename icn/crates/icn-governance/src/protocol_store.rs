@@ -337,6 +337,30 @@ pub trait ProtocolParameterStore: Send + Sync {
     ) -> Result<(), ParameterValidationError>;
 
     // ========================================
+    // Scoped Parameter Operations (for cleanup)
+    // ========================================
+
+    /// List all scoped (non-global) parameters
+    ///
+    /// Returns all parameters that have a scope other than Global
+    /// (i.e., Federation or Cooperative scoped overrides).
+    /// This is useful for orphan detection and cleanup.
+    fn list_scoped_parameters(&self) -> Result<Vec<ProtocolParameter>>;
+
+    /// Delete a specific scoped parameter by ID and scope
+    ///
+    /// Removes a scoped override without affecting the global parameter.
+    /// Returns Ok(true) if the parameter was deleted, Ok(false) if not found.
+    ///
+    /// # Arguments
+    /// - `id`: The parameter ID (e.g., "governance.min_quorum")
+    /// - `scope`: The specific scope to delete (must not be Global)
+    ///
+    /// # Errors
+    /// Returns an error if scope is Global (use `delete()` for that).
+    fn delete_scoped_parameter(&self, id: &str, scope: &ParameterScope) -> Result<bool>;
+
+    // ========================================
     // Pending Change Methods (Delayed Execution)
     // ========================================
 
@@ -730,6 +754,59 @@ impl ProtocolParameterStore for InMemoryParameterStore {
             .ok_or_else(|| ParameterValidationError::NotFound(id.to_string()))?;
 
         param.validate(new_value)
+    }
+
+    fn list_scoped_parameters(&self) -> Result<Vec<ProtocolParameter>> {
+        let scoped = self
+            .scoped_params
+            .read()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+        Ok(scoped.values().cloned().collect())
+    }
+
+    fn delete_scoped_parameter(&self, id: &str, scope: &ParameterScope) -> Result<bool> {
+        // Cannot use this method for global scope
+        if matches!(scope, ParameterScope::Global) {
+            anyhow::bail!(
+                "Cannot delete global parameter via delete_scoped_parameter(). \
+                 Use delete() to remove global parameters."
+            );
+        }
+
+        let scope_key = Self::scope_key(scope);
+
+        // Remove from scoped params
+        let mut scoped = self
+            .scoped_params
+            .write()
+            .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+
+        let key = (scope_key.clone(), id.to_string());
+        let removed = scoped.remove(&key).is_some();
+
+        if removed {
+            // Update reverse index
+            let mut index = self
+                .scoped_index
+                .write()
+                .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+
+            if let Some(scopes) = index.get_mut(id) {
+                scopes.retain(|s| s != &scope_key);
+                // Remove the index entry entirely if no scopes remain
+                if scopes.is_empty() {
+                    index.remove(id);
+                }
+            }
+
+            debug!(
+                parameter_id = %id,
+                scope = ?scope,
+                "Deleted scoped parameter"
+            );
+        }
+
+        Ok(removed)
     }
 
     // ========================================
@@ -1514,6 +1591,93 @@ impl ProtocolParameterStore for SledParameterStore {
             .ok_or_else(|| ParameterValidationError::NotFound(id.to_string()))?;
 
         param.validate(new_value)
+    }
+
+    fn list_scoped_parameters(&self) -> Result<Vec<ProtocolParameter>> {
+        // Prefix b"param_scope:" matches all scoped parameters
+        let prefix = b"param_scope:";
+        let mut params = Vec::new();
+
+        for item in self.db.scan_prefix(prefix) {
+            let (_, value) = item?;
+            params.push(Self::deserialize_param(&value)?);
+        }
+
+        Ok(params)
+    }
+
+    fn delete_scoped_parameter(&self, id: &str, scope: &ParameterScope) -> Result<bool> {
+        // Cannot use this method for global scope
+        if matches!(scope, ParameterScope::Global) {
+            anyhow::bail!(
+                "Cannot delete global parameter via delete_scoped_parameter(). \
+                 Use delete() to remove global parameters."
+            );
+        }
+
+        let scoped_key = Self::scoped_param_key(scope, id);
+        let index_key = Self::param_index_key(id);
+        let scope_str = Self::scope_str(scope);
+
+        // Use transaction for atomicity - existence check is inside transaction
+        // to avoid TOCTOU race conditions
+        let existed = self
+            .db
+            .transaction(|tx| {
+                // Check if the parameter exists inside the transaction
+                if tx.get(&scoped_key)?.is_none() {
+                    return Ok(false);
+                }
+
+                // Remove the scoped parameter
+                tx.remove(scoped_key.as_slice())?;
+
+                // Update reverse index
+                if let Some(index_bytes) = tx.get(&index_key)? {
+                    let mut scope_strs: Vec<String> = serde_json::from_slice(&index_bytes)
+                        .unwrap_or_else(|e| {
+                            // Log warning for corrupted index but continue with empty list
+                            // This allows cleanup to proceed even with corrupted state
+                            warn!(
+                                error = %e,
+                                "Failed to deserialize scope index, treating as empty"
+                            );
+                            Vec::new()
+                        });
+                    scope_strs.retain(|s| s != &scope_str);
+
+                    if scope_strs.is_empty() {
+                        // Remove index entirely if no scopes remain
+                        tx.remove(index_key.as_slice())?;
+                    } else {
+                        // Update with remaining scopes
+                        let updated = serde_json::to_vec(&scope_strs).map_err(|e| {
+                            sled::transaction::ConflictableTransactionError::Abort(anyhow::anyhow!(
+                                "Failed to serialize index: {e}"
+                            ))
+                        })?;
+                        tx.insert(index_key.as_slice(), updated.as_slice())?;
+                    }
+                }
+
+                Ok(true)
+            })
+            .map_err(|e| match e {
+                sled::transaction::TransactionError::Abort(err) => err,
+                sled::transaction::TransactionError::Storage(e) => {
+                    anyhow::anyhow!("Storage error during scoped parameter deletion: {e}")
+                }
+            })?;
+
+        if existed {
+            debug!(
+                parameter_id = %id,
+                scope = ?scope,
+                "Deleted scoped parameter"
+            );
+        }
+
+        Ok(existed)
     }
 
     // ========================================
@@ -2773,6 +2937,239 @@ mod tests {
         };
         assert!(err.to_string().contains("governance.threshold"));
         assert!(err.to_string().contains("scope overrides"));
+    }
+
+    // ========================================
+    // Scoped parameter listing and deletion tests
+    // ========================================
+
+    #[test]
+    fn test_inmemory_list_scoped_parameters() {
+        let store = InMemoryParameterStore::new();
+        let coop_id = EntityId::cooperative("test-coop").unwrap();
+        let fed_id = EntityId::federation("test-fed").unwrap();
+
+        // No scoped params initially
+        assert!(store.list_scoped_parameters().unwrap().is_empty());
+
+        // Create global param with overrides enabled
+        store
+            .set(
+                test_param_with_override("test.scoped", 100, true),
+                None,
+                None,
+            )
+            .unwrap();
+
+        // Still no scoped params (only global)
+        assert!(store.list_scoped_parameters().unwrap().is_empty());
+
+        // Add federation override
+        let fed_param = ProtocolParameter::new(
+            "test.scoped",
+            "Scoped",
+            "Scoped param",
+            ParameterValue::Integer(200),
+        )
+        .with_scope(ParameterScope::Federation { id: fed_id.clone() });
+        store.set(fed_param, None, None).unwrap();
+
+        let scoped = store.list_scoped_parameters().unwrap();
+        assert_eq!(scoped.len(), 1);
+
+        // Add cooperative override
+        let coop_param = ProtocolParameter::new(
+            "test.scoped",
+            "Scoped",
+            "Scoped param",
+            ParameterValue::Integer(300),
+        )
+        .with_scope(ParameterScope::Cooperative {
+            id: coop_id.clone(),
+        });
+        store.set(coop_param, None, None).unwrap();
+
+        let scoped = store.list_scoped_parameters().unwrap();
+        assert_eq!(scoped.len(), 2);
+    }
+
+    #[test]
+    fn test_inmemory_delete_scoped_parameter() {
+        let store = InMemoryParameterStore::new();
+        let coop_id = EntityId::cooperative("test-coop").unwrap();
+
+        // Create global param with overrides enabled
+        store
+            .set(
+                test_param_with_override("test.delete_scoped", 100, true),
+                None,
+                None,
+            )
+            .unwrap();
+
+        // Add cooperative override
+        let coop_param = ProtocolParameter::new(
+            "test.delete_scoped",
+            "Scoped",
+            "Scoped param",
+            ParameterValue::Integer(200),
+        )
+        .with_scope(ParameterScope::Cooperative {
+            id: coop_id.clone(),
+        });
+        store.set(coop_param, None, None).unwrap();
+
+        assert_eq!(store.list_scoped_parameters().unwrap().len(), 1);
+
+        // Delete the scoped override
+        let scope = ParameterScope::Cooperative {
+            id: coop_id.clone(),
+        };
+        let deleted = store
+            .delete_scoped_parameter("test.delete_scoped", &scope)
+            .unwrap();
+        assert!(deleted);
+
+        // Verify it's gone
+        assert!(store.list_scoped_parameters().unwrap().is_empty());
+
+        // Global still exists
+        assert!(store.exists("test.delete_scoped").unwrap());
+
+        // Deleting again returns false
+        let deleted = store
+            .delete_scoped_parameter("test.delete_scoped", &scope)
+            .unwrap();
+        assert!(!deleted);
+    }
+
+    #[test]
+    fn test_inmemory_delete_scoped_global_fails() {
+        let store = InMemoryParameterStore::new();
+        store
+            .set(test_param("test.global", 100), None, None)
+            .unwrap();
+
+        let result = store.delete_scoped_parameter("test.global", &ParameterScope::Global);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Cannot delete global"));
+    }
+
+    #[test]
+    fn test_sled_list_scoped_parameters() {
+        let store = SledParameterStore::temporary().unwrap();
+        let coop_id = EntityId::cooperative("test-coop").unwrap();
+        let fed_id = EntityId::federation("test-fed").unwrap();
+
+        // No scoped params initially
+        assert!(store.list_scoped_parameters().unwrap().is_empty());
+
+        // Create global param with overrides enabled
+        store
+            .set(
+                test_param_with_override("test.scoped", 100, true),
+                None,
+                None,
+            )
+            .unwrap();
+
+        // Add overrides
+        let fed_param = ProtocolParameter::new(
+            "test.scoped",
+            "Scoped",
+            "Scoped param",
+            ParameterValue::Integer(200),
+        )
+        .with_scope(ParameterScope::Federation { id: fed_id.clone() });
+        store.set(fed_param, None, None).unwrap();
+
+        let coop_param = ProtocolParameter::new(
+            "test.scoped",
+            "Scoped",
+            "Scoped param",
+            ParameterValue::Integer(300),
+        )
+        .with_scope(ParameterScope::Cooperative {
+            id: coop_id.clone(),
+        });
+        store.set(coop_param, None, None).unwrap();
+
+        let scoped = store.list_scoped_parameters().unwrap();
+        assert_eq!(scoped.len(), 2);
+    }
+
+    #[test]
+    fn test_sled_delete_scoped_parameter() {
+        let store = SledParameterStore::temporary().unwrap();
+        let coop_id = EntityId::cooperative("test-coop").unwrap();
+        let fed_id = EntityId::federation("test-fed").unwrap();
+
+        // Create global param with overrides enabled
+        store
+            .set(
+                test_param_with_override("test.delete_scoped", 100, true),
+                None,
+                None,
+            )
+            .unwrap();
+
+        // Add two scoped overrides
+        let fed_param = ProtocolParameter::new(
+            "test.delete_scoped",
+            "Scoped",
+            "Scoped param",
+            ParameterValue::Integer(200),
+        )
+        .with_scope(ParameterScope::Federation { id: fed_id.clone() });
+        store.set(fed_param, None, None).unwrap();
+
+        let coop_param = ProtocolParameter::new(
+            "test.delete_scoped",
+            "Scoped",
+            "Scoped param",
+            ParameterValue::Integer(300),
+        )
+        .with_scope(ParameterScope::Cooperative {
+            id: coop_id.clone(),
+        });
+        store.set(coop_param, None, None).unwrap();
+
+        assert_eq!(store.list_scoped_parameters().unwrap().len(), 2);
+
+        // Delete only the federation override
+        let fed_scope = ParameterScope::Federation { id: fed_id.clone() };
+        let deleted = store
+            .delete_scoped_parameter("test.delete_scoped", &fed_scope)
+            .unwrap();
+        assert!(deleted);
+
+        // Verify only coop remains
+        let remaining = store.list_scoped_parameters().unwrap();
+        assert_eq!(remaining.len(), 1);
+        assert!(
+            matches!(&remaining[0].scope, ParameterScope::Cooperative { id } if id == &coop_id)
+        );
+
+        // Global still exists
+        assert!(store.exists("test.delete_scoped").unwrap());
+    }
+
+    #[test]
+    fn test_sled_delete_scoped_global_fails() {
+        let store = SledParameterStore::temporary().unwrap();
+        store
+            .set(test_param("test.global", 100), None, None)
+            .unwrap();
+
+        let result = store.delete_scoped_parameter("test.global", &ParameterScope::Global);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Cannot delete global"));
     }
 
     // ========================================
