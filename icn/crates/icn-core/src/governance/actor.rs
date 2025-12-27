@@ -1370,6 +1370,16 @@ impl GovernanceActor {
     /// and check for precise overlap. If proposal is not found, assumes NO overlap
     /// (proposal-specific delegations are narrower than domain delegations).
     /// Falls back to conservative (assume overlap) only on storage errors.
+    ///
+    /// # Eventual Consistency
+    ///
+    /// In a distributed gossip-based system, proposal info may not have propagated
+    /// to all nodes when a delegation is created. By assuming no overlap for unknown
+    /// proposals, we allow delegations to proceed without blocking valid use cases.
+    ///
+    /// Cycles that form during this propagation window are detected when the proposal
+    /// is registered via [`icn_governance::DelegationManager::register_proposal`],
+    /// which triggers cycle reconciliation and emits metrics for operator alerting.
     fn scopes_overlap(
         &self,
         a: &icn_governance::DelegationScope,

@@ -2209,6 +2209,21 @@ pub mod governance {
     pub fn orphan_cleanup_failures_inc() {
         counter!("icn_governance_orphan_cleanup_failures_total").increment(1);
     }
+
+    // Delegation cycle reconciliation metrics
+
+    /// Record when a delegation cycle is detected after proposal registration
+    ///
+    /// In an eventually consistent system, cycles may be detected after formation
+    /// when proposal domain information propagates to nodes.
+    pub fn delegation_cycle_detected_inc() {
+        counter!("icn_governance_delegation_cycles_detected_total").increment(1);
+    }
+
+    /// Record the number of cycles detected in a single reconciliation run
+    pub fn delegation_cycles_found_add(count: u64) {
+        counter!("icn_governance_delegation_cycles_found_total").increment(count);
+    }
 }
 
 /// Protocol parameter metrics (delayed execution)

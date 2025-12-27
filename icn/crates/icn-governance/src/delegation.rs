@@ -11,6 +11,23 @@
 //! - **Conflict resolution**: If both delegator and delegate vote, delegator's vote wins
 //! - **Expiry**: Delegations can have an optional expiration time
 //!
+//! # Eventual Consistency and Cycle Detection
+//!
+//! In ICN's gossip-based P2P system, proposal information may not be immediately
+//! available on all nodes. When comparing domain and proposal scopes during cycle
+//! detection, if the proposal's domain is unknown, we assume **no overlap** to
+//! avoid blocking valid delegations.
+//!
+//! This means cycles may temporarily form if:
+//! 1. Alice delegates Domain A → Bob
+//! 2. Proposal X is created in Domain A on another node (not yet propagated)
+//! 3. Bob delegates Proposal X → Alice (accepted because proposal unknown)
+//! 4. Proposal info propagates, revealing the cycle
+//!
+//! **Reconciliation**: When a proposal is registered via [`DelegationManager::register_proposal`],
+//! any cycles that are now detectable are logged and metrics are emitted. Operators
+//! can monitor `icn_governance_delegation_cycles_detected_total` for alerts.
+//!
 //! # Example
 //!
 //! ```rust
@@ -261,8 +278,135 @@ impl DelegationManager {
     ///
     /// Call this when a proposal is created to enable accurate domain/proposal
     /// scope overlap detection during delegation cycle checking.
+    ///
+    /// # Cycle Reconciliation
+    ///
+    /// When a proposal is registered, this method checks for any delegation cycles
+    /// that may have formed while the proposal's domain was unknown. In an eventually
+    /// consistent, gossip-based system, delegations may be created before proposal
+    /// information propagates to all nodes. This reconciliation detects those cycles
+    /// and logs them for operator awareness.
+    ///
+    /// Cycles are NOT automatically revoked - they are logged and metrics are emitted
+    /// so that governance can decide how to handle them.
     pub fn register_proposal(&mut self, proposal_id: ProposalId, domain_id: GovernanceDomainId) {
-        self.proposal_domains.insert(proposal_id, domain_id);
+        self.proposal_domains
+            .insert(proposal_id.clone(), domain_id.clone());
+
+        // Reconcile: check for cycles that are now detectable with this proposal's domain
+        let cycles = self.detect_cycles_for_proposal(&proposal_id, &domain_id);
+        if !cycles.is_empty() {
+            tracing::warn!(
+                proposal_id = %proposal_id.0,
+                domain_id = %domain_id.0,
+                cycle_count = cycles.len(),
+                "Delegation cycles detected after proposal registration - \
+                 these may have formed during gossip propagation"
+            );
+            for (delegator, delegate, path) in &cycles {
+                tracing::warn!(
+                    delegator = %delegator,
+                    delegate = %delegate,
+                    path = ?path,
+                    "Cycle detected: delegation from {} to {} creates cycle via proposal {}",
+                    delegator, delegate, proposal_id.0
+                );
+            }
+            // Emit metrics
+            icn_obs::metrics::governance::delegation_cycle_detected_inc();
+            icn_obs::metrics::governance::delegation_cycles_found_add(cycles.len() as u64);
+        }
+    }
+
+    /// Detect delegation cycles that involve a specific proposal
+    ///
+    /// This is called during proposal registration to find cycles that may have
+    /// formed while the proposal's domain was unknown.
+    fn detect_cycles_for_proposal(
+        &self,
+        proposal_id: &ProposalId,
+        domain_id: &GovernanceDomainId,
+    ) -> Vec<(Did, Did, Vec<Did>)> {
+        let now = icn_time::current_timestamp_secs();
+        let mut cycles = Vec::new();
+
+        // Find all delegations that reference this proposal
+        let _proposal_scope = DelegationScope::Proposal(proposal_id.clone());
+        let domain_scope = DelegationScope::Domain(domain_id.clone());
+
+        for delegation in self.delegations.values() {
+            if !delegation.is_active(now) {
+                continue;
+            }
+
+            // Check if this delegation involves the proposal
+            let involves_proposal = match &delegation.scope {
+                DelegationScope::Proposal(p) => p == proposal_id,
+                _ => false,
+            };
+
+            if !involves_proposal {
+                continue;
+            }
+
+            // Now check if this delegation creates a cycle with domain delegations
+            // by walking the chain from the delegate
+            if self.would_create_cycle_with_scope(
+                &delegation.delegator,
+                &delegation.delegate,
+                &domain_scope,
+            ) {
+                let path =
+                    self.find_cycle(&delegation.delegator, &delegation.delegate, &domain_scope);
+                cycles.push((
+                    delegation.delegator.clone(),
+                    delegation.delegate.clone(),
+                    path,
+                ));
+            }
+        }
+
+        cycles
+    }
+
+    /// Check if a delegation would create a cycle when checked against a specific scope
+    ///
+    /// This is similar to would_create_cycle but uses an explicit scope for checking.
+    fn would_create_cycle_with_scope(
+        &self,
+        delegator: &Did,
+        delegate: &Did,
+        scope: &DelegationScope,
+    ) -> bool {
+        let now = icn_time::current_timestamp_secs();
+        let mut current = delegate.clone();
+        let mut visited = HashSet::new();
+        visited.insert(delegator.clone());
+
+        for _ in 0..self.max_depth {
+            if visited.contains(&current) {
+                return true;
+            }
+            visited.insert(current.clone());
+
+            // Find any active delegation from current that matches scope
+            let next = self
+                .delegations_from
+                .get(&current)
+                .and_then(|ids| {
+                    ids.iter()
+                        .filter_map(|id| self.delegations.get(id))
+                        .find(|d| d.is_active(now) && self.scopes_overlap(&d.scope, scope))
+                })
+                .map(|d| d.delegate.clone());
+
+            match next {
+                Some(d) => current = d,
+                None => return false,
+            }
+        }
+
+        false
     }
 
     /// Unregister a proposal (e.g., when proposal is finalized)
@@ -1039,6 +1183,65 @@ mod tests {
         assert!(
             result.is_ok(),
             "Expected delegation to succeed but got: {result:?}"
+        );
+    }
+
+    #[test]
+    fn test_cycle_detected_on_proposal_registration() {
+        let mut manager = DelegationManager::new();
+        let alice = test_did(1);
+        let bob = test_did(2);
+
+        let domain_a = GovernanceDomainId::new("domain-a");
+        let proposal_in_a = ProposalId::new("proposal-in-domain-a");
+
+        // Scenario: Create a cycle that's not detected initially because
+        // proposal's domain is unknown, then register the proposal and
+        // verify the cycle is detected during reconciliation.
+
+        // Step 1: Alice delegates domain A to Bob
+        manager
+            .add_delegation(Delegation::new(
+                alice.clone(),
+                bob.clone(),
+                DelegationScope::Domain(domain_a.clone()),
+            ))
+            .unwrap();
+
+        // Step 2: Bob delegates proposal to Alice (accepted - proposal domain unknown)
+        manager
+            .add_delegation(Delegation::new(
+                bob.clone(),
+                alice.clone(),
+                DelegationScope::Proposal(proposal_in_a.clone()),
+            ))
+            .unwrap();
+
+        // Step 3: Now register the proposal - cycle should be detected
+        // The cycle exists: Alice --(domain A)--> Bob --(proposal in A)--> Alice
+        manager.register_proposal(proposal_in_a.clone(), domain_a.clone());
+
+        // Verify cycle is detected via detect_cycles_for_proposal
+        let cycles = manager.detect_cycles_for_proposal(&proposal_in_a, &domain_a);
+        assert!(
+            !cycles.is_empty(),
+            "Expected cycle to be detected after proposal registration"
+        );
+        assert_eq!(cycles.len(), 1, "Expected exactly one cycle");
+
+        // Verify the cycle involves the correct participants
+        let (delegator, delegate, path) = &cycles[0];
+        assert_eq!(
+            delegator, &bob,
+            "Cycle should start from Bob (the proposal delegator)"
+        );
+        assert_eq!(
+            delegate, &alice,
+            "Cycle should go to Alice (the proposal delegate)"
+        );
+        assert!(
+            path.contains(&alice) && path.contains(&bob),
+            "Path should contain both Alice and Bob"
         );
     }
 }
