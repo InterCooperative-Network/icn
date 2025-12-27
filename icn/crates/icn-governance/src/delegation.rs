@@ -674,36 +674,10 @@ impl DelegationManager {
     }
 
     /// Check if adding a delegation would create a cycle
+    ///
+    /// Delegates to `would_create_cycle_with_scope` for the actual logic.
     fn would_create_cycle(&self, delegator: &Did, delegate: &Did, scope: &DelegationScope) -> bool {
-        let now = icn_time::current_timestamp_secs();
-        let mut current = delegate.clone();
-        let mut visited = HashSet::new();
-        visited.insert(delegator.clone());
-
-        for _ in 0..self.max_depth {
-            if visited.contains(&current) {
-                return true;
-            }
-            visited.insert(current.clone());
-
-            // Find any active delegation from current that matches scope
-            let next = self
-                .delegations_from
-                .get(&current)
-                .and_then(|ids| {
-                    ids.iter()
-                        .filter_map(|id| self.delegations.get(id))
-                        .find(|d| d.is_active(now) && self.scopes_overlap(&d.scope, scope))
-                })
-                .map(|d| d.delegate.clone());
-
-            match next {
-                Some(d) => current = d,
-                None => return false,
-            }
-        }
-
-        false
+        self.would_create_cycle_with_scope(delegator, delegate, scope)
     }
 
     /// Find the cycle path (for error reporting)
@@ -1381,6 +1355,52 @@ mod tests {
         assert!(
             cycles.is_empty(),
             "Expected NO cycles when domains don't overlap"
+        );
+    }
+
+    #[test]
+    fn test_cycle_reconciliation_ignores_revoked_delegations() {
+        let mut manager = DelegationManager::new();
+        let alice = test_did(1);
+        let bob = test_did(2);
+
+        let domain_a = GovernanceDomainId::new("domain-a");
+        let proposal_in_a = ProposalId::new("proposal-in-domain-a");
+
+        // Create a potential cycle where one link is revoked:
+        // Alice --(domain A, active)--> Bob --(proposal, REVOKED)--> Alice
+
+        // Step 1: Alice delegates domain A to Bob (active delegation)
+        manager
+            .add_delegation(Delegation::new(
+                alice.clone(),
+                bob.clone(),
+                DelegationScope::Domain(domain_a.clone()),
+            ))
+            .unwrap();
+
+        // Step 2: Bob delegates proposal to Alice
+        let proposal_delegation = Delegation::new(
+            bob.clone(),
+            alice.clone(),
+            DelegationScope::Proposal(proposal_in_a.clone()),
+        );
+
+        // Add the delegation then revoke it
+        let delegation_id = proposal_delegation.id.clone();
+        manager.add_delegation(proposal_delegation).unwrap();
+
+        // Revoke the delegation - this breaks the cycle chain
+        manager.revoke_delegation(&delegation_id).unwrap();
+
+        // Step 3: Register the proposal - NO cycle should be detected
+        // because the proposal delegation is revoked (inactive)
+        manager.register_proposal(proposal_in_a.clone(), domain_a.clone());
+
+        let cycles = manager.detect_cycles_for_proposal(&proposal_in_a, &domain_a);
+        assert!(
+            cycles.is_empty(),
+            "Expected NO cycle because the proposal delegation is revoked"
         );
     }
 }

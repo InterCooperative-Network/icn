@@ -1399,7 +1399,15 @@ impl GovernanceActor {
                     // so assume no overlap when proposal is not found
                     Ok(None) => false,
                     // Keep conservative for storage errors (potential data corruption)
-                    Err(_) => true,
+                    Err(e) => {
+                        tracing::warn!(
+                            proposal_id = %p.0,
+                            error = %e,
+                            "Storage error during cycle detection - assuming overlap conservatively. \
+                             This may block valid delegations; check storage health."
+                        );
+                        true
+                    }
                 }
             }
             (DelegationScope::Proposal(p1), DelegationScope::Proposal(p2)) => p1 == p2,
