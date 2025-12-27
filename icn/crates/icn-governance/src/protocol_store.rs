@@ -806,8 +806,15 @@ impl ProtocolParameterStore for InMemoryParameterStore {
             .filter(|c| c.status == PendingChangeStatus::Pending && c.effective_at <= timestamp)
             .cloned()
             .collect();
-        // Sort by effective_at (earliest first) for consistent processing order
-        due.sort_by_key(|c| c.effective_at);
+        // Sort by effective_at (earliest first), with tie-breakers for deterministic ordering.
+        // This ensures consistent processing order even when multiple changes have the same
+        // effective_at timestamp. Tie-breakers: created_at (earlier wins), then id (lexicographic).
+        due.sort_by(|a, b| {
+            a.effective_at
+                .cmp(&b.effective_at)
+                .then_with(|| a.created_at.cmp(&b.created_at))
+                .then_with(|| a.id.cmp(&b.id))
+        });
         Ok(due)
     }
 
@@ -1622,7 +1629,15 @@ impl ProtocolParameterStore for SledParameterStore {
             }
         }
 
-        // Already sorted by effective_at due to index key ordering
+        // Re-sort with tie-breakers for deterministic ordering when effective_at matches.
+        // The index provides effective_at ordering, but for same-timestamp conflicts we need
+        // additional tie-breakers: created_at (earlier wins), then id (lexicographic).
+        due.sort_by(|a, b| {
+            a.effective_at
+                .cmp(&b.effective_at)
+                .then_with(|| a.created_at.cmp(&b.created_at))
+                .then_with(|| a.id.cmp(&b.id))
+        });
         Ok(due)
     }
 

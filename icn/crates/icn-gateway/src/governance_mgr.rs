@@ -773,6 +773,21 @@ fn scopes_overlap(
 ///
 /// Returns Some(cycle_path) if a cycle would be created, None otherwise.
 /// The path includes the full cycle from delegator back to delegator.
+///
+/// # Algorithm Limitations
+///
+/// This function uses a single-path traversal starting from the delegate, following
+/// one outgoing delegation at each step. For each node, it picks the first active
+/// delegation that matches the scope, which means it may not explore all possible paths
+/// in a branching delegation graph.
+///
+/// In practice, this is acceptable because:
+/// 1. Most delegation graphs are linear chains, not DAGs
+/// 2. The MAX_DELEGATION_DEPTH limit (3) bounds the blast radius
+/// 3. Diamond patterns (A→B, A→C, B→D, C→D) don't create cycles by themselves
+///
+/// A more comprehensive BFS/DFS approach could be implemented if needed, but would
+/// add complexity without significant benefit for the expected use cases.
 fn find_delegation_cycle(
     delegator: &Did,
     delegate: &Did,
