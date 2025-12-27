@@ -351,25 +351,42 @@ pub async fn register_entity(
     }
 
     // Record audit trail - fail the request if audit logging fails for compliance
-    audit_mgr
-        .record_audit(
-            &entity_id,
-            EntityOperation::Registered {
-                entity_type: format_entity_type(&entity_type).to_string(),
-                name: body.name.clone(),
-            },
-            &creator_id,
-            None,
-            None,
-        )
-        .map_err(|e| {
-            warn!(
+    // If audit fails, we must clean up both entity and membership to maintain consistency
+    if let Err(e) = audit_mgr.record_audit(
+        &entity_id,
+        EntityOperation::Registered {
+            entity_type: format_entity_type(&entity_type).to_string(),
+            name: body.name.clone(),
+        },
+        &creator_id,
+        None,
+        None,
+    ) {
+        warn!(
+            entity_id = %entity_id,
+            error = %e,
+            "Failed to record entity registration audit - rolling back"
+        );
+        // Cleanup: remove membership first, then entity
+        if let Err(cleanup_err) = entity_mgr.remove_membership(&entity_id, &creator_id) {
+            tracing::error!(
                 entity_id = %entity_id,
-                error = %e,
-                "Failed to record entity registration audit"
+                member_id = %creator_id,
+                error = %cleanup_err,
+                "Failed to cleanup membership after audit failure"
             );
-            GatewayError::InternalError(format!("Failed to record audit: {e}"))
-        })?;
+        }
+        if let Err(cleanup_err) = entity_mgr.remove(&entity_id) {
+            tracing::error!(
+                entity_id = %entity_id,
+                error = %cleanup_err,
+                "Failed to cleanup entity after audit failure"
+            );
+        }
+        return Err(GatewayError::InternalError(format!(
+            "Failed to record audit: {e}"
+        )));
+    }
 
     let members = entity_mgr.get_members(&entity_id).unwrap_or_default();
     let response = entity_to_response(&entity, members.len());
@@ -466,27 +483,45 @@ pub async fn update_entity(
         "Updating entity"
     );
 
+    // Store previous entity state for potential rollback
+    let previous_entity = entity_mgr.get(&entity_id).ok().flatten();
+
     entity_mgr
         .update(entity.clone())
         .map_err(|e| GatewayError::InternalError(format!("Failed to update entity: {e}")))?;
 
     // Record audit trail - fail the request if audit logging fails for compliance
-    audit_mgr
-        .record_audit(
-            &entity_id,
-            EntityOperation::Updated { changed_fields },
-            &caller_id,
-            None,
-            None,
-        )
-        .map_err(|e| {
-            warn!(
-                entity_id = %entity_id,
-                error = %e,
-                "Failed to record entity update audit"
-            );
-            GatewayError::InternalError(format!("Failed to record audit: {e}"))
-        })?;
+    // NOTE: Compensation tradeoff - if audit fails after update, we attempt to restore
+    // the previous entity state. This provides stronger consistency guarantees but adds
+    // complexity. Alternative would be "best effort" auditing (warn but don't fail).
+    if let Err(e) = audit_mgr.record_audit(
+        &entity_id,
+        EntityOperation::Updated {
+            changed_fields: changed_fields.clone(),
+        },
+        &caller_id,
+        None,
+        None,
+    ) {
+        warn!(
+            entity_id = %entity_id,
+            error = %e,
+            "Failed to record entity update audit - attempting rollback"
+        );
+        // Attempt compensation: restore previous state
+        if let Some(prev) = previous_entity {
+            if let Err(rollback_err) = entity_mgr.update(prev) {
+                tracing::error!(
+                    entity_id = %entity_id,
+                    error = %rollback_err,
+                    "Failed to rollback entity after audit failure - entity in inconsistent state"
+                );
+            }
+        }
+        return Err(GatewayError::InternalError(format!(
+            "Failed to record audit: {e}"
+        )));
+    }
 
     let members = entity_mgr.get_members(&entity_id).unwrap_or_default();
     let response = entity_to_response(&entity, members.len());
@@ -518,8 +553,8 @@ pub async fn delete_entity(
         .parse()
         .map_err(|e| GatewayError::BadRequest(format!("Invalid entity ID: {e}")))?;
 
-    // Verify entity exists
-    let _entity = entity_mgr
+    // Verify entity exists and store for potential restoration
+    let entity = entity_mgr
         .get(&entity_id)
         .map_err(|e| GatewayError::InternalError(format!("Failed to get entity: {e}")))?
         .ok_or_else(|| GatewayError::NotFound(format!("Entity not found: {entity_id}")))?;
@@ -541,16 +576,28 @@ pub async fn delete_entity(
     })?;
 
     // Record audit trail - fail the request if audit logging fails for compliance
-    audit_mgr
-        .record_audit(&entity_id, EntityOperation::Deleted, &caller_id, None, None)
-        .map_err(|e| {
-            warn!(
+    // NOTE: Compensation tradeoff - if audit fails after deletion, we attempt to restore
+    // the entity. This is complex since we need to re-register rather than just update.
+    if let Err(e) =
+        audit_mgr.record_audit(&entity_id, EntityOperation::Deleted, &caller_id, None, None)
+    {
+        warn!(
+            entity_id = %entity_id,
+            error = %e,
+            "Failed to record entity deletion audit - attempting restoration"
+        );
+        // Attempt compensation: re-register the entity
+        if let Err(restore_err) = entity_mgr.register(entity.clone()) {
+            tracing::error!(
                 entity_id = %entity_id,
-                error = %e,
-                "Failed to record entity deletion audit"
+                error = %restore_err,
+                "Failed to restore entity after audit failure - data loss occurred"
             );
-            GatewayError::InternalError(format!("Failed to record audit: {e}"))
-        })?;
+        }
+        return Err(GatewayError::InternalError(format!(
+            "Failed to record audit: {e}"
+        )));
+    }
 
     Ok(HttpResponse::NoContent().finish())
 }

@@ -262,7 +262,18 @@ impl EntityAuditManager {
 
         let records: Vec<EntityAuditRecord> = pairs
             .into_iter()
-            .filter_map(|(_, value)| serde_json::from_slice(&value).ok())
+            .filter_map(|(key, value)| {
+                serde_json::from_slice(&value)
+                    .map_err(|e| {
+                        tracing::warn!(
+                            key = ?String::from_utf8_lossy(&key),
+                            error = %e,
+                            "Failed to deserialize audit record - data may be corrupted"
+                        );
+                        e
+                    })
+                    .ok()
+            })
             .collect();
 
         // Record query duration metric
