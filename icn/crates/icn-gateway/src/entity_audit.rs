@@ -324,6 +324,244 @@ impl EntityAuditManager {
         self.store.put(key.as_bytes(), &value)?;
         Ok(())
     }
+
+    /// Prune audit records based on retention policy
+    ///
+    /// This method scans all entity audit records and removes those that:
+    /// 1. Exceed the maximum age (retention_days)
+    /// 2. Exceed the maximum count per entity (max_records_per_entity)
+    ///
+    /// Records are pruned in order from oldest to newest.
+    ///
+    /// # Arguments
+    /// * `retention_days` - Maximum age of records in days
+    /// * `max_records_per_entity` - Maximum records to keep per entity
+    /// * `batch_size` - Maximum records to process per entity per call
+    ///
+    /// # Returns
+    /// Statistics about the pruning operation
+    pub fn prune_audit_records(
+        &self,
+        retention_days: u64,
+        max_records_per_entity: usize,
+        batch_size: usize,
+    ) -> Result<PruneStats> {
+        let start = std::time::Instant::now();
+        let mut stats = PruneStats {
+            records_scanned: 0,
+            records_pruned: 0,
+            entities_processed: 0,
+            duration_ms: 0,
+            errors: Vec::new(),
+        };
+
+        // Calculate cutoff timestamp (seconds)
+        let now_secs = icn_time::current_timestamp_millis() / 1000;
+        let cutoff_secs = now_secs.saturating_sub(retention_days * 24 * 60 * 60);
+
+        // Get all unique entity IDs with audit records
+        let entity_ids = self.get_entities_with_audits()?;
+
+        for entity_id in entity_ids {
+            stats.entities_processed += 1;
+
+            match self.prune_entity_audits(
+                &entity_id,
+                cutoff_secs,
+                max_records_per_entity,
+                batch_size,
+            ) {
+                Ok((scanned, pruned)) => {
+                    stats.records_scanned += scanned;
+                    stats.records_pruned += pruned;
+                }
+                Err(e) => {
+                    stats.errors.push(format!("{entity_id}: {e}"));
+                }
+            }
+        }
+
+        stats.duration_ms = start.elapsed().as_millis() as u64;
+
+        // Record metrics
+        gateway_metrics::entity_audit_pruned_inc(stats.records_pruned);
+        gateway_metrics::entity_audit_prune_duration(stats.duration_ms as f64 / 1000.0);
+
+        info!(
+            records_pruned = stats.records_pruned,
+            entities_processed = stats.entities_processed,
+            duration_ms = stats.duration_ms,
+            "Audit pruning completed"
+        );
+
+        Ok(stats)
+    }
+
+    /// Prune audit records for a specific entity
+    ///
+    /// # Arguments
+    /// * `entity_id` - Entity to prune records for
+    /// * `retention_days` - Optional max age override (None = no age limit)
+    /// * `max_records` - Optional max count override (None = no count limit)
+    ///
+    /// # Returns
+    /// Statistics about the pruning operation
+    pub fn prune_entity(
+        &self,
+        entity_id: &EntityId,
+        retention_days: Option<u64>,
+        max_records: Option<usize>,
+    ) -> Result<PruneStats> {
+        let start = std::time::Instant::now();
+
+        let now_secs = icn_time::current_timestamp_millis() / 1000;
+        let cutoff_secs = retention_days
+            .map(|days| now_secs.saturating_sub(days * 24 * 60 * 60))
+            .unwrap_or(0);
+
+        let max = max_records.unwrap_or(usize::MAX);
+
+        let (scanned, pruned) =
+            self.prune_entity_audits(entity_id, cutoff_secs, max, usize::MAX)?;
+
+        let stats = PruneStats {
+            records_scanned: scanned,
+            records_pruned: pruned,
+            entities_processed: 1,
+            duration_ms: start.elapsed().as_millis() as u64,
+            errors: Vec::new(),
+        };
+
+        // Record metrics
+        gateway_metrics::entity_audit_pruned_inc(stats.records_pruned);
+
+        Ok(stats)
+    }
+
+    /// Count total audit records across all entities
+    pub fn count_audit_records(&self) -> Result<usize> {
+        self.store.scan_count(ENTITY_AUDIT_PREFIX.as_bytes())
+    }
+
+    /// Prune audit records for a single entity
+    ///
+    /// Returns (records_scanned, records_pruned)
+    fn prune_entity_audits(
+        &self,
+        entity_id: &EntityId,
+        cutoff_secs: u64,
+        max_records: usize,
+        batch_size: usize,
+    ) -> Result<(usize, usize)> {
+        let prefix = format!("{ENTITY_AUDIT_PREFIX}{entity_id}:");
+
+        // Scan all records for this entity (forward order = oldest first)
+        let all_pairs = self.store.scan(prefix.as_bytes())?;
+        let total_count = all_pairs.len();
+
+        // Calculate how many to prune based on count limit
+        let excess_count = total_count.saturating_sub(max_records);
+
+        let mut scanned = 0;
+        let mut pruned = 0;
+
+        for (key, value) in all_pairs.into_iter().take(batch_size) {
+            scanned += 1;
+
+            // Check if record should be pruned
+            let should_prune = if scanned <= excess_count {
+                // Prune excess records (oldest first since keys are timestamp-ordered)
+                true
+            } else if cutoff_secs > 0 {
+                // Check age-based pruning
+                if let Ok(record) = serde_json::from_slice::<EntityAuditRecord>(&value) {
+                    record.performed_at < cutoff_secs
+                } else {
+                    // Corrupted record - prune it
+                    gateway_metrics::entity_audit_corruption_inc();
+                    true
+                }
+            } else {
+                false
+            };
+
+            if should_prune {
+                self.store.delete(&key)?;
+                pruned += 1;
+            }
+        }
+
+        Ok((scanned, pruned))
+    }
+
+    /// Get list of entity IDs that have audit records
+    pub fn get_entities_with_audits(&self) -> Result<Vec<EntityId>> {
+        let mut entities = std::collections::HashSet::new();
+
+        // Scan all audit keys to extract unique entity IDs
+        // Key format: gateway:entity:audit:{entity_id}:{timestamp}:{audit_id}
+        let pairs = self.store.scan(ENTITY_AUDIT_PREFIX.as_bytes())?;
+
+        for (key, _) in pairs {
+            let key_str = String::from_utf8_lossy(&key);
+            if let Some(rest) = key_str.strip_prefix(ENTITY_AUDIT_PREFIX) {
+                // rest = "{entity_id}:{timestamp}:{audit_id}"
+                // entity_id format: "entity:icn:cooperative:name" or similar
+                // We need to find where the entity_id ends (before the millisecond timestamp)
+                // The timestamp is a large number, so we look for the pattern
+                if let Some(entity_id_str) = Self::extract_entity_id_from_key(rest) {
+                    if let Ok(entity_id) = entity_id_str.parse() {
+                        entities.insert(entity_id);
+                    }
+                }
+            }
+        }
+
+        Ok(entities.into_iter().collect())
+    }
+
+    /// Extract entity ID from the rest of the key after prefix
+    ///
+    /// Key rest format: "{entity_id}:{millis_timestamp}:{audit_id}"
+    /// Entity ID format: "entity:icn:{type}:{name}" (contains colons)
+    /// We find the timestamp by looking for the millisecond number pattern
+    fn extract_entity_id_from_key(rest: &str) -> Option<String> {
+        // Split by colon and work backwards to find the timestamp
+        // The timestamp is a 13-digit number (milliseconds since epoch)
+        let parts: Vec<&str> = rest.split(':').collect();
+
+        // Minimum: entity:icn:type:name:timestamp:audit-id = 6 parts
+        if parts.len() < 6 {
+            return None;
+        }
+
+        // Find the timestamp part (should be at position -2 from end, before audit-id)
+        // audit-id format: "audit-{secs}-{uuid}"
+        // So we look for a part that is purely numeric and ~13 digits (millis timestamp)
+        for i in 3..parts.len().saturating_sub(1) {
+            if parts[i].chars().all(|c| c.is_ascii_digit()) && parts[i].len() >= 13 {
+                // Found the timestamp - entity_id is everything before this
+                return Some(parts[..i].join(":"));
+            }
+        }
+
+        None
+    }
+}
+
+/// Statistics from a pruning operation
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct PruneStats {
+    /// Total records scanned
+    pub records_scanned: usize,
+    /// Records pruned (deleted)
+    pub records_pruned: usize,
+    /// Entities processed
+    pub entities_processed: usize,
+    /// Duration in milliseconds
+    pub duration_ms: u64,
+    /// Errors encountered (non-fatal)
+    pub errors: Vec<String>,
 }
 
 #[cfg(test)]
@@ -519,5 +757,306 @@ mod tests {
             trail.records[1].performed_at >= trail.records[2].performed_at,
             "Timestamps should be descending"
         );
+    }
+
+    #[test]
+    fn test_count_audit_records() {
+        let (mgr, _temp) = create_test_manager();
+
+        let entity1 = EntityId::cooperative("coop-1").expect("valid coop id");
+        let entity2 = EntityId::cooperative("coop-2").expect("valid coop id");
+        let performer_keypair = KeyPair::generate().expect("keypair");
+        let performer = EntityId::from_did(performer_keypair.did());
+
+        // Start with 0 records
+        assert_eq!(mgr.count_audit_records().unwrap(), 0);
+
+        // Add 3 records to entity1
+        for i in 0..3 {
+            mgr.record_audit(
+                &entity1,
+                EntityOperation::Updated {
+                    changed_fields: vec![format!("field{}", i)],
+                },
+                &performer,
+                None,
+                None,
+            )
+            .expect("Failed to record audit");
+        }
+
+        assert_eq!(mgr.count_audit_records().unwrap(), 3);
+
+        // Add 2 records to entity2
+        for i in 0..2 {
+            mgr.record_audit(
+                &entity2,
+                EntityOperation::Updated {
+                    changed_fields: vec![format!("field{}", i)],
+                },
+                &performer,
+                None,
+                None,
+            )
+            .expect("Failed to record audit");
+        }
+
+        assert_eq!(mgr.count_audit_records().unwrap(), 5);
+    }
+
+    #[test]
+    fn test_get_entities_with_audits() {
+        let (mgr, _temp) = create_test_manager();
+
+        let entity1 = EntityId::cooperative("coop-1").expect("valid coop id");
+        let entity2 = EntityId::cooperative("coop-2").expect("valid coop id");
+        let performer_keypair = KeyPair::generate().expect("keypair");
+        let performer = EntityId::from_did(performer_keypair.did());
+
+        // Start with 0 entities
+        assert_eq!(mgr.get_entities_with_audits().unwrap().len(), 0);
+
+        // Add record to entity1
+        mgr.record_audit(
+            &entity1,
+            EntityOperation::Registered {
+                entity_type: "cooperative".to_string(),
+                name: "Coop 1".to_string(),
+            },
+            &performer,
+            None,
+            None,
+        )
+        .expect("Failed to record audit");
+
+        let entities = mgr.get_entities_with_audits().unwrap();
+        assert_eq!(entities.len(), 1);
+        assert!(entities.contains(&entity1));
+
+        // Add record to entity2
+        mgr.record_audit(
+            &entity2,
+            EntityOperation::Registered {
+                entity_type: "cooperative".to_string(),
+                name: "Coop 2".to_string(),
+            },
+            &performer,
+            None,
+            None,
+        )
+        .expect("Failed to record audit");
+
+        let entities = mgr.get_entities_with_audits().unwrap();
+        assert_eq!(entities.len(), 2);
+        assert!(entities.contains(&entity1));
+        assert!(entities.contains(&entity2));
+    }
+
+    #[test]
+    fn test_prune_by_count() {
+        let (mgr, _temp) = create_test_manager();
+
+        let entity_id = EntityId::cooperative("test-coop").expect("valid coop id");
+        let performer_keypair = KeyPair::generate().expect("keypair");
+        let performer = EntityId::from_did(performer_keypair.did());
+
+        // Create 10 records
+        for i in 0..10 {
+            std::thread::sleep(std::time::Duration::from_millis(10));
+            mgr.record_audit(
+                &entity_id,
+                EntityOperation::Updated {
+                    changed_fields: vec![format!("field{}", i)],
+                },
+                &performer,
+                None,
+                None,
+            )
+            .expect("Failed to record audit");
+        }
+
+        assert_eq!(mgr.count_audit_records().unwrap(), 10);
+
+        // Prune to max 5 records (long retention to avoid age-based pruning)
+        let stats = mgr
+            .prune_audit_records(
+                365 * 10, // 10 years retention - won't trigger age-based prune
+                5,        // max 5 records per entity
+                100,      // batch size
+            )
+            .expect("Failed to prune");
+
+        assert_eq!(stats.records_scanned, 10);
+        assert_eq!(stats.records_pruned, 5); // Oldest 5 pruned
+        assert_eq!(stats.entities_processed, 1);
+
+        // Verify 5 records remain
+        assert_eq!(mgr.count_audit_records().unwrap(), 5);
+
+        // Verify we kept the 5 most recent (newest) records
+        let trail = mgr.get_audit_trail(&entity_id, 10, 0).unwrap();
+        assert_eq!(trail.total, 5);
+    }
+
+    #[test]
+    fn test_prune_specific_entity() {
+        let (mgr, _temp) = create_test_manager();
+
+        let entity1 = EntityId::cooperative("coop-1").expect("valid coop id");
+        let entity2 = EntityId::cooperative("coop-2").expect("valid coop id");
+        let performer_keypair = KeyPair::generate().expect("keypair");
+        let performer = EntityId::from_did(performer_keypair.did());
+
+        // Create 10 records each for 2 entities
+        for entity in [&entity1, &entity2] {
+            for i in 0..10 {
+                std::thread::sleep(std::time::Duration::from_millis(10));
+                mgr.record_audit(
+                    entity,
+                    EntityOperation::Updated {
+                        changed_fields: vec![format!("field{}", i)],
+                    },
+                    &performer,
+                    None,
+                    None,
+                )
+                .expect("Failed to record audit");
+            }
+        }
+
+        assert_eq!(mgr.count_audit_records().unwrap(), 20);
+
+        // Prune only entity1 to max 3 records
+        let stats = mgr
+            .prune_entity(
+                &entity1,
+                Some(365 * 10), // Long retention
+                Some(3),        // max 3 records
+            )
+            .expect("Failed to prune");
+
+        assert_eq!(stats.records_scanned, 10); // Only scanned entity1
+        assert_eq!(stats.records_pruned, 7); // Pruned 7 records from entity1
+        assert_eq!(stats.entities_processed, 1);
+
+        // Verify entity1 has 3 records
+        let trail1 = mgr.get_audit_trail(&entity1, 20, 0).unwrap();
+        assert_eq!(trail1.total, 3);
+
+        // Verify entity2 still has 10 records (unaffected)
+        let trail2 = mgr.get_audit_trail(&entity2, 20, 0).unwrap();
+        assert_eq!(trail2.total, 10);
+    }
+
+    #[test]
+    fn test_prune_all_entities() {
+        let (mgr, _temp) = create_test_manager();
+
+        let entity1 = EntityId::cooperative("coop-1").expect("valid coop id");
+        let entity2 = EntityId::cooperative("coop-2").expect("valid coop id");
+        let performer_keypair = KeyPair::generate().expect("keypair");
+        let performer = EntityId::from_did(performer_keypair.did());
+
+        // Create 10 records each for 2 entities
+        for entity in [&entity1, &entity2] {
+            for i in 0..10 {
+                std::thread::sleep(std::time::Duration::from_millis(10));
+                mgr.record_audit(
+                    entity,
+                    EntityOperation::Updated {
+                        changed_fields: vec![format!("field{}", i)],
+                    },
+                    &performer,
+                    None,
+                    None,
+                )
+                .expect("Failed to record audit");
+            }
+        }
+
+        assert_eq!(mgr.count_audit_records().unwrap(), 20);
+
+        // Prune all entities to max 5 records each
+        let stats = mgr
+            .prune_audit_records(
+                365 * 10, // Long retention
+                5,        // max 5 records per entity
+                100,
+            )
+            .expect("Failed to prune");
+
+        assert_eq!(stats.records_scanned, 20); // Scanned all
+        assert_eq!(stats.records_pruned, 10); // 5 pruned from each entity
+        assert_eq!(stats.entities_processed, 2);
+
+        // Verify both entities have 5 records
+        let trail1 = mgr.get_audit_trail(&entity1, 20, 0).unwrap();
+        assert_eq!(trail1.total, 5);
+
+        let trail2 = mgr.get_audit_trail(&entity2, 20, 0).unwrap();
+        assert_eq!(trail2.total, 5);
+    }
+
+    #[test]
+    fn test_prune_no_op_when_under_limit() {
+        let (mgr, _temp) = create_test_manager();
+
+        let entity_id = EntityId::cooperative("test-coop").expect("valid coop id");
+        let performer_keypair = KeyPair::generate().expect("keypair");
+        let performer = EntityId::from_did(performer_keypair.did());
+
+        // Create 3 records
+        for i in 0..3 {
+            mgr.record_audit(
+                &entity_id,
+                EntityOperation::Updated {
+                    changed_fields: vec![format!("field{}", i)],
+                },
+                &performer,
+                None,
+                None,
+            )
+            .expect("Failed to record audit");
+        }
+
+        // Prune with limit of 10 (higher than actual count)
+        let stats = mgr
+            .prune_audit_records(365 * 10, 10, 100)
+            .expect("Failed to prune");
+
+        assert_eq!(stats.records_scanned, 3);
+        assert_eq!(stats.records_pruned, 0); // Nothing pruned
+        assert_eq!(stats.entities_processed, 1);
+
+        // All 3 records still exist
+        assert_eq!(mgr.count_audit_records().unwrap(), 3);
+    }
+
+    #[test]
+    fn test_extract_entity_id_from_key() {
+        // Test cooperative entity ID extraction
+        let key = "entity:icn:cooperative:test-coop:1703500000000:audit-1703500000-abc123";
+        assert_eq!(
+            EntityAuditManager::extract_entity_id_from_key(key),
+            Some("entity:icn:cooperative:test-coop".to_string())
+        );
+
+        // Test federation entity ID extraction
+        let key = "entity:icn:federation:test-fed:1703500000000:audit-1703500000-xyz789";
+        assert_eq!(
+            EntityAuditManager::extract_entity_id_from_key(key),
+            Some("entity:icn:federation:test-fed".to_string())
+        );
+
+        // Test DID-based entity ID (individual)
+        let key = "entity:icn:individual:5FyKAM:1703500000000:audit-1703500000-def456";
+        assert_eq!(
+            EntityAuditManager::extract_entity_id_from_key(key),
+            Some("entity:icn:individual:5FyKAM".to_string())
+        );
+
+        // Test invalid key (too few parts)
+        let key = "entity:icn:invalid:123";
+        assert_eq!(EntityAuditManager::extract_entity_id_from_key(key), None);
     }
 }

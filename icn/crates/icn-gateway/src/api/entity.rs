@@ -946,6 +946,45 @@ pub struct AuditQueryParams {
     pub offset: Option<usize>,
 }
 
+// ============================================================================
+// Admin API Types (Audit Retention)
+// ============================================================================
+
+/// Request to prune audit records
+#[derive(Debug, Deserialize)]
+pub struct PruneAuditRequest {
+    /// Specific entity to prune (optional - prunes all if not set)
+    pub entity_id: Option<String>,
+    /// Override retention days (optional - uses system default if not set)
+    pub retention_days: Option<u64>,
+    /// Override max records per entity (optional)
+    pub max_records: Option<usize>,
+}
+
+/// Response from prune operation
+#[derive(Debug, Serialize)]
+pub struct PruneAuditResponse {
+    /// Number of records scanned
+    pub records_scanned: usize,
+    /// Number of records pruned
+    pub records_pruned: usize,
+    /// Number of entities processed
+    pub entities_processed: usize,
+    /// Duration of operation in milliseconds
+    pub duration_ms: u64,
+    /// Any errors encountered (non-fatal)
+    pub errors: Vec<String>,
+}
+
+/// Response from audit stats endpoint
+#[derive(Debug, Serialize)]
+pub struct AuditStatsResponse {
+    /// Total number of audit records
+    pub total_records: usize,
+    /// Number of entities with audit trails
+    pub entities_with_audits: usize,
+}
+
 /// GET /entities/:id/audit - Get entity audit trail
 ///
 /// Requires the caller to either:
@@ -1012,9 +1051,149 @@ pub async fn get_entity_audit(
     Ok(HttpResponse::Ok().json(trail))
 }
 
+// ============================================================================
+// Admin Endpoints (Audit Retention)
+// ============================================================================
+
+/// POST /entities/audit/prune - Manually prune audit records (admin only)
+///
+/// Requires "admin" or "entity:audit" scope.
+/// Can prune all entities or a specific entity. Supports overriding
+/// retention policy parameters.
+#[post("/audit/prune")]
+pub async fn prune_audit(
+    req: HttpRequest,
+    audit_mgr: web::Data<Arc<EntityAuditManager>>,
+    body: web::Json<PruneAuditRequest>,
+) -> Result<HttpResponse> {
+    // Require admin scope
+    let claims = get_claims(&req)
+        .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
+
+    let has_admin_scope = claims
+        .scopes
+        .iter()
+        .any(|s| s == "admin" || s == "entity:audit");
+
+    if !has_admin_scope {
+        return Err(GatewayError::Forbidden(
+            "Admin scope required to prune audit records".to_string(),
+        ));
+    }
+
+    // Default retention policy values
+    let retention_days = body.retention_days.unwrap_or(365);
+    let max_records = body.max_records.unwrap_or(10000);
+    let batch_size = 1000; // Fixed batch size for manual prune
+
+    let start = std::time::Instant::now();
+
+    let stats = if let Some(ref entity_id_str) = body.entity_id {
+        // Prune specific entity
+        let entity_id: EntityId = entity_id_str
+            .parse()
+            .map_err(|e| GatewayError::BadRequest(format!("Invalid entity ID: {e}")))?;
+
+        info!(
+            entity_id = %entity_id,
+            retention_days = retention_days,
+            max_records = max_records,
+            "Admin pruning audit records for specific entity"
+        );
+
+        audit_mgr
+            .prune_entity(&entity_id, Some(retention_days), Some(max_records))
+            .map_err(|e| {
+                GatewayError::InternalError(format!("Failed to prune audit records: {e}"))
+            })?
+    } else {
+        // Prune all entities
+        info!(
+            retention_days = retention_days,
+            max_records = max_records,
+            "Admin pruning audit records for all entities"
+        );
+
+        audit_mgr
+            .prune_audit_records(retention_days, max_records, batch_size)
+            .map_err(|e| {
+                GatewayError::InternalError(format!("Failed to prune audit records: {e}"))
+            })?
+    };
+
+    let duration_ms = start.elapsed().as_millis() as u64;
+
+    // Record metrics
+    gateway_metrics::entity_audit_pruned_inc(stats.records_pruned);
+    gateway_metrics::entity_audit_prune_duration(start.elapsed().as_secs_f64());
+
+    let response = PruneAuditResponse {
+        records_scanned: stats.records_scanned,
+        records_pruned: stats.records_pruned,
+        entities_processed: stats.entities_processed,
+        duration_ms,
+        errors: stats.errors,
+    };
+
+    info!(
+        records_scanned = stats.records_scanned,
+        records_pruned = stats.records_pruned,
+        entities_processed = stats.entities_processed,
+        duration_ms = duration_ms,
+        "Admin prune completed"
+    );
+
+    Ok(HttpResponse::Ok().json(response))
+}
+
+/// GET /entities/audit/stats - Get audit storage statistics (admin only)
+///
+/// Requires "admin" or "entity:audit" scope.
+/// Returns total record count and number of entities with audit trails.
+#[get("/audit/stats")]
+pub async fn audit_stats(
+    req: HttpRequest,
+    audit_mgr: web::Data<Arc<EntityAuditManager>>,
+) -> Result<HttpResponse> {
+    // Require admin scope
+    let claims = get_claims(&req)
+        .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
+
+    let has_admin_scope = claims
+        .scopes
+        .iter()
+        .any(|s| s == "admin" || s == "entity:audit");
+
+    if !has_admin_scope {
+        return Err(GatewayError::Forbidden(
+            "Admin scope required to view audit statistics".to_string(),
+        ));
+    }
+
+    let total_records = audit_mgr
+        .count_audit_records()
+        .map_err(|e| GatewayError::InternalError(format!("Failed to count audit records: {e}")))?;
+
+    let entities_with_audits = audit_mgr
+        .get_entities_with_audits()
+        .map_err(|e| GatewayError::InternalError(format!("Failed to get entities: {e}")))?
+        .len();
+
+    let response = AuditStatsResponse {
+        total_records,
+        entities_with_audits,
+    };
+
+    Ok(HttpResponse::Ok().json(response))
+}
+
 /// Configure entity routes
 pub fn configure(cfg: &mut web::ServiceConfig) {
-    cfg.service(register_entity)
+    // Order matters: /audit/* routes must come before /{id}/* routes
+    // to avoid treating "audit" as an entity ID
+    cfg.service(prune_audit)
+        .service(audit_stats)
+        .service(register_entity)
         .service(get_entity)
         .service(update_entity)
         .service(delete_entity)

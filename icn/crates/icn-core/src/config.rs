@@ -372,6 +372,62 @@ impl Default for RateLimitingConfig {
     }
 }
 
+// Audit retention default value functions
+fn default_retention_days() -> u64 {
+    365
+}
+fn default_max_records_per_entity() -> usize {
+    10000
+}
+fn default_prune_interval_secs() -> u64 {
+    3600
+}
+fn default_prune_batch_size() -> usize {
+    1000
+}
+
+/// Audit retention configuration for entity audit records
+///
+/// Controls how long audit records are kept and how pruning is performed.
+/// This prevents unbounded storage growth in high-activity cooperatives.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuditRetentionConfig {
+    /// Maximum age of audit records in days (default: 365)
+    /// Records older than this are eligible for pruning
+    #[serde(default = "default_retention_days")]
+    pub retention_days: u64,
+
+    /// Maximum number of audit records per entity (default: 10000)
+    /// Oldest records beyond this limit are eligible for pruning
+    #[serde(default = "default_max_records_per_entity")]
+    pub max_records_per_entity: usize,
+
+    /// Interval between automatic pruning runs in seconds (default: 3600 = 1 hour)
+    #[serde(default = "default_prune_interval_secs")]
+    pub prune_interval_secs: u64,
+
+    /// Enable automatic background pruning (default: true)
+    #[serde(default = "default_true")]
+    pub auto_prune_enabled: bool,
+
+    /// Batch size for pruning operations (default: 1000)
+    /// Larger batches are more efficient but may cause longer lock times
+    #[serde(default = "default_prune_batch_size")]
+    pub prune_batch_size: usize,
+}
+
+impl Default for AuditRetentionConfig {
+    fn default() -> Self {
+        Self {
+            retention_days: default_retention_days(),
+            max_records_per_entity: default_max_records_per_entity(),
+            prune_interval_secs: default_prune_interval_secs(),
+            auto_prune_enabled: true,
+            prune_batch_size: default_prune_batch_size(),
+        }
+    }
+}
+
 /// Gateway API configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GatewayConfig {
@@ -395,6 +451,10 @@ pub struct GatewayConfig {
     /// If empty, gateway will fail to start
     #[serde(default)]
     pub jwt_secret: String,
+
+    /// Audit retention policy configuration
+    #[serde(default)]
+    pub audit_retention: AuditRetentionConfig,
 }
 
 /// Federation configuration for cross-network connectivity
@@ -642,6 +702,7 @@ impl Default for GatewayConfig {
             token_expiry_hours: default_token_expiry_hours(),
             challenge_ttl_minutes: default_challenge_ttl_minutes(),
             jwt_secret: String::new(),
+            audit_retention: AuditRetentionConfig::default(),
         }
     }
 }

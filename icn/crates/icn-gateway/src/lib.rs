@@ -64,6 +64,7 @@ pub use commons_store::SledCommonsStore;
 pub use commons_store::{CommonsStore, CommonsStoreBackend, InMemoryCommonsStore};
 pub use community_mgr::CommunityManager;
 pub use compute_events::{create_forwarding_callback, forward_compute_event};
+pub use entity_audit::{EntityAuditManager, PruneStats};
 pub use entity_mgr::EntityHandle;
 pub use error::{GatewayError, Result};
 pub use events::{BalanceChangeDetail, EventBroadcaster, GatewayEvent, SequencedEvent};
