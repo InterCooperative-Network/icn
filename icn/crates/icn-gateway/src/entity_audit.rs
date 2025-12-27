@@ -134,6 +134,12 @@ pub struct EntityAuditRecord {
     /// When performed (Unix timestamp in seconds, matching treasury audit pattern)
     pub performed_at: u64,
 
+    /// Millisecond timestamp for storage ordering.
+    /// Ensures proper chronological ordering for operations within the same second.
+    /// Internal implementation detail; use `performed_at` for display.
+    #[serde(default)]
+    storage_order_millis: u64,
+
     /// Governance proposal ID (if operation required approval)
     pub proposal_id: Option<String>,
 
@@ -144,10 +150,11 @@ pub struct EntityAuditRecord {
 impl EntityAuditRecord {
     /// Create a new audit record
     ///
-    /// Uses second-precision timestamps matching the treasury audit pattern.
-    /// UUID ensures uniqueness for multiple operations within the same second.
+    /// Uses second-precision timestamps in `performed_at` for API consistency,
+    /// but uses millisecond-precision internally for proper storage ordering.
     pub fn new(entity_id: EntityId, operation: EntityOperation, performed_by: EntityId) -> Self {
-        let now_secs = icn_time::current_timestamp_secs();
+        let now_millis = icn_time::current_timestamp_millis();
+        let now_secs = now_millis / 1000;
         Self {
             // Format matches treasury pattern: "audit-{timestamp}-{uuid}"
             id: format!("audit-{}-{}", now_secs, uuid::Uuid::new_v4().simple()),
@@ -155,6 +162,7 @@ impl EntityAuditRecord {
             operation,
             performed_by,
             performed_at: now_secs,
+            storage_order_millis: now_millis,
             proposal_id: None,
             notes: None,
         }
@@ -295,10 +303,11 @@ impl EntityAuditManager {
 
     /// Persist an audit record to storage
     fn persist_audit_record(&self, record: &EntityAuditRecord) -> Result<()> {
-        // Key includes timestamp for time-ordered retrieval
+        // Key uses millisecond timestamp for proper sub-second ordering.
+        // Records within the same second will sort chronologically.
         let key = format!(
             "{}{}:{}:{}",
-            ENTITY_AUDIT_PREFIX, record.entity_id, record.performed_at, record.id
+            ENTITY_AUDIT_PREFIX, record.entity_id, record.storage_order_millis, record.id
         );
         let value = serde_json::to_vec(record)?;
         self.store.put(key.as_bytes(), &value)?;

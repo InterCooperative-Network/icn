@@ -6,6 +6,23 @@
 //!
 //! Entities are organizational units in the ICN that can own treasuries,
 //! have governance domains, and contain members (individuals or other entities).
+//!
+//! ## Authorization Model
+//!
+//! This module uses a two-layer authorization model:
+//!
+//! 1. **Scope-based (coarse-grained)**: JWT must include the required scope
+//!    (e.g., `entity:write`) to access the endpoint at all. This is an
+//!    application-level capability check.
+//!
+//! 2. **Membership-based (fine-grained)**: For mutating operations, the caller
+//!    must be a Founder or BoardMember of the specific entity. This is enforced
+//!    by `require_entity_write_access()`.
+//!
+//! This design intentionally separates "can this client use entity APIs" from
+//! "can this user modify THIS entity". A token with `entity:write` scope can
+//! attempt modifications, but will be rejected unless the caller has the
+//! appropriate role in the target entity.
 
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
 use icn_entity::{CooperativeEntity, EntityId, EntityType, Membership, MembershipRole};
@@ -498,8 +515,16 @@ pub async fn update_entity(
         changed_fields.push("description".to_string());
     }
 
+    // Skip no-op updates - return early if no changes were requested
+    if changed_fields.is_empty() {
+        let members = entity_mgr.get_members(&entity_id).unwrap_or_default();
+        let response = entity_to_response(&entity, members.len());
+        return Ok(HttpResponse::Ok().json(response));
+    }
+
     info!(
         entity_id = %entity_id,
+        changed_fields = ?changed_fields,
         "Updating entity"
     );
 
@@ -706,6 +731,15 @@ pub async fn add_membership(
     };
 
     let role = parse_role(&body.role)?;
+
+    // Validate shares if provided
+    if let Some(shares) = body.shares {
+        if shares == 0 {
+            return Err(GatewayError::BadRequest(
+                "Shares must be greater than 0. Omit the field to use default (1).".to_string(),
+            ));
+        }
+    }
 
     info!(
         entity_id = %entity_id,
