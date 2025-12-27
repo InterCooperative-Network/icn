@@ -697,26 +697,36 @@ pub async fn add_membership(
         .map_err(|e| GatewayError::InternalError(format!("Failed to add membership: {e}")))?;
 
     // Record audit trail - fail the request if audit logging fails for compliance
-    audit_mgr
-        .record_audit(
-            &entity_id,
-            EntityOperation::MemberAdded {
-                member_id: member_id.clone(),
-                role,
-            },
-            &caller_id,
-            None,
-            None,
-        )
-        .map_err(|e| {
-            warn!(
+    // NOTE: Compensation - if audit fails, rollback the membership addition
+    if let Err(e) = audit_mgr.record_audit(
+        &entity_id,
+        EntityOperation::MemberAdded {
+            member_id: member_id.clone(),
+            role,
+        },
+        &caller_id,
+        None,
+        None,
+    ) {
+        warn!(
+            entity_id = %entity_id,
+            member_id = %member_id,
+            error = %e,
+            "Failed to record member addition audit - rolling back"
+        );
+        // Rollback: remove the membership we just added
+        if let Err(rollback_err) = entity_mgr.remove_membership(&entity_id, &member_id) {
+            tracing::error!(
                 entity_id = %entity_id,
                 member_id = %member_id,
-                error = %e,
-                "Failed to record member addition audit"
+                error = %rollback_err,
+                "Failed to rollback membership after audit failure - inconsistent state"
             );
-            GatewayError::InternalError(format!("Failed to record audit: {e}"))
-        })?;
+        }
+        return Err(GatewayError::InternalError(format!(
+            "Failed to record audit: {e}"
+        )));
+    }
 
     let response = membership_to_response(&membership);
 
@@ -802,36 +812,51 @@ pub async fn remove_membership(
         "Removing membership"
     );
 
+    // Store membership for potential rollback
+    let removed_membership = membership_to_remove.cloned();
+
     entity_mgr
         .remove_membership(&entity_id, &member_id)
         .map_err(|e| GatewayError::InternalError(format!("Failed to remove membership: {e}")))?;
 
     // Record audit trail - fail the request if audit logging fails for compliance
+    // NOTE: Compensation - if audit fails, restore the membership we just removed
     let reason = if is_self_removal {
         Some("Self-removal".to_string())
     } else {
         None
     };
-    audit_mgr
-        .record_audit(
-            &entity_id,
-            EntityOperation::MemberRemoved {
-                member_id: member_id.clone(),
-                reason,
-            },
-            &caller_id,
-            None,
-            None,
-        )
-        .map_err(|e| {
-            warn!(
-                entity_id = %entity_id,
-                member_id = %member_id,
-                error = %e,
-                "Failed to record member removal audit"
-            );
-            GatewayError::InternalError(format!("Failed to record audit: {e}"))
-        })?;
+    if let Err(e) = audit_mgr.record_audit(
+        &entity_id,
+        EntityOperation::MemberRemoved {
+            member_id: member_id.clone(),
+            reason,
+        },
+        &caller_id,
+        None,
+        None,
+    ) {
+        warn!(
+            entity_id = %entity_id,
+            member_id = %member_id,
+            error = %e,
+            "Failed to record member removal audit - attempting rollback"
+        );
+        // Rollback: restore the membership we just removed
+        if let Some(membership) = removed_membership {
+            if let Err(rollback_err) = entity_mgr.add_membership(membership) {
+                tracing::error!(
+                    entity_id = %entity_id,
+                    member_id = %member_id,
+                    error = %rollback_err,
+                    "Failed to rollback membership removal - member lost from entity"
+                );
+            }
+        }
+        return Err(GatewayError::InternalError(format!(
+            "Failed to record audit: {e}"
+        )));
+    }
 
     Ok(HttpResponse::NoContent().finish())
 }
