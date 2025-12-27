@@ -22,7 +22,10 @@ pub use handle::CoopHandle;
 pub use lifecycle::{LifecycleEvent, LifecycleManager};
 pub use membership::{MembershipChange, MembershipManager};
 pub use store::CoopStore;
-pub use types::{CoopStatus, CoopType, Cooperative, Member, MemberRole, MemberStatus};
+pub use types::{
+    CoopStatus, CoopType, Cooperative, CooperativeId, Member, MemberRole, MemberStatus,
+    MembershipApplication, MembershipTier,
+};
 
 use thiserror::Error;
 
