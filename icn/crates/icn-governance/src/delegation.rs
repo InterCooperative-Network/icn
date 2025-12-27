@@ -453,6 +453,21 @@ impl DelegationManager {
     }
 
     /// Add a new delegation
+    ///
+    /// # Cycle Detection
+    ///
+    /// This method detects cycles at delegation time using `scopes_overlap()` which
+    /// checks registered proposal domains. This handles two scenarios:
+    ///
+    /// 1. **Proposal registered first**: If a node already knows a proposal's domain
+    ///    when a proposal-scoped delegation arrives, cycles are detected immediately.
+    ///
+    /// 2. **Proposal not yet registered**: If the proposal's domain is unknown, the
+    ///    delegation is allowed. Cycles are detected later via `register_proposal()`
+    ///    reconciliation when the proposal information propagates.
+    ///
+    /// This dual approach ensures cycles are always eventually detected regardless
+    /// of the order in which proposals and delegations arrive via gossip.
     pub fn add_delegation(&mut self, delegation: Delegation) -> Result<()> {
         // Validate: no self-delegation
         if delegation.delegator == delegation.delegate {
@@ -460,6 +475,8 @@ impl DelegationManager {
         }
 
         // Validate: no cycles
+        // Uses scopes_overlap() which checks registered proposal domains, so cycles
+        // involving known proposals are detected even if delegations arrive out of order.
         if self.would_create_cycle(
             &delegation.delegator,
             &delegation.delegate,
@@ -1401,6 +1418,95 @@ mod tests {
         assert!(
             cycles.is_empty(),
             "Expected NO cycle because the proposal delegation is revoked"
+        );
+    }
+
+    /// Tests the race condition scenario from code review:
+    /// When delegations arrive in reverse order (proposal-scoped first, then domain-scoped),
+    /// the cycle should still be detected because add_delegation checks registered proposals.
+    #[test]
+    fn test_cycle_detected_when_delegations_arrive_out_of_order() {
+        let mut manager = DelegationManager::new();
+        let alice = test_did(1);
+        let bob = test_did(2);
+
+        let domain_x = GovernanceDomainId::new("domain-x");
+        let proposal_p = ProposalId::new("proposal-p");
+
+        // Simulates Node B's state after proposal registration
+        // Step 1: Proposal P is registered in Domain X (on this node)
+        manager.register_proposal(proposal_p.clone(), domain_x.clone());
+
+        // Step 2: Bob → Alice (Proposal P) arrives first via gossip
+        // This should succeed because Alice has no delegations yet
+        manager
+            .add_delegation(Delegation::new(
+                bob.clone(),
+                alice.clone(),
+                DelegationScope::Proposal(proposal_p.clone()),
+            ))
+            .unwrap();
+
+        // Step 3: Alice → Bob (Domain X) arrives second via gossip
+        // This SHOULD fail because it would create a cycle:
+        // Alice → Bob (Domain X) → Alice (via Proposal P which is in Domain X)
+        let result = manager.add_delegation(Delegation::new(
+            alice.clone(),
+            bob.clone(),
+            DelegationScope::Domain(domain_x.clone()),
+        ));
+
+        assert!(result.is_err(), "Expected cycle to be detected");
+        assert!(
+            result.unwrap_err().to_string().contains("cycle"),
+            "Error should mention cycle"
+        );
+    }
+
+    /// Tests that cycles are detected when domain delegation arrives after proposal delegation
+    /// on a node that already knows the proposal's domain.
+    #[test]
+    fn test_cycle_detected_domain_delegation_after_proposal_delegation() {
+        let mut manager = DelegationManager::new();
+        let alice = test_did(1);
+        let bob = test_did(2);
+        let charlie = test_did(3);
+
+        let domain_x = GovernanceDomainId::new("domain-x");
+        let proposal_p = ProposalId::new("proposal-p");
+
+        // Register proposal first
+        manager.register_proposal(proposal_p.clone(), domain_x.clone());
+
+        // Build a chain: Bob → Alice (Proposal P), then Charlie → Bob (Domain X)
+        manager
+            .add_delegation(Delegation::new(
+                bob.clone(),
+                alice.clone(),
+                DelegationScope::Proposal(proposal_p.clone()),
+            ))
+            .unwrap();
+
+        manager
+            .add_delegation(Delegation::new(
+                charlie.clone(),
+                bob.clone(),
+                DelegationScope::Domain(domain_x.clone()),
+            ))
+            .unwrap();
+
+        // Now try Alice → Charlie (Domain X) - should detect multi-hop cycle
+        // Alice → Charlie → Bob → Alice
+        let result = manager.add_delegation(Delegation::new(
+            alice.clone(),
+            charlie.clone(),
+            DelegationScope::Domain(domain_x.clone()),
+        ));
+
+        assert!(result.is_err(), "Expected multi-hop cycle to be detected");
+        assert!(
+            result.unwrap_err().to_string().contains("cycle"),
+            "Error should mention cycle"
         );
     }
 }
