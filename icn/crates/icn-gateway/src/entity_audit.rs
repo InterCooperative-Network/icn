@@ -192,6 +192,14 @@ pub struct PaginatedEntityAuditTrail {
     pub offset: usize,
     /// Page size limit
     pub limit: usize,
+    /// Number of records that failed to deserialize (data integrity issue)
+    /// This is only non-zero if corruption was detected; investigate if > 0
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub corrupted_count: usize,
+}
+
+fn is_zero(n: &usize) -> bool {
+    *n == 0
 }
 
 /// Manager for entity audit records with persistent storage
@@ -272,12 +280,14 @@ impl EntityAuditManager {
             .store
             .scan_reverse_paginated(prefix.as_bytes(), offset, limit)?;
 
+        let mut corrupted_count = 0usize;
         let records: Vec<EntityAuditRecord> = pairs
             .into_iter()
             .filter_map(|(key, value)| {
                 serde_json::from_slice(&value)
                     .map_err(|e| {
                         // Track corruption for operational alerting
+                        corrupted_count += 1;
                         gateway_metrics::entity_audit_corruption_inc();
                         tracing::error!(
                             key = ?String::from_utf8_lossy(&key),
@@ -298,6 +308,7 @@ impl EntityAuditManager {
             total,
             offset,
             limit,
+            corrupted_count,
         })
     }
 

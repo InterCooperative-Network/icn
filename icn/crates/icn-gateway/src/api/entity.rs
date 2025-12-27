@@ -733,11 +733,18 @@ pub async fn add_membership(
     let role = parse_role(&body.role)?;
 
     // Validate shares if provided
+    // Max 1 million shares per member to prevent overflow in weighted voting calculations
+    const MAX_SHARES: u64 = 1_000_000;
     if let Some(shares) = body.shares {
         if shares == 0 {
             return Err(GatewayError::BadRequest(
                 "Shares must be greater than 0. Omit the field to use default (1).".to_string(),
             ));
+        }
+        if shares > MAX_SHARES {
+            return Err(GatewayError::BadRequest(format!(
+                "Shares cannot exceed {MAX_SHARES}. Requested: {shares}"
+            )));
         }
     }
 
