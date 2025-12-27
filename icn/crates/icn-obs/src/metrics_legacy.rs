@@ -927,6 +927,18 @@ pub fn init_descriptions() {
         "icn_gateway_entity_audit_corruption_total",
         "Total number of corrupted audit records detected during reads"
     );
+    describe_counter!(
+        "icn_gateway_entity_audit_records_pruned_total",
+        "Total number of entity audit records pruned by retention policy"
+    );
+    describe_histogram!(
+        "icn_gateway_entity_audit_prune_duration_seconds",
+        "Duration of entity audit pruning operations in seconds"
+    );
+    describe_counter!(
+        "icn_gateway_entity_audit_prune_failures_total",
+        "Total number of failed audit prune operations"
+    );
 
     // RPC metrics
     describe_counter!(
@@ -2813,6 +2825,27 @@ pub mod gateway {
     /// indicating potential data corruption requiring investigation.
     pub fn entity_audit_corruption_inc() {
         counter!("icn_gateway_entity_audit_corruption_total").increment(1);
+    }
+
+    /// Increment audit records pruned counter
+    ///
+    /// Tracks the total number of audit records removed by the retention policy.
+    pub fn entity_audit_pruned_inc(count: usize) {
+        counter!("icn_gateway_entity_audit_records_pruned_total").increment(count as u64);
+    }
+
+    /// Record audit pruning duration in seconds
+    ///
+    /// Tracks how long pruning operations take for performance monitoring.
+    pub fn entity_audit_prune_duration(duration_secs: f64) {
+        histogram!("icn_gateway_entity_audit_prune_duration_seconds").record(duration_secs);
+    }
+
+    /// Increment audit prune failure counter
+    ///
+    /// Tracks cases where the pruning operation failed.
+    pub fn entity_audit_prune_failed_inc() {
+        counter!("icn_gateway_entity_audit_prune_failures_total").increment(1);
     }
 }
 

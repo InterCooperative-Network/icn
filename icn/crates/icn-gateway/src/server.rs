@@ -40,6 +40,33 @@ use crate::trust_mgr::{TrustGraphHandle, TrustManager};
 use icn_compute::ComputeHandle;
 use icn_store::SledStore;
 
+/// Configuration for audit record pruning
+#[derive(Debug, Clone)]
+pub struct AuditPruneConfig {
+    /// Maximum age of audit records in days
+    pub retention_days: u64,
+    /// Maximum records per entity
+    pub max_records_per_entity: usize,
+    /// Interval between prune runs in seconds
+    pub prune_interval_secs: u64,
+    /// Batch size for pruning
+    pub batch_size: usize,
+    /// Whether auto-pruning is enabled
+    pub enabled: bool,
+}
+
+impl Default for AuditPruneConfig {
+    fn default() -> Self {
+        Self {
+            retention_days: 365,
+            max_records_per_entity: 10000,
+            prune_interval_secs: 3600,
+            batch_size: 1000,
+            enabled: true,
+        }
+    }
+}
+
 /// Gateway server configuration
 pub struct GatewayServer {
     bind_addr: SocketAddr,
@@ -66,6 +93,8 @@ pub struct GatewayServer {
     community_handle: Option<icn_community::CommunityHandle>,
     /// Optional handle to daemon's StewardActor (for SDIS ceremonies)
     steward_handle: Option<icn_steward::StewardHandle>,
+    /// Audit pruning configuration
+    audit_prune_config: Option<AuditPruneConfig>,
 }
 
 impl GatewayServer {
@@ -88,6 +117,7 @@ impl GatewayServer {
             entity_handle: None,
             community_handle: None,
             steward_handle: None,
+            audit_prune_config: None,
         }
     }
 
@@ -114,6 +144,7 @@ impl GatewayServer {
             entity_handle: None,
             community_handle: None,
             steward_handle: None,
+            audit_prune_config: None,
         }
     }
 
@@ -141,7 +172,14 @@ impl GatewayServer {
             entity_handle: None,
             community_handle: None,
             steward_handle: None,
+            audit_prune_config: None,
         }
+    }
+
+    /// Set audit pruning configuration
+    pub fn with_audit_prune_config(mut self, config: AuditPruneConfig) -> Self {
+        self.audit_prune_config = Some(config);
+        self
     }
 
     /// Set custom security configuration
@@ -581,6 +619,66 @@ impl GatewayServer {
                     }
                 }
             });
+        }
+
+        // Spawn audit record pruning background task if configured
+        if let Some(ref prune_config) = self.audit_prune_config {
+            if prune_config.enabled {
+                let entity_audit_manager_clone = entity_audit_manager.clone();
+                let retention_days = prune_config.retention_days;
+                let max_records = prune_config.max_records_per_entity;
+                let batch_size = prune_config.batch_size;
+                let prune_interval = Duration::from_secs(prune_config.prune_interval_secs);
+                let mut shutdown_signal = shutdown_tx.subscribe();
+
+                tokio::spawn(async move {
+                    let mut interval = tokio::time::interval(prune_interval);
+                    info!(
+                        "Audit prune task started: retention_days={}, max_records={}, interval={}s",
+                        retention_days,
+                        max_records,
+                        prune_interval.as_secs()
+                    );
+
+                    loop {
+                        tokio::select! {
+                            _ = interval.tick() => {
+                                let start = std::time::Instant::now();
+                                match entity_audit_manager_clone.prune_audit_records(
+                                    retention_days,
+                                    max_records,
+                                    batch_size,
+                                ) {
+                                    Ok(stats) => {
+                                        let duration = start.elapsed().as_secs_f64();
+                                        if stats.records_pruned > 0 {
+                                            info!(
+                                                "Audit prune completed: scanned={}, pruned={}, entities={}, duration={:.2}s",
+                                                stats.records_scanned,
+                                                stats.records_pruned,
+                                                stats.entities_processed,
+                                                duration
+                                            );
+                                        }
+                                        // Record metrics
+                                        icn_obs::metrics::gateway::entity_audit_pruned_inc(stats.records_pruned);
+                                        icn_obs::metrics::gateway::entity_audit_prune_duration(duration);
+                                    }
+                                    Err(e) => {
+                                        warn!("Audit prune failed: {}", e);
+                                        icn_obs::metrics::gateway::entity_audit_prune_failed_inc();
+                                    }
+                                }
+                            }
+                            _ = shutdown_signal.recv() => {
+                                info!("Audit prune task received shutdown signal");
+                                break;
+                            }
+                        }
+                    }
+                });
+                info!("Audit record pruning task started");
+            }
         }
 
         // Clone security config for the move closure

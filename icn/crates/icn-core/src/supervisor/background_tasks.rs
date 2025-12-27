@@ -474,6 +474,111 @@ async fn apply_pending_change(
     ParameterApplyResult::Applied
 }
 
+/// Configuration for entity audit pruning task
+pub struct AuditPruneConfig {
+    /// Interval between pruning runs
+    pub prune_interval: Duration,
+    /// Maximum age of audit records in days
+    pub retention_days: u64,
+    /// Maximum records to keep per entity
+    pub max_records_per_entity: usize,
+    /// Batch size for pruning operations
+    pub batch_size: usize,
+}
+
+impl Default for AuditPruneConfig {
+    fn default() -> Self {
+        Self {
+            prune_interval: Duration::from_secs(3600), // 1 hour
+            retention_days: 365,
+            max_records_per_entity: 10000,
+            batch_size: 1000,
+        }
+    }
+}
+
+impl From<&crate::config::AuditRetentionConfig> for AuditPruneConfig {
+    fn from(config: &crate::config::AuditRetentionConfig) -> Self {
+        Self {
+            prune_interval: Duration::from_secs(config.prune_interval_secs),
+            retention_days: config.retention_days,
+            max_records_per_entity: config.max_records_per_entity,
+            batch_size: config.prune_batch_size,
+        }
+    }
+}
+
+/// Spawn the entity audit pruning background task
+///
+/// This task periodically prunes old audit records based on the retention policy.
+/// It runs at the configured interval and removes records that:
+/// 1. Exceed the maximum age (retention_days)
+/// 2. Exceed the maximum count per entity (max_records_per_entity)
+///
+/// # Parameters
+/// - `config`: Pruning configuration
+/// - `audit_manager`: The entity audit manager
+/// - `shutdown_rx`: Shutdown signal receiver
+pub fn spawn_audit_prune_task(
+    config: AuditPruneConfig,
+    audit_manager: Arc<icn_gateway::EntityAuditManager>,
+    mut shutdown_rx: BroadcastReceiver<()>,
+) -> JoinHandle<()> {
+    tokio::spawn(async move {
+        info!(
+            retention_days = config.retention_days,
+            max_records = config.max_records_per_entity,
+            interval_secs = config.prune_interval.as_secs(),
+            "Audit prune task started"
+        );
+
+        let mut interval = tokio::time::interval(config.prune_interval);
+
+        // Skip first tick to avoid immediate pruning on startup
+        interval.tick().await;
+
+        loop {
+            select! {
+                _ = interval.tick() => {
+                    debug!("Running scheduled audit pruning");
+
+                    match audit_manager.prune_audit_records(
+                        config.retention_days,
+                        config.max_records_per_entity,
+                        config.batch_size,
+                    ) {
+                        Ok(stats) => {
+                            if stats.records_pruned > 0 {
+                                info!(
+                                    records_pruned = stats.records_pruned,
+                                    entities_processed = stats.entities_processed,
+                                    duration_ms = stats.duration_ms,
+                                    "Audit pruning completed"
+                                );
+                            } else {
+                                debug!("Audit pruning completed - no records to prune");
+                            }
+
+                            // Log any non-fatal errors
+                            for error in &stats.errors {
+                                warn!("Audit prune error: {}", error);
+                            }
+                        }
+                        Err(e) => {
+                            warn!("Audit pruning failed: {}", e);
+                            icn_obs::metrics::gateway::entity_audit_prune_failed_inc();
+                        }
+                    }
+                }
+                _ = shutdown_rx.recv() => {
+                    info!("Audit prune task shutting down");
+                    break;
+                }
+            }
+        }
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -495,5 +600,14 @@ mod tests {
     fn test_parameter_scheduler_config_default() {
         let config = ParameterSchedulerConfig::default();
         assert_eq!(config.check_interval, Duration::from_secs(10));
+    }
+
+    #[test]
+    fn test_audit_prune_config_default() {
+        let config = AuditPruneConfig::default();
+        assert_eq!(config.prune_interval, Duration::from_secs(3600));
+        assert_eq!(config.retention_days, 365);
+        assert_eq!(config.max_records_per_entity, 10000);
+        assert_eq!(config.batch_size, 1000);
     }
 }
