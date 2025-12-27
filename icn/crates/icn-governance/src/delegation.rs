@@ -306,6 +306,13 @@ impl DelegationManager {
     ///
     /// Cycles detected during reconciliation are generally benign timing artifacts,
     /// not security incidents. However, a sustained pattern warrants investigation.
+    ///
+    /// # Performance
+    ///
+    /// Reconciliation has O(P × D) complexity where P = proposal-scoped delegations
+    /// and D = max delegation depth (default 10). For typical cooperatives with
+    /// hundreds of delegations, this completes in microseconds. Monitor the
+    /// `delegation_reconciliation_duration_seconds` histogram for performance issues.
     pub fn register_proposal(&mut self, proposal_id: ProposalId, domain_id: GovernanceDomainId) {
         self.proposal_domains
             .insert(proposal_id.clone(), domain_id.clone());
@@ -1334,6 +1341,46 @@ mod tests {
         assert!(
             path.contains(&alice) && path.contains(&bob) && path.contains(&charlie),
             "Path should contain Alice, Bob, and Charlie"
+        );
+    }
+
+    #[test]
+    fn test_proposal_registration_no_cycles_happy_path() {
+        let mut manager = DelegationManager::new();
+        let alice = test_did(1);
+        let bob = test_did(2);
+
+        let domain_a = GovernanceDomainId::new("domain-a");
+        let domain_b = GovernanceDomainId::new("domain-b");
+        let proposal_in_b = ProposalId::new("proposal-in-domain-b");
+
+        // Create delegations that do NOT form a cycle:
+        // Alice delegates domain A to Bob (different domain than proposal)
+        manager
+            .add_delegation(Delegation::new(
+                alice.clone(),
+                bob.clone(),
+                DelegationScope::Domain(domain_a.clone()),
+            ))
+            .unwrap();
+
+        // Bob delegates proposal (in domain B) to Alice - no cycle since different domain
+        manager
+            .add_delegation(Delegation::new(
+                bob.clone(),
+                alice.clone(),
+                DelegationScope::Proposal(proposal_in_b.clone()),
+            ))
+            .unwrap();
+
+        // Register proposal in domain B (different from Alice's delegation to Bob)
+        // No cycle should be detected - metrics should NOT be incremented
+        manager.register_proposal(proposal_in_b.clone(), domain_b.clone());
+
+        let cycles = manager.detect_cycles_for_proposal(&proposal_in_b, &domain_b);
+        assert!(
+            cycles.is_empty(),
+            "Expected NO cycles when domains don't overlap"
         );
     }
 }
