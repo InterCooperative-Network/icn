@@ -98,7 +98,6 @@ async fn test_entity_manager_direct() {
     entity_mgr
         .register(entity)
         .expect("Registration should work");
-    println!("DEBUG: Entity registered");
 
     // Record audit
     audit_mgr
@@ -113,12 +112,10 @@ async fn test_entity_manager_direct() {
             None,
         )
         .expect("Audit recording should work");
-    println!("DEBUG: Audit recorded");
 
     // Verify it exists
     let retrieved = entity_mgr.get(&entity_id).expect("Get should work");
     assert!(retrieved.is_some());
-    println!("DEBUG: EntityManager direct test passed");
 }
 
 // ============================================================================
@@ -133,11 +130,9 @@ async fn test_register_entity_success() {
     let alice = test_identity();
 
     let did_str = alice.did().to_string();
-    println!("DEBUG: Alice DID: {did_str}");
 
     // Verify DID parses correctly
-    let parsed_did: Did = did_str.parse().expect("DID should parse");
-    println!("DEBUG: Parsed DID: {parsed_did}");
+    let _parsed_did: Did = did_str.parse().expect("DID should parse");
 
     let req_body = json!({
         "entity_type": "cooperative",
@@ -147,7 +142,6 @@ async fn test_register_entity_success() {
     });
 
     let claims = create_test_claims(&did_str, vec!["entity:write"]);
-    println!("DEBUG: Claims sub: {}", claims.sub);
 
     let req = test::TestRequest::post()
         .uri("/entities")
@@ -483,7 +477,7 @@ async fn test_delete_entity_as_founder() {
     let (app, entity_mgr, _audit_mgr) = create_test_app().await;
     let alice = test_identity();
 
-    // Register entity
+    // Register entity (alice becomes founder)
     let req_body = json!({
         "entity_type": "cooperative",
         "identifier": "delete-test",
@@ -498,14 +492,7 @@ async fn test_delete_entity_as_founder() {
     req.extensions_mut().insert(claims);
     test::call_service(&app, req).await;
 
-    // Remove the founder membership first (entity must have no members to delete)
-    let entity_id = EntityId::cooperative("delete-test").unwrap();
-    let alice_entity_id = EntityId::from_did(alice.did());
-    entity_mgr
-        .remove_membership(&entity_id, &alice_entity_id)
-        .unwrap();
-
-    // Delete as original creator (still has permission via caller DID check)
+    // Founder trying to delete entity that still has members (themselves) should fail
     let claims = create_test_claims(&alice.did().to_string(), vec!["entity:write"]);
     let req = test::TestRequest::delete()
         .uri("/entities/entity:icn:cooperative:delete-test")
@@ -513,8 +500,27 @@ async fn test_delete_entity_as_founder() {
     req.extensions_mut().insert(claims);
 
     let resp = test::call_service(&app, req).await;
-    // May be 204 or 403 depending on implementation - just verify it's handled
-    assert!(resp.status() == 204 || resp.status() == 403);
+    // Deletion fails because entity still has members
+    assert_eq!(resp.status(), 400);
+
+    // Directly remove the founder via EntityManager to test empty entity deletion
+    // (This bypasses the "last founder protection" in the API)
+    let entity_id = EntityId::cooperative("delete-test").unwrap();
+    let alice_entity_id = EntityId::from_did(alice.did());
+    entity_mgr
+        .remove_membership(&entity_id, &alice_entity_id)
+        .unwrap();
+
+    // After membership removal, alice is no longer a founder, so deletion should fail with 403
+    let claims = create_test_claims(&alice.did().to_string(), vec!["entity:write"]);
+    let req = test::TestRequest::delete()
+        .uri("/entities/entity:icn:cooperative:delete-test")
+        .to_request();
+    req.extensions_mut().insert(claims);
+
+    let resp = test::call_service(&app, req).await;
+    // Former founder cannot delete - they lost authorization when removed
+    assert_eq!(resp.status(), 403);
 }
 
 #[actix_web::test]
@@ -794,13 +800,7 @@ async fn test_remove_membership_self() {
     test::call_service(&app, req).await;
 
     // Bob removes himself
-    let bob_entity_id = format!(
-        "entity:icn:individual:{}",
-        bob.did()
-            .to_string()
-            .strip_prefix("did:icn:")
-            .unwrap_or(&bob.did().to_string())
-    );
+    let bob_entity_id = EntityId::from_did(bob.did()).to_string();
     let claims = create_test_claims(&bob.did().to_string(), vec!["entity:write"]);
     let req = test::TestRequest::delete()
         .uri(&format!(
@@ -810,7 +810,7 @@ async fn test_remove_membership_self() {
     req.extensions_mut().insert(claims);
 
     let resp = test::call_service(&app, req).await;
-    assert!(resp.status().is_success() || resp.status() == 204);
+    assert!(resp.status().is_success());
 }
 
 #[actix_web::test]
@@ -834,9 +834,11 @@ async fn test_remove_membership_last_founder() {
     test::call_service(&app, req).await;
 
     // Try to remove alice (the last founder) - should fail
+    let entity_id = "entity:icn:cooperative:last-founder";
+    let alice_member_id = EntityId::from_did(alice.did()).to_string();
     let claims = create_test_claims(&alice.did().to_string(), vec!["entity:write"]);
     let req = test::TestRequest::delete()
-        .uri(&format!("/entities/last-founder/members/{}", alice.did()))
+        .uri(&format!("/entities/{entity_id}/members/{alice_member_id}"))
         .to_request();
     req.extensions_mut().insert(claims);
 
@@ -877,7 +879,7 @@ async fn test_get_audit_as_member() {
 
     let resp = test::call_service(&app, req).await;
     // Member can access audit
-    assert!(resp.status().is_success() || resp.status() == 200);
+    assert!(resp.status().is_success());
 }
 
 #[actix_web::test]
