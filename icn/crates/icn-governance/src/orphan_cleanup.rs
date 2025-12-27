@@ -13,6 +13,14 @@
 //!
 //! While rare due to governed entity deletion, cleanup is needed for data hygiene.
 //!
+//! # Error Handling
+//!
+//! The `entity_exists` callback returns `bool`, not `Result<bool>`. If your entity
+//! lookup can fail (e.g., network/database errors), handle errors within the callback:
+//! - Return `true` (assume exists) to be conservative and avoid false-positive deletions
+//! - Return `false` (assume deleted) if you want aggressive cleanup
+//! - Log errors internally for debugging
+//!
 //! # Usage
 //!
 //! ```ignore
@@ -206,9 +214,15 @@ where
                         );
                     }
                     Ok(false) => {
-                        // Parameter was already deleted (race condition)
-                        detail.deletion_succeeded = Some(false);
-                        detail.error = Some("Parameter not found (already deleted?)".to_string());
+                        // Parameter was already deleted (race condition) - this is still a success
+                        // since our goal (parameter is gone) was achieved
+                        result.orphans_deleted += 1;
+                        detail.deletion_succeeded = Some(true);
+                        detail.error = Some("Already deleted (concurrent removal)".to_string());
+                        debug!(
+                            parameter_id = %param.id,
+                            "Orphan parameter was already deleted by concurrent operation"
+                        );
                     }
                     Err(e) => {
                         result.deletion_failures += 1;
@@ -237,6 +251,17 @@ where
         "Completed orphan parameter cleanup"
     );
 
+    // Emit metrics
+    icn_obs::metrics::governance::orphan_cleanup_run_inc();
+    icn_obs::metrics::governance::orphan_parameters_found_add(result.orphans_found as u64);
+    icn_obs::metrics::governance::orphan_parameters_deleted_add(result.orphans_deleted as u64);
+    if result.dry_run {
+        icn_obs::metrics::governance::orphan_cleanup_dry_run_inc();
+    }
+    if result.deletion_failures > 0 {
+        icn_obs::metrics::governance::orphan_cleanup_failures_inc();
+    }
+
     Ok(result)
 }
 
@@ -262,8 +287,15 @@ where
     result.total_scoped_params = scoped_params.len();
 
     if scoped_params.is_empty() {
+        debug!("No scoped parameters found, nothing to clean up");
         return Ok(result);
     }
+
+    info!(
+        total_scoped_params = result.total_scoped_params,
+        dry_run = result.dry_run,
+        "Starting orphan parameter cleanup (sync)"
+    );
 
     // Check each scoped parameter
     for param in scoped_params {
@@ -278,14 +310,25 @@ where
             let mut detail = OrphanDetail {
                 parameter_id: param.id.clone(),
                 scope: param.scope.clone(),
-                missing_entity_id: entity_id,
+                missing_entity_id: entity_id.clone(),
                 deletion_attempted: false,
                 deletion_succeeded: None,
                 error: None,
             };
 
+            warn!(
+                parameter_id = %param.id,
+                scope = ?param.scope,
+                entity_id = %entity_id.as_str(),
+                "Found orphan parameter (entity no longer exists)"
+            );
+
             if config.delete_orphans {
                 if config.max_deletions > 0 && result.orphans_deleted >= config.max_deletions {
+                    debug!(
+                        max_deletions = config.max_deletions,
+                        "Reached max deletions limit, skipping remaining orphans"
+                    );
                     result.orphan_details.push(detail);
                     continue;
                 }
@@ -295,21 +338,59 @@ where
                     Ok(true) => {
                         result.orphans_deleted += 1;
                         detail.deletion_succeeded = Some(true);
+                        info!(
+                            parameter_id = %param.id,
+                            scope = ?param.scope,
+                            "Deleted orphan parameter"
+                        );
                     }
                     Ok(false) => {
-                        detail.deletion_succeeded = Some(false);
-                        detail.error = Some("Parameter not found".to_string());
+                        // Parameter was already deleted (race condition) - this is still a success
+                        // since our goal (parameter is gone) was achieved
+                        result.orphans_deleted += 1;
+                        detail.deletion_succeeded = Some(true);
+                        detail.error = Some("Already deleted (concurrent removal)".to_string());
+                        debug!(
+                            parameter_id = %param.id,
+                            "Orphan parameter was already deleted by concurrent operation"
+                        );
                     }
                     Err(e) => {
                         result.deletion_failures += 1;
                         detail.deletion_succeeded = Some(false);
                         detail.error = Some(e.to_string());
+                        warn!(
+                            parameter_id = %param.id,
+                            scope = ?param.scope,
+                            error = %e,
+                            "Failed to delete orphan parameter"
+                        );
                     }
                 }
             }
 
             result.orphan_details.push(detail);
         }
+    }
+
+    info!(
+        total_scoped = result.total_scoped_params,
+        orphans_found = result.orphans_found,
+        orphans_deleted = result.orphans_deleted,
+        deletion_failures = result.deletion_failures,
+        dry_run = result.dry_run,
+        "Completed orphan parameter cleanup (sync)"
+    );
+
+    // Emit metrics
+    icn_obs::metrics::governance::orphan_cleanup_run_inc();
+    icn_obs::metrics::governance::orphan_parameters_found_add(result.orphans_found as u64);
+    icn_obs::metrics::governance::orphan_parameters_deleted_add(result.orphans_deleted as u64);
+    if result.dry_run {
+        icn_obs::metrics::governance::orphan_cleanup_dry_run_inc();
+    }
+    if result.deletion_failures > 0 {
+        icn_obs::metrics::governance::orphan_cleanup_failures_inc();
     }
 
     Ok(result)

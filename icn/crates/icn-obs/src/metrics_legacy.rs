@@ -2182,6 +2182,33 @@ pub mod governance {
     pub fn deserialization_failures_inc() {
         counter!("icn_governance_deserialization_failures_total").increment(1);
     }
+
+    // Orphan parameter cleanup metrics
+
+    /// Record an orphan cleanup run
+    pub fn orphan_cleanup_run_inc() {
+        counter!("icn_governance_orphan_cleanup_runs_total").increment(1);
+    }
+
+    /// Record the number of orphan parameters found in a cleanup run
+    pub fn orphan_parameters_found_add(count: u64) {
+        counter!("icn_governance_orphan_parameters_found_total").increment(count);
+    }
+
+    /// Record the number of orphan parameters deleted in a cleanup run
+    pub fn orphan_parameters_deleted_add(count: u64) {
+        counter!("icn_governance_orphan_parameters_deleted_total").increment(count);
+    }
+
+    /// Record when cleanup was skipped due to dry-run mode
+    pub fn orphan_cleanup_dry_run_inc() {
+        counter!("icn_governance_orphan_cleanup_dry_runs_total").increment(1);
+    }
+
+    /// Record orphan cleanup failures
+    pub fn orphan_cleanup_failures_inc() {
+        counter!("icn_governance_orphan_cleanup_failures_total").increment(1);
+    }
 }
 
 /// Trust graph metrics
