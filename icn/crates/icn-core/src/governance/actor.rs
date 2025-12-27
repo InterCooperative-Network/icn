@@ -1367,8 +1367,9 @@ impl GovernanceActor {
     /// Check if two delegation scopes overlap (for cycle detection)
     ///
     /// For Domain/Proposal combinations, we look up the proposal to get its domain
-    /// and check for precise overlap. Falls back to conservative (assume overlap)
-    /// if proposal lookup fails.
+    /// and check for precise overlap. If proposal is not found, assumes NO overlap
+    /// (proposal-specific delegations are narrower than domain delegations).
+    /// Falls back to conservative (assume overlap) only on storage errors.
     fn scopes_overlap(
         &self,
         a: &icn_governance::DelegationScope,
@@ -1384,8 +1385,11 @@ impl GovernanceActor {
                 // Look up proposal to get its domain for precise overlap checking
                 match self.load_proposal(p) {
                     Ok(Some(proposal)) => &proposal.domain_id == d,
-                    // Conservative fallback: assume overlap if proposal not found or error
-                    Ok(None) | Err(_) => true,
+                    // Proposal-specific delegations are narrower than domain delegations,
+                    // so assume no overlap when proposal is not found
+                    Ok(None) => false,
+                    // Keep conservative for storage errors (potential data corruption)
+                    Err(_) => true,
                 }
             }
             (DelegationScope::Proposal(p1), DelegationScope::Proposal(p2)) => p1 == p2,

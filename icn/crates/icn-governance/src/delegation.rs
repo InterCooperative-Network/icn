@@ -572,8 +572,10 @@ impl DelegationManager {
     /// - Blanket scope overlaps with all scopes
     /// - Domain scopes overlap only if they match
     /// - Proposal scopes overlap only if they match
-    /// - Domain + Proposal: uses registered domain mapping for precise check,
-    ///   falls back to conservative (assume overlap) if proposal not registered
+    /// - Domain + Proposal: uses registered domain mapping for precise check.
+    ///   If proposal is not registered, assumes NO overlap (proposal-specific
+    ///   delegations are narrower than domain delegations, so actual conflicts
+    ///   will be detected when the proposal is properly registered).
     fn scopes_overlap(&self, a: &DelegationScope, b: &DelegationScope) -> bool {
         match (a, b) {
             (DelegationScope::Blanket, _) | (_, DelegationScope::Blanket) => true,
@@ -583,8 +585,9 @@ impl DelegationManager {
                 // Use registered domain mapping for precise check
                 match self.proposal_domains.get(p) {
                     Some(proposal_domain) => proposal_domain == d,
-                    // Conservative fallback: assume overlap if proposal not registered
-                    None => true,
+                    // Proposal-specific delegations are narrower than domain delegations,
+                    // so assume no overlap when proposal domain is unknown
+                    None => false,
                 }
             }
             (DelegationScope::Proposal(p1), DelegationScope::Proposal(p2)) => p1 == p2,
@@ -1005,7 +1008,7 @@ mod tests {
     }
 
     #[test]
-    fn test_unregistered_proposal_conservative_fallback() {
+    fn test_unregistered_proposal_no_overlap_assumed() {
         let mut manager = DelegationManager::new();
         let alice = test_did(1);
         let bob = test_did(2);
@@ -1013,7 +1016,7 @@ mod tests {
         let domain_a = GovernanceDomainId::new("domain-a");
         let unknown_proposal = ProposalId::new("unknown-proposal");
 
-        // Don't register the proposal - should fall back to conservative behavior
+        // Don't register the proposal - should assume no overlap with domain
 
         // Alice delegates domain A to Bob
         manager
@@ -1025,14 +1028,17 @@ mod tests {
             .unwrap();
 
         // Bob delegates unknown proposal to Alice
-        // Should fail (conservative: assume overlap when unknown)
+        // Should succeed - proposal-specific delegations are narrower than domain,
+        // so we assume no overlap when the proposal's domain is unknown
         let result = manager.add_delegation(Delegation::new(
             bob.clone(),
             alice.clone(),
             DelegationScope::Proposal(unknown_proposal.clone()),
         ));
 
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("cycle"));
+        assert!(
+            result.is_ok(),
+            "Expected delegation to succeed but got: {result:?}"
+        );
     }
 }
