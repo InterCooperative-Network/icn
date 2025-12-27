@@ -6,14 +6,33 @@
 //!
 //! Entities are organizational units in the ICN that can own treasuries,
 //! have governance domains, and contain members (individuals or other entities).
+//!
+//! ## Authorization Model
+//!
+//! This module uses a two-layer authorization model:
+//!
+//! 1. **Scope-based (coarse-grained)**: JWT must include the required scope
+//!    (e.g., `entity:write`) to access the endpoint at all. This is an
+//!    application-level capability check.
+//!
+//! 2. **Membership-based (fine-grained)**: For mutating operations, the caller
+//!    must be a Founder or BoardMember of the specific entity. This is enforced
+//!    by `require_entity_write_access()`.
+//!
+//! This design intentionally separates "can this client use entity APIs" from
+//! "can this user modify THIS entity". A token with `entity:write` scope can
+//! attempt modifications, but will be rejected unless the caller has the
+//! appropriate role in the target entity.
 
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
 use icn_entity::{CooperativeEntity, EntityId, EntityType, Membership, MembershipRole};
 use icn_identity::Did;
+use icn_obs::metrics::gateway as gateway_metrics;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tracing::info;
+use tracing::{info, warn};
 
+use crate::entity_audit::{EntityAuditManager, EntityOperation};
 use crate::entity_mgr::EntityManager;
 use crate::error::{GatewayError, Result};
 use crate::middleware::{get_claims, require_scope};
@@ -249,6 +268,7 @@ fn require_entity_write_access(
 pub async fn register_entity(
     req: HttpRequest,
     entity_mgr: web::Data<Arc<EntityManager>>,
+    audit_mgr: web::Data<Arc<EntityAuditManager>>,
     body: web::Json<RegisterEntityRequest>,
 ) -> Result<HttpResponse> {
     require_scope(&req, "entity:write")?;
@@ -329,8 +349,11 @@ pub async fn register_entity(
 
     // Add the creator as a founder member
     // If this fails, clean up the entity to avoid orphaned entities
-    let founder_membership =
-        Membership::new(creator_id, entity_id.clone(), MembershipRole::Founder);
+    let founder_membership = Membership::new(
+        creator_id.clone(),
+        entity_id.clone(),
+        MembershipRole::Founder,
+    );
     if let Err(e) = entity_mgr.add_membership(founder_membership) {
         // Cleanup: remove the entity we just registered
         if let Err(cleanup_err) = entity_mgr.remove(&entity_id) {
@@ -342,6 +365,58 @@ pub async fn register_entity(
         }
         return Err(GatewayError::InternalError(format!(
             "Failed to add founder membership: {e}"
+        )));
+    }
+
+    // Record audit trail - fail the request if audit logging fails for compliance
+    // If audit fails, we must clean up both entity and membership to maintain consistency
+    if let Err(e) = audit_mgr.record_audit(
+        &entity_id,
+        EntityOperation::Registered {
+            entity_type: format_entity_type(&entity_type).to_string(),
+            name: body.name.clone(),
+        },
+        &creator_id,
+        None,
+        None,
+    ) {
+        warn!(
+            entity_id = %entity_id,
+            error = %e,
+            "Failed to record entity registration audit - rolling back"
+        );
+        // Cleanup: remove entity first, then membership
+        // Order matters: if entity removal fails, we still have a valid entity with its founder.
+        // If we removed membership first and entity removal failed, we'd have an orphaned entity.
+        // Track rollback failures for operational alerting
+        let mut rollback_errors = Vec::new();
+        if let Err(cleanup_err) = entity_mgr.remove(&entity_id) {
+            rollback_errors.push(format!("entity: {cleanup_err}"));
+            tracing::error!(
+                entity_id = %entity_id,
+                error = %cleanup_err,
+                "Failed to cleanup entity after audit failure"
+            );
+        }
+        if let Err(cleanup_err) = entity_mgr.remove_membership(&entity_id, &creator_id) {
+            rollback_errors.push(format!("membership: {cleanup_err}"));
+            tracing::error!(
+                entity_id = %entity_id,
+                member_id = %creator_id,
+                error = %cleanup_err,
+                "Failed to cleanup membership after audit failure"
+            );
+        }
+        // Record metric if any rollback failed
+        if !rollback_errors.is_empty() {
+            gateway_metrics::entity_audit_rollback_failure_inc("register_entity");
+            return Err(GatewayError::InternalError(format!(
+                "Failed to record audit: {e}. CRITICAL: Rollback also failed: [{}]. Entity may be in inconsistent state.",
+                rollback_errors.join(", ")
+            )));
+        }
+        return Err(GatewayError::InternalError(format!(
+            "Failed to record audit: {e}"
         )));
     }
 
@@ -386,6 +461,7 @@ pub async fn get_entity(
 pub async fn update_entity(
     req: HttpRequest,
     entity_mgr: web::Data<Arc<EntityManager>>,
+    audit_mgr: web::Data<Arc<EntityAuditManager>>,
     path: web::Path<String>,
     body: web::Json<UpdateEntityRequest>,
 ) -> Result<HttpResponse> {
@@ -413,6 +489,14 @@ pub async fn update_entity(
     // Check caller has permission to modify this entity
     require_entity_write_access(&entity_mgr, &entity_id, &caller_id)?;
 
+    // Store previous entity state BEFORE mutation for potential rollback
+    // This ensures we capture the true pre-mutation state even if EntityManager
+    // implements caching in the future
+    let previous_entity = entity.clone();
+
+    // Track changed fields for audit
+    let mut changed_fields = Vec::new();
+
     // Apply updates
     if let Some(ref name) = body.name {
         if name.trim().is_empty() {
@@ -421,22 +505,67 @@ pub async fn update_entity(
             ));
         }
         entity.name = name.clone();
+        changed_fields.push("name".to_string());
     }
 
     if let Some(ref desc) = body.description {
         entity
             .metadata
             .insert("description".to_string(), desc.clone());
+        changed_fields.push("description".to_string());
+    }
+
+    // Skip no-op updates - return early if no changes were requested
+    if changed_fields.is_empty() {
+        let members = entity_mgr.get_members(&entity_id).unwrap_or_default();
+        let response = entity_to_response(&entity, members.len());
+        return Ok(HttpResponse::Ok().json(response));
     }
 
     info!(
         entity_id = %entity_id,
+        changed_fields = ?changed_fields,
         "Updating entity"
     );
 
     entity_mgr
         .update(entity.clone())
         .map_err(|e| GatewayError::InternalError(format!("Failed to update entity: {e}")))?;
+
+    // Record audit trail - fail the request if audit logging fails for compliance
+    // NOTE: Compensation tradeoff - if audit fails after update, we attempt to restore
+    // the previous entity state. This provides stronger consistency guarantees but adds
+    // complexity. Alternative would be "best effort" auditing (warn but don't fail).
+    if let Err(e) = audit_mgr.record_audit(
+        &entity_id,
+        EntityOperation::Updated {
+            changed_fields: changed_fields.clone(),
+        },
+        &caller_id,
+        None,
+        None,
+    ) {
+        warn!(
+            entity_id = %entity_id,
+            error = %e,
+            "Failed to record entity update audit - attempting rollback"
+        );
+        // Attempt compensation: restore pre-mutation state (cloned BEFORE applying updates)
+        if let Err(rollback_err) = entity_mgr.update(previous_entity) {
+            gateway_metrics::entity_audit_rollback_failure_inc("update_entity");
+            tracing::error!(
+                entity_id = %entity_id,
+                error = %rollback_err,
+                "Failed to rollback entity after audit failure - entity in inconsistent state"
+            );
+            return Err(GatewayError::InternalError(format!(
+                "Failed to record audit: {e}. CRITICAL: Rollback also failed: {rollback_err}. Entity may be in inconsistent state."
+            )));
+        }
+        return Err(GatewayError::InternalError(format!(
+            "Failed to record audit: {e}"
+        )));
+    }
 
     let members = entity_mgr.get_members(&entity_id).unwrap_or_default();
     let response = entity_to_response(&entity, members.len());
@@ -449,6 +578,7 @@ pub async fn update_entity(
 pub async fn delete_entity(
     req: HttpRequest,
     entity_mgr: web::Data<Arc<EntityManager>>,
+    audit_mgr: web::Data<Arc<EntityAuditManager>>,
     path: web::Path<String>,
 ) -> Result<HttpResponse> {
     require_scope(&req, "entity:write")?;
@@ -467,8 +597,8 @@ pub async fn delete_entity(
         .parse()
         .map_err(|e| GatewayError::BadRequest(format!("Invalid entity ID: {e}")))?;
 
-    // Verify entity exists
-    let _entity = entity_mgr
+    // Verify entity exists and store for potential restoration
+    let entity = entity_mgr
         .get(&entity_id)
         .map_err(|e| GatewayError::InternalError(format!("Failed to get entity: {e}")))?
         .ok_or_else(|| GatewayError::NotFound(format!("Entity not found: {entity_id}")))?;
@@ -488,6 +618,38 @@ pub async fn delete_entity(
             GatewayError::InternalError(format!("Failed to delete entity: {e}"))
         }
     })?;
+
+    // Record audit trail - fail the request if audit logging fails for compliance
+    // NOTE: Compensation tradeoff - if audit fails after deletion, we attempt to restore
+    // the entity. We only need to restore the entity itself, not memberships, because
+    // entity_mgr.remove() enforces that entities can only be deleted when they have
+    // no members (see entity_mgr.rs:118-123). If there were members, the deletion
+    // would have failed before reaching this point.
+    if let Err(e) =
+        audit_mgr.record_audit(&entity_id, EntityOperation::Deleted, &caller_id, None, None)
+    {
+        warn!(
+            entity_id = %entity_id,
+            error = %e,
+            "Failed to record entity deletion audit - attempting restoration"
+        );
+        // Attempt compensation: re-register the entity (no memberships to restore
+        // since remove() only succeeds when entity has no members)
+        if let Err(restore_err) = entity_mgr.register(entity.clone()) {
+            gateway_metrics::entity_audit_rollback_failure_inc("delete_entity");
+            tracing::error!(
+                entity_id = %entity_id,
+                error = %restore_err,
+                "Failed to restore entity after audit failure - data loss occurred"
+            );
+            return Err(GatewayError::InternalError(format!(
+                "Failed to record audit: {e}. CRITICAL: Restoration also failed: {restore_err}. Entity data lost."
+            )));
+        }
+        return Err(GatewayError::InternalError(format!(
+            "Failed to record audit: {e}"
+        )));
+    }
 
     Ok(HttpResponse::NoContent().finish())
 }
@@ -526,6 +688,7 @@ pub async fn list_members(
 pub async fn add_membership(
     req: HttpRequest,
     entity_mgr: web::Data<Arc<EntityManager>>,
+    audit_mgr: web::Data<Arc<EntityAuditManager>>,
     path: web::Path<String>,
     body: web::Json<AddMembershipRequest>,
 ) -> Result<HttpResponse> {
@@ -569,6 +732,22 @@ pub async fn add_membership(
 
     let role = parse_role(&body.role)?;
 
+    // Validate shares if provided
+    // Max 1 million shares per member to prevent overflow in weighted voting calculations
+    const MAX_SHARES: u64 = 1_000_000;
+    if let Some(shares) = body.shares {
+        if shares == 0 {
+            return Err(GatewayError::BadRequest(
+                "Shares must be greater than 0. Omit the field to use default (1).".to_string(),
+            ));
+        }
+        if shares > MAX_SHARES {
+            return Err(GatewayError::BadRequest(format!(
+                "Shares cannot exceed {MAX_SHARES}. Requested: {shares}"
+            )));
+        }
+    }
+
     info!(
         entity_id = %entity_id,
         member_id = %member_id,
@@ -576,7 +755,7 @@ pub async fn add_membership(
         "Adding membership"
     );
 
-    let mut membership = Membership::new(member_id.clone(), entity_id.clone(), role);
+    let mut membership = Membership::new(member_id.clone(), entity_id.clone(), role.clone());
     if let Some(shares) = body.shares {
         membership.shares = shares;
     }
@@ -584,6 +763,42 @@ pub async fn add_membership(
     entity_mgr
         .add_membership(membership.clone())
         .map_err(|e| GatewayError::InternalError(format!("Failed to add membership: {e}")))?;
+
+    // Record audit trail - fail the request if audit logging fails for compliance
+    // NOTE: Compensation - if audit fails, rollback the membership addition
+    if let Err(e) = audit_mgr.record_audit(
+        &entity_id,
+        EntityOperation::MemberAdded {
+            member_id: member_id.clone(),
+            role,
+        },
+        &caller_id,
+        None,
+        None,
+    ) {
+        warn!(
+            entity_id = %entity_id,
+            member_id = %member_id,
+            error = %e,
+            "Failed to record member addition audit - rolling back"
+        );
+        // Rollback: remove the membership we just added
+        if let Err(rollback_err) = entity_mgr.remove_membership(&entity_id, &member_id) {
+            gateway_metrics::entity_audit_rollback_failure_inc("add_membership");
+            tracing::error!(
+                entity_id = %entity_id,
+                member_id = %member_id,
+                error = %rollback_err,
+                "Failed to rollback membership after audit failure - inconsistent state"
+            );
+            return Err(GatewayError::InternalError(format!(
+                "Failed to record audit: {e}. CRITICAL: Rollback also failed: {rollback_err}. Membership may be in inconsistent state."
+            )));
+        }
+        return Err(GatewayError::InternalError(format!(
+            "Failed to record audit: {e}"
+        )));
+    }
 
     let response = membership_to_response(&membership);
 
@@ -595,6 +810,7 @@ pub async fn add_membership(
 pub async fn remove_membership(
     req: HttpRequest,
     entity_mgr: web::Data<Arc<EntityManager>>,
+    audit_mgr: web::Data<Arc<EntityAuditManager>>,
     path: web::Path<(String, String)>,
 ) -> Result<HttpResponse> {
     require_scope(&req, "entity:write")?;
@@ -668,11 +884,132 @@ pub async fn remove_membership(
         "Removing membership"
     );
 
+    // Store membership for potential rollback
+    let removed_membership = membership_to_remove.cloned();
+
     entity_mgr
         .remove_membership(&entity_id, &member_id)
         .map_err(|e| GatewayError::InternalError(format!("Failed to remove membership: {e}")))?;
 
+    // Record audit trail - fail the request if audit logging fails for compliance
+    // NOTE: Compensation - if audit fails, restore the membership we just removed
+    let reason = if is_self_removal {
+        Some("Self-removal".to_string())
+    } else {
+        None
+    };
+    if let Err(e) = audit_mgr.record_audit(
+        &entity_id,
+        EntityOperation::MemberRemoved {
+            member_id: member_id.clone(),
+            reason,
+        },
+        &caller_id,
+        None,
+        None,
+    ) {
+        warn!(
+            entity_id = %entity_id,
+            member_id = %member_id,
+            error = %e,
+            "Failed to record member removal audit - attempting rollback"
+        );
+        // Rollback: restore the membership we just removed
+        if let Some(membership) = removed_membership {
+            if let Err(rollback_err) = entity_mgr.add_membership(membership) {
+                gateway_metrics::entity_audit_rollback_failure_inc("remove_membership");
+                tracing::error!(
+                    entity_id = %entity_id,
+                    member_id = %member_id,
+                    error = %rollback_err,
+                    "Failed to rollback membership removal - member lost from entity"
+                );
+                return Err(GatewayError::InternalError(format!(
+                    "Failed to record audit: {e}. CRITICAL: Rollback also failed: {rollback_err}. Member may have been lost."
+                )));
+            }
+        }
+        return Err(GatewayError::InternalError(format!(
+            "Failed to record audit: {e}"
+        )));
+    }
+
     Ok(HttpResponse::NoContent().finish())
+}
+
+/// Query parameters for audit trail endpoint
+#[derive(Debug, Deserialize)]
+pub struct AuditQueryParams {
+    /// Maximum number of records to return (default: 50)
+    pub limit: Option<usize>,
+    /// Number of records to skip (default: 0)
+    pub offset: Option<usize>,
+}
+
+/// GET /entities/:id/audit - Get entity audit trail
+///
+/// Requires the caller to either:
+/// - Be a member of the entity, or
+/// - Have "entity:audit" scope (for admin access)
+#[get("/{id}/audit")]
+pub async fn get_entity_audit(
+    req: HttpRequest,
+    entity_mgr: web::Data<Arc<EntityManager>>,
+    audit_mgr: web::Data<Arc<EntityAuditManager>>,
+    path: web::Path<String>,
+    query: web::Query<AuditQueryParams>,
+) -> Result<HttpResponse> {
+    require_scope(&req, "entity:read")?;
+
+    let entity_id_str = path.into_inner();
+    let entity_id: EntityId = entity_id_str
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid entity ID: {e}")))?;
+
+    // Verify entity exists
+    let _entity = entity_mgr
+        .get(&entity_id)
+        .map_err(|e| GatewayError::InternalError(format!("Failed to get entity: {e}")))?
+        .ok_or_else(|| GatewayError::NotFound(format!("Entity not found: {entity_id}")))?;
+
+    // Authorization: caller must be a member of the entity OR have entity:audit scope
+    let claims = get_claims(&req)
+        .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
+
+    // Check for admin audit scope (allows viewing any entity's audit trail)
+    let has_audit_scope = claims
+        .scopes
+        .iter()
+        .any(|s| s == "entity:audit" || s == "admin");
+
+    if !has_audit_scope {
+        // If no admin scope, must be a member of the entity
+        let caller_did: Did = claims
+            .sub
+            .parse()
+            .map_err(|e| GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
+        let caller_id = EntityId::from_did(&caller_did);
+
+        let members = entity_mgr
+            .get_members(&entity_id)
+            .map_err(|e| GatewayError::InternalError(format!("Failed to get members: {e}")))?;
+
+        let is_member = members.iter().any(|m| m.member_id == caller_id);
+        if !is_member {
+            return Err(GatewayError::Forbidden(
+                "You must be a member of the entity to view its audit trail".to_string(),
+            ));
+        }
+    }
+
+    let limit = query.limit.unwrap_or(50).min(100);
+    let offset = query.offset.unwrap_or(0);
+
+    let trail = audit_mgr
+        .get_audit_trail(&entity_id, limit, offset)
+        .map_err(|e| GatewayError::InternalError(format!("Failed to get audit trail: {e}")))?;
+
+    Ok(HttpResponse::Ok().json(trail))
 }
 
 /// Configure entity routes
@@ -683,7 +1020,8 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         .service(delete_entity)
         .service(list_members)
         .service(add_membership)
-        .service(remove_membership);
+        .service(remove_membership)
+        .service(get_entity_audit);
 }
 
 #[cfg(test)]

@@ -115,17 +115,22 @@ impl EntityManager {
     }
 
     /// Remove an entity (only if no members)
+    ///
+    /// This method is atomic - it holds a write lock throughout the member check
+    /// and deletion to prevent TOCTOU race conditions where a member could be
+    /// added between the check and the delete.
     pub fn remove(&self, id: &EntityId) -> Result<()> {
-        // First check if entity has members
-        let members = self.get_members(id)?;
-        if !members.is_empty() {
-            anyhow::bail!("Cannot remove entity with active members. Remove all members first.");
-        }
-
         if let Some(ref handle) = self.entity_handle {
             let mut registry = handle
                 .write()
                 .map_err(|e| anyhow::anyhow!("Entity registry lock poisoned: {e}"))?;
+            // Atomically check for members and delete while holding write lock
+            let members = registry.get_members(id)?;
+            if !members.is_empty() {
+                anyhow::bail!(
+                    "Cannot remove entity with active members. Remove all members first."
+                );
+            }
             return Ok(registry.delete(id)?);
         }
 
@@ -133,6 +138,13 @@ impl EntityManager {
             let mut registry = standalone
                 .write()
                 .map_err(|e| anyhow::anyhow!("Entity registry lock poisoned: {e}"))?;
+            // Atomically check for members and delete while holding write lock
+            let members = registry.get_members(id)?;
+            if !members.is_empty() {
+                anyhow::bail!(
+                    "Cannot remove entity with active members. Remove all members first."
+                );
+            }
             return Ok(registry.delete(id)?);
         }
 

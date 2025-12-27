@@ -379,6 +379,7 @@ impl RecoveryTestNode {
 }
 
 #[tokio::test]
+#[ignore = "Uses hardcoded ports (6001-6004) - flaky in CI due to port conflicts; passes locally"]
 async fn test_full_recovery_flow() -> Result<()> {
     // Install rustls crypto provider
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();

@@ -911,6 +911,22 @@ pub fn init_descriptions() {
         "icn_gateway_governance_votes_cast_total",
         "Total number of governance votes cast"
     );
+    describe_counter!(
+        "icn_gateway_entity_audit_records_total",
+        "Total number of entity audit records created by operation type"
+    );
+    describe_histogram!(
+        "icn_gateway_entity_audit_query_duration_seconds",
+        "Duration of entity audit trail queries in seconds"
+    );
+    describe_counter!(
+        "icn_gateway_entity_audit_rollback_failures_total",
+        "Total number of audit rollback failures requiring operator attention"
+    );
+    describe_counter!(
+        "icn_gateway_entity_audit_corruption_total",
+        "Total number of corrupted audit records detected during reads"
+    );
 
     // RPC metrics
     describe_counter!(
@@ -2761,6 +2777,42 @@ pub mod gateway {
             "coop_id" => coop_id.to_string()
         )
         .increment(1);
+    }
+
+    // --- Entity Audit Metrics ---
+
+    /// Increment entity audit record counter by operation type
+    pub fn entity_audit_record_inc(operation: &str) {
+        counter!(
+            "icn_gateway_entity_audit_records_total",
+            "operation" => operation.to_string()
+        )
+        .increment(1);
+    }
+
+    /// Record entity audit query duration in seconds
+    pub fn entity_audit_query_duration(duration_secs: f64) {
+        histogram!("icn_gateway_entity_audit_query_duration_seconds").record(duration_secs);
+    }
+
+    /// Increment audit rollback failure counter
+    ///
+    /// Tracks cases where both audit logging and subsequent rollback failed,
+    /// indicating potential data inconsistency requiring operator attention.
+    pub fn entity_audit_rollback_failure_inc(endpoint: &str) {
+        counter!(
+            "icn_gateway_entity_audit_rollback_failures_total",
+            "endpoint" => endpoint.to_string()
+        )
+        .increment(1);
+    }
+
+    /// Increment audit record corruption counter
+    ///
+    /// Tracks cases where stored audit records failed to deserialize,
+    /// indicating potential data corruption requiring investigation.
+    pub fn entity_audit_corruption_inc() {
+        counter!("icn_gateway_entity_audit_corruption_total").increment(1);
     }
 }
 
