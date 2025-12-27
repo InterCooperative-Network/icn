@@ -97,8 +97,11 @@ async fn test_concurrent_budget_spending() -> Result<()> {
     let success_count = Arc::new(AtomicUsize::new(0));
     let failure_count = Arc::new(AtomicUsize::new(0));
 
-    // Spawn 10 concurrent tasks, each trying to spend 150 credits
-    // With 1000 total, only 6 should succeed (900 credits), 4 should fail
+    // Spawn 10 concurrent tasks, each trying to spend 150 credits.
+    // With 1000 total, only 6 should succeed (900 credits), 4 should fail.
+    //
+    // Note: The RwLock serializes access, so each task's check+spend is atomic.
+    // This tests that concurrent access is properly serialized, not true parallelism.
     let mut handles = Vec::new();
     for i in 0..10 {
         let treasury_mgr = treasury_manager.clone();
@@ -107,31 +110,25 @@ async fn test_concurrent_budget_spending() -> Result<()> {
         let failure = failure_count.clone();
 
         let handle = tokio::spawn(async move {
+            // Acquire exclusive write lock - this serializes all concurrent tasks
             let mut guard = treasury_mgr.write().await;
 
-            // Check if we can spend
-            let can_spend = {
-                if let Some(budget) = guard.get_budget(&bid) {
-                    budget.remaining() >= 150
-                } else {
-                    false
-                }
-            };
+            // The check and spend are atomic because we hold the write lock
+            let can_spend = guard
+                .get_budget(&bid)
+                .map(|b| b.remaining() >= 150)
+                .unwrap_or(false);
 
             if can_spend {
-                // Record spending
                 let hash = test_hash(&format!("spending-{i}"));
                 match guard.record_spending(&bid, 150, hash) {
-                    Ok(_) => {
-                        success.fetch_add(1, Ordering::SeqCst);
-                    }
-                    Err(_) => {
-                        failure.fetch_add(1, Ordering::SeqCst);
-                    }
-                }
+                    Ok(_) => success.fetch_add(1, Ordering::SeqCst),
+                    Err(_) => failure.fetch_add(1, Ordering::SeqCst),
+                };
             } else {
                 failure.fetch_add(1, Ordering::SeqCst);
             }
+            // Lock released here when guard drops
         });
         handles.push(handle);
     }
@@ -249,7 +246,7 @@ async fn test_spending_rule_enforcement() -> Result<()> {
         let err_msg = result.unwrap_err().to_string();
         assert!(
             err_msg.contains("requires") && err_msg.contains("approval"),
-            "Error should mention approval requirement: {err_msg}"
+            "Error should mention 'requires...approval': {err_msg}"
         );
     }
 
@@ -456,22 +453,23 @@ async fn test_budget_status_transitions() -> Result<()> {
         assert!(budget.can_spend(), "Active budget should allow spending");
     }
 
-    // Spend the full budget amount (note: "exceeded" status only triggers when spent > allocated)
+    // Spend the full budget amount.
+    // Design note: "Exceeded" status only triggers when spent > allocated (an edge case).
+    // Since record_spending validates amount <= remaining, normal spending can't exceed.
+    // The Exceeded status exists for manual intervention or external adjustments.
     {
         let mut guard = treasury_manager.write().await;
-        // Spend the full amount
         guard.record_spending(&budget_id, 1000, test_hash("spend-all"))?;
     }
 
-    // Check status after spending all - status stays Active, but can't spend more
+    // Verify: after spending all funds, status stays Active but no more spending is possible
     {
         let guard = treasury_manager.read().await;
         let budget = guard.get_budget(&budget_id).unwrap();
-        // Status is still Active (Exceeded only when spent > allocated)
+        // Status is Active because spent == allocated (not exceeded)
         assert_eq!(budget.status, BudgetStatus::Active);
         assert_eq!(budget.remaining(), 0, "No funds remaining");
-        // Note: can_spend() returns true because status is Active
-        // But record_spending would fail because amount > remaining()
+        // can_spend() returns true, but record_spending will fail on amount validation
     }
 
     // Verify we can't spend more (even though can_spend is true)
