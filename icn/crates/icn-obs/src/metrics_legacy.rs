@@ -2211,6 +2211,36 @@ pub mod governance {
     }
 }
 
+/// Protocol parameter metrics (delayed execution)
+pub mod protocol {
+    use metrics::{counter, gauge};
+
+    /// Increment when a pending parameter change is scheduled
+    pub fn pending_parameter_changes_scheduled_inc() {
+        counter!("icn_protocol_pending_changes_scheduled_total").increment(1);
+    }
+
+    /// Increment when a pending parameter change is applied
+    pub fn pending_parameter_changes_applied_inc() {
+        counter!("icn_protocol_pending_changes_applied_total").increment(1);
+    }
+
+    /// Increment when a pending parameter change is cancelled
+    pub fn pending_parameter_changes_cancelled_inc() {
+        counter!("icn_protocol_pending_changes_cancelled_total").increment(1);
+    }
+
+    /// Increment when a pending parameter change is superseded
+    pub fn pending_parameter_changes_superseded_inc() {
+        counter!("icn_protocol_pending_changes_superseded_total").increment(1);
+    }
+
+    /// Set the current number of active pending changes
+    pub fn pending_parameter_changes_active_set(count: u64) {
+        gauge!("icn_protocol_pending_changes_active").set(count as f64);
+    }
+}
+
 /// Trust graph metrics
 pub mod trust {
     use metrics::{counter, gauge, histogram};

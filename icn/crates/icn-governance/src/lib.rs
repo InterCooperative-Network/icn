@@ -120,7 +120,8 @@ pub use vote::{Vote, VoteChoice};
 // Protocol governance types (Phase 20)
 pub use protocol::{
     ParameterChange, ParameterConstraints, ParameterScope, ParameterValidationError,
-    ParameterValue, ProtocolChangeProposal, ProtocolParameter,
+    ParameterValue, PendingChangeId, PendingChangeStatus, PendingParameterChange,
+    ProtocolChangeProposal, ProtocolParameter,
 };
 pub use protocol_defaults::{default_parameters, get_default_parameter, ParameterCategory};
 pub use protocol_store::{

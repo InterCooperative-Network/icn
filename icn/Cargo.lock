@@ -2740,7 +2740,6 @@ version = "0.1.0"
 dependencies = [
  "bincode",
  "chrono",
- "icn-cooperative",
  "icn-gossip",
  "icn-governance",
  "icn-identity",
@@ -2826,22 +2825,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "icn-cooperative"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "icn-governance",
- "icn-identity",
- "icn-ledger",
- "icn-store",
- "serde",
- "serde_json",
- "thiserror 2.0.17",
- "tokio",
- "tracing",
-]
-
-[[package]]
 name = "icn-core"
 version = "0.1.0"
 dependencies = [
@@ -2856,7 +2839,6 @@ dependencies = [
  "icn-community",
  "icn-compute",
  "icn-coop",
- "icn-cooperative",
  "icn-entity",
  "icn-federation",
  "icn-gateway",
@@ -2984,7 +2966,6 @@ dependencies = [
  "icn-community",
  "icn-compute",
  "icn-coop",
- "icn-cooperative",
  "icn-crypto-pq",
  "icn-entity",
  "icn-federation",

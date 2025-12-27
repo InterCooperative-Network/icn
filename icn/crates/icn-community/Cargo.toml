@@ -7,7 +7,6 @@ repository.workspace = true
 
 [dependencies]
 icn-identity = { path = "../icn-identity" }
-icn-cooperative = { path = "../icn-cooperative" }
 icn-governance = { path = "../icn-governance" }
 icn-gossip = { path = "../icn-gossip" }
 icn-ledger = { path = "../icn-ledger" }

@@ -646,7 +646,7 @@ impl GovernanceManager {
         let max_depth = DEFAULT_MAX_DELEGATION_DEPTH;
         if incoming_depth >= max_depth {
             anyhow::bail!(
-                "Maximum delegation depth exceeded: computed depth {incoming_depth} >= max {max_depth}. The delegation chain is too long.",
+                "Maximum delegation depth ({max_depth}) exceeded. The delegation chain is too long.",
             );
         }
 
@@ -773,6 +773,21 @@ fn scopes_overlap(
 ///
 /// Returns Some(cycle_path) if a cycle would be created, None otherwise.
 /// The path includes the full cycle from delegator back to delegator.
+///
+/// # Algorithm Limitations
+///
+/// This function uses a single-path traversal starting from the delegate, following
+/// one outgoing delegation at each step. For each node, it picks the first active
+/// delegation that matches the scope, which means it may not explore all possible paths
+/// in a branching delegation graph.
+///
+/// In practice, this is acceptable because:
+/// 1. Most delegation graphs are linear chains, not DAGs
+/// 2. The MAX_DELEGATION_DEPTH limit (3) bounds the blast radius
+/// 3. Diamond patterns (A→B, A→C, B→D, C→D) don't create cycles by themselves
+///
+/// A more comprehensive BFS/DFS approach could be implemented if needed, but would
+/// add complexity without significant benefit for the expected use cases.
 fn find_delegation_cycle(
     delegator: &Did,
     delegate: &Did,
@@ -789,17 +804,9 @@ fn find_delegation_cycle(
     // Use inclusive range to detect cycles at the depth boundary
     // With MAX_DELEGATION_DEPTH=3: 0..=3 checks 4 positions (delegate + 3 hops)
     for _ in 0..=DEFAULT_MAX_DELEGATION_DEPTH {
-        // Only report a cycle if it leads back to the original delegator.
-        // If we encounter a node visited earlier in THIS walk but it's not
-        // the delegator, that's an existing cycle in the graph (e.g., B→C→B)
-        // which shouldn't block the new delegation A→B.
         if visited.contains(&current) {
-            if current == *delegator {
-                // True cycle back to origin delegator
-                return Some(path);
-            }
-            // Existing cycle in graph, but doesn't affect this delegation
-            return None;
+            // Found a cycle - current is already in our path
+            return Some(path);
         }
         visited.insert(current.clone());
 
@@ -844,16 +851,6 @@ fn compute_incoming_depth(
     compute_incoming_depth_recursive(delegate, scope, delegations, proposals, now, &mut visited)
 }
 
-/// Recursive helper for computing incoming delegation depth.
-///
-/// The visited set is shared across all recursive branches to:
-/// 1. Prevent infinite loops on cyclic delegation graphs
-/// 2. Avoid redundant computation when multiple paths lead to the same node
-///
-/// For diamond patterns (A→C, B→C, D→A, D→B), sharing the visited set means
-/// we only compute C's depth once. This is safe because depth is the maximum
-/// chain length, and once we've computed a node's contribution, we don't need
-/// to recompute it from a different path.
 fn compute_incoming_depth_recursive(
     delegate: &Did,
     scope: &DelegationScope,
@@ -862,15 +859,13 @@ fn compute_incoming_depth_recursive(
     now: Timestamp,
     visited: &mut HashSet<Did>,
 ) -> usize {
-    // Prevent infinite recursion on cyclic graphs
+    // Prevent infinite recursion
     if visited.contains(delegate) {
         return 0;
     }
     visited.insert(delegate.clone());
 
-    // Safety limit: MAX_DELEGATION_DEPTH + 10 provides margin for edge cases
-    // like diamond patterns where we may visit more unique nodes than the
-    // strict chain depth. This is a defensive guard, not the primary limit.
+    // Safety limit
     if visited.len() > DEFAULT_MAX_DELEGATION_DEPTH + 10 {
         return 0;
     }
