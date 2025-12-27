@@ -18,6 +18,7 @@ use crate::auth::AuthManager;
 use crate::commons_mgr::CommonsManager;
 use crate::compute_mgr::ComputeManager;
 use crate::coop::CoopManager;
+use crate::entity_audit::EntityAuditManager;
 use crate::entity_mgr::{EntityHandle, EntityManager};
 use crate::error::{GatewayError, Result};
 use crate::events::EventBroadcaster;
@@ -37,6 +38,7 @@ use crate::security::{configure_cors, SecurityConfig, SecurityHeaders};
 use crate::treasury_mgr::{GatewayTreasuryManager, LedgerHandle, TreasuryHandle};
 use crate::trust_mgr::{TrustGraphHandle, TrustManager};
 use icn_compute::ComputeHandle;
+use icn_store::SledStore;
 
 /// Gateway server configuration
 pub struct GatewayServer {
@@ -408,6 +410,23 @@ impl GatewayServer {
         let budget_store = Arc::new(budget_store);
         info!("Budget store initialized");
 
+        // Create entity audit manager for compliance logging
+        let entity_audit_store: Arc<dyn icn_store::Store> =
+            if let Some(ref data_dir) = self.data_dir {
+                let store_path = data_dir.join("gateway_store");
+                Arc::new(SledStore::open(&store_path).map_err(|e| {
+                    GatewayError::InternalError(format!("Failed to open entity audit store: {e}"))
+                })?)
+            } else {
+                Arc::new(SledStore::temporary().map_err(|e| {
+                    GatewayError::InternalError(format!(
+                        "Failed to create temporary entity audit store: {e}"
+                    ))
+                })?)
+            };
+        let entity_audit_manager = Arc::new(EntityAuditManager::new(entity_audit_store));
+        info!("Entity audit manager initialized");
+
         // Create ledger manager with persistent storage if data_dir is set
         let mut ledger_manager = if let Some(ref data_dir) = self.data_dir {
             LedgerManager::new_with_storage(data_dir.clone())
@@ -612,6 +631,7 @@ impl GatewayServer {
                 .app_data(web::Data::new(federation_manager.clone()))
                 .app_data(web::Data::new(commons_manager.clone()))
                 .app_data(web::Data::new(entity_manager.clone()))
+                .app_data(web::Data::new(entity_audit_manager.clone()))
                 .app_data(web::Data::new(treasury_manager.clone()))
                 .app_data(web::Data::new(ledger_manager.clone()))
                 .app_data(web::Data::new(identity_manager.clone()))
