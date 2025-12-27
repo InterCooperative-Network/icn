@@ -17,12 +17,13 @@
 
 use anyhow::Result;
 use icn_governance::{
-    Delegation, DelegationId, GovernanceConfig, GovernanceDomain, GovernanceDomainId,
-    GovernanceOps, GovernanceParams, GovernanceProfileId, MembershipConfig, MembershipSource,
-    Proposal, ProposalId, ProposalPayload, ProposalState, Timestamp, Vote, VoteChoice, VoteTally,
+    Delegation, DelegationId, DelegationScope, GovernanceConfig, GovernanceDomain,
+    GovernanceDomainId, GovernanceOps, GovernanceParams, GovernanceProfileId, MembershipConfig,
+    MembershipSource, Proposal, ProposalId, ProposalPayload, ProposalState, Timestamp, Vote,
+    VoteChoice, VoteTally, DEFAULT_MAX_DELEGATION_DEPTH,
 };
 use icn_identity::Did;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, RwLock};
 use tracing::debug;
 
@@ -588,6 +589,11 @@ impl GovernanceManager {
             anyhow::anyhow!("Delegations storage lock poisoned (concurrent panic?): {e}")
         })?;
 
+        // Get proposals for precise scope overlap checking
+        let proposals = self.proposals.read().map_err(|e| {
+            anyhow::anyhow!("Proposals storage lock poisoned (concurrent panic?): {e}")
+        })?;
+
         // Check for duplicate delegation ID
         if delegations.contains_key(&delegation.id) {
             anyhow::bail!(
@@ -608,20 +614,44 @@ impl GovernanceManager {
             );
         }
 
-        // Simple cycle check: would this create a direct cycle?
-        // (Full transitive cycle detection would require building a DelegationManager)
-        let would_cycle = delegations.values().any(|d| {
-            d.delegator == delegation.delegate
-                && d.delegate == delegation.delegator
-                && d.is_active(now)
-        });
-        if would_cycle {
+        // Full transitive cycle detection: walk the delegation chain from delegate
+        // and check if it eventually leads back to delegator (A→B→C→A detection)
+        let cycle_path = find_delegation_cycle(
+            &delegation.delegator,
+            &delegation.delegate,
+            &delegation.scope,
+            &delegations,
+            &proposals,
+            now,
+        );
+        if let Some(path) = cycle_path {
+            let path_str = path
+                .iter()
+                .map(|did| did.to_string())
+                .collect::<Vec<_>>()
+                .join(" → ");
             anyhow::bail!(
-                "Delegation would create a cycle: {} <-> {}. The delegate already delegates to this delegator.",
-                delegation.delegator,
-                delegation.delegate
+                "Delegation would create a cycle: {path_str}. Remove an existing delegation to break the cycle.",
             );
         }
+
+        // Check max delegation depth: count how many hops lead TO the delegator
+        let incoming_depth = compute_incoming_depth(
+            &delegation.delegator,
+            &delegation.scope,
+            &delegations,
+            &proposals,
+            now,
+        );
+        let max_depth = DEFAULT_MAX_DELEGATION_DEPTH;
+        if incoming_depth >= max_depth {
+            anyhow::bail!(
+                "Maximum delegation depth exceeded: computed depth {incoming_depth} >= max {max_depth}. The delegation chain is too long.",
+            );
+        }
+
+        // Release proposals lock before inserting
+        drop(proposals);
 
         delegations.insert(delegation.id.clone(), delegation);
         Ok(())
@@ -710,6 +740,166 @@ impl Default for GovernanceManager {
     }
 }
 
+// ============================================================================
+// Delegation Cycle Detection Helpers
+// ============================================================================
+
+/// Check if two delegation scopes overlap (for cycle detection)
+///
+/// Returns true if delegations with these scopes could conflict.
+/// Uses proposal domain lookup for precise Domain/Proposal overlap checking.
+fn scopes_overlap(
+    a: &DelegationScope,
+    b: &DelegationScope,
+    proposals: &HashMap<ProposalId, Proposal>,
+) -> bool {
+    match (a, b) {
+        (DelegationScope::Blanket, _) | (_, DelegationScope::Blanket) => true,
+        (DelegationScope::Domain(d1), DelegationScope::Domain(d2)) => d1 == d2,
+        (DelegationScope::Domain(d), DelegationScope::Proposal(p))
+        | (DelegationScope::Proposal(p), DelegationScope::Domain(d)) => {
+            // Use proposal lookup for precise domain checking
+            match proposals.get(p) {
+                Some(proposal) => &proposal.domain_id == d,
+                // Conservative fallback: assume overlap if proposal not found
+                None => true,
+            }
+        }
+        (DelegationScope::Proposal(p1), DelegationScope::Proposal(p2)) => p1 == p2,
+    }
+}
+
+/// Find a delegation cycle if adding delegator→delegate would create one
+///
+/// Returns Some(cycle_path) if a cycle would be created, None otherwise.
+/// The path includes the full cycle from delegator back to delegator.
+fn find_delegation_cycle(
+    delegator: &Did,
+    delegate: &Did,
+    scope: &DelegationScope,
+    delegations: &HashMap<DelegationId, Delegation>,
+    proposals: &HashMap<ProposalId, Proposal>,
+    now: Timestamp,
+) -> Option<Vec<Did>> {
+    let mut path = vec![delegator.clone(), delegate.clone()];
+    let mut visited = HashSet::new();
+    visited.insert(delegator.clone());
+    let mut current = delegate.clone();
+
+    // Use inclusive range to detect cycles at the depth boundary
+    // With MAX_DELEGATION_DEPTH=3: 0..=3 checks 4 positions (delegate + 3 hops)
+    for _ in 0..=DEFAULT_MAX_DELEGATION_DEPTH {
+        // Only report a cycle if it leads back to the original delegator.
+        // If we encounter a node visited earlier in THIS walk but it's not
+        // the delegator, that's an existing cycle in the graph (e.g., B→C→B)
+        // which shouldn't block the new delegation A→B.
+        if visited.contains(&current) {
+            if current == *delegator {
+                // True cycle back to origin delegator
+                return Some(path);
+            }
+            // Existing cycle in graph, but doesn't affect this delegation
+            return None;
+        }
+        visited.insert(current.clone());
+
+        // Find any active delegation from current that matches scope
+        let next = delegations
+            .values()
+            .find(|d| {
+                d.delegator == current
+                    && d.is_active(now)
+                    && scopes_overlap(&d.scope, scope, proposals)
+            })
+            .map(|d| d.delegate.clone());
+
+        match next {
+            Some(d) => {
+                if d == *delegator {
+                    // Completes the cycle back to delegator
+                    path.push(d);
+                    return Some(path);
+                }
+                path.push(d.clone());
+                current = d;
+            }
+            None => return None, // No more delegations, no cycle
+        }
+    }
+
+    None
+}
+
+/// Compute incoming delegation chain depth (how many hops lead TO this delegate)
+///
+/// For example, if Alice→Bob→Charlie, then Charlie has incoming depth 2.
+fn compute_incoming_depth(
+    delegate: &Did,
+    scope: &DelegationScope,
+    delegations: &HashMap<DelegationId, Delegation>,
+    proposals: &HashMap<ProposalId, Proposal>,
+    now: Timestamp,
+) -> usize {
+    let mut visited = HashSet::new();
+    compute_incoming_depth_recursive(delegate, scope, delegations, proposals, now, &mut visited)
+}
+
+/// Recursive helper for computing incoming delegation depth.
+///
+/// The visited set is shared across all recursive branches to:
+/// 1. Prevent infinite loops on cyclic delegation graphs
+/// 2. Avoid redundant computation when multiple paths lead to the same node
+///
+/// For diamond patterns (A→C, B→C, D→A, D→B), sharing the visited set means
+/// we only compute C's depth once. This is safe because depth is the maximum
+/// chain length, and once we've computed a node's contribution, we don't need
+/// to recompute it from a different path.
+fn compute_incoming_depth_recursive(
+    delegate: &Did,
+    scope: &DelegationScope,
+    delegations: &HashMap<DelegationId, Delegation>,
+    proposals: &HashMap<ProposalId, Proposal>,
+    now: Timestamp,
+    visited: &mut HashSet<Did>,
+) -> usize {
+    // Prevent infinite recursion on cyclic graphs
+    if visited.contains(delegate) {
+        return 0;
+    }
+    visited.insert(delegate.clone());
+
+    // Safety limit: MAX_DELEGATION_DEPTH + 10 provides margin for edge cases
+    // like diamond patterns where we may visit more unique nodes than the
+    // strict chain depth. This is a defensive guard, not the primary limit.
+    if visited.len() > DEFAULT_MAX_DELEGATION_DEPTH + 10 {
+        return 0;
+    }
+
+    // Find all delegators who have delegated to this delegate with overlapping scope
+    let delegators: Vec<Did> = delegations
+        .values()
+        .filter(|d| {
+            d.delegate == *delegate
+                && d.is_active(now)
+                && scopes_overlap(&d.scope, scope, proposals)
+        })
+        .map(|d| d.delegator.clone())
+        .collect();
+
+    if delegators.is_empty() {
+        return 0;
+    }
+
+    // Recursively find the maximum depth
+    delegators
+        .into_iter()
+        .map(|d| {
+            1 + compute_incoming_depth_recursive(&d, scope, delegations, proposals, now, visited)
+        })
+        .max()
+        .unwrap_or(0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -765,5 +955,266 @@ mod tests {
         let domain = mgr.get_domain(&domain_id).await.unwrap().unwrap();
         assert_eq!(domain.config.profile.0, "contract:did:icn:abc123");
         assert!(domain.config.profile.is_contract());
+    }
+
+    // ============================================================================
+    // Delegation Cycle Detection Tests
+    // ============================================================================
+
+    fn test_did(seed: u8) -> Did {
+        Did::from_anchor_id(&[seed; 32])
+    }
+
+    #[tokio::test]
+    async fn test_delegation_direct_cycle_rejected() {
+        let mgr = GovernanceManager::new();
+        let alice = test_did(1);
+        let bob = test_did(2);
+
+        // Alice -> Bob (allowed)
+        let d1 = Delegation::new(alice.clone(), bob.clone(), DelegationScope::Blanket);
+        mgr.create_delegation(d1).await.unwrap();
+
+        // Bob -> Alice (should fail - direct cycle)
+        let d2 = Delegation::new(bob.clone(), alice.clone(), DelegationScope::Blanket);
+        let result = mgr.create_delegation(d2).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("cycle"));
+    }
+
+    #[tokio::test]
+    async fn test_delegation_transitive_cycle_rejected() {
+        let mgr = GovernanceManager::new();
+        let alice = test_did(1);
+        let bob = test_did(2);
+        let charlie = test_did(3);
+
+        // Alice -> Bob (allowed)
+        let d1 = Delegation::new(alice.clone(), bob.clone(), DelegationScope::Blanket);
+        mgr.create_delegation(d1).await.unwrap();
+
+        // Bob -> Charlie (allowed)
+        let d2 = Delegation::new(bob.clone(), charlie.clone(), DelegationScope::Blanket);
+        mgr.create_delegation(d2).await.unwrap();
+
+        // Charlie -> Alice (should fail - transitive cycle A->B->C->A)
+        let d3 = Delegation::new(charlie.clone(), alice.clone(), DelegationScope::Blanket);
+        let result = mgr.create_delegation(d3).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("cycle"));
+    }
+
+    #[tokio::test]
+    async fn test_delegation_max_depth_enforced() {
+        let mgr = GovernanceManager::new();
+        let alice = test_did(1);
+        let bob = test_did(2);
+        let charlie = test_did(3);
+        let dave = test_did(4);
+        let eve = test_did(5);
+
+        // Create a chain: Alice -> Bob -> Charlie -> Dave (depth 3)
+        mgr.create_delegation(Delegation::new(
+            alice.clone(),
+            bob.clone(),
+            DelegationScope::Blanket,
+        ))
+        .await
+        .unwrap();
+
+        mgr.create_delegation(Delegation::new(
+            bob.clone(),
+            charlie.clone(),
+            DelegationScope::Blanket,
+        ))
+        .await
+        .unwrap();
+
+        mgr.create_delegation(Delegation::new(
+            charlie.clone(),
+            dave.clone(),
+            DelegationScope::Blanket,
+        ))
+        .await
+        .unwrap();
+
+        // Dave -> Eve would exceed max depth (default is 3)
+        let result = mgr
+            .create_delegation(Delegation::new(
+                dave.clone(),
+                eve.clone(),
+                DelegationScope::Blanket,
+            ))
+            .await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("depth"));
+    }
+
+    #[tokio::test]
+    async fn test_delegation_different_scopes_no_cycle() {
+        let mgr = GovernanceManager::new();
+        let alice = test_did(1);
+        let bob = test_did(2);
+        let domain1 = GovernanceDomainId::new("domain1");
+        let domain2 = GovernanceDomainId::new("domain2");
+
+        // Alice -> Bob for domain1 (allowed)
+        let d1 = Delegation::new(
+            alice.clone(),
+            bob.clone(),
+            DelegationScope::Domain(domain1.clone()),
+        );
+        mgr.create_delegation(d1).await.unwrap();
+
+        // Bob -> Alice for domain2 (allowed - different domain, no cycle)
+        let d2 = Delegation::new(
+            bob.clone(),
+            alice.clone(),
+            DelegationScope::Domain(domain2.clone()),
+        );
+        let result = mgr.create_delegation(d2).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_delegation_blanket_causes_cycle_with_domain() {
+        let mgr = GovernanceManager::new();
+        let alice = test_did(1);
+        let bob = test_did(2);
+        let domain = GovernanceDomainId::new("test");
+
+        // Alice -> Bob (blanket)
+        let d1 = Delegation::new(alice.clone(), bob.clone(), DelegationScope::Blanket);
+        mgr.create_delegation(d1).await.unwrap();
+
+        // Bob -> Alice for domain (should fail - blanket overlaps with all domains)
+        let d2 = Delegation::new(
+            bob.clone(),
+            alice.clone(),
+            DelegationScope::Domain(domain.clone()),
+        );
+        let result = mgr.create_delegation(d2).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("cycle"));
+    }
+
+    #[tokio::test]
+    async fn test_precise_scope_overlap_no_cycle_different_domains() {
+        let mgr = GovernanceManager::new();
+        let alice = test_did(1);
+        let bob = test_did(2);
+
+        let domain_a = GovernanceDomainId::new("domain-a");
+        let domain_b = GovernanceDomainId::new("domain-b");
+        let membership = MembershipConfig {
+            source: MembershipSource::StaticList(vec![alice.clone(), bob.clone()]),
+        };
+        let params = GovernanceParams::new(50, 50, 86400);
+
+        // Create domain B
+        mgr.create_domain(
+            domain_b.clone(),
+            "Domain B".to_string(),
+            "cooperative_default".to_string(),
+            params.clone(),
+            membership.clone(),
+        )
+        .await
+        .unwrap();
+
+        // Create a proposal in domain B
+        let proposal_id = ProposalId::generate();
+        mgr.create_proposal(
+            proposal_id.clone(),
+            domain_b.clone(),
+            alice.clone(),
+            "Test Proposal".to_string(),
+            "Description".to_string(),
+            ProposalPayload::Text {
+                body: "test".to_string(),
+            },
+        )
+        .await
+        .unwrap();
+
+        // Alice delegates domain A to Bob
+        mgr.create_delegation(Delegation::new(
+            alice.clone(),
+            bob.clone(),
+            DelegationScope::Domain(domain_a.clone()),
+        ))
+        .await
+        .unwrap();
+
+        // Bob delegates proposal (in domain B) to Alice
+        // This should SUCCEED because domain A != domain B (no cycle with precise checking)
+        let result = mgr
+            .create_delegation(Delegation::new(
+                bob.clone(),
+                alice.clone(),
+                DelegationScope::Proposal(proposal_id),
+            ))
+            .await;
+        assert!(result.is_ok(), "Expected no cycle but got: {result:?}");
+    }
+
+    #[tokio::test]
+    async fn test_precise_scope_overlap_cycle_same_domain() {
+        let mgr = GovernanceManager::new();
+        let alice = test_did(1);
+        let bob = test_did(2);
+
+        let domain_a = GovernanceDomainId::new("domain-a");
+        let membership = MembershipConfig {
+            source: MembershipSource::StaticList(vec![alice.clone(), bob.clone()]),
+        };
+        let params = GovernanceParams::new(50, 50, 86400);
+
+        // Create domain A
+        mgr.create_domain(
+            domain_a.clone(),
+            "Domain A".to_string(),
+            "cooperative_default".to_string(),
+            params.clone(),
+            membership.clone(),
+        )
+        .await
+        .unwrap();
+
+        // Create a proposal in domain A
+        let proposal_id = ProposalId::generate();
+        mgr.create_proposal(
+            proposal_id.clone(),
+            domain_a.clone(),
+            alice.clone(),
+            "Test Proposal".to_string(),
+            "Description".to_string(),
+            ProposalPayload::Text {
+                body: "test".to_string(),
+            },
+        )
+        .await
+        .unwrap();
+
+        // Alice delegates domain A to Bob
+        mgr.create_delegation(Delegation::new(
+            alice.clone(),
+            bob.clone(),
+            DelegationScope::Domain(domain_a.clone()),
+        ))
+        .await
+        .unwrap();
+
+        // Bob delegates proposal (in domain A) to Alice
+        // This should FAIL because proposal is in domain A (cycle detected)
+        let result = mgr
+            .create_delegation(Delegation::new(
+                bob.clone(),
+                alice.clone(),
+                DelegationScope::Proposal(proposal_id),
+            ))
+            .await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("cycle"));
     }
 }

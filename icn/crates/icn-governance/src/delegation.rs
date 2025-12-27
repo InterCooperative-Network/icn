@@ -234,6 +234,9 @@ pub struct DelegationManager {
 
     /// Maximum allowed delegation depth
     max_depth: usize,
+
+    /// Proposal to domain mapping for precise scope overlap checking
+    proposal_domains: HashMap<ProposalId, GovernanceDomainId>,
 }
 
 impl DelegationManager {
@@ -244,6 +247,7 @@ impl DelegationManager {
             delegations_from: HashMap::new(),
             delegations_to: HashMap::new(),
             max_depth: DEFAULT_MAX_DELEGATION_DEPTH,
+            proposal_domains: HashMap::new(),
         }
     }
 
@@ -251,6 +255,24 @@ impl DelegationManager {
     pub fn with_max_depth(mut self, max_depth: usize) -> Self {
         self.max_depth = max_depth;
         self
+    }
+
+    /// Register a proposal's domain for precise scope overlap checking
+    ///
+    /// Call this when a proposal is created to enable accurate domain/proposal
+    /// scope overlap detection during delegation cycle checking.
+    pub fn register_proposal(&mut self, proposal_id: ProposalId, domain_id: GovernanceDomainId) {
+        self.proposal_domains.insert(proposal_id, domain_id);
+    }
+
+    /// Unregister a proposal (e.g., when proposal is finalized)
+    pub fn unregister_proposal(&mut self, proposal_id: &ProposalId) {
+        self.proposal_domains.remove(proposal_id);
+    }
+
+    /// Get the domain for a proposal, if registered
+    pub fn get_proposal_domain(&self, proposal_id: &ProposalId) -> Option<&GovernanceDomainId> {
+        self.proposal_domains.get(proposal_id)
     }
 
     /// Add a new delegation
@@ -543,24 +565,27 @@ impl DelegationManager {
     /// Check if two scopes overlap (for cycle detection)
     ///
     /// This function is used to determine if two delegations could conflict.
-    /// It is conservative: when uncertain, it assumes overlap to prevent potential cycles.
+    /// Uses registered proposal domains for precise overlap checking when available.
     ///
-    /// # Known Limitation
+    /// # Behavior
     ///
-    /// Domain and Proposal scopes are assumed to overlap because we don't have
-    /// access to proposal metadata to verify domain membership. This could cause
-    /// false positive cycle detection in edge cases (e.g., Alice delegates domain A
-    /// to Bob, Bob delegates proposal in domain B to Alice - flagged as cycle but isn't).
-    /// This conservative approach ensures safety at the cost of some flexibility.
+    /// - Blanket scope overlaps with all scopes
+    /// - Domain scopes overlap only if they match
+    /// - Proposal scopes overlap only if they match
+    /// - Domain + Proposal: uses registered domain mapping for precise check,
+    ///   falls back to conservative (assume overlap) if proposal not registered
     fn scopes_overlap(&self, a: &DelegationScope, b: &DelegationScope) -> bool {
         match (a, b) {
             (DelegationScope::Blanket, _) | (_, DelegationScope::Blanket) => true,
             (DelegationScope::Domain(d1), DelegationScope::Domain(d2)) => d1 == d2,
             (DelegationScope::Domain(d), DelegationScope::Proposal(p))
             | (DelegationScope::Proposal(p), DelegationScope::Domain(d)) => {
-                // Conservative: assume overlap since we can't verify domain membership
-                let _ = (d, p);
-                true
+                // Use registered domain mapping for precise check
+                match self.proposal_domains.get(p) {
+                    Some(proposal_domain) => proposal_domain == d,
+                    // Conservative fallback: assume overlap if proposal not registered
+                    None => true,
+                }
             }
             (DelegationScope::Proposal(p1), DelegationScope::Proposal(p2)) => p1 == p2,
         }
@@ -911,5 +936,103 @@ mod tests {
         assert!(manager
             .get_delegate(&alice, &DelegationScope::Blanket)
             .is_none());
+    }
+
+    #[test]
+    fn test_precise_domain_proposal_no_overlap() {
+        let mut manager = DelegationManager::new();
+        let alice = test_did(1);
+        let bob = test_did(2);
+
+        let domain_a = GovernanceDomainId::new("domain-a");
+        let domain_b = GovernanceDomainId::new("domain-b");
+        let proposal_in_b = ProposalId::new("proposal-in-domain-b");
+
+        // Register that the proposal is in domain B
+        manager.register_proposal(proposal_in_b.clone(), domain_b.clone());
+
+        // Alice delegates domain A to Bob
+        manager
+            .add_delegation(Delegation::new(
+                alice.clone(),
+                bob.clone(),
+                DelegationScope::Domain(domain_a.clone()),
+            ))
+            .unwrap();
+
+        // Bob delegates proposal (in domain B) to Alice
+        // This should succeed because domain A != domain B (no cycle)
+        let result = manager.add_delegation(Delegation::new(
+            bob.clone(),
+            alice.clone(),
+            DelegationScope::Proposal(proposal_in_b.clone()),
+        ));
+
+        assert!(result.is_ok(), "Expected no cycle but got: {:?}", result);
+    }
+
+    #[test]
+    fn test_precise_domain_proposal_with_overlap() {
+        let mut manager = DelegationManager::new();
+        let alice = test_did(1);
+        let bob = test_did(2);
+
+        let domain_a = GovernanceDomainId::new("domain-a");
+        let proposal_in_a = ProposalId::new("proposal-in-domain-a");
+
+        // Register that the proposal is in domain A
+        manager.register_proposal(proposal_in_a.clone(), domain_a.clone());
+
+        // Alice delegates domain A to Bob
+        manager
+            .add_delegation(Delegation::new(
+                alice.clone(),
+                bob.clone(),
+                DelegationScope::Domain(domain_a.clone()),
+            ))
+            .unwrap();
+
+        // Bob delegates proposal (in domain A) to Alice
+        // This should fail because domain A == proposal's domain (cycle detected)
+        let result = manager.add_delegation(Delegation::new(
+            bob.clone(),
+            alice.clone(),
+            DelegationScope::Proposal(proposal_in_a.clone()),
+        ));
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("cycle"));
+    }
+
+    #[test]
+    fn test_unregistered_proposal_conservative_fallback() {
+        let mut manager = DelegationManager::new();
+        let alice = test_did(1);
+        let bob = test_did(2);
+
+        let domain_a = GovernanceDomainId::new("domain-a");
+        let unknown_proposal = ProposalId::new("unknown-proposal");
+
+        // Don't register the proposal - should fall back to conservative behavior
+
+        // Alice delegates domain A to Bob
+        manager
+            .add_delegation(Delegation::new(
+                alice.clone(),
+                bob.clone(),
+                DelegationScope::Domain(domain_a.clone()),
+            ))
+            .unwrap();
+
+        // Bob delegates unknown proposal to Alice
+        // Should fail (conservative: assume overlap when unknown)
+        let result = manager.add_delegation(Delegation::new(
+            bob.clone(),
+            alice.clone(),
+            DelegationScope::Proposal(unknown_proposal.clone()),
+        ));
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("cycle"));
     }
 }
