@@ -470,6 +470,11 @@ pub async fn update_entity(
     // Check caller has permission to modify this entity
     require_entity_write_access(&entity_mgr, &entity_id, &caller_id)?;
 
+    // Store previous entity state BEFORE mutation for potential rollback
+    // This ensures we capture the true pre-mutation state even if EntityManager
+    // implements caching in the future
+    let previous_entity = entity.clone();
+
     // Track changed fields for audit
     let mut changed_fields = Vec::new();
 
@@ -496,9 +501,6 @@ pub async fn update_entity(
         "Updating entity"
     );
 
-    // Store previous entity state for potential rollback
-    let previous_entity = entity_mgr.get(&entity_id).ok().flatten();
-
     entity_mgr
         .update(entity.clone())
         .map_err(|e| GatewayError::InternalError(format!("Failed to update entity: {e}")))?;
@@ -521,19 +523,17 @@ pub async fn update_entity(
             error = %e,
             "Failed to record entity update audit - attempting rollback"
         );
-        // Attempt compensation: restore previous state
-        if let Some(prev) = previous_entity {
-            if let Err(rollback_err) = entity_mgr.update(prev) {
-                gateway_metrics::entity_audit_rollback_failure_inc("update_entity");
-                tracing::error!(
-                    entity_id = %entity_id,
-                    error = %rollback_err,
-                    "Failed to rollback entity after audit failure - entity in inconsistent state"
-                );
-                return Err(GatewayError::InternalError(format!(
-                    "Failed to record audit: {e}. CRITICAL: Rollback also failed: {rollback_err}. Entity may be in inconsistent state."
-                )));
-            }
+        // Attempt compensation: restore pre-mutation state (cloned BEFORE applying updates)
+        if let Err(rollback_err) = entity_mgr.update(previous_entity) {
+            gateway_metrics::entity_audit_rollback_failure_inc("update_entity");
+            tracing::error!(
+                entity_id = %entity_id,
+                error = %rollback_err,
+                "Failed to rollback entity after audit failure - entity in inconsistent state"
+            );
+            return Err(GatewayError::InternalError(format!(
+                "Failed to record audit: {e}. CRITICAL: Rollback also failed: {rollback_err}. Entity may be in inconsistent state."
+            )));
         }
         return Err(GatewayError::InternalError(format!(
             "Failed to record audit: {e}"
