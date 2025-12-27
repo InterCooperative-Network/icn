@@ -2713,6 +2713,22 @@ pub mod gateway {
         )
         .increment(1);
     }
+
+    // --- Entity Audit Metrics ---
+
+    /// Increment entity audit record counter by operation type
+    pub fn entity_audit_record_inc(operation: &str) {
+        counter!(
+            "icn_gateway_entity_audit_records_total",
+            "operation" => operation.to_string()
+        )
+        .increment(1);
+    }
+
+    /// Record entity audit query duration in seconds
+    pub fn entity_audit_query_duration(duration_secs: f64) {
+        histogram!("icn_gateway_entity_audit_query_duration_seconds").record(duration_secs);
+    }
 }
 
 /// NAT traversal metrics

@@ -27,6 +27,7 @@ pub mod compute_events;
 pub mod compute_mgr;
 pub mod coop;
 pub mod email_client;
+pub mod entity_audit;
 pub mod entity_mgr;
 pub mod error;
 pub mod events;

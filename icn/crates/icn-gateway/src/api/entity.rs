@@ -12,8 +12,9 @@ use icn_entity::{CooperativeEntity, EntityId, EntityType, Membership, Membership
 use icn_identity::Did;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tracing::info;
+use tracing::{info, warn};
 
+use crate::entity_audit::{EntityAuditManager, EntityOperation};
 use crate::entity_mgr::EntityManager;
 use crate::error::{GatewayError, Result};
 use crate::middleware::{get_claims, require_scope};
@@ -249,6 +250,7 @@ fn require_entity_write_access(
 pub async fn register_entity(
     req: HttpRequest,
     entity_mgr: web::Data<Arc<EntityManager>>,
+    audit_mgr: web::Data<Arc<EntityAuditManager>>,
     body: web::Json<RegisterEntityRequest>,
 ) -> Result<HttpResponse> {
     require_scope(&req, "entity:write")?;
@@ -329,8 +331,11 @@ pub async fn register_entity(
 
     // Add the creator as a founder member
     // If this fails, clean up the entity to avoid orphaned entities
-    let founder_membership =
-        Membership::new(creator_id, entity_id.clone(), MembershipRole::Founder);
+    let founder_membership = Membership::new(
+        creator_id.clone(),
+        entity_id.clone(),
+        MembershipRole::Founder,
+    );
     if let Err(e) = entity_mgr.add_membership(founder_membership) {
         // Cleanup: remove the entity we just registered
         if let Err(cleanup_err) = entity_mgr.remove(&entity_id) {
@@ -343,6 +348,24 @@ pub async fn register_entity(
         return Err(GatewayError::InternalError(format!(
             "Failed to add founder membership: {e}"
         )));
+    }
+
+    // Record audit trail
+    if let Err(e) = audit_mgr.record_audit(
+        &entity_id,
+        EntityOperation::Registered {
+            entity_type: format!("{entity_type:?}").to_lowercase(),
+            name: body.name.clone(),
+        },
+        &creator_id,
+        None,
+        None,
+    ) {
+        warn!(
+            entity_id = %entity_id,
+            error = %e,
+            "Failed to record entity registration audit"
+        );
     }
 
     let members = entity_mgr.get_members(&entity_id).unwrap_or_default();
@@ -386,6 +409,7 @@ pub async fn get_entity(
 pub async fn update_entity(
     req: HttpRequest,
     entity_mgr: web::Data<Arc<EntityManager>>,
+    audit_mgr: web::Data<Arc<EntityAuditManager>>,
     path: web::Path<String>,
     body: web::Json<UpdateEntityRequest>,
 ) -> Result<HttpResponse> {
@@ -413,6 +437,9 @@ pub async fn update_entity(
     // Check caller has permission to modify this entity
     require_entity_write_access(&entity_mgr, &entity_id, &caller_id)?;
 
+    // Track changed fields for audit
+    let mut changed_fields = Vec::new();
+
     // Apply updates
     if let Some(ref name) = body.name {
         if name.trim().is_empty() {
@@ -421,12 +448,14 @@ pub async fn update_entity(
             ));
         }
         entity.name = name.clone();
+        changed_fields.push("name".to_string());
     }
 
     if let Some(ref desc) = body.description {
         entity
             .metadata
             .insert("description".to_string(), desc.clone());
+        changed_fields.push("description".to_string());
     }
 
     info!(
@@ -437,6 +466,21 @@ pub async fn update_entity(
     entity_mgr
         .update(entity.clone())
         .map_err(|e| GatewayError::InternalError(format!("Failed to update entity: {e}")))?;
+
+    // Record audit trail
+    if let Err(e) = audit_mgr.record_audit(
+        &entity_id,
+        EntityOperation::Updated { changed_fields },
+        &caller_id,
+        None,
+        None,
+    ) {
+        warn!(
+            entity_id = %entity_id,
+            error = %e,
+            "Failed to record entity update audit"
+        );
+    }
 
     let members = entity_mgr.get_members(&entity_id).unwrap_or_default();
     let response = entity_to_response(&entity, members.len());
@@ -449,6 +493,7 @@ pub async fn update_entity(
 pub async fn delete_entity(
     req: HttpRequest,
     entity_mgr: web::Data<Arc<EntityManager>>,
+    audit_mgr: web::Data<Arc<EntityAuditManager>>,
     path: web::Path<String>,
 ) -> Result<HttpResponse> {
     require_scope(&req, "entity:write")?;
@@ -489,6 +534,17 @@ pub async fn delete_entity(
         }
     })?;
 
+    // Record audit trail
+    if let Err(e) =
+        audit_mgr.record_audit(&entity_id, EntityOperation::Deleted, &caller_id, None, None)
+    {
+        warn!(
+            entity_id = %entity_id,
+            error = %e,
+            "Failed to record entity deletion audit"
+        );
+    }
+
     Ok(HttpResponse::NoContent().finish())
 }
 
@@ -526,6 +582,7 @@ pub async fn list_members(
 pub async fn add_membership(
     req: HttpRequest,
     entity_mgr: web::Data<Arc<EntityManager>>,
+    audit_mgr: web::Data<Arc<EntityAuditManager>>,
     path: web::Path<String>,
     body: web::Json<AddMembershipRequest>,
 ) -> Result<HttpResponse> {
@@ -576,7 +633,7 @@ pub async fn add_membership(
         "Adding membership"
     );
 
-    let mut membership = Membership::new(member_id.clone(), entity_id.clone(), role);
+    let mut membership = Membership::new(member_id.clone(), entity_id.clone(), role.clone());
     if let Some(shares) = body.shares {
         membership.shares = shares;
     }
@@ -584,6 +641,25 @@ pub async fn add_membership(
     entity_mgr
         .add_membership(membership.clone())
         .map_err(|e| GatewayError::InternalError(format!("Failed to add membership: {e}")))?;
+
+    // Record audit trail
+    if let Err(e) = audit_mgr.record_audit(
+        &entity_id,
+        EntityOperation::MemberAdded {
+            member_id: member_id.clone(),
+            role,
+        },
+        &caller_id,
+        None,
+        None,
+    ) {
+        warn!(
+            entity_id = %entity_id,
+            member_id = %member_id,
+            error = %e,
+            "Failed to record member addition audit"
+        );
+    }
 
     let response = membership_to_response(&membership);
 
@@ -595,6 +671,7 @@ pub async fn add_membership(
 pub async fn remove_membership(
     req: HttpRequest,
     entity_mgr: web::Data<Arc<EntityManager>>,
+    audit_mgr: web::Data<Arc<EntityAuditManager>>,
     path: web::Path<(String, String)>,
 ) -> Result<HttpResponse> {
     require_scope(&req, "entity:write")?;
@@ -672,7 +749,65 @@ pub async fn remove_membership(
         .remove_membership(&entity_id, &member_id)
         .map_err(|e| GatewayError::InternalError(format!("Failed to remove membership: {e}")))?;
 
+    // Record audit trail
+    let reason = if is_self_removal {
+        Some("Self-removal".to_string())
+    } else {
+        None
+    };
+    if let Err(e) = audit_mgr.record_audit(
+        &entity_id,
+        EntityOperation::MemberRemoved {
+            member_id: member_id.clone(),
+            reason,
+        },
+        &caller_id,
+        None,
+        None,
+    ) {
+        warn!(
+            entity_id = %entity_id,
+            member_id = %member_id,
+            error = %e,
+            "Failed to record member removal audit"
+        );
+    }
+
     Ok(HttpResponse::NoContent().finish())
+}
+
+/// Query parameters for audit trail endpoint
+#[derive(Debug, Deserialize)]
+pub struct AuditQueryParams {
+    /// Maximum number of records to return (default: 50)
+    pub limit: Option<usize>,
+    /// Number of records to skip (default: 0)
+    pub offset: Option<usize>,
+}
+
+/// GET /entities/:id/audit - Get entity audit trail
+#[get("/{id}/audit")]
+pub async fn get_entity_audit(
+    req: HttpRequest,
+    audit_mgr: web::Data<Arc<EntityAuditManager>>,
+    path: web::Path<String>,
+    query: web::Query<AuditQueryParams>,
+) -> Result<HttpResponse> {
+    require_scope(&req, "entity:read")?;
+
+    let entity_id_str = path.into_inner();
+    let entity_id: EntityId = entity_id_str
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid entity ID: {e}")))?;
+
+    let limit = query.limit.unwrap_or(50).min(100);
+    let offset = query.offset.unwrap_or(0);
+
+    let trail = audit_mgr
+        .get_audit_trail(&entity_id, limit, offset)
+        .map_err(|e| GatewayError::InternalError(format!("Failed to get audit trail: {e}")))?;
+
+    Ok(HttpResponse::Ok().json(trail))
 }
 
 /// Configure entity routes
@@ -683,7 +818,8 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         .service(delete_entity)
         .service(list_members)
         .service(add_membership)
-        .service(remove_membership);
+        .service(remove_membership)
+        .service(get_entity_audit);
 }
 
 #[cfg(test)]
