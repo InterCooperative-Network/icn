@@ -748,6 +748,16 @@ impl Default for GovernanceManager {
 ///
 /// Returns true if delegations with these scopes could conflict.
 /// Uses proposal domain lookup for precise Domain/Proposal overlap checking.
+///
+/// # Eventual Consistency
+///
+/// If proposal is not found, assumes NO overlap (proposal-specific delegations
+/// are narrower than domain delegations). This allows delegations to proceed
+/// when proposal info hasn't propagated via gossip yet.
+///
+/// Cycles that form during this window are detected when the proposal is
+/// registered in [`DelegationManager::register_proposal`], which triggers
+/// reconciliation and emits metrics for operator alerting.
 fn scopes_overlap(
     a: &DelegationScope,
     b: &DelegationScope,
@@ -761,8 +771,9 @@ fn scopes_overlap(
             // Use proposal lookup for precise domain checking
             match proposals.get(p) {
                 Some(proposal) => &proposal.domain_id == d,
-                // Conservative fallback: assume overlap if proposal not found
-                None => true,
+                // Proposal-specific delegations are narrower than domain delegations,
+                // so assume no overlap when proposal is not found
+                None => false,
             }
         }
         (DelegationScope::Proposal(p1), DelegationScope::Proposal(p2)) => p1 == p2,
