@@ -2224,6 +2224,13 @@ pub mod governance {
     pub fn delegation_cycles_found_add(count: u64) {
         counter!("icn_governance_delegation_cycles_found_total").increment(count);
     }
+
+    /// Record the duration of a cycle reconciliation operation
+    ///
+    /// This metric helps identify performance issues with large delegation graphs.
+    pub fn delegation_reconciliation_duration_observe(duration_secs: f64) {
+        histogram!("icn_governance_delegation_reconciliation_duration_seconds").record(duration_secs);
+    }
 }
 
 /// Protocol parameter metrics (delayed execution)

@@ -289,17 +289,43 @@ impl DelegationManager {
     ///
     /// Cycles are NOT automatically revoked - they are logged and metrics are emitted
     /// so that governance can decide how to handle them.
+    ///
+    /// # Operator Response
+    ///
+    /// When `icn_governance_delegation_cycles_detected_total` metric fires or cycle
+    /// warnings appear in logs, operators should:
+    ///
+    /// 1. **Review the cycle path** in logs to understand which delegations are involved
+    /// 2. **Check for Byzantine behavior** - frequent cycles from same nodes may indicate
+    ///    malicious activity attempting to exploit the propagation window
+    /// 3. **Contact affected parties** to have one delegation manually revoked via
+    ///    `revoke_delegation()`. The delegation in the cycle that was created LAST
+    ///    (the proposal-scoped one) is typically the one to revoke.
+    /// 4. **For voting conflicts**, note that if both parties voted, the delegator's
+    ///    direct vote takes precedence over any delegated vote
+    ///
+    /// Cycles detected during reconciliation are generally benign timing artifacts,
+    /// not security incidents. However, a sustained pattern warrants investigation.
     pub fn register_proposal(&mut self, proposal_id: ProposalId, domain_id: GovernanceDomainId) {
         self.proposal_domains
             .insert(proposal_id.clone(), domain_id.clone());
 
         // Reconcile: check for cycles that are now detectable with this proposal's domain
+        let start = std::time::Instant::now();
         let cycles = self.detect_cycles_for_proposal(&proposal_id, &domain_id);
+        let duration = start.elapsed();
+
+        // Record reconciliation duration for performance monitoring
+        icn_obs::metrics::governance::delegation_reconciliation_duration_observe(
+            duration.as_secs_f64(),
+        );
+
         if !cycles.is_empty() {
             tracing::warn!(
                 proposal_id = %proposal_id.0,
                 domain_id = %domain_id.0,
                 cycle_count = cycles.len(),
+                duration_ms = duration.as_millis(),
                 "Delegation cycles detected after proposal registration - \
                  these may have formed during gossip propagation"
             );
@@ -330,8 +356,8 @@ impl DelegationManager {
         let now = icn_time::current_timestamp_secs();
         let mut cycles = Vec::new();
 
-        // Find all delegations that reference this proposal
-        let _proposal_scope = DelegationScope::Proposal(proposal_id.clone());
+        // We check for cycles against the domain scope, since the proposal is now
+        // registered as belonging to this domain
         let domain_scope = DelegationScope::Domain(domain_id.clone());
 
         for delegation in self.delegations.values() {
@@ -1242,6 +1268,72 @@ mod tests {
         assert!(
             path.contains(&alice) && path.contains(&bob),
             "Path should contain both Alice and Bob"
+        );
+    }
+
+    #[test]
+    fn test_multi_hop_cycle_detected_on_proposal_registration() {
+        let mut manager = DelegationManager::new();
+        let alice = test_did(1);
+        let bob = test_did(2);
+        let charlie = test_did(3);
+
+        let domain_a = GovernanceDomainId::new("domain-a");
+        let proposal_in_a = ProposalId::new("proposal-in-domain-a");
+
+        // Multi-hop cycle: Alice -> Bob -> Charlie -> Alice
+        // where the final hop uses an unknown proposal
+
+        // Step 1: Alice delegates domain A to Bob
+        manager
+            .add_delegation(Delegation::new(
+                alice.clone(),
+                bob.clone(),
+                DelegationScope::Domain(domain_a.clone()),
+            ))
+            .unwrap();
+
+        // Step 2: Bob delegates domain A to Charlie
+        manager
+            .add_delegation(Delegation::new(
+                bob.clone(),
+                charlie.clone(),
+                DelegationScope::Domain(domain_a.clone()),
+            ))
+            .unwrap();
+
+        // Step 3: Charlie delegates proposal to Alice (accepted - proposal domain unknown)
+        manager
+            .add_delegation(Delegation::new(
+                charlie.clone(),
+                alice.clone(),
+                DelegationScope::Proposal(proposal_in_a.clone()),
+            ))
+            .unwrap();
+
+        // Step 4: Register the proposal - 3-hop cycle should be detected
+        // Cycle: Alice --(domain A)--> Bob --(domain A)--> Charlie --(proposal)--> Alice
+        manager.register_proposal(proposal_in_a.clone(), domain_a.clone());
+
+        let cycles = manager.detect_cycles_for_proposal(&proposal_in_a, &domain_a);
+        assert!(
+            !cycles.is_empty(),
+            "Expected multi-hop cycle to be detected after proposal registration"
+        );
+
+        // Verify the cycle involves all three participants
+        let (delegator, delegate, path) = &cycles[0];
+        assert_eq!(
+            delegator, &charlie,
+            "Cycle should start from Charlie (the proposal delegator)"
+        );
+        assert_eq!(
+            delegate, &alice,
+            "Cycle should go to Alice (the proposal delegate)"
+        );
+        assert!(
+            path.contains(&alice) && path.contains(&bob) && path.contains(&charlie),
+            "Path should contain Alice, Bob, and Charlie"
         );
     }
 }
