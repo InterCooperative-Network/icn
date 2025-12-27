@@ -75,7 +75,6 @@ icn-zkp = { path = "../icn-zkp" }
 icn-steward = { path = "../icn-steward" }
 icn-crypto-pq = { path = "../icn-crypto-pq" }
 icn-coop = { path = "../icn-coop" }
-icn-cooperative = { path = "../icn-cooperative" }
 icn-community = { path = "../icn-community" }
 
 # Caching

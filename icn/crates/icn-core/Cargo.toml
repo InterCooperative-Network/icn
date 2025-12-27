@@ -40,7 +40,6 @@ icn-security.workspace = true
 icn-federation.workspace = true
 icn-steward.workspace = true
 icn-coop = { path = "../icn-coop" }
-icn-cooperative = { path = "../icn-cooperative" }
 icn-community = { path = "../icn-community" }
 
 [dev-dependencies]
