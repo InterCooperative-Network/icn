@@ -30,7 +30,7 @@ use icn_identity::Did;
 use icn_obs::metrics::gateway as gateway_metrics;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 use crate::entity_audit::{EntityAuditManager, EntityOperation};
 use crate::entity_mgr::EntityManager;
@@ -282,6 +282,16 @@ pub async fn register_entity(
         .parse()
         .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in claims: {e}")))?;
     let creator_id = EntityId::from_did(&creator_did);
+
+    // Ensure the creator's individual entity exists (auto-register if not)
+    // This allows users to create cooperatives without first explicitly registering themselves
+    if entity_mgr.get(&creator_id)?.is_none() {
+        let individual_entity = CooperativeEntity::individual(&creator_did, &claims.sub);
+        entity_mgr.register(individual_entity).map_err(|e| {
+            GatewayError::InternalError(format!("Failed to auto-register individual entity: {e}"))
+        })?;
+        debug!(creator_id = %creator_id, "Auto-registered individual entity for creator");
+    }
 
     // Validate identifier
     if body.identifier.trim().is_empty() {
@@ -723,7 +733,20 @@ pub async fn add_membership(
             .member_id
             .parse()
             .map_err(|e| GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
-        EntityId::from_did(&did)
+
+        // Auto-register the individual entity if it doesn't exist
+        let entity_id = EntityId::from_did(&did);
+        if entity_mgr.get(&entity_id)?.is_none() {
+            let individual_entity = CooperativeEntity::individual(&did, &body.member_id);
+            entity_mgr.register(individual_entity).map_err(|e| {
+                GatewayError::InternalError(format!(
+                    "Failed to auto-register individual entity: {e}"
+                ))
+            })?;
+            debug!(member_id = %entity_id, "Auto-registered individual entity for new member");
+        }
+
+        entity_id
     } else {
         body.member_id
             .parse()

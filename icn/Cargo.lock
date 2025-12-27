@@ -2949,6 +2949,7 @@ dependencies = [
  "actix",
  "actix-cors",
  "actix-files",
+ "actix-http",
  "actix-web",
  "actix-web-actors",
  "actix-web-httpauth",

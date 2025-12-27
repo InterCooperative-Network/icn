@@ -37,7 +37,7 @@ pub const MAX_COOPERATIVES: usize = 1_000;
 pub const MAX_SUBSCRIBERS_PER_COOP: usize = 1_000;
 
 /// Maximum number of scopes in a token request
-pub const MAX_SCOPES: usize = 20;
+pub const MAX_SCOPES: usize = 30;
 
 /// Allowed scopes for gateway tokens
 /// These are the only scopes that can be requested during authentication
@@ -67,6 +67,12 @@ pub const ALLOWED_SCOPES: &[&str] = &[
     "constitutional:read",
     "constitutional:write",
     "constitutional:admin",
+    // Entity operations
+    "entity:read",
+    "entity:write",
+    "entity:audit",
+    // Admin operations
+    "admin",
 ];
 
 /// Maximum payment amount (prevent overflow and unrealistic values)
@@ -560,15 +566,18 @@ mod tests {
         assert!(validate_scopes(&["ledger:read".to_string()]).is_ok());
         assert!(validate_scopes(&["ledger:write".to_string(), "coop:read".to_string()]).is_ok());
 
+        // Valid admin scope (now allowed)
+        assert!(validate_scopes(&["admin".to_string()]).is_ok());
+
         // Invalid scope
         assert!(validate_scopes(&["invalid:scope".to_string()]).is_err());
-        assert!(validate_scopes(&["admin".to_string()]).is_err());
+        assert!(validate_scopes(&["not:allowed".to_string()]).is_err());
 
         // Too many valid scopes
-        let many_scopes: Vec<String> = (0..20).map(|_| "ledger:read".to_string()).collect();
+        let many_scopes: Vec<String> = (0..30).map(|_| "ledger:read".to_string()).collect();
         assert!(validate_scopes(&many_scopes).is_ok());
 
-        let too_many_scopes: Vec<String> = (0..21).map(|_| "ledger:read".to_string()).collect();
+        let too_many_scopes: Vec<String> = (0..31).map(|_| "ledger:read".to_string()).collect();
         assert!(validate_scopes(&too_many_scopes).is_err());
     }
 

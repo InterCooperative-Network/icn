@@ -23,8 +23,10 @@ fn test_scope_allowlist_validation() {
     ])
     .is_ok());
 
+    // Admin scope is now valid (used for entity audit admin operations)
+    assert!(validation::validate_scopes(&["admin".to_string()]).is_ok());
+
     // Invalid scopes should fail
-    assert!(validation::validate_scopes(&["admin".to_string()]).is_err());
     assert!(validation::validate_scopes(&["superuser".to_string()]).is_err());
     assert!(validation::validate_scopes(&["ledger:admin".to_string()]).is_err());
     assert!(validation::validate_scopes(&["*".to_string()]).is_err());
@@ -40,8 +42,8 @@ fn test_scope_allowlist_validation() {
 #[test]
 fn test_scope_allowlist_prevents_privilege_escalation() {
     // Attempt various privilege escalation patterns
+    // Note: "admin" is now allowed as a valid scope for entity audit operations
     let attack_scopes = vec![
-        "admin",
         "root",
         "superuser",
         "ledger:*",
@@ -60,12 +62,12 @@ fn test_scope_allowlist_prevents_privilege_escalation() {
 
 #[test]
 fn test_scope_count_limit() {
-    // Max scopes (20) should work
-    let max_scopes: Vec<String> = (0..20).map(|_| "ledger:read".to_string()).collect();
+    // Max scopes (30) should work
+    let max_scopes: Vec<String> = (0..30).map(|_| "ledger:read".to_string()).collect();
     assert!(validation::validate_scopes(&max_scopes).is_ok());
 
     // Over limit should fail
-    let too_many_scopes: Vec<String> = (0..21).map(|_| "ledger:read".to_string()).collect();
+    let too_many_scopes: Vec<String> = (0..31).map(|_| "ledger:read".to_string()).collect();
     assert!(validation::validate_scopes(&too_many_scopes).is_err());
 }
 
