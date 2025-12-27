@@ -131,7 +131,7 @@ pub struct EntityAuditRecord {
     /// Who performed the operation
     pub performed_by: EntityId,
 
-    /// When performed (Unix timestamp)
+    /// When performed (Unix timestamp in seconds, matching treasury audit pattern)
     pub performed_at: u64,
 
     /// Governance proposal ID (if operation required approval)
@@ -144,19 +144,17 @@ pub struct EntityAuditRecord {
 impl EntityAuditRecord {
     /// Create a new audit record
     ///
-    /// Uses millisecond-precision timestamps to avoid ordering ambiguity
-    /// when multiple operations occur within the same second.
+    /// Uses second-precision timestamps matching the treasury audit pattern.
+    /// UUID ensures uniqueness for multiple operations within the same second.
     pub fn new(entity_id: EntityId, operation: EntityOperation, performed_by: EntityId) -> Self {
-        // Use milliseconds for better ordering precision in high-throughput scenarios
-        let now_millis = icn_time::current_timestamp_millis();
+        let now_secs = icn_time::current_timestamp_secs();
         Self {
-            // Include millis in ID for uniqueness even without UUID in extreme cases
-            id: format!("audit-{}-{}", now_millis, uuid::Uuid::new_v4().simple()),
+            // Format matches treasury pattern: "audit-{timestamp}-{uuid}"
+            id: format!("audit-{}-{}", now_secs, uuid::Uuid::new_v4().simple()),
             entity_id,
             operation,
             performed_by,
-            // Store as millis for proper ordering in reverse pagination
-            performed_at: now_millis,
+            performed_at: now_secs,
             proposal_id: None,
             notes: None,
         }
@@ -271,10 +269,12 @@ impl EntityAuditManager {
             .filter_map(|(key, value)| {
                 serde_json::from_slice(&value)
                     .map_err(|e| {
-                        tracing::warn!(
+                        // Track corruption for operational alerting
+                        gateway_metrics::entity_audit_corruption_inc();
+                        tracing::error!(
                             key = ?String::from_utf8_lossy(&key),
                             error = %e,
-                            "Failed to deserialize audit record - data may be corrupted"
+                            "Corrupted audit record detected - data integrity issue"
                         );
                         e
                     })
@@ -452,5 +452,52 @@ mod tests {
             .get_audit_trail(&entity_id, 10, 0)
             .expect("Failed to get audit trail");
         assert_eq!(trail.records[0].proposal_id.as_deref(), Some("prop-123"));
+    }
+
+    #[test]
+    fn test_audit_record_ordering() {
+        let (mgr, _temp) = create_test_manager();
+
+        let entity_id = EntityId::cooperative("test-coop").expect("valid coop id");
+        let performer_keypair = KeyPair::generate().expect("keypair");
+        let performer = EntityId::from_did(performer_keypair.did());
+
+        // Create 3 records with small delays to ensure distinct timestamps
+        let mut ids = Vec::new();
+        for i in 0..3 {
+            // Sleep to ensure distinct timestamps (seconds precision)
+            std::thread::sleep(std::time::Duration::from_millis(1100));
+            let record = mgr
+                .record_audit(
+                    &entity_id,
+                    EntityOperation::Updated {
+                        changed_fields: vec![format!("field{}", i)],
+                    },
+                    &performer,
+                    None,
+                    None,
+                )
+                .expect("Failed to record audit");
+            ids.push(record.id.clone());
+        }
+
+        // Verify reverse chronological order (most recent first)
+        let trail = mgr
+            .get_audit_trail(&entity_id, 10, 0)
+            .expect("Failed to get audit trail");
+        assert_eq!(trail.records.len(), 3, "Should have 3 records");
+        assert_eq!(trail.records[0].id, ids[2], "Most recent should be first");
+        assert_eq!(trail.records[1].id, ids[1], "Second most recent");
+        assert_eq!(trail.records[2].id, ids[0], "Oldest should be last");
+
+        // Verify timestamps are descending (most recent first)
+        assert!(
+            trail.records[0].performed_at >= trail.records[1].performed_at,
+            "Timestamps should be descending"
+        );
+        assert!(
+            trail.records[1].performed_at >= trail.records[2].performed_at,
+            "Timestamps should be descending"
+        );
     }
 }

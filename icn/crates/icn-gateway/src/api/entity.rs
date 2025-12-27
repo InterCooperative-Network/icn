@@ -368,9 +368,19 @@ pub async fn register_entity(
             error = %e,
             "Failed to record entity registration audit - rolling back"
         );
-        // Cleanup: remove membership first, then entity
+        // Cleanup: remove entity first, then membership
+        // Order matters: if entity removal fails, we still have a valid entity with its founder.
+        // If we removed membership first and entity removal failed, we'd have an orphaned entity.
         // Track rollback failures for operational alerting
         let mut rollback_errors = Vec::new();
+        if let Err(cleanup_err) = entity_mgr.remove(&entity_id) {
+            rollback_errors.push(format!("entity: {cleanup_err}"));
+            tracing::error!(
+                entity_id = %entity_id,
+                error = %cleanup_err,
+                "Failed to cleanup entity after audit failure"
+            );
+        }
         if let Err(cleanup_err) = entity_mgr.remove_membership(&entity_id, &creator_id) {
             rollback_errors.push(format!("membership: {cleanup_err}"));
             tracing::error!(
@@ -378,14 +388,6 @@ pub async fn register_entity(
                 member_id = %creator_id,
                 error = %cleanup_err,
                 "Failed to cleanup membership after audit failure"
-            );
-        }
-        if let Err(cleanup_err) = entity_mgr.remove(&entity_id) {
-            rollback_errors.push(format!("entity: {cleanup_err}"));
-            tracing::error!(
-                entity_id = %entity_id,
-                error = %cleanup_err,
-                "Failed to cleanup entity after audit failure"
             );
         }
         // Record metric if any rollback failed
