@@ -594,7 +594,10 @@ pub async fn delete_entity(
 
     // Record audit trail - fail the request if audit logging fails for compliance
     // NOTE: Compensation tradeoff - if audit fails after deletion, we attempt to restore
-    // the entity. This is complex since we need to re-register rather than just update.
+    // the entity. We only need to restore the entity itself, not memberships, because
+    // entity_mgr.remove() enforces that entities can only be deleted when they have
+    // no members (see entity_mgr.rs:118-123). If there were members, the deletion
+    // would have failed before reaching this point.
     if let Err(e) =
         audit_mgr.record_audit(&entity_id, EntityOperation::Deleted, &caller_id, None, None)
     {
@@ -603,7 +606,8 @@ pub async fn delete_entity(
             error = %e,
             "Failed to record entity deletion audit - attempting restoration"
         );
-        // Attempt compensation: re-register the entity
+        // Attempt compensation: re-register the entity (no memberships to restore
+        // since remove() only succeeds when entity has no members)
         if let Err(restore_err) = entity_mgr.register(entity.clone()) {
             gateway_metrics::entity_audit_rollback_failure_inc("delete_entity");
             tracing::error!(
