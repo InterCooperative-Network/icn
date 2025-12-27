@@ -2,11 +2,13 @@
 //! Treasury Integration Tests (Issue #255)
 //!
 //! Comprehensive integration tests for the treasury system including:
-//! - Concurrent spending operations
-//! - Spending rule validation
-//! - Velocity limit enforcement
-//! - Audit trail verification
-//! - Error paths and edge cases
+//! - Concurrent spending operations (test_concurrent_budget_spending)
+//! - Spending rule validation (test_spending_rule_enforcement, test_spending_below_threshold_allowed)
+//! - Velocity limit enforcement (test_velocity_limit_blocks_rapid_withdrawals)
+//! - Budget lifecycle (test_budget_status_transitions, test_expired_budget_spending_rejected, test_exceeded_budget_status)
+//! - Audit trail verification (test_audit_trail_created_for_operations, test_audit_trail_pagination)
+//! - Error paths (test_negative_amount_rejected, test_treasury_not_found_errors)
+//! - Multi-currency (test_multi_currency_operations)
 
 use anyhow::Result;
 use icn_identity::Did;
@@ -21,6 +23,10 @@ use tokio::sync::RwLock;
 use tracing::info;
 
 /// Helper to create deterministic test DIDs
+///
+/// Uses `DefaultHasher` for deterministic-per-run DID generation.
+/// Note: DefaultHasher may change across Rust versions, but this is acceptable
+/// for integration tests where cross-version reproducibility isn't required.
 fn test_did(seed: &str) -> Did {
     let hash = {
         use std::hash::{Hash, Hasher};
@@ -535,6 +541,71 @@ async fn test_expired_budget_spending_rejected() -> Result<()> {
     }
 
     info!("Expired budget spending rejected test passed");
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_exceeded_budget_status() -> Result<()> {
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter("info")
+        .with_test_writer()
+        .try_init();
+
+    info!("=== Testing exceeded budget status ===");
+
+    let (treasury_manager, treasury_did, admin, _store) = setup_treasury().await;
+
+    // Create a budget and manually set it to Exceeded status.
+    // This simulates a scenario where budget tracking detected overspending
+    // (e.g., due to external adjustment, reconciliation, or manual intervention).
+    let budget_id = {
+        let mut guard = treasury_manager.write().await;
+
+        let budget = guard.create_budget(
+            treasury_did.clone(),
+            "exceeded-test".to_string(),
+            1000,
+            "credits".to_string(),
+            None,
+            admin.clone(),
+            None,
+        )?;
+
+        // Set status to Exceeded (simulates overspending detection)
+        guard.update_budget_status(&budget.id, BudgetStatus::Exceeded)?;
+        budget.id.clone()
+    };
+
+    // Verify Exceeded status blocks spending
+    {
+        let mut guard = treasury_manager.write().await;
+        let budget = guard.get_budget(&budget_id).unwrap();
+
+        assert_eq!(budget.status, BudgetStatus::Exceeded);
+        assert!(
+            !budget.can_spend(),
+            "Exceeded budget should not allow spending"
+        );
+
+        // record_spending should fail
+        let result = guard.record_spending(&budget_id, 100, test_hash("should-fail"));
+        assert!(result.is_err(), "Spending on exceeded budget should fail");
+    }
+
+    // Verify Exceeded budget can be transitioned back to Active if reconciled
+    {
+        let mut guard = treasury_manager.write().await;
+        guard.update_budget_status(&budget_id, BudgetStatus::Active)?;
+
+        let budget = guard.get_budget(&budget_id).unwrap();
+        assert_eq!(budget.status, BudgetStatus::Active);
+        assert!(
+            budget.can_spend(),
+            "Reconciled budget should allow spending again"
+        );
+    }
+
+    info!("Exceeded budget status test passed");
     Ok(())
 }
 
