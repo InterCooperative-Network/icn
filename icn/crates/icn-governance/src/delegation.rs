@@ -968,7 +968,7 @@ mod tests {
             DelegationScope::Proposal(proposal_in_b.clone()),
         ));
 
-        assert!(result.is_ok(), "Expected no cycle but got: {:?}", result);
+        assert!(result.is_ok(), "Expected no cycle but got: {result:?}");
     }
 
     #[test]

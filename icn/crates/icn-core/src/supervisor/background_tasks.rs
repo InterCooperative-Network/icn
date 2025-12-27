@@ -245,6 +245,235 @@ pub mod steward {
     }
 }
 
+/// Configuration for parameter scheduler task
+pub struct ParameterSchedulerConfig {
+    /// Interval between checking for due parameter changes
+    pub check_interval: Duration,
+}
+
+impl Default for ParameterSchedulerConfig {
+    fn default() -> Self {
+        Self {
+            check_interval: Duration::from_secs(10), // Check every 10 seconds
+        }
+    }
+}
+
+/// Result of applying a single pending parameter change
+pub enum ParameterApplyResult {
+    /// Change was successfully applied
+    Applied,
+    /// Change was skipped (e.g., parameter no longer exists)
+    Skipped { reason: String },
+    /// Change application failed
+    Failed { error: String },
+}
+
+/// Spawn the parameter scheduler background task
+///
+/// This task periodically checks for pending protocol parameter changes
+/// that are due and applies them. This enables delayed execution of
+/// governance-approved parameter changes.
+///
+/// # Parameters
+/// - `config`: Scheduler configuration
+/// - `parameter_store`: The parameter store (must support pending changes)
+/// - `shutdown_rx`: Shutdown signal receiver
+///
+/// # Behavior
+/// - Checks for due changes every `check_interval`
+/// - Applies changes in chronological order (earliest first)
+/// - Handles conflicts by superseding older pending changes for the same parameter
+/// - Logs all actions for audit trail
+pub fn spawn_parameter_scheduler_task(
+    config: ParameterSchedulerConfig,
+    parameter_store: Arc<dyn icn_governance::ProtocolParameterStore>,
+    mut shutdown_rx: BroadcastReceiver<()>,
+) -> JoinHandle<()> {
+    tokio::spawn(async move {
+        info!("Parameter scheduler task started");
+
+        let mut interval = tokio::time::interval(config.check_interval);
+
+        loop {
+            select! {
+                _ = interval.tick() => {
+                    if let Err(e) = process_due_changes(&parameter_store).await {
+                        warn!("Error processing due parameter changes: {}", e);
+                    }
+                }
+                _ = shutdown_rx.recv() => {
+                    info!("Parameter scheduler task shutting down");
+                    break;
+                }
+            }
+        }
+    })
+}
+
+/// Process all pending parameter changes that are due
+async fn process_due_changes(
+    store: &Arc<dyn icn_governance::ProtocolParameterStore>,
+) -> anyhow::Result<()> {
+    let now = icn_time::current_timestamp_secs();
+
+    // Get all changes that are due
+    let due_changes = store.get_changes_due_before(now)?;
+
+    if due_changes.is_empty() {
+        return Ok(());
+    }
+
+    debug!(
+        due_count = due_changes.len(),
+        "Processing due parameter changes"
+    );
+
+    // Track which parameters we've processed to handle superseding
+    let mut processed_params: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+    for change in due_changes {
+        // If we've already processed a change for this parameter in this batch,
+        // this later change should be superseded (since get_changes_due_before returns
+        // changes ordered by effective_at ascending, earlier changes are processed first)
+        if processed_params.contains(&change.parameter_id) {
+            let mut updated = change.clone();
+            updated.mark_superseded("Superseded by change with earlier effective time");
+            if let Err(e) = store.update_pending_change(updated) {
+                warn!(
+                    pending_change_id = %change.id,
+                    error = %e,
+                    "Failed to mark pending change as superseded"
+                );
+            } else {
+                icn_obs::metrics::protocol::pending_parameter_changes_superseded_inc();
+            }
+            continue;
+        }
+
+        // Mark this parameter as processed BEFORE attempting to apply.
+        // This ensures that if apply_pending_change() fails, any subsequent changes
+        // for the same parameter are still marked as superseded (not attempted).
+        processed_params.insert(change.parameter_id.clone());
+
+        // Apply the change
+        match apply_pending_change(store, &change).await {
+            ParameterApplyResult::Applied => {
+                info!(
+                    pending_change_id = %change.id,
+                    parameter_id = %change.parameter_id,
+                    proposal_id = %change.proposal_id,
+                    "Applied delayed parameter change"
+                );
+                icn_obs::metrics::protocol::pending_parameter_changes_applied_inc();
+            }
+            ParameterApplyResult::Skipped { reason } => {
+                warn!(
+                    pending_change_id = %change.id,
+                    parameter_id = %change.parameter_id,
+                    reason = %reason,
+                    "Skipped pending parameter change"
+                );
+            }
+            ParameterApplyResult::Failed { error } => {
+                warn!(
+                    pending_change_id = %change.id,
+                    parameter_id = %change.parameter_id,
+                    error = %error,
+                    "Failed to apply pending parameter change"
+                );
+            }
+        }
+    }
+
+    // Update the active pending changes gauge
+    if let Ok(active_count) = store.count_pending_changes() {
+        icn_obs::metrics::protocol::pending_parameter_changes_active_set(active_count as u64);
+    }
+
+    Ok(())
+}
+
+/// Apply a single pending parameter change
+async fn apply_pending_change(
+    store: &Arc<dyn icn_governance::ProtocolParameterStore>,
+    change: &icn_governance::PendingParameterChange,
+) -> ParameterApplyResult {
+    // Get the current parameter
+    let current_param = match store.get(&change.parameter_id) {
+        Ok(Some(p)) => p,
+        Ok(None) => {
+            // Parameter no longer exists, mark as cancelled
+            let mut updated = change.clone();
+            updated.mark_cancelled("Parameter no longer exists");
+            if store.update_pending_change(updated).is_ok() {
+                icn_obs::metrics::protocol::pending_parameter_changes_cancelled_inc();
+            }
+            return ParameterApplyResult::Skipped {
+                reason: "Parameter no longer exists".to_string(),
+            };
+        }
+        Err(e) => {
+            return ParameterApplyResult::Failed {
+                error: format!("Failed to get parameter: {e}"),
+            };
+        }
+    };
+
+    // Validate scope consistency: the pending change's scope must match the parameter's scope.
+    // This prevents a cooperative-scoped pending change from modifying a global parameter.
+    if current_param.scope != change.scope {
+        let mut updated = change.clone();
+        updated.mark_cancelled(format!(
+            "Scope mismatch: pending change has scope {:?} but parameter has scope {:?}",
+            change.scope, current_param.scope
+        ));
+        if store.update_pending_change(updated).is_ok() {
+            icn_obs::metrics::protocol::pending_parameter_changes_cancelled_inc();
+        }
+        return ParameterApplyResult::Skipped {
+            reason: format!(
+                "Scope mismatch: expected {:?}, found {:?}",
+                change.scope, current_param.scope
+            ),
+        };
+    }
+
+    // Note: Superseding of later changes for the same parameter is handled
+    // in process_due_changes() at the batch level, not here.
+
+    // Create updated parameter with new value
+    let mut updated_param = current_param.clone();
+    updated_param.value = change.new_value.clone();
+    updated_param.updated_at = icn_time::current_timestamp_secs();
+    updated_param.updated_by = Some(change.proposal_id.clone());
+
+    // Apply the parameter change
+    if let Err(e) = store.set(
+        updated_param,
+        Some(change.proposal_id.clone()),
+        Some(format!("delayed execution of {}", change.proposal_id)),
+    ) {
+        return ParameterApplyResult::Failed {
+            error: format!("Failed to set parameter: {e}"),
+        };
+    }
+
+    // Mark the pending change as applied
+    let mut applied_change = change.clone();
+    applied_change.mark_applied();
+    if let Err(e) = store.update_pending_change(applied_change) {
+        // Log but don't fail - the parameter was successfully updated
+        warn!(
+            pending_change_id = %change.id,
+            error = %e,
+            "Failed to mark pending change as applied"
+        );
+    }
+
+    ParameterApplyResult::Applied
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -260,5 +489,11 @@ mod tests {
         let config = MetricsUpdateConfig::default();
         assert_eq!(config.update_interval, Duration::from_secs(10));
         assert_eq!(config.active_actor_count, 7);
+    }
+
+    #[test]
+    fn test_parameter_scheduler_config_default() {
+        let config = ParameterSchedulerConfig::default();
+        assert_eq!(config.check_interval, Duration::from_secs(10));
     }
 }
