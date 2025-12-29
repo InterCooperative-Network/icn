@@ -672,8 +672,8 @@ pub async fn delete_entity(
 /// GET /entities/:id/members - List members
 ///
 /// Query parameters:
-/// - `cursor`: Pagination cursor (opaque string)
-/// - `limit`: Max items per page (default 50, max 1000)
+/// - `cursor`: Pagination cursor (offset-based, format: "offset:<number>")
+/// - `limit`: Max items per page (default 20, max 100)
 /// - `sort`: Sort field with optional `-` prefix for descending (e.g., `-joined_at`)
 /// - `filter[role]`: Filter by membership role
 #[get("/{id}/members")]
@@ -716,51 +716,46 @@ pub async fn list_members(
         // Default sort by joined_at ascending
         response.sort_by(|a, b| a.joined_at.cmp(&b.joined_at));
     } else {
-        for field in sort_fields.iter().rev() {
-            match field.field.as_str() {
-                "joined_at" => {
-                    response.sort_by(|a, b| {
-                        let cmp = a.joined_at.cmp(&b.joined_at);
-                        if field.ascending {
-                            cmp
-                        } else {
-                            cmp.reverse()
-                        }
-                    });
+        // Multi-field sort: apply fields in order, using each as a tie-breaker
+        response.sort_by(|a, b| {
+            for field in &sort_fields {
+                let cmp = match field.field.as_str() {
+                    "joined_at" => a.joined_at.cmp(&b.joined_at),
+                    "role" => a.role.cmp(&b.role),
+                    _ => std::cmp::Ordering::Equal, // Ignore unknown sort fields
+                };
+                let cmp = if field.ascending { cmp } else { cmp.reverse() };
+                if cmp != std::cmp::Ordering::Equal {
+                    return cmp;
                 }
-                "role" => {
-                    response.sort_by(|a, b| {
-                        let cmp = a.role.cmp(&b.role);
-                        if field.ascending {
-                            cmp
-                        } else {
-                            cmp.reverse()
-                        }
-                    });
-                }
-                _ => {} // Ignore unknown sort fields
             }
-        }
+            std::cmp::Ordering::Equal
+        });
     }
 
     let total = response.len();
 
-    // Apply cursor-based pagination
-    let start_idx = if let Some(cursor) = &query.cursor {
-        // Cursor is the index to start from
-        cursor.parse::<usize>().unwrap_or(0)
-    } else {
-        0
-    };
+    // Parse cursor to get offset (format: "offset:<number>" or plain number for backwards compat)
+    let offset: usize = query
+        .cursor
+        .as_deref()
+        .and_then(|c| {
+            c.strip_prefix("offset:")
+                .and_then(|n| n.parse::<usize>().ok())
+                .or_else(|| c.parse::<usize>().ok())
+        })
+        .unwrap_or(0)
+        .min(total);
 
     let page_items: Vec<_> = response
         .into_iter()
-        .skip(start_idx)
+        .skip(offset)
         .take(query.limit)
         .collect();
-    let has_more = start_idx + page_items.len() < total;
+    let next_offset = offset + page_items.len();
+    let has_more = next_offset < total;
     let next_cursor = if has_more {
-        Some((start_idx + page_items.len()).to_string())
+        Some(format!("offset:{next_offset}"))
     } else {
         None
     };

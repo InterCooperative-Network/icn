@@ -191,17 +191,24 @@ pub async fn list_domains(
     // Apply pagination
     let limit = query.limit;
     let total = domains.len();
-    let paginated: Vec<_> = domains.into_iter().take(limit).collect();
+
+    // Parse cursor to get offset (format: "offset:<number>")
+    let offset: usize = query
+        .cursor
+        .as_deref()
+        .and_then(|c| c.strip_prefix("offset:"))
+        .and_then(|n| n.parse::<usize>().ok())
+        .unwrap_or(0)
+        .min(total);
+
+    let paginated: Vec<_> = domains.into_iter().skip(offset).take(limit).collect();
     let count = paginated.len();
-    let has_more = count < total;
+    let next_offset = offset + count;
+    let has_more = next_offset < total;
 
     // Build pagination metadata
     let pagination = if has_more {
-        ListPagination::with_cursor(
-            format!("offset:{count}"), // Simple offset-based cursor for now
-            count,
-        )
-        .with_total(total)
+        ListPagination::with_cursor(format!("offset:{next_offset}"), count).with_total(total)
     } else {
         ListPagination::last_page(count).with_total(total)
     };
@@ -498,13 +505,24 @@ pub async fn list_proposals(
     // Apply pagination
     let limit = query.limit;
     let total = proposals.len();
-    let paginated: Vec<_> = proposals.into_iter().take(limit).collect();
+
+    // Parse cursor to get offset (format: "offset:<number>")
+    let offset: usize = query
+        .cursor
+        .as_deref()
+        .and_then(|c| c.strip_prefix("offset:"))
+        .and_then(|n| n.parse::<usize>().ok())
+        .unwrap_or(0)
+        .min(total);
+
+    let paginated: Vec<_> = proposals.into_iter().skip(offset).take(limit).collect();
     let count = paginated.len();
-    let has_more = count < total;
+    let next_offset = offset + count;
+    let has_more = next_offset < total;
 
     // Build pagination metadata
     let pagination = if has_more {
-        ListPagination::with_cursor(format!("offset:{count}"), count).with_total(total)
+        ListPagination::with_cursor(format!("offset:{next_offset}"), count).with_total(total)
     } else {
         ListPagination::last_page(count).with_total(total)
     };
@@ -1501,6 +1519,87 @@ mod tests {
         let draft_proposals: Vec<Proposal> = serde_json::from_value(resp["data"].clone()).unwrap();
         assert_eq!(draft_proposals.len(), 3);
         assert_eq!(resp["pagination"]["total"], 3);
+    }
+
+    #[actix_web::test]
+    async fn test_list_domains_cursor_pagination() {
+        let gov_mgr = Arc::new(GovernanceManager::new());
+        let alice = IdentityBundle::generate().unwrap();
+
+        // Create 5 domains
+        for i in 0..5 {
+            gov_mgr
+                .create_domain(
+                    GovernanceDomainId(format!("coop:domain{i}")),
+                    format!("Domain {i}"),
+                    "cooperative".to_string(),
+                    GovernanceParams::new(50, 66, 7 * 86400),
+                    MembershipConfig::static_list(vec![alice.did().clone()]),
+                )
+                .await
+                .unwrap();
+        }
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(gov_mgr.clone()))
+                .service(web::scope("/gov").service(list_domains)),
+        )
+        .await;
+
+        // First page: limit=2
+        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:read"]);
+        let req = test::TestRequest::get()
+            .uri("/gov/domains?limit=2")
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp: serde_json::Value = test::call_and_read_body_json(&app, req).await;
+        let page1: Vec<serde_json::Value> = serde_json::from_value(resp["data"].clone()).unwrap();
+        assert_eq!(page1.len(), 2);
+        assert_eq!(resp["pagination"]["has_more"], true);
+        assert_eq!(resp["pagination"]["total"], 5);
+        let cursor = resp["pagination"]["cursor"].as_str().unwrap();
+        assert_eq!(cursor, "offset:2");
+
+        // Second page using cursor
+        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:read"]);
+        let req = test::TestRequest::get()
+            .uri(&format!("/gov/domains?limit=2&cursor={cursor}"))
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp: serde_json::Value = test::call_and_read_body_json(&app, req).await;
+        let page2: Vec<serde_json::Value> = serde_json::from_value(resp["data"].clone()).unwrap();
+        assert_eq!(page2.len(), 2);
+        assert_eq!(resp["pagination"]["has_more"], true);
+        let cursor = resp["pagination"]["cursor"].as_str().unwrap();
+        assert_eq!(cursor, "offset:4");
+
+        // Third page (last, only 1 item)
+        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:read"]);
+        let req = test::TestRequest::get()
+            .uri(&format!("/gov/domains?limit=2&cursor={cursor}"))
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp: serde_json::Value = test::call_and_read_body_json(&app, req).await;
+        let page3: Vec<serde_json::Value> = serde_json::from_value(resp["data"].clone()).unwrap();
+        assert_eq!(page3.len(), 1);
+        assert_eq!(resp["pagination"]["has_more"], false);
+        assert!(resp["pagination"]["cursor"].is_null());
+
+        // Verify no duplicates across pages
+        let all_names: Vec<String> = page1
+            .iter()
+            .chain(page2.iter())
+            .chain(page3.iter())
+            .map(|d| d["name"].as_str().unwrap().to_string())
+            .collect();
+        assert_eq!(all_names.len(), 5);
+        // Should all be unique
+        let unique: std::collections::HashSet<_> = all_names.iter().collect();
+        assert_eq!(unique.len(), 5);
     }
 
     #[actix_web::test]
