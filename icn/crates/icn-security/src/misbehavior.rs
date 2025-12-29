@@ -303,23 +303,28 @@ impl MisbehaviorDetector {
         // Add to violation history
         self.violations.entry(did.clone()).or_default().push(record);
 
-        // Update reputation score
-        let score = self.reputation_scores.entry(did.clone()).or_default();
+        // Update reputation score and capture thresholds for later checks
+        let (is_auto_ban, should_ban, should_quarantine) = {
+            let score = self.reputation_scores.entry(did.clone()).or_default();
+            score.apply_penalty(&violation, self.thresholds.decay_rate);
 
-        score.apply_penalty(&violation, self.thresholds.decay_rate);
+            (
+                violation.is_auto_ban(),
+                score.is_banned(self.thresholds.ban_threshold),
+                score.is_quarantined(self.thresholds.quarantine_threshold),
+            )
+        };
 
         // Emit metrics
         metrics::violations_inc(&did.to_string(), &violation.description());
 
-        // Update trust graph if callback is set (Phase 18)
-        if let Some(ref callback) = self.trust_penalty_callback {
-            callback(did, score.score);
-        }
+        // Update trust graph if callback is set (Phase 18, with panic safety)
+        self.invoke_trust_callback(did);
 
         // Check for auto-quarantine/ban
-        if violation.is_auto_ban() || score.is_banned(self.thresholds.ban_threshold) {
+        if is_auto_ban || should_ban {
             self.ban_peer(did);
-        } else if score.is_quarantined(self.thresholds.quarantine_threshold) {
+        } else if should_quarantine {
             self.quarantine_peer(did);
         }
 
@@ -419,6 +424,146 @@ impl MisbehaviorDetector {
 
         // Remove DIDs with no violations
         self.violations.retain(|_, v| !v.is_empty());
+    }
+
+    /// Check and release peers whose reputation has recovered above quarantine threshold.
+    ///
+    /// Should be called periodically to restore baseline trust for rehabilitated peers.
+    /// Returns the list of DIDs that were released from quarantine.
+    ///
+    /// # Reputation Decay
+    ///
+    /// This method applies reputation decay to ALL tracked peers, not just quarantined ones.
+    /// This is intentional: good actors' scores should also recover towards 1.0 over time,
+    /// and the decay rate provides a "healing" mechanism for the entire trust system.
+    /// Without universal decay, a single past violation would permanently lower a peer's score.
+    pub fn check_quarantine_releases(&mut self) -> Vec<Did> {
+        let mut released = Vec::new();
+        let now = SystemTime::now();
+
+        // Apply reputation decay to ALL reputation scores.
+        // This is intentional - it allows good actors to recover reputation over time
+        // and prevents permanent penalties for minor past violations.
+        for (_did, score) in self.reputation_scores.iter_mut() {
+            if let Ok(elapsed) = now.duration_since(score.updated_at) {
+                // Cap decay hours to 720 (30 days) to prevent floating point precision issues
+                // when nodes are offline for extended periods
+                const MAX_DECAY_HOURS: f64 = 720.0;
+                let hours = (elapsed.as_secs() as f64 / 3600.0).min(MAX_DECAY_HOURS);
+                if hours > 0.0 {
+                    let decay_amount = self.thresholds.decay_rate * hours;
+                    score.score = (score.score + decay_amount).min(1.0);
+                    score.updated_at = now; // Critical: update timestamp to prevent re-decay
+                }
+            }
+        }
+
+        // Check for quarantine release
+        let quarantine_threshold = self.thresholds.quarantine_threshold;
+        let release_threshold = quarantine_threshold + 0.1; // Must exceed threshold by 0.1
+
+        let dids_to_check: Vec<Did> = self.quarantined.keys().cloned().collect();
+
+        for did in dids_to_check {
+            if let Some(score) = self.reputation_scores.get(&did) {
+                if score.score >= release_threshold {
+                    self.release_from_quarantine(&did);
+                    released.push(did);
+                }
+            }
+        }
+
+        if !released.is_empty() {
+            info!("Released {} peers from quarantine", released.len());
+        }
+
+        // Periodic cleanup of old violations
+        self.cleanup_old_violations();
+
+        released
+    }
+
+    /// Release a peer from quarantine, restoring baseline trust.
+    ///
+    /// This should only be called when a peer's reputation has sufficiently recovered.
+    pub fn release_from_quarantine(&mut self, did: &Did) {
+        if self.quarantined.remove(did).is_some() {
+            info!("Released {} from quarantine (reputation recovered)", did);
+            metrics::quarantined_dec();
+
+            // Update trust graph if callback is set (with panic safety)
+            self.invoke_trust_callback(did);
+
+            // Cleanup old violations to prevent unbounded growth
+            self.cleanup_old_violations();
+        }
+    }
+
+    /// Safely invoke the trust penalty callback with panic protection.
+    ///
+    /// If the callback panics, the error is logged but does not propagate.
+    /// This prevents callback failures from crashing the detector.
+    fn invoke_trust_callback(&self, did: &Did) {
+        if let Some(ref callback) = self.trust_penalty_callback {
+            if let Some(score) = self.reputation_scores.get(did) {
+                let did_clone = did.clone();
+                let score_value = score.score;
+                let callback_clone = callback.clone();
+
+                // Catch panics from callback to prevent detector crash
+                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
+                    callback_clone(&did_clone, score_value);
+                }));
+
+                if let Err(e) = result {
+                    warn!(
+                        "Trust penalty callback panicked for {}: {:?}",
+                        did,
+                        e.downcast_ref::<&str>().unwrap_or(&"unknown panic")
+                    );
+                }
+            }
+        }
+    }
+
+    /// Baseline reputation score for administrative release (0.6 = moderate trust)
+    const BASELINE_REPUTATION_SCORE: f64 = 0.6;
+
+    /// Manually force release from quarantine (administrative action).
+    ///
+    /// This bypasses reputation checks and provides a full "administrative pardon":
+    /// - Removes from quarantine
+    /// - Resets reputation to baseline (0.6)
+    /// - Clears violation history
+    ///
+    /// **AUDIT**: This is a privileged operation that should be logged and monitored.
+    pub fn force_release_from_quarantine(&mut self, did: &Did) {
+        if self.quarantined.remove(did).is_some() {
+            // High-priority audit log for administrative override
+            warn!(
+                "AUDIT: Administrative quarantine release for {} - this is a privileged operation",
+                did
+            );
+            metrics::quarantined_dec();
+
+            // Reset reputation to baseline (full pardon)
+            if let Some(score) = self.reputation_scores.get_mut(did) {
+                score.score = Self::BASELINE_REPUTATION_SCORE;
+                score.total_violations = 0;
+                score.severity_points = 0;
+                score.last_violation = None; // Clear violation history for clean slate
+                score.updated_at = SystemTime::now();
+            }
+
+            // Clear violation history for true administrative pardon
+            self.violations.remove(did);
+
+            // Update trust graph if callback is set (with panic safety)
+            self.invoke_trust_callback(did);
+
+            // Cleanup old violations from other DIDs
+            self.cleanup_old_violations();
+        }
     }
 
     /// Get statistics for monitoring
@@ -610,5 +755,178 @@ mod tests {
         assert_eq!(stats.total_tracked_dids, 2);
         assert_eq!(stats.total_violations, 2);
         assert_eq!(stats.banned_count, 1); // did2 auto-banned
+    }
+
+    #[test]
+    fn test_quarantine_release_with_high_score() {
+        let mut detector = MisbehaviorDetector::new(MisbehaviorThresholds::default());
+        let did = test_did();
+
+        // First quarantine the peer via rate limiting
+        for _ in 0..15 {
+            let violation = Violation::ExcessiveResourceUse {
+                metric: "test".to_string(),
+                observed: 10,
+                limit: 5,
+            };
+            detector.record_violation(&did, violation, vec![]);
+        }
+
+        assert!(detector.is_quarantined(&did), "DID should be quarantined");
+
+        // Manually set reputation just above release threshold (quarantine_threshold + 0.1)
+        if let Some(score) = detector.reputation_scores.get_mut(&did) {
+            score.score = 0.61; // Slightly above 0.5 + 0.1 = 0.6 release threshold
+        }
+
+        let released = detector.check_quarantine_releases();
+        assert!(released.contains(&did), "DID should be released");
+        assert!(
+            !detector.is_quarantined(&did),
+            "DID should no longer be quarantined"
+        );
+    }
+
+    #[test]
+    fn test_force_release_from_quarantine() {
+        let mut detector = MisbehaviorDetector::new(MisbehaviorThresholds::default());
+        let did = test_did();
+
+        // Quarantine the peer
+        for _ in 0..15 {
+            let violation = Violation::ExcessiveResourceUse {
+                metric: "test".to_string(),
+                observed: 10,
+                limit: 5,
+            };
+            detector.record_violation(&did, violation, vec![]);
+        }
+
+        assert!(detector.is_quarantined(&did), "DID should be quarantined");
+
+        // Force release
+        detector.force_release_from_quarantine(&did);
+
+        assert!(
+            !detector.is_quarantined(&did),
+            "DID should no longer be quarantined"
+        );
+
+        // Reputation should be reset to baseline
+        let rep = detector.get_reputation(&did).unwrap().score;
+        assert!(
+            (rep - 0.6).abs() < 0.01,
+            "Reputation should be reset to 0.6 baseline"
+        );
+    }
+
+    #[test]
+    fn test_trust_penalty_callback_called() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::Arc;
+
+        let call_count = Arc::new(AtomicUsize::new(0));
+        let call_count_clone = call_count.clone();
+
+        let mut detector = MisbehaviorDetector::new(MisbehaviorThresholds::default());
+
+        // Set up callback
+        let callback: TrustPenaltyCallback = Arc::new(move |_did, _score| {
+            call_count_clone.fetch_add(1, Ordering::SeqCst);
+        });
+        detector.set_trust_penalty_callback(callback);
+
+        let did = test_did();
+        let violation = Violation::ExcessiveResourceUse {
+            metric: "test".to_string(),
+            observed: 10,
+            limit: 5,
+        };
+
+        detector.record_violation(&did, violation, vec![]);
+
+        assert_eq!(
+            call_count.load(Ordering::SeqCst),
+            1,
+            "Trust penalty callback should be called once"
+        );
+    }
+
+    #[test]
+    fn test_trust_penalty_callback_receives_correct_score() {
+        use std::sync::{Arc, Mutex};
+
+        let received_score = Arc::new(Mutex::new(None));
+        let received_score_clone = received_score.clone();
+
+        let mut detector = MisbehaviorDetector::new(MisbehaviorThresholds::default());
+
+        // Set up callback to capture score
+        let callback: TrustPenaltyCallback = Arc::new(move |_did, score| {
+            *received_score_clone.lock().unwrap() = Some(score);
+        });
+        detector.set_trust_penalty_callback(callback);
+
+        let did = test_did();
+        let violation = Violation::InvalidSignature {
+            message_hash: [0u8; 32],
+        };
+
+        detector.record_violation(&did, violation, vec![]);
+
+        let score = received_score.lock().unwrap().expect("Score should be set");
+        // InvalidSignature has severity 5, penalty = 5 * 0.05 = 0.25
+        // Starting from 1.0, new score = 1.0 - 0.25 = 0.75
+        assert!(
+            (score - 0.75).abs() < 0.01,
+            "Score should be approximately 0.75, got {score}"
+        );
+    }
+
+    #[test]
+    fn test_release_from_quarantine_calls_callback() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::Arc;
+
+        let call_count = Arc::new(AtomicUsize::new(0));
+        let call_count_clone = call_count.clone();
+
+        let mut detector = MisbehaviorDetector::new(MisbehaviorThresholds::default());
+
+        let callback: TrustPenaltyCallback = Arc::new(move |_did, _score| {
+            call_count_clone.fetch_add(1, Ordering::SeqCst);
+        });
+        detector.set_trust_penalty_callback(callback);
+
+        let did = test_did();
+
+        // Quarantine via violations
+        for _ in 0..15 {
+            detector.record_violation(
+                &did,
+                Violation::ExcessiveResourceUse {
+                    metric: "test".to_string(),
+                    observed: 10,
+                    limit: 5,
+                },
+                vec![],
+            );
+        }
+
+        // Reset call count after initial violations
+        call_count.store(0, Ordering::SeqCst);
+
+        // Set reputation high enough for release
+        if let Some(score) = detector.reputation_scores.get_mut(&did) {
+            score.score = 0.65;
+        }
+
+        detector.release_from_quarantine(&did);
+
+        assert_eq!(
+            call_count.load(Ordering::SeqCst),
+            1,
+            "Callback should be called on quarantine release"
+        );
     }
 }

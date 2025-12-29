@@ -104,6 +104,10 @@ import {
   ListDevicesResponse,
   RevokeDeviceRequest,
   RevokeDeviceResponse,
+  // Vote delegation types
+  CreateDelegationRequest,
+  DelegationResponse,
+  DelegationListResponse,
 } from './types';
 
 export * from './types';
@@ -117,6 +121,123 @@ const DEFAULT_RETRY: Required<RetryOptions> = {
   jitterFactor: 0.1,
   retryableStatuses: [408, 429, 500, 502, 503, 504],
 };
+
+// ===========================================================================
+// Input Validation Helpers
+// ===========================================================================
+
+/**
+ * Validate a DID (Decentralized Identifier) format.
+ *
+ * ICN DIDs follow the pattern: did:icn:<multibase-encoded-public-key>
+ * where the key portion is base58btc encoded (starts with 'z').
+ *
+ * Accepts both ICN DIDs (strict 3-part format) and other DID methods
+ * (for interoperability with external systems).
+ *
+ * @throws ICNError if the DID format is invalid
+ */
+function validateDid(did: string, fieldName = 'DID'): void {
+  if (!did || typeof did !== 'string') {
+    throw new ICNError(`${fieldName} is required`, 400, 'INVALID_DID');
+  }
+
+  // Basic format check: did:method:identifier
+  const parts = did.split(':');
+  if (parts.length < 3 || parts[0] !== 'did') {
+    throw new ICNError(`${fieldName} must be a valid DID (did:method:identifier)`, 400, 'INVALID_DID');
+  }
+
+  const method = parts[1];
+
+  // ICN-specific validation (strict 3-part format)
+  if (method === 'icn') {
+    // ICN DIDs must be exactly: did:icn:<key>
+    if (parts.length !== 3) {
+      throw new ICNError(`${fieldName} must be exactly did:icn:<key> format`, 400, 'INVALID_DID');
+    }
+
+    const key = parts[2];
+    // Key portion should be base58btc encoded (typically 43-44 chars for Ed25519)
+    if (!key || key.length < 10) {
+      throw new ICNError(`${fieldName} has invalid key portion`, 400, 'INVALID_DID');
+    }
+
+    // Multibase prefix check: ICN DIDs use base58btc encoding (multibase prefix 'z').
+    // For backwards compatibility with legacy DIDs, we also accept raw base58 without
+    // the 'z' prefix. Base58 charset excludes 0, O, I, l to avoid ambiguity.
+    // New DIDs should use multibase format: did:icn:z<base58btc-key>
+    if (!key.startsWith('z') && !/^[1-9A-HJ-NP-Za-km-z]+$/.test(key)) {
+      throw new ICNError(`${fieldName} has invalid key encoding`, 400, 'INVALID_DID');
+    }
+  }
+  // Other DID methods (did:key, did:web, etc.) - allow more parts
+}
+
+/**
+ * Validate delegation scope format.
+ *
+ * Valid formats:
+ * - undefined or 'blanket' - blanket delegation
+ * - 'domain:<domain-id>' - domain-scoped delegation
+ * - 'proposal:<proposal-id>' - proposal-scoped delegation
+ *
+ * @throws ICNError if the scope format is invalid
+ */
+function validateDelegationScope(scope: string | undefined): void {
+  if (scope === undefined || scope === 'blanket') {
+    return; // Valid blanket delegation
+  }
+
+  if (typeof scope !== 'string') {
+    throw new ICNError('scope must be a string', 400, 'INVALID_SCOPE');
+  }
+
+  const validPrefixes = ['domain:', 'proposal:'];
+  const hasValidPrefix = validPrefixes.some(prefix => scope.startsWith(prefix));
+
+  if (!hasValidPrefix) {
+    throw new ICNError(
+      `scope must be 'blanket', 'domain:<id>', or 'proposal:<id>' (got: ${scope})`,
+      400,
+      'INVALID_SCOPE'
+    );
+  }
+
+  // Validate that the ID portion is non-empty
+  const colonIndex = scope.indexOf(':');
+  const id = scope.slice(colonIndex + 1);
+  if (!id || id.length === 0) {
+    throw new ICNError('scope ID cannot be empty', 400, 'INVALID_SCOPE');
+  }
+}
+
+/**
+ * Validate expiration timestamp.
+ *
+ * @throws ICNError if the expiration is in the past or too far in the future
+ */
+function validateExpiration(expiresAt: number | undefined): void {
+  if (expiresAt === undefined) {
+    return; // Optional field
+  }
+
+  if (typeof expiresAt !== 'number' || !Number.isInteger(expiresAt)) {
+    throw new ICNError('expires_at must be an integer timestamp', 400, 'INVALID_EXPIRATION');
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+
+  if (expiresAt <= now) {
+    throw new ICNError('expires_at must be in the future', 400, 'INVALID_EXPIRATION');
+  }
+
+  // Max 10 years in the future
+  const maxExpiry = now + (10 * 365 * 24 * 60 * 60);
+  if (expiresAt > maxExpiry) {
+    throw new ICNError('expires_at cannot be more than 10 years in the future', 400, 'INVALID_EXPIRATION');
+  }
+}
 
 /**
  * ICN Gateway API Client
@@ -624,6 +745,91 @@ export class ICNClient {
    */
   async getVotes(proposalId: string): Promise<VoteTally> {
     return this.get<VoteTally>(`/gov/proposals/${proposalId}/votes`);
+  }
+
+  // ===========================================================================
+  // Vote Delegation
+  // ===========================================================================
+
+  /**
+   * Create a vote delegation
+   *
+   * Allows the authenticated user to delegate their voting power to another DID.
+   *
+   * @example
+   * ```typescript
+   * // Blanket delegation - delegate can vote on all proposals
+   * await client.createDelegation({
+   *   delegate: 'did:icn:delegate123',
+   *   scope: 'blanket',
+   * });
+   *
+   * // Domain-scoped delegation - delegate can only vote in specific domain
+   * await client.createDelegation({
+   *   delegate: 'did:icn:delegate123',
+   *   scope: 'domain:my-governance-domain',
+   *   expires_at: Math.floor(Date.now() / 1000) + 86400, // Expires in 24 hours
+   * });
+   *
+   * // Proposal-scoped delegation - delegate can only vote on specific proposal
+   * await client.createDelegation({
+   *   delegate: 'did:icn:delegate123',
+   *   scope: 'proposal:prop-123',
+   * });
+   * ```
+   */
+  async createDelegation(req: CreateDelegationRequest): Promise<DelegationResponse> {
+    // Client-side validation
+    validateDid(req.delegate, 'delegate');
+    validateDelegationScope(req.scope);
+    validateExpiration(req.expires_at);
+
+    return this.post<DelegationResponse>('/gov/delegations', req);
+  }
+
+  /**
+   * List delegations for the authenticated user
+   *
+   * Returns both delegations given by and received by the user.
+   *
+   * @param includeRevoked - Whether to include revoked delegations (default: false)
+   * @example
+   * ```typescript
+   * // Get active delegations only
+   * const { given, received } = await client.listDelegations();
+   * console.log('Delegations given:', given.length);
+   * console.log('Delegations received:', received.length);
+   *
+   * // Include revoked delegations
+   * const all = await client.listDelegations(true);
+   * ```
+   */
+  async listDelegations(includeRevoked = false): Promise<DelegationListResponse> {
+    const query = includeRevoked ? '?include_revoked=true' : '';
+    return this.get<DelegationListResponse>(`/gov/delegations${query}`);
+  }
+
+  /**
+   * Get a specific delegation by ID
+   *
+   * Only the delegator or delegate can view a delegation (for privacy).
+   */
+  async getDelegation(delegationId: string): Promise<DelegationResponse> {
+    return this.get<DelegationResponse>(`/gov/delegations/${encodeURIComponent(delegationId)}`);
+  }
+
+  /**
+   * Revoke a delegation
+   *
+   * Only the delegator can revoke their delegation.
+   *
+   * @example
+   * ```typescript
+   * await client.revokeDelegation('delegation-123');
+   * ```
+   */
+  async revokeDelegation(delegationId: string): Promise<void> {
+    return this.delete<void>(`/gov/delegations/${encodeURIComponent(delegationId)}`);
   }
 
   // ===========================================================================

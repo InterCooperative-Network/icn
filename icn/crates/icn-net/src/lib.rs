@@ -20,6 +20,7 @@ mod handlers;
 pub mod protocol;
 pub mod rate_limit;
 pub mod replay_guard;
+pub mod sequence_tracker;
 pub mod session;
 pub mod stun;
 pub mod tls;
@@ -43,6 +44,7 @@ pub use protocol::{
 };
 pub use rate_limit::{RateLimitConfig, RateLimiter, TrustGatedRateLimitConfig};
 pub use replay_guard::ReplayGuard;
+pub use sequence_tracker::OutgoingSequenceTracker;
 pub use session::SessionManager;
 pub use stun::StunClient;
 pub use topology::{
