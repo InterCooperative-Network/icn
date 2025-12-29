@@ -308,6 +308,21 @@ impl LimitChangeEvent {
 }
 
 /// Manager for dynamic credit limit calculations
+///
+/// # Safety
+///
+/// **This type is NOT thread-safe for concurrent operations on the same (DID, currency) pair.**
+///
+/// The `record_activity`, `apply_decay`, and `recalculate_limit` methods use a
+/// load-modify-save pattern that can cause lost updates if called concurrently
+/// for the same account. When integrating with `Ledger`, ensure that operations
+/// on the same (DID, currency) pair are serialized, for example:
+///
+/// - Use per-(DID, currency) locks in the calling code
+/// - Use Sled transactions that encompass both ledger and limit updates
+/// - Process transactions sequentially per account
+///
+/// Read-only methods (`get_effective_limit`, `get_state`) are safe for concurrent access.
 pub struct DynamicCreditLimitManager {
     store: Arc<dyn Store>,
     base_policy: CreditPolicy,
