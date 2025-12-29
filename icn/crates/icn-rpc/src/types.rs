@@ -408,3 +408,229 @@ pub struct CancelRecoveryRequest {
     pub recovery_id: String,
     pub reason: String,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_rpc_response_success() {
+        let result = serde_json::json!({"key": "value"});
+        let response = RpcResponse::success(42, result.clone());
+
+        assert_eq!(response.jsonrpc, "2.0");
+        assert_eq!(response.id, 42);
+        assert!(response.error.is_none());
+        assert_eq!(response.result.unwrap(), result);
+    }
+
+    #[test]
+    fn test_rpc_response_error() {
+        let response = RpcResponse::error(123, -32600, "Invalid Request".to_string());
+
+        assert_eq!(response.jsonrpc, "2.0");
+        assert_eq!(response.id, 123);
+        assert!(response.result.is_none());
+
+        let error = response.error.unwrap();
+        assert_eq!(error.code, -32600);
+        assert_eq!(error.message, "Invalid Request");
+    }
+
+    #[test]
+    fn test_rpc_request_serialization() {
+        let request = RpcRequest {
+            jsonrpc: "2.0".to_string(),
+            method: "test.method".to_string(),
+            params: serde_json::json!({"param1": 42}),
+            id: 1,
+        };
+
+        let json = serde_json::to_string(&request).unwrap();
+        let parsed: RpcRequest = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(parsed.method, "test.method");
+        assert_eq!(parsed.id, 1);
+    }
+
+    #[test]
+    fn test_peer_info_serialization() {
+        let peer = PeerInfo {
+            did: "did:icn:test123".to_string(),
+            addr: "127.0.0.1:9000".to_string(),
+            version: "0.1.0".to_string(),
+        };
+
+        let json = serde_json::to_string(&peer).unwrap();
+        assert!(json.contains("did:icn:test123"));
+        assert!(json.contains("127.0.0.1:9000"));
+    }
+
+    #[test]
+    fn test_code_type_default() {
+        let code_type: CodeType = Default::default();
+        assert!(matches!(code_type, CodeType::Ccl));
+    }
+
+    #[test]
+    fn test_code_type_serialization() {
+        let ccl = CodeType::Ccl;
+        let wasm = CodeType::Wasm;
+
+        assert_eq!(serde_json::to_string(&ccl).unwrap(), "\"ccl\"");
+        assert_eq!(serde_json::to_string(&wasm).unwrap(), "\"wasm\"");
+    }
+
+    #[test]
+    fn test_submit_task_request_defaults() {
+        let json = r#"{"task_id": "task-1"}"#;
+        let request: SubmitTaskRequest = serde_json::from_str(json).unwrap();
+
+        assert_eq!(request.task_id, "task-1");
+        assert_eq!(request.fuel_limit, 10_000); // default
+        assert_eq!(request.priority, "normal"); // default
+        assert!(matches!(request.code_type, CodeType::Ccl)); // default
+    }
+
+    #[test]
+    fn test_membership_config_serialization() {
+        let static_list = MembershipConfigInfo::StaticList {
+            members: vec!["did:icn:alice".to_string(), "did:icn:bob".to_string()],
+        };
+        let trust_threshold = MembershipConfigInfo::TrustThreshold { threshold: 0.5 };
+
+        let static_json = serde_json::to_string(&static_list).unwrap();
+        let trust_json = serde_json::to_string(&trust_threshold).unwrap();
+
+        assert!(static_json.contains("\"type\":\"static_list\""));
+        assert!(trust_json.contains("\"type\":\"trust_threshold\""));
+    }
+
+    #[test]
+    fn test_proposal_payload_serialization() {
+        let text = ProposalPayloadInfo::Text {
+            body: "Test proposal".to_string(),
+        };
+        let budget = ProposalPayloadInfo::Budget {
+            amount: 1000,
+            currency: "credits".to_string(),
+            recipient: "did:icn:bob".to_string(),
+            purpose: "Development".to_string(),
+        };
+
+        let text_json = serde_json::to_string(&text).unwrap();
+        let budget_json = serde_json::to_string(&budget).unwrap();
+
+        assert!(text_json.contains("\"type\":\"text\""));
+        assert!(budget_json.contains("\"type\":\"budget\""));
+        assert!(budget_json.contains("\"amount\":1000"));
+    }
+
+    #[test]
+    fn test_network_stats_serialization() {
+        let stats = NetworkStats {
+            peers_discovered: 10,
+            connections_active: 5,
+            connections_total: 100,
+        };
+
+        let json = serde_json::to_string(&stats).unwrap();
+        let parsed: NetworkStats = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(parsed.peers_discovered, 10);
+        assert_eq!(parsed.connections_active, 5);
+        assert_eq!(parsed.connections_total, 100);
+    }
+
+    #[test]
+    fn test_task_result_info_optional_fields() {
+        // With all fields
+        let full_result = TaskResultInfo {
+            outcome: "success".to_string(),
+            output: Some(serde_json::json!({"result": 42})),
+            error: None,
+            fuel_used: 500,
+            duration_ms: 100,
+        };
+
+        let json = serde_json::to_string(&full_result).unwrap();
+        assert!(json.contains("\"outcome\":\"success\""));
+        assert!(!json.contains("\"error\"")); // skip_serializing_if = "Option::is_none"
+
+        // With error
+        let error_result = TaskResultInfo {
+            outcome: "failed".to_string(),
+            output: None,
+            error: Some("Out of memory".to_string()),
+            fuel_used: 100,
+            duration_ms: 50,
+        };
+
+        let error_json = serde_json::to_string(&error_result).unwrap();
+        assert!(error_json.contains("Out of memory"));
+    }
+
+    #[test]
+    fn test_recovery_event_info_serialization() {
+        let event = RecoveryEventInfo {
+            id: "recovery-1".to_string(),
+            old_did: "did:icn:old".to_string(),
+            new_did: "did:icn:new".to_string(),
+            initiated_at: 1700000000,
+            finalized_at: None,
+            threshold: 3,
+            delay_period: 86400,
+            status: "pending".to_string(),
+            attestations_count: 1,
+            progress_summary: "1/3 attestations".to_string(),
+        };
+
+        let json = serde_json::to_string(&event).unwrap();
+        let parsed: RecoveryEventInfo = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(parsed.id, "recovery-1");
+        assert_eq!(parsed.threshold, 3);
+        assert!(parsed.finalized_at.is_none());
+    }
+
+    #[test]
+    fn test_ledger_entry_serialization() {
+        let entry = LedgerEntry {
+            hash: "abc123".to_string(),
+            timestamp: 1700000000,
+            author: "did:icn:alice".to_string(),
+            accounts: vec![
+                LedgerAccountDelta {
+                    account_id: "alice".to_string(),
+                    currency: "credits".to_string(),
+                    debit: Some(100),
+                    credit: None,
+                },
+                LedgerAccountDelta {
+                    account_id: "bob".to_string(),
+                    currency: "credits".to_string(),
+                    debit: None,
+                    credit: Some(100),
+                },
+            ],
+        };
+
+        let json = serde_json::to_string(&entry).unwrap();
+        let parsed: LedgerEntry = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(parsed.accounts.len(), 2);
+        assert_eq!(parsed.accounts[0].debit, Some(100));
+        assert_eq!(parsed.accounts[1].credit, Some(100));
+    }
+
+    #[test]
+    fn test_resource_profile_optional_fields() {
+        let json = r#"{"cpu_cores": 2.0}"#;
+        let profile: ResourceProfileRequest = serde_json::from_str(json).unwrap();
+
+        assert_eq!(profile.cpu_cores, Some(2.0));
+        assert!(profile.memory_mb.is_none());
+        assert!(profile.storage_mb.is_none());
+        assert!(profile.network_mbps.is_none());
+    }
+}
