@@ -678,6 +678,88 @@ async fn test_add_membership_as_founder() {
 }
 
 #[actix_web::test]
+async fn test_list_members_pagination() {
+    let (app, _entity_mgr, _audit_mgr) = create_test_app().await;
+    let alice = test_identity();
+
+    // Register entity (alice is founder)
+    let req_body = json!({
+        "entity_type": "cooperative",
+        "identifier": "paginate-members",
+        "name": "Paginate Members Test"
+    });
+
+    let claims = create_test_claims(&alice.did().to_string(), vec!["entity:write"]);
+    let req = test::TestRequest::post()
+        .uri("/entities")
+        .set_json(&req_body)
+        .to_request();
+    req.extensions_mut().insert(claims);
+    test::call_service(&app, req).await;
+
+    // Add 4 more members (total 5 with alice as founder)
+    for i in 0..4 {
+        let member = test_identity();
+        let add_body = json!({
+            "member_id": member.did().to_string(),
+            "role": "member"
+        });
+
+        let claims = create_test_claims(&alice.did().to_string(), vec!["entity:write"]);
+        let req = test::TestRequest::post()
+            .uri("/entities/entity:icn:cooperative:paginate-members/members")
+            .set_json(&add_body)
+            .to_request();
+        req.extensions_mut().insert(claims);
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success(), "Failed to add member {i}");
+    }
+
+    // First page: limit=2
+    let claims = create_test_claims(&alice.did().to_string(), vec!["entity:read"]);
+    let req = test::TestRequest::get()
+        .uri("/entities/entity:icn:cooperative:paginate-members/members?limit=2")
+        .to_request();
+    req.extensions_mut().insert(claims);
+
+    let resp: serde_json::Value = test::call_and_read_body_json(&app, req).await;
+    let page1 = resp["data"].as_array().expect("response.data should be array");
+    assert_eq!(page1.len(), 2);
+    assert_eq!(resp["pagination"]["has_more"], true);
+    assert_eq!(resp["pagination"]["total"], 5);
+    let cursor = resp["pagination"]["cursor"].as_str().expect("should have cursor");
+
+    // Second page using cursor
+    let claims = create_test_claims(&alice.did().to_string(), vec!["entity:read"]);
+    let req = test::TestRequest::get()
+        .uri(&format!(
+            "/entities/entity:icn:cooperative:paginate-members/members?limit=2&cursor={cursor}"
+        ))
+        .to_request();
+    req.extensions_mut().insert(claims);
+
+    let resp: serde_json::Value = test::call_and_read_body_json(&app, req).await;
+    let page2 = resp["data"].as_array().expect("response.data should be array");
+    assert_eq!(page2.len(), 2);
+    assert_eq!(resp["pagination"]["has_more"], true);
+    let cursor = resp["pagination"]["cursor"].as_str().expect("should have cursor");
+
+    // Third page (last, only 1 item)
+    let claims = create_test_claims(&alice.did().to_string(), vec!["entity:read"]);
+    let req = test::TestRequest::get()
+        .uri(&format!(
+            "/entities/entity:icn:cooperative:paginate-members/members?limit=2&cursor={cursor}"
+        ))
+        .to_request();
+    req.extensions_mut().insert(claims);
+
+    let resp: serde_json::Value = test::call_and_read_body_json(&app, req).await;
+    let page3 = resp["data"].as_array().expect("response.data should be array");
+    assert_eq!(page3.len(), 1);
+    assert_eq!(resp["pagination"]["has_more"], false);
+}
+
+#[actix_web::test]
 async fn test_add_membership_with_shares() {
     let (app, _entity_mgr, _audit_mgr) = create_test_app().await;
     let alice = test_identity();
