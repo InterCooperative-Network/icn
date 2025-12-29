@@ -627,4 +627,234 @@ mod tests {
         assert_eq!(&key[0..8], b"replica:");
         assert_eq!(&key[8..], &hash);
     }
+
+    #[test]
+    fn test_basic_store_operations() -> Result<()> {
+        let store = SledStore::temporary()?;
+
+        // Test put and get
+        let key = b"test:key1";
+        let value = b"hello world";
+        store.put(key, value)?;
+
+        let retrieved = store.get(key)?;
+        assert_eq!(retrieved.as_deref(), Some(value.as_slice()));
+
+        // Test overwrite
+        let new_value = b"updated value";
+        store.put(key, new_value)?;
+        let retrieved = store.get(key)?;
+        assert_eq!(retrieved.as_deref(), Some(new_value.as_slice()));
+
+        // Test get non-existent key
+        let missing = store.get(b"does:not:exist")?;
+        assert!(missing.is_none());
+
+        // Test delete
+        store.delete(key)?;
+        let deleted = store.get(key)?;
+        assert!(deleted.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_store_scan() -> Result<()> {
+        let store = SledStore::temporary()?;
+
+        // Insert multiple values with same prefix
+        store.put(b"users:alice", b"Alice data")?;
+        store.put(b"users:bob", b"Bob data")?;
+        store.put(b"users:charlie", b"Charlie data")?;
+        store.put(b"posts:post1", b"Post data")?;
+
+        // Scan users
+        let users = store.scan(b"users:")?;
+        assert_eq!(users.len(), 3);
+
+        // Scan posts
+        let posts = store.scan(b"posts:")?;
+        assert_eq!(posts.len(), 1);
+
+        // Scan with non-matching prefix
+        let empty = store.scan(b"nonexistent:")?;
+        assert_eq!(empty.len(), 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_store_scan_count() -> Result<()> {
+        let store = SledStore::temporary()?;
+
+        // Insert multiple values
+        store.put(b"items:1", b"data1")?;
+        store.put(b"items:2", b"data2")?;
+        store.put(b"items:3", b"data3")?;
+        store.put(b"other:1", b"other")?;
+
+        // Count with prefix
+        assert_eq!(store.scan_count(b"items:")?, 3);
+        assert_eq!(store.scan_count(b"other:")?, 1);
+        assert_eq!(store.scan_count(b"nonexistent:")?, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_store_scan_paginated() -> Result<()> {
+        let store = SledStore::temporary()?;
+
+        // Insert 10 items
+        for i in 0..10 {
+            store.put(format!("items:{i:02}").as_bytes(), b"data")?;
+        }
+
+        // Get first page (5 items)
+        let (page1, total) = store.scan_paginated(b"items:", 0, 5)?;
+        assert_eq!(total, 10);
+        assert_eq!(page1.len(), 5);
+
+        // Get second page
+        let (page2, total) = store.scan_paginated(b"items:", 5, 5)?;
+        assert_eq!(total, 10);
+        assert_eq!(page2.len(), 5);
+
+        // Get partial last page
+        let (page3, total) = store.scan_paginated(b"items:", 8, 5)?;
+        assert_eq!(total, 10);
+        assert_eq!(page3.len(), 2);
+
+        // Offset beyond total
+        let (empty, total) = store.scan_paginated(b"items:", 20, 5)?;
+        assert_eq!(total, 10);
+        assert_eq!(empty.len(), 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_store_scan_reverse_paginated() -> Result<()> {
+        let store = SledStore::temporary()?;
+
+        // Insert items (they'll be sorted by key)
+        store.put(b"items:001", b"first")?;
+        store.put(b"items:002", b"second")?;
+        store.put(b"items:003", b"third")?;
+        store.put(b"items:004", b"fourth")?;
+        store.put(b"items:005", b"fifth")?;
+
+        // Get first page in reverse (should start with 005)
+        let (page, total) = store.scan_reverse_paginated(b"items:", 0, 3)?;
+        assert_eq!(total, 5);
+        assert_eq!(page.len(), 3);
+        assert_eq!(&page[0].0, b"items:005");
+        assert_eq!(&page[1].0, b"items:004");
+        assert_eq!(&page[2].0, b"items:003");
+
+        // Get second page
+        let (page2, _) = store.scan_reverse_paginated(b"items:", 3, 3)?;
+        assert_eq!(page2.len(), 2);
+        assert_eq!(&page2[0].0, b"items:002");
+        assert_eq!(&page2[1].0, b"items:001");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_replica_health_enum() {
+        // Test all enum variants
+        let healthy = ReplicaHealth::Healthy;
+        let stale = ReplicaHealth::Stale;
+        let unreachable = ReplicaHealth::Unreachable;
+
+        // Test equality
+        assert_eq!(healthy, ReplicaHealth::Healthy);
+        assert_ne!(healthy, stale);
+        assert_ne!(stale, unreachable);
+
+        // Test serialization
+        let json = serde_json::to_string(&healthy).unwrap();
+        assert_eq!(json, "\"Healthy\"");
+
+        let parsed: ReplicaHealth = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, healthy);
+    }
+
+    #[test]
+    fn test_replica_info_creation() {
+        let info = ReplicaInfo {
+            peer_did: "did:icn:test".to_string(),
+            last_seen: SystemTime::now(),
+            health: ReplicaHealth::Healthy,
+        };
+
+        assert_eq!(info.peer_did, "did:icn:test");
+        assert_eq!(info.health, ReplicaHealth::Healthy);
+
+        // Test serialization roundtrip
+        let json = serde_json::to_string(&info).unwrap();
+        let parsed: ReplicaInfo = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.peer_did, info.peer_did);
+        assert_eq!(parsed.health, info.health);
+    }
+
+    #[test]
+    fn test_sled_store_temporary() -> Result<()> {
+        // Temporary store should be independent
+        let store1 = SledStore::temporary()?;
+        let store2 = SledStore::temporary()?;
+
+        store1.put(b"key", b"value1")?;
+
+        // Store 2 should not see store 1's data
+        assert!(store2.get(b"key")?.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_store_delete_nonexistent() -> Result<()> {
+        let store = SledStore::temporary()?;
+
+        // Deleting non-existent key should succeed silently
+        store.delete(b"nonexistent:key")?;
+
+        // Verify the key still doesn't exist
+        assert!(store.get(b"nonexistent:key")?.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_store_empty_values() -> Result<()> {
+        let store = SledStore::temporary()?;
+
+        // Empty value
+        store.put(b"empty:value", b"")?;
+        let retrieved = store.get(b"empty:value")?;
+        assert_eq!(retrieved, Some(vec![]));
+
+        // Empty key (edge case)
+        store.put(b"", b"value for empty key")?;
+        let retrieved = store.get(b"")?;
+        assert_eq!(retrieved.as_deref(), Some(b"value for empty key".as_slice()));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_store_binary_data() -> Result<()> {
+        let store = SledStore::temporary()?;
+
+        // Binary data with null bytes
+        let binary_key = &[0x00, 0x01, 0x02, 0xFF, 0xFE];
+        let binary_value = &[0xDE, 0xAD, 0xBE, 0xEF, 0x00, 0x00];
+
+        store.put(binary_key, binary_value)?;
+        let retrieved = store.get(binary_key)?;
+        assert_eq!(retrieved.as_deref(), Some(binary_value.as_slice()));
+
+        Ok(())
+    }
 }
