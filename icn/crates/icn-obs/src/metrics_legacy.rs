@@ -1660,6 +1660,20 @@ pub fn init_descriptions() {
         "icn_ledger_progressive_pop_level_defaulted_total",
         "Total times POPLevel defaulted to Weak for unknown account"
     );
+
+    // Dynamic credit limit metrics (Issue #326)
+    describe_counter!(
+        "icn_ledger_dynamic_limit_decay_applied_total",
+        "Total times decay was applied to inactive accounts"
+    );
+    describe_counter!(
+        "icn_ledger_dynamic_limit_recovery_total",
+        "Total times a limit recovered due to account activity"
+    );
+    describe_counter!(
+        "icn_ledger_dynamic_limit_recalculations_total",
+        "Total times a limit was recalculated due to trust changes"
+    );
 }
 
 /// Network metrics
@@ -2190,6 +2204,23 @@ pub mod ledger {
     /// Increment counter when POPLevel defaults to Weak for unknown account (Issue #336)
     pub fn progressive_pop_level_defaulted_inc() {
         counter!("icn_ledger_progressive_pop_level_defaulted_total").increment(1);
+    }
+
+    // Dynamic credit limit metrics (Issue #326)
+
+    /// Increment counter when decay is applied to an inactive account
+    pub fn dynamic_limit_decay_applied_inc() {
+        counter!("icn_ledger_dynamic_limit_decay_applied_total").increment(1);
+    }
+
+    /// Increment counter when a limit recovers due to activity
+    pub fn dynamic_limit_recovery_inc() {
+        counter!("icn_ledger_dynamic_limit_recovery_total").increment(1);
+    }
+
+    /// Increment counter when a limit is recalculated (trust change, etc.)
+    pub fn dynamic_limit_recalculations_inc() {
+        counter!("icn_ledger_dynamic_limit_recalculations_total").increment(1);
     }
 }
 
