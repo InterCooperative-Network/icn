@@ -299,7 +299,10 @@ fn test_multiple_currencies_tracked_separately() {
         .unwrap();
 
     let result = ledger.append_entry(hours_exceed);
-    assert!(result.is_err(), "Should reject hours transaction exceeding limit");
+    assert!(
+        result.is_err(),
+        "Should reject hours transaction exceeding limit"
+    );
 
     // But kwh transactions should still work (independent limit)
     // Bob is at -80 in kwh, adding 15 more would be -95, still within -100 limit
