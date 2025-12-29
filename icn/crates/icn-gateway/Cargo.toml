@@ -85,7 +85,7 @@ dashmap = "6.0"
 metrics = "0.24"
 
 # OpenAPI documentation
-utoipa = { version = "4", features = ["actix_extras"] }
+utoipa = { version = "5", features = ["actix_extras"] }
 utoipa-swagger-ui = { version = "6", features = ["actix-web"] }
 
 # HTTP client for FCM
