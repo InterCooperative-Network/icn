@@ -16,11 +16,16 @@
 //! pair, callers should serialize mutations through the ledger's transaction
 //! validation layer. Specifically:
 //!
-//! - `get_effective_limit()` is read-only and safe to call concurrently
+//! - `get_effective_limit()` is read-only and safe to call concurrently, but
+//!   provides eventual consistency - it may show stale decay if another thread
+//!   just called `record_activity()`
 //! - `record_activity()` and `apply_decay()` mutate state and should be
 //!   serialized per (DID, currency) pair to avoid lost updates
 //! - In practice, this is naturally achieved when limit checks are part of
 //!   atomic ledger transaction validation
+//!
+//! **Recommended pattern**: Call `record_activity()` as part of transaction
+//! validation to ensure the limit is current before checking the balance
 //!
 //! # Example
 //!
@@ -428,11 +433,6 @@ impl DynamicCreditLimitManager {
 
         let old_limit = state.current_limit;
 
-        // Calculate what the limit would be with decay
-        let days_inactive = state.days_inactive(now);
-        let current_decay = self.calculate_decay(calculated_limit, days_inactive);
-        let _decayed_limit = (calculated_limit - current_decay).max(self.config.min_limit_floor);
-
         // Determine new limit based on recovery mode
         let new_limit = if self.config.instant_recovery_on_activity {
             // Instant recovery to full calculated limit
@@ -444,8 +444,10 @@ impl DynamicCreditLimitManager {
                 calculated_limit
             } else {
                 let gap = calculated_limit - old_limit;
+                // Use .max(1) to ensure at least 1 unit recovery per transaction
+                // Prevents stall when gap * rate truncates to 0
                 let recovery_amount =
-                    (gap as f64 * self.config.recovery_rate_per_transaction) as i64;
+                    ((gap as f64 * self.config.recovery_rate_per_transaction) as i64).max(1);
                 (old_limit + recovery_amount).min(calculated_limit)
             }
         };
@@ -613,6 +615,11 @@ mod tests {
         (manager, temp_dir)
     }
 
+    /// Helper to create a timestamp N days in the past
+    fn days_ago(days: u64) -> u64 {
+        DynamicCreditLimitManager::now().saturating_sub(days * 86400)
+    }
+
     #[test]
     fn test_config_defaults() {
         let config = DynamicLimitConfig::default();
@@ -737,12 +744,11 @@ mod tests {
         let keypair = KeyPair::generate().unwrap();
         let did = keypair.did().clone();
 
-        // Create initial state
+        // Create initial state with activity 60 days ago
         let calculated = manager.calculate_base_limit(0.5, 0);
-        let mut state = AccountLimitState::new(&did, "hours", calculated, 0);
+        let mut state = AccountLimitState::new(&did, "hours", calculated, days_ago(60));
 
-        // Simulate decay by setting old activity timestamp (60 days ago)
-        state.last_activity_timestamp = 0;
+        // Simulate decay state
         state.current_limit = calculated / 2; // Decayed to half
         state.decay_applied = calculated / 2;
         manager.save_state(&state).unwrap();
@@ -778,29 +784,28 @@ mod tests {
         let calculated = manager.calculate_base_limit(0.5, 0);
         let decayed_to = calculated / 2; // Decayed to 50%
 
-        // Create state with decayed limit
-        let mut state = AccountLimitState::new(&did, "hours", calculated, 0);
-        state.last_activity_timestamp = 0;
+        // Create state with decayed limit (60 days ago)
+        let mut state = AccountLimitState::new(&did, "hours", calculated, days_ago(60));
         state.current_limit = decayed_to;
         state.decay_applied = calculated - decayed_to;
         manager.save_state(&state).unwrap();
 
-        // First activity - should recover 25% of the gap
+        // First activity - should recover 25% of the gap (with .max(1) floor)
         let event = manager.record_activity(&did, "hours", 0.5, 0).unwrap();
         assert!(event.is_some());
 
         let event = event.unwrap();
         let gap = calculated - decayed_to;
-        let expected_recovery = (gap as f64 * 0.25) as i64;
+        let expected_recovery = ((gap as f64 * 0.25) as i64).max(1);
         let expected_limit = decayed_to + expected_recovery;
 
         assert_eq!(event.new_limit, expected_limit);
         assert!(event.new_limit < calculated); // Not fully recovered yet
 
-        // Second activity - should recover 25% of remaining gap
+        // Second activity - should recover 25% of remaining gap (with .max(1) floor)
         let state = manager.get_state(&did, "hours").unwrap().unwrap();
         let new_gap = calculated - state.current_limit;
-        let expected_recovery2 = (new_gap as f64 * 0.25) as i64;
+        let expected_recovery2 = ((new_gap as f64 * 0.25) as i64).max(1);
         let expected_limit2 = state.current_limit + expected_recovery2;
 
         let event2 = manager.record_activity(&did, "hours", 0.5, 0).unwrap();
