@@ -1648,6 +1648,18 @@ pub fn init_descriptions() {
         "icn_ledger_credit_limit_bypass_contribution_total",
         "Total members bypassing credit limit ramping via contribution threshold"
     );
+    describe_counter!(
+        "icn_ledger_progressive_balance_limit_exceeded_total",
+        "Total entries rejected due to POPLevel-based balance limit"
+    );
+    describe_counter!(
+        "icn_ledger_progressive_velocity_limit_exceeded_total",
+        "Total entries rejected due to velocity limit"
+    );
+    describe_counter!(
+        "icn_ledger_progressive_pop_level_defaulted_total",
+        "Total times POPLevel defaulted to Weak for unknown account"
+    );
 }
 
 /// Network metrics

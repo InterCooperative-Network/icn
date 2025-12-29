@@ -576,6 +576,28 @@ impl Ledger {
         self.save_cached_balances()?;
         self.save_cleared_volume_index()?;
 
+        // Record velocity changes for progressive limits (Issue #336)
+        // This MUST be done after the entry is committed to storage
+        if let Some(ref prog_manager) = self.progressive_limit_manager {
+            for delta in &entry.accounts {
+                let net_change = delta.net_change();
+                if let Err(e) = prog_manager.record_change(
+                    delta.account_id.as_str(),
+                    &delta.currency,
+                    net_change,
+                ) {
+                    // Log but don't fail - velocity tracking is best-effort
+                    // The entry is already committed, so we can't roll back
+                    warn!(
+                        account = %delta.account_id,
+                        currency = %delta.currency,
+                        error = %e,
+                        "Failed to record velocity change"
+                    );
+                }
+            }
+        }
+
         // Emit events if emitter is configured
         if let Some(ref emitter) = self.event_emitter {
             // Emit TransactionCreated event
@@ -2687,5 +2709,211 @@ mod tests {
         ledger.unfreeze_member(&bob, "Clear".to_string());
         assert_eq!(ledger.get_balance(&alice, "hours"), 50);
         assert_eq!(ledger.get_balance(&bob, "hours"), -50);
+    }
+
+    // ========================================================================
+    // Progressive Limit Integration Tests (Issue #336)
+    // ========================================================================
+
+    use crate::progressive_limits::{
+        DefaultWeakLookup, FnCommonsHolderLookup, ProgressiveLimitManager,
+    };
+
+    fn create_test_ledger_with_progressive_limits() -> (Ledger, TempDir) {
+        let temp_dir = TempDir::new().unwrap();
+        let store = Arc::new(SledStore::open(temp_dir.path()).unwrap());
+
+        // Create progressive limit manager with default (Weak) lookup
+        let lookup = Arc::new(DefaultWeakLookup);
+        let prog_manager = Arc::new(ProgressiveLimitManager::new(
+            store.clone() as Arc<dyn icn_store::Store>,
+            lookup,
+        ));
+
+        let mut ledger = Ledger::new(store).unwrap();
+        ledger.set_progressive_limit_manager(prog_manager);
+        (ledger, temp_dir)
+    }
+
+    #[test]
+    fn test_progressive_balance_limit_blocks_excessive_accumulation() {
+        let (mut ledger, _temp) = create_test_ledger_with_progressive_limits();
+
+        let keypair = KeyPair::generate().unwrap();
+        let alice = keypair.did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        // Weak POPLevel has max_balance of 500
+        // Try to give alice 600 hours (should fail)
+        let entry = JournalEntryBuilder::new(alice.clone())
+            .debit(alice.clone(), "hours".to_string(), 600)
+            .credit(bob.clone(), "hours".to_string(), 600)
+            .build()
+            .unwrap();
+
+        let result = ledger.append_entry(entry);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Balance limit exceeded"));
+    }
+
+    #[test]
+    fn test_progressive_balance_limit_allows_within_limit() {
+        let (mut ledger, _temp) = create_test_ledger_with_progressive_limits();
+
+        let keypair = KeyPair::generate().unwrap();
+        let alice = keypair.did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        // Weak POPLevel: max_balance=500, max_credit=50
+        // Give alice 40 hours - bob goes to -40 (within credit limit of 50)
+        let entry = JournalEntryBuilder::new(alice.clone())
+            .debit(alice.clone(), "hours".to_string(), 40)
+            .credit(bob.clone(), "hours".to_string(), 40)
+            .build()
+            .unwrap();
+
+        let result = ledger.append_entry(entry);
+        assert!(result.is_ok(), "Expected Ok but got: {:?}", result.err());
+        assert_eq!(ledger.get_balance(&alice, "hours"), 40);
+        assert_eq!(ledger.get_balance(&bob, "hours"), -40);
+    }
+
+    #[test]
+    fn test_progressive_velocity_limit_blocks_rapid_accumulation() {
+        // Use Strong POPLevel for Alice to test velocity independently of balance
+        // Strong: max_balance=5000, max_credit=500, daily_velocity=500
+        // This lets us test velocity limit (500) without hitting balance limit (5000)
+
+        let temp_dir = TempDir::new().unwrap();
+        let store = Arc::new(SledStore::open(temp_dir.path()).unwrap());
+
+        let keypair = KeyPair::generate().unwrap();
+        let alice = keypair.did().clone();
+        let alice_str = alice.to_string();
+
+        // Create lookup that returns Strong for Alice, Weak for others
+        let lookup = Arc::new(FnCommonsHolderLookup::new(move |did: &str| {
+            if did == alice_str {
+                Some(icn_identity::POPLevel::Strong)
+            } else {
+                Some(icn_identity::POPLevel::Weak)
+            }
+        }));
+
+        let prog_manager = Arc::new(ProgressiveLimitManager::new(
+            store.clone() as Arc<dyn icn_store::Store>,
+            lookup,
+        ));
+
+        let mut ledger = Ledger::new(store).unwrap();
+        ledger.set_progressive_limit_manager(prog_manager);
+
+        let funders: Vec<_> = (0..15)
+            .map(|_| KeyPair::generate().unwrap().did().clone())
+            .collect();
+
+        // Alice receives 50 from 10 different funders = 500 total
+        // Funders are Weak (max_credit=50), so 50 per funder is at their limit
+        // Velocity = 500 (at limit), balance = 500 (well under 5000 limit)
+        for (i, funder) in funders.iter().take(10).enumerate() {
+            let entry = JournalEntryBuilder::new(alice.clone())
+                .debit(alice.clone(), "hours".to_string(), 50)
+                .credit(funder.clone(), "hours".to_string(), 50)
+                .build()
+                .unwrap();
+
+            let result = ledger.append_entry(entry);
+            assert!(
+                result.is_ok(),
+                "Receive {} failed: {:?}",
+                i + 1,
+                result.err()
+            );
+        }
+        assert_eq!(ledger.get_balance(&alice, "hours"), 500);
+
+        // Try to receive 10 more - this should fail on VELOCITY
+        // Balance would be 510 (< 5000, OK)
+        // Velocity would be 510 (> 500, FAIL)
+        let entry_over = JournalEntryBuilder::new(alice.clone())
+            .debit(alice.clone(), "hours".to_string(), 10)
+            .credit(funders[10].clone(), "hours".to_string(), 10)
+            .build()
+            .unwrap();
+
+        let result = ledger.append_entry(entry_over);
+        assert!(result.is_err(), "Expected error but got Ok");
+        let err_str = result.unwrap_err().to_string();
+        assert!(
+            err_str.contains("Velocity limit"),
+            "Expected velocity limit error but got: {err_str}"
+        );
+    }
+
+    #[test]
+    fn test_progressive_velocity_allows_spending() {
+        let (mut ledger, _temp) = create_test_ledger_with_progressive_limits();
+
+        let keypair = KeyPair::generate().unwrap();
+        let alice = keypair.did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+        let charlie = KeyPair::generate().unwrap().did().clone();
+
+        // Build up alice's balance to 40 (within limits)
+        let entry1 = JournalEntryBuilder::new(alice.clone())
+            .debit(alice.clone(), "hours".to_string(), 40)
+            .credit(bob.clone(), "hours".to_string(), 40)
+            .build()
+            .unwrap();
+
+        let result = ledger.append_entry(entry1);
+        assert!(result.is_ok(), "Entry1 failed: {:?}", result.err());
+        assert_eq!(ledger.get_balance(&alice, "hours"), 40);
+
+        // Alice spends 30 hours to charlie
+        // This is a CREDIT to alice (spending), so alice's net_change is NEGATIVE
+        // Velocity should allow spending even if accumulation velocity was maxed
+        let entry2 = JournalEntryBuilder::new(alice.clone())
+            .debit(charlie.clone(), "hours".to_string(), 30)
+            .credit(alice.clone(), "hours".to_string(), 30)
+            .build()
+            .unwrap();
+
+        // This should succeed because spending (credit to alice = negative net_change) is allowed
+        let result = ledger.append_entry(entry2);
+        assert!(
+            result.is_ok(),
+            "Entry2 (spending) failed: {:?}",
+            result.err()
+        );
+        assert_eq!(ledger.get_balance(&alice, "hours"), 10); // 40 - 30 = 10
+        assert_eq!(ledger.get_balance(&charlie, "hours"), 30);
+    }
+
+    #[test]
+    fn test_progressive_credit_limit() {
+        let (mut ledger, _temp) = create_test_ledger_with_progressive_limits();
+
+        let keypair = KeyPair::generate().unwrap();
+        let alice = keypair.did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        // Weak POPLevel has max_credit of 50
+        // Try to put alice -100 in debt (should fail)
+        let entry = JournalEntryBuilder::new(bob.clone())
+            .debit(bob.clone(), "hours".to_string(), 100)
+            .credit(alice.clone(), "hours".to_string(), 100)
+            .build()
+            .unwrap();
+
+        let result = ledger.append_entry(entry);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Balance limit exceeded"));
     }
 }
