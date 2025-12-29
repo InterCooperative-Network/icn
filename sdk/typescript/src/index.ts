@@ -122,6 +122,103 @@ const DEFAULT_RETRY: Required<RetryOptions> = {
   retryableStatuses: [408, 429, 500, 502, 503, 504],
 };
 
+// ===========================================================================
+// Input Validation Helpers
+// ===========================================================================
+
+/**
+ * Validate a DID (Decentralized Identifier) format.
+ *
+ * ICN DIDs follow the pattern: did:icn:<multibase-encoded-public-key>
+ * where the key portion is base58btc encoded (starts with 'z').
+ *
+ * @throws ICNError if the DID format is invalid
+ */
+function validateDid(did: string, fieldName = 'DID'): void {
+  if (!did || typeof did !== 'string') {
+    throw new ICNError(`${fieldName} is required`, 400, 'INVALID_DID');
+  }
+
+  // Basic format check: did:method:identifier
+  const parts = did.split(':');
+  if (parts.length < 3 || parts[0] !== 'did') {
+    throw new ICNError(`${fieldName} must be a valid DID (did:method:identifier)`, 400, 'INVALID_DID');
+  }
+
+  // ICN-specific validation
+  if (parts[1] === 'icn') {
+    const key = parts.slice(2).join(':'); // Handle edge case of colons in key
+    if (!key || key.length < 10) {
+      throw new ICNError(`${fieldName} has invalid key portion`, 400, 'INVALID_DID');
+    }
+  }
+}
+
+/**
+ * Validate delegation scope format.
+ *
+ * Valid formats:
+ * - undefined or 'blanket' - blanket delegation
+ * - 'domain:<domain-id>' - domain-scoped delegation
+ * - 'proposal:<proposal-id>' - proposal-scoped delegation
+ *
+ * @throws ICNError if the scope format is invalid
+ */
+function validateDelegationScope(scope: string | undefined): void {
+  if (scope === undefined || scope === 'blanket') {
+    return; // Valid blanket delegation
+  }
+
+  if (typeof scope !== 'string') {
+    throw new ICNError('scope must be a string', 400, 'INVALID_SCOPE');
+  }
+
+  const validPrefixes = ['domain:', 'proposal:'];
+  const hasValidPrefix = validPrefixes.some(prefix => scope.startsWith(prefix));
+
+  if (!hasValidPrefix) {
+    throw new ICNError(
+      `scope must be 'blanket', 'domain:<id>', or 'proposal:<id>' (got: ${scope})`,
+      400,
+      'INVALID_SCOPE'
+    );
+  }
+
+  // Validate that the ID portion is non-empty
+  const colonIndex = scope.indexOf(':');
+  const id = scope.slice(colonIndex + 1);
+  if (!id || id.length === 0) {
+    throw new ICNError('scope ID cannot be empty', 400, 'INVALID_SCOPE');
+  }
+}
+
+/**
+ * Validate expiration timestamp.
+ *
+ * @throws ICNError if the expiration is in the past or too far in the future
+ */
+function validateExpiration(expiresAt: number | undefined): void {
+  if (expiresAt === undefined) {
+    return; // Optional field
+  }
+
+  if (typeof expiresAt !== 'number' || !Number.isInteger(expiresAt)) {
+    throw new ICNError('expires_at must be an integer timestamp', 400, 'INVALID_EXPIRATION');
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+
+  if (expiresAt <= now) {
+    throw new ICNError('expires_at must be in the future', 400, 'INVALID_EXPIRATION');
+  }
+
+  // Max 10 years in the future
+  const maxExpiry = now + (10 * 365 * 24 * 60 * 60);
+  if (expiresAt > maxExpiry) {
+    throw new ICNError('expires_at cannot be more than 10 years in the future', 400, 'INVALID_EXPIRATION');
+  }
+}
+
 /**
  * ICN Gateway API Client
  */
@@ -662,6 +759,11 @@ export class ICNClient {
    * ```
    */
   async createDelegation(req: CreateDelegationRequest): Promise<DelegationResponse> {
+    // Client-side validation
+    validateDid(req.delegate, 'delegate');
+    validateDelegationScope(req.scope);
+    validateExpiration(req.expires_at);
+
     return this.post<DelegationResponse>('/gov/delegations', req);
   }
 

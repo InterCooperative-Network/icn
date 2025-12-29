@@ -1083,11 +1083,15 @@ describe('governance operations - additional', () => {
 });
 
 describe('vote delegation', () => {
+  // Use valid-looking DIDs (key portion must be at least 10 chars)
+  const validBobDid = 'did:icn:zBobKey123456789';
+  const validCharlieDid = 'did:icn:zCharlieKey12345';
+
   it('should create a blanket delegation', async () => {
     const mockResponse = {
       id: 'del-123',
-      delegator: 'did:icn:alice',
-      delegate: 'did:icn:bob',
+      delegator: 'did:icn:alice123456',
+      delegate: validBobDid,
       scope: 'blanket',
       created_at: 1700000000,
       is_active: true,
@@ -1106,7 +1110,7 @@ describe('vote delegation', () => {
     });
 
     const result = await client.createDelegation({
-      delegate: 'did:icn:bob',
+      delegate: validBobDid,
       scope: 'blanket',
     });
 
@@ -1119,18 +1123,21 @@ describe('vote delegation', () => {
     expect(options.method).toBe('POST');
 
     const body = JSON.parse(options.body);
-    expect(body.delegate).toBe('did:icn:bob');
+    expect(body.delegate).toBe(validBobDid);
     expect(body.scope).toBe('blanket');
   });
 
   it('should create a domain-scoped delegation with expiry', async () => {
+    // Use a future timestamp (2030-01-01 00:00:00 UTC)
+    const futureExpiry = 1893456000;
+
     const mockResponse = {
       id: 'del-456',
-      delegator: 'did:icn:alice',
-      delegate: 'did:icn:charlie',
+      delegator: 'did:icn:alice123456',
+      delegate: validCharlieDid,
       scope: 'domain:my-domain',
       created_at: 1700000000,
-      expires_at: 1700086400,
+      expires_at: futureExpiry,
       is_active: true,
     };
 
@@ -1147,13 +1154,13 @@ describe('vote delegation', () => {
     });
 
     const result = await client.createDelegation({
-      delegate: 'did:icn:charlie',
+      delegate: validCharlieDid,
       scope: 'domain:my-domain',
-      expires_at: 1700086400,
+      expires_at: futureExpiry,
     });
 
     expect(result.scope).toBe('domain:my-domain');
-    expect(result.expires_at).toBe(1700086400);
+    expect(result.expires_at).toBe(futureExpiry);
   });
 
   it('should list delegations (active only by default)', async () => {
@@ -1271,6 +1278,130 @@ describe('vote delegation', () => {
     const [url, options] = mockFetch.mock.calls[0];
     expect(url).toBe('http://localhost:8080/v1/gov/delegations/del-123');
     expect(options.method).toBe('DELETE');
+  });
+
+  describe('input validation', () => {
+    let client: ICNClient;
+    const mockFetch = jest.fn();
+
+    beforeEach(() => {
+      client = new ICNClient({
+        baseUrl: 'http://localhost:8080',
+        token: 'test-token',
+        fetch: mockFetch as unknown as typeof fetch,
+      });
+    });
+
+    it('should reject invalid delegate DID', async () => {
+      await expect(
+        client.createDelegation({
+          delegate: 'not-a-valid-did',
+          scope: 'blanket',
+        })
+      ).rejects.toThrow('must be a valid DID');
+    });
+
+    it('should reject empty delegate', async () => {
+      await expect(
+        client.createDelegation({
+          delegate: '',
+          scope: 'blanket',
+        })
+      ).rejects.toThrow('delegate is required');
+    });
+
+    it('should reject invalid scope format', async () => {
+      await expect(
+        client.createDelegation({
+          delegate: 'did:icn:validkey123456',
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          scope: 'invalid-scope' as any, // Bypass type check for runtime validation test
+        })
+      ).rejects.toThrow("scope must be 'blanket'");
+    });
+
+    it('should reject empty scope ID', async () => {
+      await expect(
+        client.createDelegation({
+          delegate: 'did:icn:validkey123456',
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          scope: 'domain:' as any, // Bypass type check for runtime validation test
+        })
+      ).rejects.toThrow('scope ID cannot be empty');
+    });
+
+    it('should reject past expiration', async () => {
+      await expect(
+        client.createDelegation({
+          delegate: 'did:icn:validkey123456',
+          scope: 'blanket',
+          expires_at: 1700000000, // Past timestamp (Nov 2023)
+        })
+      ).rejects.toThrow('expires_at must be in the future');
+    });
+
+    it('should accept valid blanket delegation', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 201,
+        json: async () => ({
+          id: 'del-1',
+          delegator: 'did:icn:alice',
+          delegate: 'did:icn:validkey123456',
+          scope: 'blanket',
+          is_active: true,
+        }),
+      });
+
+      await expect(
+        client.createDelegation({
+          delegate: 'did:icn:validkey123456',
+          scope: 'blanket',
+        })
+      ).resolves.toBeDefined();
+    });
+
+    it('should accept valid domain-scoped delegation', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 201,
+        json: async () => ({
+          id: 'del-2',
+          delegator: 'did:icn:alice',
+          delegate: 'did:icn:validkey123456',
+          scope: 'domain:test-domain',
+          is_active: true,
+        }),
+      });
+
+      await expect(
+        client.createDelegation({
+          delegate: 'did:icn:validkey123456',
+          scope: 'domain:test-domain',
+        })
+      ).resolves.toBeDefined();
+    });
+
+    it('should accept valid proposal-scoped delegation', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 201,
+        json: async () => ({
+          id: 'del-3',
+          delegator: 'did:icn:alice',
+          delegate: 'did:icn:validkey123456',
+          scope: 'proposal:prop-123',
+          is_active: true,
+        }),
+      });
+
+      await expect(
+        client.createDelegation({
+          delegate: 'did:icn:validkey123456',
+          scope: 'proposal:prop-123',
+        })
+      ).resolves.toBeDefined();
+    });
   });
 });
 

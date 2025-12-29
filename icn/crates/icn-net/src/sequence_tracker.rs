@@ -254,6 +254,79 @@ impl OutgoingSequenceTracker {
         self.cache.read().await.len()
     }
 
+    /// Cleanup stale entries from cache and persistent storage.
+    ///
+    /// Removes entries that haven't been used within the retention period.
+    /// Should be called periodically (e.g., hourly) to prevent unbounded memory growth.
+    ///
+    /// # Arguments
+    /// * `retention_secs` - Remove entries older than this many seconds
+    ///
+    /// # Returns
+    /// Number of entries removed
+    pub async fn cleanup_stale_entries(&self, retention_secs: u64) -> Result<usize> {
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
+
+        let cutoff_ms = now_ms.saturating_sub(retention_secs * 1000);
+
+        let entries = self
+            .store
+            .scan(SEQUENCE_PREFIX)
+            .context("Failed to scan sequence entries")?;
+
+        let mut removed = 0;
+        let mut cache = self.cache.write().await;
+
+        for (key, value) in entries {
+            if let Ok(entry) = serde_json::from_slice::<SequenceEntry>(&value) {
+                if entry.updated_at_ms < cutoff_ms {
+                    // Remove from storage
+                    if self.store.delete(&key).is_ok() {
+                        // Remove from cache if we can parse the key
+                        if let Some((sender, recipient)) = Self::parse_key(&key) {
+                            cache.remove(&(sender, recipient));
+                        }
+                        removed += 1;
+                    }
+                }
+            }
+        }
+
+        if removed > 0 {
+            tracing::info!(
+                removed_entries = removed,
+                retention_secs = retention_secs,
+                "Cleaned up stale sequence tracker entries"
+            );
+        }
+
+        Ok(removed)
+    }
+
+    /// Check if safety gap has been applied.
+    ///
+    /// Returns true if `load_and_apply_safety_gap()` has been called.
+    /// Useful for startup validation.
+    pub async fn is_initialized(&self) -> bool {
+        *self.restart_gap_applied.read().await
+    }
+
+    /// Require that safety gap has been explicitly applied.
+    ///
+    /// Returns error if `load_and_apply_safety_gap()` hasn't been called.
+    /// Use this in strict mode when you want to enforce explicit initialization.
+    pub async fn require_initialized(&self) -> Result<()> {
+        if !*self.restart_gap_applied.read().await {
+            anyhow::bail!(
+                "Sequence tracker not initialized. Call load_and_apply_safety_gap() during startup."
+            )
+        }
+        Ok(())
+    }
+
     /// Clear all sequences (for testing only).
     #[cfg(test)]
     pub async fn clear(&self) {
@@ -474,5 +547,84 @@ mod tests {
         // Same pair doesn't increase count
         tracker.next_sequence(&alice, &bob).await.unwrap();
         assert_eq!(tracker.pair_count().await, 3);
+    }
+
+    #[tokio::test]
+    async fn test_is_initialized() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let tracker = OutgoingSequenceTracker::new(store).unwrap();
+
+        // Not initialized yet
+        assert!(!tracker.is_initialized().await);
+
+        // Apply safety gap
+        tracker.load_and_apply_safety_gap().await.unwrap();
+
+        // Now initialized
+        assert!(tracker.is_initialized().await);
+    }
+
+    #[tokio::test]
+    async fn test_require_initialized_error() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let tracker = OutgoingSequenceTracker::new(store).unwrap();
+
+        // Should error before initialization
+        let result = tracker.require_initialized().await;
+        assert!(result.is_err());
+
+        // Apply safety gap
+        tracker.load_and_apply_safety_gap().await.unwrap();
+
+        // Should succeed after initialization
+        let result = tracker.require_initialized().await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_auto_initialization_on_next_sequence() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let tracker = OutgoingSequenceTracker::new(store).unwrap();
+
+        let alice = generate_did();
+        let bob = generate_did();
+
+        // Not initialized
+        assert!(!tracker.is_initialized().await);
+
+        // next_sequence auto-initializes
+        let seq = tracker.next_sequence(&alice, &bob).await.unwrap();
+        assert_eq!(seq, 1);
+
+        // Now initialized
+        assert!(tracker.is_initialized().await);
+    }
+
+    #[tokio::test]
+    async fn test_cleanup_stale_entries() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let tracker = OutgoingSequenceTracker::new(store).unwrap();
+        tracker.load_and_apply_safety_gap().await.unwrap();
+
+        let alice = generate_did();
+        let bob = generate_did();
+        let charlie = generate_did();
+
+        // Create some entries
+        tracker.next_sequence(&alice, &bob).await.unwrap();
+        tracker.next_sequence(&alice, &charlie).await.unwrap();
+
+        assert_eq!(tracker.pair_count().await, 2);
+
+        // Cleanup with 0 retention - should remove nothing (entries are fresh)
+        // Actually with 0 retention, entries created "now" shouldn't be removed
+        // because their timestamp is >= cutoff
+        let removed = tracker.cleanup_stale_entries(0).await.unwrap();
+        assert_eq!(removed, 0);
+
+        // Cleanup with very long retention - should remove nothing
+        let removed = tracker.cleanup_stale_entries(86400).await.unwrap();
+        assert_eq!(removed, 0);
+        assert_eq!(tracker.pair_count().await, 2);
     }
 }

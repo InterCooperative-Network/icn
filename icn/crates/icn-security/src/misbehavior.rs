@@ -425,12 +425,20 @@ impl MisbehaviorDetector {
     ///
     /// Should be called periodically to restore baseline trust for rehabilitated peers.
     /// Returns the list of DIDs that were released from quarantine.
+    ///
+    /// # Reputation Decay
+    ///
+    /// This method applies reputation decay to ALL tracked peers, not just quarantined ones.
+    /// This is intentional: good actors' scores should also recover towards 1.0 over time,
+    /// and the decay rate provides a "healing" mechanism for the entire trust system.
+    /// Without universal decay, a single past violation would permanently lower a peer's score.
     pub fn check_quarantine_releases(&mut self) -> Vec<Did> {
         let mut released = Vec::new();
         let now = SystemTime::now();
 
-        // Apply reputation decay based on time since last update
-        // This prevents re-applying decay on every call
+        // Apply reputation decay to ALL reputation scores.
+        // This is intentional - it allows good actors to recover reputation over time
+        // and prevents permanent penalties for minor past violations.
         for (_did, score) in self.reputation_scores.iter_mut() {
             if let Ok(elapsed) = now.duration_since(score.updated_at) {
                 let hours = elapsed.as_secs() as f64 / 3600.0;
