@@ -151,6 +151,11 @@ pub async fn list_domains(
 
     let query = query.into_inner().validate();
 
+    // Validate filter lengths to prevent DoS
+    query
+        .validate_filters()
+        .map_err(crate::error::GatewayError::BadRequest)?;
+
     // TODO(performance): Currently loads all domains into memory for filtering/sorting.
     // For large deployments, consider pushing filtering/sorting to storage layer.
     // See: https://github.com/InterCooperative-Network/icn/issues/322#performance
@@ -450,6 +455,12 @@ pub async fn list_proposals(
     require_scope(&http_req, "gov:read")?;
 
     let query = query.into_inner().validate();
+
+    // Validate filter lengths to prevent DoS
+    query
+        .validate_filters()
+        .map_err(crate::error::GatewayError::BadRequest)?;
+
     let mut proposals = gov_mgr.list_proposals().await?;
 
     // Filter by domain if requested

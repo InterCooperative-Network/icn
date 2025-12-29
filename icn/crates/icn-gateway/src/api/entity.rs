@@ -686,6 +686,10 @@ pub async fn list_members(
     require_scope(&req, "entity:read")?;
 
     let query = query.into_inner().validate();
+
+    // Validate filter lengths to prevent DoS
+    query.validate_filters().map_err(GatewayError::BadRequest)?;
+
     let entity_id_str = path.into_inner();
     let entity_id: EntityId = entity_id_str
         .parse()

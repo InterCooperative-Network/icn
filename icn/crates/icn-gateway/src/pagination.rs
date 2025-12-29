@@ -49,6 +49,9 @@ pub const MAX_PAGE_SIZE: usize = 100;
 /// Default page size
 pub const DEFAULT_PAGE_SIZE: usize = 20;
 
+/// Maximum filter string length to prevent DoS via expensive string matching
+pub const MAX_FILTER_LENGTH: usize = 256;
+
 /// Direction of pagination
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -336,6 +339,7 @@ impl ListQuery {
     /// Get a specific filter value
     ///
     /// Checks both `filter[field]` format and direct `field` format for backwards compatibility.
+    /// Returns None if filter exceeds MAX_FILTER_LENGTH.
     pub fn filter(&self, field: &str) -> Option<&str> {
         // Check filter[field] format first (new standard)
         let filter_key = format!("filter[{field}]");
@@ -344,6 +348,22 @@ impl ListQuery {
             // Fall back to direct field name (backwards compatibility)
             .or_else(|| self.extra.get(field))
             .map(|s| s.as_str())
+            // Prevent DoS via expensive string matching
+            .filter(|s| s.len() <= MAX_FILTER_LENGTH)
+    }
+
+    /// Validate all filter values don't exceed MAX_FILTER_LENGTH
+    ///
+    /// Returns Err with a message if any filter is too long.
+    pub fn validate_filters(&self) -> Result<(), String> {
+        for (key, value) in &self.extra {
+            if value.len() > MAX_FILTER_LENGTH {
+                return Err(format!(
+                    "Filter '{key}' exceeds maximum length of {MAX_FILTER_LENGTH} characters"
+                ));
+            }
+        }
+        Ok(())
     }
 
     /// Parse sort fields into a list of (field, ascending) tuples
@@ -959,6 +979,76 @@ mod tests {
         };
         let validated = query.validate();
         assert_eq!(validated.limit, 1);
+    }
+
+    #[test]
+    fn test_validate_filters() {
+        // Valid filter length
+        let mut extra = HashMap::new();
+        extra.insert("filter[name]".to_string(), "short".to_string());
+        let query = ListQuery {
+            cursor: None,
+            limit: 20,
+            sort: None,
+            extra,
+        };
+        assert!(query.validate_filters().is_ok());
+
+        // Filter at max length
+        let mut extra = HashMap::new();
+        extra.insert("filter[name]".to_string(), "a".repeat(MAX_FILTER_LENGTH));
+        let query = ListQuery {
+            cursor: None,
+            limit: 20,
+            sort: None,
+            extra,
+        };
+        assert!(query.validate_filters().is_ok());
+
+        // Filter exceeds max length
+        let mut extra = HashMap::new();
+        extra.insert(
+            "filter[name]".to_string(),
+            "a".repeat(MAX_FILTER_LENGTH + 1),
+        );
+        let query = ListQuery {
+            cursor: None,
+            limit: 20,
+            sort: None,
+            extra,
+        };
+        let result = query.validate_filters();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("exceeds maximum length"));
+    }
+
+    #[test]
+    fn test_filter_rejects_too_long() {
+        // filter() should return None for too-long filters
+        let mut extra = HashMap::new();
+        extra.insert(
+            "filter[name]".to_string(),
+            "a".repeat(MAX_FILTER_LENGTH + 1),
+        );
+        let query = ListQuery {
+            cursor: None,
+            limit: 20,
+            sort: None,
+            extra,
+        };
+        // filter() silently rejects too-long filters
+        assert_eq!(query.filter("name"), None);
+
+        // Valid length filter works
+        let mut extra = HashMap::new();
+        extra.insert("filter[name]".to_string(), "valid".to_string());
+        let query = ListQuery {
+            cursor: None,
+            limit: 20,
+            sort: None,
+            extra,
+        };
+        assert_eq!(query.filter("name"), Some("valid"));
     }
 
     #[test]
