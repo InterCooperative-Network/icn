@@ -303,15 +303,16 @@ impl EntityRegistry for InMemoryRegistry {
         // Validate entity type relationships:
         // - Individuals can join Cooperatives, Communities, or Federations
         // - Cooperatives can join Communities or Federations
-        // - Communities can join Federations
+        // - Communities can join Communities (nested) or Federations
         // - Federations can join Federations (recursive)
         // - Nothing can join an Individual
         let valid_relationship = match (&parent_entity.entity_type, &member_entity.entity_type) {
             // Cooperatives accept individuals
             (EntityType::Cooperative, EntityType::Individual) => true,
-            // Communities accept individuals and cooperatives
+            // Communities accept individuals, cooperatives, and other communities (nested)
             (EntityType::Community, EntityType::Individual) => true,
             (EntityType::Community, EntityType::Cooperative) => true,
+            (EntityType::Community, EntityType::Community) => true,
             // Federations accept individuals, cooperatives, communities, and other federations
             (EntityType::Federation, EntityType::Individual) => true,
             (EntityType::Federation, EntityType::Cooperative) => true,
@@ -319,8 +320,7 @@ impl EntityRegistry for InMemoryRegistry {
             (EntityType::Federation, EntityType::Federation) => true,
             // Individuals cannot have members
             (EntityType::Individual, _) => false,
-            // Communities cannot have community or federation members
-            (EntityType::Community, EntityType::Community) => false,
+            // Communities cannot have federation members (federations are higher in hierarchy)
             (EntityType::Community, EntityType::Federation) => false,
             // Unknown types - reject for safety
             (EntityType::Unknown, _) | (_, EntityType::Unknown) => false,
@@ -714,21 +714,20 @@ mod tests {
         );
         assert!(registry.add_membership(membership).is_ok());
 
-        // Invalid: Community cannot join Community (no nested communities)
+        // Valid: Community can join another Community (nested communities)
         let community2 =
             CooperativeEntity::community("other-community", "Other Community").unwrap();
         let community2_id = community2.id.clone();
         registry.register(community2).unwrap();
 
-        let invalid = Membership::active(
+        let membership = Membership::active(
             community2_id.clone(),
             community_id.clone(),
             MembershipRole::FederatedMember,
         );
-        let result = registry.add_membership(invalid);
-        assert!(matches!(result, Err(EntityError::MembershipError(_))));
+        assert!(registry.add_membership(membership).is_ok());
 
-        // Invalid: Federation cannot join Community
+        // Invalid: Federation cannot join Community (federations are higher in hierarchy)
         let invalid = Membership::active(
             fed_id,
             community_id.clone(),

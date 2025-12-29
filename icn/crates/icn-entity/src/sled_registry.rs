@@ -248,15 +248,16 @@ impl SledEntityRegistry {
         // Validate entity type relationships:
         // - Individuals can join Cooperatives, Communities, or Federations
         // - Cooperatives can join Communities or Federations
-        // - Communities can join Federations
+        // - Communities can join Communities (nested) or Federations
         // - Federations can join Federations (recursive)
         // - Nothing can join an Individual
         let valid_relationship = match (&parent_entity.entity_type, &member_entity.entity_type) {
             // Cooperatives accept individuals
             (EntityType::Cooperative, EntityType::Individual) => true,
-            // Communities accept individuals and cooperatives
+            // Communities accept individuals, cooperatives, and other communities (nested)
             (EntityType::Community, EntityType::Individual) => true,
             (EntityType::Community, EntityType::Cooperative) => true,
+            (EntityType::Community, EntityType::Community) => true,
             // Federations accept individuals, cooperatives, communities, and other federations
             (EntityType::Federation, EntityType::Individual) => true,
             (EntityType::Federation, EntityType::Cooperative) => true,
@@ -264,8 +265,7 @@ impl SledEntityRegistry {
             (EntityType::Federation, EntityType::Federation) => true,
             // Individuals cannot have members
             (EntityType::Individual, _) => false,
-            // Communities cannot have community or federation members
-            (EntityType::Community, EntityType::Community) => false,
+            // Communities cannot have federation members (federations are higher in hierarchy)
             (EntityType::Community, EntityType::Federation) => false,
             // Unknown types - reject for safety
             (EntityType::Unknown, _) | (_, EntityType::Unknown) => false,
