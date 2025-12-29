@@ -145,10 +145,10 @@ impl DynamicLimitConfig {
             )));
         }
 
-        // recovery_rate must be positive
-        if self.recovery_rate_per_transaction < 0.0 {
+        // recovery_rate must be in [0.0, 1.0] - values > 1.0 would recover more than the gap
+        if self.recovery_rate_per_transaction < 0.0 || self.recovery_rate_per_transaction > 1.0 {
             return Err(LedgerError::InvalidEntry(format!(
-                "recovery_rate_per_transaction must be >= 0, got {}",
+                "recovery_rate_per_transaction must be in [0.0, 1.0], got {}",
                 self.recovery_rate_per_transaction
             )));
         }
@@ -765,6 +765,13 @@ mod tests {
         // Negative recovery rate should fail
         let invalid = DynamicLimitConfig {
             recovery_rate_per_transaction: -0.1,
+            ..DynamicLimitConfig::default()
+        };
+        assert!(invalid.validate().is_err());
+
+        // recovery_rate > 1.0 should fail (would recover more than the gap)
+        let invalid = DynamicLimitConfig {
+            recovery_rate_per_transaction: 1.5,
             ..DynamicLimitConfig::default()
         };
         assert!(invalid.validate().is_err());
