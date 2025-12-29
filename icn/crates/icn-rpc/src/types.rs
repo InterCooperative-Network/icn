@@ -449,21 +449,28 @@ mod tests {
         let json = serde_json::to_string(&request).unwrap();
         let parsed: RpcRequest = serde_json::from_str(&json).unwrap();
 
+        // Verify all fields round-trip correctly
+        assert_eq!(parsed.jsonrpc, "2.0");
         assert_eq!(parsed.method, "test.method");
+        assert_eq!(parsed.params["param1"], 42);
         assert_eq!(parsed.id, 1);
     }
 
     #[test]
     fn test_peer_info_serialization() {
         let peer = PeerInfo {
-            did: "did:icn:test123".to_string(),
+            did: "did:icn:zPeerKeyABCDEFGHJ".to_string(), // Valid base58btc format
             addr: "127.0.0.1:9000".to_string(),
             version: "0.1.0".to_string(),
         };
 
         let json = serde_json::to_string(&peer).unwrap();
-        assert!(json.contains("did:icn:test123"));
-        assert!(json.contains("127.0.0.1:9000"));
+        let parsed: PeerInfo = serde_json::from_str(&json).unwrap();
+
+        // Verify round-trip
+        assert_eq!(parsed.did, peer.did);
+        assert_eq!(parsed.addr, peer.addr);
+        assert_eq!(parsed.version, peer.version);
     }
 
     #[test]
@@ -495,7 +502,7 @@ mod tests {
     #[test]
     fn test_membership_config_serialization() {
         let static_list = MembershipConfigInfo::StaticList {
-            members: vec!["did:icn:alice".to_string(), "did:icn:bob".to_string()],
+            members: vec!["did:icn:zAliceKeyABCDEF".to_string(), "did:icn:zBobKeyABCDEFG".to_string()],
         };
         let trust_threshold = MembershipConfigInfo::TrustThreshold { threshold: 0.5 };
 
@@ -504,6 +511,25 @@ mod tests {
 
         assert!(static_json.contains("\"type\":\"static_list\""));
         assert!(trust_json.contains("\"type\":\"trust_threshold\""));
+
+        // Verify round-trip deserialization
+        let parsed_static: MembershipConfigInfo = serde_json::from_str(&static_json).unwrap();
+        let parsed_trust: MembershipConfigInfo = serde_json::from_str(&trust_json).unwrap();
+
+        match parsed_static {
+            MembershipConfigInfo::StaticList { members } => {
+                assert_eq!(members.len(), 2);
+                assert_eq!(members[0], "did:icn:zAliceKeyABCDEF");
+            }
+            _ => panic!("Expected StaticList variant"),
+        }
+
+        match parsed_trust {
+            MembershipConfigInfo::TrustThreshold { threshold } => {
+                assert!((threshold - 0.5).abs() < f64::EPSILON);
+            }
+            _ => panic!("Expected TrustThreshold variant"),
+        }
     }
 
     #[test]
@@ -514,7 +540,7 @@ mod tests {
         let budget = ProposalPayloadInfo::Budget {
             amount: 1000,
             currency: "credits".to_string(),
-            recipient: "did:icn:bob".to_string(),
+            recipient: "did:icn:zBobKeyABCDEFGH".to_string(),
             purpose: "Development".to_string(),
         };
 
@@ -524,6 +550,27 @@ mod tests {
         assert!(text_json.contains("\"type\":\"text\""));
         assert!(budget_json.contains("\"type\":\"budget\""));
         assert!(budget_json.contains("\"amount\":1000"));
+
+        // Verify round-trip deserialization
+        let parsed_text: ProposalPayloadInfo = serde_json::from_str(&text_json).unwrap();
+        let parsed_budget: ProposalPayloadInfo = serde_json::from_str(&budget_json).unwrap();
+
+        match parsed_text {
+            ProposalPayloadInfo::Text { body } => {
+                assert_eq!(body, "Test proposal");
+            }
+            _ => panic!("Expected Text variant"),
+        }
+
+        match parsed_budget {
+            ProposalPayloadInfo::Budget { amount, currency, recipient, purpose } => {
+                assert_eq!(amount, 1000);
+                assert_eq!(currency, "credits");
+                assert_eq!(recipient, "did:icn:zBobKeyABCDEFGH");
+                assert_eq!(purpose, "Development");
+            }
+            _ => panic!("Expected Budget variant"),
+        }
     }
 
     #[test]
@@ -555,7 +602,14 @@ mod tests {
 
         let json = serde_json::to_string(&full_result).unwrap();
         assert!(json.contains("\"outcome\":\"success\""));
+        assert!(json.contains("\"output\"")); // Verify Some field is present
         assert!(!json.contains("\"error\"")); // skip_serializing_if = "Option::is_none"
+
+        // Verify round-trip
+        let parsed: TaskResultInfo = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.outcome, "success");
+        assert_eq!(parsed.output.as_ref().unwrap()["result"], 42);
+        assert!(parsed.error.is_none());
 
         // With error
         let error_result = TaskResultInfo {
@@ -568,6 +622,7 @@ mod tests {
 
         let error_json = serde_json::to_string(&error_result).unwrap();
         assert!(error_json.contains("Out of memory"));
+        assert!(!error_json.contains("\"output\"")); // None field should be skipped
     }
 
     #[test]
@@ -632,5 +687,57 @@ mod tests {
         assert!(profile.memory_mb.is_none());
         assert!(profile.storage_mb.is_none());
         assert!(profile.network_mbps.is_none());
+
+        // Verify skip_serializing_if works
+        let output = serde_json::to_string(&profile).unwrap();
+        assert!(output.contains("cpu_cores"));
+        assert!(!output.contains("memory_mb")); // None should be skipped
+        assert!(!output.contains("storage_mb"));
+        assert!(!output.contains("network_mbps"));
+    }
+
+    // Error case tests
+    #[test]
+    fn test_invalid_membership_config_type() {
+        let json = r#"{"type": "invalid_type"}"#;
+        let result: Result<MembershipConfigInfo, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_invalid_proposal_payload_type() {
+        let json = r#"{"type": "unknown_payload"}"#;
+        let result: Result<ProposalPayloadInfo, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_missing_required_fields() {
+        // RpcRequest missing required fields
+        let json = r#"{"jsonrpc": "2.0"}"#;
+        let result: Result<RpcRequest, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+
+        // SubmitTaskRequest missing task_id
+        let json = r#"{"code": "some code"}"#;
+        let result: Result<SubmitTaskRequest, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_code_type_deserialization() {
+        // Valid cases
+        assert!(matches!(
+            serde_json::from_str::<CodeType>(r#""ccl""#).unwrap(),
+            CodeType::Ccl
+        ));
+        assert!(matches!(
+            serde_json::from_str::<CodeType>(r#""wasm""#).unwrap(),
+            CodeType::Wasm
+        ));
+
+        // Invalid case
+        let result: Result<CodeType, _> = serde_json::from_str(r#""invalid""#);
+        assert!(result.is_err());
     }
 }
