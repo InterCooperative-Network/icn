@@ -88,3 +88,4 @@ pub use rate_limit::{
 pub use server::GatewayServer;
 pub use steward_mgr::{StewardHandleType, StewardManager};
 pub use treasury_mgr::{GatewayTreasuryManager, LedgerHandle, TreasuryHandle};
+pub use websocket::ServerMessage;

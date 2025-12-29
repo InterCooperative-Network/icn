@@ -27,9 +27,9 @@ enum ClientMessage {
 }
 
 /// WebSocket server message (from server to client)
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(tag = "type")]
-enum ServerMessage {
+pub enum ServerMessage {
     /// Authentication successful with current sequence number
     AuthOk { did: String, current_seq: u64 },
     /// Authentication failed
@@ -44,6 +44,19 @@ enum ServerMessage {
     BackfillComplete { count: usize },
     /// Error message
     Error { message: String },
+    /// Server is shutting down gracefully
+    ///
+    /// Clients should:
+    /// 1. Save the last received sequence number
+    /// 2. Close the connection
+    /// 3. If `reconnect_after_ms` is Some, reconnect after that delay
+    /// 4. On reconnect, request backfill from saved sequence
+    Shutdown {
+        /// Human-readable reason for shutdown
+        reason: String,
+        /// Suggested delay before reconnecting (None = don't reconnect)
+        reconnect_after_ms: Option<u64>,
+    },
 }
 
 /// WebSocket session for a cooperative namespace

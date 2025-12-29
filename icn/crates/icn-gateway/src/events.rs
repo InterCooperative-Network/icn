@@ -245,6 +245,21 @@ pub enum GatewayEvent {
         archived_count: usize,
         reason: String,
     },
+
+    // === Control Events ===
+    /// Server is shutting down gracefully
+    ///
+    /// Clients should:
+    /// 1. Save the last received sequence number
+    /// 2. Close the connection
+    /// 3. If `reconnect_after_ms` is Some, reconnect after that delay
+    /// 4. On reconnect, request backfill from saved sequence
+    Shutdown {
+        /// Human-readable reason for shutdown
+        reason: String,
+        /// Suggested delay before reconnecting (None = don't reconnect)
+        reconnect_after_ms: Option<u64>,
+    },
 }
 
 /// Detail of a single balance change (used in BatchBalanceChanged)
@@ -502,6 +517,50 @@ impl EventBroadcaster {
             }
         }
     }
+
+    /// Broadcast a shutdown signal to all subscribers of a cooperative
+    ///
+    /// This sends a graceful shutdown notification before disconnecting clients.
+    /// Clients can use this to save state and prepare for reconnection.
+    pub async fn broadcast_shutdown(
+        &self,
+        coop_id: &str,
+        reason: &str,
+        reconnect_after_ms: Option<u64>,
+    ) {
+        let event = GatewayEvent::Shutdown {
+            reason: reason.to_string(),
+            reconnect_after_ms,
+        };
+        self.broadcast(coop_id, event).await;
+    }
+
+    /// Broadcast a shutdown signal to ALL subscribers across all cooperatives
+    ///
+    /// Used during server shutdown to notify all connected clients.
+    pub async fn broadcast_shutdown_all(&self, reason: &str, reconnect_after_ms: Option<u64>) {
+        let coop_ids: Vec<String> = {
+            let subscribers = self.subscribers.read().await;
+            subscribers.keys().cloned().collect()
+        };
+
+        for coop_id in coop_ids {
+            self.broadcast_shutdown(&coop_id, reason, reconnect_after_ms)
+                .await;
+        }
+    }
+
+    /// Get the number of active subscribers for a cooperative
+    pub async fn subscriber_count(&self, coop_id: &str) -> usize {
+        let subscribers = self.subscribers.read().await;
+        subscribers.get(coop_id).map(|s| s.len()).unwrap_or(0)
+    }
+
+    /// Get the total number of active subscribers across all cooperatives
+    pub async fn total_subscriber_count(&self) -> usize {
+        let subscribers = self.subscribers.read().await;
+        subscribers.values().map(|s| s.len()).sum()
+    }
 }
 
 impl Default for EventBroadcaster {
@@ -691,5 +750,90 @@ mod tests {
 
         // Verify config was applied correctly
         assert_eq!(broadcaster.config().max_subscribers_per_coop, 5);
+    }
+
+    #[tokio::test]
+    async fn test_shutdown_broadcast() {
+        let broadcaster = EventBroadcaster::new();
+
+        let mut rx = broadcaster
+            .subscribe("test-coop")
+            .await
+            .expect("Should subscribe successfully");
+
+        // Broadcast shutdown signal
+        broadcaster
+            .broadcast_shutdown("test-coop", "Server maintenance", Some(5000))
+            .await;
+
+        // Receive the shutdown event
+        let received = rx.recv().await;
+        assert!(received.is_some());
+
+        let sequenced = received.unwrap();
+        match sequenced.event {
+            GatewayEvent::Shutdown {
+                reason,
+                reconnect_after_ms,
+            } => {
+                assert_eq!(reason, "Server maintenance");
+                assert_eq!(reconnect_after_ms, Some(5000));
+            }
+            _ => panic!("Expected Shutdown event"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_shutdown_broadcast_all() {
+        let broadcaster = EventBroadcaster::new();
+
+        // Subscribe to multiple coops
+        let mut rx1 = broadcaster
+            .subscribe("coop-1")
+            .await
+            .expect("Should subscribe");
+        let mut rx2 = broadcaster
+            .subscribe("coop-2")
+            .await
+            .expect("Should subscribe");
+
+        // Broadcast shutdown to all
+        broadcaster
+            .broadcast_shutdown_all("Server shutting down", None)
+            .await;
+
+        // Both should receive shutdown
+        let event1 = rx1.recv().await.expect("Should receive");
+        let event2 = rx2.recv().await.expect("Should receive");
+
+        match event1.event {
+            GatewayEvent::Shutdown { reason, .. } => {
+                assert_eq!(reason, "Server shutting down");
+            }
+            _ => panic!("Expected Shutdown event"),
+        }
+
+        match event2.event {
+            GatewayEvent::Shutdown { reason, .. } => {
+                assert_eq!(reason, "Server shutting down");
+            }
+            _ => panic!("Expected Shutdown event"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_subscriber_count() {
+        let broadcaster = EventBroadcaster::new();
+
+        assert_eq!(broadcaster.subscriber_count("test-coop").await, 0);
+        assert_eq!(broadcaster.total_subscriber_count().await, 0);
+
+        let _rx1 = broadcaster.subscribe("coop-1").await;
+        let _rx2 = broadcaster.subscribe("coop-1").await;
+        let _rx3 = broadcaster.subscribe("coop-2").await;
+
+        assert_eq!(broadcaster.subscriber_count("coop-1").await, 2);
+        assert_eq!(broadcaster.subscriber_count("coop-2").await, 1);
+        assert_eq!(broadcaster.total_subscriber_count().await, 3);
     }
 }
