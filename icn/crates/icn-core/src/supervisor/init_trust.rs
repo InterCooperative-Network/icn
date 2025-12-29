@@ -175,4 +175,174 @@ mod tests {
         // Either None or Isolated is acceptable for unknown peers
         assert!(result.is_none() || result == Some(TrustClass::Isolated));
     }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_misbehavior_updates_trust_graph() {
+        let temp_dir = TempDir::new().unwrap();
+        let config = Config {
+            data_dir: temp_dir.path().to_path_buf(),
+            ..Default::default()
+        };
+        let keypair = icn_identity::KeyPair::generate().unwrap();
+        let own_did = keypair.did().clone();
+
+        let services = init_trust_services(&config, own_did.clone()).await.unwrap();
+
+        // Create a peer DID
+        let peer_keypair = icn_identity::KeyPair::generate().unwrap();
+        let peer_did = peer_keypair.did().clone();
+
+        // Record a violation against the peer
+        {
+            let mut detector = services.misbehavior_detector.write().await;
+            let violation = icn_security::Violation::InvalidSignature {
+                message_hash: [0u8; 32],
+            };
+            detector.record_violation(&peer_did, violation, vec![]);
+        }
+
+        // Give the callback time to complete
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+
+        // Verify the trust graph was updated
+        let graph = services.trust_graph.read().await;
+        let trust_score = graph.compute_trust_score(&peer_did).unwrap_or(0.0);
+
+        // Score should be reduced from the violation (0.75 after one InvalidSignature)
+        // The callback maps this to trust score, so it should be 0.75
+        assert!(
+            trust_score >= 0.5 && trust_score <= 1.0,
+            "Trust score should be moderate after violation: got {}",
+            trust_score
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_severe_misbehavior_causes_quarantine() {
+        let temp_dir = TempDir::new().unwrap();
+        let config = Config {
+            data_dir: temp_dir.path().to_path_buf(),
+            ..Default::default()
+        };
+        let keypair = icn_identity::KeyPair::generate().unwrap();
+        let own_did = keypair.did().clone();
+
+        let services = init_trust_services(&config, own_did).await.unwrap();
+
+        let peer_keypair = icn_identity::KeyPair::generate().unwrap();
+        let peer_did = peer_keypair.did().clone();
+
+        // Record multiple violations to trigger quarantine/ban
+        {
+            let mut detector = services.misbehavior_detector.write().await;
+
+            // Record enough violations to drop reputation below quarantine threshold
+            // InvalidSignature has severity 5, penalty = 0.25 per violation
+            // After 3 violations: 1.0 - 0.75 = 0.25 (quarantined)
+            // After 4+ violations: 0.0 (banned, as score <= ban_threshold of 0.0)
+            for _ in 0..10 {
+                let violation = icn_security::Violation::InvalidSignature {
+                    message_hash: [0u8; 32],
+                };
+                detector.record_violation(&peer_did, violation, vec![]);
+            }
+        }
+
+        // Verify peer is quarantined OR banned (severe misbehavior escalates to ban)
+        let detector = services.misbehavior_detector.read().await;
+        assert!(
+            detector.is_quarantined(&peer_did) || detector.is_banned(&peer_did),
+            "Peer should be quarantined or banned after many violations"
+        );
+
+        // Trust should be very low
+        let graph = services.trust_graph.read().await;
+        let trust_score = graph.compute_trust_score(&peer_did).unwrap_or(0.0);
+        assert!(
+            trust_score < 0.3,
+            "Trust score should be very low when quarantined/banned: got {}",
+            trust_score
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_quarantine_release_restores_trust() {
+        let temp_dir = TempDir::new().unwrap();
+        let config = Config {
+            data_dir: temp_dir.path().to_path_buf(),
+            ..Default::default()
+        };
+        let keypair = icn_identity::KeyPair::generate().unwrap();
+        let own_did = keypair.did().clone();
+
+        let services = init_trust_services(&config, own_did).await.unwrap();
+
+        let peer_keypair = icn_identity::KeyPair::generate().unwrap();
+        let peer_did = peer_keypair.did().clone();
+
+        // Quarantine the peer using InvalidSignature (severity 5, penalty 0.25)
+        // After 3 violations: 1.0 - 0.75 = 0.25 (quarantined but not banned)
+        {
+            let mut detector = services.misbehavior_detector.write().await;
+            for _ in 0..3 {
+                let violation = icn_security::Violation::InvalidSignature {
+                    message_hash: [0u8; 32],
+                };
+                detector.record_violation(&peer_did, violation, vec![]);
+            }
+        }
+
+        // Verify quarantined (not banned yet)
+        {
+            let detector = services.misbehavior_detector.read().await;
+            assert!(
+                detector.is_quarantined(&peer_did),
+                "Peer should be quarantined after 3 InvalidSignature violations"
+            );
+            assert!(
+                !detector.is_banned(&peer_did),
+                "Peer should NOT be banned yet"
+            );
+        }
+
+        // Get trust score before release
+        let trust_before = {
+            let graph = services.trust_graph.read().await;
+            graph.compute_trust_score(&peer_did).unwrap_or(0.0)
+        };
+
+        // Force release from quarantine
+        {
+            let mut detector = services.misbehavior_detector.write().await;
+            detector.force_release_from_quarantine(&peer_did);
+        }
+
+        // Give callback time to complete
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+
+        // Verify no longer quarantined
+        {
+            let detector = services.misbehavior_detector.read().await;
+            assert!(
+                !detector.is_quarantined(&peer_did),
+                "Peer should no longer be quarantined after force release"
+            );
+        }
+
+        // Trust should improve after release
+        let graph = services.trust_graph.read().await;
+        let trust_after = graph.compute_trust_score(&peer_did).unwrap_or(0.0);
+        assert!(
+            trust_after > trust_before,
+            "Trust should improve after quarantine release: before={}, after={}",
+            trust_before,
+            trust_after
+        );
+        // Trust should be at least moderate after reset to 0.6 reputation
+        assert!(
+            trust_after >= 0.3,
+            "Trust should be at least moderate after release: got {}",
+            trust_after
+        );
+    }
 }

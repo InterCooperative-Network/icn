@@ -183,3 +183,177 @@ impl ConnectionContext {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::replay_guard::ReplayGuard;
+    use crate::topology::{NeighborLimitsConfig, NeighborSets, TopologyConfig};
+    use crate::{RateLimitConfig, RateLimiter, SessionManager};
+    use icn_identity::{IdentityBundle, KeyPair};
+    use std::collections::HashMap;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+    use tokio::sync::RwLock;
+
+    fn create_test_context_with_topology() -> (ConnectionContext, Arc<RwLock<NeighborSets>>) {
+        let keypair = KeyPair::generate().unwrap();
+        let identity_bundle = IdentityBundle::from_keypair(keypair.clone()).unwrap();
+        let own_did = keypair.did().clone();
+
+        let forward_count = Arc::new(AtomicUsize::new(0));
+        let forward_count_clone = Arc::clone(&forward_count);
+
+        let handler: crate::IncomingMessageHandler = Arc::new(move |_msg| {
+            forward_count_clone.fetch_add(1, Ordering::SeqCst);
+        });
+
+        let rate_limiter = Arc::new(RateLimiter::new(RateLimitConfig::default()));
+        let replay_guard = Arc::new(RwLock::new(ReplayGuard::new(300, 3600)));
+        let session_manager = Arc::new(RwLock::new(SessionManager::new()));
+        let peer_connections = Arc::new(RwLock::new(HashMap::new()));
+
+        let topology_config = TopologyConfig {
+            region: "us-west".to_string(),
+            cluster_id: "cluster-1".to_string(),
+            role: NodeRole::Edge,
+            neighbor_limits: NeighborLimitsConfig::default(),
+            fanout: Default::default(),
+        };
+
+        let own_topology = TopologyInfo {
+            region: "us-west".to_string(),
+            cluster_id: "cluster-1".to_string(),
+            role: NodeRole::Edge,
+        };
+
+        let neighbor_sets = Arc::new(RwLock::new(NeighborSets::new(own_topology)));
+
+        let ctx = ConnectionContext {
+            handler,
+            rate_limiter,
+            replay_guard,
+            neighbor_sets: Some(neighbor_sets.clone()),
+            topology_config: Some(topology_config),
+            trust_graph: None,
+            session_manager,
+            peer_connections,
+            blob_registry: None,
+            misbehavior_detector: None,
+            identity_bundle,
+            own_did,
+        };
+
+        (ctx, neighbor_sets)
+    }
+
+    fn create_test_context_no_topology() -> ConnectionContext {
+        let keypair = KeyPair::generate().unwrap();
+        let identity_bundle = IdentityBundle::from_keypair(keypair.clone()).unwrap();
+        let own_did = keypair.did().clone();
+
+        let handler: crate::IncomingMessageHandler = Arc::new(move |_msg| {});
+
+        let rate_limiter = Arc::new(RateLimiter::new(RateLimitConfig::default()));
+        let replay_guard = Arc::new(RwLock::new(ReplayGuard::new(300, 3600)));
+        let session_manager = Arc::new(RwLock::new(SessionManager::new()));
+        let peer_connections = Arc::new(RwLock::new(HashMap::new()));
+
+        ConnectionContext {
+            handler,
+            rate_limiter,
+            replay_guard,
+            neighbor_sets: None,
+            topology_config: None,
+            trust_graph: None,
+            session_manager,
+            peer_connections,
+            blob_registry: None,
+            misbehavior_detector: None,
+            identity_bundle,
+            own_did,
+        }
+    }
+
+    #[test]
+    fn test_handle_handshake_ack() {
+        // Simple test - just ensures it doesn't panic
+        let ctx = create_test_context_no_topology();
+        let peer = KeyPair::generate().unwrap();
+        ctx.handle_handshake_ack(&peer.did());
+        // If we get here without panic, test passes
+    }
+
+    #[tokio::test]
+    async fn test_handle_pong_records_rtt() {
+        let (ctx, neighbor_sets) = create_test_context_with_topology();
+        let peer = KeyPair::generate().unwrap();
+        let peer_did = peer.did().clone();
+
+        // Add the peer to neighbor sets first
+        {
+            let mut sets = neighbor_sets.write().await;
+            sets.add_neighbor(
+                PeerId(peer_did.clone()),
+                TopologyInfo {
+                    region: "us-west".to_string(),
+                    cluster_id: "cluster-1".to_string(),
+                    role: NodeRole::Edge,
+                },
+                None,
+                0.5,
+                &NeighborLimitsConfig::default(),
+            );
+        }
+
+        // Simulate a ping sent 50ms ago
+        let ping_sent_at = icn_time::current_timestamp_millis() - 50;
+        let pong_sent_at = ping_sent_at + 25; // Pong sent 25ms after ping received
+
+        ctx.handle_pong(&peer_did, ping_sent_at, pong_sent_at).await;
+
+        // Verify RTT was recorded (should be approximately 50ms)
+        let sets = neighbor_sets.read().await;
+        let rtt = sets.get_rtt(&PeerId(peer_did.clone()));
+        assert!(rtt.is_some());
+        // RTT should be close to 50ms (with some timing variance)
+        let rtt = rtt.unwrap();
+        assert!(
+            rtt >= 40 && rtt <= 100,
+            "RTT {} was not in expected range",
+            rtt
+        );
+    }
+
+    #[tokio::test]
+    async fn test_handle_pong_without_topology() {
+        // Should not panic even without topology enabled
+        let ctx = create_test_context_no_topology();
+        let peer = KeyPair::generate().unwrap();
+
+        let ping_sent_at = icn_time::current_timestamp_millis() - 50;
+        let pong_sent_at = ping_sent_at + 25;
+
+        ctx.handle_pong(&peer.did(), ping_sent_at, pong_sent_at)
+            .await;
+        // Test passes if no panic
+    }
+
+    #[tokio::test]
+    async fn test_handle_pong_unknown_peer() {
+        let (ctx, neighbor_sets) = create_test_context_with_topology();
+        let peer = KeyPair::generate().unwrap();
+
+        // Don't add peer to neighbor sets - should still not panic
+        let ping_sent_at = icn_time::current_timestamp_millis() - 50;
+        let pong_sent_at = ping_sent_at + 25;
+
+        ctx.handle_pong(&peer.did(), ping_sent_at, pong_sent_at)
+            .await;
+
+        // RTT should not be recorded for unknown peer
+        let sets = neighbor_sets.read().await;
+        let rtt = sets.get_rtt(&PeerId(peer.did().clone()));
+        assert!(rtt.is_none());
+    }
+}

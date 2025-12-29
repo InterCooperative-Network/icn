@@ -104,6 +104,10 @@ import {
   ListDevicesResponse,
   RevokeDeviceRequest,
   RevokeDeviceResponse,
+  // Vote delegation types
+  CreateDelegationRequest,
+  DelegationResponse,
+  DelegationListResponse,
 } from './types';
 
 export * from './types';
@@ -624,6 +628,86 @@ export class ICNClient {
    */
   async getVotes(proposalId: string): Promise<VoteTally> {
     return this.get<VoteTally>(`/gov/proposals/${proposalId}/votes`);
+  }
+
+  // ===========================================================================
+  // Vote Delegation
+  // ===========================================================================
+
+  /**
+   * Create a vote delegation
+   *
+   * Allows the authenticated user to delegate their voting power to another DID.
+   *
+   * @example
+   * ```typescript
+   * // Blanket delegation - delegate can vote on all proposals
+   * await client.createDelegation({
+   *   delegate: 'did:icn:delegate123',
+   *   scope: 'blanket',
+   * });
+   *
+   * // Domain-scoped delegation - delegate can only vote in specific domain
+   * await client.createDelegation({
+   *   delegate: 'did:icn:delegate123',
+   *   scope: 'domain:my-governance-domain',
+   *   expires_at: Date.now() / 1000 + 86400, // Expires in 24 hours
+   * });
+   *
+   * // Proposal-scoped delegation - delegate can only vote on specific proposal
+   * await client.createDelegation({
+   *   delegate: 'did:icn:delegate123',
+   *   scope: 'proposal:prop-123',
+   * });
+   * ```
+   */
+  async createDelegation(req: CreateDelegationRequest): Promise<DelegationResponse> {
+    return this.post<DelegationResponse>('/gov/delegations', req);
+  }
+
+  /**
+   * List delegations for the authenticated user
+   *
+   * Returns both delegations given by and received by the user.
+   *
+   * @param includeRevoked - Whether to include revoked delegations (default: false)
+   * @example
+   * ```typescript
+   * // Get active delegations only
+   * const { given, received } = await client.listDelegations();
+   * console.log('Delegations given:', given.length);
+   * console.log('Delegations received:', received.length);
+   *
+   * // Include revoked delegations
+   * const all = await client.listDelegations(true);
+   * ```
+   */
+  async listDelegations(includeRevoked = false): Promise<DelegationListResponse> {
+    const query = includeRevoked ? '?include_revoked=true' : '';
+    return this.get<DelegationListResponse>(`/gov/delegations${query}`);
+  }
+
+  /**
+   * Get a specific delegation by ID
+   *
+   * Only the delegator or delegate can view a delegation (for privacy).
+   */
+  async getDelegation(delegationId: string): Promise<DelegationResponse> {
+    return this.get<DelegationResponse>(`/gov/delegations/${encodeURIComponent(delegationId)}`);
+  }
+
+  /**
+   * Revoke a delegation
+   *
+   * Only the delegator can revoke their delegation.
+   *
+   * @example
+   * ```typescript
+   * await client.revokeDelegation('delegation-123');
+   * ```
+   */
+  async revokeDelegation(delegationId: string): Promise<void> {
+    return this.delete<void>(`/gov/delegations/${encodeURIComponent(delegationId)}`);
   }
 
   // ===========================================================================

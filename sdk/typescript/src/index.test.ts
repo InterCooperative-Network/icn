@@ -1082,6 +1082,198 @@ describe('governance operations - additional', () => {
   });
 });
 
+describe('vote delegation', () => {
+  it('should create a blanket delegation', async () => {
+    const mockResponse = {
+      id: 'del-123',
+      delegator: 'did:icn:alice',
+      delegate: 'did:icn:bob',
+      scope: 'blanket',
+      created_at: 1700000000,
+      is_active: true,
+    };
+
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 201,
+      json: async () => mockResponse,
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      token: 'test-token',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    const result = await client.createDelegation({
+      delegate: 'did:icn:bob',
+      scope: 'blanket',
+    });
+
+    expect(result.id).toBe('del-123');
+    expect(result.scope).toBe('blanket');
+    expect(result.is_active).toBe(true);
+
+    const [url, options] = mockFetch.mock.calls[0];
+    expect(url).toBe('http://localhost:8080/v1/gov/delegations');
+    expect(options.method).toBe('POST');
+
+    const body = JSON.parse(options.body);
+    expect(body.delegate).toBe('did:icn:bob');
+    expect(body.scope).toBe('blanket');
+  });
+
+  it('should create a domain-scoped delegation with expiry', async () => {
+    const mockResponse = {
+      id: 'del-456',
+      delegator: 'did:icn:alice',
+      delegate: 'did:icn:charlie',
+      scope: 'domain:my-domain',
+      created_at: 1700000000,
+      expires_at: 1700086400,
+      is_active: true,
+    };
+
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 201,
+      json: async () => mockResponse,
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      token: 'test-token',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    const result = await client.createDelegation({
+      delegate: 'did:icn:charlie',
+      scope: 'domain:my-domain',
+      expires_at: 1700086400,
+    });
+
+    expect(result.scope).toBe('domain:my-domain');
+    expect(result.expires_at).toBe(1700086400);
+  });
+
+  it('should list delegations (active only by default)', async () => {
+    const mockResponse = {
+      given: [
+        {
+          id: 'del-1',
+          delegator: 'did:icn:alice',
+          delegate: 'did:icn:bob',
+          scope: 'blanket',
+          created_at: 1700000000,
+          is_active: true,
+        },
+      ],
+      received: [
+        {
+          id: 'del-2',
+          delegator: 'did:icn:charlie',
+          delegate: 'did:icn:alice',
+          scope: 'domain:test',
+          created_at: 1700000000,
+          is_active: true,
+        },
+      ],
+    };
+
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockResponse,
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      token: 'test-token',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    const result = await client.listDelegations();
+
+    expect(result.given).toHaveLength(1);
+    expect(result.received).toHaveLength(1);
+    expect(result.given[0].id).toBe('del-1');
+    expect(result.received[0].scope).toBe('domain:test');
+
+    const [url] = mockFetch.mock.calls[0];
+    expect(url).toBe('http://localhost:8080/v1/gov/delegations');
+  });
+
+  it('should list delegations including revoked', async () => {
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ given: [], received: [] }),
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      token: 'test-token',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    await client.listDelegations(true);
+
+    const [url] = mockFetch.mock.calls[0];
+    expect(url).toBe('http://localhost:8080/v1/gov/delegations?include_revoked=true');
+  });
+
+  it('should get a specific delegation', async () => {
+    const mockResponse = {
+      id: 'del-123',
+      delegator: 'did:icn:alice',
+      delegate: 'did:icn:bob',
+      scope: 'proposal:prop-1',
+      created_at: 1700000000,
+      is_active: true,
+    };
+
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => mockResponse,
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      token: 'test-token',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    const result = await client.getDelegation('del-123');
+
+    expect(result.id).toBe('del-123');
+    expect(result.scope).toBe('proposal:prop-1');
+
+    const [url] = mockFetch.mock.calls[0];
+    expect(url).toBe('http://localhost:8080/v1/gov/delegations/del-123');
+  });
+
+  it('should revoke a delegation', async () => {
+    const mockFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 204,
+      json: async () => null,
+    });
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      token: 'test-token',
+      fetch: mockFetch as unknown as typeof fetch,
+    });
+
+    await client.revokeDelegation('del-123');
+
+    const [url, options] = mockFetch.mock.calls[0];
+    expect(url).toBe('http://localhost:8080/v1/gov/delegations/del-123');
+    expect(options.method).toBe('DELETE');
+  });
+});
+
 describe('compute task submission - CCL', () => {
   it('should submit CCL task with code', async () => {
     const mockResponse = {

@@ -237,6 +237,62 @@ export interface ProposalOutcome {
 }
 
 // ============================================================================
+// Vote Delegation
+// ============================================================================
+
+/**
+ * Scope of a vote delegation.
+ * - "blanket": Delegate can vote on behalf of delegator for all proposals
+ * - "domain:<id>": Delegate can only vote in the specified governance domain
+ * - "proposal:<id>": Delegate can only vote on the specified proposal
+ */
+export type DelegationScope = 'blanket' | `domain:${string}` | `proposal:${string}`;
+
+/**
+ * Request to create a new vote delegation
+ */
+export interface CreateDelegationRequest {
+  /** DID of the delegate (who receives voting power) */
+  delegate: string;
+  /** Scope of delegation */
+  scope: DelegationScope;
+  /** Optional expiry timestamp (Unix seconds) */
+  expires_at?: number;
+}
+
+/**
+ * Response containing delegation details
+ */
+export interface DelegationResponse {
+  /** Unique delegation ID */
+  id: string;
+  /** DID of the delegator (who gave up voting power) */
+  delegator: string;
+  /** DID of the delegate (who received voting power) */
+  delegate: string;
+  /** Scope of delegation */
+  scope: string;
+  /** Creation timestamp (Unix seconds) */
+  created_at: number;
+  /** Optional expiry timestamp (Unix seconds) */
+  expires_at?: number;
+  /** Revocation timestamp (Unix seconds), if revoked */
+  revoked_at?: number;
+  /** Whether the delegation is currently active */
+  is_active: boolean;
+}
+
+/**
+ * Response containing delegations given and received by a user
+ */
+export interface DelegationListResponse {
+  /** Delegations given by the caller */
+  given: DelegationResponse[];
+  /** Delegations received by the caller */
+  received: DelegationResponse[];
+}
+
+// ============================================================================
 // Compute
 // ============================================================================
 
