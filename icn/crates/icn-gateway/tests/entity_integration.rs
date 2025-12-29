@@ -723,11 +723,15 @@ async fn test_list_members_pagination() {
     req.extensions_mut().insert(claims);
 
     let resp: serde_json::Value = test::call_and_read_body_json(&app, req).await;
-    let page1 = resp["data"].as_array().expect("response.data should be array");
+    let page1 = resp["data"]
+        .as_array()
+        .expect("response.data should be array");
     assert_eq!(page1.len(), 2);
     assert_eq!(resp["pagination"]["has_more"], true);
     assert_eq!(resp["pagination"]["total"], 5);
-    let cursor = resp["pagination"]["cursor"].as_str().expect("should have cursor");
+    let cursor = resp["pagination"]["cursor"]
+        .as_str()
+        .expect("should have cursor");
 
     // Second page using cursor
     let claims = create_test_claims(&alice.did().to_string(), vec!["entity:read"]);
@@ -739,10 +743,14 @@ async fn test_list_members_pagination() {
     req.extensions_mut().insert(claims);
 
     let resp: serde_json::Value = test::call_and_read_body_json(&app, req).await;
-    let page2 = resp["data"].as_array().expect("response.data should be array");
+    let page2 = resp["data"]
+        .as_array()
+        .expect("response.data should be array");
     assert_eq!(page2.len(), 2);
     assert_eq!(resp["pagination"]["has_more"], true);
-    let cursor = resp["pagination"]["cursor"].as_str().expect("should have cursor");
+    let cursor = resp["pagination"]["cursor"]
+        .as_str()
+        .expect("should have cursor");
 
     // Third page (last, only 1 item)
     let claims = create_test_claims(&alice.did().to_string(), vec!["entity:read"]);
@@ -754,7 +762,9 @@ async fn test_list_members_pagination() {
     req.extensions_mut().insert(claims);
 
     let resp: serde_json::Value = test::call_and_read_body_json(&app, req).await;
-    let page3 = resp["data"].as_array().expect("response.data should be array");
+    let page3 = resp["data"]
+        .as_array()
+        .expect("response.data should be array");
     assert_eq!(page3.len(), 1);
     assert_eq!(resp["pagination"]["has_more"], false);
 }
