@@ -76,6 +76,36 @@ impl EntityManager {
         anyhow::bail!("Entity manager not initialized")
     }
 
+    /// Ensure an entity exists, registering it atomically if not
+    ///
+    /// This method uses a try-insert pattern to avoid race conditions:
+    /// - If the entity doesn't exist, it's registered
+    /// - If the entity already exists (including from a concurrent registration), returns Ok(())
+    /// - Only propagates errors for actual failures (not "already exists")
+    ///
+    /// This is primarily used for auto-registering individual entities when users
+    /// perform operations that require their entity to exist.
+    pub fn ensure_entity_exists(&self, entity: CooperativeEntity) -> Result<bool> {
+        let entity_id = entity.id.clone();
+        match self.register(entity) {
+            Ok(()) => {
+                debug!(entity_id = %entity_id, "Auto-registered entity");
+                Ok(true) // Entity was newly created
+            }
+            Err(e) => {
+                // Check if this is an "already exists" error (from concurrent registration)
+                // EntityError::AlreadyExists gets converted to anyhow error with this message format
+                let err_msg = e.to_string();
+                if err_msg.contains("already exists") || err_msg.contains("AlreadyExists") {
+                    debug!(entity_id = %entity_id, "Entity already exists (concurrent registration)");
+                    Ok(false) // Entity already existed
+                } else {
+                    Err(e)
+                }
+            }
+        }
+    }
+
     /// Get an entity by ID
     pub fn get(&self, id: &EntityId) -> Result<Option<CooperativeEntity>> {
         if let Some(ref handle) = self.entity_handle {
