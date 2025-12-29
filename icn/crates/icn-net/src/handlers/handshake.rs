@@ -280,7 +280,7 @@ mod tests {
         // Simple test - just ensures it doesn't panic
         let ctx = create_test_context_no_topology();
         let peer = KeyPair::generate().unwrap();
-        ctx.handle_handshake_ack(&peer.did());
+        ctx.handle_handshake_ack(peer.did());
         // If we get here without panic, test passes
     }
 
@@ -319,9 +319,8 @@ mod tests {
         // RTT should be close to 50ms (with some timing variance)
         let rtt = rtt.unwrap();
         assert!(
-            rtt >= 40 && rtt <= 100,
-            "RTT {} was not in expected range",
-            rtt
+            (40..=100).contains(&rtt),
+            "RTT {rtt} was not in expected range"
         );
     }
 
@@ -334,7 +333,7 @@ mod tests {
         let ping_sent_at = icn_time::current_timestamp_millis() - 50;
         let pong_sent_at = ping_sent_at + 25;
 
-        ctx.handle_pong(&peer.did(), ping_sent_at, pong_sent_at)
+        ctx.handle_pong(peer.did(), ping_sent_at, pong_sent_at)
             .await;
         // Test passes if no panic
     }
@@ -348,7 +347,7 @@ mod tests {
         let ping_sent_at = icn_time::current_timestamp_millis() - 50;
         let pong_sent_at = ping_sent_at + 25;
 
-        ctx.handle_pong(&peer.did(), ping_sent_at, pong_sent_at)
+        ctx.handle_pong(peer.did(), ping_sent_at, pong_sent_at)
             .await;
 
         // RTT should not be recorded for unknown peer

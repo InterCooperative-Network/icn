@@ -198,7 +198,7 @@ mod tests {
 
         // Should record an InvalidSignature violation
         let detector_guard = detector.read().await;
-        let violations = detector_guard.get_violations(&sender.did());
+        let violations = detector_guard.get_violations(sender.did());
         assert!(!violations.is_empty());
         assert!(matches!(
             violations[0].violation,
@@ -227,7 +227,7 @@ mod tests {
 
         // Should record a ReplayAttack violation
         let detector_guard = detector.read().await;
-        let violations = detector_guard.get_violations(&sender.did());
+        let violations = detector_guard.get_violations(sender.did());
         assert!(!violations.is_empty());
         assert!(matches!(
             violations[0].violation,

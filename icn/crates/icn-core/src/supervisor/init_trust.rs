@@ -211,9 +211,8 @@ mod tests {
         // Score should be reduced from the violation (0.75 after one InvalidSignature)
         // The callback maps this to trust score, so it should be 0.75
         assert!(
-            trust_score >= 0.5 && trust_score <= 1.0,
-            "Trust score should be moderate after violation: got {}",
-            trust_score
+            (0.5..=1.0).contains(&trust_score),
+            "Trust score should be moderate after violation: got {trust_score}"
         );
     }
 
@@ -260,8 +259,7 @@ mod tests {
         let trust_score = graph.compute_trust_score(&peer_did).unwrap_or(0.0);
         assert!(
             trust_score < 0.3,
-            "Trust score should be very low when quarantined/banned: got {}",
-            trust_score
+            "Trust score should be very low when quarantined/banned: got {trust_score}"
         );
     }
 
@@ -334,15 +332,12 @@ mod tests {
         let trust_after = graph.compute_trust_score(&peer_did).unwrap_or(0.0);
         assert!(
             trust_after > trust_before,
-            "Trust should improve after quarantine release: before={}, after={}",
-            trust_before,
-            trust_after
+            "Trust should improve after quarantine release: before={trust_before}, after={trust_after}"
         );
         // Trust should be at least moderate after reset to 0.6 reputation
         assert!(
             trust_after >= 0.3,
-            "Trust should be at least moderate after release: got {}",
-            trust_after
+            "Trust should be at least moderate after release: got {trust_after}"
         );
     }
 }
