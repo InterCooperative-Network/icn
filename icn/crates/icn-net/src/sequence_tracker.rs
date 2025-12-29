@@ -214,7 +214,8 @@ impl OutgoingSequenceTracker {
     }
 
     /// Separator between sender and recipient DIDs in storage key.
-    /// Using a sequence that won't appear in DIDs (which contain colons).
+    /// Chosen because `||` is unlikely to appear in the base58-encoded public keys used in DIDs,
+    /// even though DIDs themselves contain colons.
     const DID_SEPARATOR: &'static [u8] = b"||";
 
     /// Generate storage key for a sender-recipient pair.

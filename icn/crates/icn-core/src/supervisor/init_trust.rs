@@ -238,8 +238,8 @@ mod tests {
 
             // Record enough violations to drop reputation below quarantine threshold
             // InvalidSignature has severity 5, penalty = 0.25 per violation
-            // After 3 violations: 1.0 - 0.75 = 0.25 (quarantined)
-            // After 4+ violations: 0.0 (banned, as score <= ban_threshold of 0.0)
+            // After 3 violations: 1.0 - (3 × 0.25) = 0.25 (quarantined)
+            // After 4+ violations: 1.0 - (4 × 0.25) = 0.0 (banned, as score <= ban_threshold of 0.0)
             for _ in 0..10 {
                 let violation = icn_security::Violation::InvalidSignature {
                     message_hash: [0u8; 32],
@@ -281,7 +281,7 @@ mod tests {
         let peer_did = peer_keypair.did().clone();
 
         // Quarantine the peer using InvalidSignature (severity 5, penalty 0.25)
-        // After 3 violations: 1.0 - 0.75 = 0.25 (quarantined but not banned)
+        // After 3 violations: 1.0 - (3 * 0.25) = 0.25 (quarantined but not banned)
         {
             let mut detector = services.misbehavior_detector.write().await;
             for _ in 0..3 {

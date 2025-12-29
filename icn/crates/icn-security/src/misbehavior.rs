@@ -477,6 +477,9 @@ impl MisbehaviorDetector {
         }
     }
 
+    /// Baseline reputation score for administrative release (0.6 = moderate trust)
+    const BASELINE_REPUTATION_SCORE: f64 = 0.6;
+
     /// Manually force release from quarantine (administrative action).
     ///
     /// This bypasses reputation checks and resets to baseline trust.
@@ -487,14 +490,16 @@ impl MisbehaviorDetector {
 
             // Reset reputation to baseline
             if let Some(score) = self.reputation_scores.get_mut(did) {
-                score.score = 0.6; // Baseline trust
+                score.score = Self::BASELINE_REPUTATION_SCORE;
                 score.total_violations = 0;
                 score.severity_points = 0;
             }
 
             // Update trust graph if callback is set
             if let Some(ref callback) = self.trust_penalty_callback {
-                callback(did, 0.6);
+                if let Some(score) = self.reputation_scores.get(did) {
+                    callback(did, score.score);
+                }
             }
         }
     }
@@ -707,9 +712,9 @@ mod tests {
 
         assert!(detector.is_quarantined(&did), "DID should be quarantined");
 
-        // Manually set reputation above release threshold (quarantine_threshold + 0.1)
+        // Manually set reputation just above release threshold (quarantine_threshold + 0.1)
         if let Some(score) = detector.reputation_scores.get_mut(&did) {
-            score.score = 0.65; // Above 0.5 + 0.1 = 0.6 release threshold
+            score.score = 0.61; // Slightly above 0.5 + 0.1 = 0.6 release threshold
         }
 
         let released = detector.check_quarantine_releases();
@@ -812,8 +817,7 @@ mod tests {
         // Starting from 1.0, new score = 1.0 - 0.25 = 0.75
         assert!(
             (score - 0.75).abs() < 0.01,
-            "Score should be approximately 0.75, got {}",
-            score
+            "Score should be approximately 0.75, got {score}"
         );
     }
 

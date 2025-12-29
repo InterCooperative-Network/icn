@@ -651,7 +651,7 @@ export class ICNClient {
    * await client.createDelegation({
    *   delegate: 'did:icn:delegate123',
    *   scope: 'domain:my-governance-domain',
-   *   expires_at: Date.now() / 1000 + 86400, // Expires in 24 hours
+   *   expires_at: Math.floor(Date.now() / 1000) + 86400, // Expires in 24 hours
    * });
    *
    * // Proposal-scoped delegation - delegate can only vote on specific proposal
