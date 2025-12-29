@@ -21,11 +21,12 @@ use std::str::FromStr;
 // EntityId
 // ============================================================================
 
-/// Unique identifier for any entity (individual, cooperative, or federation)
+/// Unique identifier for any entity (individual, cooperative, community, or federation)
 ///
 /// EntityId is designed to be compatible with DIDs:
 /// - For individuals: wraps their DID directly
 /// - For cooperatives: derived from cooperative creation ceremony
+/// - For communities: derived from community formation
 /// - For federations: derived from federation charter
 ///
 /// # Format
@@ -36,6 +37,7 @@ use std::str::FromStr;
 ///
 /// - `entity:icn:individual:z5TrA8...` (wraps DID)
 /// - `entity:icn:cooperative:food-coop-2024`
+/// - `entity:icn:community:neighborhood-2024`
 /// - `entity:icn:federation:midwest-fed`
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct EntityId(String);
@@ -723,6 +725,23 @@ mod tests {
         assert_eq!(entity.entity_type, EntityType::Community);
         assert_eq!(entity.name, "Local Community Network");
         assert!(matches!(entity.status, EntityStatus::Forming));
+    }
+
+    #[test]
+    fn test_is_organization_includes_community() {
+        let keypair = KeyPair::generate().unwrap();
+        let individual_id = EntityId::from_did(keypair.did());
+        let coop_id = EntityId::cooperative("test-coop").unwrap();
+        let community_id = EntityId::community("test-community").unwrap();
+        let fed_id = EntityId::federation("test-fed").unwrap();
+
+        // Individuals are NOT organizations
+        assert!(!individual_id.is_organization());
+
+        // Cooperatives, communities, and federations ARE organizations
+        assert!(coop_id.is_organization());
+        assert!(community_id.is_organization());
+        assert!(fed_id.is_organization());
     }
 
     #[test]
