@@ -23,7 +23,7 @@ bincode = { version = "2.0", features = ["serde"] }
 
 # Cryptography
 ed25519-dalek = { version = "2", features = ["rand_core", "serde"] }
-rand = "0.8"
+rand = "0.9"
 sha2 = "0.10"
 sha3 = "0.10"
 hmac = "0.12"

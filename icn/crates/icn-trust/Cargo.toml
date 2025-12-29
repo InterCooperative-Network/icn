@@ -21,7 +21,7 @@ bloomfilter = "1.0"
 ordered-float = "5.1"
 
 [dev-dependencies]
-rand = "0.8"
+rand = "0.9"
 criterion = "0.5"
 tempfile = "3.8"
 
