@@ -773,9 +773,11 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let store = Arc::new(SledStore::open(temp_dir.path()).unwrap());
         let base_policy = CreditPolicy::conservative("hours".to_string());
-        let mut config = DynamicLimitConfig::default();
-        config.instant_recovery_on_activity = false;
-        config.recovery_rate_per_transaction = 0.25; // 25% of gap per tx
+        let config = DynamicLimitConfig {
+            instant_recovery_on_activity: false,
+            recovery_rate_per_transaction: 0.25, // 25% of gap per tx
+            ..DynamicLimitConfig::default()
+        };
 
         let manager = DynamicCreditLimitManager::new(store, base_policy, config);
         let keypair = KeyPair::generate().unwrap();
