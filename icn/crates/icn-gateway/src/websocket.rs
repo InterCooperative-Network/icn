@@ -59,7 +59,8 @@ pub struct WsSession {
     /// Event broadcaster
     event_broadcaster: Arc<EventBroadcaster>,
     /// Event receiver (subscribed after authentication)
-    event_rx: Option<mpsc::UnboundedReceiver<SequencedEvent>>,
+    /// Uses bounded channel to prevent memory exhaustion from slow clients
+    event_rx: Option<mpsc::Receiver<SequencedEvent>>,
     /// Tracks whether this connection was successfully started and incremented the global counter
     /// This prevents counter desync when connection is rejected at limit
     connection_tracked: bool,

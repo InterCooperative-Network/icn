@@ -14,14 +14,18 @@
 //! // Use metrics
 //! metrics::network::connections_total_inc();
 //! metrics::gossip::messages_published_inc();
+//! metrics::gateway::websocket_connections_total_inc();
 //! ```
 
 // Include the legacy metrics file directly
 // This keeps backwards compatibility while allowing gradual migration
-// Allow missing docs for legacy metrics - documenting these incrementally
-#[allow(missing_docs)]
+// Allow missing docs and dead_code for legacy metrics - being migrated to submodules
+#[allow(missing_docs, dead_code)]
 mod legacy {
     include!("../metrics_legacy.rs");
 }
 
 pub use legacy::*;
+
+pub mod gateway;
+pub mod network;
