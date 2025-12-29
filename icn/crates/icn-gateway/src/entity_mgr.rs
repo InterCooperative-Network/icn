@@ -7,7 +7,8 @@
 
 use anyhow::Result;
 use icn_entity::{
-    CooperativeEntity, EntityId, EntityRegistry, EntityType, InMemoryRegistry, Membership,
+    CooperativeEntity, EntityError, EntityId, EntityRegistry, EntityType, InMemoryRegistry,
+    Membership,
 };
 use std::sync::{Arc, RwLock};
 use tracing::debug;
@@ -94,9 +95,10 @@ impl EntityManager {
             }
             Err(e) => {
                 // Check if this is an "already exists" error (from concurrent registration)
-                // EntityError::AlreadyExists gets converted to anyhow error with this message format
-                let err_msg = e.to_string();
-                if err_msg.contains("already exists") || err_msg.contains("AlreadyExists") {
+                // Use proper error downcasting instead of string matching for robustness
+                if e.downcast_ref::<EntityError>()
+                    .is_some_and(|entity_err| matches!(entity_err, EntityError::AlreadyExists(_)))
+                {
                     debug!(entity_id = %entity_id, "Entity already exists (concurrent registration)");
                     Ok(false) // Entity already existed
                 } else {
@@ -346,5 +348,88 @@ mod tests {
 
         // Now removal should succeed
         mgr.remove(&coop_id).unwrap();
+    }
+
+    #[test]
+    fn test_ensure_entity_exists_creates_new() {
+        let mgr = EntityManager::new();
+        let keypair = KeyPair::generate().unwrap();
+        let entity = CooperativeEntity::individual(keypair.did(), "Test User");
+        let entity_id = entity.id.clone();
+
+        // First call should create the entity
+        let was_created = mgr.ensure_entity_exists(entity).unwrap();
+        assert!(was_created, "Entity should be newly created");
+
+        // Verify entity exists
+        let retrieved = mgr.get(&entity_id).unwrap();
+        assert!(retrieved.is_some());
+        assert_eq!(retrieved.unwrap().name, "Test User");
+    }
+
+    #[test]
+    fn test_ensure_entity_exists_handles_existing() {
+        let mgr = EntityManager::new();
+        let keypair = KeyPair::generate().unwrap();
+        let entity = CooperativeEntity::individual(keypair.did(), "Test User");
+        let entity_id = entity.id.clone();
+
+        // Register entity directly first
+        mgr.register(entity.clone()).unwrap();
+
+        // ensure_entity_exists should return Ok(false) for existing entity
+        let entity_copy = CooperativeEntity::individual(keypair.did(), "Test User");
+        let was_created = mgr.ensure_entity_exists(entity_copy).unwrap();
+        assert!(!was_created, "Entity already existed, should return false");
+
+        // Entity should still be there
+        let retrieved = mgr.get(&entity_id).unwrap();
+        assert!(retrieved.is_some());
+    }
+
+    #[test]
+    fn test_ensure_entity_exists_concurrent_simulation() {
+        // This test simulates what happens when ensure_entity_exists is called
+        // for an entity that was just registered by another thread.
+        // We can't easily test true concurrency in unit tests, but we can verify
+        // that the "already exists" path works correctly.
+        use std::sync::Arc;
+        use std::thread;
+
+        let mgr = Arc::new(EntityManager::new());
+        let keypair = KeyPair::generate().unwrap();
+        let did = keypair.did().clone();
+
+        // Spawn multiple threads that all try to ensure the same entity exists
+        let handles: Vec<_> = (0..5)
+            .map(|i| {
+                let mgr = Arc::clone(&mgr);
+                let did = did.clone();
+                thread::spawn(move || {
+                    let entity = CooperativeEntity::individual(&did, format!("User {i}"));
+                    mgr.ensure_entity_exists(entity)
+                })
+            })
+            .collect();
+
+        // All threads should succeed (either creating or finding existing)
+        let results: Vec<bool> = handles
+            .into_iter()
+            .map(|h| h.join().unwrap().unwrap())
+            .collect();
+
+        // Exactly one should have created the entity
+        let created_count = results.iter().filter(|&&was_created| was_created).count();
+        assert_eq!(
+            created_count, 1,
+            "Exactly one thread should create the entity"
+        );
+
+        // The rest should have found it existing
+        let existing_count = results.iter().filter(|&&was_created| !was_created).count();
+        assert_eq!(
+            existing_count, 4,
+            "Other threads should find entity existing"
+        );
     }
 }

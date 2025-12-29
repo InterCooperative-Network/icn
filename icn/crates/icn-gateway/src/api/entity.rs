@@ -289,8 +289,9 @@ pub async fn register_entity(
     // Ensure the creator's individual entity exists (auto-register if not)
     // This allows users to create cooperatives without first explicitly registering themselves
     // Uses atomic ensure_entity_exists to prevent race conditions with concurrent requests
+    // Return value (was_created: bool) intentionally unused - we only care that entity exists
     let individual_entity = CooperativeEntity::individual(&creator_did, &claims.sub);
-    entity_mgr
+    let _ = entity_mgr
         .ensure_entity_exists(individual_entity)
         .map_err(|e| {
             GatewayError::InternalError(format!("Failed to auto-register individual entity: {e}"))
@@ -828,9 +829,10 @@ pub async fn add_membership(
 
         // Auto-register the individual entity if it doesn't exist
         // Uses atomic ensure_entity_exists to prevent race conditions with concurrent requests
+        // Return value (was_created: bool) intentionally unused - we only care that entity exists
         let entity_id = EntityId::from_did(&did);
         let individual_entity = CooperativeEntity::individual(&did, &body.member_id);
-        entity_mgr
+        let _ = entity_mgr
             .ensure_entity_exists(individual_entity)
             .map_err(|e| {
                 GatewayError::InternalError(format!(
