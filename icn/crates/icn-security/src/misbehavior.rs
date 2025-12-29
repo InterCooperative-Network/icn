@@ -303,23 +303,28 @@ impl MisbehaviorDetector {
         // Add to violation history
         self.violations.entry(did.clone()).or_default().push(record);
 
-        // Update reputation score
-        let score = self.reputation_scores.entry(did.clone()).or_default();
+        // Update reputation score and capture thresholds for later checks
+        let (is_auto_ban, should_ban, should_quarantine) = {
+            let score = self.reputation_scores.entry(did.clone()).or_default();
+            score.apply_penalty(&violation, self.thresholds.decay_rate);
 
-        score.apply_penalty(&violation, self.thresholds.decay_rate);
+            (
+                violation.is_auto_ban(),
+                score.is_banned(self.thresholds.ban_threshold),
+                score.is_quarantined(self.thresholds.quarantine_threshold),
+            )
+        };
 
         // Emit metrics
         metrics::violations_inc(&did.to_string(), &violation.description());
 
-        // Update trust graph if callback is set (Phase 18)
-        if let Some(ref callback) = self.trust_penalty_callback {
-            callback(did, score.score);
-        }
+        // Update trust graph if callback is set (Phase 18, with panic safety)
+        self.invoke_trust_callback(did);
 
         // Check for auto-quarantine/ban
-        if violation.is_auto_ban() || score.is_banned(self.thresholds.ban_threshold) {
+        if is_auto_ban || should_ban {
             self.ban_peer(did);
-        } else if score.is_quarantined(self.thresholds.quarantine_threshold) {
+        } else if should_quarantine {
             self.quarantine_peer(did);
         }
 
@@ -483,10 +488,36 @@ impl MisbehaviorDetector {
             info!("Released {} from quarantine (reputation recovered)", did);
             metrics::quarantined_dec();
 
-            // Update trust graph if callback is set
-            if let Some(ref callback) = self.trust_penalty_callback {
-                if let Some(score) = self.reputation_scores.get(did) {
-                    callback(did, score.score);
+            // Update trust graph if callback is set (with panic safety)
+            self.invoke_trust_callback(did);
+
+            // Cleanup old violations to prevent unbounded growth
+            self.cleanup_old_violations();
+        }
+    }
+
+    /// Safely invoke the trust penalty callback with panic protection.
+    ///
+    /// If the callback panics, the error is logged but does not propagate.
+    /// This prevents callback failures from crashing the detector.
+    fn invoke_trust_callback(&self, did: &Did) {
+        if let Some(ref callback) = self.trust_penalty_callback {
+            if let Some(score) = self.reputation_scores.get(did) {
+                let did_clone = did.clone();
+                let score_value = score.score;
+                let callback_clone = callback.clone();
+
+                // Catch panics from callback to prevent detector crash
+                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
+                    callback_clone(&did_clone, score_value);
+                }));
+
+                if let Err(e) = result {
+                    warn!(
+                        "Trust penalty callback panicked for {}: {:?}",
+                        did,
+                        e.downcast_ref::<&str>().unwrap_or(&"unknown panic")
+                    );
                 }
             }
         }
@@ -512,23 +543,23 @@ impl MisbehaviorDetector {
             );
             metrics::quarantined_dec();
 
-            // Reset reputation to baseline
+            // Reset reputation to baseline (full pardon)
             if let Some(score) = self.reputation_scores.get_mut(did) {
                 score.score = Self::BASELINE_REPUTATION_SCORE;
                 score.total_violations = 0;
                 score.severity_points = 0;
+                score.last_violation = None; // Clear violation history for clean slate
                 score.updated_at = SystemTime::now();
             }
 
             // Clear violation history for true administrative pardon
             self.violations.remove(did);
 
-            // Update trust graph if callback is set
-            if let Some(ref callback) = self.trust_penalty_callback {
-                if let Some(score) = self.reputation_scores.get(did) {
-                    callback(did, score.score);
-                }
-            }
+            // Update trust graph if callback is set (with panic safety)
+            self.invoke_trust_callback(did);
+
+            // Cleanup old violations from other DIDs
+            self.cleanup_old_violations();
         }
     }
 

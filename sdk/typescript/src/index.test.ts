@@ -1083,9 +1083,10 @@ describe('governance operations - additional', () => {
 });
 
 describe('vote delegation', () => {
-  // Use valid-looking DIDs (key portion must be at least 10 chars)
-  const validBobDid = 'did:icn:zBobKey123456789';
-  const validCharlieDid = 'did:icn:zCharlieKey12345';
+  // Use valid-looking DIDs (key portion must be at least 10 chars and use base58btc encoding)
+  // Base58btc starts with 'z' prefix, followed by valid base58 chars
+  const validBobDid = 'did:icn:zBobKeyABCDEFGHJ';
+  const validCharlieDid = 'did:icn:zCharlieKeyNPQRS';
 
   it('should create a blanket delegation', async () => {
     const mockResponse = {
@@ -1313,7 +1314,7 @@ describe('vote delegation', () => {
     it('should reject invalid scope format', async () => {
       await expect(
         client.createDelegation({
-          delegate: 'did:icn:validkey123456',
+          delegate: 'did:icn:zValidKeyABCDEF',
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           scope: 'invalid-scope' as any, // Bypass type check for runtime validation test
         })
@@ -1323,7 +1324,7 @@ describe('vote delegation', () => {
     it('should reject empty scope ID', async () => {
       await expect(
         client.createDelegation({
-          delegate: 'did:icn:validkey123456',
+          delegate: 'did:icn:zValidKeyABCDEF',
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           scope: 'domain:' as any, // Bypass type check for runtime validation test
         })
@@ -1333,7 +1334,7 @@ describe('vote delegation', () => {
     it('should reject past expiration', async () => {
       await expect(
         client.createDelegation({
-          delegate: 'did:icn:validkey123456',
+          delegate: 'did:icn:zValidKeyABCDEF',
           scope: 'blanket',
           expires_at: 1700000000, // Past timestamp (Nov 2023)
         })
@@ -1341,13 +1342,15 @@ describe('vote delegation', () => {
     });
 
     it('should accept valid blanket delegation', async () => {
+      // Valid base58btc DID (starts with 'z')
+      const validDid = 'did:icn:zValidKeyABCDEF';
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 201,
         json: async () => ({
           id: 'del-1',
-          delegator: 'did:icn:alice',
-          delegate: 'did:icn:validkey123456',
+          delegator: 'did:icn:alice123456789',
+          delegate: validDid,
           scope: 'blanket',
           is_active: true,
         }),
@@ -1355,20 +1358,21 @@ describe('vote delegation', () => {
 
       await expect(
         client.createDelegation({
-          delegate: 'did:icn:validkey123456',
+          delegate: validDid,
           scope: 'blanket',
         })
       ).resolves.toBeDefined();
     });
 
     it('should accept valid domain-scoped delegation', async () => {
+      const validDid = 'did:icn:zValidKeyABCDEF';
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 201,
         json: async () => ({
           id: 'del-2',
-          delegator: 'did:icn:alice',
-          delegate: 'did:icn:validkey123456',
+          delegator: 'did:icn:alice123456789',
+          delegate: validDid,
           scope: 'domain:test-domain',
           is_active: true,
         }),
@@ -1376,20 +1380,21 @@ describe('vote delegation', () => {
 
       await expect(
         client.createDelegation({
-          delegate: 'did:icn:validkey123456',
+          delegate: validDid,
           scope: 'domain:test-domain',
         })
       ).resolves.toBeDefined();
     });
 
     it('should accept valid proposal-scoped delegation', async () => {
+      const validDid = 'did:icn:zValidKeyABCDEF';
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 201,
         json: async () => ({
           id: 'del-3',
-          delegator: 'did:icn:alice',
-          delegate: 'did:icn:validkey123456',
+          delegator: 'did:icn:alice123456789',
+          delegate: validDid,
           scope: 'proposal:prop-123',
           is_active: true,
         }),
@@ -1397,7 +1402,7 @@ describe('vote delegation', () => {
 
       await expect(
         client.createDelegation({
-          delegate: 'did:icn:validkey123456',
+          delegate: validDid,
           scope: 'proposal:prop-123',
         })
       ).resolves.toBeDefined();

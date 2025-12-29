@@ -264,6 +264,10 @@ impl OutgoingSequenceTracker {
     ///
     /// # Returns
     /// Number of entries removed
+    ///
+    /// # Safety
+    /// Uses double-check pattern to avoid TOCTOU race conditions: entries are
+    /// verified as still stale after acquiring the write lock before deletion.
     pub async fn cleanup_stale_entries(&self, retention_secs: u64) -> Result<usize> {
         let now_ms = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -272,20 +276,36 @@ impl OutgoingSequenceTracker {
 
         let cutoff_ms = now_ms.saturating_sub(retention_secs * 1000);
 
+        // First pass: collect candidate keys (without holding cache lock)
         let entries = self
             .store
             .scan(SEQUENCE_PREFIX)
             .context("Failed to scan sequence entries")?;
 
-        let mut removed = 0;
-        let mut cache = self.cache.write().await;
-
+        let mut candidate_keys: Vec<Vec<u8>> = Vec::new();
         for (key, value) in entries {
             if let Ok(entry) = serde_json::from_slice::<SequenceEntry>(&value) {
                 if entry.updated_at_ms < cutoff_ms {
-                    // Remove from storage
-                    if self.store.delete(&key).is_ok() {
-                        // Remove from cache if we can parse the key
+                    candidate_keys.push(key);
+                }
+            }
+        }
+
+        if candidate_keys.is_empty() {
+            return Ok(0);
+        }
+
+        // Second pass: re-check and delete under lock (TOCTOU protection)
+        let mut removed = 0;
+        let mut cache = self.cache.write().await;
+
+        for key in candidate_keys {
+            // Re-read entry from store to check if it's still stale
+            // (could have been updated between scan and now)
+            if let Ok(Some(fresh_value)) = self.store.get(&key) {
+                if let Ok(fresh_entry) = serde_json::from_slice::<SequenceEntry>(&fresh_value) {
+                    // Only delete if STILL stale after re-check AND delete succeeds
+                    if fresh_entry.updated_at_ms < cutoff_ms && self.store.delete(&key).is_ok() {
                         if let Some((sender, recipient)) = Self::parse_key(&key) {
                             cache.remove(&(sender, recipient));
                         }

@@ -132,6 +132,9 @@ const DEFAULT_RETRY: Required<RetryOptions> = {
  * ICN DIDs follow the pattern: did:icn:<multibase-encoded-public-key>
  * where the key portion is base58btc encoded (starts with 'z').
  *
+ * Accepts both ICN DIDs (strict 3-part format) and other DID methods
+ * (for interoperability with external systems).
+ *
  * @throws ICNError if the DID format is invalid
  */
 function validateDid(did: string, fieldName = 'DID'): void {
@@ -145,13 +148,28 @@ function validateDid(did: string, fieldName = 'DID'): void {
     throw new ICNError(`${fieldName} must be a valid DID (did:method:identifier)`, 400, 'INVALID_DID');
   }
 
-  // ICN-specific validation
-  if (parts[1] === 'icn') {
-    const key = parts.slice(2).join(':'); // Handle edge case of colons in key
+  const method = parts[1];
+
+  // ICN-specific validation (strict 3-part format)
+  if (method === 'icn') {
+    // ICN DIDs must be exactly: did:icn:<key>
+    if (parts.length !== 3) {
+      throw new ICNError(`${fieldName} must be exactly did:icn:<key> format`, 400, 'INVALID_DID');
+    }
+
+    const key = parts[2];
+    // Key portion should be base58btc encoded (typically 43-44 chars for Ed25519)
     if (!key || key.length < 10) {
       throw new ICNError(`${fieldName} has invalid key portion`, 400, 'INVALID_DID');
     }
+
+    // Multibase prefix check (base58btc starts with 'z')
+    if (!key.startsWith('z') && !/^[1-9A-HJ-NP-Za-km-z]+$/.test(key)) {
+      // Allow both multibase format and raw base58 for backwards compatibility
+      throw new ICNError(`${fieldName} has invalid key encoding`, 400, 'INVALID_DID');
+    }
   }
+  // Other DID methods (did:key, did:web, etc.) - allow more parts
 }
 
 /**
