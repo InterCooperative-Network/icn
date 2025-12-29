@@ -838,7 +838,10 @@ mod tests {
         // Empty key (edge case)
         store.put(b"", b"value for empty key")?;
         let retrieved = store.get(b"")?;
-        assert_eq!(retrieved.as_deref(), Some(b"value for empty key".as_slice()));
+        assert_eq!(
+            retrieved.as_deref(),
+            Some(b"value for empty key".as_slice())
+        );
 
         Ok(())
     }
