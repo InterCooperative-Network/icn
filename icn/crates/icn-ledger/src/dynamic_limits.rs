@@ -9,6 +9,19 @@
 //! - **Recovery**: Limits recover instantly or gradually when members become active
 //! - **Events**: Emits events when limits change for real-time notifications
 //!
+//! # Concurrency
+//!
+//! The manager uses Sled for storage which provides internal synchronization.
+//! However, for correctness under concurrent access to the same (DID, currency)
+//! pair, callers should serialize mutations through the ledger's transaction
+//! validation layer. Specifically:
+//!
+//! - `get_effective_limit()` is read-only and safe to call concurrently
+//! - `record_activity()` and `apply_decay()` mutate state and should be
+//!   serialized per (DID, currency) pair to avoid lost updates
+//! - In practice, this is naturally achieved when limit checks are part of
+//!   atomic ledger transaction validation
+//!
 //! # Example
 //!
 //! ```rust,ignore
@@ -182,7 +195,8 @@ pub enum LimitChangeReason {
     /// Trust score changed
     TrustScoreChanged { old_score: f64, new_score: f64 },
 
-    /// Contribution (cleared volume) increased
+    /// Contribution (cleared volume) increased (reserved for future use)
+    #[allow(dead_code)]
     ContributionIncreased { cleared_volume: i64 },
 
     /// Limit decayed due to inactivity
@@ -362,13 +376,10 @@ impl DynamicCreditLimitManager {
         let now = Self::now();
         let calculated_limit = self.calculate_base_limit(trust_score, cleared_volume);
 
-        // Load existing state or create new
+        // Load existing state - this is a read-only operation
+        // Note: calculated_limit in state may be stale; we use fresh calculation
         let state = match self.load_state(did, currency)? {
-            Some(mut state) => {
-                // Update calculated limit if trust/contributions changed
-                state.calculated_limit = calculated_limit;
-                state
-            }
+            Some(state) => state,
             None => {
                 // New account, no decay yet
                 return Ok(calculated_limit);
@@ -546,19 +557,10 @@ impl DynamicCreditLimitManager {
 
         let old_limit = state.current_limit;
 
-        // Apply existing decay ratio to new calculated limit
-        let decay_ratio = if state.calculated_limit > 0 {
-            state.decay_applied as f64 / state.calculated_limit as f64
-        } else {
-            // Invariant: when calculated_limit is zero, no decay should have been applied
-            debug_assert_eq!(
-                state.decay_applied, 0,
-                "AccountLimitState invariant violated: calculated_limit is zero but decay_applied is non-zero"
-            );
-            0.0
-        };
-
-        let new_decay = (new_calculated as f64 * decay_ratio) as i64;
+        // Recalculate decay based on actual inactivity time, not preserved ratio
+        // This ensures decay is always time-based regardless of limit changes
+        let days_inactive = state.days_inactive(now);
+        let new_decay = self.calculate_decay(new_calculated, days_inactive);
         let new_limit = (new_calculated - new_decay).max(self.config.min_limit_floor);
 
         state.calculated_limit = new_calculated;
