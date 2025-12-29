@@ -23,7 +23,7 @@ ordered-float = "5.1"
 [dev-dependencies]
 rand = "0.8"
 criterion = "0.5"
-tempfile = "3.8"
+tempfile = "3.24"
 
 [[bench]]
 name = "trust_bench"
