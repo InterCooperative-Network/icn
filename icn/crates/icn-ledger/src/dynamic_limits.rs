@@ -20,10 +20,12 @@
 //! let manager = DynamicCreditLimitManager::new(store, base_policy, config);
 //!
 //! // Get effective limit (includes decay if inactive)
+//! let trust_score = 0.6;
+//! let cleared_volume = 5000;
 //! let limit = manager.get_effective_limit(&did, "hours", trust_score, cleared_volume)?;
 //!
 //! // Record activity to recover limits
-//! if let Some(event) = manager.record_activity(&did, "hours", now)? {
+//! if let Some(event) = manager.record_activity(&did, "hours", trust_score, cleared_volume)? {
 //!     // Limit changed, emit event
 //! }
 //! ```
@@ -57,6 +59,7 @@ pub struct DynamicLimitConfig {
     pub instant_recovery_on_activity: bool,
 
     /// Enable network-aware adjustments (future feature)
+    #[allow(dead_code)]
     pub enable_network_adjustment: bool,
 
     /// Currency this config applies to
@@ -295,8 +298,11 @@ impl DynamicCreditLimitManager {
 
         let decay_days = days_inactive - self.config.inactivity_threshold_days;
 
+        // Clamp decay_days to prevent i32 overflow (1000 days = ~2.7 years is reasonable max)
+        let decay_days_clamped = decay_days.min(1000) as i32;
+
         // Compound decay: limit * (1 - rate)^days, but we calculate the reduction
-        let decay_factor = (1.0 - self.config.decay_rate_per_day).powi(decay_days as i32);
+        let decay_factor = (1.0 - self.config.decay_rate_per_day).powi(decay_days_clamped);
         let decayed_limit = (calculated_limit as f64 * decay_factor) as i64;
 
         // Decay is the difference
@@ -431,6 +437,7 @@ impl DynamicCreditLimitManager {
 
         // Emit event if limit changed
         if new_limit != old_limit {
+            icn_obs::metrics::ledger::dynamic_limit_recovery_inc();
             Ok(Some(LimitChangeEvent::new(
                 did,
                 currency,
