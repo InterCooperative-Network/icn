@@ -710,25 +710,38 @@ mod tests {
         assert!(config.validate().is_ok());
 
         // decay_rate >= 1.0 should fail
-        let mut invalid = DynamicLimitConfig::default();
-        invalid.decay_rate_per_day = 1.0;
+        let invalid = DynamicLimitConfig {
+            decay_rate_per_day: 1.0,
+            ..DynamicLimitConfig::default()
+        };
         assert!(invalid.validate().is_err());
 
-        invalid.decay_rate_per_day = 0.99; // Valid - just under 1.0
-        assert!(invalid.validate().is_ok());
+        // decay_rate just under 1.0 should pass
+        let valid = DynamicLimitConfig {
+            decay_rate_per_day: 0.99,
+            ..DynamicLimitConfig::default()
+        };
+        assert!(valid.validate().is_ok());
 
         // Negative decay_rate should fail
-        invalid.decay_rate_per_day = -0.1;
+        let invalid = DynamicLimitConfig {
+            decay_rate_per_day: -0.1,
+            ..DynamicLimitConfig::default()
+        };
         assert!(invalid.validate().is_err());
 
         // Negative recovery rate should fail
-        invalid.decay_rate_per_day = 0.01;
-        invalid.recovery_rate_per_transaction = -0.1;
+        let invalid = DynamicLimitConfig {
+            recovery_rate_per_transaction: -0.1,
+            ..DynamicLimitConfig::default()
+        };
         assert!(invalid.validate().is_err());
 
         // Negative min_limit_floor should fail
-        invalid.recovery_rate_per_transaction = 0.05;
-        invalid.min_limit_floor = -100;
+        let invalid = DynamicLimitConfig {
+            min_limit_floor: -100,
+            ..DynamicLimitConfig::default()
+        };
         assert!(invalid.validate().is_err());
     }
 
