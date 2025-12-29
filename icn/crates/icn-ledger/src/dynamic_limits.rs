@@ -130,6 +130,13 @@ impl DynamicLimitConfig {
     ///
     /// Returns an error if any parameter is out of valid range.
     pub fn validate(&self) -> Result<()> {
+        // inactivity_threshold_days must be positive
+        if self.inactivity_threshold_days == 0 {
+            return Err(LedgerError::InvalidEntry(
+                "inactivity_threshold_days must be > 0".into(),
+            ));
+        }
+
         // decay_rate_per_day must be in [0.0, 1.0) to prevent instant zeroing
         if self.decay_rate_per_day < 0.0 || self.decay_rate_per_day >= 1.0 {
             return Err(LedgerError::InvalidEntry(format!(
@@ -152,6 +159,13 @@ impl DynamicLimitConfig {
                 "min_limit_floor must be >= 0, got {}",
                 self.min_limit_floor
             )));
+        }
+
+        // currency must not be empty
+        if self.currency.is_empty() {
+            return Err(LedgerError::InvalidEntry(
+                "currency must not be empty".into(),
+            ));
         }
 
         Ok(())
@@ -204,21 +218,21 @@ impl AccountLimitState {
 
     /// Days since last activity
     ///
-    /// Returns 0 if `now` is before `last_activity_timestamp` (clock skew).
+    /// Returns 0 if `now` is before or equal to `last_activity_timestamp`.
+    /// Logs a warning on clock skew (now < last_activity).
     pub fn days_inactive(&self, now: u64) -> u64 {
-        if now <= self.last_activity_timestamp {
+        if now < self.last_activity_timestamp {
             // Clock skew detected - log warning for observability
-            if now < self.last_activity_timestamp {
-                tracing::warn!(
-                    did = %self.did,
-                    currency = %self.currency,
-                    now = now,
-                    last_activity = self.last_activity_timestamp,
-                    "Clock skew detected: current time is before last activity timestamp"
-                );
-            }
+            tracing::warn!(
+                did = %self.did,
+                currency = %self.currency,
+                now = now,
+                last_activity = self.last_activity_timestamp,
+                "Clock skew detected: current time is before last activity timestamp"
+            );
             return 0;
         }
+        // now >= last_activity_timestamp from here
         (now - self.last_activity_timestamp) / 86400 // seconds per day
     }
 }
@@ -376,7 +390,10 @@ impl DynamicCreditLimitManager {
 
         let decay_days = days_inactive - self.config.inactivity_threshold_days;
 
-        // Clamp decay_days to prevent i32 overflow (1000 days = ~2.7 years is reasonable max)
+        // Clamp to 1000 days (~2.7 years) as practical maximum inactivity period.
+        // Beyond this, limits would decay to near-floor anyway with typical rates
+        // (e.g., at 1% daily decay, limit reaches ~0.004% after 550 days).
+        // Also prevents i32 overflow in powi().
         let decay_days_clamped = decay_days.min(1000) as i32;
 
         // Compound decay: limit * (1 - rate)^days, but we calculate the reduction
