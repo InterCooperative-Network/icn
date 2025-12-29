@@ -601,9 +601,14 @@ async fn test_list_members_success() {
     req.extensions_mut().insert(claims);
 
     let resp: serde_json::Value = test::call_and_read_body_json(&app, req).await;
-    let members = resp.as_array().expect("response should be array");
+    let members = resp["data"]
+        .as_array()
+        .expect("response.data should be array");
     assert_eq!(members.len(), 1); // Just the founder
     assert_eq!(members[0]["role"], "founder");
+    // Verify pagination metadata
+    assert_eq!(resp["pagination"]["count"], 1);
+    assert_eq!(resp["pagination"]["has_more"], false);
 }
 
 #[actix_web::test]
@@ -665,8 +670,10 @@ async fn test_add_membership_as_founder() {
         .to_request();
     req.extensions_mut().insert(claims);
 
-    let members: serde_json::Value = test::call_and_read_body_json(&app, req).await;
-    let members_arr = members.as_array().expect("response should be array");
+    let resp: serde_json::Value = test::call_and_read_body_json(&app, req).await;
+    let members_arr = resp["data"]
+        .as_array()
+        .expect("response.data should be array");
     assert_eq!(members_arr.len(), 2);
 }
 

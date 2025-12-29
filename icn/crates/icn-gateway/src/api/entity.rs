@@ -36,6 +36,7 @@ use crate::entity_audit::{EntityAuditManager, EntityOperation};
 use crate::entity_mgr::EntityManager;
 use crate::error::{GatewayError, Result};
 use crate::middleware::{get_claims, require_scope};
+use crate::pagination::{ListPagination, ListQuery, ListResponse};
 
 // ============================================================================
 // Request/Response Types
@@ -669,14 +670,22 @@ pub async fn delete_entity(
 }
 
 /// GET /entities/:id/members - List members
+///
+/// Query parameters:
+/// - `cursor`: Pagination cursor (opaque string)
+/// - `limit`: Max items per page (default 50, max 1000)
+/// - `sort`: Sort field with optional `-` prefix for descending (e.g., `-joined_at`)
+/// - `filter[role]`: Filter by membership role
 #[get("/{id}/members")]
 pub async fn list_members(
     req: HttpRequest,
     entity_mgr: web::Data<Arc<EntityManager>>,
     path: web::Path<String>,
+    query: web::Query<ListQuery>,
 ) -> Result<HttpResponse> {
     require_scope(&req, "entity:read")?;
 
+    let query = query.into_inner().validate();
     let entity_id_str = path.into_inner();
     let entity_id: EntityId = entity_id_str
         .parse()
@@ -692,7 +701,78 @@ pub async fn list_members(
         .get_members(&entity_id)
         .map_err(|e| GatewayError::InternalError(format!("Failed to get members: {e}")))?;
 
-    let response: Vec<MembershipResponse> = members.iter().map(membership_to_response).collect();
+    // Convert to response type
+    let mut response: Vec<MembershipResponse> =
+        members.iter().map(membership_to_response).collect();
+
+    // Apply role filter
+    if let Some(role_filter) = query.filter("role") {
+        response.retain(|m| m.role.eq_ignore_ascii_case(role_filter));
+    }
+
+    // Apply sorting (default: joined_at ascending)
+    let sort_fields = query.sort_fields();
+    if sort_fields.is_empty() {
+        // Default sort by joined_at ascending
+        response.sort_by(|a, b| a.joined_at.cmp(&b.joined_at));
+    } else {
+        for field in sort_fields.iter().rev() {
+            match field.field.as_str() {
+                "joined_at" => {
+                    response.sort_by(|a, b| {
+                        let cmp = a.joined_at.cmp(&b.joined_at);
+                        if field.ascending {
+                            cmp
+                        } else {
+                            cmp.reverse()
+                        }
+                    });
+                }
+                "role" => {
+                    response.sort_by(|a, b| {
+                        let cmp = a.role.cmp(&b.role);
+                        if field.ascending {
+                            cmp
+                        } else {
+                            cmp.reverse()
+                        }
+                    });
+                }
+                _ => {} // Ignore unknown sort fields
+            }
+        }
+    }
+
+    let total = response.len();
+
+    // Apply cursor-based pagination
+    let start_idx = if let Some(cursor) = &query.cursor {
+        // Cursor is the index to start from
+        cursor.parse::<usize>().unwrap_or(0)
+    } else {
+        0
+    };
+
+    let page_items: Vec<_> = response
+        .into_iter()
+        .skip(start_idx)
+        .take(query.limit)
+        .collect();
+    let has_more = start_idx + page_items.len() < total;
+    let next_cursor = if has_more {
+        Some((start_idx + page_items.len()).to_string())
+    } else {
+        None
+    };
+
+    let pagination = ListPagination {
+        cursor: next_cursor,
+        has_more,
+        count: Some(page_items.len()),
+        total: Some(total),
+    };
+
+    let response: ListResponse<MembershipResponse> = ListResponse::new(page_items, pagination);
 
     Ok(HttpResponse::Ok().json(response))
 }

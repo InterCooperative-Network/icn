@@ -1,13 +1,37 @@
-//! Cursor-based pagination for efficient large dataset navigation
+//! Standardized pagination, filtering, and response envelopes for API endpoints
 //!
-//! This module provides cursor-based pagination which is more efficient than
-//! offset-based pagination for large datasets because:
+//! This module provides a consistent API experience across all list endpoints:
 //!
-//! 1. No need to count/skip over items before the cursor
-//! 2. Stable pagination even when data changes
-//! 3. Consistent performance regardless of page number
+//! ## Request Parameters
 //!
-//! # Cursor Format
+//! ```text
+//! GET /v1/entities?cursor=<opaque>&limit=50&filter[type]=cooperative&sort=-created_at
+//! ```
+//!
+//! | Parameter | Description |
+//! |-----------|-------------|
+//! | `cursor` | Opaque cursor for next page |
+//! | `limit` | Items per page (default 20, max 100) |
+//! | `filter[field]` | Field-specific filters |
+//! | `sort` | Sort field, prefix `-` for descending |
+//!
+//! ## Response Envelope
+//!
+//! ```json
+//! {
+//!   "data": [...],
+//!   "pagination": {
+//!     "cursor": "next_cursor_value",
+//!     "has_more": true
+//!   },
+//!   "meta": {
+//!     "request_id": "...",
+//!     "timestamp": "..."
+//!   }
+//! }
+//! ```
+//!
+//! ## Cursor Format
 //!
 //! Cursors are base64-encoded JSON objects containing:
 //! - `ts`: timestamp (Unix milliseconds)
@@ -17,6 +41,7 @@
 
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Maximum page size to prevent OOM attacks
 pub const MAX_PAGE_SIZE: usize = 100;
@@ -213,6 +238,374 @@ pub trait Cursored {
     }
 }
 
+// ============================================================================
+// Standard API Response Types
+// ============================================================================
+
+/// Standard query parameters for list endpoints
+///
+/// Supports cursor-based pagination, filtering, and sorting.
+///
+/// # Example Query String
+/// ```text
+/// ?cursor=abc123&limit=50&filter[type]=cooperative&filter[status]=active&sort=-created_at
+/// ```
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct ListQuery {
+    /// Opaque cursor for pagination (from previous response)
+    #[serde(default)]
+    pub cursor: Option<String>,
+
+    /// Maximum items to return (default: 20, max: 100)
+    #[serde(default = "default_limit")]
+    pub limit: usize,
+
+    /// Sort field(s), prefix with `-` for descending
+    /// Examples: "created_at", "-created_at", "name,-created_at"
+    #[serde(default)]
+    pub sort: Option<String>,
+
+    /// Raw query parameters for filter extraction
+    /// Filters use the format: filter[field]=value
+    #[serde(flatten)]
+    pub extra: HashMap<String, String>,
+}
+
+impl ListQuery {
+    /// Create a new ListQuery with default values
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Validate and normalize query parameters
+    pub fn validate(mut self) -> Self {
+        self.limit = self.limit.clamp(1, MAX_PAGE_SIZE);
+        self
+    }
+
+    /// Get the decoded cursor if present
+    pub fn decoded_cursor(&self) -> Option<Cursor> {
+        self.cursor.as_ref().and_then(|c| Cursor::decode(c))
+    }
+
+    /// Extract filters from query parameters
+    ///
+    /// Parses `filter[field]=value` parameters into a HashMap.
+    pub fn filters(&self) -> HashMap<String, String> {
+        let mut filters = HashMap::new();
+        for (key, value) in &self.extra {
+            if let Some(field) = key
+                .strip_prefix("filter[")
+                .and_then(|s| s.strip_suffix(']'))
+            {
+                filters.insert(field.to_string(), value.clone());
+            }
+        }
+        filters
+    }
+
+    /// Get a specific filter value
+    ///
+    /// Checks both `filter[field]` format and direct `field` format for backwards compatibility.
+    pub fn filter(&self, field: &str) -> Option<&str> {
+        // Check filter[field] format first (new standard)
+        let filter_key = format!("filter[{field}]");
+        self.extra
+            .get(&filter_key)
+            // Fall back to direct field name (backwards compatibility)
+            .or_else(|| self.extra.get(field))
+            .map(|s| s.as_str())
+    }
+
+    /// Parse sort fields into a list of (field, ascending) tuples
+    pub fn sort_fields(&self) -> Vec<SortField> {
+        self.sort
+            .as_ref()
+            .map(|s| SortField::parse_list(s))
+            .unwrap_or_default()
+    }
+
+    /// Convert to a PaginationRequest for backward compatibility
+    pub fn to_pagination_request(&self) -> PaginationRequest {
+        PaginationRequest {
+            cursor: self.cursor.clone(),
+            limit: self.limit.clamp(1, MAX_PAGE_SIZE),
+            direction: Direction::Forward,
+        }
+    }
+}
+
+/// A sort field with direction
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SortField {
+    /// Field name to sort by
+    pub field: String,
+    /// Sort direction (true = ascending, false = descending)
+    pub ascending: bool,
+}
+
+impl SortField {
+    /// Create a new ascending sort field
+    pub fn asc(field: impl Into<String>) -> Self {
+        Self {
+            field: field.into(),
+            ascending: true,
+        }
+    }
+
+    /// Create a new descending sort field
+    pub fn desc(field: impl Into<String>) -> Self {
+        Self {
+            field: field.into(),
+            ascending: false,
+        }
+    }
+
+    /// Parse a single sort field (e.g., "-created_at" or "name")
+    pub fn parse(s: &str) -> Self {
+        if let Some(field) = s.strip_prefix('-') {
+            Self::desc(field)
+        } else {
+            Self::asc(s)
+        }
+    }
+
+    /// Parse a comma-separated list of sort fields
+    pub fn parse_list(s: &str) -> Vec<Self> {
+        s.split(',')
+            .map(|field| field.trim())
+            .filter(|field| !field.is_empty())
+            .map(Self::parse)
+            .collect()
+    }
+}
+
+/// Response metadata for API responses
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResponseMeta {
+    /// Unique request identifier for tracing
+    pub request_id: String,
+
+    /// ISO 8601 timestamp when response was generated
+    pub timestamp: String,
+}
+
+impl ResponseMeta {
+    /// Create metadata with a generated request ID and current timestamp
+    pub fn now() -> Self {
+        Self {
+            request_id: generate_request_id(),
+            timestamp: chrono_timestamp(),
+        }
+    }
+
+    /// Create metadata with a specific request ID
+    pub fn with_request_id(request_id: impl Into<String>) -> Self {
+        Self {
+            request_id: request_id.into(),
+            timestamp: chrono_timestamp(),
+        }
+    }
+}
+
+/// Standard response envelope for list endpoints
+///
+/// Provides consistent structure across all paginated endpoints:
+/// ```json
+/// {
+///   "data": [...],
+///   "pagination": { "cursor": "...", "has_more": true },
+///   "meta": { "request_id": "...", "timestamp": "..." }
+/// }
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ListResponse<T> {
+    /// The items on this page
+    pub data: Vec<T>,
+
+    /// Pagination metadata
+    pub pagination: ListPagination,
+
+    /// Response metadata
+    pub meta: ResponseMeta,
+}
+
+/// Pagination metadata in ListResponse
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ListPagination {
+    /// Cursor for the next page (None if no more items)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cursor: Option<String>,
+
+    /// Whether there are more items after this page
+    pub has_more: bool,
+
+    /// Number of items in current page
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub count: Option<usize>,
+
+    /// Total number of items (optional, can be expensive to compute)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total: Option<usize>,
+}
+
+impl ListPagination {
+    /// Create pagination metadata for a page with more items
+    pub fn with_cursor(cursor: impl Into<String>, count: usize) -> Self {
+        Self {
+            cursor: Some(cursor.into()),
+            has_more: true,
+            count: Some(count),
+            total: None,
+        }
+    }
+
+    /// Create pagination metadata for the last page
+    pub fn last_page(count: usize) -> Self {
+        Self {
+            cursor: None,
+            has_more: false,
+            count: Some(count),
+            total: None,
+        }
+    }
+
+    /// Create empty pagination
+    pub fn empty() -> Self {
+        Self {
+            cursor: None,
+            has_more: false,
+            count: Some(0),
+            total: None,
+        }
+    }
+
+    /// Add total count to pagination
+    pub fn with_total(mut self, total: usize) -> Self {
+        self.total = Some(total);
+        self
+    }
+}
+
+impl<T: Serialize> ListResponse<T> {
+    /// Create a new list response
+    pub fn new(data: Vec<T>, pagination: ListPagination) -> Self {
+        Self {
+            data,
+            pagination,
+            meta: ResponseMeta::now(),
+        }
+    }
+
+    /// Create a list response with specific metadata
+    pub fn with_meta(data: Vec<T>, pagination: ListPagination, meta: ResponseMeta) -> Self {
+        Self {
+            data,
+            pagination,
+            meta,
+        }
+    }
+
+    /// Create an empty list response
+    pub fn empty() -> Self {
+        Self::new(Vec::new(), ListPagination::empty())
+    }
+
+    /// Create a list response from a PaginatedList
+    pub fn from_paginated_list<U: Into<T>>(list: PaginatedList<U>) -> Self
+    where
+        T: From<U>,
+    {
+        let pagination = ListPagination {
+            cursor: list.pagination.next_cursor,
+            has_more: list.pagination.has_more,
+            count: Some(list.pagination.count),
+            total: None,
+        };
+        Self::new(list.items.into_iter().map(Into::into).collect(), pagination)
+    }
+}
+
+/// Helper to create a ListResponse from items with cursor-based pagination
+pub fn create_list_response<T, F>(
+    items: Vec<T>,
+    query: &ListQuery,
+    get_cursor: F,
+) -> ListResponse<T>
+where
+    T: Serialize + Clone,
+    F: Fn(&T) -> Cursor,
+{
+    let limit = query.limit.min(MAX_PAGE_SIZE);
+    let cursor = query.decoded_cursor();
+
+    // Find starting position if cursor provided
+    let start_idx = if let Some(ref cursor) = cursor {
+        items
+            .iter()
+            .position(|item| {
+                let item_cursor = get_cursor(item);
+                item_cursor.ts < cursor.ts
+                    || (item_cursor.ts == cursor.ts && item_cursor.id < cursor.id)
+            })
+            .unwrap_or(items.len())
+    } else {
+        0
+    };
+
+    // Collect items for this page
+    let page_items: Vec<T> = items.iter().skip(start_idx).take(limit).cloned().collect();
+    let count = page_items.len();
+    let has_more = start_idx + limit < items.len();
+
+    // Build pagination
+    let pagination = if has_more {
+        if let Some(last_item) = page_items.last() {
+            ListPagination::with_cursor(get_cursor(last_item).encode(), count)
+        } else {
+            ListPagination::empty()
+        }
+    } else {
+        ListPagination::last_page(count)
+    };
+
+    ListResponse::new(page_items, pagination)
+}
+
+// Helper functions for metadata generation
+
+fn generate_request_id() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_micros())
+        .unwrap_or(0);
+    // Simple request ID format: timestamp + random suffix
+    format!("req_{timestamp:x}_{:04x}", rand_u16())
+}
+
+fn rand_u16() -> u16 {
+    use std::collections::hash_map::RandomState;
+    use std::hash::{BuildHasher, Hasher};
+    let hasher = RandomState::new().build_hasher();
+    hasher.finish() as u16
+}
+
+fn chrono_timestamp() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let secs = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    // Format as ISO 8601 (simplified - using Unix timestamp for now)
+    // In production, use chrono crate for proper formatting
+    format!("{secs}")
+}
+
+// ============================================================================
+// Legacy Pagination (for backward compatibility)
+// ============================================================================
+
 /// Paginate a vector of items using cursor-based pagination
 ///
 /// Items must be sorted in descending timestamp order (newest first).
@@ -274,7 +667,7 @@ pub fn paginate_items<T: Cursored + Clone>(
 mod tests {
     use super::*;
 
-    #[derive(Clone, Debug)]
+    #[derive(Clone, Debug, Serialize)]
     struct TestItem {
         id: String,
         timestamp: u64,
@@ -436,5 +829,183 @@ mod tests {
         assert!(!json.contains("prev_cursor")); // Skipped when None
         assert!(json.contains("count"));
         assert!(json.contains("has_more"));
+    }
+
+    // ========================================================================
+    // Tests for new standardized types
+    // ========================================================================
+
+    #[test]
+    fn test_sort_field_parse() {
+        // Ascending
+        let field = SortField::parse("created_at");
+        assert_eq!(field.field, "created_at");
+        assert!(field.ascending);
+
+        // Descending
+        let field = SortField::parse("-created_at");
+        assert_eq!(field.field, "created_at");
+        assert!(!field.ascending);
+    }
+
+    #[test]
+    fn test_sort_field_parse_list() {
+        let fields = SortField::parse_list("-created_at,name,-updated_at");
+        assert_eq!(fields.len(), 3);
+        assert_eq!(fields[0], SortField::desc("created_at"));
+        assert_eq!(fields[1], SortField::asc("name"));
+        assert_eq!(fields[2], SortField::desc("updated_at"));
+
+        // Handle empty
+        let fields = SortField::parse_list("");
+        assert!(fields.is_empty());
+
+        // Handle whitespace
+        let fields = SortField::parse_list(" name , -created_at ");
+        assert_eq!(fields.len(), 2);
+    }
+
+    #[test]
+    fn test_list_query_filters() {
+        let mut extra = HashMap::new();
+        extra.insert("filter[type]".to_string(), "cooperative".to_string());
+        extra.insert("filter[status]".to_string(), "active".to_string());
+        extra.insert("other_param".to_string(), "ignored".to_string());
+
+        let query = ListQuery {
+            cursor: None,
+            limit: 20,
+            sort: None,
+            extra,
+        };
+
+        let filters = query.filters();
+        assert_eq!(filters.len(), 2);
+        assert_eq!(filters.get("type"), Some(&"cooperative".to_string()));
+        assert_eq!(filters.get("status"), Some(&"active".to_string()));
+
+        // Get specific filter
+        assert_eq!(query.filter("type"), Some("cooperative"));
+        assert_eq!(query.filter("status"), Some("active"));
+        assert_eq!(query.filter("missing"), None);
+
+        // Test backwards compatibility: direct field names also work
+        let mut extra = HashMap::new();
+        extra.insert("domain_id".to_string(), "coop:food".to_string());
+        extra.insert("state".to_string(), "draft".to_string());
+        let query = ListQuery {
+            cursor: None,
+            limit: 20,
+            sort: None,
+            extra,
+        };
+        assert_eq!(query.filter("domain_id"), Some("coop:food"));
+        assert_eq!(query.filter("state"), Some("draft"));
+    }
+
+    #[test]
+    fn test_list_query_validate() {
+        let query = ListQuery {
+            cursor: None,
+            limit: 1000, // Too large
+            sort: None,
+            extra: HashMap::new(),
+        };
+        let validated = query.validate();
+        assert_eq!(validated.limit, MAX_PAGE_SIZE);
+
+        let query = ListQuery {
+            cursor: None,
+            limit: 0, // Too small
+            sort: None,
+            extra: HashMap::new(),
+        };
+        let validated = query.validate();
+        assert_eq!(validated.limit, 1);
+    }
+
+    #[test]
+    fn test_list_pagination() {
+        // With cursor
+        let pag = ListPagination::with_cursor("cursor123", 10);
+        assert_eq!(pag.cursor, Some("cursor123".to_string()));
+        assert!(pag.has_more);
+        assert_eq!(pag.count, Some(10));
+
+        // Last page
+        let pag = ListPagination::last_page(5);
+        assert!(pag.cursor.is_none());
+        assert!(!pag.has_more);
+        assert_eq!(pag.count, Some(5));
+
+        // Empty
+        let pag = ListPagination::empty();
+        assert!(pag.cursor.is_none());
+        assert!(!pag.has_more);
+        assert_eq!(pag.count, Some(0));
+
+        // With total
+        let pag = ListPagination::with_cursor("c", 10).with_total(100);
+        assert_eq!(pag.total, Some(100));
+    }
+
+    #[test]
+    fn test_list_response_serialization() {
+        #[derive(Debug, Clone, Serialize, Deserialize)]
+        struct Item {
+            id: String,
+        }
+
+        let response: ListResponse<Item> = ListResponse::new(
+            vec![Item { id: "1".into() }, Item { id: "2".into() }],
+            ListPagination::with_cursor("next", 2),
+        );
+
+        let json = serde_json::to_string(&response).unwrap();
+
+        // Check structure
+        assert!(json.contains("\"data\""));
+        assert!(json.contains("\"pagination\""));
+        assert!(json.contains("\"meta\""));
+        assert!(json.contains("\"cursor\""));
+        assert!(json.contains("\"has_more\""));
+        assert!(json.contains("\"request_id\""));
+        assert!(json.contains("\"timestamp\""));
+    }
+
+    #[test]
+    fn test_create_list_response() {
+        let items: Vec<TestItem> = (0..25)
+            .rev()
+            .map(|i| TestItem {
+                id: format!("item{i}"),
+                timestamp: 1000000 + i as u64,
+            })
+            .collect();
+
+        let query = ListQuery {
+            cursor: None,
+            limit: 10,
+            sort: None,
+            extra: HashMap::new(),
+        };
+
+        let response =
+            create_list_response(items, &query, |item| Cursor::new(item.timestamp, &item.id));
+
+        assert_eq!(response.data.len(), 10);
+        assert!(response.pagination.has_more);
+        assert!(response.pagination.cursor.is_some());
+        assert_eq!(response.data[0].id, "item24");
+    }
+
+    #[test]
+    fn test_response_meta() {
+        let meta = ResponseMeta::now();
+        assert!(meta.request_id.starts_with("req_"));
+        assert!(!meta.timestamp.is_empty());
+
+        let meta = ResponseMeta::with_request_id("custom-123");
+        assert_eq!(meta.request_id, "custom-123");
     }
 }

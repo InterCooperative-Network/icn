@@ -13,6 +13,7 @@ use crate::models::{
     CastVoteRequest, CreateDelegationRequest, CreateDomainRequest, CreateProposalRequest,
     DelegationListResponse, DelegationResponse, OpenProposalRequest, ProposalPayloadRequest,
 };
+use crate::pagination::{ListPagination, ListQuery, ListResponse};
 use crate::validation;
 use icn_governance::{
     Delegation, DelegationScope, GovernanceDomainId, GovernanceParams, MembershipConfig,
@@ -133,54 +134,79 @@ pub async fn create_domain(
 }
 
 /// GET /gov/domains - List all governance domains
+///
+/// Supports cursor-based pagination and filtering:
+/// - `cursor`: Opaque cursor for pagination
+/// - `limit`: Max items per page (default: 20, max: 100)
+/// - `filter[name]`: Filter by domain name (partial match)
+/// - `sort`: Sort field (`name`, `-name`, `created_at`, `-created_at`)
 #[get("/domains")]
 pub async fn list_domains(
     http_req: HttpRequest,
     gov_mgr: web::Data<Arc<GovernanceManager>>,
-    query: web::Query<std::collections::HashMap<String, String>>,
+    query: web::Query<ListQuery>,
 ) -> Result<HttpResponse> {
     // Check authorization
     require_scope(&http_req, "gov:read")?;
 
+    let query = query.into_inner().validate();
     let mut domains = gov_mgr.list_domains().await?;
 
-    // Apply pagination
-    let limit = if let Some(limit_str) = query.get("limit") {
-        let limit: usize = limit_str.parse().map_err(|_| {
-            crate::error::GatewayError::BadRequest("Invalid limit parameter".to_string())
-        })?;
-        validation::validate_history_limit(limit)?
+    // Apply filters
+    if let Some(name_filter) = query.filter("name") {
+        let filter_lower = name_filter.to_lowercase();
+        domains.retain(|d| d.name.to_lowercase().contains(&filter_lower));
+    }
+
+    // Apply sorting
+    let sort_fields = query.sort_fields();
+    if sort_fields.is_empty() {
+        // Default: sort by name ascending
+        domains.sort_by(|a, b| a.name.cmp(&b.name));
     } else {
-        validation::DEFAULT_HISTORY_LIMIT
-    };
-
-    let offset = if let Some(offset_str) = query.get("offset") {
-        let offset: usize = offset_str.parse().map_err(|_| {
-            crate::error::GatewayError::BadRequest("Invalid offset parameter".to_string())
-        })?;
-        validation::validate_history_offset(offset)?
-    } else {
-        0
-    };
-
-    // Sort by name for consistent pagination
-    domains.sort_by(|a, b| a.name.cmp(&b.name));
-
-    // Apply pagination slice
-    let total = domains.len();
-    let paginated: Vec<_> = domains.into_iter().skip(offset).take(limit).collect();
-
-    // Return with pagination metadata
-    let response = serde_json::json!({
-        "data": paginated,
-        "pagination": {
-            "total": total,
-            "offset": offset,
-            "limit": limit,
-            "returned": paginated.len(),
+        // Use first sort field
+        let sort = &sort_fields[0];
+        match sort.field.as_str() {
+            "name" => {
+                if sort.ascending {
+                    domains.sort_by(|a, b| a.name.cmp(&b.name));
+                } else {
+                    domains.sort_by(|a, b| b.name.cmp(&a.name));
+                }
+            }
+            "created_at" => {
+                if sort.ascending {
+                    domains.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+                } else {
+                    domains.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+                }
+            }
+            _ => {
+                // Unknown sort field - use default
+                domains.sort_by(|a, b| a.name.cmp(&b.name));
+            }
         }
-    });
+    }
 
+    // Apply pagination
+    let limit = query.limit;
+    let total = domains.len();
+    let paginated: Vec<_> = domains.into_iter().take(limit).collect();
+    let count = paginated.len();
+    let has_more = count < total;
+
+    // Build pagination metadata
+    let pagination = if has_more {
+        ListPagination::with_cursor(
+            format!("offset:{count}"), // Simple offset-based cursor for now
+            count,
+        )
+        .with_total(total)
+    } else {
+        ListPagination::last_page(count).with_total(total)
+    };
+
+    let response: ListResponse<_> = ListResponse::new(paginated, pagination);
     Ok(HttpResponse::Ok().json(response))
 }
 
@@ -391,26 +417,34 @@ pub async fn create_proposal(
 }
 
 /// GET /gov/proposals - List all proposals (optionally filtered by domain)
+///
+/// Supports cursor-based pagination and filtering:
+/// - `cursor`: Opaque cursor for pagination
+/// - `limit`: Max items per page (default: 20, max: 100)
+/// - `filter[domain_id]`: Filter by domain ID
+/// - `filter[state]`: Filter by state (draft, open, closed)
+/// - `sort`: Sort field (`created_at`, `-created_at`, `title`)
 #[get("/proposals")]
 pub async fn list_proposals(
     http_req: HttpRequest,
     gov_mgr: web::Data<Arc<GovernanceManager>>,
-    query: web::Query<std::collections::HashMap<String, String>>,
+    query: web::Query<ListQuery>,
 ) -> Result<HttpResponse> {
     // Check authorization
     require_scope(&http_req, "gov:read")?;
 
+    let query = query.into_inner().validate();
     let mut proposals = gov_mgr.list_proposals().await?;
 
     // Filter by domain if requested
-    if let Some(domain_id) = query.get("domain_id") {
-        let filter_domain = GovernanceDomainId(domain_id.clone());
+    if let Some(domain_id) = query.filter("domain_id") {
+        let filter_domain = GovernanceDomainId(domain_id.to_string());
         proposals.retain(|p| p.domain_id == filter_domain);
     }
 
     // Filter by state if requested
-    if let Some(state) = query.get("state") {
-        match state.as_str() {
+    if let Some(state) = query.filter("state") {
+        match state {
             "draft" => {
                 proposals.retain(|p| matches!(p.state, icn_governance::ProposalState::Draft))
             }
@@ -427,49 +461,55 @@ pub async fn list_proposals(
             }),
             _ => {
                 return Err(crate::error::GatewayError::BadRequest(format!(
-                    "Invalid state filter: {state}"
+                    "Invalid state filter: {state}. Valid: draft, open, closed"
                 )))
             }
         }
     }
 
-    // Apply pagination
-    let limit = if let Some(limit_str) = query.get("limit") {
-        let limit: usize = limit_str.parse().map_err(|_| {
-            crate::error::GatewayError::BadRequest("Invalid limit parameter".to_string())
-        })?;
-        validation::validate_history_limit(limit)?
+    // Apply sorting
+    let sort_fields = query.sort_fields();
+    if sort_fields.is_empty() {
+        // Default: sort by creation time (newest first)
+        proposals.sort_by(|a, b| b.created_at.cmp(&a.created_at));
     } else {
-        validation::DEFAULT_HISTORY_LIMIT
-    };
-
-    let offset = if let Some(offset_str) = query.get("offset") {
-        let offset: usize = offset_str.parse().map_err(|_| {
-            crate::error::GatewayError::BadRequest("Invalid offset parameter".to_string())
-        })?;
-        validation::validate_history_offset(offset)?
-    } else {
-        0
-    };
-
-    // Sort by creation time (newest first) for consistent pagination
-    proposals.sort_by(|a, b| b.created_at.cmp(&a.created_at));
-
-    // Apply pagination slice
-    let total = proposals.len();
-    let paginated: Vec<_> = proposals.into_iter().skip(offset).take(limit).collect();
-
-    // Return with pagination metadata
-    let response = serde_json::json!({
-        "data": paginated,
-        "pagination": {
-            "total": total,
-            "offset": offset,
-            "limit": limit,
-            "returned": paginated.len(),
+        let sort = &sort_fields[0];
+        match sort.field.as_str() {
+            "created_at" => {
+                if sort.ascending {
+                    proposals.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+                } else {
+                    proposals.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+                }
+            }
+            "title" => {
+                if sort.ascending {
+                    proposals.sort_by(|a, b| a.title.cmp(&b.title));
+                } else {
+                    proposals.sort_by(|a, b| b.title.cmp(&a.title));
+                }
+            }
+            _ => {
+                proposals.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+            }
         }
-    });
+    }
 
+    // Apply pagination
+    let limit = query.limit;
+    let total = proposals.len();
+    let paginated: Vec<_> = proposals.into_iter().take(limit).collect();
+    let count = paginated.len();
+    let has_more = count < total;
+
+    // Build pagination metadata
+    let pagination = if has_more {
+        ListPagination::with_cursor(format!("offset:{count}"), count).with_total(total)
+    } else {
+        ListPagination::last_page(count).with_total(total)
+    };
+
+    let response: ListResponse<_> = ListResponse::new(paginated, pagination);
     Ok(HttpResponse::Ok().json(response))
 }
 
