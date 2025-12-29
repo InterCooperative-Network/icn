@@ -2164,6 +2164,21 @@ pub mod ledger {
     pub fn sync_lag_seconds_set(lag_secs: f64) {
         gauge!("icn_ledger_sync_lag_seconds").set(lag_secs);
     }
+
+    /// Increment counter when an entry is rejected due to POPLevel-based balance limit (Issue #336)
+    pub fn progressive_balance_limit_exceeded_inc() {
+        counter!("icn_ledger_progressive_balance_limit_exceeded_total").increment(1);
+    }
+
+    /// Increment counter when an entry is rejected due to velocity limit (Issue #336)
+    pub fn progressive_velocity_limit_exceeded_inc() {
+        counter!("icn_ledger_progressive_velocity_limit_exceeded_total").increment(1);
+    }
+
+    /// Increment counter when POPLevel defaults to Weak for unknown account (Issue #336)
+    pub fn progressive_pop_level_defaulted_inc() {
+        counter!("icn_ledger_progressive_pop_level_defaulted_total").increment(1);
+    }
 }
 
 /// Governance execution metrics

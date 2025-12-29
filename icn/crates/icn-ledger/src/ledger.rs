@@ -9,6 +9,7 @@ use crate::fork_resolution::{
 use crate::freeze::{FreezeManager, FrozenMember};
 use crate::membership::MembershipStore;
 use crate::merge::{MergeDecision, QuarantineItem};
+use crate::progressive_limits::ProgressiveLimitManager;
 use crate::quarantine::QuarantineStore;
 use crate::sync::{serialize_sync_message, LedgerSyncMessage};
 use crate::types::{AccountBalances, ContentHash, JournalEntry, QuarantineReason};
@@ -131,6 +132,10 @@ pub struct Ledger {
     /// Membership store for tracking when members joined
     /// Used to apply new member credit limit ramping
     membership_store: Option<Arc<dyn MembershipStore>>,
+
+    /// Progressive limit manager for POPLevel-based balance and velocity limits
+    /// When set, entries that exceed limits based on verification level are rejected.
+    progressive_limit_manager: Option<Arc<ProgressiveLimitManager>>,
 }
 
 impl Ledger {
@@ -156,11 +161,12 @@ impl Ledger {
             trust_graph: None,
             min_trust_for_entry: DEFAULT_MIN_TRUST_FOR_ENTRY,
             journal_version,
-            event_emitter: None,         // Set via set_event_emitter()
-            domain_id: None,             // Set via set_domain_id()
-            validation_hook: None,       // Set via set_validation_hook()
-            credit_policy_manager: None, // Set via set_credit_policy_manager()
-            membership_store: None,      // Set via set_membership_store()
+            event_emitter: None,             // Set via set_event_emitter()
+            domain_id: None,                 // Set via set_domain_id()
+            validation_hook: None,           // Set via set_validation_hook()
+            credit_policy_manager: None,     // Set via set_credit_policy_manager()
+            membership_store: None,          // Set via set_membership_store()
+            progressive_limit_manager: None, // Set via set_progressive_limit_manager()
         };
 
         // Load cached balances from storage
@@ -300,6 +306,20 @@ impl Ledger {
     /// Get the membership store (if set)
     pub fn membership_store(&self) -> Option<&Arc<dyn MembershipStore>> {
         self.membership_store.as_ref()
+    }
+
+    /// Set the progressive limit manager for POPLevel-based balance and velocity limits
+    ///
+    /// When set, entries are validated against:
+    /// - Balance limits based on the account's proof-of-personhood level
+    /// - Velocity limits to prevent rapid wealth accumulation
+    pub fn set_progressive_limit_manager(&mut self, manager: Arc<ProgressiveLimitManager>) {
+        self.progressive_limit_manager = Some(manager);
+    }
+
+    /// Get the progressive limit manager (if set)
+    pub fn progressive_limit_manager(&self) -> Option<&Arc<ProgressiveLimitManager>> {
+        self.progressive_limit_manager.as_ref()
     }
 
     /// Append a journal entry to the ledger
@@ -2177,6 +2197,55 @@ impl Ledger {
                     anyhow::bail!(
                         "Account {account} would exceed credit limit for {currency}: new balance {new_balance} < -{calculated_limit}"
                     );
+                }
+            }
+        }
+
+        // Enforce progressive balance and velocity limits (Issue #336)
+        // Check that no account would exceed POPLevel-based limits after this entry
+        if let Some(ref prog_manager) = self.progressive_limit_manager {
+            for delta in &entry.accounts {
+                let account = &delta.account_id;
+                let currency = &delta.currency;
+                let net_change = delta.net_change();
+
+                // Get POPLevel for the account (defaults to Weak if unknown)
+                let pop_level = prog_manager.get_pop_level(account.as_str());
+
+                // Calculate new balance after this transaction
+                let current_balance = self.get_balance(account, currency);
+                let new_balance = current_balance + net_change;
+
+                // Check balance limits based on POPLevel
+                if let Err(e) = prog_manager.check_balance_limits(
+                    account.as_str(),
+                    currency,
+                    new_balance,
+                    pop_level,
+                ) {
+                    warn!(
+                        account = %account,
+                        currency = currency,
+                        pop_level = ?pop_level,
+                        new_balance = new_balance,
+                        "Entry would exceed progressive balance limit"
+                    );
+                    icn_obs::metrics::ledger::progressive_balance_limit_exceeded_inc();
+                    anyhow::bail!("{e}");
+                }
+
+                // Check velocity limits (only for positive changes)
+                if let Err(e) =
+                    prog_manager.check_velocity_limits(account.as_str(), currency, net_change)
+                {
+                    warn!(
+                        account = %account,
+                        currency = currency,
+                        net_change = net_change,
+                        "Entry would exceed progressive velocity limit"
+                    );
+                    icn_obs::metrics::ledger::progressive_velocity_limit_exceeded_inc();
+                    anyhow::bail!("{e}");
                 }
             }
         }
