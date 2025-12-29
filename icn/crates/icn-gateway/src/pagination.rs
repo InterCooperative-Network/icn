@@ -288,6 +288,35 @@ impl ListQuery {
         self.cursor.as_ref().and_then(|c| Cursor::decode(c))
     }
 
+    /// Parse offset-based cursor for simple pagination
+    ///
+    /// Returns Ok(offset) if cursor is valid or None.
+    /// Returns Err with message if cursor format is invalid.
+    ///
+    /// Valid formats:
+    /// - None -> Ok(0)
+    /// - "offset:123" -> Ok(123)
+    /// - "123" -> Ok(123) (backwards compatibility)
+    /// - "invalid" -> Err
+    pub fn parse_offset_cursor(&self) -> Result<usize, String> {
+        match &self.cursor {
+            None => Ok(0),
+            Some(cursor) => {
+                // Try "offset:N" format first
+                if let Some(num_str) = cursor.strip_prefix("offset:") {
+                    num_str.parse::<usize>().map_err(|_| {
+                        format!("Invalid cursor format: expected 'offset:<number>', got '{cursor}'")
+                    })
+                } else {
+                    // Try plain number for backwards compatibility
+                    cursor.parse::<usize>().map_err(|_| {
+                        format!("Invalid cursor format: expected 'offset:<number>', got '{cursor}'")
+                    })
+                }
+            }
+        }
+    }
+
     /// Extract filters from query parameters
     ///
     /// Parses `filter[field]=value` parameters into a HashMap.
@@ -585,21 +614,29 @@ fn generate_request_id() -> String {
 }
 
 fn rand_u16() -> u16 {
-    use std::collections::hash_map::RandomState;
-    use std::hash::{BuildHasher, Hasher};
-    let hasher = RandomState::new().build_hasher();
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    let mut hasher = DefaultHasher::new();
+
+    // Hash current timestamp (nanoseconds for uniqueness)
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    nanos.hash(&mut hasher);
+
+    // Hash thread ID for cross-thread uniqueness
+    std::thread::current().id().hash(&mut hasher);
+
     hasher.finish() as u16
 }
 
 fn chrono_timestamp() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let secs = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
-    // Format as ISO 8601 (simplified - using Unix timestamp for now)
-    // In production, use chrono crate for proper formatting
-    format!("{secs}")
+    use chrono::Utc;
+    // Format as ISO 8601 with UTC timezone
+    Utc::now().to_rfc3339()
 }
 
 // ============================================================================
@@ -922,6 +959,57 @@ mod tests {
         };
         let validated = query.validate();
         assert_eq!(validated.limit, 1);
+    }
+
+    #[test]
+    fn test_parse_offset_cursor() {
+        // No cursor -> 0
+        let query = ListQuery {
+            cursor: None,
+            limit: 20,
+            sort: None,
+            extra: HashMap::new(),
+        };
+        assert_eq!(query.parse_offset_cursor(), Ok(0));
+
+        // Valid "offset:N" format
+        let query = ListQuery {
+            cursor: Some("offset:42".to_string()),
+            limit: 20,
+            sort: None,
+            extra: HashMap::new(),
+        };
+        assert_eq!(query.parse_offset_cursor(), Ok(42));
+
+        // Plain number (backwards compatibility)
+        let query = ListQuery {
+            cursor: Some("100".to_string()),
+            limit: 20,
+            sort: None,
+            extra: HashMap::new(),
+        };
+        assert_eq!(query.parse_offset_cursor(), Ok(100));
+
+        // Invalid cursor format
+        let query = ListQuery {
+            cursor: Some("invalid".to_string()),
+            limit: 20,
+            sort: None,
+            extra: HashMap::new(),
+        };
+        let result = query.parse_offset_cursor();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Invalid cursor format"));
+
+        // Invalid offset:N format (non-numeric)
+        let query = ListQuery {
+            cursor: Some("offset:abc".to_string()),
+            limit: 20,
+            sort: None,
+            extra: HashMap::new(),
+        };
+        let result = query.parse_offset_cursor();
+        assert!(result.is_err());
     }
 
     #[test]

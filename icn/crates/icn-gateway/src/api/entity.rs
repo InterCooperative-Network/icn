@@ -737,14 +737,8 @@ pub async fn list_members(
 
     // Parse cursor to get offset (format: "offset:<number>" or plain number for backwards compat)
     let offset: usize = query
-        .cursor
-        .as_deref()
-        .and_then(|c| {
-            c.strip_prefix("offset:")
-                .and_then(|n| n.parse::<usize>().ok())
-                .or_else(|| c.parse::<usize>().ok())
-        })
-        .unwrap_or(0)
+        .parse_offset_cursor()
+        .map_err(GatewayError::BadRequest)?
         .min(total);
 
     let page_items: Vec<_> = response

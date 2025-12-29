@@ -194,11 +194,8 @@ pub async fn list_domains(
 
     // Parse cursor to get offset (format: "offset:<number>")
     let offset: usize = query
-        .cursor
-        .as_deref()
-        .and_then(|c| c.strip_prefix("offset:"))
-        .and_then(|n| n.parse::<usize>().ok())
-        .unwrap_or(0)
+        .parse_offset_cursor()
+        .map_err(crate::error::GatewayError::BadRequest)?
         .min(total);
 
     let paginated: Vec<_> = domains.into_iter().skip(offset).take(limit).collect();
@@ -508,11 +505,8 @@ pub async fn list_proposals(
 
     // Parse cursor to get offset (format: "offset:<number>")
     let offset: usize = query
-        .cursor
-        .as_deref()
-        .and_then(|c| c.strip_prefix("offset:"))
-        .and_then(|n| n.parse::<usize>().ok())
-        .unwrap_or(0)
+        .parse_offset_cursor()
+        .map_err(crate::error::GatewayError::BadRequest)?
         .min(total);
 
     let paginated: Vec<_> = proposals.into_iter().skip(offset).take(limit).collect();
