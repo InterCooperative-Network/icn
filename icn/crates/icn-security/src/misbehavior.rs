@@ -427,13 +427,17 @@ impl MisbehaviorDetector {
     /// Returns the list of DIDs that were released from quarantine.
     pub fn check_quarantine_releases(&mut self) -> Vec<Did> {
         let mut released = Vec::new();
+        let now = SystemTime::now();
 
-        // Apply reputation decay first to update scores
+        // Apply reputation decay based on time since last update
+        // This prevents re-applying decay on every call
         for (_did, score) in self.reputation_scores.iter_mut() {
-            if let Some(last) = score.last_violation {
-                if let Ok(elapsed) = SystemTime::now().duration_since(last) {
-                    let hours = elapsed.as_secs() as f64 / 3600.0;
-                    score.score = (score.score + self.thresholds.decay_rate * hours).min(1.0);
+            if let Ok(elapsed) = now.duration_since(score.updated_at) {
+                let hours = elapsed.as_secs() as f64 / 3600.0;
+                if hours > 0.0 {
+                    let decay_amount = self.thresholds.decay_rate * hours;
+                    score.score = (score.score + decay_amount).min(1.0);
+                    score.updated_at = now; // Critical: update timestamp to prevent re-decay
                 }
             }
         }
@@ -456,6 +460,9 @@ impl MisbehaviorDetector {
         if !released.is_empty() {
             info!("Released {} peers from quarantine", released.len());
         }
+
+        // Periodic cleanup of old violations
+        self.cleanup_old_violations();
 
         released
     }
@@ -482,10 +489,19 @@ impl MisbehaviorDetector {
 
     /// Manually force release from quarantine (administrative action).
     ///
-    /// This bypasses reputation checks and resets to baseline trust.
+    /// This bypasses reputation checks and provides a full "administrative pardon":
+    /// - Removes from quarantine
+    /// - Resets reputation to baseline (0.6)
+    /// - Clears violation history
+    ///
+    /// **AUDIT**: This is a privileged operation that should be logged and monitored.
     pub fn force_release_from_quarantine(&mut self, did: &Did) {
         if self.quarantined.remove(did).is_some() {
-            warn!("Administratively released {} from quarantine", did);
+            // High-priority audit log for administrative override
+            warn!(
+                "AUDIT: Administrative quarantine release for {} - this is a privileged operation",
+                did
+            );
             metrics::quarantined_dec();
 
             // Reset reputation to baseline
@@ -493,7 +509,11 @@ impl MisbehaviorDetector {
                 score.score = Self::BASELINE_REPUTATION_SCORE;
                 score.total_violations = 0;
                 score.severity_points = 0;
+                score.updated_at = SystemTime::now();
             }
+
+            // Clear violation history for true administrative pardon
+            self.violations.remove(did);
 
             // Update trust graph if callback is set
             if let Some(ref callback) = self.trust_penalty_callback {

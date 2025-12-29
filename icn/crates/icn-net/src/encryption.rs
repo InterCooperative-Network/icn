@@ -35,13 +35,19 @@
 //! - Applies a safety gap (+10,000) on restart to handle any unsaved sequences
 //! - Provides per-(sender, recipient) sequence isolation
 //!
+//! **IMPORTANT**: Call `load_and_apply_safety_gap()` during node startup,
+//! AFTER the store is initialized but BEFORE sending any encrypted messages.
+//! This ensures the safety gap is applied exactly once per restart.
+//!
 //! **Usage**:
 //! ```rust,ignore
 //! use icn_net::{OutgoingSequenceTracker, EncryptedEnvelope};
 //!
+//! // During node startup (once per restart)
 //! let tracker = OutgoingSequenceTracker::new(store)?;
-//! tracker.load_and_apply_safety_gap().await?;
+//! tracker.load_and_apply_safety_gap().await?; // Apply safety gap
 //!
+//! // When sending encrypted messages
 //! let seq = tracker.next_sequence(&my_did, &recipient_did).await?;
 //! let envelope = EncryptedEnvelope::encrypt(&my_did, &recipient_did, seq, ...)?;
 //! ```
