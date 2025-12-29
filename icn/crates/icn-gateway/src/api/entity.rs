@@ -110,7 +110,7 @@ fn parse_entity_type(type_str: &str) -> Result<EntityType> {
         "federation" | "fed" => Ok(EntityType::Federation),
         "individual" => Ok(EntityType::Individual),
         _ => Err(GatewayError::BadRequest(format!(
-            "Invalid entity type: {type_str}. Valid types: cooperative, community, federation"
+            "Invalid entity type: {type_str}. Valid types: cooperative, community, federation, individual"
         ))),
     }
 }
