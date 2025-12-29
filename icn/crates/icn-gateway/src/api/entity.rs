@@ -106,10 +106,11 @@ pub struct MembershipResponse {
 fn parse_entity_type(type_str: &str) -> Result<EntityType> {
     match type_str.to_lowercase().as_str() {
         "cooperative" | "coop" => Ok(EntityType::Cooperative),
+        "community" => Ok(EntityType::Community),
         "federation" | "fed" => Ok(EntityType::Federation),
         "individual" => Ok(EntityType::Individual),
         _ => Err(GatewayError::BadRequest(format!(
-            "Invalid entity type: {type_str}. Valid types: cooperative, federation"
+            "Invalid entity type: {type_str}. Valid types: cooperative, community, federation, individual"
         ))),
     }
 }
@@ -150,6 +151,7 @@ fn format_entity_type(entity_type: &EntityType) -> &'static str {
     match entity_type {
         EntityType::Individual => "individual",
         EntityType::Cooperative => "cooperative",
+        EntityType::Community => "community",
         EntityType::Federation => "federation",
         EntityType::Unknown => "unknown",
     }
@@ -315,6 +317,8 @@ pub async fn register_entity(
             .map_err(|e| {
                 GatewayError::BadRequest(format!("Invalid cooperative identifier: {e}"))
             })?,
+        EntityType::Community => CooperativeEntity::community(&body.identifier, &body.name)
+            .map_err(|e| GatewayError::BadRequest(format!("Invalid community identifier: {e}")))?,
         EntityType::Federation => CooperativeEntity::federation(&body.identifier, &body.name)
             .map_err(|e| GatewayError::BadRequest(format!("Invalid federation identifier: {e}")))?,
         EntityType::Individual => {
@@ -1241,6 +1245,10 @@ mod tests {
             EntityType::Cooperative
         ));
         assert!(matches!(
+            parse_entity_type("community").unwrap(),
+            EntityType::Community
+        ));
+        assert!(matches!(
             parse_entity_type("federation").unwrap(),
             EntityType::Federation
         ));
@@ -1280,6 +1288,7 @@ mod tests {
     fn test_format_entity_type() {
         assert_eq!(format_entity_type(&EntityType::Individual), "individual");
         assert_eq!(format_entity_type(&EntityType::Cooperative), "cooperative");
+        assert_eq!(format_entity_type(&EntityType::Community), "community");
         assert_eq!(format_entity_type(&EntityType::Federation), "federation");
         assert_eq!(format_entity_type(&EntityType::Unknown), "unknown");
     }

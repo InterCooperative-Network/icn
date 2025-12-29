@@ -3,10 +3,12 @@
 //! This module defines the foundational types for representing entities at all scales:
 //! - Individuals (backed by DIDs)
 //! - Cooperatives (worker, consumer, multi-stakeholder)
+//! - Communities (geographic, interest-based, or practice-based groups)
 //! - Federations (cooperatives of cooperatives)
 //!
 //! The key insight is that membership is recursive: a cooperative's members
-//! can themselves be cooperatives.
+//! can themselves be cooperatives. Communities bridge individuals and cooperatives,
+//! allowing diverse membership models.
 
 use crate::error::{EntityError, Result};
 use icn_identity::Did;
@@ -19,11 +21,12 @@ use std::str::FromStr;
 // EntityId
 // ============================================================================
 
-/// Unique identifier for any entity (individual, cooperative, or federation)
+/// Unique identifier for any entity (individual, cooperative, community, or federation)
 ///
 /// EntityId is designed to be compatible with DIDs:
 /// - For individuals: wraps their DID directly
 /// - For cooperatives: derived from cooperative creation ceremony
+/// - For communities: derived from community formation
 /// - For federations: derived from federation charter
 ///
 /// # Format
@@ -34,6 +37,7 @@ use std::str::FromStr;
 ///
 /// - `entity:icn:individual:z5TrA8...` (wraps DID)
 /// - `entity:icn:cooperative:food-coop-2024`
+/// - `entity:icn:community:neighborhood-2024`
 /// - `entity:icn:federation:midwest-fed`
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct EntityId(String);
@@ -65,6 +69,16 @@ impl EntityId {
     pub fn federation(slug: &str) -> Result<Self> {
         Self::validate_slug(slug)?;
         Ok(EntityId(format!("entity:icn:federation:{slug}")))
+    }
+
+    /// Create an EntityId for a community
+    ///
+    /// The slug should be a URL-safe identifier for the community.
+    /// Communities can have both Individual and Cooperative members,
+    /// and can join Federations.
+    pub fn community(slug: &str) -> Result<Self> {
+        Self::validate_slug(slug)?;
+        Ok(EntityId(format!("entity:icn:community:{slug}")))
     }
 
     /// Validate a slug for use in EntityId
@@ -132,6 +146,7 @@ impl EntityId {
         match parts.next() {
             Some("individual") => EntityType::Individual,
             Some("cooperative") => EntityType::Cooperative,
+            Some("community") => EntityType::Community,
             Some("federation") => EntityType::Federation,
             _ => EntityType::Unknown,
         }
@@ -175,11 +190,16 @@ impl EntityId {
         self.entity_type() == EntityType::Federation
     }
 
-    /// Check if this entity represents an organization (cooperative or federation)
+    /// Check if this entity represents a community
+    pub fn is_community(&self) -> bool {
+        self.entity_type() == EntityType::Community
+    }
+
+    /// Check if this entity represents an organization (cooperative, community, or federation)
     pub fn is_organization(&self) -> bool {
         matches!(
             self.entity_type(),
-            EntityType::Cooperative | EntityType::Federation
+            EntityType::Cooperative | EntityType::Community | EntityType::Federation
         )
     }
 }
@@ -214,8 +234,8 @@ impl FromStr for EntityId {
                     ));
                 }
             }
-            "cooperative" | "federation" => {
-                // Cooperative/federation identifiers must be valid slugs
+            "cooperative" | "community" | "federation" => {
+                // Cooperative/community/federation identifiers must be valid slugs
                 Self::validate_slug(identifier)?;
             }
             _ => {
@@ -249,6 +269,12 @@ pub enum EntityType {
     /// A cooperative (worker, consumer, producer, multi-stakeholder, etc.)
     Cooperative,
 
+    /// A community (geographic, interest-based, or practice-based group)
+    ///
+    /// Communities can have both Individual and Cooperative members.
+    /// They can join Federations, and Cooperatives can join Communities.
+    Community,
+
     /// A federation of cooperatives
     Federation,
 
@@ -261,6 +287,7 @@ impl fmt::Display for EntityType {
         match self {
             EntityType::Individual => write!(f, "individual"),
             EntityType::Cooperative => write!(f, "cooperative"),
+            EntityType::Community => write!(f, "community"),
             EntityType::Federation => write!(f, "federation"),
             EntityType::Unknown => write!(f, "unknown"),
         }
@@ -485,6 +512,28 @@ impl CooperativeEntity {
         })
     }
 
+    /// Create a new community entity
+    ///
+    /// Communities are geographic, interest-based, or practice-based groups
+    /// that can have both Individual and Cooperative members. They can
+    /// also join Federations.
+    pub fn community(slug: &str, name: impl Into<String>) -> Result<Self> {
+        let now = icn_time::current_timestamp_secs();
+        Ok(CooperativeEntity {
+            id: EntityId::community(slug)?,
+            name: name.into(),
+            entity_type: EntityType::Community,
+            status: EntityStatus::Forming,
+            parent_id: None,
+            governance_domain_id: None,
+            treasury_account: None,
+            created_at: now,
+            updated_at: now,
+            description: None,
+            metadata: HashMap::new(),
+        })
+    }
+
     // ========================================================================
     // Builder methods
     //
@@ -649,6 +698,50 @@ mod tests {
         assert!(entity_id.is_federation());
         assert!(entity_id.is_organization());
         assert_eq!(entity_id.entity_type(), EntityType::Federation);
+    }
+
+    #[test]
+    fn test_entity_id_community() {
+        let entity_id = EntityId::community("neighborhood-2024").unwrap();
+
+        assert!(!entity_id.is_individual());
+        assert!(!entity_id.is_cooperative());
+        assert!(!entity_id.is_federation());
+        assert!(entity_id.is_community());
+        assert!(entity_id.is_organization());
+        assert_eq!(entity_id.entity_type(), EntityType::Community);
+        assert_eq!(entity_id.identifier(), "neighborhood-2024");
+
+        // Should not be able to convert to DID
+        assert!(entity_id.to_did().is_none());
+    }
+
+    #[test]
+    fn test_community_entity_creation() {
+        let entity =
+            CooperativeEntity::community("local-community", "Local Community Network").unwrap();
+
+        assert!(entity.id.is_community());
+        assert_eq!(entity.entity_type, EntityType::Community);
+        assert_eq!(entity.name, "Local Community Network");
+        assert!(matches!(entity.status, EntityStatus::Forming));
+    }
+
+    #[test]
+    fn test_is_organization_includes_community() {
+        let keypair = KeyPair::generate().unwrap();
+        let individual_id = EntityId::from_did(keypair.did());
+        let coop_id = EntityId::cooperative("test-coop").unwrap();
+        let community_id = EntityId::community("test-community").unwrap();
+        let fed_id = EntityId::federation("test-fed").unwrap();
+
+        // Individuals are NOT organizations
+        assert!(!individual_id.is_organization());
+
+        // Cooperatives, communities, and federations ARE organizations
+        assert!(coop_id.is_organization());
+        assert!(community_id.is_organization());
+        assert!(fed_id.is_organization());
     }
 
     #[test]
