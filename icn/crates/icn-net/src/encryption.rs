@@ -58,6 +58,13 @@
 //!
 //! [`OutgoingSequenceTracker`]: crate::sequence_tracker::OutgoingSequenceTracker
 //!
+//! ## TODO: Integration
+//!
+//! The `OutgoingSequenceTracker` is currently standalone. Future work:
+//! - Wire into `NetworkActor` for automatic sequence management
+//! - Add periodic cleanup task for stale entries
+//! - Add metrics for cache size monitoring
+//!
 //! ## Limitations
 //!
 //! - No Perfect Forward Secrecy (static keys, add in Phase 11)

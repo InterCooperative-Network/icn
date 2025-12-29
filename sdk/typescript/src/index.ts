@@ -163,9 +163,11 @@ function validateDid(did: string, fieldName = 'DID'): void {
       throw new ICNError(`${fieldName} has invalid key portion`, 400, 'INVALID_DID');
     }
 
-    // Multibase prefix check (base58btc starts with 'z')
+    // Multibase prefix check: ICN DIDs use base58btc encoding (multibase prefix 'z').
+    // For backwards compatibility with legacy DIDs, we also accept raw base58 without
+    // the 'z' prefix. Base58 charset excludes 0, O, I, l to avoid ambiguity.
+    // New DIDs should use multibase format: did:icn:z<base58btc-key>
     if (!key.startsWith('z') && !/^[1-9A-HJ-NP-Za-km-z]+$/.test(key)) {
-      // Allow both multibase format and raw base58 for backwards compatibility
       throw new ICNError(`${fieldName} has invalid key encoding`, 400, 'INVALID_DID');
     }
   }

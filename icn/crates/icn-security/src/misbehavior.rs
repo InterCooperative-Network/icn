@@ -446,7 +446,10 @@ impl MisbehaviorDetector {
         // and prevents permanent penalties for minor past violations.
         for (_did, score) in self.reputation_scores.iter_mut() {
             if let Ok(elapsed) = now.duration_since(score.updated_at) {
-                let hours = elapsed.as_secs() as f64 / 3600.0;
+                // Cap decay hours to 720 (30 days) to prevent floating point precision issues
+                // when nodes are offline for extended periods
+                const MAX_DECAY_HOURS: f64 = 720.0;
+                let hours = (elapsed.as_secs() as f64 / 3600.0).min(MAX_DECAY_HOURS);
                 if hours > 0.0 {
                     let decay_amount = self.thresholds.decay_rate * hours;
                     score.score = (score.score + decay_amount).min(1.0);
