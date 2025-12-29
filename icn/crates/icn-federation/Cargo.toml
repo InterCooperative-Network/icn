@@ -46,7 +46,7 @@ urlencoding = "2.1"
 [dev-dependencies]
 icn-testkit.workspace = true
 tokio = { workspace = true, features = ["test-util", "rt-multi-thread", "macros"] }
-tempfile = "3.8"
+tempfile = "3.24"
 rand.workspace = true
 wiremock = "0.6"
 

@@ -46,7 +46,7 @@ icn-community = { path = "../icn-community" }
 rustls.workspace = true
 tracing-subscriber.workspace = true
 hex = "0.4"
-tempfile = "3.8"
+tempfile = "3.24"
 sha2 = "0.10"
 icn-governance.workspace = true
 
