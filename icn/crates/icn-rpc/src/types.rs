@@ -502,7 +502,10 @@ mod tests {
     #[test]
     fn test_membership_config_serialization() {
         let static_list = MembershipConfigInfo::StaticList {
-            members: vec!["did:icn:zAliceKeyABCDEF".to_string(), "did:icn:zBobKeyABCDEFG".to_string()],
+            members: vec![
+                "did:icn:zAliceKeyABCDEF".to_string(),
+                "did:icn:zBobKeyABCDEFG".to_string(),
+            ],
         };
         let trust_threshold = MembershipConfigInfo::TrustThreshold { threshold: 0.5 };
 
@@ -563,7 +566,12 @@ mod tests {
         }
 
         match parsed_budget {
-            ProposalPayloadInfo::Budget { amount, currency, recipient, purpose } => {
+            ProposalPayloadInfo::Budget {
+                amount,
+                currency,
+                recipient,
+                purpose,
+            } => {
                 assert_eq!(amount, 1000);
                 assert_eq!(currency, "credits");
                 assert_eq!(recipient, "did:icn:zBobKeyABCDEFGH");
