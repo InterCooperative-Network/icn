@@ -136,7 +136,7 @@ pub async fn create_domain(
 /// GET /gov/domains - List all governance domains
 ///
 /// Supports cursor-based pagination and filtering:
-/// - `cursor`: Opaque cursor for pagination
+/// - `cursor`: Offset-based cursor (e.g., "offset:20")
 /// - `limit`: Max items per page (default: 20, max: 100)
 /// - `filter[name]`: Filter by domain name (partial match)
 /// - `sort`: Sort field (`name`, `-name`, `created_at`, `-created_at`)
@@ -150,6 +150,10 @@ pub async fn list_domains(
     require_scope(&http_req, "gov:read")?;
 
     let query = query.into_inner().validate();
+
+    // TODO(performance): Currently loads all domains into memory for filtering/sorting.
+    // For large deployments, consider pushing filtering/sorting to storage layer.
+    // See: https://github.com/InterCooperative-Network/icn/issues/322#performance
     let mut domains = gov_mgr.list_domains().await?;
 
     // Apply filters
@@ -159,13 +163,24 @@ pub async fn list_domains(
     }
 
     // Apply sorting
+    // Valid sort fields for domains
+    const VALID_DOMAIN_SORT_FIELDS: &[&str] = &["name", "created_at"];
+
     let sort_fields = query.sort_fields();
     if sort_fields.is_empty() {
         // Default: sort by name ascending
         domains.sort_by(|a, b| a.name.cmp(&b.name));
     } else {
-        // Use first sort field
+        // Validate sort field
         let sort = &sort_fields[0];
+        if !VALID_DOMAIN_SORT_FIELDS.contains(&sort.field.as_str()) {
+            return Err(crate::error::GatewayError::BadRequest(format!(
+                "Invalid sort field '{}'. Valid fields: {}",
+                sort.field,
+                VALID_DOMAIN_SORT_FIELDS.join(", ")
+            )));
+        }
+
         match sort.field.as_str() {
             "name" => {
                 if sort.ascending {
@@ -181,10 +196,7 @@ pub async fn list_domains(
                     domains.sort_by(|a, b| b.created_at.cmp(&a.created_at));
                 }
             }
-            _ => {
-                // Unknown sort field - use default
-                domains.sort_by(|a, b| a.name.cmp(&b.name));
-            }
+            _ => unreachable!(), // Already validated above
         }
     }
 
@@ -472,12 +484,24 @@ pub async fn list_proposals(
     }
 
     // Apply sorting
+    // Valid sort fields for proposals
+    const VALID_PROPOSAL_SORT_FIELDS: &[&str] = &["created_at", "title"];
+
     let sort_fields = query.sort_fields();
     if sort_fields.is_empty() {
         // Default: sort by creation time (newest first)
         proposals.sort_by(|a, b| b.created_at.cmp(&a.created_at));
     } else {
+        // Validate sort field
         let sort = &sort_fields[0];
+        if !VALID_PROPOSAL_SORT_FIELDS.contains(&sort.field.as_str()) {
+            return Err(crate::error::GatewayError::BadRequest(format!(
+                "Invalid sort field '{}'. Valid fields: {}",
+                sort.field,
+                VALID_PROPOSAL_SORT_FIELDS.join(", ")
+            )));
+        }
+
         match sort.field.as_str() {
             "created_at" => {
                 if sort.ascending {
@@ -493,9 +517,7 @@ pub async fn list_proposals(
                     proposals.sort_by(|a, b| b.title.cmp(&a.title));
                 }
             }
-            _ => {
-                proposals.sort_by(|a, b| b.created_at.cmp(&a.created_at));
-            }
+            _ => unreachable!(), // Already validated above
         }
     }
 

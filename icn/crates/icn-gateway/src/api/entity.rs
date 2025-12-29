@@ -711,7 +711,22 @@ pub async fn list_members(
     }
 
     // Apply sorting (default: joined_at ascending)
+    // Valid sort fields for members
+    const VALID_MEMBER_SORT_FIELDS: &[&str] = &["joined_at", "role"];
+
     let sort_fields = query.sort_fields();
+
+    // Validate all sort fields first
+    for field in &sort_fields {
+        if !VALID_MEMBER_SORT_FIELDS.contains(&field.field.as_str()) {
+            return Err(GatewayError::BadRequest(format!(
+                "Invalid sort field '{}'. Valid fields: {}",
+                field.field,
+                VALID_MEMBER_SORT_FIELDS.join(", ")
+            )));
+        }
+    }
+
     if sort_fields.is_empty() {
         // Default sort by joined_at ascending
         response.sort_by(|a, b| a.joined_at.cmp(&b.joined_at));
@@ -722,7 +737,7 @@ pub async fn list_members(
                 let cmp = match field.field.as_str() {
                     "joined_at" => a.joined_at.cmp(&b.joined_at),
                     "role" => a.role.cmp(&b.role),
-                    _ => std::cmp::Ordering::Equal, // Ignore unknown sort fields
+                    _ => unreachable!(), // Already validated above
                 };
                 let cmp = if field.ascending { cmp } else { cmp.reverse() };
                 if cmp != std::cmp::Ordering::Equal {
