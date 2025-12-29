@@ -338,7 +338,19 @@ impl Ledger {
     ///
     /// This takes precedence over static credit_policy_manager for limit calculations.
     /// The manager's state is automatically updated when entries are appended.
+    ///
+    /// # Thread-Safety
+    /// The manager's load-modify-save operations are serialized through Ledger's
+    /// `&mut self` requirement. Concurrent transactions are naturally serialized
+    /// per (DID, currency) pair by the ledger's transaction validation layer.
+    ///
+    /// # Warning
+    /// If no trust graph is set, all trust scores will default to 0.0, which
+    /// results in baseline-only credit limits (no trust multiplier bonus).
     pub fn set_dynamic_limit_manager(&mut self, manager: Arc<DynamicCreditLimitManager>) {
+        if self.trust_graph.is_none() {
+            warn!("Dynamic credit limits set without trust graph; all trust scores will be 0.0");
+        }
         self.dynamic_limit_manager = Some(manager);
     }
 
@@ -567,10 +579,19 @@ impl Ledger {
                 .collect();
 
             for (did, currency) in unique_pairs {
-                // Get trust score for the account
+                // Get trust score for the account using try_read() to avoid blocking
+                // Activity recording is non-critical, so we use 0.0 if lock unavailable
                 let trust_score: f64 = if let Some(ref trust_graph) = self.trust_graph {
-                    let graph = trust_graph.blocking_read();
-                    graph.compute_trust_score(did).unwrap_or(0.0)
+                    match trust_graph.try_read() {
+                        Ok(graph) => graph.compute_trust_score(did).unwrap_or(0.0),
+                        Err(_) => {
+                            debug!(
+                                account = %did,
+                                "Trust graph locked during activity recording; using 0.0"
+                            );
+                            0.0
+                        }
+                    }
                 } else {
                     0.0
                 }

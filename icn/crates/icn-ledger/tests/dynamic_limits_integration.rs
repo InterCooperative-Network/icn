@@ -231,13 +231,22 @@ fn test_multiple_currencies_tracked_separately() {
 
     let mut ledger = Ledger::new(store.clone()).unwrap();
 
-    // Set up for hours currency
-    let hours_policy = CreditPolicy::conservative("hours".to_string());
+    // Set up with low baseline to test limit enforcement per currency
+    let hours_policy = CreditPolicy {
+        currency: "hours".to_string(),
+        baseline: 100, // Low baseline: max debt = 100
+        trust_multiplier: 0.0,
+        history_bonus_rate: 0.0,
+    };
     let new_member_policy = NewMemberPolicy::conservative("hours".to_string());
     let policy_manager = CreditPolicyManager::new(hours_policy.clone(), new_member_policy);
     ledger.set_credit_policy_manager(policy_manager);
 
-    let config = DynamicLimitConfig::default();
+    // Low floor so baseline (100) applies
+    let config = DynamicLimitConfig {
+        min_limit_floor: 50,
+        ..DynamicLimitConfig::default()
+    };
     let dynamic_manager = Arc::new(DynamicCreditLimitManager::new(
         store.clone(),
         hours_policy,
@@ -249,23 +258,25 @@ fn test_multiple_currencies_tracked_separately() {
     let alice = alice_kp.did().clone();
     let bob = KeyPair::generate().unwrap().did().clone();
 
-    // Transaction in hours
+    // Transaction in hours - Bob goes to -50 (within limit of 100)
     let hours_entry = JournalEntryBuilder::new(alice.clone())
-        .debit(alice.clone(), "hours".to_string(), 10)
-        .credit(bob.clone(), "hours".to_string(), 10)
+        .debit(alice.clone(), "hours".to_string(), 50)
+        .credit(bob.clone(), "hours".to_string(), 50)
         .build()
         .unwrap();
 
     ledger.append_entry(hours_entry).unwrap();
+    assert_eq!(ledger.get_balance(&bob, "hours"), -50);
 
-    // Transaction in different currency (kwh)
+    // Transaction in different currency (kwh) - Bob goes to -80 in kwh
     let kwh_entry = JournalEntryBuilder::new(alice.clone())
-        .debit(alice.clone(), "kwh".to_string(), 100)
-        .credit(bob.clone(), "kwh".to_string(), 100)
+        .debit(alice.clone(), "kwh".to_string(), 80)
+        .credit(bob.clone(), "kwh".to_string(), 80)
         .build()
         .unwrap();
 
     ledger.append_entry(kwh_entry).unwrap();
+    assert_eq!(ledger.get_balance(&bob, "kwh"), -80);
 
     // Both should have separate state entries
     let hours_state = dynamic_manager.get_state(&alice, "hours").unwrap();
@@ -279,4 +290,31 @@ fn test_multiple_currencies_tracked_separately() {
     let kwh_state = kwh_state.unwrap();
     assert_eq!(hours_state.currency, "hours");
     assert_eq!(kwh_state.currency, "kwh");
+
+    // Try to exceed hours limit - Bob at -50, adding 60 more would be -110, exceeding -100 limit
+    let hours_exceed = JournalEntryBuilder::new(alice.clone())
+        .debit(alice.clone(), "hours".to_string(), 60)
+        .credit(bob.clone(), "hours".to_string(), 60)
+        .build()
+        .unwrap();
+
+    let result = ledger.append_entry(hours_exceed);
+    assert!(result.is_err(), "Should reject hours transaction exceeding limit");
+
+    // But kwh transactions should still work (independent limit)
+    // Bob is at -80 in kwh, adding 15 more would be -95, still within -100 limit
+    let kwh_ok = JournalEntryBuilder::new(alice.clone())
+        .debit(alice.clone(), "kwh".to_string(), 15)
+        .credit(bob.clone(), "kwh".to_string(), 15)
+        .build()
+        .unwrap();
+
+    assert!(
+        ledger.append_entry(kwh_ok).is_ok(),
+        "kwh transaction should succeed independently of hours limit"
+    );
+    assert_eq!(ledger.get_balance(&bob, "kwh"), -95);
+
+    // Hours balance should be unchanged (rejected transaction didn't affect it)
+    assert_eq!(ledger.get_balance(&bob, "hours"), -50);
 }
