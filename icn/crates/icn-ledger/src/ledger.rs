@@ -2,6 +2,7 @@
 
 use crate::balance::compute_all_balances;
 use crate::credit_policy::CreditPolicyManager;
+use crate::dynamic_limits::DynamicCreditLimitManager;
 use crate::events::{BalanceChanged, SharedEventEmitter, Transfer};
 use crate::fork_resolution::{
     Fork, ForkDetector, ForkResolution, ForkResolutionStrategy, ForkResolver,
@@ -136,6 +137,11 @@ pub struct Ledger {
     /// Progressive limit manager for POPLevel-based balance and velocity limits
     /// When set, entries that exceed limits based on verification level are rejected.
     progressive_limit_manager: Option<Arc<ProgressiveLimitManager>>,
+
+    /// Dynamic credit limit manager for adaptive limits based on activity/trust
+    /// When set, provides decay on inactivity and recovery on activity.
+    /// Takes precedence over static credit_policy_manager for limit calculations.
+    dynamic_limit_manager: Option<Arc<DynamicCreditLimitManager>>,
 }
 
 impl Ledger {
@@ -167,6 +173,7 @@ impl Ledger {
             credit_policy_manager: None,     // Set via set_credit_policy_manager()
             membership_store: None,          // Set via set_membership_store()
             progressive_limit_manager: None, // Set via set_progressive_limit_manager()
+            dynamic_limit_manager: None,     // Set via set_dynamic_limit_manager()
         };
 
         // Load cached balances from storage
@@ -320,6 +327,24 @@ impl Ledger {
     /// Get the progressive limit manager (if set)
     pub fn progressive_limit_manager(&self) -> Option<&Arc<ProgressiveLimitManager>> {
         self.progressive_limit_manager.as_ref()
+    }
+
+    /// Set the dynamic credit limit manager for adaptive decay/recovery
+    ///
+    /// When set, this manager provides:
+    /// - Decay: Limits decrease after inactivity threshold (default 30 days)
+    /// - Recovery: Limits restore on activity (instant or gradual)
+    /// - Trust-weighted calculation integrated with base CreditPolicy
+    ///
+    /// This takes precedence over static credit_policy_manager for limit calculations.
+    /// The manager's state is automatically updated when entries are appended.
+    pub fn set_dynamic_limit_manager(&mut self, manager: Arc<DynamicCreditLimitManager>) {
+        self.dynamic_limit_manager = Some(manager);
+    }
+
+    /// Get the dynamic credit limit manager (if set)
+    pub fn dynamic_limit_manager(&self) -> Option<&Arc<DynamicCreditLimitManager>> {
+        self.dynamic_limit_manager.as_ref()
     }
 
     /// Append a journal entry to the ledger
@@ -525,6 +550,60 @@ impl Ledger {
                             timestamp = entry.timestamp,
                             error = %e,
                             "Failed to register new member"
+                        );
+                    }
+                }
+            }
+        }
+
+        // Update dynamic limit manager state (record activity for all accounts)
+        // This updates last_activity_timestamp and potentially recovers decayed limits.
+        if let Some(ref dynamic_manager) = self.dynamic_limit_manager {
+            // Collect unique (DID, currency) pairs from this entry
+            let unique_pairs: std::collections::HashSet<_> = entry
+                .accounts
+                .iter()
+                .map(|d| (&d.account_id, d.currency.as_str()))
+                .collect();
+
+            for (did, currency) in unique_pairs {
+                // Get trust score for the account
+                let trust_score: f64 = if let Some(ref trust_graph) = self.trust_graph {
+                    let graph = trust_graph.blocking_read();
+                    graph.compute_trust_score(did).unwrap_or(0.0)
+                } else {
+                    0.0
+                }
+                .clamp(0.0, 1.0);
+
+                // Get cleared volume (already updated above for this entry)
+                let cleared_volume = self
+                    .cleared_volume_index
+                    .get(&(did.clone(), currency.to_string()))
+                    .copied()
+                    .unwrap_or(0);
+
+                match dynamic_manager.record_activity(did, currency, trust_score, cleared_volume) {
+                    Ok(Some(event)) => {
+                        debug!(
+                            account = %did,
+                            currency = currency,
+                            old_limit = event.old_limit,
+                            new_limit = event.new_limit,
+                            reason = ?event.reason,
+                            "Dynamic limit updated on activity"
+                        );
+                    }
+                    Ok(None) => {
+                        // No limit change (normal case)
+                    }
+                    Err(e) => {
+                        // Log but don't fail the transaction - limit tracking is non-critical
+                        warn!(
+                            account = %did,
+                            currency = currency,
+                            error = ?e,
+                            "Failed to record activity for dynamic limits"
                         );
                     }
                 }
@@ -2098,9 +2177,13 @@ impl Ledger {
             }
         }
 
-        // Enforce credit limits (Issue #164)
-        // Check that no account would exceed its credit limit after this entry
-        if let Some(ref policy_manager) = self.credit_policy_manager {
+        // Enforce credit limits (Issue #164, #326)
+        // Check that no account would exceed its credit limit after this entry.
+        // Priority: dynamic_limit_manager > credit_policy_manager
+        let has_credit_limits =
+            self.dynamic_limit_manager.is_some() || self.credit_policy_manager.is_some();
+
+        if has_credit_limits {
             // PERFORMANCE: Calculate current time once for all deltas in this entry.
             // This ensures consistent timestamps and reduces syscalls.
             // SECURITY: Use actual system time for ramping calculation.
@@ -2139,68 +2222,45 @@ impl Ledger {
                     .copied()
                     .unwrap_or(0);
 
-                // Calculate credit limit using the policy
-                let base_policy = &policy_manager.credit_policy;
-
-                // Calculate: baseline + trust_bonus + history_bonus
-                let trust_bonus = (base_policy.baseline as f64
-                    * trust_score
-                    * base_policy.trust_multiplier) as i64;
-                let history_bonus = (cleared_volume as f64 * base_policy.history_bonus_rate) as i64;
-                let full_limit = base_policy.baseline + trust_bonus + history_bonus;
-
-                // Apply new member ramping only if membership store is configured
-                // Without membership store, use full calculated limit (backward compatible)
-                let calculated_limit = if let Some(ref membership_store) = self.membership_store {
-                    // Track when members bypass ramping via cleared volume threshold
-                    if cleared_volume >= policy_manager.new_member_policy.cleared_volume_threshold {
-                        icn_obs::metrics::ledger::credit_limit_bypass_via_contribution_inc();
-                    }
-
-                    // Get member_since from store, with proper error handling.
-                    // On storage error, fall back to full_limit (permissive) rather than
-                    // treating established members as new (which would reduce their limit).
-                    // The member_since is stored from their FIRST transaction (immutable),
-                    // and validation_time uses real wall clock time for the ramp calculation.
-                    match membership_store.get_member_since(account) {
-                        Ok(Some(member_since)) => {
-                            // Apply new member ramping
-                            policy_manager.new_member_policy.calculate_effective_limit(
-                                account,
-                                member_since,
-                                validation_time,
-                                cleared_volume,
-                                full_limit,
-                            )
-                        }
-                        Ok(None) => {
-                            // New member - use entry timestamp as join date for consistency
-                            // with what gets stored (entry.timestamp at line ~494).
-                            // validation_time is still used as current_time to prevent
-                            // timestamp manipulation attacks.
-                            policy_manager.new_member_policy.calculate_effective_limit(
-                                account,
-                                entry.timestamp, // member_since = entry timestamp
-                                validation_time, // current_time = wall clock (security)
-                                cleared_volume,
-                                full_limit,
-                            )
-                        }
+                // Calculate credit limit - use dynamic manager if available
+                let calculated_limit = if let Some(ref dynamic_manager) = self.dynamic_limit_manager
+                {
+                    // Use dynamic limit manager (includes decay/recovery)
+                    match dynamic_manager.get_effective_limit(
+                        account,
+                        currency,
+                        trust_score,
+                        cleared_volume,
+                    ) {
+                        Ok(limit) => limit,
                         Err(e) => {
-                            // Storage error - log, track metric, and use full limit
-                            // (permissive fallback to prevent penalizing established members)
+                            // On error, log and fall back to static calculation
                             warn!(
                                 account = %account,
+                                currency = currency,
                                 error = ?e,
-                                "Failed to read member_since; using full credit limit"
+                                "Dynamic limit calculation failed; falling back to static"
                             );
-                            icn_obs::metrics::ledger::membership_storage_errors_inc();
-                            full_limit
+                            self.calculate_static_credit_limit(
+                                account,
+                                currency,
+                                trust_score,
+                                cleared_volume,
+                                validation_time,
+                                entry.timestamp,
+                            )
                         }
                     }
                 } else {
-                    // No membership store = no ramping (backward compatible)
-                    full_limit
+                    // Use static credit policy manager
+                    self.calculate_static_credit_limit(
+                        account,
+                        currency,
+                        trust_score,
+                        cleared_volume,
+                        validation_time,
+                        entry.timestamp,
+                    )
                 };
 
                 // Check if the new balance would exceed the limit
@@ -2273,6 +2333,77 @@ impl Ledger {
         }
 
         Ok(())
+    }
+
+    /// Calculate static credit limit using credit_policy_manager
+    ///
+    /// This is the fallback method when dynamic_limit_manager is not configured
+    /// or fails. It applies the base policy formula plus new member ramping.
+    fn calculate_static_credit_limit(
+        &self,
+        account: &Did,
+        _currency: &str,
+        trust_score: f64,
+        cleared_volume: i64,
+        validation_time: u64,
+        entry_timestamp: u64,
+    ) -> i64 {
+        let Some(ref policy_manager) = self.credit_policy_manager else {
+            // No policy manager = unlimited credit (return i64::MAX)
+            return i64::MAX;
+        };
+
+        let base_policy = &policy_manager.credit_policy;
+
+        // Calculate: baseline + trust_bonus + history_bonus
+        let trust_bonus =
+            (base_policy.baseline as f64 * trust_score * base_policy.trust_multiplier) as i64;
+        let history_bonus = (cleared_volume as f64 * base_policy.history_bonus_rate) as i64;
+        let full_limit = base_policy.baseline + trust_bonus + history_bonus;
+
+        // Apply new member ramping only if membership store is configured
+        let Some(ref membership_store) = self.membership_store else {
+            return full_limit;
+        };
+
+        // Track when members bypass ramping via cleared volume threshold
+        if cleared_volume >= policy_manager.new_member_policy.cleared_volume_threshold {
+            icn_obs::metrics::ledger::credit_limit_bypass_via_contribution_inc();
+        }
+
+        // Get member_since from store, with proper error handling
+        match membership_store.get_member_since(account) {
+            Ok(Some(member_since)) => {
+                // Apply new member ramping
+                policy_manager.new_member_policy.calculate_effective_limit(
+                    account,
+                    member_since,
+                    validation_time,
+                    cleared_volume,
+                    full_limit,
+                )
+            }
+            Ok(None) => {
+                // New member - use entry timestamp as join date
+                policy_manager.new_member_policy.calculate_effective_limit(
+                    account,
+                    entry_timestamp,
+                    validation_time,
+                    cleared_volume,
+                    full_limit,
+                )
+            }
+            Err(e) => {
+                // Storage error - log, track metric, and use full limit
+                warn!(
+                    account = %account,
+                    error = ?e,
+                    "Failed to read member_since; using full credit limit"
+                );
+                icn_obs::metrics::ledger::membership_storage_errors_inc();
+                full_limit
+            }
+        }
     }
 }
 
