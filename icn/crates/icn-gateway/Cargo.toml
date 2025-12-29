@@ -86,7 +86,7 @@ metrics = "0.24"
 
 # OpenAPI documentation
 utoipa = { version = "4", features = ["actix_extras"] }
-utoipa-swagger-ui = { version = "6", features = ["actix-web"] }
+utoipa-swagger-ui = { version = "9", features = ["actix-web"] }
 
 # HTTP client for FCM
 reqwest = { version = "0.11", features = ["json"] }
