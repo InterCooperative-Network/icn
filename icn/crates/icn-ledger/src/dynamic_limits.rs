@@ -76,17 +76,6 @@ pub struct DynamicLimitConfig {
     /// If false, recovery is gradual based on recovery_rate_per_transaction
     pub instant_recovery_on_activity: bool,
 
-    /// Enable network-aware limit adjustments based on overall ledger health.
-    ///
-    /// When enabled in future versions, this flag will allow the credit limit
-    /// algorithms to scale individual member limits up or down in response to
-    /// network-wide metrics such as utilization, default rates, and available
-    /// liquidity.
-    ///
-    /// NOTE: Currently reserved for future use and is effectively a no-op.
-    #[allow(dead_code)]
-    pub enable_network_adjustment: bool,
-
     /// Currency this config applies to
     pub currency: String,
 }
@@ -99,7 +88,6 @@ impl Default for DynamicLimitConfig {
             min_limit_floor: 1000, // 10 hours in centihours
             recovery_rate_per_transaction: 0.05,
             instant_recovery_on_activity: true,
-            enable_network_adjustment: false,
             currency: "hours".to_string(),
         }
     }
@@ -122,7 +110,6 @@ impl DynamicLimitConfig {
             min_limit_floor: 1000,
             recovery_rate_per_transaction: 0.10,
             instant_recovery_on_activity: true,
-            enable_network_adjustment: false,
             currency: currency.into(),
         }
     }
@@ -135,9 +122,39 @@ impl DynamicLimitConfig {
             min_limit_floor: 500,
             recovery_rate_per_transaction: 0.03,
             instant_recovery_on_activity: false,
-            enable_network_adjustment: false,
             currency: currency.into(),
         }
+    }
+
+    /// Validate the configuration parameters
+    ///
+    /// Returns an error if any parameter is out of valid range.
+    pub fn validate(&self) -> Result<()> {
+        // decay_rate_per_day must be in [0.0, 1.0) to prevent instant zeroing
+        if self.decay_rate_per_day < 0.0 || self.decay_rate_per_day >= 1.0 {
+            return Err(LedgerError::InvalidEntry(format!(
+                "decay_rate_per_day must be in [0.0, 1.0), got {}",
+                self.decay_rate_per_day
+            )));
+        }
+
+        // recovery_rate must be positive
+        if self.recovery_rate_per_transaction < 0.0 {
+            return Err(LedgerError::InvalidEntry(format!(
+                "recovery_rate_per_transaction must be >= 0, got {}",
+                self.recovery_rate_per_transaction
+            )));
+        }
+
+        // min_limit_floor must be non-negative
+        if self.min_limit_floor < 0 {
+            return Err(LedgerError::InvalidEntry(format!(
+                "min_limit_floor must be >= 0, got {}",
+                self.min_limit_floor
+            )));
+        }
+
+        Ok(())
     }
 }
 
@@ -186,8 +203,20 @@ impl AccountLimitState {
     }
 
     /// Days since last activity
+    ///
+    /// Returns 0 if `now` is before `last_activity_timestamp` (clock skew).
     pub fn days_inactive(&self, now: u64) -> u64 {
         if now <= self.last_activity_timestamp {
+            // Clock skew detected - log warning for observability
+            if now < self.last_activity_timestamp {
+                tracing::warn!(
+                    did = %self.did,
+                    currency = %self.currency,
+                    now = now,
+                    last_activity = self.last_activity_timestamp,
+                    "Clock skew detected: current time is before last activity timestamp"
+                );
+            }
             return 0;
         }
         (now - self.last_activity_timestamp) / 86400 // seconds per day
@@ -273,16 +302,39 @@ pub struct DynamicCreditLimitManager {
 
 impl DynamicCreditLimitManager {
     /// Create a new dynamic limit manager
+    ///
+    /// # Panics
+    /// Panics if the config contains invalid parameters (e.g., decay_rate >= 1.0).
+    /// Use `try_new()` if you need to handle invalid configs gracefully.
     pub fn new(
         store: Arc<dyn Store>,
         base_policy: CreditPolicy,
         config: DynamicLimitConfig,
     ) -> Self {
+        if let Err(e) = config.validate() {
+            panic!("Invalid DynamicLimitConfig: {e}");
+        }
         Self {
             store,
             base_policy,
             config,
         }
+    }
+
+    /// Create a new dynamic limit manager, validating the config
+    ///
+    /// Returns an error if the config is invalid.
+    pub fn try_new(
+        store: Arc<dyn Store>,
+        base_policy: CreditPolicy,
+        config: DynamicLimitConfig,
+    ) -> Result<Self> {
+        config.validate()?;
+        Ok(Self {
+            store,
+            base_policy,
+            config,
+        })
     }
 
     /// Get the base policy
@@ -404,6 +456,13 @@ impl DynamicCreditLimitManager {
     /// the limit if it was decayed.
     ///
     /// Returns a LimitChangeEvent if the limit changed.
+    ///
+    /// # Concurrency
+    ///
+    /// **Warning**: This method uses a load-modify-save pattern that is susceptible
+    /// to lost updates under concurrent access. Callers MUST serialize access to
+    /// the same (DID, currency) pair, typically through the ledger's transaction
+    /// validation layer.
     pub fn record_activity(
         &self,
         did: &Did,
@@ -642,6 +701,35 @@ mod tests {
         assert_eq!(config.inactivity_threshold_days, 14);
         assert_eq!(config.decay_rate_per_day, 0.02);
         assert!(!config.instant_recovery_on_activity);
+    }
+
+    #[test]
+    fn test_config_validation() {
+        // Valid config should pass
+        let config = DynamicLimitConfig::default();
+        assert!(config.validate().is_ok());
+
+        // decay_rate >= 1.0 should fail
+        let mut invalid = DynamicLimitConfig::default();
+        invalid.decay_rate_per_day = 1.0;
+        assert!(invalid.validate().is_err());
+
+        invalid.decay_rate_per_day = 0.99; // Valid - just under 1.0
+        assert!(invalid.validate().is_ok());
+
+        // Negative decay_rate should fail
+        invalid.decay_rate_per_day = -0.1;
+        assert!(invalid.validate().is_err());
+
+        // Negative recovery rate should fail
+        invalid.decay_rate_per_day = 0.01;
+        invalid.recovery_rate_per_transaction = -0.1;
+        assert!(invalid.validate().is_err());
+
+        // Negative min_limit_floor should fail
+        invalid.recovery_rate_per_transaction = 0.05;
+        invalid.min_limit_floor = -100;
+        assert!(invalid.validate().is_err());
     }
 
     #[test]
