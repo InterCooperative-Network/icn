@@ -36,6 +36,7 @@ use crate::entity_audit::{EntityAuditManager, EntityOperation};
 use crate::entity_mgr::EntityManager;
 use crate::error::{GatewayError, Result};
 use crate::middleware::{get_claims, require_scope};
+use crate::pagination::{ListPagination, ListQuery, ListResponse};
 
 // ============================================================================
 // Request/Response Types
@@ -669,13 +670,25 @@ pub async fn delete_entity(
 }
 
 /// GET /entities/:id/members - List members
+///
+/// Query parameters:
+/// - `cursor`: Pagination cursor (offset-based, format: "offset:<number>")
+/// - `limit`: Max items per page (default 20, max 100)
+/// - `sort`: Sort field with optional `-` prefix for descending (e.g., `-joined_at`)
+/// - `filter[role]`: Filter by membership role
 #[get("/{id}/members")]
 pub async fn list_members(
     req: HttpRequest,
     entity_mgr: web::Data<Arc<EntityManager>>,
     path: web::Path<String>,
+    query: web::Query<ListQuery>,
 ) -> Result<HttpResponse> {
     require_scope(&req, "entity:read")?;
+
+    let query = query.into_inner().validate();
+
+    // Validate filter lengths to prevent DoS
+    query.validate_filters().map_err(GatewayError::BadRequest)?;
 
     let entity_id_str = path.into_inner();
     let entity_id: EntityId = entity_id_str
@@ -692,7 +705,82 @@ pub async fn list_members(
         .get_members(&entity_id)
         .map_err(|e| GatewayError::InternalError(format!("Failed to get members: {e}")))?;
 
-    let response: Vec<MembershipResponse> = members.iter().map(membership_to_response).collect();
+    // Convert to response type
+    let mut response: Vec<MembershipResponse> =
+        members.iter().map(membership_to_response).collect();
+
+    // Apply role filter
+    if let Some(role_filter) = query.filter("role") {
+        response.retain(|m| m.role.eq_ignore_ascii_case(role_filter));
+    }
+
+    // Apply sorting (default: joined_at ascending)
+    // Valid sort fields for members
+    const VALID_MEMBER_SORT_FIELDS: &[&str] = &["joined_at", "role"];
+
+    let sort_fields = query.sort_fields();
+
+    // Validate all sort fields first
+    for field in &sort_fields {
+        if !VALID_MEMBER_SORT_FIELDS.contains(&field.field.as_str()) {
+            return Err(GatewayError::BadRequest(format!(
+                "Invalid sort field '{}'. Valid fields: {}",
+                field.field,
+                VALID_MEMBER_SORT_FIELDS.join(", ")
+            )));
+        }
+    }
+
+    if sort_fields.is_empty() {
+        // Default sort by joined_at ascending
+        response.sort_by(|a, b| a.joined_at.cmp(&b.joined_at));
+    } else {
+        // Multi-field sort: apply fields in order, using each as a tie-breaker
+        response.sort_by(|a, b| {
+            for field in &sort_fields {
+                let cmp = match field.field.as_str() {
+                    "joined_at" => a.joined_at.cmp(&b.joined_at),
+                    "role" => a.role.cmp(&b.role),
+                    _ => unreachable!(), // Already validated above
+                };
+                let cmp = if field.ascending { cmp } else { cmp.reverse() };
+                if cmp != std::cmp::Ordering::Equal {
+                    return cmp;
+                }
+            }
+            std::cmp::Ordering::Equal
+        });
+    }
+
+    let total = response.len();
+
+    // Parse cursor to get offset (format: "offset:<number>" or plain number for backwards compat)
+    let offset: usize = query
+        .parse_offset_cursor()
+        .map_err(GatewayError::BadRequest)?
+        .min(total);
+
+    let page_items: Vec<_> = response
+        .into_iter()
+        .skip(offset)
+        .take(query.limit)
+        .collect();
+    let next_offset = offset + page_items.len();
+    let has_more = next_offset < total;
+    let next_cursor = if has_more {
+        Some(format!("offset:{next_offset}"))
+    } else {
+        None
+    };
+
+    let pagination = ListPagination {
+        cursor: next_cursor,
+        has_more,
+        count: Some(page_items.len()),
+        total: Some(total),
+    };
+
+    let response: ListResponse<MembershipResponse> = ListResponse::new(page_items, pagination);
 
     Ok(HttpResponse::Ok().json(response))
 }

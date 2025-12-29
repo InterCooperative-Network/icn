@@ -13,6 +13,7 @@ use crate::models::{
     CastVoteRequest, CreateDelegationRequest, CreateDomainRequest, CreateProposalRequest,
     DelegationListResponse, DelegationResponse, OpenProposalRequest, ProposalPayloadRequest,
 };
+use crate::pagination::{ListPagination, ListQuery, ListResponse};
 use crate::validation;
 use icn_governance::{
     Delegation, DelegationScope, GovernanceDomainId, GovernanceParams, MembershipConfig,
@@ -133,54 +134,100 @@ pub async fn create_domain(
 }
 
 /// GET /gov/domains - List all governance domains
+///
+/// Supports cursor-based pagination and filtering:
+/// - `cursor`: Offset-based cursor (e.g., "offset:20")
+/// - `limit`: Max items per page (default: 20, max: 100)
+/// - `filter[name]`: Filter by domain name (partial match)
+/// - `sort`: Sort field (`name`, `-name`, `created_at`, `-created_at`)
 #[get("/domains")]
 pub async fn list_domains(
     http_req: HttpRequest,
     gov_mgr: web::Data<Arc<GovernanceManager>>,
-    query: web::Query<std::collections::HashMap<String, String>>,
+    query: web::Query<ListQuery>,
 ) -> Result<HttpResponse> {
     // Check authorization
     require_scope(&http_req, "gov:read")?;
 
+    let query = query.into_inner().validate();
+
+    // Validate filter lengths to prevent DoS
+    query
+        .validate_filters()
+        .map_err(crate::error::GatewayError::BadRequest)?;
+
+    // TODO(performance): Currently loads all domains into memory for filtering/sorting.
+    // For large deployments, consider pushing filtering/sorting to storage layer.
+    // See: https://github.com/InterCooperative-Network/icn/issues/322#performance
     let mut domains = gov_mgr.list_domains().await?;
 
-    // Apply pagination
-    let limit = if let Some(limit_str) = query.get("limit") {
-        let limit: usize = limit_str.parse().map_err(|_| {
-            crate::error::GatewayError::BadRequest("Invalid limit parameter".to_string())
-        })?;
-        validation::validate_history_limit(limit)?
+    // Apply filters
+    if let Some(name_filter) = query.filter("name") {
+        let filter_lower = name_filter.to_lowercase();
+        domains.retain(|d| d.name.to_lowercase().contains(&filter_lower));
+    }
+
+    // Apply sorting
+    // Valid sort fields for domains
+    const VALID_DOMAIN_SORT_FIELDS: &[&str] = &["name", "created_at"];
+
+    let sort_fields = query.sort_fields();
+    if sort_fields.is_empty() {
+        // Default: sort by name ascending
+        domains.sort_by(|a, b| a.name.cmp(&b.name));
     } else {
-        validation::DEFAULT_HISTORY_LIMIT
-    };
-
-    let offset = if let Some(offset_str) = query.get("offset") {
-        let offset: usize = offset_str.parse().map_err(|_| {
-            crate::error::GatewayError::BadRequest("Invalid offset parameter".to_string())
-        })?;
-        validation::validate_history_offset(offset)?
-    } else {
-        0
-    };
-
-    // Sort by name for consistent pagination
-    domains.sort_by(|a, b| a.name.cmp(&b.name));
-
-    // Apply pagination slice
-    let total = domains.len();
-    let paginated: Vec<_> = domains.into_iter().skip(offset).take(limit).collect();
-
-    // Return with pagination metadata
-    let response = serde_json::json!({
-        "data": paginated,
-        "pagination": {
-            "total": total,
-            "offset": offset,
-            "limit": limit,
-            "returned": paginated.len(),
+        // Validate sort field
+        let sort = &sort_fields[0];
+        if !VALID_DOMAIN_SORT_FIELDS.contains(&sort.field.as_str()) {
+            return Err(crate::error::GatewayError::BadRequest(format!(
+                "Invalid sort field '{}'. Valid fields: {}",
+                sort.field,
+                VALID_DOMAIN_SORT_FIELDS.join(", ")
+            )));
         }
-    });
 
+        match sort.field.as_str() {
+            "name" => {
+                if sort.ascending {
+                    domains.sort_by(|a, b| a.name.cmp(&b.name));
+                } else {
+                    domains.sort_by(|a, b| b.name.cmp(&a.name));
+                }
+            }
+            "created_at" => {
+                if sort.ascending {
+                    domains.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+                } else {
+                    domains.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+                }
+            }
+            _ => unreachable!(), // Already validated above
+        }
+    }
+
+    // Apply pagination
+    let limit = query.limit;
+    let total = domains.len();
+
+    // Parse cursor to get offset (format: "offset:<number>")
+    let offset: usize = query
+        .parse_offset_cursor()
+        .map_err(crate::error::GatewayError::BadRequest)?
+        .min(total);
+
+    let paginated: Vec<_> = domains.into_iter().skip(offset).take(limit).collect();
+    let count = paginated.len();
+    let next_offset = offset + count;
+    let has_more = next_offset < total;
+
+    // Build pagination metadata
+    let pagination = if has_more {
+        ListPagination::with_cursor(format!("offset:{next_offset}"), count).with_total(total)
+    } else {
+        ListPagination::last_page(count).with_total(total)
+    };
+
+    let response: ListResponse<_> = ListResponse::new(paginated, pagination);
     Ok(HttpResponse::Ok().json(response))
 }
 
@@ -391,26 +438,40 @@ pub async fn create_proposal(
 }
 
 /// GET /gov/proposals - List all proposals (optionally filtered by domain)
+///
+/// Supports cursor-based pagination and filtering:
+/// - `cursor`: Opaque cursor for pagination
+/// - `limit`: Max items per page (default: 20, max: 100)
+/// - `filter[domain_id]`: Filter by domain ID
+/// - `filter[state]`: Filter by state (draft, open, closed)
+/// - `sort`: Sort field (`created_at`, `-created_at`, `title`)
 #[get("/proposals")]
 pub async fn list_proposals(
     http_req: HttpRequest,
     gov_mgr: web::Data<Arc<GovernanceManager>>,
-    query: web::Query<std::collections::HashMap<String, String>>,
+    query: web::Query<ListQuery>,
 ) -> Result<HttpResponse> {
     // Check authorization
     require_scope(&http_req, "gov:read")?;
 
+    let query = query.into_inner().validate();
+
+    // Validate filter lengths to prevent DoS
+    query
+        .validate_filters()
+        .map_err(crate::error::GatewayError::BadRequest)?;
+
     let mut proposals = gov_mgr.list_proposals().await?;
 
     // Filter by domain if requested
-    if let Some(domain_id) = query.get("domain_id") {
-        let filter_domain = GovernanceDomainId(domain_id.clone());
+    if let Some(domain_id) = query.filter("domain_id") {
+        let filter_domain = GovernanceDomainId(domain_id.to_string());
         proposals.retain(|p| p.domain_id == filter_domain);
     }
 
     // Filter by state if requested
-    if let Some(state) = query.get("state") {
-        match state.as_str() {
+    if let Some(state) = query.filter("state") {
+        match state {
             "draft" => {
                 proposals.retain(|p| matches!(p.state, icn_governance::ProposalState::Draft))
             }
@@ -427,49 +488,73 @@ pub async fn list_proposals(
             }),
             _ => {
                 return Err(crate::error::GatewayError::BadRequest(format!(
-                    "Invalid state filter: {state}"
+                    "Invalid state filter: {state}. Valid: draft, open, closed"
                 )))
             }
         }
     }
 
-    // Apply pagination
-    let limit = if let Some(limit_str) = query.get("limit") {
-        let limit: usize = limit_str.parse().map_err(|_| {
-            crate::error::GatewayError::BadRequest("Invalid limit parameter".to_string())
-        })?;
-        validation::validate_history_limit(limit)?
+    // Apply sorting
+    // Valid sort fields for proposals
+    const VALID_PROPOSAL_SORT_FIELDS: &[&str] = &["created_at", "title"];
+
+    let sort_fields = query.sort_fields();
+    if sort_fields.is_empty() {
+        // Default: sort by creation time (newest first)
+        proposals.sort_by(|a, b| b.created_at.cmp(&a.created_at));
     } else {
-        validation::DEFAULT_HISTORY_LIMIT
-    };
-
-    let offset = if let Some(offset_str) = query.get("offset") {
-        let offset: usize = offset_str.parse().map_err(|_| {
-            crate::error::GatewayError::BadRequest("Invalid offset parameter".to_string())
-        })?;
-        validation::validate_history_offset(offset)?
-    } else {
-        0
-    };
-
-    // Sort by creation time (newest first) for consistent pagination
-    proposals.sort_by(|a, b| b.created_at.cmp(&a.created_at));
-
-    // Apply pagination slice
-    let total = proposals.len();
-    let paginated: Vec<_> = proposals.into_iter().skip(offset).take(limit).collect();
-
-    // Return with pagination metadata
-    let response = serde_json::json!({
-        "data": paginated,
-        "pagination": {
-            "total": total,
-            "offset": offset,
-            "limit": limit,
-            "returned": paginated.len(),
+        // Validate sort field
+        let sort = &sort_fields[0];
+        if !VALID_PROPOSAL_SORT_FIELDS.contains(&sort.field.as_str()) {
+            return Err(crate::error::GatewayError::BadRequest(format!(
+                "Invalid sort field '{}'. Valid fields: {}",
+                sort.field,
+                VALID_PROPOSAL_SORT_FIELDS.join(", ")
+            )));
         }
-    });
 
+        match sort.field.as_str() {
+            "created_at" => {
+                if sort.ascending {
+                    proposals.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+                } else {
+                    proposals.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+                }
+            }
+            "title" => {
+                if sort.ascending {
+                    proposals.sort_by(|a, b| a.title.cmp(&b.title));
+                } else {
+                    proposals.sort_by(|a, b| b.title.cmp(&a.title));
+                }
+            }
+            _ => unreachable!(), // Already validated above
+        }
+    }
+
+    // Apply pagination
+    let limit = query.limit;
+    let total = proposals.len();
+
+    // Parse cursor to get offset (format: "offset:<number>")
+    let offset: usize = query
+        .parse_offset_cursor()
+        .map_err(crate::error::GatewayError::BadRequest)?
+        .min(total);
+
+    let paginated: Vec<_> = proposals.into_iter().skip(offset).take(limit).collect();
+    let count = paginated.len();
+    let next_offset = offset + count;
+    let has_more = next_offset < total;
+
+    // Build pagination metadata
+    let pagination = if has_more {
+        ListPagination::with_cursor(format!("offset:{next_offset}"), count).with_total(total)
+    } else {
+        ListPagination::last_page(count).with_total(total)
+    };
+
+    let response: ListResponse<_> = ListResponse::new(paginated, pagination);
     Ok(HttpResponse::Ok().json(response))
 }
 
@@ -1461,6 +1546,87 @@ mod tests {
         let draft_proposals: Vec<Proposal> = serde_json::from_value(resp["data"].clone()).unwrap();
         assert_eq!(draft_proposals.len(), 3);
         assert_eq!(resp["pagination"]["total"], 3);
+    }
+
+    #[actix_web::test]
+    async fn test_list_domains_cursor_pagination() {
+        let gov_mgr = Arc::new(GovernanceManager::new());
+        let alice = IdentityBundle::generate().unwrap();
+
+        // Create 5 domains
+        for i in 0..5 {
+            gov_mgr
+                .create_domain(
+                    GovernanceDomainId(format!("coop:domain{i}")),
+                    format!("Domain {i}"),
+                    "cooperative".to_string(),
+                    GovernanceParams::new(50, 66, 7 * 86400),
+                    MembershipConfig::static_list(vec![alice.did().clone()]),
+                )
+                .await
+                .unwrap();
+        }
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(gov_mgr.clone()))
+                .service(web::scope("/gov").service(list_domains)),
+        )
+        .await;
+
+        // First page: limit=2
+        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:read"]);
+        let req = test::TestRequest::get()
+            .uri("/gov/domains?limit=2")
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp: serde_json::Value = test::call_and_read_body_json(&app, req).await;
+        let page1: Vec<serde_json::Value> = serde_json::from_value(resp["data"].clone()).unwrap();
+        assert_eq!(page1.len(), 2);
+        assert_eq!(resp["pagination"]["has_more"], true);
+        assert_eq!(resp["pagination"]["total"], 5);
+        let cursor = resp["pagination"]["cursor"].as_str().unwrap();
+        assert_eq!(cursor, "offset:2");
+
+        // Second page using cursor
+        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:read"]);
+        let req = test::TestRequest::get()
+            .uri(&format!("/gov/domains?limit=2&cursor={cursor}"))
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp: serde_json::Value = test::call_and_read_body_json(&app, req).await;
+        let page2: Vec<serde_json::Value> = serde_json::from_value(resp["data"].clone()).unwrap();
+        assert_eq!(page2.len(), 2);
+        assert_eq!(resp["pagination"]["has_more"], true);
+        let cursor = resp["pagination"]["cursor"].as_str().unwrap();
+        assert_eq!(cursor, "offset:4");
+
+        // Third page (last, only 1 item)
+        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:read"]);
+        let req = test::TestRequest::get()
+            .uri(&format!("/gov/domains?limit=2&cursor={cursor}"))
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp: serde_json::Value = test::call_and_read_body_json(&app, req).await;
+        let page3: Vec<serde_json::Value> = serde_json::from_value(resp["data"].clone()).unwrap();
+        assert_eq!(page3.len(), 1);
+        assert_eq!(resp["pagination"]["has_more"], false);
+        assert!(resp["pagination"]["cursor"].is_null());
+
+        // Verify no duplicates across pages
+        let all_names: Vec<String> = page1
+            .iter()
+            .chain(page2.iter())
+            .chain(page3.iter())
+            .map(|d| d["name"].as_str().unwrap().to_string())
+            .collect();
+        assert_eq!(all_names.len(), 5);
+        // Should all be unique
+        let unique: std::collections::HashSet<_> = all_names.iter().collect();
+        assert_eq!(unique.len(), 5);
     }
 
     #[actix_web::test]
