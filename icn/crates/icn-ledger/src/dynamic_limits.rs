@@ -58,7 +58,14 @@ pub struct DynamicLimitConfig {
     /// If false, recovery is gradual based on recovery_rate_per_transaction
     pub instant_recovery_on_activity: bool,
 
-    /// Enable network-aware adjustments (future feature)
+    /// Enable network-aware limit adjustments based on overall ledger health.
+    ///
+    /// When enabled in future versions, this flag will allow the credit limit
+    /// algorithms to scale individual member limits up or down in response to
+    /// network-wide metrics such as utilization, default rates, and available
+    /// liquidity.
+    ///
+    /// NOTE: Currently reserved for future use and is effectively a no-op.
     #[allow(dead_code)]
     pub enable_network_adjustment: bool,
 
@@ -413,17 +420,23 @@ impl DynamicCreditLimitManager {
         // Calculate what the limit would be with decay
         let days_inactive = state.days_inactive(now);
         let current_decay = self.calculate_decay(calculated_limit, days_inactive);
-        let decayed_limit = (calculated_limit - current_decay).max(self.config.min_limit_floor);
+        let _decayed_limit = (calculated_limit - current_decay).max(self.config.min_limit_floor);
 
         // Determine new limit based on recovery mode
         let new_limit = if self.config.instant_recovery_on_activity {
             // Instant recovery to full calculated limit
             calculated_limit
         } else {
-            // Gradual recovery
-            let recovery_amount =
-                (calculated_limit as f64 * self.config.recovery_rate_per_transaction) as i64;
-            (decayed_limit + recovery_amount).min(calculated_limit)
+            // Gradual recovery based on gap to calculated limit
+            // This ensures consistent recovery speed regardless of limit size
+            if old_limit >= calculated_limit {
+                calculated_limit
+            } else {
+                let gap = calculated_limit - old_limit;
+                let recovery_amount =
+                    (gap as f64 * self.config.recovery_rate_per_transaction) as i64;
+                (old_limit + recovery_amount).min(calculated_limit)
+            }
         };
 
         // Update state
@@ -537,6 +550,11 @@ impl DynamicCreditLimitManager {
         let decay_ratio = if state.calculated_limit > 0 {
             state.decay_applied as f64 / state.calculated_limit as f64
         } else {
+            // Invariant: when calculated_limit is zero, no decay should have been applied
+            debug_assert_eq!(
+                state.decay_applied, 0,
+                "AccountLimitState invariant violated: calculated_limit is zero but decay_applied is non-zero"
+            );
             0.0
         };
 
@@ -739,6 +757,53 @@ mod tests {
         let state = manager.get_state(&did, "hours").unwrap().unwrap();
         assert_eq!(state.current_limit, calculated);
         assert_eq!(state.decay_applied, 0);
+    }
+
+    #[test]
+    fn test_gradual_recovery() {
+        // Create manager with gradual recovery config
+        let temp_dir = TempDir::new().unwrap();
+        let store = Arc::new(SledStore::open(temp_dir.path()).unwrap());
+        let base_policy = CreditPolicy::conservative("hours".to_string());
+        let mut config = DynamicLimitConfig::default();
+        config.instant_recovery_on_activity = false;
+        config.recovery_rate_per_transaction = 0.25; // 25% of gap per tx
+
+        let manager = DynamicCreditLimitManager::new(store, base_policy, config);
+        let keypair = KeyPair::generate().unwrap();
+        let did = keypair.did().clone();
+
+        let calculated = manager.calculate_base_limit(0.5, 0);
+        let decayed_to = calculated / 2; // Decayed to 50%
+
+        // Create state with decayed limit
+        let mut state = AccountLimitState::new(&did, "hours", calculated, 0);
+        state.last_activity_timestamp = 0;
+        state.current_limit = decayed_to;
+        state.decay_applied = calculated - decayed_to;
+        manager.save_state(&state).unwrap();
+
+        // First activity - should recover 25% of the gap
+        let event = manager.record_activity(&did, "hours", 0.5, 0).unwrap();
+        assert!(event.is_some());
+
+        let event = event.unwrap();
+        let gap = calculated - decayed_to;
+        let expected_recovery = (gap as f64 * 0.25) as i64;
+        let expected_limit = decayed_to + expected_recovery;
+
+        assert_eq!(event.new_limit, expected_limit);
+        assert!(event.new_limit < calculated); // Not fully recovered yet
+
+        // Second activity - should recover 25% of remaining gap
+        let state = manager.get_state(&did, "hours").unwrap().unwrap();
+        let new_gap = calculated - state.current_limit;
+        let expected_recovery2 = (new_gap as f64 * 0.25) as i64;
+        let expected_limit2 = state.current_limit + expected_recovery2;
+
+        let event2 = manager.record_activity(&did, "hours", 0.5, 0).unwrap();
+        assert!(event2.is_some());
+        assert_eq!(event2.unwrap().new_limit, expected_limit2);
     }
 
     #[test]
