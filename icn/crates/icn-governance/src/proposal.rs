@@ -637,7 +637,7 @@ impl Proposal {
                 if now < *ends_at {
                     anyhow::bail!(
                         "Deliberation period not yet ended ({} seconds remaining)",
-                        ends_at - now
+                        ends_at.saturating_sub(now)
                     );
                 }
             }
@@ -942,7 +942,7 @@ mod tests {
             },
         );
 
-        // Cannot force close from Draft (must be Open)
+        // Cannot force close from Draft (must be Deliberation or Open)
         assert!(proposal
             .force_close(crate::ProposalOutcome::Accepted, "Emergency".to_string())
             .is_err());
