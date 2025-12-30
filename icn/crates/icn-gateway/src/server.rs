@@ -493,14 +493,11 @@ impl GatewayServer {
                 ))
             })?)
         } else {
-            Arc::new(
-                icn_store::SledStore::temporary()
-                    .map_err(|e| {
-                        crate::error::GatewayError::InternalError(format!(
-                            "Failed to create temporary oracle storage: {e}"
-                        ))
-                    })?,
-            )
+            Arc::new(icn_store::SledStore::temporary().map_err(|e| {
+                crate::error::GatewayError::InternalError(format!(
+                    "Failed to create temporary oracle storage: {e}"
+                ))
+            })?)
         };
         let oracle_state = Arc::new(api::oracle::OracleState::new(oracle_store).await);
         info!("Oracle state initialized with manual rate source");
