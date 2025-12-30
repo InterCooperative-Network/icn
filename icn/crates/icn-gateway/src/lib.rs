@@ -67,7 +67,9 @@ pub use compute_events::{create_forwarding_callback, forward_compute_event};
 pub use entity_audit::{EntityAuditManager, PruneStats};
 pub use entity_mgr::EntityHandle;
 pub use error::{GatewayError, Result};
-pub use events::{BalanceChangeDetail, EventBroadcaster, GatewayEvent, SequencedEvent};
+pub use events::{
+    BalanceChangeDetail, EventBroadcaster, GatewayEvent, SequencedEvent, WebSocketConfig,
+};
 pub use identity_mgr::{DeviceInfo, IdentityManager, RegisterDeviceRequest};
 pub use ledger_events::LedgerEventBridge;
 pub use notification_queue::{
@@ -86,3 +88,4 @@ pub use rate_limit::{
 pub use server::GatewayServer;
 pub use steward_mgr::{StewardHandleType, StewardManager};
 pub use treasury_mgr::{GatewayTreasuryManager, LedgerHandle, TreasuryHandle};
+pub use websocket::ServerMessage;

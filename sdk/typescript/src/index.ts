@@ -60,6 +60,12 @@ import {
   ProposalOutcome,
   HealthResponse,
   WsMessage,
+  WsAuthOkMessage,
+  WsEventMessage,
+  WsBackfillMessage,
+  WsBackfillCompleteMessage,
+  WsErrorMessage,
+  WsShutdownMessage,
   SignatureProvider,
   SubmitTaskRequest,
   SubmitTaskResponse,
@@ -1772,20 +1778,37 @@ const DEFAULT_WS_OPTIONS: Required<WebSocketOptions> = {
   maxReconnectAttempts: 10,
   reconnectDelayMs: 1000,
   maxReconnectDelayMs: 30000,
+  autoBackfill: true,
+  gapDetection: true,
 };
 
 /**
- * Managed WebSocket subscription with auto-reconnect
+ * Subscription state for tracking connection status
+ */
+export type SubscriptionState = 'connecting' | 'connected' | 'reconnecting' | 'disconnected' | 'closed';
+
+/**
+ * Managed WebSocket subscription with auto-reconnect, backfill, and gap detection
+ *
+ * Features:
+ * - Automatic reconnection with exponential backoff
+ * - Sequence number tracking for reliable event delivery
+ * - Automatic backfill request after reconnection
+ * - Gap detection to catch missed events
+ * - Graceful shutdown handling with server-suggested reconnect delay
  */
 export class ICNSubscription {
   private client: ICNClient;
   private coopId: string;
   private handlers: {
     onEvent?: (event: WsMessage) => void;
-    onAuthOk?: (did: string) => void;
+    onAuthOk?: (did: string, currentSeq: number) => void;
     onError?: (error: Error) => void;
     onReconnect?: (attempt: number) => void;
     onDisconnect?: () => void;
+    onShutdown?: (reason: string, reconnectAfterMs: number | null) => void;
+    onBackfillComplete?: (count: number) => void;
+    onStateChange?: (state: SubscriptionState) => void;
   };
   private options: Required<WebSocketOptions>;
   private ws?: WebSocket;
@@ -1793,15 +1816,24 @@ export class ICNSubscription {
   private closed = false;
   private reconnectTimer?: ReturnType<typeof setTimeout>;
 
+  // Sequence tracking for reliable delivery
+  private lastSeq: number | null = null;
+  private expectedSeq: number | null = null;
+  private serverSuggestedDelay: number | null = null;
+  private _state: SubscriptionState = 'connecting';
+
   constructor(
     client: ICNClient,
     coopId: string,
     handlers: {
       onEvent?: (event: WsMessage) => void;
-      onAuthOk?: (did: string) => void;
+      onAuthOk?: (did: string, currentSeq: number) => void;
       onError?: (error: Error) => void;
       onReconnect?: (attempt: number) => void;
       onDisconnect?: () => void;
+      onShutdown?: (reason: string, reconnectAfterMs: number | null) => void;
+      onBackfillComplete?: (count: number) => void;
+      onStateChange?: (state: SubscriptionState) => void;
     },
     options?: WebSocketOptions
   ) {
@@ -1812,22 +1844,48 @@ export class ICNSubscription {
     this.connect();
   }
 
+  /**
+   * Get current subscription state
+   */
+  get state(): SubscriptionState {
+    return this._state;
+  }
+
+  /**
+   * Get the last received sequence number (useful for persistence)
+   */
+  getLastSeq(): number | null {
+    return this.lastSeq;
+  }
+
+  /**
+   * Set the last sequence number (for resuming after app restart)
+   */
+  setLastSeq(seq: number): void {
+    this.lastSeq = seq;
+    this.expectedSeq = seq + 1;
+  }
+
+  private setState(state: SubscriptionState): void {
+    if (this._state !== state) {
+      this._state = state;
+      this.handlers.onStateChange?.(state);
+    }
+  }
+
   private connect(): void {
     if (this.closed) return;
+
+    this.setState('connecting');
 
     this.ws = this.client.connectWebSocket(this.coopId, {
       onOpen: () => {
         // Reset reconnect counter on successful connection
         this.reconnectAttempt = 0;
+        this.serverSuggestedDelay = null;
       },
       onMessage: (message) => {
-        if (message.type === 'AuthOk') {
-          this.handlers.onAuthOk?.(message.did);
-        } else if (message.type === 'Error') {
-          this.handlers.onError?.(new Error(message.message));
-        } else {
-          this.handlers.onEvent?.(message);
-        }
+        this.handleMessage(message);
       },
       onError: (error) => {
         this.handlers.onError?.(error);
@@ -1839,22 +1897,110 @@ export class ICNSubscription {
     });
   }
 
-  private scheduleReconnect(): void {
-    if (this.closed || !this.options.autoReconnect) return;
+  private handleMessage(message: WsMessage): void {
+    switch (message.type) {
+      case 'AuthOk': {
+        this.setState('connected');
+        const currentSeq = (message as WsAuthOkMessage).current_seq;
+        this.handlers.onAuthOk?.((message as WsAuthOkMessage).did, currentSeq);
 
-    if (this.reconnectAttempt >= this.options.maxReconnectAttempts) {
-      this.handlers.onError?.(new Error('Max reconnection attempts reached'));
+        // Request backfill if we have a last sequence and auto-backfill is enabled
+        if (this.options.autoBackfill && this.lastSeq !== null && this.lastSeq < currentSeq) {
+          this.requestBackfill(this.lastSeq);
+        } else if (this.expectedSeq === null) {
+          // First connection - set expected to current + 1
+          this.expectedSeq = currentSeq + 1;
+        }
+        break;
+      }
+
+      case 'Event': {
+        const eventMsg = message as WsEventMessage;
+        const seq = eventMsg.seq;
+
+        // Gap detection
+        if (this.options.gapDetection && this.expectedSeq !== null && seq > this.expectedSeq) {
+          // Gap detected - request backfill for missed events
+          this.requestBackfill(this.expectedSeq - 1);
+        }
+
+        // Update sequence tracking
+        this.lastSeq = seq;
+        this.expectedSeq = seq + 1;
+
+        // Forward event to handler
+        this.handlers.onEvent?.(message);
+        break;
+      }
+
+      case 'BackfillComplete': {
+        const count = (message as WsBackfillCompleteMessage).count;
+        this.handlers.onBackfillComplete?.(count);
+        break;
+      }
+
+      case 'Shutdown': {
+        const shutdownMsg = message as WsShutdownMessage;
+        this.handlers.onShutdown?.(shutdownMsg.reason, shutdownMsg.reconnect_after_ms);
+
+        // Use server-suggested delay if provided
+        if (shutdownMsg.reconnect_after_ms !== null) {
+          this.serverSuggestedDelay = shutdownMsg.reconnect_after_ms;
+        }
+        break;
+      }
+
+      case 'Error': {
+        this.handlers.onError?.(new Error((message as WsErrorMessage).message));
+        break;
+      }
+
+      default:
+        // Forward other messages (Ping, Pong, etc.)
+        this.handlers.onEvent?.(message);
+    }
+  }
+
+  /**
+   * Request backfill of events after a given sequence number
+   */
+  requestBackfill(afterSeq: number): void {
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      const backfillMsg: WsBackfillMessage = {
+        type: 'Backfill',
+        after_seq: afterSeq,
+      };
+      this.ws.send(JSON.stringify(backfillMsg));
+    }
+  }
+
+  private scheduleReconnect(): void {
+    if (this.closed || !this.options.autoReconnect) {
+      this.setState('disconnected');
       return;
     }
 
+    if (this.reconnectAttempt >= this.options.maxReconnectAttempts) {
+      this.handlers.onError?.(new Error('Max reconnection attempts reached'));
+      this.setState('disconnected');
+      return;
+    }
+
+    this.setState('reconnecting');
     this.reconnectAttempt++;
     this.handlers.onReconnect?.(this.reconnectAttempt);
 
-    // Calculate delay with exponential backoff
-    const delay = Math.min(
-      this.options.reconnectDelayMs * Math.pow(2, this.reconnectAttempt - 1),
-      this.options.maxReconnectDelayMs
-    );
+    // Use server-suggested delay if available, otherwise calculate with exponential backoff
+    let delay: number;
+    if (this.serverSuggestedDelay !== null) {
+      delay = this.serverSuggestedDelay;
+      this.serverSuggestedDelay = null; // Use only once
+    } else {
+      delay = Math.min(
+        this.options.reconnectDelayMs * Math.pow(2, this.reconnectAttempt - 1),
+        this.options.maxReconnectDelayMs
+      );
+    }
 
     this.reconnectTimer = setTimeout(() => {
       this.connect();
@@ -1873,6 +2019,7 @@ export class ICNSubscription {
    */
   close(): void {
     this.closed = true;
+    this.setState('closed');
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
     }
@@ -1888,6 +2035,19 @@ export class ICNSubscription {
   send(message: WsMessage): void {
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(message));
+    }
+  }
+
+  /**
+   * Manually trigger reconnection (resets attempt counter)
+   */
+  reconnect(): void {
+    if (this.closed) return;
+    this.reconnectAttempt = 0;
+    if (this.ws) {
+      this.ws.close();
+    } else {
+      this.connect();
     }
   }
 }

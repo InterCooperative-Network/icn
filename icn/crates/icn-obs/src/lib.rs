@@ -44,7 +44,11 @@ pub fn init() -> Result<()> {
 
 /// Initialize metrics system and descriptions
 pub fn init_metrics() -> Result<()> {
+    // Initialize legacy metrics descriptions
     metrics::init_descriptions();
+    // Initialize new submodule metrics descriptions
+    metrics::gateway::init_descriptions();
+    metrics::network::init_descriptions();
     tracing::info!("Metrics descriptions initialized");
     Ok(())
 }

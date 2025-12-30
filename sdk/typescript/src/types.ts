@@ -394,6 +394,12 @@ export interface WsErrorMessage {
   message: string;
 }
 
+export interface WsShutdownMessage {
+  type: 'Shutdown';
+  reason: string;
+  reconnect_after_ms: number | null;
+}
+
 export type CoopEventType =
   | 'PaymentCreated'
   | 'MemberAdded'
@@ -408,7 +414,8 @@ export type CoopEventType =
   | 'ComputeTaskSubmitted'
   | 'ComputeTaskClaimed'
   | 'ComputeTaskCompleted'
-  | 'ComputeTaskCancelled';
+  | 'ComputeTaskCancelled'
+  | 'Shutdown';
 
 /** GatewayEvent payload with its type tag */
 export interface GatewayEventPayload {
@@ -429,6 +436,7 @@ export type WsMessage =
   | WsBackfillCompleteMessage
   | WsEventMessage
   | WsErrorMessage
+  | WsShutdownMessage
   | { type: 'Ping' }
   | { type: 'Pong' };
 
@@ -517,6 +525,10 @@ export interface WebSocketOptions {
   reconnectDelayMs?: number;
   /** Maximum reconnect delay in ms (default: 30000) */
   maxReconnectDelayMs?: number;
+  /** Auto-request backfill after reconnect (default: true) */
+  autoBackfill?: boolean;
+  /** Detect gaps in sequence numbers and request backfill (default: true) */
+  gapDetection?: boolean;
 }
 
 // ============================================================================
