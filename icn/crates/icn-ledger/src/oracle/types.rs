@@ -226,6 +226,25 @@ pub struct ManualRateRecord {
     pub note: Option<String>,
 }
 
+/// Audit trail entry for rate changes
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RateAuditEntry {
+    /// Currency pair
+    pub pair: CurrencyPair,
+    /// Previous rate (None if first entry)
+    pub previous_rate: Option<f64>,
+    /// New rate
+    pub new_rate: f64,
+    /// Who made the change (DID)
+    pub changed_by: String,
+    /// When the change was made (Unix timestamp)
+    pub changed_at: u64,
+    /// Source of the change (e.g., "manual", "federation:agreement-123")
+    pub source: String,
+    /// Optional note/reason for the change
+    pub note: Option<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

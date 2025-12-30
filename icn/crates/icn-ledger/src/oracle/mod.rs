@@ -81,7 +81,8 @@ pub use manager::{CacheStats, OracleManager};
 pub use price_feed::PriceFeed;
 pub use sources::{FederationRateSource, ManualRateSource};
 pub use types::{
-    CurrencyPair, ExchangeRate, ManualRateRecord, OracleConfig, RateObservation, SourceInfo,
+    CurrencyPair, ExchangeRate, ManualRateRecord, OracleConfig, RateAuditEntry, RateObservation,
+    SourceInfo,
 };
 
 // Re-export AgreementRates for federation integration

@@ -5,7 +5,7 @@
 
 use crate::oracle::error::{OracleError, OracleResult};
 use crate::oracle::price_feed::PriceFeed;
-use crate::oracle::types::{CurrencyPair, ManualRateRecord, RateObservation};
+use crate::oracle::types::{CurrencyPair, ManualRateRecord, RateAuditEntry, RateObservation};
 use async_trait::async_trait;
 use icn_store::Store;
 use std::sync::Arc;
@@ -13,6 +13,9 @@ use tracing::{debug, info};
 
 /// Storage key prefix for manual rates
 const MANUAL_RATE_PREFIX: &str = "oracle:manual:";
+
+/// Storage key prefix for rate audit trail
+const RATE_AUDIT_PREFIX: &str = "oracle:audit:";
 
 /// A price feed source for cooperative-defined (manual) exchange rates
 ///
@@ -50,11 +53,15 @@ impl ManualRateSource {
             )));
         }
 
+        // Get previous rate for audit trail
+        let previous_rate = self.get_rate_record(pair)?.map(|r| r.rate);
+
+        let now = crate::current_timestamp_secs();
         let record = ManualRateRecord {
             rate,
             set_by: set_by.to_string(),
-            set_at: crate::current_timestamp_secs(),
-            note,
+            set_at: now,
+            note: note.clone(),
         };
 
         let key = format!("{}{}", MANUAL_RATE_PREFIX, pair.key());
@@ -64,14 +71,82 @@ impl ManualRateSource {
             .put(key.as_bytes(), &value)
             .map_err(|e| OracleError::Storage(e.to_string()))?;
 
+        // Record audit entry
+        let audit_entry = RateAuditEntry {
+            pair: pair.clone(),
+            previous_rate,
+            new_rate: rate,
+            changed_by: set_by.to_string(),
+            changed_at: now,
+            source: "manual".to_string(),
+            note,
+        };
+        self.record_audit_entry(&audit_entry)?;
+
         info!(
             pair = %pair,
             rate = rate,
+            previous_rate = ?previous_rate,
             set_by = set_by,
             "Set manual exchange rate"
         );
 
         Ok(record)
+    }
+
+    /// Record an audit entry for rate changes
+    fn record_audit_entry(&self, entry: &RateAuditEntry) -> OracleResult<()> {
+        // Key format: oracle:audit:{pair}:{timestamp}
+        let key = format!(
+            "{}{}:{}",
+            RATE_AUDIT_PREFIX,
+            entry.pair.key(),
+            entry.changed_at
+        );
+        let value = serde_json::to_vec(entry).map_err(OracleError::from)?;
+
+        self.store
+            .put(key.as_bytes(), &value)
+            .map_err(|e| OracleError::Storage(e.to_string()))?;
+
+        debug!(
+            pair = %entry.pair,
+            previous = ?entry.previous_rate,
+            new = entry.new_rate,
+            "Recorded rate audit entry"
+        );
+
+        Ok(())
+    }
+
+    /// Get rate change history for a currency pair
+    ///
+    /// Returns audit entries in reverse chronological order (newest first).
+    pub fn get_rate_history(
+        &self,
+        pair: &CurrencyPair,
+        limit: usize,
+    ) -> OracleResult<Vec<RateAuditEntry>> {
+        let prefix = format!("{}{}:", RATE_AUDIT_PREFIX, pair.key());
+        let entries = self
+            .store
+            .scan(prefix.as_bytes())
+            .map_err(|e| OracleError::Storage(e.to_string()))?;
+
+        let mut history = Vec::new();
+        for (_, value) in entries {
+            if let Ok(entry) = serde_json::from_slice::<RateAuditEntry>(&value) {
+                history.push(entry);
+            }
+        }
+
+        // Sort by timestamp descending (newest first)
+        history.sort_by(|a, b| b.changed_at.cmp(&a.changed_at));
+
+        // Apply limit
+        history.truncate(limit);
+
+        Ok(history)
     }
 
     /// Remove a manual exchange rate

@@ -221,11 +221,19 @@ pub async fn get_rate(
 
     let pair = CurrencyPair::new(&from, &to);
 
+    // Record metrics
+    icn_obs::metrics::gateway::oracle_rate_queries_inc(&pair.to_string());
+
     let rate = oracle_state
         .oracle
         .get_rate(&pair)
         .await
         .map_err(|e| GatewayError::BadRequest(format!("Failed to get rate: {e}")))?;
+
+    // Track stale rate returns
+    if rate.is_stale {
+        icn_obs::metrics::gateway::oracle_stale_rates_inc(&pair.to_string());
+    }
 
     let response = ExchangeRateResponse {
         from_currency: from,
@@ -254,19 +262,36 @@ pub async fn convert_amount(
     validate_currency_code(&body.from_currency).map_err(GatewayError::BadRequest)?;
     validate_currency_code(&body.to_currency).map_err(GatewayError::BadRequest)?;
 
-    let converted = oracle_state
-        .oracle
-        .convert_amount(body.amount, &body.from_currency, &body.to_currency)
-        .await
-        .map_err(|e| GatewayError::BadRequest(format!("Failed to convert: {e}")))?;
+    // Same currency - no conversion needed
+    if body.from_currency == body.to_currency {
+        let response = ConvertAmountResponse {
+            original_amount: body.amount,
+            converted_amount: body.amount,
+            from_currency: body.from_currency.clone(),
+            to_currency: body.to_currency.clone(),
+            rate_used: 1.0,
+        };
+        return Ok(HttpResponse::Ok().json(response));
+    }
 
-    // Get the rate for the response
+    // Get the rate once and use for both conversion and response
     let pair = CurrencyPair::new(&body.from_currency, &body.to_currency);
     let rate = oracle_state
         .oracle
         .get_rate(&pair)
         .await
         .map_err(|e| GatewayError::BadRequest(format!("Failed to get rate: {e}")))?;
+
+    // Convert using the fetched rate
+    let converted = rate.convert(body.amount).ok_or_else(|| {
+        GatewayError::BadRequest(format!(
+            "Conversion overflow: {} * {} exceeds i64 bounds",
+            body.amount, rate.rate
+        ))
+    })?;
+
+    // Record conversion metric
+    icn_obs::metrics::gateway::oracle_conversions_inc(&body.from_currency, &body.to_currency);
 
     let response = ConvertAmountResponse {
         original_amount: body.amount,
@@ -340,6 +365,9 @@ pub async fn set_rate(
         set_by = %claims.sub,
         "Manual rate set via API"
     );
+
+    // Record rate update metric
+    icn_obs::metrics::gateway::oracle_rate_updates_inc(&pair.to_string(), "manual");
 
     let response = SetManualRateResponse {
         pair: pair.key(),

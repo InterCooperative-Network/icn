@@ -296,18 +296,48 @@ impl OracleManager {
     }
 
     /// Load cached rates from storage on startup
-    pub fn load_from_storage(&self) -> OracleResult<usize> {
-        // Note: This is synchronous because it's called during initialization
-        // In a future iteration, this could be made async
+    ///
+    /// This should be called during initialization to pre-populate the cache
+    /// with any persisted rates, reducing startup latency for first queries.
+    pub async fn load_from_storage(&self) -> OracleResult<usize> {
+        let prefix = RATE_CACHE_PREFIX.as_bytes();
+        let pairs = self
+            .store
+            .scan(prefix)
+            .map_err(|e| OracleError::Storage(e.to_string()))?;
 
-        // Scan is sync, but we need to update the cache atomically
-        // For now, we'll skip the async cache update in load_from_storage
-        // This is acceptable because load is typically called at startup before queries
+        let mut loaded = 0;
+        let mut cache = self.cache.write().await;
+        let now = crate::current_timestamp_secs();
 
-        // TODO: Implement proper async loading if needed
-        debug!("Load from storage skipped - rates will be fetched on demand");
+        for (key, value) in pairs {
+            match serde_json::from_slice::<ExchangeRate>(&value) {
+                Ok(mut rate) => {
+                    // Check if rate is expired
+                    let expires_at = rate.aggregated_at.saturating_add(rate.ttl_secs);
+                    if now > expires_at {
+                        debug!(pair = %rate.pair, "Skipping expired cached rate");
+                        continue;
+                    }
 
-        Ok(0)
+                    // Check if rate is stale
+                    let stale_at = rate
+                        .aggregated_at
+                        .saturating_add(self.config.staleness_threshold_secs);
+                    rate.is_stale = now > stale_at;
+
+                    cache.insert(rate.pair.key(), rate);
+                    loaded += 1;
+                }
+                Err(e) => {
+                    let key_str = String::from_utf8_lossy(&key);
+                    warn!(key = %key_str, error = %e, "Failed to deserialize cached rate");
+                }
+            }
+        }
+
+        info!(loaded_count = loaded, "Loaded cached rates from storage");
+        Ok(loaded)
     }
 
     // === Aggregation ===
@@ -346,17 +376,28 @@ impl OracleManager {
             .collect();
 
         // Use median of valid observations for final rate
-        let final_rate = if !valid_observations.is_empty() {
+        // If all observations were filtered as outliers, fall back to original observations
+        // with a warning - this indicates potential data quality issues
+        let (final_rate, final_observations) = if !valid_observations.is_empty() {
             let mut valid_rates: Vec<f64> = valid_observations.iter().map(|o| o.rate).collect();
             valid_rates.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-            if valid_rates.len().is_multiple_of(2) {
+            let rate = if valid_rates.len().is_multiple_of(2) {
                 (valid_rates[valid_rates.len() / 2 - 1] + valid_rates[valid_rates.len() / 2]) / 2.0
             } else {
                 valid_rates[valid_rates.len() / 2]
-            }
+            };
+            (rate, valid_observations)
         } else {
-            // Fallback to median if all are "outliers" (shouldn't happen normally)
-            median
+            // All observations were outliers - this indicates high disagreement between sources
+            // Fall back to original median but log a warning
+            warn!(
+                pair = %pair,
+                observation_count = observations.len(),
+                threshold = self.config.outlier_threshold,
+                "All rate observations filtered as outliers - high source disagreement"
+            );
+            // Return original observations so caller can see the disagreement
+            (median, observations.to_vec())
         };
 
         let now = crate::current_timestamp_secs();
@@ -364,7 +405,7 @@ impl OracleManager {
         Ok(ExchangeRate {
             pair: pair.clone(),
             rate: final_rate,
-            observations: valid_observations,
+            observations: final_observations,
             aggregated_at: now,
             ttl_secs: self.config.default_ttl_secs,
             is_stale: false,
