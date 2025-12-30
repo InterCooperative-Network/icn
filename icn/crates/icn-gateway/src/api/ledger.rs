@@ -960,4 +960,237 @@ mod tests {
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), actix_web::http::StatusCode::BAD_REQUEST);
     }
+
+    #[actix_web::test]
+    async fn test_cross_payment_same_currency_rejected() {
+        let ledger_mgr = Arc::new(LedgerManager::new());
+        let db = sled::Config::new().temporary(true).open().unwrap();
+        let budget_store = BudgetStore::new(db);
+        let velocity_limiter = VelocityLimiter::default();
+        let trust_mgr = Arc::new(TrustManager::new());
+        let alice = IdentityBundle::generate().unwrap();
+        let bob = IdentityBundle::generate().unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(ledger_mgr.clone()))
+                .app_data(web::Data::new(budget_store.clone()))
+                .app_data(web::Data::new(velocity_limiter.clone()))
+                .app_data(web::Data::new(trust_mgr.clone()))
+                .service(web::scope("/ledger").service(create_cross_payment)),
+        )
+        .await;
+
+        // Try cross-payment with same currency (should fail)
+        let req_body = CreateCrossPaymentRequest {
+            from: alice.did().to_string(),
+            to: bob.did().to_string(),
+            amount: 10,
+            from_currency: "hours".to_string(),
+            to_currency: "hours".to_string(), // Same currency!
+            max_target_amount: None,
+            memo: None,
+        };
+
+        let claims = TokenClaims {
+            sub: alice.did().to_string(),
+            iat: 1000000000,
+            coop_id: "test-coop".to_string(),
+            scopes: vec!["ledger:write".to_string()],
+            exp: 9999999999,
+        };
+
+        let req = test::TestRequest::post()
+            .uri("/ledger/test-coop/payment/convert")
+            .set_json(&req_body)
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), actix_web::http::StatusCode::BAD_REQUEST);
+    }
+
+    #[actix_web::test]
+    async fn test_cross_payment_self_payment_rejected() {
+        let ledger_mgr = Arc::new(LedgerManager::new());
+        let db = sled::Config::new().temporary(true).open().unwrap();
+        let budget_store = BudgetStore::new(db);
+        let velocity_limiter = VelocityLimiter::default();
+        let trust_mgr = Arc::new(TrustManager::new());
+        let alice = IdentityBundle::generate().unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(ledger_mgr.clone()))
+                .app_data(web::Data::new(budget_store.clone()))
+                .app_data(web::Data::new(velocity_limiter.clone()))
+                .app_data(web::Data::new(trust_mgr.clone()))
+                .service(web::scope("/ledger").service(create_cross_payment)),
+        )
+        .await;
+
+        // Try cross-payment to self (should fail)
+        let req_body = CreateCrossPaymentRequest {
+            from: alice.did().to_string(),
+            to: alice.did().to_string(), // Self-payment!
+            amount: 10,
+            from_currency: "hours".to_string(),
+            to_currency: "USD".to_string(),
+            max_target_amount: None,
+            memo: None,
+        };
+
+        let claims = TokenClaims {
+            sub: alice.did().to_string(),
+            iat: 1000000000,
+            coop_id: "test-coop".to_string(),
+            scopes: vec!["ledger:write".to_string()],
+            exp: 9999999999,
+        };
+
+        let req = test::TestRequest::post()
+            .uri("/ledger/test-coop/payment/convert")
+            .set_json(&req_body)
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), actix_web::http::StatusCode::BAD_REQUEST);
+    }
+
+    #[actix_web::test]
+    async fn test_cross_payment_authorization_check() {
+        let ledger_mgr = Arc::new(LedgerManager::new());
+        let db = sled::Config::new().temporary(true).open().unwrap();
+        let budget_store = BudgetStore::new(db);
+        let velocity_limiter = VelocityLimiter::default();
+        let trust_mgr = Arc::new(TrustManager::new());
+        let alice = IdentityBundle::generate().unwrap();
+        let bob = IdentityBundle::generate().unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(ledger_mgr.clone()))
+                .app_data(web::Data::new(budget_store.clone()))
+                .app_data(web::Data::new(velocity_limiter.clone()))
+                .app_data(web::Data::new(trust_mgr.clone()))
+                .service(web::scope("/ledger").service(create_cross_payment)),
+        )
+        .await;
+
+        // Try cross-payment with read-only scope (should fail)
+        let req_body = CreateCrossPaymentRequest {
+            from: alice.did().to_string(),
+            to: bob.did().to_string(),
+            amount: 10,
+            from_currency: "hours".to_string(),
+            to_currency: "USD".to_string(),
+            max_target_amount: None,
+            memo: None,
+        };
+
+        let claims = TokenClaims {
+            sub: alice.did().to_string(),
+            iat: 1000000000,
+            coop_id: "test-coop".to_string(),
+            scopes: vec!["ledger:read".to_string()], // Wrong scope!
+            exp: 9999999999,
+        };
+
+        let req = test::TestRequest::post()
+            .uri("/ledger/test-coop/payment/convert")
+            .set_json(&req_body)
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), actix_web::http::StatusCode::FORBIDDEN);
+    }
+
+    #[actix_web::test]
+    async fn test_cross_payment_quote_same_currency_rejected() {
+        let ledger_mgr = Arc::new(LedgerManager::new());
+        let alice = IdentityBundle::generate().unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(ledger_mgr.clone()))
+                .service(web::scope("/ledger").service(get_cross_payment_quote)),
+        )
+        .await;
+
+        // Try quote with same currency (should fail)
+        let req_body = CrossPaymentQuoteRequest {
+            amount: 10,
+            from_currency: "hours".to_string(),
+            to_currency: "hours".to_string(), // Same currency!
+        };
+
+        let claims = TokenClaims {
+            sub: alice.did().to_string(),
+            iat: 1000000000,
+            coop_id: "test-coop".to_string(),
+            scopes: vec!["ledger:read".to_string()],
+            exp: 9999999999,
+        };
+
+        let req = test::TestRequest::post()
+            .uri("/ledger/test-coop/payment/convert/quote")
+            .set_json(&req_body)
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), actix_web::http::StatusCode::BAD_REQUEST);
+    }
+
+    #[actix_web::test]
+    async fn test_cross_payment_from_other_account_rejected() {
+        let ledger_mgr = Arc::new(LedgerManager::new());
+        let db = sled::Config::new().temporary(true).open().unwrap();
+        let budget_store = BudgetStore::new(db);
+        let velocity_limiter = VelocityLimiter::default();
+        let trust_mgr = Arc::new(TrustManager::new());
+        let alice = IdentityBundle::generate().unwrap();
+        let bob = IdentityBundle::generate().unwrap();
+        let charlie = IdentityBundle::generate().unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(ledger_mgr.clone()))
+                .app_data(web::Data::new(budget_store.clone()))
+                .app_data(web::Data::new(velocity_limiter.clone()))
+                .app_data(web::Data::new(trust_mgr.clone()))
+                .service(web::scope("/ledger").service(create_cross_payment)),
+        )
+        .await;
+
+        // Alice tries to create cross-payment from Bob's account (should fail)
+        let req_body = CreateCrossPaymentRequest {
+            from: bob.did().to_string(), // Bob's account
+            to: charlie.did().to_string(),
+            amount: 10,
+            from_currency: "hours".to_string(),
+            to_currency: "USD".to_string(),
+            max_target_amount: None,
+            memo: None,
+        };
+
+        let claims = TokenClaims {
+            sub: alice.did().to_string(), // Alice authenticated
+            iat: 1000000000,
+            coop_id: "test-coop".to_string(),
+            scopes: vec!["ledger:write".to_string()],
+            exp: 9999999999,
+        };
+
+        let req = test::TestRequest::post()
+            .uri("/ledger/test-coop/payment/convert")
+            .set_json(&req_body)
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), actix_web::http::StatusCode::FORBIDDEN);
+    }
 }
