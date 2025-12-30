@@ -318,6 +318,46 @@ mod tests {
     }
 
     #[test]
+    fn test_exchange_rate_convert_safety_margin() {
+        // Test that values between 99% and 100% of i64 bounds return None
+        // due to the safety margin for floating-point precision
+        let rate = ExchangeRate {
+            pair: CurrencyPair::new("hours", "USD"),
+            rate: 1.0,
+            observations: vec![],
+            aggregated_at: 0,
+            ttl_secs: 3600,
+            is_stale: false,
+        };
+
+        // Value at exactly i64::MAX should return None (beyond 99% margin)
+        assert_eq!(rate.convert(i64::MAX), None);
+
+        // Value at 98% of i64::MAX should succeed (within 99% margin)
+        let safe_amount = (i64::MAX as f64 * 0.98) as i64;
+        assert!(rate.convert(safe_amount).is_some());
+
+        // Test negative overflow with safety margin
+        assert_eq!(rate.convert(i64::MIN), None);
+
+        // Value at 98% of i64::MIN should succeed
+        let safe_negative = (i64::MIN as f64 * 0.98) as i64;
+        assert!(rate.convert(safe_negative).is_some());
+
+        // Test with rate = 2.0 and i64::MIN (negative overflow)
+        let rate2 = ExchangeRate {
+            pair: CurrencyPair::new("hours", "USD"),
+            rate: 2.0,
+            observations: vec![],
+            aggregated_at: 0,
+            ttl_secs: 3600,
+            is_stale: false,
+        };
+        assert_eq!(rate2.convert(i64::MIN), None);
+        assert_eq!(rate2.convert_saturating(i64::MIN), i64::MIN);
+    }
+
+    #[test]
     fn test_exchange_rate_inverse() {
         let rate = ExchangeRate {
             pair: CurrencyPair::new("hours", "USD"),
