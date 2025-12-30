@@ -690,8 +690,8 @@ export class RateLimitError extends ICNError {
  * Network-level error
  */
 export class NetworkError extends ICNError {
-  constructor(message: string, code?: string, details?: unknown) {
-    super(message, 0, code || ErrorCode.NETWORK_ERROR, details);
+  constructor(message: string, code?: string, details?: unknown, statusCode = 0) {
+    super(message, statusCode, code || ErrorCode.NETWORK_ERROR, details);
     this.name = 'NetworkError';
   }
 
@@ -707,11 +707,9 @@ export class TimeoutError extends NetworkError {
   public readonly timeoutMs?: number;
 
   constructor(message = 'Request timeout', timeoutMs?: number, details?: unknown) {
-    super(message, ErrorCode.TIMEOUT, details);
+    super(message, ErrorCode.TIMEOUT, details, 408);
     this.name = 'TimeoutError';
     this.timeoutMs = timeoutMs;
-    // Override status code for timeout
-    (this as { statusCode: number }).statusCode = 408;
   }
 }
 

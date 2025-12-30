@@ -2,7 +2,26 @@
  * ICN TypeScript SDK Tests
  */
 
-import { ICNClient, ICNError, ICNSubscription } from './index';
+import {
+  ICNClient,
+  ICNError,
+  ICNSubscription,
+  ErrorCode,
+  AuthenticationError,
+  TokenExpiredError,
+  InvalidCredentialsError,
+  AuthorizationError,
+  InsufficientPermissionsError,
+  ValidationError,
+  NotFoundError,
+  ConflictError,
+  RateLimitError,
+  NetworkError,
+  TimeoutError,
+  ConnectionError,
+  ServerError,
+  createErrorFromResponse,
+} from './index';
 
 describe('ICNClient', () => {
   describe('constructor', () => {
@@ -2338,5 +2357,254 @@ describe('device management', () => {
     const [, options] = mockFetch.mock.calls[0];
     const body = JSON.parse(options.body);
     expect(body.encryption_public_key).toBe('cafebabe...');
+  });
+});
+
+// ============================================================================
+// Error Classes Tests
+// ============================================================================
+
+describe('Error Classes', () => {
+  describe('ICNError', () => {
+    it('should create error with all properties', () => {
+      const error = new ICNError('Test error', 500, 'TEST_CODE', { foo: 'bar' });
+      expect(error.message).toBe('Test error');
+      expect(error.statusCode).toBe(500);
+      expect(error.code).toBe('TEST_CODE');
+      expect(error.details).toEqual({ foo: 'bar' });
+      expect(error.name).toBe('ICNError');
+    });
+
+    it('should be retryable for 5xx errors', () => {
+      expect(new ICNError('error', 500).isRetryable()).toBe(true);
+      expect(new ICNError('error', 502).isRetryable()).toBe(true);
+      expect(new ICNError('error', 503).isRetryable()).toBe(true);
+    });
+
+    it('should be retryable for timeout and rate limit', () => {
+      expect(new ICNError('error', 408).isRetryable()).toBe(true);
+      expect(new ICNError('error', 429).isRetryable()).toBe(true);
+    });
+
+    it('should not be retryable for client errors', () => {
+      expect(new ICNError('error', 400).isRetryable()).toBe(false);
+      expect(new ICNError('error', 401).isRetryable()).toBe(false);
+      expect(new ICNError('error', 403).isRetryable()).toBe(false);
+      expect(new ICNError('error', 404).isRetryable()).toBe(false);
+    });
+  });
+
+  describe('AuthenticationError', () => {
+    it('should have correct status code', () => {
+      const error = new AuthenticationError('Auth failed');
+      expect(error.statusCode).toBe(401);
+      expect(error.name).toBe('AuthenticationError');
+      expect(error instanceof ICNError).toBe(true);
+    });
+  });
+
+  describe('TokenExpiredError', () => {
+    it('should have default message', () => {
+      const error = new TokenExpiredError();
+      expect(error.message).toBe('Token has expired');
+      expect(error.code).toBe(ErrorCode.TOKEN_EXPIRED);
+      expect(error instanceof AuthenticationError).toBe(true);
+    });
+  });
+
+  describe('InvalidCredentialsError', () => {
+    it('should have default message', () => {
+      const error = new InvalidCredentialsError();
+      expect(error.message).toBe('Invalid credentials');
+      expect(error.code).toBe(ErrorCode.INVALID_CREDENTIALS);
+    });
+  });
+
+  describe('AuthorizationError', () => {
+    it('should have correct status code', () => {
+      const error = new AuthorizationError('Forbidden');
+      expect(error.statusCode).toBe(403);
+      expect(error.name).toBe('AuthorizationError');
+    });
+  });
+
+  describe('InsufficientPermissionsError', () => {
+    it('should store required permissions', () => {
+      const error = new InsufficientPermissionsError('Need perms', ['read', 'write']);
+      expect(error.requiredPermissions).toEqual(['read', 'write']);
+      expect(error.code).toBe(ErrorCode.INSUFFICIENT_PERMISSIONS);
+    });
+  });
+
+  describe('ValidationError', () => {
+    it('should store field errors', () => {
+      const error = new ValidationError('Validation failed', {
+        email: ['Invalid format'],
+        name: ['Required', 'Too short'],
+      });
+      expect(error.fields.email).toEqual(['Invalid format']);
+      expect(error.fields.name).toEqual(['Required', 'Too short']);
+    });
+
+    it('should get field errors', () => {
+      const error = new ValidationError('Validation failed', {
+        email: ['Invalid format'],
+      });
+      expect(error.getFieldErrors('email')).toEqual(['Invalid format']);
+      expect(error.getFieldErrors('unknown')).toEqual([]);
+    });
+
+    it('should check if field has errors', () => {
+      const error = new ValidationError('Validation failed', {
+        email: ['Invalid format'],
+      });
+      expect(error.hasFieldError('email')).toBe(true);
+      expect(error.hasFieldError('unknown')).toBe(false);
+    });
+  });
+
+  describe('NotFoundError', () => {
+    it('should store resource info', () => {
+      const error = new NotFoundError('User not found', 'user', 'user-123');
+      expect(error.statusCode).toBe(404);
+      expect(error.resourceType).toBe('user');
+      expect(error.resourceId).toBe('user-123');
+    });
+  });
+
+  describe('ConflictError', () => {
+    it('should have correct status code', () => {
+      const error = new ConflictError('Already exists');
+      expect(error.statusCode).toBe(409);
+      expect(error.code).toBe(ErrorCode.CONFLICT);
+    });
+  });
+
+  describe('RateLimitError', () => {
+    it('should store rate limit info', () => {
+      const error = new RateLimitError('Too many requests', 60, 100, 0);
+      expect(error.statusCode).toBe(429);
+      expect(error.retryAfter).toBe(60);
+      expect(error.limit).toBe(100);
+      expect(error.remaining).toBe(0);
+    });
+
+    it('should always be retryable', () => {
+      const error = new RateLimitError();
+      expect(error.isRetryable()).toBe(true);
+    });
+  });
+
+  describe('NetworkError', () => {
+    it('should have status code 0 by default', () => {
+      const error = new NetworkError('Network failed');
+      expect(error.statusCode).toBe(0);
+      expect(error.isRetryable()).toBe(true);
+    });
+  });
+
+  describe('TimeoutError', () => {
+    it('should have status code 408', () => {
+      const error = new TimeoutError('Timeout', 5000);
+      expect(error.statusCode).toBe(408);
+      expect(error.timeoutMs).toBe(5000);
+      expect(error instanceof NetworkError).toBe(true);
+    });
+  });
+
+  describe('ConnectionError', () => {
+    it('should have correct code', () => {
+      const error = new ConnectionError();
+      expect(error.code).toBe(ErrorCode.CONNECTION_FAILED);
+      expect(error instanceof NetworkError).toBe(true);
+    });
+  });
+
+  describe('ServerError', () => {
+    it('should accept custom status code', () => {
+      const error = new ServerError('Bad Gateway', 502);
+      expect(error.statusCode).toBe(502);
+      expect(error.isRetryable()).toBe(true);
+    });
+  });
+});
+
+describe('createErrorFromResponse', () => {
+  it('should create AuthenticationError for 401', () => {
+    const error = createErrorFromResponse(401, 'Unauthorized');
+    expect(error).toBeInstanceOf(AuthenticationError);
+    expect(error.statusCode).toBe(401);
+  });
+
+  it('should create TokenExpiredError for 401 with TOKEN_EXPIRED code', () => {
+    const error = createErrorFromResponse(401, 'Token expired', ErrorCode.TOKEN_EXPIRED);
+    expect(error).toBeInstanceOf(TokenExpiredError);
+  });
+
+  it('should create AuthorizationError for 403', () => {
+    const error = createErrorFromResponse(403, 'Forbidden');
+    expect(error).toBeInstanceOf(AuthorizationError);
+  });
+
+  it('should create InsufficientPermissionsError with permissions', () => {
+    const error = createErrorFromResponse(
+      403,
+      'Need permissions',
+      ErrorCode.INSUFFICIENT_PERMISSIONS,
+      { required_permissions: ['admin'] }
+    );
+    expect(error).toBeInstanceOf(InsufficientPermissionsError);
+    expect((error as InsufficientPermissionsError).requiredPermissions).toEqual(['admin']);
+  });
+
+  it('should create NotFoundError for 404', () => {
+    const error = createErrorFromResponse(404, 'Not found', undefined, {
+      resource_type: 'user',
+      resource_id: '123',
+    });
+    expect(error).toBeInstanceOf(NotFoundError);
+    expect((error as NotFoundError).resourceType).toBe('user');
+    expect((error as NotFoundError).resourceId).toBe('123');
+  });
+
+  it('should create TimeoutError for 408', () => {
+    const error = createErrorFromResponse(408, 'Timeout');
+    expect(error).toBeInstanceOf(TimeoutError);
+  });
+
+  it('should create ConflictError for 409', () => {
+    const error = createErrorFromResponse(409, 'Conflict');
+    expect(error).toBeInstanceOf(ConflictError);
+  });
+
+  it('should create RateLimitError for 429', () => {
+    const error = createErrorFromResponse(429, 'Too many requests', undefined, {
+      retry_after: 30,
+      limit: 100,
+      remaining: 0,
+    });
+    expect(error).toBeInstanceOf(RateLimitError);
+    expect((error as RateLimitError).retryAfter).toBe(30);
+    expect((error as RateLimitError).limit).toBe(100);
+  });
+
+  it('should create ServerError for 5xx', () => {
+    const error = createErrorFromResponse(500, 'Internal error');
+    expect(error).toBeInstanceOf(ServerError);
+    expect(error.isRetryable()).toBe(true);
+  });
+
+  it('should create ValidationError for 400 with VALIDATION_FAILED', () => {
+    const error = createErrorFromResponse(400, 'Validation failed', ErrorCode.VALIDATION_FAILED, {
+      fields: { email: ['Invalid format'] },
+    });
+    expect(error).toBeInstanceOf(ValidationError);
+    expect((error as ValidationError).fields.email).toEqual(['Invalid format']);
+  });
+
+  it('should create generic ICNError for unknown status', () => {
+    const error = createErrorFromResponse(418, "I'm a teapot");
+    expect(error).toBeInstanceOf(ICNError);
+    expect(error.statusCode).toBe(418);
   });
 });
