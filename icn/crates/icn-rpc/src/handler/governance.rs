@@ -124,6 +124,15 @@ pub async fn handle_governance_proposal_list(id: u64, state: &Arc<RpcServer>) ->
                 .map(|p| {
                     let (state_str, opened_at, closes_at, closed_at) = match &p.state {
                         ProposalState::Draft => ("draft".to_string(), None, None, None),
+                        ProposalState::Deliberation {
+                            started_at,
+                            ends_at,
+                        } => (
+                            "deliberation".to_string(),
+                            Some(*started_at),
+                            Some(*ends_at),
+                            None,
+                        ),
                         ProposalState::Open {
                             opened_at,
                             closes_at,
@@ -204,6 +213,15 @@ pub async fn handle_governance_proposal_get(
         Ok(Some(p)) => {
             let (state_str, opened_at, closes_at, closed_at) = match &p.state {
                 ProposalState::Draft => ("draft".to_string(), None, None, None),
+                ProposalState::Deliberation {
+                    started_at,
+                    ends_at,
+                } => (
+                    "deliberation".to_string(),
+                    Some(*started_at),
+                    Some(*ends_at),
+                    None,
+                ),
                 ProposalState::Open {
                     opened_at,
                     closes_at,
@@ -297,11 +315,11 @@ pub async fn handle_governance_domain_create(
         },
     };
 
-    let params_config = icn_governance::GovernanceParams {
-        quorum_percentage: request.params.quorum_percentage,
-        approval_threshold_percentage: request.params.approval_threshold_percentage,
-        voting_period_seconds: request.params.voting_period_seconds,
-    };
+    let params_config = icn_governance::GovernanceParams::new(
+        request.params.quorum_percentage,
+        request.params.approval_threshold_percentage,
+        request.params.voting_period_seconds,
+    );
 
     let domain_id = icn_governance::GovernanceDomainId(request.domain_id);
 

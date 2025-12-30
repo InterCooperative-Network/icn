@@ -1,6 +1,8 @@
 //! Governance gossip messages for distributed coordination
 
-use crate::{Delegation, DelegationId, GovernanceDomain, Proposal, ProposalId, Timestamp, Vote};
+use crate::{
+    CommentId, Delegation, DelegationId, GovernanceDomain, Proposal, ProposalId, Timestamp, Vote,
+};
 use icn_identity::Did;
 use serde::{Deserialize, Serialize};
 
@@ -93,6 +95,106 @@ pub enum GovernanceMessage {
         /// When it was revoked
         revoked_at: Timestamp,
     },
+
+    // === Deliberation Messages ===
+    /// A proposal has entered the deliberation phase
+    DeliberationStarted {
+        /// Proposal ID
+        proposal_id: ProposalId,
+
+        /// When deliberation started
+        started_at: Timestamp,
+
+        /// When deliberation ends
+        ends_at: Timestamp,
+    },
+
+    /// Deliberation has ended and voting has opened
+    DeliberationEnded {
+        /// Proposal ID
+        proposal_id: ProposalId,
+
+        /// When deliberation ended
+        ended_at: Timestamp,
+
+        /// Number of comments during deliberation
+        comment_count: usize,
+
+        /// Number of unique participants in the discussion
+        participant_count: usize,
+    },
+
+    /// A comment was added to a proposal
+    CommentCreated {
+        /// Proposal ID
+        proposal_id: ProposalId,
+
+        /// Comment ID
+        comment_id: CommentId,
+
+        /// Who wrote the comment
+        author: Did,
+
+        /// Parent comment ID (if this is a reply)
+        parent_id: Option<CommentId>,
+
+        /// When the comment was created
+        created_at: Timestamp,
+    },
+
+    /// A comment was edited
+    CommentEdited {
+        /// Proposal ID
+        proposal_id: ProposalId,
+
+        /// Comment ID
+        comment_id: CommentId,
+
+        /// When the comment was edited
+        edited_at: Timestamp,
+    },
+
+    /// A comment was deleted
+    CommentDeleted {
+        /// Proposal ID
+        proposal_id: ProposalId,
+
+        /// Comment ID
+        comment_id: CommentId,
+
+        /// When the comment was deleted
+        deleted_at: Timestamp,
+    },
+
+    /// A reaction was added to a comment
+    ReactionAdded {
+        /// Proposal ID
+        proposal_id: ProposalId,
+
+        /// Comment ID
+        comment_id: CommentId,
+
+        /// Who reacted
+        reactor: Did,
+
+        /// The emoji reaction
+        emoji: String,
+    },
+
+    /// A reaction was removed from a comment
+    ReactionRemoved {
+        /// Proposal ID
+        proposal_id: ProposalId,
+
+        /// Comment ID
+        comment_id: CommentId,
+
+        /// Who removed their reaction
+        reactor: Did,
+
+        /// The emoji reaction that was removed
+        emoji: String,
+    },
 }
 
 /// Outcome of a closed proposal
@@ -180,6 +282,107 @@ impl GovernanceMessage {
         }
     }
 
+    /// Create a DeliberationStarted message
+    pub fn deliberation_started(
+        proposal_id: ProposalId,
+        started_at: Timestamp,
+        ends_at: Timestamp,
+    ) -> Self {
+        Self::DeliberationStarted {
+            proposal_id,
+            started_at,
+            ends_at,
+        }
+    }
+
+    /// Create a DeliberationEnded message
+    pub fn deliberation_ended(
+        proposal_id: ProposalId,
+        ended_at: Timestamp,
+        comment_count: usize,
+        participant_count: usize,
+    ) -> Self {
+        Self::DeliberationEnded {
+            proposal_id,
+            ended_at,
+            comment_count,
+            participant_count,
+        }
+    }
+
+    /// Create a CommentCreated message
+    pub fn comment_created(
+        proposal_id: ProposalId,
+        comment_id: CommentId,
+        author: Did,
+        parent_id: Option<CommentId>,
+        created_at: Timestamp,
+    ) -> Self {
+        Self::CommentCreated {
+            proposal_id,
+            comment_id,
+            author,
+            parent_id,
+            created_at,
+        }
+    }
+
+    /// Create a CommentEdited message
+    pub fn comment_edited(
+        proposal_id: ProposalId,
+        comment_id: CommentId,
+        edited_at: Timestamp,
+    ) -> Self {
+        Self::CommentEdited {
+            proposal_id,
+            comment_id,
+            edited_at,
+        }
+    }
+
+    /// Create a CommentDeleted message
+    pub fn comment_deleted(
+        proposal_id: ProposalId,
+        comment_id: CommentId,
+        deleted_at: Timestamp,
+    ) -> Self {
+        Self::CommentDeleted {
+            proposal_id,
+            comment_id,
+            deleted_at,
+        }
+    }
+
+    /// Create a ReactionAdded message
+    pub fn reaction_added(
+        proposal_id: ProposalId,
+        comment_id: CommentId,
+        reactor: Did,
+        emoji: String,
+    ) -> Self {
+        Self::ReactionAdded {
+            proposal_id,
+            comment_id,
+            reactor,
+            emoji,
+        }
+    }
+
+    /// Create a ReactionRemoved message
+    pub fn reaction_removed(
+        proposal_id: ProposalId,
+        comment_id: CommentId,
+        reactor: Did,
+        emoji: String,
+    ) -> Self {
+        Self::ReactionRemoved {
+            proposal_id,
+            comment_id,
+            reactor,
+            emoji,
+        }
+    }
+
     /// Get a short description of this message type for logging
     pub fn message_type(&self) -> &'static str {
         match self {
@@ -192,6 +395,13 @@ impl GovernanceMessage {
             Self::ProposalCancelled { .. } => "ProposalCancelled",
             Self::DelegationCreated { .. } => "DelegationCreated",
             Self::DelegationRevoked { .. } => "DelegationRevoked",
+            Self::DeliberationStarted { .. } => "DeliberationStarted",
+            Self::DeliberationEnded { .. } => "DeliberationEnded",
+            Self::CommentCreated { .. } => "CommentCreated",
+            Self::CommentEdited { .. } => "CommentEdited",
+            Self::CommentDeleted { .. } => "CommentDeleted",
+            Self::ReactionAdded { .. } => "ReactionAdded",
+            Self::ReactionRemoved { .. } => "ReactionRemoved",
         }
     }
 

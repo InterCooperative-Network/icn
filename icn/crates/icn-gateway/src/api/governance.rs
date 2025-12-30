@@ -2,7 +2,7 @@
 //!
 //! RESTful API for managing governance domains, proposals, and votes.
 
-use actix_web::{delete, get, post, web, HttpRequest, HttpResponse};
+use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
 use std::sync::Arc;
 
 use crate::error::Result;
@@ -1169,6 +1169,489 @@ fn parse_delegation_scope(scope: &str) -> Result<DelegationScope> {
     )))
 }
 
+// ============================================================================
+// Deliberation Endpoints
+// ============================================================================
+
+/// POST /gov/proposals/{id}/deliberation/start - Start deliberation period
+#[post("/proposals/{id}/deliberation/start")]
+pub async fn start_deliberation(
+    http_req: HttpRequest,
+    gov_mgr: web::Data<Arc<GovernanceManager>>,
+    id: web::Path<String>,
+    req: web::Json<StartDeliberationRequest>,
+) -> Result<HttpResponse> {
+    // Check authorization
+    require_scope(&http_req, "gov:write")?;
+
+    // Extract authenticated DID from JWT claims
+    let claims = get_claims(&http_req).ok_or_else(|| {
+        crate::error::GatewayError::AuthenticationFailed("No claims found".to_string())
+    })?;
+
+    let caller_did: Did = claims.sub.parse().map_err(|e| {
+        crate::error::GatewayError::BadRequest(format!("Invalid DID in token: {e}"))
+    })?;
+
+    let proposal_id = ProposalId(id.into_inner());
+
+    // Get the proposal to verify authorization
+    let proposal = gov_mgr.get_proposal(&proposal_id).await?.ok_or_else(|| {
+        crate::error::GatewayError::NotFound(format!("Proposal not found: {}", proposal_id.0))
+    })?;
+
+    // Only the proposer can start deliberation
+    if proposal.proposer != caller_did {
+        return Err(crate::error::GatewayError::AuthorizationFailed(
+            "Only the proposer can start deliberation".to_string(),
+        ));
+    }
+
+    // Use the provided period or get default from domain config
+    let period = req.deliberation_period_seconds.unwrap_or(7 * 24 * 60 * 60); // Default: 7 days
+
+    gov_mgr.start_deliberation(&proposal_id, period).await?;
+
+    // Get updated proposal
+    let updated_proposal = gov_mgr.get_proposal(&proposal_id).await?.ok_or_else(|| {
+        crate::error::GatewayError::InternalError("Proposal disappeared after update".to_string())
+    })?;
+
+    Ok(HttpResponse::Ok().json(updated_proposal))
+}
+
+/// POST /gov/proposals/{id}/deliberation/end - End deliberation and open voting
+#[post("/proposals/{id}/deliberation/end")]
+pub async fn end_deliberation(
+    http_req: HttpRequest,
+    gov_mgr: web::Data<Arc<GovernanceManager>>,
+    id: web::Path<String>,
+    req: web::Json<EndDeliberationRequest>,
+) -> Result<HttpResponse> {
+    // Check authorization
+    require_scope(&http_req, "gov:write")?;
+
+    // Extract authenticated DID from JWT claims
+    let claims = get_claims(&http_req).ok_or_else(|| {
+        crate::error::GatewayError::AuthenticationFailed("No claims found".to_string())
+    })?;
+
+    let caller_did: Did = claims.sub.parse().map_err(|e| {
+        crate::error::GatewayError::BadRequest(format!("Invalid DID in token: {e}"))
+    })?;
+
+    let proposal_id = ProposalId(id.into_inner());
+
+    // Get the proposal to verify authorization
+    let proposal = gov_mgr.get_proposal(&proposal_id).await?.ok_or_else(|| {
+        crate::error::GatewayError::NotFound(format!("Proposal not found: {}", proposal_id.0))
+    })?;
+
+    // Only the proposer can end deliberation
+    if proposal.proposer != caller_did {
+        return Err(crate::error::GatewayError::AuthorizationFailed(
+            "Only the proposer can end deliberation".to_string(),
+        ));
+    }
+
+    let voting_period = req.voting_period_seconds.unwrap_or(7 * 24 * 60 * 60); // Default: 7 days
+
+    gov_mgr
+        .end_deliberation_and_open(&proposal_id, voting_period)
+        .await?;
+
+    // Get updated proposal
+    let updated_proposal = gov_mgr.get_proposal(&proposal_id).await?.ok_or_else(|| {
+        crate::error::GatewayError::InternalError("Proposal disappeared after update".to_string())
+    })?;
+
+    Ok(HttpResponse::Ok().json(updated_proposal))
+}
+
+// ============================================================================
+// Discussion Endpoints
+// ============================================================================
+
+/// POST /gov/proposals/{id}/comments - Add a comment to a proposal
+#[post("/proposals/{id}/comments")]
+pub async fn add_comment(
+    http_req: HttpRequest,
+    gov_mgr: web::Data<Arc<GovernanceManager>>,
+    id: web::Path<String>,
+    req: web::Json<AddCommentRequest>,
+) -> Result<HttpResponse> {
+    // Check authorization
+    require_scope(&http_req, "gov:write")?;
+
+    // Extract authenticated DID from JWT claims
+    let claims = get_claims(&http_req).ok_or_else(|| {
+        crate::error::GatewayError::AuthenticationFailed("No claims found".to_string())
+    })?;
+
+    let author: Did = claims.sub.parse().map_err(|e| {
+        crate::error::GatewayError::BadRequest(format!("Invalid DID in token: {e}"))
+    })?;
+
+    let proposal_id = ProposalId(id.into_inner());
+
+    // Validate content
+    if req.content.trim().is_empty() {
+        return Err(crate::error::GatewayError::BadRequest(
+            "Comment content cannot be empty".to_string(),
+        ));
+    }
+
+    if req.content.len() > 10000 {
+        return Err(crate::error::GatewayError::BadRequest(
+            "Comment content exceeds maximum length of 10000 characters".to_string(),
+        ));
+    }
+
+    // Create the comment
+    let mut comment =
+        icn_governance::Comment::new(proposal_id.clone(), author, req.content.clone());
+
+    // Set parent if this is a reply
+    if let Some(parent_id) = &req.parent_id {
+        comment.parent_id = Some(icn_governance::CommentId(parent_id.clone()));
+    }
+
+    let comment_id = gov_mgr.add_comment(comment.clone()).await?;
+
+    Ok(HttpResponse::Created().json(CommentResponse {
+        id: comment_id.0,
+        proposal_id: comment.proposal_id.0,
+        author: comment.author.to_string(),
+        content: comment.content,
+        parent_id: comment.parent_id.map(|p| p.0),
+        created_at: comment.created_at,
+        updated_at: comment.updated_at,
+        reactions: std::collections::HashMap::new(),
+        is_edited: comment.is_edited,
+        is_deleted: comment.is_deleted,
+    }))
+}
+
+/// GET /gov/proposals/{id}/comments - List comments on a proposal
+#[get("/proposals/{id}/comments")]
+pub async fn list_comments(
+    http_req: HttpRequest,
+    gov_mgr: web::Data<Arc<GovernanceManager>>,
+    id: web::Path<String>,
+    query: web::Query<ListCommentsQuery>,
+) -> Result<HttpResponse> {
+    // Check authorization (read access)
+    require_scope(&http_req, "gov:read")?;
+
+    let proposal_id = ProposalId(id.into_inner());
+
+    let limit = query.limit.unwrap_or(50).min(100);
+    let offset = query.offset.unwrap_or(0);
+
+    let comments = gov_mgr.list_comments(&proposal_id, limit, offset).await?;
+    let total = gov_mgr.count_comments(&proposal_id).await?;
+
+    let responses: Vec<CommentResponse> = comments
+        .into_iter()
+        .map(|c| CommentResponse {
+            id: c.id.0,
+            proposal_id: c.proposal_id.0,
+            author: c.author.to_string(),
+            content: c.content,
+            parent_id: c.parent_id.map(|p| p.0),
+            created_at: c.created_at,
+            updated_at: c.updated_at,
+            reactions: c.reactions.into_iter().map(|(k, v)| (k, v.len())).collect(),
+            is_edited: c.is_edited,
+            is_deleted: c.is_deleted,
+        })
+        .collect();
+
+    Ok(HttpResponse::Ok().json(ListCommentsResponse {
+        comments: responses,
+        total,
+        limit,
+        offset,
+    }))
+}
+
+/// GET /gov/proposals/{id}/discussion - Get full discussion with metadata
+#[get("/proposals/{id}/discussion")]
+pub async fn get_discussion(
+    http_req: HttpRequest,
+    gov_mgr: web::Data<Arc<GovernanceManager>>,
+    id: web::Path<String>,
+) -> Result<HttpResponse> {
+    // Check authorization (read access)
+    require_scope(&http_req, "gov:read")?;
+
+    let proposal_id = ProposalId(id.into_inner());
+
+    let discussion = gov_mgr.get_discussion(&proposal_id).await?;
+
+    match discussion {
+        Some(d) => {
+            let comments: Vec<CommentResponse> = d
+                .comments
+                .into_iter()
+                .map(|c| CommentResponse {
+                    id: c.id.0,
+                    proposal_id: c.proposal_id.0,
+                    author: c.author.to_string(),
+                    content: c.content,
+                    parent_id: c.parent_id.map(|p| p.0),
+                    created_at: c.created_at,
+                    updated_at: c.updated_at,
+                    reactions: c.reactions.into_iter().map(|(k, v)| (k, v.len())).collect(),
+                    is_edited: c.is_edited,
+                    is_deleted: c.is_deleted,
+                })
+                .collect();
+
+            Ok(HttpResponse::Ok().json(DiscussionResponse {
+                proposal_id: d.proposal_id.0,
+                comments,
+                participant_count: d.participant_count,
+                last_activity_at: d.last_activity_at,
+            }))
+        }
+        None => Ok(HttpResponse::Ok().json(DiscussionResponse {
+            proposal_id: proposal_id.0,
+            comments: vec![],
+            participant_count: 0,
+            last_activity_at: 0,
+        })),
+    }
+}
+
+/// PUT /gov/comments/{id} - Edit a comment
+#[put("/comments/{id}")]
+pub async fn edit_comment(
+    http_req: HttpRequest,
+    gov_mgr: web::Data<Arc<GovernanceManager>>,
+    id: web::Path<String>,
+    req: web::Json<EditCommentRequest>,
+) -> Result<HttpResponse> {
+    // Check authorization
+    require_scope(&http_req, "gov:write")?;
+
+    // Extract authenticated DID from JWT claims
+    let claims = get_claims(&http_req).ok_or_else(|| {
+        crate::error::GatewayError::AuthenticationFailed("No claims found".to_string())
+    })?;
+
+    let editor: Did = claims.sub.parse().map_err(|e| {
+        crate::error::GatewayError::BadRequest(format!("Invalid DID in token: {e}"))
+    })?;
+
+    let comment_id = icn_governance::CommentId(id.into_inner());
+
+    // Validate content
+    if req.content.trim().is_empty() {
+        return Err(crate::error::GatewayError::BadRequest(
+            "Comment content cannot be empty".to_string(),
+        ));
+    }
+
+    gov_mgr
+        .edit_comment(&comment_id, req.content.clone(), &editor)
+        .await?;
+
+    // Get updated comment
+    let updated = gov_mgr.get_comment(&comment_id).await?.ok_or_else(|| {
+        crate::error::GatewayError::NotFound("Comment not found after update".to_string())
+    })?;
+
+    Ok(HttpResponse::Ok().json(CommentResponse {
+        id: updated.id.0,
+        proposal_id: updated.proposal_id.0,
+        author: updated.author.to_string(),
+        content: updated.content,
+        parent_id: updated.parent_id.map(|p| p.0),
+        created_at: updated.created_at,
+        updated_at: updated.updated_at,
+        reactions: updated
+            .reactions
+            .into_iter()
+            .map(|(k, v)| (k, v.len()))
+            .collect(),
+        is_edited: updated.is_edited,
+        is_deleted: updated.is_deleted,
+    }))
+}
+
+/// DELETE /gov/comments/{id} - Delete a comment
+#[delete("/comments/{id}")]
+pub async fn delete_comment(
+    http_req: HttpRequest,
+    gov_mgr: web::Data<Arc<GovernanceManager>>,
+    id: web::Path<String>,
+) -> Result<HttpResponse> {
+    // Check authorization
+    require_scope(&http_req, "gov:write")?;
+
+    // Extract authenticated DID from JWT claims
+    let claims = get_claims(&http_req).ok_or_else(|| {
+        crate::error::GatewayError::AuthenticationFailed("No claims found".to_string())
+    })?;
+
+    let deleter: Did = claims.sub.parse().map_err(|e| {
+        crate::error::GatewayError::BadRequest(format!("Invalid DID in token: {e}"))
+    })?;
+
+    let comment_id = icn_governance::CommentId(id.into_inner());
+
+    gov_mgr.delete_comment(&comment_id, &deleter).await?;
+
+    Ok(HttpResponse::NoContent().finish())
+}
+
+/// POST /gov/comments/{id}/reactions - Add a reaction to a comment
+#[post("/comments/{id}/reactions")]
+pub async fn add_reaction(
+    http_req: HttpRequest,
+    gov_mgr: web::Data<Arc<GovernanceManager>>,
+    id: web::Path<String>,
+    req: web::Json<AddReactionRequest>,
+) -> Result<HttpResponse> {
+    // Check authorization
+    require_scope(&http_req, "gov:write")?;
+
+    // Extract authenticated DID from JWT claims
+    let claims = get_claims(&http_req).ok_or_else(|| {
+        crate::error::GatewayError::AuthenticationFailed("No claims found".to_string())
+    })?;
+
+    let reactor: Did = claims.sub.parse().map_err(|e| {
+        crate::error::GatewayError::BadRequest(format!("Invalid DID in token: {e}"))
+    })?;
+
+    let comment_id = icn_governance::CommentId(id.into_inner());
+
+    // Validate emoji
+    if req.emoji.is_empty() || req.emoji.chars().count() > 10 {
+        return Err(crate::error::GatewayError::BadRequest(
+            "Invalid emoji: must be 1-10 characters".to_string(),
+        ));
+    }
+
+    gov_mgr
+        .add_reaction(&comment_id, &reactor, &req.emoji)
+        .await?;
+
+    Ok(HttpResponse::Created().finish())
+}
+
+/// DELETE /gov/comments/{id}/reactions/{emoji} - Remove a reaction from a comment
+#[delete("/comments/{id}/reactions/{emoji}")]
+pub async fn remove_reaction(
+    http_req: HttpRequest,
+    gov_mgr: web::Data<Arc<GovernanceManager>>,
+    path: web::Path<(String, String)>,
+) -> Result<HttpResponse> {
+    // Check authorization
+    require_scope(&http_req, "gov:write")?;
+
+    // Extract authenticated DID from JWT claims
+    let claims = get_claims(&http_req).ok_or_else(|| {
+        crate::error::GatewayError::AuthenticationFailed("No claims found".to_string())
+    })?;
+
+    let reactor: Did = claims.sub.parse().map_err(|e| {
+        crate::error::GatewayError::BadRequest(format!("Invalid DID in token: {e}"))
+    })?;
+
+    let (comment_id_str, emoji) = path.into_inner();
+    let comment_id = icn_governance::CommentId(comment_id_str);
+
+    gov_mgr
+        .remove_reaction(&comment_id, &reactor, &emoji)
+        .await?;
+
+    Ok(HttpResponse::NoContent().finish())
+}
+
+// ============================================================================
+// Request/Response Types for Deliberation & Discussion
+// ============================================================================
+
+/// Request to start deliberation
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct StartDeliberationRequest {
+    /// Duration in seconds (optional, defaults to domain config or 7 days)
+    pub deliberation_period_seconds: Option<u64>,
+}
+
+/// Request to end deliberation
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct EndDeliberationRequest {
+    /// Voting period in seconds (optional, defaults to domain config or 7 days)
+    pub voting_period_seconds: Option<u64>,
+}
+
+/// Request to add a comment
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct AddCommentRequest {
+    /// Comment content
+    pub content: String,
+    /// Parent comment ID (if this is a reply)
+    pub parent_id: Option<String>,
+}
+
+/// Request to edit a comment
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct EditCommentRequest {
+    /// New content
+    pub content: String,
+}
+
+/// Request to add a reaction
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct AddReactionRequest {
+    /// Emoji reaction
+    pub emoji: String,
+}
+
+/// Query parameters for listing comments
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct ListCommentsQuery {
+    pub limit: Option<usize>,
+    pub offset: Option<usize>,
+}
+
+/// Response for a single comment
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct CommentResponse {
+    pub id: String,
+    pub proposal_id: String,
+    pub author: String,
+    pub content: String,
+    pub parent_id: Option<String>,
+    pub created_at: u64,
+    pub updated_at: u64,
+    pub reactions: std::collections::HashMap<String, usize>,
+    pub is_edited: bool,
+    pub is_deleted: bool,
+}
+
+/// Response for listing comments
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct ListCommentsResponse {
+    pub comments: Vec<CommentResponse>,
+    pub total: usize,
+    pub limit: usize,
+    pub offset: usize,
+}
+
+/// Response for a discussion
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct DiscussionResponse {
+    pub proposal_id: String,
+    pub comments: Vec<CommentResponse>,
+    pub participant_count: usize,
+    pub last_activity_at: u64,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1754,11 +2237,11 @@ mod tests {
                 domain_id.clone(),
                 "Test Coop".to_string(),
                 "cooperative".to_string(),
-                GovernanceParams {
-                    quorum_percentage: 80, // Need 4 out of 5 members to vote
-                    approval_threshold_percentage: 66,
-                    voting_period_seconds: 86400,
-                },
+                GovernanceParams::new(
+                    80,    // quorum_percentage - Need 4 out of 5 members to vote
+                    66,    // approval_threshold_percentage
+                    86400, // voting_period_seconds
+                ),
                 MembershipConfig {
                     source: MembershipSource::StaticList(vec![
                         alice.did().clone(),

@@ -31,8 +31,20 @@ impl std::fmt::Display for ProposalId {
 /// State of a proposal in its lifecycle
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ProposalState {
-    /// Draft proposal, not yet open for voting
+    /// Draft proposal, not yet open for discussion or voting
     Draft,
+
+    /// Open for deliberation (discussion before voting)
+    ///
+    /// During deliberation, members can comment, discuss, and refine the proposal.
+    /// No voting occurs during this phase. When deliberation ends, the proposal
+    /// transitions to Open for voting.
+    Deliberation {
+        /// When deliberation started
+        started_at: Timestamp,
+        /// When deliberation ends (and voting can begin)
+        ends_at: Timestamp,
+    },
 
     /// Open for voting
     Open {
@@ -86,9 +98,27 @@ pub enum ProposalState {
 }
 
 impl ProposalState {
+    /// Check if proposal is in draft state
+    pub fn is_draft(&self) -> bool {
+        matches!(self, ProposalState::Draft)
+    }
+
+    /// Check if proposal is in deliberation phase
+    pub fn is_deliberating(&self) -> bool {
+        matches!(self, ProposalState::Deliberation { .. })
+    }
+
     /// Check if proposal is open for voting
     pub fn is_open(&self) -> bool {
         matches!(self, ProposalState::Open { .. })
+    }
+
+    /// Check if proposal allows comments (deliberation or open for voting)
+    pub fn allows_comments(&self) -> bool {
+        matches!(
+            self,
+            ProposalState::Deliberation { .. } | ProposalState::Open { .. }
+        )
     }
 
     /// Check if proposal is closed (any terminal state)
@@ -104,11 +134,27 @@ impl ProposalState {
         )
     }
 
+    /// Get the timestamp when deliberation ends (if deliberating)
+    pub fn deliberation_ends_at(&self) -> Option<Timestamp> {
+        match self {
+            ProposalState::Deliberation { ends_at, .. } => Some(*ends_at),
+            _ => None,
+        }
+    }
+
     /// Get the timestamp when voting closes (if open)
     pub fn closes_at(&self) -> Option<Timestamp> {
         match self {
             ProposalState::Open { closes_at, .. } => Some(*closes_at),
             _ => None,
+        }
+    }
+
+    /// Check if deliberation period has ended (for transition to voting)
+    pub fn can_end_deliberation(&self, current_time: Timestamp) -> bool {
+        match self {
+            ProposalState::Deliberation { ends_at, .. } => current_time >= *ends_at,
+            _ => false,
         }
     }
 }
@@ -554,7 +600,88 @@ impl Proposal {
         }
     }
 
-    /// Open the proposal for voting
+    /// Start deliberation period for the proposal
+    ///
+    /// Transitions: Draft → Deliberation
+    ///
+    /// During deliberation, members can comment and discuss the proposal.
+    /// Voting is not yet open. Call `end_deliberation_and_open()` to
+    /// transition to voting when the deliberation period ends.
+    pub fn start_deliberation(&mut self, deliberation_period_seconds: u64) -> anyhow::Result<()> {
+        if !matches!(self.state, ProposalState::Draft) {
+            anyhow::bail!("Can only start deliberation from Draft state");
+        }
+
+        let now = icn_time::current_timestamp_secs();
+
+        self.state = ProposalState::Deliberation {
+            started_at: now,
+            ends_at: now + deliberation_period_seconds,
+        };
+        self.updated_at = now;
+
+        Ok(())
+    }
+
+    /// End deliberation and open for voting
+    ///
+    /// Transitions: Deliberation → Open
+    ///
+    /// Can only be called after the deliberation period has ended.
+    /// For early transition (before deliberation ends), use `force_end_deliberation()`.
+    pub fn end_deliberation_and_open(&mut self, voting_period_seconds: u64) -> anyhow::Result<()> {
+        let now = icn_time::current_timestamp_secs();
+
+        match &self.state {
+            ProposalState::Deliberation { ends_at, .. } => {
+                if now < *ends_at {
+                    anyhow::bail!(
+                        "Deliberation period not yet ended ({} seconds remaining)",
+                        ends_at - now
+                    );
+                }
+            }
+            _ => {
+                anyhow::bail!("Can only end deliberation from Deliberation state");
+            }
+        }
+
+        self.state = ProposalState::Open {
+            opened_at: now,
+            closes_at: now + voting_period_seconds,
+        };
+        self.updated_at = now;
+
+        Ok(())
+    }
+
+    /// Force end deliberation early and open for voting
+    ///
+    /// This is an administrative action that bypasses the deliberation timer.
+    /// Use with caution - deliberation exists to ensure adequate discussion.
+    pub fn force_end_deliberation(&mut self, voting_period_seconds: u64) -> anyhow::Result<()> {
+        if !matches!(self.state, ProposalState::Deliberation { .. }) {
+            anyhow::bail!("Can only force end deliberation from Deliberation state");
+        }
+
+        let now = icn_time::current_timestamp_secs();
+
+        self.state = ProposalState::Open {
+            opened_at: now,
+            closes_at: now + voting_period_seconds,
+        };
+        self.updated_at = now;
+
+        Ok(())
+    }
+
+    /// Open the proposal for voting directly (skip deliberation)
+    ///
+    /// Transitions: Draft → Open
+    ///
+    /// Use this when deliberation is not required (e.g., emergency proposals).
+    /// For normal proposals, prefer `start_deliberation()` followed by
+    /// `end_deliberation_and_open()`.
     pub fn open(&mut self, voting_period_seconds: u64) -> anyhow::Result<()> {
         if !matches!(self.state, ProposalState::Draft) {
             anyhow::bail!("Can only open proposals in Draft state");
@@ -588,6 +715,9 @@ impl Proposal {
     }
 
     /// Cancel the proposal
+    ///
+    /// Can cancel from Draft, Deliberation, or Open states.
+    /// Cannot cancel already closed proposals.
     pub fn cancel(&mut self) -> anyhow::Result<()> {
         if self.state.is_closed() {
             anyhow::bail!("Cannot cancel a closed proposal");
@@ -603,7 +733,7 @@ impl Proposal {
 
     /// Veto the proposal (emergency governance action)
     ///
-    /// Can be applied to proposals in Draft or Open state.
+    /// Can be applied to proposals in Draft, Deliberation, or Open state.
     /// Vetoed proposals cannot be reopened or executed.
     pub fn veto(&mut self, reason: String) -> anyhow::Result<()> {
         if self.state.is_closed() {
@@ -623,15 +753,15 @@ impl Proposal {
 
     /// Force close the proposal with a specified outcome
     ///
-    /// Can be applied to proposals in Open state only.
-    /// Used for emergency situations where normal voting cannot proceed.
+    /// Can be applied to proposals in Deliberation or Open state.
+    /// Used for emergency situations where normal process cannot proceed.
     pub fn force_close(
         &mut self,
         outcome: super::ProposalOutcome,
         reason: String,
     ) -> anyhow::Result<()> {
-        if !self.state.is_open() {
-            anyhow::bail!("Can only force close proposals in Open state");
+        if !self.state.is_open() && !self.state.is_deliberating() {
+            anyhow::bail!("Can only force close proposals in Deliberation or Open state");
         }
 
         let now = icn_time::current_timestamp_secs();

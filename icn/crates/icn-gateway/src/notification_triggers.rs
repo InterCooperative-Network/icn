@@ -307,6 +307,162 @@ impl GovernanceNotificationTrigger {
         }));
         self.queue.queue(notif).await
     }
+
+    /// Queue notification when deliberation starts on a proposal
+    pub async fn on_deliberation_started(
+        &self,
+        recipient: &str,
+        coop_id: &str,
+        proposal_id: &str,
+        proposal_title: &str,
+        ends_at: u64,
+    ) -> Result<String, String> {
+        let days_remaining = (ends_at.saturating_sub(current_timestamp())) / 86400;
+        let body = format!(
+            "📣 New proposal open for discussion: \"{proposal_title}\"\nDeliberation ends in {days_remaining} days. Join the conversation!"
+        );
+
+        let notif = QueuedNotification::new(
+            recipient,
+            coop_id,
+            "Deliberation Started",
+            body,
+            NotificationType::DeliberationStarted,
+        )
+        .with_data(serde_json::json!({
+            "type": "deliberation_started",
+            "proposal_id": proposal_id,
+            "proposal_title": proposal_title,
+            "ends_at": ends_at,
+        }));
+        self.queue.queue(notif).await
+    }
+
+    /// Queue notification when deliberation is ending soon
+    pub async fn on_deliberation_ending_soon(
+        &self,
+        recipient: &str,
+        coop_id: &str,
+        proposal_id: &str,
+        proposal_title: &str,
+        hours_remaining: u64,
+    ) -> Result<String, String> {
+        let body = format!(
+            "⏰ Deliberation ending soon: \"{proposal_title}\"\nOnly {hours_remaining} hours left to comment before voting begins."
+        );
+
+        let notif = QueuedNotification::new(
+            recipient,
+            coop_id,
+            "Deliberation Ending Soon",
+            body,
+            NotificationType::DeliberationEnding,
+        )
+        .with_data(serde_json::json!({
+            "type": "deliberation_ending",
+            "proposal_id": proposal_id,
+            "proposal_title": proposal_title,
+            "hours_remaining": hours_remaining,
+        }));
+        self.queue.queue(notif).await
+    }
+
+    /// Queue notification when a comment is added to a proposal
+    pub async fn on_comment_added(
+        &self,
+        recipient: &str,
+        coop_id: &str,
+        proposal_id: &str,
+        comment_id: &str,
+        commenter: &str,
+    ) -> Result<String, String> {
+        let body = format!(
+            "{} commented on a proposal you're following",
+            truncate_did(commenter)
+        );
+
+        let notif = QueuedNotification::new(
+            recipient,
+            coop_id,
+            "New Comment",
+            body,
+            NotificationType::CommentAdded,
+        )
+        .with_data(serde_json::json!({
+            "type": "comment_added",
+            "proposal_id": proposal_id,
+            "comment_id": comment_id,
+            "commenter": commenter,
+        }));
+        self.queue.queue(notif).await
+    }
+
+    /// Queue notification when someone replies to your comment
+    pub async fn on_comment_reply(
+        &self,
+        recipient: &str,
+        coop_id: &str,
+        proposal_id: &str,
+        comment_id: &str,
+        parent_comment_id: &str,
+        replier: &str,
+    ) -> Result<String, String> {
+        let body = format!("{} replied to your comment", truncate_did(replier));
+
+        let notif = QueuedNotification::new(
+            recipient,
+            coop_id,
+            "New Reply",
+            body,
+            NotificationType::CommentReply,
+        )
+        .with_data(serde_json::json!({
+            "type": "comment_reply",
+            "proposal_id": proposal_id,
+            "comment_id": comment_id,
+            "parent_comment_id": parent_comment_id,
+            "replier": replier,
+        }));
+        self.queue.queue(notif).await
+    }
+
+    /// Queue notification when someone reacts to your comment
+    pub async fn on_comment_reaction(
+        &self,
+        recipient: &str,
+        coop_id: &str,
+        proposal_id: &str,
+        comment_id: &str,
+        reactor: &str,
+        emoji: &str,
+    ) -> Result<String, String> {
+        let body = format!(
+            "{} reacted {} to your comment",
+            truncate_did(reactor),
+            emoji
+        );
+
+        let notif = QueuedNotification::new(
+            recipient,
+            coop_id,
+            "New Reaction",
+            body,
+            NotificationType::CommentReaction,
+        )
+        .with_data(serde_json::json!({
+            "type": "comment_reaction",
+            "proposal_id": proposal_id,
+            "comment_id": comment_id,
+            "reactor": reactor,
+            "emoji": emoji,
+        }));
+        self.queue.queue(notif).await
+    }
+}
+
+/// Get current timestamp in seconds
+fn current_timestamp() -> u64 {
+    icn_time::current_timestamp_secs()
 }
 
 /// Truncate DID for display

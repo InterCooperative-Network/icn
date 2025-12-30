@@ -17,10 +17,11 @@
 
 use anyhow::Result;
 use icn_governance::{
-    Delegation, DelegationId, DelegationScope, GovernanceConfig, GovernanceDomain,
-    GovernanceDomainId, GovernanceOps, GovernanceParams, GovernanceProfileId, MembershipConfig,
-    MembershipSource, Proposal, ProposalId, ProposalPayload, ProposalState, Timestamp, Vote,
-    VoteChoice, VoteTally, DEFAULT_MAX_DELEGATION_DEPTH,
+    Comment, CommentId, Delegation, DelegationId, DelegationScope, Discussion, DiscussionStore,
+    GovernanceConfig, GovernanceDomain, GovernanceDomainId, GovernanceOps, GovernanceParams,
+    GovernanceProfileId, InMemoryDiscussionStore, MembershipConfig, MembershipSource, Proposal,
+    ProposalId, ProposalPayload, ProposalState, Timestamp, Vote, VoteChoice, VoteTally,
+    DEFAULT_MAX_DELEGATION_DEPTH,
 };
 use icn_identity::Did;
 use std::collections::{HashMap, HashSet};
@@ -51,6 +52,8 @@ pub struct GovernanceManager {
     votes: RwLock<HashMap<ProposalId, Vec<Vote>>>,
     /// In-memory storage for delegations (standalone mode only)
     delegations: RwLock<HashMap<DelegationId, Delegation>>,
+    /// In-memory storage for discussions (standalone mode only)
+    discussions: RwLock<InMemoryDiscussionStore>,
     /// Optional handle to daemon's GovernanceActor (actor-backed mode)
     governance_handle: Option<GovernanceHandle>,
 }
@@ -67,6 +70,7 @@ impl GovernanceManager {
             proposals: RwLock::new(HashMap::new()),
             votes: RwLock::new(HashMap::new()),
             delegations: RwLock::new(HashMap::new()),
+            discussions: RwLock::new(InMemoryDiscussionStore::new()),
             governance_handle: None,
         }
     }
@@ -90,6 +94,7 @@ impl GovernanceManager {
             proposals: RwLock::new(HashMap::new()),
             votes: RwLock::new(HashMap::new()),
             delegations: RwLock::new(HashMap::new()),
+            discussions: RwLock::new(InMemoryDiscussionStore::new()),
             governance_handle: Some(handle),
         }
     }
@@ -731,6 +736,215 @@ impl GovernanceManager {
                 id.0
             )
         }
+    }
+
+    // ============================================================================
+    // Deliberation Methods
+    // ============================================================================
+
+    /// Start deliberation period for a proposal
+    ///
+    /// Transitions the proposal from Draft to Deliberation state.
+    /// The deliberation period allows structured discussion before voting.
+    pub async fn start_deliberation(
+        &self,
+        proposal_id: &ProposalId,
+        deliberation_period_seconds: u64,
+    ) -> Result<()> {
+        // TODO: When actor-backed mode supports deliberation, delegate here
+        // For now, standalone mode only
+
+        let mut proposals = self.proposals.write().map_err(|e| {
+            anyhow::anyhow!("Proposals storage lock poisoned (concurrent panic?): {e}")
+        })?;
+
+        let proposal = proposals
+            .get_mut(proposal_id)
+            .ok_or_else(|| anyhow::anyhow!("Proposal '{}' not found", proposal_id.0))?;
+
+        proposal.start_deliberation(deliberation_period_seconds)?;
+        Ok(())
+    }
+
+    /// End deliberation and open for voting
+    ///
+    /// Transitions the proposal from Deliberation to Open state.
+    pub async fn end_deliberation_and_open(
+        &self,
+        proposal_id: &ProposalId,
+        voting_period_seconds: u64,
+    ) -> Result<()> {
+        // TODO: When actor-backed mode supports deliberation, delegate here
+        // For now, standalone mode only
+
+        let mut proposals = self.proposals.write().map_err(|e| {
+            anyhow::anyhow!("Proposals storage lock poisoned (concurrent panic?): {e}")
+        })?;
+
+        let proposal = proposals
+            .get_mut(proposal_id)
+            .ok_or_else(|| anyhow::anyhow!("Proposal '{}' not found", proposal_id.0))?;
+
+        proposal.end_deliberation_and_open(voting_period_seconds)?;
+        Ok(())
+    }
+
+    // ============================================================================
+    // Discussion Methods
+    // ============================================================================
+
+    /// Add a comment to a proposal's discussion
+    pub async fn add_comment(&self, comment: Comment) -> Result<CommentId> {
+        // Validate proposal exists and allows comments
+        {
+            let proposals = self
+                .proposals
+                .read()
+                .map_err(|e| anyhow::anyhow!("Proposals storage lock poisoned: {e}"))?;
+
+            let proposal = proposals
+                .get(&comment.proposal_id)
+                .ok_or_else(|| anyhow::anyhow!("Proposal '{}' not found", comment.proposal_id.0))?;
+
+            if !proposal.state.allows_comments() {
+                anyhow::bail!(
+                    "Cannot add comment: proposal '{}' is not open for discussion (state: {:?})",
+                    comment.proposal_id.0,
+                    proposal.state
+                );
+            }
+        }
+
+        let mut discussions = self
+            .discussions
+            .write()
+            .map_err(|e| anyhow::anyhow!("Discussions storage lock poisoned: {e}"))?;
+
+        discussions
+            .add_comment(comment)
+            .map_err(|e| anyhow::anyhow!("{e}"))
+    }
+
+    /// Get a comment by ID
+    pub async fn get_comment(&self, comment_id: &CommentId) -> Result<Option<Comment>> {
+        let discussions = self
+            .discussions
+            .read()
+            .map_err(|e| anyhow::anyhow!("Discussions storage lock poisoned: {e}"))?;
+
+        Ok(discussions.get_comment(comment_id).cloned())
+    }
+
+    /// Edit a comment
+    pub async fn edit_comment(
+        &self,
+        comment_id: &CommentId,
+        new_content: String,
+        editor: &Did,
+    ) -> Result<()> {
+        let mut discussions = self
+            .discussions
+            .write()
+            .map_err(|e| anyhow::anyhow!("Discussions storage lock poisoned: {e}"))?;
+
+        discussions
+            .edit_comment(comment_id, new_content, editor)
+            .map_err(|e| anyhow::anyhow!("{e}"))
+    }
+
+    /// Delete a comment (soft delete)
+    pub async fn delete_comment(&self, comment_id: &CommentId, deleter: &Did) -> Result<()> {
+        let mut discussions = self
+            .discussions
+            .write()
+            .map_err(|e| anyhow::anyhow!("Discussions storage lock poisoned: {e}"))?;
+
+        discussions
+            .delete_comment(comment_id, deleter)
+            .map_err(|e| anyhow::anyhow!("{e}"))
+    }
+
+    /// Add a reaction to a comment
+    pub async fn add_reaction(
+        &self,
+        comment_id: &CommentId,
+        reactor: &Did,
+        emoji: &str,
+    ) -> Result<()> {
+        let mut discussions = self
+            .discussions
+            .write()
+            .map_err(|e| anyhow::anyhow!("Discussions storage lock poisoned: {e}"))?;
+
+        discussions
+            .add_reaction(comment_id, reactor, emoji)
+            .map_err(|e| anyhow::anyhow!("{e}"))
+    }
+
+    /// Remove a reaction from a comment
+    pub async fn remove_reaction(
+        &self,
+        comment_id: &CommentId,
+        reactor: &Did,
+        emoji: &str,
+    ) -> Result<()> {
+        let mut discussions = self
+            .discussions
+            .write()
+            .map_err(|e| anyhow::anyhow!("Discussions storage lock poisoned: {e}"))?;
+
+        discussions
+            .remove_reaction(comment_id, reactor, emoji)
+            .map_err(|e| anyhow::anyhow!("{e}"))
+    }
+
+    /// Get the full discussion for a proposal
+    pub async fn get_discussion(&self, proposal_id: &ProposalId) -> Result<Option<Discussion>> {
+        let discussions = self
+            .discussions
+            .read()
+            .map_err(|e| anyhow::anyhow!("Discussions storage lock poisoned: {e}"))?;
+
+        Ok(discussions.get_discussion(proposal_id))
+    }
+
+    /// List comments for a proposal with pagination
+    pub async fn list_comments(
+        &self,
+        proposal_id: &ProposalId,
+        limit: usize,
+        offset: usize,
+    ) -> Result<Vec<Comment>> {
+        let discussions = self
+            .discussions
+            .read()
+            .map_err(|e| anyhow::anyhow!("Discussions storage lock poisoned: {e}"))?;
+
+        Ok(discussions
+            .list_comments(proposal_id, limit, offset)
+            .into_iter()
+            .cloned()
+            .collect())
+    }
+
+    /// Get comment count for a proposal
+    pub async fn count_comments(&self, proposal_id: &ProposalId) -> Result<usize> {
+        let discussions = self
+            .discussions
+            .read()
+            .map_err(|e| anyhow::anyhow!("Discussions storage lock poisoned: {e}"))?;
+
+        Ok(discussions.count_comments(proposal_id))
+    }
+
+    /// Get participants in a proposal's discussion
+    pub async fn get_discussion_participants(&self, proposal_id: &ProposalId) -> Result<Vec<Did>> {
+        let discussions = self
+            .discussions
+            .read()
+            .map_err(|e| anyhow::anyhow!("Discussions storage lock poisoned: {e}"))?;
+
+        Ok(discussions.get_participants(proposal_id))
     }
 }
 

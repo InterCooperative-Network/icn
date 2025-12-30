@@ -56,16 +56,14 @@ impl GovernanceConfig {
     /// - Membership: Trust threshold 0.3 (known peers)
     /// - Quorum: 50% of eligible voters
     /// - Approval: Simple majority (>50%)
+    /// - Deliberation: 7 days required
+    /// - Voting: 7 days
     /// - Emergency: 67% quorum, 75% approval for freeze/veto, 80% for rollback
     pub fn cooperative_default() -> Self {
         Self {
             profile: GovernanceProfileId::builtin("cooperative_default"),
             membership: MembershipConfig::trust_threshold(0.3),
-            params: GovernanceParams {
-                quorum_percentage: 50,
-                approval_threshold_percentage: 50,
-                voting_period_seconds: 7 * 24 * 60 * 60, // 7 days
-            },
+            params: GovernanceParams::default(),
             emergency: EmergencyThresholds::default(),
         }
     }
@@ -271,7 +269,7 @@ impl EmergencyThresholds {
     }
 }
 
-/// Governance parameters (quorum, thresholds, voting period)
+/// Governance parameters (quorum, thresholds, voting period, deliberation)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GovernanceParams {
     /// Minimum percentage of eligible voters that must vote (0-100)
@@ -282,10 +280,45 @@ pub struct GovernanceParams {
 
     /// How long voting is open (in seconds)
     pub voting_period_seconds: u64,
+
+    /// Default deliberation period before voting (in seconds)
+    /// Default: 604800 (7 days)
+    pub deliberation_period_seconds: u64,
+
+    /// Whether deliberation is required before voting
+    /// When true, proposals must go through Draft → Deliberation → Open
+    /// When false, proposals can skip directly to Open (Draft → Open)
+    /// Default: true
+    pub require_deliberation: bool,
+
+    /// Minimum deliberation period (in seconds)
+    /// Cannot set deliberation shorter than this
+    /// Default: 86400 (1 day)
+    pub min_deliberation_seconds: u64,
+
+    /// Maximum deliberation period (in seconds)
+    /// Cannot set deliberation longer than this
+    /// Default: 2592000 (30 days)
+    pub max_deliberation_seconds: u64,
+}
+
+impl Default for GovernanceParams {
+    fn default() -> Self {
+        Self {
+            quorum_percentage: 50,
+            approval_threshold_percentage: 50,
+            voting_period_seconds: 7 * 24 * 60 * 60, // 7 days
+            deliberation_period_seconds: 7 * 24 * 60 * 60, // 7 days
+            require_deliberation: true,
+            min_deliberation_seconds: 24 * 60 * 60, // 1 day
+            max_deliberation_seconds: 30 * 24 * 60 * 60, // 30 days
+        }
+    }
 }
 
 impl GovernanceParams {
-    /// Create new governance parameters
+    /// Create new governance parameters with basic settings
+    /// Uses default deliberation settings
     pub fn new(
         quorum_percentage: u8,
         approval_threshold_percentage: u8,
@@ -295,7 +328,45 @@ impl GovernanceParams {
             quorum_percentage,
             approval_threshold_percentage,
             voting_period_seconds,
+            ..Default::default()
         }
+    }
+
+    /// Create governance parameters with custom deliberation settings
+    pub fn with_deliberation(
+        quorum_percentage: u8,
+        approval_threshold_percentage: u8,
+        voting_period_seconds: u64,
+        deliberation_period_seconds: u64,
+        require_deliberation: bool,
+    ) -> Self {
+        Self {
+            quorum_percentage,
+            approval_threshold_percentage,
+            voting_period_seconds,
+            deliberation_period_seconds,
+            require_deliberation,
+            ..Default::default()
+        }
+    }
+
+    /// Set deliberation requirement
+    pub fn set_require_deliberation(mut self, require: bool) -> Self {
+        self.require_deliberation = require;
+        self
+    }
+
+    /// Set deliberation period
+    pub fn set_deliberation_period(mut self, seconds: u64) -> Self {
+        self.deliberation_period_seconds = seconds;
+        self
+    }
+
+    /// Set minimum and maximum deliberation bounds
+    pub fn set_deliberation_bounds(mut self, min_seconds: u64, max_seconds: u64) -> Self {
+        self.min_deliberation_seconds = min_seconds;
+        self.max_deliberation_seconds = max_seconds;
+        self
     }
 
     /// Validate parameters are in valid ranges
@@ -308,6 +379,52 @@ impl GovernanceParams {
         }
         if self.voting_period_seconds == 0 {
             anyhow::bail!("Voting period must be greater than 0");
+        }
+
+        // Deliberation validation
+        if self.require_deliberation && self.deliberation_period_seconds == 0 {
+            anyhow::bail!("Deliberation period must be greater than 0 when required");
+        }
+        if self.deliberation_period_seconds < self.min_deliberation_seconds {
+            anyhow::bail!(
+                "Deliberation period ({}) is less than minimum ({})",
+                self.deliberation_period_seconds,
+                self.min_deliberation_seconds
+            );
+        }
+        if self.deliberation_period_seconds > self.max_deliberation_seconds {
+            anyhow::bail!(
+                "Deliberation period ({}) exceeds maximum ({})",
+                self.deliberation_period_seconds,
+                self.max_deliberation_seconds
+            );
+        }
+        if self.min_deliberation_seconds > self.max_deliberation_seconds {
+            anyhow::bail!(
+                "Minimum deliberation ({}) exceeds maximum ({})",
+                self.min_deliberation_seconds,
+                self.max_deliberation_seconds
+            );
+        }
+
+        Ok(())
+    }
+
+    /// Validate a specific deliberation duration against bounds
+    pub fn validate_deliberation_duration(&self, duration_seconds: u64) -> anyhow::Result<()> {
+        if duration_seconds < self.min_deliberation_seconds {
+            anyhow::bail!(
+                "Deliberation duration ({} seconds) is less than minimum ({} seconds)",
+                duration_seconds,
+                self.min_deliberation_seconds
+            );
+        }
+        if duration_seconds > self.max_deliberation_seconds {
+            anyhow::bail!(
+                "Deliberation duration ({} seconds) exceeds maximum ({} seconds)",
+                duration_seconds,
+                self.max_deliberation_seconds
+            );
         }
         Ok(())
     }
@@ -325,6 +442,12 @@ mod tests {
         assert_eq!(config.params.quorum_percentage, 50);
         assert_eq!(config.params.approval_threshold_percentage, 50);
         assert_eq!(config.params.voting_period_seconds, 7 * 24 * 60 * 60);
+
+        // Deliberation parameters should be default
+        assert_eq!(config.params.deliberation_period_seconds, 7 * 24 * 60 * 60);
+        assert!(config.params.require_deliberation);
+        assert_eq!(config.params.min_deliberation_seconds, 24 * 60 * 60);
+        assert_eq!(config.params.max_deliberation_seconds, 30 * 24 * 60 * 60);
 
         // Emergency thresholds should be default
         assert_eq!(config.emergency.freeze_quorum_percentage, 67);
@@ -346,6 +469,77 @@ mod tests {
 
         let invalid_period = GovernanceParams::new(50, 50, 0);
         assert!(invalid_period.validate().is_err());
+    }
+
+    #[test]
+    fn test_deliberation_validation() {
+        // Valid default params
+        let valid = GovernanceParams::default();
+        assert!(valid.validate().is_ok());
+
+        // Deliberation period below minimum
+        let mut invalid = GovernanceParams::default();
+        invalid.deliberation_period_seconds = 3600; // 1 hour, below 1 day minimum
+        assert!(invalid.validate().is_err());
+
+        // Deliberation period above maximum
+        let mut invalid = GovernanceParams::default();
+        invalid.deliberation_period_seconds = 60 * 24 * 60 * 60; // 60 days, above 30 day max
+        assert!(invalid.validate().is_err());
+
+        // Min > max is invalid
+        let mut invalid = GovernanceParams::default();
+        invalid.min_deliberation_seconds = 10 * 24 * 60 * 60;
+        invalid.max_deliberation_seconds = 5 * 24 * 60 * 60;
+        assert!(invalid.validate().is_err());
+
+        // Zero deliberation with require_deliberation = true
+        let mut invalid = GovernanceParams::default();
+        invalid.deliberation_period_seconds = 0;
+        invalid.min_deliberation_seconds = 0;
+        assert!(invalid.validate().is_err());
+
+        // Zero deliberation with require_deliberation = false is fine
+        let mut valid = GovernanceParams::default();
+        valid.require_deliberation = false;
+        valid.deliberation_period_seconds = 0;
+        valid.min_deliberation_seconds = 0;
+        assert!(valid.validate().is_ok());
+    }
+
+    #[test]
+    fn test_params_with_deliberation() {
+        let params = GovernanceParams::with_deliberation(
+            60,    // quorum
+            51,    // approval
+            3600,  // voting period
+            86400, // deliberation period (1 day)
+            true,  // require deliberation
+        );
+
+        assert_eq!(params.quorum_percentage, 60);
+        assert_eq!(params.approval_threshold_percentage, 51);
+        assert_eq!(params.voting_period_seconds, 3600);
+        assert_eq!(params.deliberation_period_seconds, 86400);
+        assert!(params.require_deliberation);
+    }
+
+    #[test]
+    fn test_validate_deliberation_duration() {
+        let params = GovernanceParams::default();
+
+        // Valid duration within bounds
+        assert!(params
+            .validate_deliberation_duration(7 * 24 * 60 * 60)
+            .is_ok());
+
+        // Below minimum
+        assert!(params.validate_deliberation_duration(3600).is_err());
+
+        // Above maximum
+        assert!(params
+            .validate_deliberation_duration(60 * 24 * 60 * 60)
+            .is_err());
     }
 
     #[test]
