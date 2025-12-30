@@ -7,6 +7,14 @@
 //! - Slow client detection with varying channel sizes
 //! - Configuration edge cases
 
+// Allow unwrap/expect in tests - panics are acceptable for test assertions
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::expect_fun_call,
+    clippy::uninlined_format_args
+)]
+
 use icn_gateway::events::{EventBroadcaster, GatewayEvent, WebSocketConfig};
 use tokio::sync::mpsc;
 
@@ -30,29 +38,45 @@ async fn test_backfill_buffer_wraparound() {
 
     // Get backfill - should only return last 100 events
     let backfill = broadcaster.get_backfill("test-coop", 0).await;
-    assert_eq!(backfill.len(), 100, "Backfill should be capped at 100 events");
+    assert_eq!(
+        backfill.len(),
+        100,
+        "Backfill should be capped at 100 events"
+    );
 
     // Verify we got the most recent events
     // Note: Sequence numbers are global, so we just verify we have 100 consecutive events
     let first_seq = backfill.first().map(|e| e.seq).unwrap_or(0);
     let last_seq = backfill.last().map(|e| e.seq).unwrap_or(0);
 
-    assert!(last_seq > first_seq, "Sequence numbers should be increasing");
+    assert!(
+        last_seq > first_seq,
+        "Sequence numbers should be increasing"
+    );
     // With 100 events, first to last should span 99 positions
     assert_eq!(backfill.len(), 100, "Should have exactly 100 events");
 
     // Verify the amounts are from the last 50 events (50-149, amounts 50-149)
     // Since we broadcasted 150 events and kept only 100, amounts should be 50-149
-    let amounts: Vec<i64> = backfill.iter().filter_map(|e| {
-        match &e.event {
+    let amounts: Vec<i64> = backfill
+        .iter()
+        .filter_map(|e| match &e.event {
             GatewayEvent::PaymentCreated { amount, .. } => Some(*amount),
             _ => None,
-        }
-    }).collect();
+        })
+        .collect();
 
     assert_eq!(amounts.len(), 100);
-    assert_eq!(*amounts.first().unwrap(), 50, "First event should have amount 50");
-    assert_eq!(*amounts.last().unwrap(), 149, "Last event should have amount 149");
+    assert_eq!(
+        *amounts.first().unwrap(),
+        50,
+        "First event should have amount 50"
+    );
+    assert_eq!(
+        *amounts.last().unwrap(),
+        149,
+        "Last event should have amount 149"
+    );
 }
 
 /// Test backfill returns correct events when requesting from middle of buffer
@@ -83,14 +107,20 @@ async fn test_backfill_from_middle() {
 
     // First event in from_middle should be the one after mid_seq
     // Due to global sequence counter, just verify it's greater than mid_seq
-    assert!(from_middle[0].seq > mid_seq, "First event should be after requested seq");
+    assert!(
+        from_middle[0].seq > mid_seq,
+        "First event should be after requested seq"
+    );
 
     // Verify we got the right member DIDs (members 25-49)
     let first_did = match &from_middle[0].event {
         GatewayEvent::MemberAdded { did, .. } => did.clone(),
         _ => panic!("Expected MemberAdded"),
     };
-    assert_eq!(first_did, "did:icn:member25", "First event should be member25");
+    assert_eq!(
+        first_did, "did:icn:member25",
+        "First event should be member25"
+    );
 }
 
 /// Test concurrent subscribers receive all events
@@ -99,9 +129,18 @@ async fn test_concurrent_subscribers_receive_all() {
     let broadcaster = EventBroadcaster::new();
 
     // Create multiple subscribers
-    let mut rx1 = broadcaster.subscribe("test-coop").await.expect("Subscribe 1");
-    let mut rx2 = broadcaster.subscribe("test-coop").await.expect("Subscribe 2");
-    let mut rx3 = broadcaster.subscribe("test-coop").await.expect("Subscribe 3");
+    let mut rx1 = broadcaster
+        .subscribe("test-coop")
+        .await
+        .expect("Subscribe 1");
+    let mut rx2 = broadcaster
+        .subscribe("test-coop")
+        .await
+        .expect("Subscribe 2");
+    let mut rx3 = broadcaster
+        .subscribe("test-coop")
+        .await
+        .expect("Subscribe 3");
 
     // Broadcast events rapidly
     let num_events = 100;
@@ -143,21 +182,37 @@ async fn test_concurrent_subscribers_receive_all() {
 async fn test_coop_isolation() {
     let broadcaster = EventBroadcaster::new();
 
-    let mut rx_coop1 = broadcaster.subscribe("coop-1").await.expect("Subscribe coop-1");
-    let mut rx_coop2 = broadcaster.subscribe("coop-2").await.expect("Subscribe coop-2");
+    let mut rx_coop1 = broadcaster
+        .subscribe("coop-1")
+        .await
+        .expect("Subscribe coop-1");
+    let mut rx_coop2 = broadcaster
+        .subscribe("coop-2")
+        .await
+        .expect("Subscribe coop-2");
 
     // Broadcast to coop-1
-    broadcaster.broadcast("coop-1", GatewayEvent::MemberAdded {
-        coop_id: "coop-1".to_string(),
-        did: "did:icn:alice".to_string(),
-        role: "Member".to_string(),
-    }).await;
+    broadcaster
+        .broadcast(
+            "coop-1",
+            GatewayEvent::MemberAdded {
+                coop_id: "coop-1".to_string(),
+                did: "did:icn:alice".to_string(),
+                role: "Member".to_string(),
+            },
+        )
+        .await;
 
     // Broadcast to coop-2
-    broadcaster.broadcast("coop-2", GatewayEvent::MemberRemoved {
-        coop_id: "coop-2".to_string(),
-        did: "did:icn:bob".to_string(),
-    }).await;
+    broadcaster
+        .broadcast(
+            "coop-2",
+            GatewayEvent::MemberRemoved {
+                coop_id: "coop-2".to_string(),
+                did: "did:icn:bob".to_string(),
+            },
+        )
+        .await;
 
     // Each coop should only get their event
     let event1 = rx_coop1.try_recv();
@@ -196,18 +251,28 @@ async fn test_slow_client_immediate_disconnect() {
     let _rx = broadcaster.subscribe("test-coop").await.expect("Subscribe");
 
     // First event fills the channel
-    broadcaster.broadcast("test-coop", GatewayEvent::MemberAdded {
-        coop_id: "test-coop".to_string(),
-        did: "did:icn:alice".to_string(),
-        role: "Member".to_string(),
-    }).await;
+    broadcaster
+        .broadcast(
+            "test-coop",
+            GatewayEvent::MemberAdded {
+                coop_id: "test-coop".to_string(),
+                did: "did:icn:alice".to_string(),
+                role: "Member".to_string(),
+            },
+        )
+        .await;
 
     // Second event should trigger slow client disconnect
-    broadcaster.broadcast("test-coop", GatewayEvent::MemberAdded {
-        coop_id: "test-coop".to_string(),
-        did: "did:icn:bob".to_string(),
-        role: "Member".to_string(),
-    }).await;
+    broadcaster
+        .broadcast(
+            "test-coop",
+            GatewayEvent::MemberAdded {
+                coop_id: "test-coop".to_string(),
+                did: "did:icn:bob".to_string(),
+                role: "Member".to_string(),
+            },
+        )
+        .await;
 
     // Subscriber should be removed
     assert_eq!(broadcaster.subscriber_count("test-coop").await, 0);
@@ -220,8 +285,14 @@ async fn test_active_client_survives_cleanup() {
     let broadcaster = EventBroadcaster::with_config(config);
 
     // Two subscribers - one active, one slow
-    let mut rx_active = broadcaster.subscribe("test-coop").await.expect("Active subscriber");
-    let _rx_slow = broadcaster.subscribe("test-coop").await.expect("Slow subscriber");
+    let mut rx_active = broadcaster
+        .subscribe("test-coop")
+        .await
+        .expect("Active subscriber");
+    let _rx_slow = broadcaster
+        .subscribe("test-coop")
+        .await
+        .expect("Slow subscriber");
 
     assert_eq!(broadcaster.subscriber_count("test-coop").await, 2);
 
@@ -239,14 +310,19 @@ async fn test_active_client_survives_cleanup() {
 
     // Broadcast more events than slow client can hold
     for i in 0..15 {
-        broadcaster.broadcast("test-coop", GatewayEvent::PaymentCreated {
-            coop_id: "test-coop".to_string(),
-            hash: format!("hash{i}"),
-            from: "did:icn:alice".to_string(),
-            to: "did:icn:bob".to_string(),
-            amount: i as i64,
-            currency: "hours".to_string(),
-        }).await;
+        broadcaster
+            .broadcast(
+                "test-coop",
+                GatewayEvent::PaymentCreated {
+                    coop_id: "test-coop".to_string(),
+                    hash: format!("hash{i}"),
+                    from: "did:icn:alice".to_string(),
+                    to: "did:icn:bob".to_string(),
+                    amount: i as i64,
+                    currency: "hours".to_string(),
+                },
+            )
+            .await;
     }
 
     // Give time for processing
@@ -276,19 +352,24 @@ async fn test_shutdown_multi_coop_varied_subscribers() {
     let mut rx3b = broadcaster.subscribe("coop-3").await.expect("3b");
 
     // Broadcast shutdown to all
-    broadcaster.broadcast_shutdown_all("System maintenance", Some(30000)).await;
+    broadcaster
+        .broadcast_shutdown_all("System maintenance", Some(30000))
+        .await;
 
     // All should receive shutdown
     let receivers: Vec<&mut mpsc::Receiver<_>> = vec![
-        &mut rx1a, &mut rx1b, &mut rx1c,
-        &mut rx2,
-        &mut rx3a, &mut rx3b,
+        &mut rx1a, &mut rx1b, &mut rx1c, &mut rx2, &mut rx3a, &mut rx3b,
     ];
 
     for (i, rx) in receivers.into_iter().enumerate() {
-        let event = rx.try_recv().expect(&format!("Receiver {} should get shutdown", i));
+        let event = rx
+            .try_recv()
+            .expect(&format!("Receiver {} should get shutdown", i));
         match event.event {
-            GatewayEvent::Shutdown { reason, reconnect_after_ms } => {
+            GatewayEvent::Shutdown {
+                reason,
+                reconnect_after_ms,
+            } => {
                 assert_eq!(reason, "System maintenance");
                 assert_eq!(reconnect_after_ms, Some(30000));
             }
@@ -329,19 +410,28 @@ async fn test_minimal_backfill_buffer() {
 
     // Broadcast multiple events
     for i in 0..10 {
-        broadcaster.broadcast("test-coop", GatewayEvent::PaymentCreated {
-            coop_id: "test-coop".to_string(),
-            hash: format!("hash{i}"),
-            from: "did:icn:alice".to_string(),
-            to: "did:icn:bob".to_string(),
-            amount: i as i64,
-            currency: "hours".to_string(),
-        }).await;
+        broadcaster
+            .broadcast(
+                "test-coop",
+                GatewayEvent::PaymentCreated {
+                    coop_id: "test-coop".to_string(),
+                    hash: format!("hash{i}"),
+                    from: "did:icn:alice".to_string(),
+                    to: "did:icn:bob".to_string(),
+                    amount: i as i64,
+                    currency: "hours".to_string(),
+                },
+            )
+            .await;
     }
 
     // Only get the latest event
     let backfill = broadcaster.get_backfill("test-coop", 0).await;
-    assert_eq!(backfill.len(), 1, "Should only get 1 event with max_backfill=1");
+    assert_eq!(
+        backfill.len(),
+        1,
+        "Should only get 1 event with max_backfill=1"
+    );
 
     // Should be the last event (amount = 9)
     match &backfill[0].event {
@@ -358,18 +448,27 @@ async fn test_broadcast_to_empty_coop() {
     let broadcaster = EventBroadcaster::new();
 
     // Broadcast to non-existent coop (no subscribers)
-    broadcaster.broadcast("nonexistent", GatewayEvent::MemberAdded {
-        coop_id: "nonexistent".to_string(),
-        did: "did:icn:alice".to_string(),
-        role: "Member".to_string(),
-    }).await;
+    broadcaster
+        .broadcast(
+            "nonexistent",
+            GatewayEvent::MemberAdded {
+                coop_id: "nonexistent".to_string(),
+                did: "did:icn:alice".to_string(),
+                role: "Member".to_string(),
+            },
+        )
+        .await;
 
     // Should not panic, just log and continue
     assert_eq!(broadcaster.subscriber_count("nonexistent").await, 0);
 
     // Backfill should still work
     let backfill = broadcaster.get_backfill("nonexistent", 0).await;
-    assert_eq!(backfill.len(), 1, "Event should be in backfill even without subscribers");
+    assert_eq!(
+        backfill.len(),
+        1,
+        "Event should be in backfill even without subscribers"
+    );
 }
 
 /// Test sequence numbers are globally unique across coops
@@ -381,33 +480,54 @@ async fn test_global_sequence_uniqueness() {
     let mut rx2 = broadcaster.subscribe("coop-2").await.expect("Subscribe 2");
 
     // Interleave events to different coops
-    broadcaster.broadcast("coop-1", GatewayEvent::MemberAdded {
-        coop_id: "coop-1".to_string(),
-        did: "did:icn:alice".to_string(),
-        role: "Member".to_string(),
-    }).await;
+    broadcaster
+        .broadcast(
+            "coop-1",
+            GatewayEvent::MemberAdded {
+                coop_id: "coop-1".to_string(),
+                did: "did:icn:alice".to_string(),
+                role: "Member".to_string(),
+            },
+        )
+        .await;
 
-    broadcaster.broadcast("coop-2", GatewayEvent::MemberAdded {
-        coop_id: "coop-2".to_string(),
-        did: "did:icn:bob".to_string(),
-        role: "Member".to_string(),
-    }).await;
+    broadcaster
+        .broadcast(
+            "coop-2",
+            GatewayEvent::MemberAdded {
+                coop_id: "coop-2".to_string(),
+                did: "did:icn:bob".to_string(),
+                role: "Member".to_string(),
+            },
+        )
+        .await;
 
-    broadcaster.broadcast("coop-1", GatewayEvent::MemberRemoved {
-        coop_id: "coop-1".to_string(),
-        did: "did:icn:alice".to_string(),
-    }).await;
+    broadcaster
+        .broadcast(
+            "coop-1",
+            GatewayEvent::MemberRemoved {
+                coop_id: "coop-1".to_string(),
+                did: "did:icn:alice".to_string(),
+            },
+        )
+        .await;
 
     let event1a = rx1.recv().await.unwrap();
     let event2 = rx2.recv().await.unwrap();
     let event1b = rx1.recv().await.unwrap();
 
     // Sequences should be globally unique and ordered
-    assert!(event1a.seq < event2.seq, "Event 1 should have lower seq than event 2");
-    assert!(event2.seq < event1b.seq, "Event 2 should have lower seq than event 3");
+    assert!(
+        event1a.seq < event2.seq,
+        "Event 1 should have lower seq than event 2"
+    );
+    assert!(
+        event2.seq < event1b.seq,
+        "Event 2 should have lower seq than event 3"
+    );
 
     // No duplicate sequences
-    let seqs = vec![event1a.seq, event2.seq, event1b.seq];
+    let seqs = [event1a.seq, event2.seq, event1b.seq];
     let unique: std::collections::HashSet<_> = seqs.iter().collect();
     assert_eq!(unique.len(), 3, "All sequences should be unique");
 }
