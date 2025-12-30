@@ -484,6 +484,27 @@ impl GatewayServer {
             Arc::new(IdentityManager::new())
         };
 
+        // Create oracle state for exchange rate management
+        let oracle_store: Arc<dyn icn_store::Store> = if let Some(ref data_dir) = self.data_dir {
+            let oracle_path = data_dir.join("oracle_store");
+            Arc::new(icn_store::SledStore::open(&oracle_path).map_err(|e| {
+                crate::error::GatewayError::InternalError(format!(
+                    "Failed to open oracle storage: {e}"
+                ))
+            })?)
+        } else {
+            Arc::new(
+                icn_store::SledStore::temporary()
+                    .map_err(|e| {
+                        crate::error::GatewayError::InternalError(format!(
+                            "Failed to create temporary oracle storage: {e}"
+                        ))
+                    })?,
+            )
+        };
+        let oracle_state = Arc::new(api::oracle::OracleState::new(oracle_store).await);
+        info!("Oracle state initialized with manual rate source");
+
         // Use provided event broadcaster or create a new one
         let event_broadcaster = self.event_broadcaster.unwrap_or_else(|| {
             info!("Creating new EventBroadcaster (not shared with compute actor)");
@@ -733,6 +754,7 @@ impl GatewayServer {
                 .app_data(web::Data::new(treasury_manager.clone()))
                 .app_data(web::Data::new(ledger_manager.clone()))
                 .app_data(web::Data::new(identity_manager.clone()))
+                .app_data(web::Data::new(oracle_state.clone()))
                 .app_data(web::Data::new(sdis_state.clone()))
                 .app_data(web::Data::new(enrollment_store.clone()))
                 .app_data(web::Data::new(event_broadcaster.clone()))

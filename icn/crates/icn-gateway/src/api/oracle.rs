@@ -74,9 +74,15 @@ pub struct OracleState {
 
 impl OracleState {
     /// Create a new oracle state with the given store
-    pub fn new(store: Arc<dyn Store>) -> Self {
+    ///
+    /// This creates the oracle manager and manual source, and registers
+    /// the manual source with the oracle manager so it's consulted for rates.
+    pub async fn new(store: Arc<dyn Store>) -> Self {
         let oracle = Arc::new(OracleManager::new(store.clone()));
         let manual_source = Arc::new(ManualRateSource::new(store));
+
+        // Register the manual source with the oracle manager so rates are consulted
+        oracle.register_source(manual_source.clone()).await;
 
         Self {
             oracle,
@@ -90,6 +96,14 @@ impl OracleState {
             oracle,
             manual_source: None,
         }
+    }
+
+    /// Register a federation rate source with the oracle manager
+    pub async fn register_federation_source(
+        &self,
+        source: Arc<icn_ledger::oracle::FederationRateSource>,
+    ) {
+        self.oracle.register_source(source).await;
     }
 }
 
@@ -194,7 +208,7 @@ pub struct ListSourcesResponse {
 #[get("/rate/{from}/{to}")]
 pub async fn get_rate(
     req: HttpRequest,
-    oracle_state: web::Data<OracleState>,
+    oracle_state: web::Data<Arc<OracleState>>,
     path: web::Path<(String, String)>,
 ) -> Result<HttpResponse> {
     require_scope(&req, "oracle:read")?;
@@ -231,7 +245,7 @@ pub async fn get_rate(
 #[post("/convert")]
 pub async fn convert_amount(
     req: HttpRequest,
-    oracle_state: web::Data<OracleState>,
+    oracle_state: web::Data<Arc<OracleState>>,
     body: web::Json<ConvertAmountRequest>,
 ) -> Result<HttpResponse> {
     require_scope(&req, "oracle:read")?;
@@ -269,7 +283,7 @@ pub async fn convert_amount(
 #[get("/sources")]
 pub async fn list_sources(
     req: HttpRequest,
-    oracle_state: web::Data<OracleState>,
+    oracle_state: web::Data<Arc<OracleState>>,
 ) -> Result<HttpResponse> {
     require_scope(&req, "oracle:read")?;
 
@@ -294,7 +308,7 @@ pub async fn list_sources(
 #[post("/rate")]
 pub async fn set_rate(
     req: HttpRequest,
-    oracle_state: web::Data<OracleState>,
+    oracle_state: web::Data<Arc<OracleState>>,
     body: web::Json<SetManualRateRequest>,
 ) -> Result<HttpResponse> {
     require_scope(&req, "oracle:write")?;
