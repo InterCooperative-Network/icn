@@ -94,15 +94,27 @@ spec:
           limits:
             cpu: "1"
             memory: 2Gi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+              - ALL
         volumeMounts:
         - name: config
           mountPath: /etc/icn
           readOnly: true
         - name: data
           mountPath: /data
+        - name: tmp
+          mountPath: /tmp
       securityContext:
-        runAsUser: 0
-        runAsGroup: 0
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
       volumes:
       - name: config
         configMap:
@@ -110,4 +122,6 @@ spec:
       - name: data
         persistentVolumeClaim:
           claimName: icn-data
+      - name: tmp
+        emptyDir: {}
 
