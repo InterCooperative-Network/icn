@@ -34,11 +34,12 @@ use tracing::{debug, info, warn};
 use crate::config::Config;
 use crate::runtime::ShutdownTx;
 
-/// Parse bootstrap peer URL in format: icn://did:icn:PUBKEY@IP:PORT
+/// Parse bootstrap peer URL in format: icn://did:icn:PUBKEY@HOST:PORT
 /// Returns (DID, SocketAddr) on success
 ///
-/// Note: Currently only supports IP addresses. DNS hostname resolution can be added later.
-fn parse_bootstrap_peer(url: &str) -> Result<(Did, SocketAddr)> {
+/// Supports both IP addresses and DNS hostnames. DNS resolution is performed
+/// asynchronously when needed.
+async fn parse_bootstrap_peer(url: &str) -> Result<(Did, SocketAddr)> {
     // Check for icn:// prefix
     let url = url
         .strip_prefix("icn://")
@@ -47,7 +48,7 @@ fn parse_bootstrap_peer(url: &str) -> Result<(Did, SocketAddr)> {
     // Split on @ to get DID and address
     let parts: Vec<&str> = url.split('@').collect();
     if parts.len() != 2 {
-        bail!("Invalid bootstrap peer format, expected icn://DID@IP:PORT");
+        bail!("Invalid bootstrap peer format, expected icn://DID@HOST:PORT");
     }
 
     let did_str = parts[0];
@@ -57,13 +58,42 @@ fn parse_bootstrap_peer(url: &str) -> Result<(Did, SocketAddr)> {
     let did: Did = serde_json::from_value(serde_json::Value::String(did_str.to_string()))
         .context("Failed to parse DID")?;
 
-    // Parse socket address (IP:PORT)
-    // Note: This requires an IP address, not a DNS hostname
-    let addr: SocketAddr = addr_str
-        .parse()
-        .context("Failed to parse socket address (must be IP:PORT, DNS names not yet supported)")?;
+    // Try to parse as direct IP:PORT first (fast path)
+    let addr = if let Ok(sock_addr) = addr_str.parse::<SocketAddr>() {
+        sock_addr
+    } else {
+        // Fall back to DNS resolution for hostname:port
+        resolve_address(addr_str).await?
+    };
 
     Ok((did, addr))
+}
+
+/// Resolve a hostname:port string to a SocketAddr using DNS lookup.
+///
+/// # Arguments
+/// * `addr_str` - Address string in format "hostname:port" or "ip:port"
+///
+/// # Returns
+/// * `Ok(SocketAddr)` - The resolved socket address (first result if multiple)
+/// * `Err` - If DNS resolution fails or no addresses are returned
+async fn resolve_address(addr_str: &str) -> Result<SocketAddr> {
+    use tokio::net::lookup_host;
+
+    debug!("Resolving DNS for: {addr_str}");
+
+    // Use tokio's async DNS resolution
+    let mut addrs = lookup_host(addr_str)
+        .await
+        .with_context(|| format!("DNS resolution failed for '{addr_str}'"))?;
+
+    // Take the first resolved address
+    let addr = addrs
+        .next()
+        .with_context(|| format!("DNS resolution returned no addresses for '{addr_str}'"))?;
+
+    debug!("Resolved {addr_str} -> {addr}");
+    Ok(addr)
 }
 
 /// Supervisor manages all actors and restarts them on failure
@@ -714,7 +744,7 @@ impl Supervisor {
                 let mut connected_bootstrap_peers = Vec::new();
 
                 for peer_url in &self.config.network.bootstrap_peers {
-                    match parse_bootstrap_peer(peer_url) {
+                    match parse_bootstrap_peer(peer_url).await {
                         Ok((peer_did, peer_addr)) => {
                             info!(
                                 "Connecting to bootstrap peer: {} at {}",
@@ -731,7 +761,10 @@ impl Supervisor {
                             }
                         }
                         Err(e) => {
-                            warn!("Failed to parse bootstrap peer URL '{}': {}", peer_url, e);
+                            warn!(
+                                "Failed to parse/resolve bootstrap peer URL '{}': {}",
+                                peer_url, e
+                            );
                         }
                     }
                 }
@@ -1324,10 +1357,10 @@ mod tests {
     /// Generated from deterministic seed [3u8; 32]
     const TEST_BOB_DID: &str = "did:icn:zGyGKxMyg1p9SsHfm15MkNUu1u9TN2JtTspcdmrtGUdse";
 
-    #[test]
-    fn test_parse_bootstrap_peer_valid() {
+    #[tokio::test]
+    async fn test_parse_bootstrap_peer_valid() {
         let url = format!("icn://{TEST_ALICE_DID}@203.0.113.50:7777");
-        let result = parse_bootstrap_peer(&url);
+        let result = parse_bootstrap_peer(&url).await;
         assert!(result.is_ok());
 
         let (did, addr) = result.unwrap();
@@ -1335,10 +1368,10 @@ mod tests {
         assert_eq!(addr.to_string(), "203.0.113.50:7777");
     }
 
-    #[test]
-    fn test_parse_bootstrap_peer_ipv4() {
+    #[tokio::test]
+    async fn test_parse_bootstrap_peer_ipv4() {
         let url = format!("icn://{TEST_BOB_DID}@192.168.1.100:7777");
-        let result = parse_bootstrap_peer(&url);
+        let result = parse_bootstrap_peer(&url).await;
         assert!(result.is_ok());
 
         let (did, addr) = result.unwrap();
@@ -1346,10 +1379,10 @@ mod tests {
         assert_eq!(addr.to_string(), "192.168.1.100:7777");
     }
 
-    #[test]
-    fn test_parse_bootstrap_peer_missing_prefix() {
+    #[tokio::test]
+    async fn test_parse_bootstrap_peer_missing_prefix() {
         let url = format!("{TEST_ALICE_DID}@203.0.113.50:7777");
-        let result = parse_bootstrap_peer(&url);
+        let result = parse_bootstrap_peer(&url).await;
         assert!(result.is_err());
         assert!(result
             .unwrap_err()
@@ -1357,25 +1390,69 @@ mod tests {
             .contains("must start with 'icn://'"));
     }
 
-    #[test]
-    fn test_parse_bootstrap_peer_missing_at() {
+    #[tokio::test]
+    async fn test_parse_bootstrap_peer_missing_at() {
         let url = format!("icn://{TEST_ALICE_DID}_203.0.113.50:7777");
-        let result = parse_bootstrap_peer(&url);
+        let result = parse_bootstrap_peer(&url).await;
         assert!(result.is_err());
         assert!(result
             .unwrap_err()
             .to_string()
-            .contains("expected icn://DID@IP:PORT"));
+            .contains("expected icn://DID@HOST:PORT"));
     }
 
-    #[test]
-    fn test_parse_bootstrap_peer_invalid_port() {
-        let url = format!("icn://{TEST_ALICE_DID}@203.0.113.50:invalid");
-        let result = parse_bootstrap_peer(&url);
+    #[tokio::test]
+    async fn test_parse_bootstrap_peer_dns_resolution() {
+        // Test DNS resolution with localhost (should resolve)
+        let url = format!("icn://{TEST_ALICE_DID}@localhost:7777");
+        let result = parse_bootstrap_peer(&url).await;
+        assert!(result.is_ok(), "Failed to resolve localhost: {result:?}");
+
+        let (did, addr) = result.unwrap();
+        assert_eq!(did.as_str(), TEST_ALICE_DID);
+        // localhost typically resolves to 127.0.0.1 or ::1
+        assert!(
+            addr.ip().is_loopback(),
+            "Expected loopback address, got: {}",
+            addr.ip()
+        );
+        assert_eq!(addr.port(), 7777);
+    }
+
+    #[tokio::test]
+    async fn test_parse_bootstrap_peer_dns_failure() {
+        // Test DNS resolution failure with a guaranteed-invalid hostname (RFC 6761)
+        let url = format!("icn://{TEST_ALICE_DID}@test.invalid:7777");
+        let result = parse_bootstrap_peer(&url).await;
         assert!(result.is_err());
         assert!(result
             .unwrap_err()
             .to_string()
-            .contains("Failed to parse socket address"));
+            .contains("DNS resolution failed"));
+    }
+
+    #[tokio::test]
+    async fn test_parse_bootstrap_peer_ipv6() {
+        // Test IPv6 address parsing (fast path, no DNS needed)
+        let url = format!("icn://{TEST_ALICE_DID}@[::1]:7777");
+        let result = parse_bootstrap_peer(&url).await;
+        assert!(result.is_ok(), "Failed to parse IPv6 address: {result:?}");
+
+        let (did, addr) = result.unwrap();
+        assert_eq!(did.as_str(), TEST_ALICE_DID);
+        assert!(addr.ip().is_loopback());
+        assert_eq!(addr.port(), 7777);
+    }
+
+    #[tokio::test]
+    async fn test_parse_bootstrap_peer_invalid_port() {
+        let url = format!("icn://{TEST_ALICE_DID}@203.0.113.50:invalid");
+        let result = parse_bootstrap_peer(&url).await;
+        assert!(result.is_err());
+        // With invalid port, DNS resolution will fail
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("DNS resolution failed"));
     }
 }
