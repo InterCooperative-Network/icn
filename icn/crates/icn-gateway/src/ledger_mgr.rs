@@ -460,13 +460,8 @@ impl LedgerManager {
             .convert(amount)
             .ok_or_else(|| GatewayError::InternalError("Conversion would overflow".to_string()))?;
 
-        // Calculate fee
-        let fee_amount = if fx_config.fee_basis_points > 0 && fx_config.treasury_did.is_some() {
-            (gross_target_amount as f64 * fx_config.fee_basis_points as f64 / 10000.0).round()
-                as i64
-        } else {
-            0
-        };
+        // Calculate fee using same logic as actual execution for consistency
+        let fee_amount = fx_config.calculate_fee(gross_target_amount);
 
         let net_target_amount = gross_target_amount - fee_amount;
 
