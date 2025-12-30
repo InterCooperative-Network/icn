@@ -39,8 +39,9 @@ pub struct WebSocketConfig {
 impl Default for WebSocketConfig {
     fn default() -> Self {
         Self {
-            max_connections_global: 10_000,
-            max_subscribers_per_coop: 1_000,
+            // Use validation constants as single source of truth
+            max_connections_global: crate::validation::MAX_TOTAL_WEBSOCKET_CONNECTIONS,
+            max_subscribers_per_coop: crate::validation::MAX_SUBSCRIBERS_PER_COOP,
             max_backfill_events: 100,
             channel_capacity: 5_000,
             heartbeat_interval_secs: 30,
