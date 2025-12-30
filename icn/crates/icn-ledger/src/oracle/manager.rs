@@ -326,7 +326,7 @@ impl OracleManager {
         rates.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
         // Calculate median
-        let median = if rates.len() % 2 == 0 {
+        let median = if rates.len().is_multiple_of(2) {
             (rates[rates.len() / 2 - 1] + rates[rates.len() / 2]) / 2.0
         } else {
             rates[rates.len() / 2]
@@ -349,7 +349,7 @@ impl OracleManager {
         let final_rate = if !valid_observations.is_empty() {
             let mut valid_rates: Vec<f64> = valid_observations.iter().map(|o| o.rate).collect();
             valid_rates.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-            if valid_rates.len() % 2 == 0 {
+            if valid_rates.len().is_multiple_of(2) {
                 (valid_rates[valid_rates.len() / 2 - 1] + valid_rates[valid_rates.len() / 2]) / 2.0
             } else {
                 valid_rates[valid_rates.len() / 2]
