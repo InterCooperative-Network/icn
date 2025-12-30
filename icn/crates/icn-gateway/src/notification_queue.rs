@@ -129,6 +129,16 @@ pub enum NotificationType {
     SecurityAlert,
     /// General system notification
     System,
+    /// Deliberation started on a proposal
+    DeliberationStarted,
+    /// Deliberation ending soon reminder
+    DeliberationEnding,
+    /// Comment added to proposal discussion
+    CommentAdded,
+    /// Reply to your comment
+    CommentReply,
+    /// Reaction to your comment
+    CommentReaction,
 }
 
 impl QueuedNotification {

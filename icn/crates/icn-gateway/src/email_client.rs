@@ -367,6 +367,13 @@ impl EmailTemplates {
             NotificationType::BalanceChange => self.balance_template(title, body, data),
             NotificationType::SecurityAlert => self.security_alert_template(title, body, data),
             NotificationType::System => self.system_template(title, body, data),
+            NotificationType::DeliberationStarted => self.deliberation_template(title, body, data),
+            NotificationType::DeliberationEnding => {
+                self.deliberation_ending_template(title, body, data)
+            }
+            NotificationType::CommentAdded => self.comment_template(title, body, data),
+            NotificationType::CommentReply => self.comment_template(title, body, data),
+            NotificationType::CommentReaction => self.comment_template(title, body, data),
         };
 
         EmailMessage::new(to, subject, text_body).with_html(html_body)
@@ -687,6 +694,115 @@ impl EmailTemplates {
         let subject = format!("[{}] {}", self.coop_name, title);
         let text = body.to_string();
         let html = self.simple_notification_html(title, body, "");
+
+        (subject, text, html)
+    }
+
+    fn deliberation_template(
+        &self,
+        title: &str,
+        body: &str,
+        data: Option<&serde_json::Value>,
+    ) -> (String, String, String) {
+        let proposal_id = data
+            .and_then(|d| d.get("proposal_id"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown");
+
+        let subject = format!("[{}] Deliberation Started: {}", self.coop_name, title);
+        let text = format!(
+            "{}\n\nJoin the discussion at: {}/governance/proposals/{}\n",
+            body, self.base_url, proposal_id
+        );
+        let html = format!(
+            r#"<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+    <h2 style="color: #1e40af;">📣 Deliberation Started</h2>
+    <p>{}</p>
+    <a href="{}/governance/proposals/{}" style="display: inline-block; background: #1e40af; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 20px 0;">Join the Discussion</a>
+    <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+    <p style="color: #666; font-size: 12px;">{}</p>
+</body>
+</html>"#,
+            body, self.base_url, proposal_id, self.coop_name
+        );
+
+        (subject, text, html)
+    }
+
+    fn deliberation_ending_template(
+        &self,
+        _title: &str,
+        body: &str,
+        data: Option<&serde_json::Value>,
+    ) -> (String, String, String) {
+        let proposal_id = data
+            .and_then(|d| d.get("proposal_id"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown");
+        let hours_remaining = data
+            .and_then(|d| d.get("hours_remaining"))
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0);
+
+        let subject = format!("[{}] ⏰ Deliberation Ending Soon", self.coop_name);
+        let text = format!(
+            "{}\n\nOnly {} hours left! Join the discussion at: {}/governance/proposals/{}\n",
+            body, hours_remaining, self.base_url, proposal_id
+        );
+        let html = format!(
+            r#"<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+    <div style="background: #fef3c7; border: 2px solid #f59e0b; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+        <h2 style="color: #d97706; margin-top: 0;">⏰ Deliberation Ending Soon</h2>
+        <p style="color: #92400e;">{}</p>
+        <p style="font-weight: bold;">Only {} hours remaining!</p>
+    </div>
+    <a href="{}/governance/proposals/{}" style="display: inline-block; background: #f59e0b; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 20px 0;">Join the Discussion</a>
+    <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+    <p style="color: #666; font-size: 12px;">{}</p>
+</body>
+</html>"#,
+            body, hours_remaining, self.base_url, proposal_id, self.coop_name
+        );
+
+        (subject, text, html)
+    }
+
+    fn comment_template(
+        &self,
+        title: &str,
+        body: &str,
+        data: Option<&serde_json::Value>,
+    ) -> (String, String, String) {
+        let proposal_id = data
+            .and_then(|d| d.get("proposal_id"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown");
+
+        let subject = format!("[{}] {}", self.coop_name, title);
+        let text = format!(
+            "{}\n\nView the discussion at: {}/governance/proposals/{}\n",
+            body, self.base_url, proposal_id
+        );
+        let html = format!(
+            r#"<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+    <h2 style="color: #1e40af;">{}</h2>
+    <p>{}</p>
+    <a href="{}/governance/proposals/{}" style="display: inline-block; background: #1e40af; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 20px 0;">View Discussion</a>
+    <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+    <p style="color: #666; font-size: 12px;">{}</p>
+</body>
+</html>"#,
+            title, body, self.base_url, proposal_id, self.coop_name
+        );
 
         (subject, text, html)
     }

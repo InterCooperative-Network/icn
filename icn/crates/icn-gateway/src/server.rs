@@ -893,6 +893,17 @@ impl GatewayServer {
                                 .service(api::governance::list_delegations)
                                 .service(api::governance::get_delegation)
                                 .service(api::governance::revoke_delegation)
+                                // Deliberation endpoints
+                                .service(api::governance::start_deliberation)
+                                .service(api::governance::end_deliberation)
+                                // Discussion endpoints
+                                .service(api::governance::add_comment)
+                                .service(api::governance::list_comments)
+                                .service(api::governance::get_discussion)
+                                .service(api::governance::edit_comment)
+                                .service(api::governance::delete_comment)
+                                .service(api::governance::add_reaction)
+                                .service(api::governance::remove_reaction)
                                 // Apply auth first, then rate limiting (wrapping order: last runs first)
                                 .wrap(middleware::from_fn(
                                     crate::rate_limit::rate_limit_middleware,

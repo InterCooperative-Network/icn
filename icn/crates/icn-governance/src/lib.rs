@@ -39,6 +39,8 @@ pub mod charter_store;
 pub mod config;
 #[allow(missing_docs)]
 pub mod delegation;
+#[allow(missing_docs)]
+pub mod discussion;
 pub mod domain;
 #[allow(missing_docs)]
 pub mod error;
@@ -89,6 +91,9 @@ pub use config::{EmergencyThresholds, GovernanceConfig, GovernanceParams};
 pub use delegation::{
     Delegation, DelegationError, DelegationId, DelegationManager, DelegationScope,
     DEFAULT_MAX_DELEGATION_DEPTH,
+};
+pub use discussion::{
+    Comment, CommentId, Discussion, DiscussionError, DiscussionStore, InMemoryDiscussionStore,
 };
 pub use domain::{GovernanceDomain, GovernanceDomainId};
 pub use error::{GovernanceError, Result};
