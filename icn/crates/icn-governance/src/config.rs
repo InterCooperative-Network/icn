@@ -478,32 +478,42 @@ mod tests {
         assert!(valid.validate().is_ok());
 
         // Deliberation period below minimum
-        let mut invalid = GovernanceParams::default();
-        invalid.deliberation_period_seconds = 3600; // 1 hour, below 1 day minimum
+        let invalid = GovernanceParams {
+            deliberation_period_seconds: 3600, // 1 hour, below 1 day minimum
+            ..Default::default()
+        };
         assert!(invalid.validate().is_err());
 
         // Deliberation period above maximum
-        let mut invalid = GovernanceParams::default();
-        invalid.deliberation_period_seconds = 60 * 24 * 60 * 60; // 60 days, above 30 day max
+        let invalid = GovernanceParams {
+            deliberation_period_seconds: 60 * 24 * 60 * 60, // 60 days, above 30 day max
+            ..Default::default()
+        };
         assert!(invalid.validate().is_err());
 
         // Min > max is invalid
-        let mut invalid = GovernanceParams::default();
-        invalid.min_deliberation_seconds = 10 * 24 * 60 * 60;
-        invalid.max_deliberation_seconds = 5 * 24 * 60 * 60;
+        let invalid = GovernanceParams {
+            min_deliberation_seconds: 10 * 24 * 60 * 60,
+            max_deliberation_seconds: 5 * 24 * 60 * 60,
+            ..Default::default()
+        };
         assert!(invalid.validate().is_err());
 
         // Zero deliberation with require_deliberation = true
-        let mut invalid = GovernanceParams::default();
-        invalid.deliberation_period_seconds = 0;
-        invalid.min_deliberation_seconds = 0;
+        let invalid = GovernanceParams {
+            deliberation_period_seconds: 0,
+            min_deliberation_seconds: 0,
+            ..Default::default()
+        };
         assert!(invalid.validate().is_err());
 
         // Zero deliberation with require_deliberation = false is fine
-        let mut valid = GovernanceParams::default();
-        valid.require_deliberation = false;
-        valid.deliberation_period_seconds = 0;
-        valid.min_deliberation_seconds = 0;
+        let valid = GovernanceParams {
+            require_deliberation: false,
+            deliberation_period_seconds: 0,
+            min_deliberation_seconds: 0,
+            ..Default::default()
+        };
         assert!(valid.validate().is_ok());
     }
 
