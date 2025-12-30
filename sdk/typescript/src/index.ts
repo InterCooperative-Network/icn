@@ -55,6 +55,10 @@ import {
   Balance,
   PaymentRequest,
   PaymentResponse,
+  CrossPaymentRequest,
+  CrossPaymentResponse,
+  CrossPaymentQuoteRequest,
+  CrossPaymentQuote,
   TransactionHistory,
   GovernanceDomain,
   CreateDomainRequest,
@@ -666,6 +670,55 @@ export class ICNClient {
    */
   async pay(coopId: string, req: PaymentRequest): Promise<PaymentResponse> {
     return this.post<PaymentResponse>(`/ledger/${coopId}/payment`, req);
+  }
+
+  /**
+   * Create a cross-currency payment
+   *
+   * Executes a payment where the sender pays in one currency and the recipient
+   * receives in another. Uses the exchange rate oracle for conversion.
+   *
+   * @example
+   * ```typescript
+   * // Send 10 hours, recipient receives USD equivalent
+   * const result = await client.crossPay('my-coop', {
+   *   from: 'did:icn:alice...',
+   *   to: 'did:icn:bob...',
+   *   amount: 10,
+   *   from_currency: 'hours',
+   *   to_currency: 'USD',
+   *   max_target_amount: 260, // Slippage protection
+   * });
+   * console.log(`Bob received ${result.net_target_amount} USD`);
+   * ```
+   */
+  async crossPay(coopId: string, req: CrossPaymentRequest): Promise<CrossPaymentResponse> {
+    return this.post<CrossPaymentResponse>(`/ledger/${coopId}/payment/convert`, req);
+  }
+
+  /**
+   * Get a cross-currency payment quote
+   *
+   * Returns a preview of what a cross-currency payment would look like without
+   * actually executing it. Useful for showing users the expected conversion.
+   *
+   * @example
+   * ```typescript
+   * // Get quote for converting 10 hours to USD
+   * const quote = await client.getCrossPaymentQuote('my-coop', {
+   *   amount: 10,
+   *   from_currency: 'hours',
+   *   to_currency: 'USD',
+   * });
+   * console.log(`Rate: ${quote.rate}, Fee: ${quote.fee_amount}`);
+   * console.log(`You would receive: ${quote.net_target_amount} USD`);
+   * if (quote.is_stale) {
+   *   console.warn('Warning: Rate may be outdated');
+   * }
+   * ```
+   */
+  async getCrossPaymentQuote(coopId: string, req: CrossPaymentQuoteRequest): Promise<CrossPaymentQuote> {
+    return this.post<CrossPaymentQuote>(`/ledger/${coopId}/payment/convert/quote`, req);
   }
 
   /**
