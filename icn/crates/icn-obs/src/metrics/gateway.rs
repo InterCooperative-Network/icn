@@ -425,3 +425,82 @@ pub fn oracle_outliers_filtered_inc(pair: &str, count: usize) {
 pub fn oracle_cached_pairs_set(count: usize) {
     gauge!("icn_gateway_oracle_cached_pairs").set(count as f64);
 }
+
+// FX (Cross-Currency) Payment metrics
+
+/// Increment cross-currency payments total counter
+pub fn fx_payments_total_inc(from_currency: &str, to_currency: &str) {
+    counter!(
+        "icn_gateway_fx_payments_total",
+        "from_currency" => from_currency.to_string(),
+        "to_currency" => to_currency.to_string()
+    )
+    .increment(1);
+}
+
+/// Record cross-currency payment source amount
+pub fn fx_payment_source_amount_record(currency: &str, amount: i64) {
+    counter!(
+        "icn_gateway_fx_payment_source_amount_total",
+        "currency" => currency.to_string()
+    )
+    .increment(amount.unsigned_abs());
+}
+
+/// Record cross-currency payment target amount (net after fees)
+pub fn fx_payment_target_amount_record(currency: &str, amount: i64) {
+    counter!(
+        "icn_gateway_fx_payment_target_amount_total",
+        "currency" => currency.to_string()
+    )
+    .increment(amount.unsigned_abs());
+}
+
+/// Record cross-currency payment fee amount
+pub fn fx_payment_fee_amount_record(currency: &str, amount: i64) {
+    counter!(
+        "icn_gateway_fx_payment_fee_amount_total",
+        "currency" => currency.to_string()
+    )
+    .increment(amount.unsigned_abs());
+}
+
+/// Increment cross-currency quote requests counter
+pub fn fx_quote_requests_inc(from_currency: &str, to_currency: &str) {
+    counter!(
+        "icn_gateway_fx_quote_requests_total",
+        "from_currency" => from_currency.to_string(),
+        "to_currency" => to_currency.to_string()
+    )
+    .increment(1);
+}
+
+/// Increment cross-currency payment slippage rejections counter
+pub fn fx_slippage_rejections_inc(from_currency: &str, to_currency: &str) {
+    counter!(
+        "icn_gateway_fx_slippage_rejections_total",
+        "from_currency" => from_currency.to_string(),
+        "to_currency" => to_currency.to_string()
+    )
+    .increment(1);
+}
+
+/// Increment cross-currency payment stale rate rejections counter
+pub fn fx_stale_rate_rejections_inc(from_currency: &str, to_currency: &str) {
+    counter!(
+        "icn_gateway_fx_stale_rate_rejections_total",
+        "from_currency" => from_currency.to_string(),
+        "to_currency" => to_currency.to_string()
+    )
+    .increment(1);
+}
+
+/// Increment cross-currency payment expired rate rejections counter
+pub fn fx_expired_rate_rejections_inc(from_currency: &str, to_currency: &str) {
+    counter!(
+        "icn_gateway_fx_expired_rate_rejections_total",
+        "from_currency" => from_currency.to_string(),
+        "to_currency" => to_currency.to_string()
+    )
+    .increment(1);
+}

@@ -472,6 +472,12 @@ pub async fn create_cross_payment(
     gateway::payments_created_inc();
     gateway::payment_amount_record(&req.from_currency, req.amount);
 
+    // Track FX-specific metrics
+    gateway::fx_payments_total_inc(&req.from_currency, &req.to_currency);
+    gateway::fx_payment_source_amount_record(&req.from_currency, req.amount);
+    gateway::fx_payment_target_amount_record(&req.to_currency, response.net_target_amount);
+    gateway::fx_payment_fee_amount_record(&req.to_currency, response.fee_amount);
+
     Ok(HttpResponse::Created().json(response))
 }
 
@@ -506,6 +512,9 @@ pub async fn get_cross_payment_quote(
     let quote = ledger_mgr
         .get_cross_payment_quote(&coop_id, req.amount, &req.from_currency, &req.to_currency)
         .await?;
+
+    // Track FX quote metrics
+    gateway::fx_quote_requests_inc(&req.from_currency, &req.to_currency);
 
     Ok(HttpResponse::Ok().json(quote))
 }
