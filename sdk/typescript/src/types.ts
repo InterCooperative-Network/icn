@@ -461,6 +461,48 @@ export interface ApiError {
   details?: unknown;
 }
 
+/**
+ * Error codes for ICN API errors
+ */
+export enum ErrorCode {
+  // Authentication errors
+  TOKEN_EXPIRED = 'TOKEN_EXPIRED',
+  INVALID_CREDENTIALS = 'INVALID_CREDENTIALS',
+  INVALID_TOKEN = 'INVALID_TOKEN',
+  AUTHENTICATION_REQUIRED = 'AUTHENTICATION_REQUIRED',
+
+  // Authorization errors
+  INSUFFICIENT_PERMISSIONS = 'INSUFFICIENT_PERMISSIONS',
+  FORBIDDEN = 'FORBIDDEN',
+
+  // Validation errors
+  VALIDATION_FAILED = 'VALIDATION_FAILED',
+  INVALID_DID = 'INVALID_DID',
+  INVALID_SCOPE = 'INVALID_SCOPE',
+  INVALID_EXPIRATION = 'INVALID_EXPIRATION',
+  INVALID_REQUEST = 'INVALID_REQUEST',
+
+  // Resource errors
+  NOT_FOUND = 'NOT_FOUND',
+  ALREADY_EXISTS = 'ALREADY_EXISTS',
+  CONFLICT = 'CONFLICT',
+
+  // Rate limiting
+  RATE_LIMITED = 'RATE_LIMITED',
+
+  // Network errors
+  NETWORK_ERROR = 'NETWORK_ERROR',
+  TIMEOUT = 'TIMEOUT',
+  CONNECTION_FAILED = 'CONNECTION_FAILED',
+
+  // Server errors
+  INTERNAL_ERROR = 'INTERNAL_ERROR',
+  SERVICE_UNAVAILABLE = 'SERVICE_UNAVAILABLE',
+}
+
+/**
+ * Base error class for all ICN SDK errors
+ */
 export class ICNError extends Error {
   public readonly statusCode: number;
   public readonly code?: string;
@@ -472,6 +514,292 @@ export class ICNError extends Error {
     this.statusCode = statusCode;
     this.code = code;
     this.details = details;
+  }
+
+  /**
+   * Check if this error is retryable
+   */
+  isRetryable(): boolean {
+    return (
+      this.statusCode >= 500 ||
+      this.statusCode === 408 ||
+      this.statusCode === 429 ||
+      this.code === ErrorCode.TIMEOUT ||
+      this.code === ErrorCode.CONNECTION_FAILED
+    );
+  }
+}
+
+// ============================================================================
+// Authentication Errors (401)
+// ============================================================================
+
+/**
+ * Authentication error - credentials invalid or missing
+ */
+export class AuthenticationError extends ICNError {
+  constructor(message: string, code?: string, details?: unknown) {
+    super(message, 401, code || ErrorCode.AUTHENTICATION_REQUIRED, details);
+    this.name = 'AuthenticationError';
+  }
+}
+
+/**
+ * Token has expired and needs to be refreshed
+ */
+export class TokenExpiredError extends AuthenticationError {
+  constructor(message = 'Token has expired', details?: unknown) {
+    super(message, ErrorCode.TOKEN_EXPIRED, details);
+    this.name = 'TokenExpiredError';
+  }
+}
+
+/**
+ * Invalid credentials provided
+ */
+export class InvalidCredentialsError extends AuthenticationError {
+  constructor(message = 'Invalid credentials', details?: unknown) {
+    super(message, ErrorCode.INVALID_CREDENTIALS, details);
+    this.name = 'InvalidCredentialsError';
+  }
+}
+
+// ============================================================================
+// Authorization Errors (403)
+// ============================================================================
+
+/**
+ * Authorization error - insufficient permissions
+ */
+export class AuthorizationError extends ICNError {
+  constructor(message: string, code?: string, details?: unknown) {
+    super(message, 403, code || ErrorCode.FORBIDDEN, details);
+    this.name = 'AuthorizationError';
+  }
+}
+
+/**
+ * User lacks required permissions for the operation
+ */
+export class InsufficientPermissionsError extends AuthorizationError {
+  public readonly requiredPermissions?: string[];
+
+  constructor(message = 'Insufficient permissions', requiredPermissions?: string[], details?: unknown) {
+    super(message, ErrorCode.INSUFFICIENT_PERMISSIONS, details);
+    this.name = 'InsufficientPermissionsError';
+    this.requiredPermissions = requiredPermissions;
+  }
+}
+
+// ============================================================================
+// Validation Errors (400)
+// ============================================================================
+
+/**
+ * Validation error with field-level details
+ */
+export class ValidationError extends ICNError {
+  public readonly fields: Record<string, string[]>;
+
+  constructor(message: string, fields: Record<string, string[]> = {}, details?: unknown) {
+    super(message, 400, ErrorCode.VALIDATION_FAILED, details);
+    this.name = 'ValidationError';
+    this.fields = fields;
+  }
+
+  /**
+   * Get all error messages for a specific field
+   */
+  getFieldErrors(field: string): string[] {
+    return this.fields[field] || [];
+  }
+
+  /**
+   * Check if a specific field has errors
+   */
+  hasFieldError(field: string): boolean {
+    return field in this.fields && this.fields[field].length > 0;
+  }
+}
+
+// ============================================================================
+// Resource Errors (404, 409)
+// ============================================================================
+
+/**
+ * Resource not found
+ */
+export class NotFoundError extends ICNError {
+  public readonly resourceType?: string;
+  public readonly resourceId?: string;
+
+  constructor(message: string, resourceType?: string, resourceId?: string, details?: unknown) {
+    super(message, 404, ErrorCode.NOT_FOUND, details);
+    this.name = 'NotFoundError';
+    this.resourceType = resourceType;
+    this.resourceId = resourceId;
+  }
+}
+
+/**
+ * Resource already exists (conflict)
+ */
+export class ConflictError extends ICNError {
+  constructor(message: string, code?: string, details?: unknown) {
+    super(message, 409, code || ErrorCode.CONFLICT, details);
+    this.name = 'ConflictError';
+  }
+}
+
+// ============================================================================
+// Rate Limiting Errors (429)
+// ============================================================================
+
+/**
+ * Rate limit exceeded
+ */
+export class RateLimitError extends ICNError {
+  public readonly retryAfter?: number;
+  public readonly limit?: number;
+  public readonly remaining?: number;
+
+  constructor(
+    message = 'Rate limit exceeded',
+    retryAfter?: number,
+    limit?: number,
+    remaining?: number,
+    details?: unknown
+  ) {
+    super(message, 429, ErrorCode.RATE_LIMITED, details);
+    this.name = 'RateLimitError';
+    this.retryAfter = retryAfter;
+    this.limit = limit;
+    this.remaining = remaining;
+  }
+
+  isRetryable(): boolean {
+    return true;
+  }
+}
+
+// ============================================================================
+// Network Errors (0, 408)
+// ============================================================================
+
+/**
+ * Network-level error
+ */
+export class NetworkError extends ICNError {
+  constructor(message: string, code?: string, details?: unknown, statusCode = 0) {
+    super(message, statusCode, code || ErrorCode.NETWORK_ERROR, details);
+    this.name = 'NetworkError';
+  }
+
+  isRetryable(): boolean {
+    return true;
+  }
+}
+
+/**
+ * Request timeout
+ */
+export class TimeoutError extends NetworkError {
+  public readonly timeoutMs?: number;
+
+  constructor(message = 'Request timeout', timeoutMs?: number, details?: unknown) {
+    super(message, ErrorCode.TIMEOUT, details, 408);
+    this.name = 'TimeoutError';
+    this.timeoutMs = timeoutMs;
+  }
+}
+
+/**
+ * Connection failed
+ */
+export class ConnectionError extends NetworkError {
+  constructor(message = 'Connection failed', details?: unknown) {
+    super(message, ErrorCode.CONNECTION_FAILED, details);
+    this.name = 'ConnectionError';
+  }
+}
+
+// ============================================================================
+// Server Errors (500+)
+// ============================================================================
+
+/**
+ * Internal server error
+ */
+export class ServerError extends ICNError {
+  constructor(message: string, statusCode = 500, code?: string, details?: unknown) {
+    super(message, statusCode, code || ErrorCode.INTERNAL_ERROR, details);
+    this.name = 'ServerError';
+  }
+
+  isRetryable(): boolean {
+    return true;
+  }
+}
+
+// ============================================================================
+// Error Factory
+// ============================================================================
+
+/**
+ * Create a typed error from an API response
+ */
+export function createErrorFromResponse(
+  statusCode: number,
+  message: string,
+  code?: string,
+  details?: unknown
+): ICNError {
+  switch (statusCode) {
+    case 400:
+      if (code === ErrorCode.VALIDATION_FAILED) {
+        const fields = (details as { fields?: Record<string, string[]> })?.fields || {};
+        return new ValidationError(message, fields, details);
+      }
+      return new ICNError(message, statusCode, code, details);
+
+    case 401:
+      if (code === ErrorCode.TOKEN_EXPIRED) {
+        return new TokenExpiredError(message, details);
+      }
+      if (code === ErrorCode.INVALID_CREDENTIALS) {
+        return new InvalidCredentialsError(message, details);
+      }
+      return new AuthenticationError(message, code, details);
+
+    case 403:
+      if (code === ErrorCode.INSUFFICIENT_PERMISSIONS) {
+        const permissions = (details as { required_permissions?: string[] })?.required_permissions;
+        return new InsufficientPermissionsError(message, permissions, details);
+      }
+      return new AuthorizationError(message, code, details);
+
+    case 404:
+      const resourceType = (details as { resource_type?: string })?.resource_type;
+      const resourceId = (details as { resource_id?: string })?.resource_id;
+      return new NotFoundError(message, resourceType, resourceId, details);
+
+    case 408:
+      return new TimeoutError(message, undefined, details);
+
+    case 409:
+      return new ConflictError(message, code, details);
+
+    case 429:
+      const retryAfter = (details as { retry_after?: number })?.retry_after;
+      const limit = (details as { limit?: number })?.limit;
+      const remaining = (details as { remaining?: number })?.remaining;
+      return new RateLimitError(message, retryAfter, limit, remaining, details);
+
+    default:
+      if (statusCode >= 500) {
+        return new ServerError(message, statusCode, code, details);
+      }
+      return new ICNError(message, statusCode, code, details);
   }
 }
 

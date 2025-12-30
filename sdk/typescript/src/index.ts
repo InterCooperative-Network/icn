@@ -37,6 +37,11 @@ declare const WebSocket: {
 import {
   ICNClientOptions,
   ICNError,
+  ErrorCode,
+  createErrorFromResponse,
+  AuthenticationError,
+  TimeoutError,
+  NetworkError,
   ChallengeResponse,
   VerifyResponse,
   Cooperative,
@@ -411,7 +416,7 @@ export class ICNClient {
 
     if (requireAuth) {
       if (!this.token) {
-        throw new ICNError('Authentication required', 401);
+        throw new AuthenticationError('Authentication required', ErrorCode.AUTHENTICATION_REQUIRED);
       }
       headers['Authorization'] = `Bearer ${this.token}`;
     }
@@ -431,9 +436,9 @@ export class ICNClient {
 
       if (!response.ok) {
         const errorBody = await response.json().catch(() => ({})) as { error?: string; code?: string; details?: unknown };
-        throw new ICNError(
-          errorBody.error || response.statusText,
+        throw createErrorFromResponse(
           response.status,
+          errorBody.error || response.statusText,
           errorBody.code,
           errorBody.details
         );
@@ -450,9 +455,9 @@ export class ICNClient {
         throw error;
       }
       if ((error as Error).name === 'AbortError') {
-        throw new ICNError('Request timeout', 408);
+        throw new TimeoutError('Request timeout', this.timeout);
       }
-      throw new ICNError((error as Error).message, 0);
+      throw new NetworkError((error as Error).message, ErrorCode.NETWORK_ERROR);
     }
   }
 
@@ -956,7 +961,7 @@ export class ICNClient {
       }
       await new Promise((resolve) => setTimeout(resolve, intervalMs));
     }
-    throw new ICNError('Task polling timeout', 408);
+    throw new TimeoutError('Task polling timeout');
   }
 
   /**
