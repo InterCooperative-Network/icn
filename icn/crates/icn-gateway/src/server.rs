@@ -846,6 +846,16 @@ impl GatewayServer {
                                 ))
                                 .wrap(auth.clone()),
                         )
+                        // Exchange rate oracle endpoints (auth + rate limiting)
+                        // Multi-currency support with cooperative-defined and federation rates
+                        .service(
+                            web::scope("/oracle")
+                                .configure(api::oracle::configure)
+                                .wrap(middleware::from_fn(
+                                    crate::rate_limit::rate_limit_middleware,
+                                ))
+                                .wrap(auth.clone()),
+                        )
                         // Recurring payments endpoints (auth + rate limiting)
                         .service(
                             web::scope("")

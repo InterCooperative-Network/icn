@@ -142,6 +142,10 @@ pub struct Ledger {
     /// When set, provides decay on inactivity and recovery on activity.
     /// Takes precedence over static credit_policy_manager for limit calculations.
     dynamic_limit_manager: Option<Arc<DynamicCreditLimitManager>>,
+
+    /// Exchange rate oracle for multi-currency support
+    /// When set, enables currency conversion operations.
+    oracle_manager: Option<Arc<crate::oracle::OracleManager>>,
 }
 
 impl Ledger {
@@ -174,6 +178,7 @@ impl Ledger {
             membership_store: None,          // Set via set_membership_store()
             progressive_limit_manager: None, // Set via set_progressive_limit_manager()
             dynamic_limit_manager: None,     // Set via set_dynamic_limit_manager()
+            oracle_manager: None,            // Set via set_oracle_manager()
         };
 
         // Load cached balances from storage
@@ -357,6 +362,70 @@ impl Ledger {
     /// Get the dynamic credit limit manager (if set)
     pub fn dynamic_limit_manager(&self) -> Option<&Arc<DynamicCreditLimitManager>> {
         self.dynamic_limit_manager.as_ref()
+    }
+
+    /// Set the exchange rate oracle for multi-currency support
+    ///
+    /// When set, enables:
+    /// - `convert_amount()` for currency conversion
+    /// - Cross-currency payment support (future)
+    ///
+    /// # Example
+    /// ```rust,no_run
+    /// # use icn_ledger::{Ledger, OracleManager, ManualRateSource, CurrencyPair};
+    /// # use icn_store::SledStore;
+    /// # use std::sync::Arc;
+    /// # fn example() -> anyhow::Result<()> {
+    /// let store = Arc::new(SledStore::temporary()?);
+    /// let mut ledger = Ledger::new(store.clone())?;
+    ///
+    /// // Create oracle with manual rate source
+    /// let oracle = OracleManager::new(store.clone());
+    /// let manual_source = ManualRateSource::new(store.clone());
+    /// manual_source.set_rate(&CurrencyPair::new("hours", "USD"), 25.0, "did:icn:admin", None)?;
+    ///
+    /// ledger.set_oracle_manager(Arc::new(oracle));
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn set_oracle_manager(&mut self, oracle: Arc<crate::oracle::OracleManager>) {
+        self.oracle_manager = Some(oracle);
+    }
+
+    /// Get the oracle manager (if set)
+    pub fn oracle_manager(&self) -> Option<&Arc<crate::oracle::OracleManager>> {
+        self.oracle_manager.as_ref()
+    }
+
+    /// Convert an amount between currencies using the oracle
+    ///
+    /// Returns `None` if no oracle is configured.
+    /// Returns an error if the conversion fails (e.g., rate not available).
+    ///
+    /// # Arguments
+    /// * `amount` - The amount to convert (in smallest unit)
+    /// * `from` - Source currency code
+    /// * `to` - Target currency code
+    ///
+    /// # Example
+    /// ```rust,no_run
+    /// # use icn_ledger::Ledger;
+    /// # async fn example(ledger: &Ledger) -> anyhow::Result<()> {
+    /// // Convert 10 hours to USD (requires oracle to be configured)
+    /// if let Some(usd_amount) = ledger.convert_amount(10, "hours", "USD").await? {
+    ///     println!("10 hours = {} USD", usd_amount);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn convert_amount(&self, amount: i64, from: &str, to: &str) -> Result<Option<i64>> {
+        let oracle = match &self.oracle_manager {
+            Some(o) => o,
+            None => return Ok(None),
+        };
+
+        let converted = oracle.convert_amount(amount, from, to).await?;
+        Ok(Some(converted))
     }
 
     /// Append a journal entry to the ledger

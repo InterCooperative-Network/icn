@@ -119,6 +119,13 @@ import {
   CreateDelegationRequest,
   DelegationResponse,
   DelegationListResponse,
+  // Exchange rate oracle types
+  ExchangeRateResponse,
+  ConvertAmountRequest,
+  ConvertAmountResponse,
+  ListRateSourcesResponse,
+  SetManualRateRequest,
+  SetManualRateResponse,
 } from './types';
 
 export * from './types';
@@ -1679,6 +1686,81 @@ export class ICNClient {
           : { success: false, error: (r.reason as Error).message }
       ),
     };
+  }
+
+  // ===========================================================================
+  // Exchange Rate Oracle
+  // ===========================================================================
+
+  /**
+   * Get exchange rate between two currencies
+   *
+   * @example
+   * ```typescript
+   * const rate = await client.getExchangeRate('hours', 'USD');
+   * console.log(`1 hour = ${rate.rate} USD`);
+   * ```
+   */
+  async getExchangeRate(
+    fromCurrency: string,
+    toCurrency: string
+  ): Promise<ExchangeRateResponse> {
+    return this.get<ExchangeRateResponse>(
+      `/v1/oracle/rate/${encodeURIComponent(fromCurrency)}/${encodeURIComponent(toCurrency)}`
+    );
+  }
+
+  /**
+   * Convert an amount between currencies
+   *
+   * @example
+   * ```typescript
+   * const result = await client.convertAmount({
+   *   amount: 10,
+   *   from_currency: 'hours',
+   *   to_currency: 'USD',
+   * });
+   * console.log(`10 hours = ${result.converted_amount} USD`);
+   * ```
+   */
+  async convertAmount(
+    request: ConvertAmountRequest
+  ): Promise<ConvertAmountResponse> {
+    return this.post<ConvertAmountResponse>('/v1/oracle/convert', request);
+  }
+
+  /**
+   * List available rate sources
+   *
+   * @example
+   * ```typescript
+   * const { sources } = await client.listRateSources();
+   * for (const source of sources) {
+   *   console.log(`${source.name} (priority ${source.priority})`);
+   * }
+   * ```
+   */
+  async listRateSources(): Promise<ListRateSourcesResponse> {
+    return this.get<ListRateSourcesResponse>('/v1/oracle/sources');
+  }
+
+  /**
+   * Set a manual exchange rate (requires oracle:write scope)
+   *
+   * @example
+   * ```typescript
+   * const result = await client.setManualRate({
+   *   from_currency: 'hours',
+   *   to_currency: 'USD',
+   *   rate: 25.0,
+   *   note: 'Q1 2025 rate adjustment',
+   * });
+   * ```
+   */
+  async setManualRate(
+    request: SetManualRateRequest
+  ): Promise<SetManualRateResponse> {
+    return this.post<SetManualRateResponse>('/v1/oracle/rate', request);
   }
 
   // ===========================================================================
