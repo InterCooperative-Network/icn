@@ -481,6 +481,8 @@ impl LedgerManager {
             net_target_amount,
             to_currency: to_currency.to_string(),
             rate: rate.rate,
+            rate_timestamp: rate.aggregated_at,
+            rate_sources: rate.sources(),
             valid_until,
             is_stale: rate.is_stale,
         })

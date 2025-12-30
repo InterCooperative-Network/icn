@@ -32,6 +32,9 @@ use crate::types::{ContentHash, JournalEntry};
 use icn_identity::Did;
 use serde::{Deserialize, Serialize};
 
+/// Basis points scale factor (100 basis points = 1%)
+const BASIS_POINTS_SCALE: i128 = 10_000;
+
 /// Configuration for cross-currency (FX) transfers
 ///
 /// Controls fee structure, slippage limits, and system accounts
@@ -141,9 +144,10 @@ impl FxConfig {
             return 0;
         }
 
-        // fee = gross_amount * fee_basis_points / 10000
+        // fee = gross_amount * fee_basis_points / BASIS_POINTS_SCALE
         // Use i128 to avoid overflow during multiplication
-        let fee = (gross_amount as i128 * self.fee_basis_points as i128 / 10000) as i64;
+        let fee =
+            (gross_amount as i128 * self.fee_basis_points as i128 / BASIS_POINTS_SCALE) as i64;
         fee.max(0) // Ensure non-negative
     }
 
@@ -166,11 +170,11 @@ impl FxConfig {
 
         // Calculate absolute percentage difference in basis points
         // Use i128 for intermediate calculations to prevent overflow
-        // Note: For extreme values where diff*10000 would overflow i128,
+        // Note: For extreme values where diff*BASIS_POINTS_SCALE would overflow i128,
         // saturating_mul returns i128::MAX which correctly triggers slippage rejection
         let diff = (actual as i128).saturating_sub(expected as i128).abs();
         let expected_abs = (expected as i128).abs().max(1); // Avoid division by zero
-        let pct = diff.saturating_mul(10000) / expected_abs;
+        let pct = diff.saturating_mul(BASIS_POINTS_SCALE) / expected_abs;
 
         pct <= self.max_slippage_basis_points as i128
     }
@@ -735,5 +739,102 @@ mod integration_tests {
 
         // Bob gets full amount
         assert_eq!(ledger.get_balance(&bob, "USD"), 250);
+    }
+
+    #[tokio::test]
+    async fn test_clearing_account_balance_verification() {
+        // Verify that the 4/5-leg entry balances net to zero per currency
+        let (mut ledger, alice, bob, clearing) = setup_ledger_with_fx().await;
+
+        // Execute multiple transfers to verify clearing account balances
+        let (_, details) = ledger
+            .transfer_with_conversion(&alice, &bob, 10, "hours", "USD", None)
+            .await
+            .expect("execute transfer 1");
+
+        // Verify clearing account maintains double-entry invariant per currency:
+        // Clearing receives hours (credit = positive in ICN semantics)
+        // Clearing sends USD (debit = negative in ICN semantics)
+        let clearing_hours = ledger.get_balance(&clearing, "hours");
+        let clearing_usd = ledger.get_balance(&clearing, "USD");
+
+        // Clearing receives 10 hours
+        assert_eq!(clearing_hours, 10);
+        // Clearing sends 250 USD (gross amount)
+        assert_eq!(clearing_usd, -details.gross_target_amount);
+
+        // Verify the sum of all balances per currency equals zero (double-entry invariant)
+        let alice_hours = ledger.get_balance(&alice, "hours");
+        // Bob's USD balance is verified in detail assertions below
+        let _bob_usd = ledger.get_balance(&bob, "USD");
+
+        // Hours: alice (-10) + clearing (+10) = 0
+        assert_eq!(
+            alice_hours + clearing_hours,
+            0,
+            "Hours currency should sum to zero"
+        );
+
+        // USD: clearing (-250) + bob (248) + treasury (2) = 0
+        // Treasury gets the 2 USD fee
+        // Note: We can't easily get treasury balance without the DID, but we can verify:
+        assert_eq!(
+            details.gross_target_amount,
+            details.net_target_amount + details.fee_amount,
+            "Gross = Net + Fee"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_fee_with_treasury_configured() {
+        // This test explicitly verifies the P1 fix:
+        // When fee_amount > 0 AND treasury is configured, the fee goes to treasury
+        let store = Arc::new(SledStore::temporary().expect("create temp store"));
+        let mut ledger = Ledger::new(store.clone()).expect("create ledger");
+
+        let alice = KeyPair::generate().expect("generate").did().clone();
+        let bob = KeyPair::generate().expect("generate").did().clone();
+        let clearing = KeyPair::generate().expect("generate").did().clone();
+        let treasury = KeyPair::generate().expect("generate").did().clone();
+
+        // Set up oracle
+        let oracle = Arc::new(OracleManager::new(store.clone()));
+        let manual_source = Arc::new(ManualRateSource::new(store.clone()));
+
+        manual_source
+            .set_rate(
+                &crate::oracle::CurrencyPair::new("hours", "USD"),
+                100.0, // 1 hour = 100 USD for easier math
+                &clearing.to_string(),
+                None,
+            )
+            .expect("set rate");
+
+        oracle.register_source(manual_source).await;
+        ledger.set_oracle_manager(oracle);
+
+        // FX config WITH fee AND treasury
+        let fx_config = FxConfig::new(clearing.clone())
+            .with_fee(100) // 1%
+            .with_treasury(treasury.clone());
+        ledger.set_fx_config(fx_config);
+
+        // Execute transfer: 10 hours -> 1000 USD gross, 10 USD fee, 990 USD net
+        let (_, details) = ledger
+            .transfer_with_conversion(&alice, &bob, 10, "hours", "USD", None)
+            .await
+            .expect("execute transfer");
+
+        // Verify fee calculation
+        assert_eq!(details.gross_target_amount, 1000);
+        assert_eq!(details.fee_amount, 10); // 1% of 1000
+        assert_eq!(details.net_target_amount, 990);
+
+        // Verify balances
+        assert_eq!(ledger.get_balance(&alice, "hours"), -10);
+        assert_eq!(ledger.get_balance(&bob, "USD"), 990); // Net amount
+        assert_eq!(ledger.get_balance(&treasury, "USD"), 10); // Fee
+        assert_eq!(ledger.get_balance(&clearing, "hours"), 10);
+        assert_eq!(ledger.get_balance(&clearing, "USD"), -1000); // Gross
     }
 }

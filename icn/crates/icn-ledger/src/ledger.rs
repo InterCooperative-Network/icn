@@ -564,17 +564,26 @@ impl Ledger {
             );
 
         // Add treasury fee leg if applicable
-        if fee_amount > 0 {
+        // Simplified logic: fee is only collected when both fee_amount > 0 AND treasury is configured
+        // Note: calculate_fee() already returns 0 when treasury_did.is_none(), but we make this
+        // explicit here for clarity and to prevent any drift between the two conditions.
+        let (recipient_amount, has_treasury_fee) =
+            if fee_amount > 0 && fx_config.treasury_did.is_some() {
+                (net_target_amount, true)
+            } else {
+                (gross_target_amount, false)
+            };
+
+        if has_treasury_fee {
+            // Use if-let pattern to satisfy clippy::unwrap_used lint
+            // has_treasury_fee is true only when treasury_did.is_some()
             if let Some(treasury) = &fx_config.treasury_did {
                 builder = builder
                     .debit(treasury.clone(), to_currency.to_string(), fee_amount)
-                    .debit(to.clone(), to_currency.to_string(), net_target_amount);
-            } else {
-                // No treasury configured, net = gross
-                builder = builder.debit(to.clone(), to_currency.to_string(), gross_target_amount);
+                    .debit(to.clone(), to_currency.to_string(), recipient_amount);
             }
         } else {
-            builder = builder.debit(to.clone(), to_currency.to_string(), gross_target_amount);
+            builder = builder.debit(to.clone(), to_currency.to_string(), recipient_amount);
         }
 
         let entry = builder
@@ -585,6 +594,7 @@ impl Ledger {
         let valid_until = rate.aggregated_at.saturating_add(rate.ttl_secs);
 
         // Build conversion details for audit
+        // Note: recipient_amount is calculated above and matches the journal entry logic
         let details = FxConversionDetails::new(
             from.to_string(),
             to.to_string(),
@@ -597,11 +607,7 @@ impl Ledger {
             rate.is_stale,
             gross_target_amount,
             fee_amount,
-            if fee_amount > 0 && fx_config.treasury_did.is_some() {
-                net_target_amount
-            } else {
-                gross_target_amount
-            },
+            recipient_amount, // Uses same logic as journal entry builder
             fx_config.fee_basis_points,
         );
 
@@ -630,8 +636,14 @@ impl Ledger {
         use crate::fx::FxError;
 
         // Check if prepared transfer is still valid
+        // Safety margin: reject 1 second before expiry to prevent TOCTOU race conditions
+        // (e.g., GC pause between check and append could allow expired rate to be committed)
+        const EXPIRATION_SAFETY_MARGIN_SECS: u64 = 1;
         let now = crate::current_timestamp_secs();
-        if now >= prepared.valid_until {
+        let effective_expiry = prepared
+            .valid_until
+            .saturating_sub(EXPIRATION_SAFETY_MARGIN_SECS);
+        if now >= effective_expiry {
             return Err(FxError::TransferExpired {
                 expired_at: prepared.valid_until,
                 current_time: now,

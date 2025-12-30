@@ -486,6 +486,10 @@ pub struct CrossPaymentQuote {
     pub to_currency: String,
     /// Exchange rate
     pub rate: f64,
+    /// When the rate was fetched (Unix seconds)
+    pub rate_timestamp: u64,
+    /// Sources that provided the rate
+    pub rate_sources: Vec<String>,
     /// When this quote expires (Unix seconds)
     pub valid_until: u64,
     /// Whether the rate is considered stale
