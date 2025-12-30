@@ -849,6 +849,8 @@ impl GatewayServer {
                                 .service(api::ledger::get_balance)
                                 .service(api::ledger::create_payment)
                                 .service(api::ledger::get_history)
+                                .service(api::ledger::create_cross_payment)
+                                .service(api::ledger::get_cross_payment_quote)
                                 // Apply auth first, then rate limiting (wrapping order: last runs first)
                                 .wrap(middleware::from_fn(
                                     crate::rate_limit::rate_limit_middleware,

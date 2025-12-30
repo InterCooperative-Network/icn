@@ -94,6 +94,18 @@ pub enum GatewayEvent {
         amount: i64,
         currency: String,
     },
+    /// A cross-currency payment was created
+    CrossPaymentCreated {
+        coop_id: String,
+        hash: String,
+        from: String,
+        to: String,
+        source_amount: i64,
+        from_currency: String,
+        target_amount: i64,
+        to_currency: String,
+        rate: f64,
+    },
     /// A member was added to a cooperative
     MemberAdded {
         coop_id: String,

@@ -5,8 +5,12 @@ use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
 use icn_identity::Did;
-use icn_ledger::{entry::JournalEntryBuilder, Ledger, SharedEventEmitter};
+use icn_ledger::{
+    entry::JournalEntryBuilder, CurrencyPair, FxConversionDetails, Ledger, SharedEventEmitter,
+};
 use icn_store::{SledStore, Store};
+
+use crate::models::{CrossPaymentQuote, CrossPaymentResponse};
 
 use crate::coop::CoopId;
 use crate::error::{GatewayError, Result};
@@ -292,6 +296,215 @@ impl LedgerManager {
         }
 
         Ok((transaction_count, total_hours_exchanged))
+    }
+
+    /// Create a cross-currency payment
+    ///
+    /// Transfers funds between two currencies using the exchange rate oracle.
+    /// The sender pays in `from_currency` and the recipient receives in `to_currency`.
+    ///
+    /// Returns the entry hash and conversion details for audit/display.
+    ///
+    /// # Note on locking
+    /// This method holds a read lock across an await point during preparation.
+    /// This is acceptable because read locks allow concurrent readers and don't block.
+    #[allow(clippy::await_holding_lock)]
+    pub async fn create_cross_payment(
+        &self,
+        coop_id: &CoopId,
+        from: &Did,
+        to: &Did,
+        amount: i64,
+        from_currency: &str,
+        to_currency: &str,
+        max_target_amount: Option<i64>,
+        _memo: Option<String>,
+    ) -> Result<CrossPaymentResponse> {
+        // Enforce budget limits if store is available
+        if let Some(store) = &self.budget_store {
+            let from_account = from.to_string();
+            if !store
+                .check_spending(&from_account, amount)
+                .map_err(|e| GatewayError::InternalError(format!("Budget check failed: {e}")))?
+            {
+                return Err(GatewayError::BudgetExceeded(format!(
+                    "Budget exceeded for account {from_account}"
+                )));
+            }
+        }
+
+        let ledger_arc = self.get_ledger(coop_id)?;
+
+        // Prepare the transfer (fetches rate from oracle) - only needs read lock
+        let prepared = {
+            let ledger = ledger_arc
+                .read()
+                .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
+
+            ledger
+                .prepare_cross_currency_transfer(
+                    from,
+                    to,
+                    amount,
+                    from_currency,
+                    to_currency,
+                    max_target_amount,
+                )
+                .await
+                .map_err(|e| GatewayError::InternalError(format!("FX error: {e}")))?
+        };
+
+        // Execute the transfer (writes to ledger) - needs write lock
+        let (hash, details) = {
+            let mut ledger = ledger_arc
+                .write()
+                .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
+
+            let (hash, details) = ledger
+                .execute_cross_currency_transfer(prepared)
+                .map_err(|e| GatewayError::InternalError(format!("FX execution error: {e}")))?;
+
+            (hash.to_hex(), details)
+        };
+
+        // Record spending in budget store
+        if let Some(store) = &self.budget_store {
+            let from_account = from.to_string();
+            if let Err(e) = store.record_spending(&from_account, amount) {
+                tracing::error!("Failed to record spending for {}: {}", from_account, e);
+            }
+        }
+
+        // Broadcast event if broadcaster is available
+        if let Some(broadcaster) = &self.event_broadcaster {
+            let event = GatewayEvent::CrossPaymentCreated {
+                coop_id: coop_id.clone(),
+                hash: hash.clone(),
+                from: from.to_string(),
+                to: to.to_string(),
+                source_amount: amount,
+                from_currency: from_currency.to_string(),
+                target_amount: details.net_target_amount,
+                to_currency: to_currency.to_string(),
+                rate: details.rate,
+            };
+            let broadcaster = broadcaster.clone();
+            let coop_id = coop_id.clone();
+            tokio::spawn(async move {
+                broadcaster.broadcast(&coop_id, event).await;
+            });
+        }
+
+        Ok(CrossPaymentResponse {
+            hash,
+            from: from.to_string(),
+            to: to.to_string(),
+            source_amount: amount,
+            from_currency: from_currency.to_string(),
+            gross_target_amount: details.gross_target_amount,
+            fee_amount: details.fee_amount,
+            net_target_amount: details.net_target_amount,
+            to_currency: to_currency.to_string(),
+            rate_used: details.rate,
+            rate_timestamp: details.rate_timestamp,
+            rate_sources: details.rate_sources,
+        })
+    }
+
+    /// Get a quote for a cross-currency payment without executing it
+    ///
+    /// Returns the expected conversion details including rate, fees, and amounts.
+    /// The quote is valid for a limited time based on oracle TTL.
+    pub async fn get_cross_payment_quote(
+        &self,
+        coop_id: &CoopId,
+        amount: i64,
+        from_currency: &str,
+        to_currency: &str,
+    ) -> Result<CrossPaymentQuote> {
+        let ledger_arc = self.get_ledger(coop_id)?;
+
+        // Get FX config and oracle under lock, then release before await
+        let (fx_config, oracle) = {
+            let ledger = ledger_arc
+                .read()
+                .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
+
+            let fx_config = ledger.fx_config().cloned().ok_or_else(|| {
+                GatewayError::InternalError("Cross-currency payments not configured".to_string())
+            })?;
+
+            let oracle = ledger.oracle_manager().cloned().ok_or_else(|| {
+                GatewayError::InternalError("Exchange rate oracle not configured".to_string())
+            })?;
+
+            (fx_config, oracle)
+        };
+
+        // Get current rate (after releasing lock)
+        let pair = CurrencyPair::new(from_currency, to_currency);
+        let rate = oracle
+            .get_rate(&pair)
+            .await
+            .map_err(|e| GatewayError::InternalError(format!("Oracle error: {e}")))?;
+
+        // Check staleness
+        if rate.is_stale && !fx_config.allow_stale_rates {
+            return Err(GatewayError::InternalError(
+                "Exchange rate is stale and stale rates are not allowed".to_string(),
+            ));
+        }
+
+        // Calculate conversion
+        let gross_target_amount = rate
+            .convert(amount)
+            .ok_or_else(|| GatewayError::InternalError("Conversion would overflow".to_string()))?;
+
+        // Calculate fee
+        let fee_amount = if fx_config.fee_basis_points > 0 && fx_config.treasury_did.is_some() {
+            (gross_target_amount as f64 * fx_config.fee_basis_points as f64 / 10000.0).round()
+                as i64
+        } else {
+            0
+        };
+
+        let net_target_amount = gross_target_amount - fee_amount;
+
+        // Quote valid until rate expires
+        let valid_until = rate.aggregated_at + rate.ttl_secs;
+
+        Ok(CrossPaymentQuote {
+            source_amount: amount,
+            from_currency: from_currency.to_string(),
+            gross_target_amount,
+            fee_amount,
+            net_target_amount,
+            to_currency: to_currency.to_string(),
+            rate: rate.rate,
+            valid_until,
+            is_stale: rate.is_stale,
+        })
+    }
+
+    /// Get conversion details for a cross-currency transfer
+    ///
+    /// This is a lower-level method that returns the FxConversionDetails directly.
+    #[allow(dead_code)]
+    pub fn get_fx_conversion_details(&self, details: &FxConversionDetails) -> CrossPaymentResponse {
+        CrossPaymentResponse {
+            hash: String::new(), // Not available without actual execution
+            from: String::new(),
+            to: String::new(),
+            source_amount: details.source_amount,
+            from_currency: details.from_currency.clone(),
+            gross_target_amount: details.gross_target_amount,
+            fee_amount: details.fee_amount,
+            net_target_amount: details.net_target_amount,
+            to_currency: details.to_currency.clone(),
+            rate_used: details.rate,
+            rate_timestamp: details.rate_timestamp,
+            rate_sources: details.rate_sources.clone(),
+        }
     }
 }
 
