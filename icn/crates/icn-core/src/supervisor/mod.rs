@@ -747,7 +747,7 @@ impl Supervisor {
                     match parse_bootstrap_peer(peer_url).await {
                         Ok((peer_did, peer_addr)) => {
                             info!(
-                                "Connecting to bootstrap peer: {} at {} (resolved)",
+                                "Connecting to bootstrap peer: {} at {}",
                                 peer_did, peer_addr
                             );
                             match network_handle.dial(peer_addr, peer_did.clone()).await {
@@ -1421,14 +1421,27 @@ mod tests {
 
     #[tokio::test]
     async fn test_parse_bootstrap_peer_dns_failure() {
-        // Test DNS resolution failure with invalid hostname
-        let url = format!("icn://{TEST_ALICE_DID}@invalid.hostname.that.does.not.exist.local:7777");
+        // Test DNS resolution failure with a guaranteed-invalid hostname (RFC 6761)
+        let url = format!("icn://{TEST_ALICE_DID}@test.invalid:7777");
         let result = parse_bootstrap_peer(&url).await;
         assert!(result.is_err());
         assert!(result
             .unwrap_err()
             .to_string()
             .contains("DNS resolution failed"));
+    }
+
+    #[tokio::test]
+    async fn test_parse_bootstrap_peer_ipv6() {
+        // Test IPv6 address parsing (fast path, no DNS needed)
+        let url = format!("icn://{TEST_ALICE_DID}@[::1]:7777");
+        let result = parse_bootstrap_peer(&url).await;
+        assert!(result.is_ok(), "Failed to parse IPv6 address: {result:?}");
+
+        let (did, addr) = result.unwrap();
+        assert_eq!(did.as_str(), TEST_ALICE_DID);
+        assert!(addr.ip().is_loopback());
+        assert_eq!(addr.port(), 7777);
     }
 
     #[tokio::test]
