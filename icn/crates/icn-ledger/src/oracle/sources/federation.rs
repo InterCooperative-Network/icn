@@ -68,7 +68,22 @@ impl FederationRateSource {
     }
 
     /// Add or update a single rate
-    pub async fn set_rate(&self, from: &str, to: &str, rate: f64, agreement_id: &str) {
+    ///
+    /// Returns an error if the rate is invalid (NaN, infinity, zero, or negative).
+    pub async fn set_rate(
+        &self,
+        from: &str,
+        to: &str,
+        rate: f64,
+        agreement_id: &str,
+    ) -> OracleResult<()> {
+        // Validate rate
+        if rate <= 0.0 || !rate.is_finite() {
+            return Err(OracleError::InvalidRate(format!(
+                "Rate must be a positive finite number, got: {rate}"
+            )));
+        }
+
         let mut rates = self.rates.write().await;
         let key = format!("{from}:{to}");
         rates.insert(
@@ -79,6 +94,7 @@ impl FederationRateSource {
                 timestamp: crate::current_timestamp_secs(),
             },
         );
+        Ok(())
     }
 
     /// Remove a rate
@@ -171,7 +187,10 @@ mod tests {
         let source = FederationRateSource::new();
 
         // Set a rate
-        source.set_rate("hours", "USD", 25.0, "agreement-1").await;
+        source
+            .set_rate("hours", "USD", 25.0, "agreement-1")
+            .await
+            .expect("should set rate");
 
         // Get it back
         let pair = CurrencyPair::new("hours", "USD");
@@ -224,7 +243,10 @@ mod tests {
         let source = FederationRateSource::new();
 
         // Set and remove
-        source.set_rate("hours", "USD", 25.0, "agreement-1").await;
+        source
+            .set_rate("hours", "USD", 25.0, "agreement-1")
+            .await
+            .expect("should set rate");
         assert!(source.supports_pair(&CurrencyPair::new("hours", "USD")));
 
         source.remove_rate("hours", "USD").await;
@@ -245,5 +267,30 @@ mod tests {
         let source = FederationRateSource::new();
         assert_eq!(source.priority(), 20);
         assert_eq!(source.source_id(), "federation");
+    }
+
+    #[tokio::test]
+    async fn test_invalid_rate() {
+        let source = FederationRateSource::new();
+
+        // Negative rate
+        let result = source.set_rate("hours", "USD", -25.0, "agreement-1").await;
+        assert!(matches!(result, Err(OracleError::InvalidRate(_))));
+
+        // Zero rate
+        let result = source.set_rate("hours", "USD", 0.0, "agreement-1").await;
+        assert!(matches!(result, Err(OracleError::InvalidRate(_))));
+
+        // NaN rate
+        let result = source
+            .set_rate("hours", "USD", f64::NAN, "agreement-1")
+            .await;
+        assert!(matches!(result, Err(OracleError::InvalidRate(_))));
+
+        // Infinity rate
+        let result = source
+            .set_rate("hours", "USD", f64::INFINITY, "agreement-1")
+            .await;
+        assert!(matches!(result, Err(OracleError::InvalidRate(_))));
     }
 }

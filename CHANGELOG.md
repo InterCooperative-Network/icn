@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Exchange Rate Oracle (2025-12-30)
+
+**Multi-Currency Support for Cooperative Economies** (PR #364):
+- Exchange rate oracle with multi-source aggregation using median consensus
+- Automatic inverse rate calculation when direct pair unavailable
+- TTL-based caching (1h) with staleness detection (24h threshold)
+- Rate audit trail for governance transparency
+
+**Rate Sources**:
+- `ManualRateSource` (priority 10): Cooperative-defined rates via governance
+- `FederationRateSource` (priority 20): Rates from bilateral clearing agreements
+- Median consensus with 15% outlier detection prevents manipulation
+
+**Gateway API** (`/v1/oracle/`):
+- `GET /rate/{from}/{to}` - Get exchange rate (with inverse fallback)
+- `POST /convert` - Convert amount between currencies
+- `GET /sources` - List available rate sources
+- `POST /rate` - Set manual rate (requires `oracle:write` scope)
+
+**TypeScript SDK**:
+- `getExchangeRate()`, `convertAmount()`, `listRateSources()`, `setManualRate()`
+- Full type definitions for all oracle operations
+
+**Metrics**:
+- `oracle_rate_queries_total`, `oracle_conversions_total`, `oracle_stale_rates_total`
+- Cache hit/miss tracking, outlier filtering counts
+
 ### Added - New Member Credit Limit Ramping (2025-12-25)
 
 **Member-Since Tracking for Economic Safety** (PR #293):

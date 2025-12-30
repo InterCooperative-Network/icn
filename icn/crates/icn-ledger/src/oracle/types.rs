@@ -120,19 +120,29 @@ impl ExchangeRate {
     /// Convert an amount from source to target currency
     ///
     /// Returns `None` if the conversion would overflow i64 bounds.
+    /// Uses a 1% safety margin to account for floating-point precision issues.
     pub fn convert(&self, amount: i64) -> Option<i64> {
         let result = (amount as f64) * self.rate;
-        // Check for overflow before casting
-        if result > i64::MAX as f64 || result < i64::MIN as f64 {
+        // Check for non-finite results (NaN, infinity)
+        if !result.is_finite() {
+            return None;
+        }
+        // Use 99% of i64 bounds as safety margin for floating-point precision
+        const SAFETY_MARGIN: f64 = 0.99;
+        let max_safe = i64::MAX as f64 * SAFETY_MARGIN;
+        let min_safe = i64::MIN as f64 * SAFETY_MARGIN;
+        if result > max_safe || result < min_safe {
             return None;
         }
         Some(result.round() as i64)
     }
 
     /// Convert an amount, saturating at i64 bounds on overflow
+    ///
+    /// Returns i64::MAX or i64::MIN for values that overflow or are non-finite.
     pub fn convert_saturating(&self, amount: i64) -> i64 {
         let result = (amount as f64) * self.rate;
-        if result > i64::MAX as f64 {
+        if !result.is_finite() || result > i64::MAX as f64 {
             i64::MAX
         } else if result < i64::MIN as f64 {
             i64::MIN
