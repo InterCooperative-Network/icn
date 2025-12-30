@@ -661,8 +661,7 @@ mod tests {
         let alice = test_did("alice");
 
         for i in 0..10 {
-            let comment =
-                Comment::new(proposal_id.clone(), alice.clone(), format!("Comment {i}"));
+            let comment = Comment::new(proposal_id.clone(), alice.clone(), format!("Comment {i}"));
             store.add_comment(comment).unwrap();
         }
 
