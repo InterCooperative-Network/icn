@@ -165,8 +165,12 @@ impl FxConfig {
         }
 
         // Calculate absolute percentage difference in basis points
-        let diff = (actual - expected).abs() as i128;
-        let pct = diff * 10000 / expected.abs() as i128;
+        // Use i128 for intermediate calculations to prevent overflow
+        // Note: For extreme values where diff*10000 would overflow i128,
+        // saturating_mul returns i128::MAX which correctly triggers slippage rejection
+        let diff = (actual as i128).saturating_sub(expected as i128).abs();
+        let expected_abs = (expected as i128).abs().max(1); // Avoid division by zero
+        let pct = diff.saturating_mul(10000) / expected_abs;
 
         pct <= self.max_slippage_basis_points as i128
     }
@@ -178,6 +182,12 @@ impl FxConfig {
 /// for transparency and dispute resolution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FxConversionDetails {
+    /// Sender DID
+    pub from_did: String,
+
+    /// Recipient DID
+    pub to_did: String,
+
     /// Source currency (what sender pays)
     pub from_currency: String,
 
@@ -214,7 +224,10 @@ pub struct FxConversionDetails {
 
 impl FxConversionDetails {
     /// Create new conversion details
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
+        from_did: String,
+        to_did: String,
         from_currency: String,
         to_currency: String,
         source_amount: i64,
@@ -228,6 +241,8 @@ impl FxConversionDetails {
         fee_basis_points: u16,
     ) -> Self {
         Self {
+            from_did,
+            to_did,
             from_currency,
             to_currency,
             rate,
@@ -447,6 +462,8 @@ mod tests {
     #[test]
     fn test_conversion_details() {
         let details = FxConversionDetails::new(
+            "did:icn:alice".to_string(),
+            "did:icn:bob".to_string(),
             "hours".to_string(),
             "USD".to_string(),
             10,    // source amount
@@ -460,6 +477,8 @@ mod tests {
             100, // fee bps
         );
 
+        assert_eq!(details.from_did, "did:icn:alice");
+        assert_eq!(details.to_did, "did:icn:bob");
         assert_eq!(details.from_currency, "hours");
         assert_eq!(details.to_currency, "USD");
         assert_eq!(details.source_amount, 10);

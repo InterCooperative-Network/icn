@@ -586,6 +586,8 @@ impl Ledger {
 
         // Build conversion details for audit
         let details = FxConversionDetails::new(
+            from.to_string(),
+            to.to_string(),
             from_currency.to_string(),
             to_currency.to_string(),
             source_amount,
@@ -640,6 +642,32 @@ impl Ledger {
         let hash = self
             .append_entry(prepared.entry)
             .map_err(|e| FxError::InvalidAmount(format!("Failed to append entry: {e}")))?;
+
+        // Emit cross-currency transfer event
+        if let Some(ref emitter) = self.event_emitter {
+            // Parse DIDs from the details (they were just converted to strings from DIDs)
+            if let (Ok(from_did), Ok(to_did)) = (
+                Did::from_str(&prepared.details.from_did),
+                Did::from_str(&prepared.details.to_did),
+            ) {
+                emitter.emit_cross_currency_transfer(
+                    &hash,
+                    &from_did,
+                    &to_did,
+                    prepared.details.source_amount,
+                    &prepared.details.from_currency,
+                    prepared.details.gross_target_amount,
+                    prepared.details.fee_amount,
+                    prepared.details.net_target_amount,
+                    &prepared.details.to_currency,
+                    prepared.details.rate,
+                    prepared.details.rate_timestamp,
+                    prepared.details.rate_sources.clone(),
+                    now,
+                    self.domain_id.clone(),
+                );
+            }
+        }
 
         Ok((hash, prepared.details))
     }
