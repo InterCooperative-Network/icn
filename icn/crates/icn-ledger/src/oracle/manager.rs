@@ -352,8 +352,17 @@ impl OracleManager {
         }
 
         // Sort by rate for median calculation
-        let mut rates: Vec<f64> = observations.iter().map(|o| o.rate).collect();
+        let mut rates: Vec<f64> = observations
+            .iter()
+            .map(|o| o.rate)
+            .filter(|r| r.is_finite()) // Filter out NaN/Infinity
+            .collect();
         rates.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+        // Defensive check: if all rates were filtered (all NaN/Infinity), return error
+        if rates.is_empty() {
+            return Err(OracleError::NoSourcesAvailable(pair.clone()));
+        }
 
         // Calculate median
         let median = if rates.len().is_multiple_of(2) {

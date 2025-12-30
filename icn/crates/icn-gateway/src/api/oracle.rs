@@ -18,7 +18,9 @@ use tracing::info;
 
 use crate::error::{GatewayError, Result};
 use crate::middleware::require_scope;
-use icn_ledger::oracle::{CurrencyPair, ManualRateSource, OracleManager};
+use icn_ledger::oracle::{
+    CurrencyPair, ExchangeRate, ManualRateSource, OracleError, OracleManager,
+};
 use icn_store::Store;
 
 /// Minimum exchange rate (prevents near-zero rates that could cause issues)
@@ -205,6 +207,9 @@ pub struct ListSourcesResponse {
 // === Endpoints ===
 
 /// GET /oracle/rate/{from}/{to} - Get exchange rate
+///
+/// Supports automatic inverse rate calculation: if hours→USD is not found,
+/// but USD→hours exists, returns 1/rate with the correct pair.
 #[get("/rate/{from}/{to}")]
 pub async fn get_rate(
     req: HttpRequest,
@@ -224,11 +229,33 @@ pub async fn get_rate(
     // Record metrics
     icn_obs::metrics::gateway::oracle_rate_queries_inc(&pair.to_string());
 
-    let rate = oracle_state
-        .oracle
-        .get_rate(&pair)
-        .await
-        .map_err(|e| GatewayError::BadRequest(format!("Failed to get rate: {e}")))?;
+    // Try direct lookup first, then inverse lookup
+    let rate = match oracle_state.oracle.get_rate(&pair).await {
+        Ok(r) => r,
+        Err(OracleError::RateNotFound(_) | OracleError::NoSourcesAvailable(_)) => {
+            // Try inverse pair
+            let inverse_pair = pair.inverse();
+            match oracle_state.oracle.get_rate(&inverse_pair).await {
+                Ok(inverse_rate) => {
+                    // Convert to requested pair orientation
+                    ExchangeRate {
+                        pair: pair.clone(),
+                        rate: inverse_rate.inverse_rate(),
+                        observations: inverse_rate.observations,
+                        aggregated_at: inverse_rate.aggregated_at,
+                        ttl_secs: inverse_rate.ttl_secs,
+                        is_stale: inverse_rate.is_stale,
+                    }
+                }
+                Err(e) => {
+                    return Err(GatewayError::BadRequest(format!(
+                        "Rate not found for {from}/{to} or inverse: {e}"
+                    )))
+                }
+            }
+        }
+        Err(e) => return Err(GatewayError::BadRequest(format!("Failed to get rate: {e}"))),
+    };
 
     // Track stale rate returns
     if rate.is_stale {
@@ -275,12 +302,32 @@ pub async fn convert_amount(
     }
 
     // Get the rate once and use for both conversion and response
+    // Try direct lookup first, then inverse lookup
     let pair = CurrencyPair::new(&body.from_currency, &body.to_currency);
-    let rate = oracle_state
-        .oracle
-        .get_rate(&pair)
-        .await
-        .map_err(|e| GatewayError::BadRequest(format!("Failed to get rate: {e}")))?;
+    let rate = match oracle_state.oracle.get_rate(&pair).await {
+        Ok(r) => r,
+        Err(OracleError::RateNotFound(_) | OracleError::NoSourcesAvailable(_)) => {
+            // Try inverse pair
+            let inverse_pair = pair.inverse();
+            match oracle_state.oracle.get_rate(&inverse_pair).await {
+                Ok(inverse_rate) => ExchangeRate {
+                    pair: pair.clone(),
+                    rate: inverse_rate.inverse_rate(),
+                    observations: inverse_rate.observations,
+                    aggregated_at: inverse_rate.aggregated_at,
+                    ttl_secs: inverse_rate.ttl_secs,
+                    is_stale: inverse_rate.is_stale,
+                },
+                Err(e) => {
+                    return Err(GatewayError::BadRequest(format!(
+                        "Rate not found for {}/{} or inverse: {e}",
+                        body.from_currency, body.to_currency
+                    )))
+                }
+            }
+        }
+        Err(e) => return Err(GatewayError::BadRequest(format!("Failed to get rate: {e}"))),
+    };
 
     // Convert using the fetched rate
     let converted = rate.convert(body.amount).ok_or_else(|| {
