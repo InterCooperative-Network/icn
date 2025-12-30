@@ -118,8 +118,27 @@ impl ExchangeRate {
     }
 
     /// Convert an amount from source to target currency
-    pub fn convert(&self, amount: i64) -> i64 {
-        ((amount as f64) * self.rate).round() as i64
+    ///
+    /// Returns `None` if the conversion would overflow i64 bounds.
+    pub fn convert(&self, amount: i64) -> Option<i64> {
+        let result = (amount as f64) * self.rate;
+        // Check for overflow before casting
+        if result > i64::MAX as f64 || result < i64::MIN as f64 {
+            return None;
+        }
+        Some(result.round() as i64)
+    }
+
+    /// Convert an amount, saturating at i64 bounds on overflow
+    pub fn convert_saturating(&self, amount: i64) -> i64 {
+        let result = (amount as f64) * self.rate;
+        if result > i64::MAX as f64 {
+            i64::MAX
+        } else if result < i64::MIN as f64 {
+            i64::MIN
+        } else {
+            result.round() as i64
+        }
     }
 
     /// Get the inverse rate
@@ -246,8 +265,27 @@ mod tests {
             is_stale: false,
         };
 
-        assert_eq!(rate.convert(10), 250);
-        assert_eq!(rate.convert(1), 25);
+        assert_eq!(rate.convert(10), Some(250));
+        assert_eq!(rate.convert(1), Some(25));
+    }
+
+    #[test]
+    fn test_exchange_rate_convert_overflow() {
+        let rate = ExchangeRate {
+            pair: CurrencyPair::new("hours", "USD"),
+            rate: 1e20,
+            observations: vec![],
+            aggregated_at: 0,
+            ttl_secs: 3600,
+            is_stale: false,
+        };
+
+        // Should return None on overflow
+        assert_eq!(rate.convert(i64::MAX), None);
+        assert_eq!(rate.convert(i64::MAX / 2), None);
+
+        // Saturating version should return i64::MAX
+        assert_eq!(rate.convert_saturating(i64::MAX), i64::MAX);
     }
 
     #[test]

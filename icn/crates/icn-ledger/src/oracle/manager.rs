@@ -243,7 +243,12 @@ impl OracleManager {
         let pair = CurrencyPair::new(from, to);
         let rate = self.get_rate(&pair).await?;
 
-        Ok(rate.convert(amount))
+        rate.convert(amount).ok_or_else(|| {
+            OracleError::InvalidRate(format!(
+                "Conversion overflow: {amount} * {} exceeds i64 bounds",
+                rate.rate
+            ))
+        })
     }
 
     // === Cache Operations ===

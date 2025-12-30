@@ -21,6 +21,49 @@ use crate::middleware::require_scope;
 use icn_ledger::oracle::{CurrencyPair, ManualRateSource, OracleManager};
 use icn_store::Store;
 
+/// Minimum exchange rate (prevents near-zero rates that could cause issues)
+const MIN_RATE: f64 = 1e-9;
+/// Maximum exchange rate (prevents extremely large rates)
+const MAX_RATE: f64 = 1e12;
+/// Maximum currency code length
+const MAX_CURRENCY_CODE_LEN: usize = 12;
+
+/// Validate a currency code
+///
+/// Valid currency codes are:
+/// - 1-12 characters
+/// - Alphanumeric (letters and numbers) or underscores
+/// - Cannot be empty
+fn validate_currency_code(code: &str) -> std::result::Result<(), String> {
+    if code.is_empty() {
+        return Err("Currency code cannot be empty".to_string());
+    }
+    if code.len() > MAX_CURRENCY_CODE_LEN {
+        return Err(format!(
+            "Currency code too long: {} chars (max {MAX_CURRENCY_CODE_LEN})",
+            code.len()
+        ));
+    }
+    if !code.chars().all(|c| c.is_alphanumeric() || c == '_') {
+        return Err(format!("Currency code must be alphanumeric: '{code}'"));
+    }
+    Ok(())
+}
+
+/// Validate an exchange rate value
+fn validate_rate(rate: f64) -> std::result::Result<(), String> {
+    if rate.is_nan() || rate.is_infinite() {
+        return Err("Rate must be a finite number".to_string());
+    }
+    if rate < MIN_RATE {
+        return Err(format!("Rate too small: {rate} (min {MIN_RATE})"));
+    }
+    if rate > MAX_RATE {
+        return Err(format!("Rate too large: {rate} (max {MAX_RATE})"));
+    }
+    Ok(())
+}
+
 /// Shared oracle manager state
 pub struct OracleState {
     /// The oracle manager
@@ -157,6 +200,11 @@ pub async fn get_rate(
     require_scope(&req, "oracle:read")?;
 
     let (from, to) = path.into_inner();
+
+    // Validate currency codes
+    validate_currency_code(&from).map_err(GatewayError::BadRequest)?;
+    validate_currency_code(&to).map_err(GatewayError::BadRequest)?;
+
     let pair = CurrencyPair::new(&from, &to);
 
     let rate = oracle_state
@@ -187,6 +235,10 @@ pub async fn convert_amount(
     body: web::Json<ConvertAmountRequest>,
 ) -> Result<HttpResponse> {
     require_scope(&req, "oracle:read")?;
+
+    // Validate currency codes
+    validate_currency_code(&body.from_currency).map_err(GatewayError::BadRequest)?;
+    validate_currency_code(&body.to_currency).map_err(GatewayError::BadRequest)?;
 
     let converted = oracle_state
         .oracle
@@ -247,6 +299,13 @@ pub async fn set_rate(
 ) -> Result<HttpResponse> {
     require_scope(&req, "oracle:write")?;
 
+    // Validate currency codes
+    validate_currency_code(&body.from_currency).map_err(GatewayError::BadRequest)?;
+    validate_currency_code(&body.to_currency).map_err(GatewayError::BadRequest)?;
+
+    // Validate rate bounds
+    validate_rate(body.rate).map_err(GatewayError::BadRequest)?;
+
     // Get the authenticated user's DID
     let claims = crate::middleware::get_claims(&req)
         .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
@@ -294,5 +353,67 @@ mod tests {
     fn test_currency_pair_creation() {
         let pair = CurrencyPair::new("hours", "USD");
         assert_eq!(pair.key(), "hours:USD");
+    }
+
+    #[test]
+    fn test_validate_currency_code_valid() {
+        assert!(validate_currency_code("USD").is_ok());
+        assert!(validate_currency_code("hours").is_ok());
+        assert!(validate_currency_code("kWh").is_ok());
+        assert!(validate_currency_code("credit_hours").is_ok());
+        assert!(validate_currency_code("A").is_ok());
+        assert!(validate_currency_code("ABC123").is_ok());
+    }
+
+    #[test]
+    fn test_validate_currency_code_empty() {
+        let result = validate_currency_code("");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("empty"));
+    }
+
+    #[test]
+    fn test_validate_currency_code_too_long() {
+        let result = validate_currency_code("ABCDEFGHIJKLM"); // 13 chars
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("too long"));
+    }
+
+    #[test]
+    fn test_validate_currency_code_invalid_chars() {
+        assert!(validate_currency_code("US$").is_err());
+        assert!(validate_currency_code("USD!").is_err());
+        assert!(validate_currency_code("US D").is_err());
+        assert!(validate_currency_code("hours/week").is_err());
+    }
+
+    #[test]
+    fn test_validate_rate_valid() {
+        assert!(validate_rate(1.0).is_ok());
+        assert!(validate_rate(0.001).is_ok());
+        assert!(validate_rate(25.0).is_ok());
+        assert!(validate_rate(1e10).is_ok());
+        assert!(validate_rate(1e-8).is_ok());
+    }
+
+    #[test]
+    fn test_validate_rate_too_small() {
+        let result = validate_rate(1e-10);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("too small"));
+    }
+
+    #[test]
+    fn test_validate_rate_too_large() {
+        let result = validate_rate(1e13);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("too large"));
+    }
+
+    #[test]
+    fn test_validate_rate_nan_inf() {
+        assert!(validate_rate(f64::NAN).is_err());
+        assert!(validate_rate(f64::INFINITY).is_err());
+        assert!(validate_rate(f64::NEG_INFINITY).is_err());
     }
 }
