@@ -1361,3 +1361,107 @@ export interface RevokeDeviceResponse {
   /** The revoked device ID */
   device_id: string;
 }
+
+// ============================================================================
+// Exchange Rate Oracle
+// ============================================================================
+
+/**
+ * Exchange rate between two currencies
+ */
+export interface ExchangeRateResponse {
+  /** Source currency code */
+  from_currency: string;
+  /** Target currency code */
+  to_currency: string;
+  /** Exchange rate (target per 1 source) */
+  rate: number;
+  /** Inverse rate (source per 1 target) */
+  inverse_rate: number;
+  /** Sources that contributed to this rate */
+  sources: string[];
+  /** Whether the rate is stale (older than staleness threshold) */
+  is_stale: boolean;
+  /** When the rate was last aggregated (Unix timestamp) */
+  aggregated_at: number;
+  /** Remaining TTL in seconds */
+  remaining_ttl: number;
+}
+
+/**
+ * Request to convert an amount between currencies
+ */
+export interface ConvertAmountRequest {
+  /** Amount to convert (in smallest unit) */
+  amount: number;
+  /** Source currency code */
+  from_currency: string;
+  /** Target currency code */
+  to_currency: string;
+}
+
+/**
+ * Response from currency conversion
+ */
+export interface ConvertAmountResponse {
+  /** Original amount */
+  original_amount: number;
+  /** Converted amount */
+  converted_amount: number;
+  /** Source currency */
+  from_currency: string;
+  /** Target currency */
+  to_currency: string;
+  /** Rate used for conversion */
+  rate_used: number;
+}
+
+/**
+ * Information about a rate source
+ */
+export interface RateSourceInfo {
+  /** Source identifier */
+  source_id: string;
+  /** Human-readable name */
+  name: string;
+  /** Priority (lower = higher priority) */
+  priority: number;
+  /** Whether the source is healthy */
+  is_healthy: boolean;
+}
+
+/**
+ * Response listing rate sources
+ */
+export interface ListRateSourcesResponse {
+  /** Available rate sources */
+  sources: RateSourceInfo[];
+}
+
+/**
+ * Request to set a manual exchange rate
+ */
+export interface SetManualRateRequest {
+  /** Source currency code */
+  from_currency: string;
+  /** Target currency code */
+  to_currency: string;
+  /** Exchange rate (target per 1 source) */
+  rate: number;
+  /** Optional note/reason for the rate */
+  note?: string;
+}
+
+/**
+ * Response from setting a manual rate
+ */
+export interface SetManualRateResponse {
+  /** Currency pair key (from:to) */
+  pair: string;
+  /** Rate that was set */
+  rate: number;
+  /** Who set the rate */
+  set_by: string;
+  /** When the rate was set (Unix timestamp) */
+  set_at: number;
+}

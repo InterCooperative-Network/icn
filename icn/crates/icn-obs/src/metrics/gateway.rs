@@ -352,3 +352,76 @@ pub fn entity_audit_rollback_failure_inc(endpoint: &str) {
 pub fn entity_audit_corruption_inc() {
     counter!("icn_gateway_entity_audit_corruption_total").increment(1);
 }
+
+// Oracle metrics
+
+/// Increment oracle rate queries counter
+pub fn oracle_rate_queries_inc(pair: &str) {
+    counter!(
+        "icn_gateway_oracle_rate_queries_total",
+        "pair" => pair.to_string()
+    )
+    .increment(1);
+}
+
+/// Increment oracle cache hits counter
+pub fn oracle_cache_hits_inc() {
+    counter!("icn_gateway_oracle_cache_hits_total").increment(1);
+}
+
+/// Increment oracle cache misses counter
+pub fn oracle_cache_misses_inc() {
+    counter!("icn_gateway_oracle_cache_misses_total").increment(1);
+}
+
+/// Increment oracle source errors counter
+pub fn oracle_source_errors_inc(source: &str) {
+    counter!(
+        "icn_gateway_oracle_source_errors_total",
+        "source" => source.to_string()
+    )
+    .increment(1);
+}
+
+/// Increment oracle rate updates counter
+pub fn oracle_rate_updates_inc(pair: &str, source: &str) {
+    counter!(
+        "icn_gateway_oracle_rate_updates_total",
+        "pair" => pair.to_string(),
+        "source" => source.to_string()
+    )
+    .increment(1);
+}
+
+/// Increment oracle conversions counter
+pub fn oracle_conversions_inc(from: &str, to: &str) {
+    counter!(
+        "icn_gateway_oracle_conversions_total",
+        "from" => from.to_string(),
+        "to" => to.to_string()
+    )
+    .increment(1);
+}
+
+/// Increment oracle stale rate returns counter
+pub fn oracle_stale_rates_inc(pair: &str) {
+    counter!(
+        "icn_gateway_oracle_stale_rates_total",
+        "pair" => pair.to_string()
+    )
+    .increment(1);
+}
+
+/// Increment oracle outliers filtered counter
+pub fn oracle_outliers_filtered_inc(pair: &str, count: usize) {
+    counter!(
+        "icn_gateway_oracle_outliers_filtered_total",
+        "pair" => pair.to_string()
+    )
+    .increment(count as u64);
+}
+
+/// Set oracle cached pairs gauge
+pub fn oracle_cached_pairs_set(count: usize) {
+    gauge!("icn_gateway_oracle_cached_pairs").set(count as f64);
+}

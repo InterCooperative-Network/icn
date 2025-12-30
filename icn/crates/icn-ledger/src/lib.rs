@@ -64,6 +64,7 @@ pub mod hash;
 pub mod ledger;
 pub mod membership;
 pub mod merge;
+pub mod oracle;
 pub mod progressive_limits;
 pub mod quarantine;
 #[allow(missing_docs)]
@@ -106,3 +107,16 @@ pub use events::{
     LedgerEvent, LedgerEventEmitter, MemberFrozen, MemberUnfrozen, RollbackPerformed,
     SharedEventEmitter, TransactionConfirmed, TransactionCreated, Transfer,
 };
+
+// Exchange rate oracle
+pub use oracle::{
+    CacheStats, CurrencyPair, ExchangeRate, FederationRateSource, ManualRateRecord,
+    ManualRateSource, OracleConfig, OracleError, OracleManager, OracleResult, PriceFeed,
+    RateObservation, SourceInfo,
+};
+
+/// Helper function to get current timestamp in seconds (re-exported from icn_time)
+#[inline]
+pub fn current_timestamp_secs() -> u64 {
+    icn_time::current_timestamp_secs()
+}
