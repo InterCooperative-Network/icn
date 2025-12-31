@@ -2414,7 +2414,7 @@ These defaults balance accessibility (low barrier for task submission) with secu
 
 **Observability stack:**
 - **Logs:** Structured (JSON) to stdout, rotate with logrotate
-- **Metrics:** Prometheus exporter on `:9090/metrics`
+- **Metrics:** Prometheus exporter on `:9100/metrics`
 - **Tracing:** OpenTelemetry (optional export to Jaeger)
 - **Health:** `/healthz` endpoint (OK/DEGRADED)
 

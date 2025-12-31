@@ -16,10 +16,10 @@ scrape_configs:
   - job_name: 'icn-nodes'
     static_configs:
       - targets:
-        - 'localhost:9090'  # Your local ICN node
+        - 'localhost:9100'  # Your local ICN node
         # Add more nodes as needed:
-        # - 'node2:9090'
-        # - 'node3:9090'
+        # - 'node2:9100'
+        # - 'node3:9100'
 ```
 
 Run Prometheus:
@@ -165,7 +165,7 @@ Run with: `docker-compose up -d`
 
 ## Available Metrics
 
-ICN exposes these Prometheus metrics on port 9090:
+ICN exposes these Prometheus metrics on port 9100:
 
 ### Network
 - `icn_network_connections_active` - Current active connections
