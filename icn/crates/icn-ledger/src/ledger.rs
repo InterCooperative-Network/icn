@@ -511,8 +511,23 @@ impl Ledger {
                 reason: e.to_string(),
             })?;
 
-        // Check staleness
-        if rate.is_stale && !fx_config.allow_stale_rates {
+        // Check staleness based on configuration
+        if let Some(max_age) = fx_config.max_rate_age_secs {
+            // Time-based staleness check
+            // Note: saturating_sub handles clock skew gracefully - if rate timestamp
+            // is in the future (due to NTP drift), age is treated as 0 (fresh).
+            let now = crate::current_timestamp_secs();
+            let rate_age = now.saturating_sub(rate.aggregated_at);
+            if rate_age > max_age {
+                return Err(FxError::StaleRateAge {
+                    from: from_currency.to_string(),
+                    to: to_currency.to_string(),
+                    age_secs: rate_age,
+                    max_age_secs: max_age,
+                });
+            }
+        } else if rate.is_stale {
+            // Fallback to oracle's is_stale flag when max_rate_age_secs is None
             return Err(FxError::StaleRate {
                 from: from_currency.to_string(),
                 to: to_currency.to_string(),

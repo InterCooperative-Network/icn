@@ -687,6 +687,7 @@ export class ICNClient {
    * @throws {ICNError} For FX-related errors with structured error codes:
    *   - `SLIPPAGE_EXCEEDED` - Converted amount exceeds max_target_amount
    *   - `STALE_RATE` - Exchange rate is stale and stale rates not allowed
+   *   - `STALE_RATE_AGE` - Exchange rate age exceeds configured maximum
    *   - `RATE_EXPIRED` - Prepared transfer expired before execution
    *   - `SAME_CURRENCY` - Same currency specified (use regular payment)
    *   - `INVALID_AMOUNT` - Amount is invalid or cannot be processed
@@ -750,6 +751,7 @@ export class ICNClient {
    *   - `FX_NOT_CONFIGURED` - Cross-currency payments not configured
    *   - `RATE_NOT_AVAILABLE` - No rate exists for the currency pair
    *   - `STALE_RATE` - Exchange rate is stale and stale rates not allowed
+   *   - `STALE_RATE_AGE` - Exchange rate age exceeds configured maximum
    *   - `SAME_CURRENCY` - Same currency specified (use regular payment)
    *
    * @example

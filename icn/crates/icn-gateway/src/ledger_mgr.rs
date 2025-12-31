@@ -460,8 +460,22 @@ impl LedgerManager {
             }
         })?;
 
-        // Check staleness
-        if rate.is_stale && !fx_config.allow_stale_rates {
+        // Check staleness based on configuration
+        if let Some(max_age) = fx_config.max_rate_age_secs {
+            // Time-based staleness check using consistent time source
+            let now = icn_time::current_timestamp_secs();
+            let rate_age = now.saturating_sub(rate.aggregated_at);
+            if rate_age > max_age {
+                return Err(icn_ledger::fx::FxError::StaleRateAge {
+                    from: from_currency.to_string(),
+                    to: to_currency.to_string(),
+                    age_secs: rate_age,
+                    max_age_secs: max_age,
+                }
+                .into());
+            }
+        } else if rate.is_stale {
+            // Fallback to oracle's is_stale flag when max_rate_age_secs is None
             return Err(icn_ledger::fx::FxError::StaleRate {
                 from: from_currency.to_string(),
                 to: to_currency.to_string(),
