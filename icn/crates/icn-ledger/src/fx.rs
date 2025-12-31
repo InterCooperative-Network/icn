@@ -172,6 +172,66 @@ impl FxConfig {
         self
     }
 
+    /// Validate that an exchange rate is fresh enough according to staleness configuration.
+    ///
+    /// This is the single source of truth for staleness validation, used by both
+    /// the ledger's `prepare_cross_currency_transfer` methods and the gateway's
+    /// quote endpoint.
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(())` if the rate is acceptable
+    /// - `Err(FxError::StaleRateAge)` if rate age exceeds `max_rate_age_secs`
+    /// - `Err(FxError::StaleRate)` if `max_rate_age_secs` is `None` but oracle marked rate as stale
+    ///
+    /// # Logging
+    ///
+    /// Logs a warning when rate age exceeds 50% of the threshold but is still valid,
+    /// providing early warning of potential staleness issues.
+    pub fn validate_rate_staleness(
+        &self,
+        rate: &crate::oracle::ExchangeRate,
+        from_currency: &str,
+        to_currency: &str,
+    ) -> Result<(), FxError> {
+        if let Some(max_age) = self.max_rate_age_secs {
+            // Time-based staleness check
+            // Note: saturating_sub handles clock skew gracefully - if rate timestamp
+            // is in the future (due to NTP drift), age is treated as 0 (fresh).
+            let now = crate::current_timestamp_secs();
+            let rate_age = now.saturating_sub(rate.aggregated_at);
+
+            // Log warning when approaching staleness threshold (>80% of max age)
+            let warning_threshold = max_age * 80 / 100;
+            if rate_age > warning_threshold && rate_age <= max_age {
+                tracing::warn!(
+                    from = from_currency,
+                    to = to_currency,
+                    rate_age_secs = rate_age,
+                    max_age_secs = max_age,
+                    "Exchange rate approaching staleness threshold"
+                );
+            }
+
+            if rate_age > max_age {
+                return Err(FxError::StaleRateAge {
+                    from: from_currency.to_string(),
+                    to: to_currency.to_string(),
+                    age_secs: rate_age,
+                    max_age_secs: max_age,
+                });
+            }
+        } else if rate.is_stale {
+            // Fallback to oracle's is_stale flag when max_rate_age_secs is None
+            return Err(FxError::StaleRate {
+                from: from_currency.to_string(),
+                to: to_currency.to_string(),
+            });
+        }
+
+        Ok(())
+    }
+
     /// Calculate fee amount from gross target amount
     ///
     /// Returns the fee portion that goes to treasury. Returns 0 if no treasury
@@ -571,6 +631,92 @@ mod tests {
         // allow_stale() disables age checking
         let config = FxConfig::new(clearing).allow_stale();
         assert_eq!(config.max_rate_age_secs, None);
+    }
+
+    fn make_test_rate(aggregated_at: u64, is_stale: bool) -> crate::oracle::ExchangeRate {
+        crate::oracle::ExchangeRate {
+            pair: crate::oracle::CurrencyPair::new("hours", "USD"),
+            rate: 25.0,
+            observations: vec![],
+            aggregated_at,
+            ttl_secs: 300,
+            is_stale,
+        }
+    }
+
+    #[test]
+    fn test_validate_rate_staleness_fresh_rate() {
+        let clearing = test_clearing_did();
+        let config = FxConfig::new(clearing).with_max_rate_age(Some(60));
+
+        // Fresh rate (now)
+        let now = crate::current_timestamp_secs();
+        let rate = make_test_rate(now, false);
+
+        let result = config.validate_rate_staleness(&rate, "hours", "USD");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_validate_rate_staleness_stale_by_age() {
+        let clearing = test_clearing_did();
+        let config = FxConfig::new(clearing).with_max_rate_age(Some(60));
+
+        // Rate from 120 seconds ago (exceeds 60s max)
+        let now = crate::current_timestamp_secs();
+        let rate = make_test_rate(now.saturating_sub(120), false);
+
+        let result = config.validate_rate_staleness(&rate, "hours", "USD");
+        assert!(matches!(
+            result,
+            Err(FxError::StaleRateAge {
+                age_secs: 120,
+                max_age_secs: 60,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn test_validate_rate_staleness_oracle_stale_flag() {
+        let clearing = test_clearing_did();
+        // No max_rate_age_secs - falls back to oracle's is_stale flag
+        let config = FxConfig::new(clearing).allow_stale();
+
+        let now = crate::current_timestamp_secs();
+        let rate = make_test_rate(now, true); // Oracle marked as stale
+
+        let result = config.validate_rate_staleness(&rate, "hours", "USD");
+        assert!(matches!(result, Err(FxError::StaleRate { .. })));
+    }
+
+    #[test]
+    fn test_validate_rate_staleness_oracle_not_stale() {
+        let clearing = test_clearing_did();
+        // No max_rate_age_secs - falls back to oracle's is_stale flag
+        let config = FxConfig::new(clearing).allow_stale();
+
+        let now = crate::current_timestamp_secs();
+        let rate = make_test_rate(now, false); // Oracle says fresh
+
+        let result = config.validate_rate_staleness(&rate, "hours", "USD");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_validate_rate_staleness_clock_skew() {
+        let clearing = test_clearing_did();
+        let config = FxConfig::new(clearing).with_max_rate_age(Some(60));
+
+        // Rate from the future (clock skew) - should be treated as fresh
+        let now = crate::current_timestamp_secs();
+        let rate = make_test_rate(now + 100, false);
+
+        let result = config.validate_rate_staleness(&rate, "hours", "USD");
+        assert!(
+            result.is_ok(),
+            "Future timestamps should be treated as fresh due to saturating_sub"
+        );
     }
 
     #[test]

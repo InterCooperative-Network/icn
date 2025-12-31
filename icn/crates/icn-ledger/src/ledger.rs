@@ -546,42 +546,8 @@ impl Ledger {
                 reason: e.to_string(),
             })?;
 
-        // Check staleness based on configuration
-        if let Some(max_age) = fx_config.max_rate_age_secs {
-            // Time-based staleness check
-            // Note: saturating_sub handles clock skew gracefully - if rate timestamp
-            // is in the future (due to NTP drift), age is treated as 0 (fresh).
-            let now = crate::current_timestamp_secs();
-            let rate_age = now.saturating_sub(rate.aggregated_at);
-
-            // Warn when rate is approaching staleness (>80% of max age)
-            let warning_threshold = max_age * 80 / 100;
-            if rate_age > warning_threshold && rate_age <= max_age {
-                tracing::warn!(
-                    from_currency = from_currency,
-                    to_currency = to_currency,
-                    rate_age_secs = rate_age,
-                    max_age_secs = max_age,
-                    remaining_secs = max_age.saturating_sub(rate_age),
-                    "Exchange rate approaching staleness threshold"
-                );
-            }
-
-            if rate_age > max_age {
-                return Err(FxError::StaleRateAge {
-                    from: from_currency.to_string(),
-                    to: to_currency.to_string(),
-                    age_secs: rate_age,
-                    max_age_secs: max_age,
-                });
-            }
-        } else if rate.is_stale {
-            // Fallback to oracle's is_stale flag when max_rate_age_secs is None
-            return Err(FxError::StaleRate {
-                from: from_currency.to_string(),
-                to: to_currency.to_string(),
-            });
-        }
+        // Validate rate staleness using centralized helper
+        fx_config.validate_rate_staleness(&rate, from_currency, to_currency)?;
 
         // Convert amount using oracle rate
         let gross_target_amount = rate.convert(source_amount).ok_or_else(|| {
@@ -763,40 +729,8 @@ impl Ledger {
             });
         }
 
-        // Check staleness based on configuration
-        if let Some(max_age) = fx_config.max_rate_age_secs {
-            // Time-based staleness check
-            let now = crate::current_timestamp_secs();
-            let rate_age = now.saturating_sub(rate.aggregated_at);
-
-            // Warn when rate is approaching staleness (>80% of max age)
-            let warning_threshold = max_age * 80 / 100;
-            if rate_age > warning_threshold && rate_age <= max_age {
-                tracing::warn!(
-                    from_currency = from_currency,
-                    to_currency = to_currency,
-                    rate_age_secs = rate_age,
-                    max_age_secs = max_age,
-                    remaining_secs = max_age.saturating_sub(rate_age),
-                    "Exchange rate approaching staleness threshold"
-                );
-            }
-
-            if rate_age > max_age {
-                return Err(FxError::StaleRateAge {
-                    from: from_currency.to_string(),
-                    to: to_currency.to_string(),
-                    age_secs: rate_age,
-                    max_age_secs: max_age,
-                });
-            }
-        } else if rate.is_stale {
-            // Fallback to oracle's is_stale flag when max_rate_age_secs is None
-            return Err(FxError::StaleRate {
-                from: from_currency.to_string(),
-                to: to_currency.to_string(),
-            });
-        }
+        // Validate rate staleness using centralized helper
+        fx_config.validate_rate_staleness(rate, from_currency, to_currency)?;
 
         // Convert amount using oracle rate
         let gross_target_amount = rate.convert(source_amount).ok_or_else(|| {
