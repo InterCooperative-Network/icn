@@ -2793,11 +2793,246 @@ pub fn create_policy_subscription(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use icn_store::SledStore;
+
+    fn test_dlq() -> DeadLetterQueue {
+        Arc::new(crate::dead_letter::DeadLetterQueue::new(Arc::new(
+            SledStore::temporary().unwrap(),
+        )))
+    }
+
+    fn test_proposal_id() -> ProposalId {
+        ProposalId("test-proposal-123".to_string())
+    }
 
     #[test]
     fn test_governance_event_handler_clone() {
         // Verify GovernanceEventHandler implements Clone
         fn assert_clone<T: Clone>() {}
         assert_clone::<GovernanceEventHandler>();
+    }
+
+    // =========================================================================
+    // Tests for validate_positive_amount helper
+    // =========================================================================
+
+    #[test]
+    fn test_validate_positive_amount_valid() {
+        let dlq = test_dlq();
+        let proposal_id = test_proposal_id();
+
+        // Test positive amount returns true
+        assert!(validate_positive_amount(
+            100,
+            &proposal_id,
+            "budget",
+            "treasury_create_budget",
+            "Amount",
+            &dlq,
+        ));
+
+        // Verify no DLQ entries were created
+        let pending = dlq.list_pending().unwrap();
+        assert!(pending.is_empty());
+    }
+
+    #[test]
+    fn test_validate_positive_amount_zero() {
+        let dlq = test_dlq();
+        let proposal_id = test_proposal_id();
+
+        // Test zero amount returns false
+        assert!(!validate_positive_amount(
+            0,
+            &proposal_id,
+            "budget",
+            "treasury_create_budget",
+            "Amount",
+            &dlq,
+        ));
+
+        // Verify DLQ entry was created
+        let pending = dlq.list_pending().unwrap();
+        assert_eq!(pending.len(), 1);
+        assert!(pending[0].id.contains("treasury:budget:"));
+        assert_eq!(
+            pending[0].failure_type,
+            crate::dead_letter::FailureType::TreasuryOperationFailed
+        );
+    }
+
+    #[test]
+    fn test_validate_positive_amount_negative() {
+        let dlq = test_dlq();
+        let proposal_id = test_proposal_id();
+
+        // Test negative amount returns false
+        assert!(!validate_positive_amount(
+            -50,
+            &proposal_id,
+            "transfer",
+            "treasury_transfer",
+            "Transfer amount",
+            &dlq,
+        ));
+
+        // Verify DLQ entry was created with correct metadata
+        let pending = dlq.list_pending().unwrap();
+        assert_eq!(pending.len(), 1);
+
+        let entry = &pending[0];
+        assert!(entry.id.contains("treasury:transfer:"));
+        assert!(entry.error_message.contains("Transfer amount"));
+        assert!(entry.error_message.contains("-50"));
+
+        // Verify context contains amount
+        let context = &entry.context;
+        assert_eq!(context["error"], "invalid_amount");
+        assert_eq!(context["amount"], -50);
+    }
+
+    #[test]
+    fn test_validate_positive_amount_threshold_field_name() {
+        let dlq = test_dlq();
+        let proposal_id = test_proposal_id();
+
+        // Test with "Threshold amount" field name
+        assert!(!validate_positive_amount(
+            -1,
+            &proposal_id,
+            "rule",
+            "treasury_modify_rule",
+            "Threshold amount",
+            &dlq,
+        ));
+
+        let pending = dlq.list_pending().unwrap();
+        assert_eq!(pending.len(), 1);
+        assert!(pending[0].error_message.contains("Threshold amount"));
+    }
+
+    // =========================================================================
+    // Tests for validate_currency_match helper
+    // =========================================================================
+
+    #[test]
+    fn test_validate_currency_match_valid() {
+        let dlq = test_dlq();
+        let proposal_id = test_proposal_id();
+
+        // Test matching currencies returns true
+        assert!(validate_currency_match(
+            "USD",
+            "USD",
+            &proposal_id,
+            "budget",
+            "treasury_create_budget",
+            serde_json::json!({
+                "proposal_id": proposal_id.0,
+                "error": "currency_mismatch",
+            }),
+            &dlq,
+        ));
+
+        // Verify no DLQ entries were created
+        let pending = dlq.list_pending().unwrap();
+        assert!(pending.is_empty());
+    }
+
+    #[test]
+    fn test_validate_currency_match_mismatch() {
+        let dlq = test_dlq();
+        let proposal_id = test_proposal_id();
+
+        let metadata = serde_json::json!({
+            "proposal_id": proposal_id.0,
+            "error": "currency_mismatch",
+            "requested_currency": "EUR",
+            "treasury_currency": "USD",
+        });
+
+        // Test mismatched currencies returns false
+        assert!(!validate_currency_match(
+            "EUR",
+            "USD",
+            &proposal_id,
+            "budget",
+            "treasury_create_budget",
+            metadata.clone(),
+            &dlq,
+        ));
+
+        // Verify DLQ entry was created
+        let pending = dlq.list_pending().unwrap();
+        assert_eq!(pending.len(), 1);
+
+        let entry = &pending[0];
+        assert!(entry.id.contains("treasury:budget:"));
+        assert_eq!(
+            entry.failure_type,
+            crate::dead_letter::FailureType::TreasuryOperationFailed
+        );
+        assert!(entry.error_message.contains("EUR"));
+        assert!(entry.error_message.contains("USD"));
+
+        // Verify metadata preserved
+        assert_eq!(entry.context["error"], "currency_mismatch");
+        assert_eq!(entry.context["requested_currency"], "EUR");
+        assert_eq!(entry.context["treasury_currency"], "USD");
+    }
+
+    #[test]
+    fn test_validate_currency_match_case_sensitive() {
+        let dlq = test_dlq();
+        let proposal_id = test_proposal_id();
+
+        // Test that currency comparison is case-sensitive
+        assert!(!validate_currency_match(
+            "usd",
+            "USD",
+            &proposal_id,
+            "budget",
+            "treasury_create_budget",
+            serde_json::json!({"error": "currency_mismatch"}),
+            &dlq,
+        ));
+
+        // Verify DLQ entry was created (currencies don't match due to case)
+        let pending = dlq.list_pending().unwrap();
+        assert_eq!(pending.len(), 1);
+    }
+
+    #[test]
+    fn test_validate_currency_match_transfer_metadata() {
+        let dlq = test_dlq();
+        let proposal_id = test_proposal_id();
+
+        // Test with transfer-specific metadata (different format)
+        let metadata = serde_json::json!({
+            "proposal_id": proposal_id.0,
+            "error": "currency_mismatch",
+            "from_budget": "budget-1",
+            "from_currency": "USD",
+            "to_budget": "budget-2",
+            "to_currency": "EUR",
+        });
+
+        assert!(!validate_currency_match(
+            "EUR",
+            "USD",
+            &proposal_id,
+            "transfer",
+            "treasury_transfer_between_budgets",
+            metadata.clone(),
+            &dlq,
+        ));
+
+        // Verify metadata is preserved exactly as passed
+        let pending = dlq.list_pending().unwrap();
+        let entry = &pending[0];
+        assert_eq!(entry.context["from_budget"], "budget-1");
+        assert_eq!(entry.context["to_budget"], "budget-2");
+        assert_eq!(entry.context["from_currency"], "USD");
+        assert_eq!(entry.context["to_currency"], "EUR");
     }
 }
