@@ -99,6 +99,11 @@ pub struct FxConfig {
     ///
     /// Default is `Some(60)` (1 minute) for user-facing operations.
     /// Use `None` for batch operations where oracle staleness is sufficient.
+    ///
+    /// # Edge Case
+    /// Setting `Some(0)` will reject all rates (even fresh ones) since any
+    /// non-zero age exceeds 0. This effectively disables cross-currency
+    /// payments and should generally be avoided.
     pub max_rate_age_secs: Option<u64>,
 }
 
