@@ -546,6 +546,109 @@ mod tests {
         // Effective rate: 248 / 10 = 24.8
         assert!((details.effective_rate() - 24.8).abs() < 0.001);
     }
+
+    fn create_test_prepared_transfer(valid_until: u64) -> PreparedFxTransfer {
+        use crate::types::JournalEntry;
+        let sender = Did::from_anchor_id(&[3u8; 32]);
+        let entry = JournalEntry {
+            id: None,
+            timestamp: crate::current_timestamp_secs() * 1000, // millis
+            author: sender.clone(),
+            contract_ref: None,
+            accounts: vec![],
+            parents: vec![],
+            signature: None,
+        };
+
+        PreparedFxTransfer {
+            entry,
+            details: FxConversionDetails::new(
+                sender.to_string(),
+                Did::from_anchor_id(&[4u8; 32]).to_string(),
+                "hours".to_string(),
+                "USD".to_string(),
+                10,
+                25.0,
+                crate::current_timestamp_secs(),
+                vec!["test".to_string()],
+                false,
+                250,
+                0,
+                250,
+                0,
+            ),
+            valid_until,
+        }
+    }
+
+    #[test]
+    fn test_prepared_transfer_is_valid_future() {
+        // Transfer valid for 1 hour from now
+        let now = crate::current_timestamp_secs();
+        let valid_until = now + 3600;
+
+        let prepared = create_test_prepared_transfer(valid_until);
+        assert!(prepared.is_valid());
+        assert!(prepared.validate_expiry().is_ok());
+    }
+
+    #[test]
+    fn test_prepared_transfer_is_valid_expired() {
+        // Transfer expired 10 seconds ago
+        let now = crate::current_timestamp_secs();
+        let valid_until = now.saturating_sub(10);
+
+        let prepared = create_test_prepared_transfer(valid_until);
+        assert!(!prepared.is_valid());
+
+        let err = prepared.validate_expiry().unwrap_err();
+        assert!(matches!(err, FxError::TransferExpired { .. }));
+    }
+
+    #[test]
+    fn test_prepared_transfer_safety_margin() {
+        // Transfer expires exactly now + 1 second (the safety margin)
+        // Should be INVALID because safety margin requires now < (valid_until - 1)
+        let now = crate::current_timestamp_secs();
+        let valid_until = now + EXPIRATION_SAFETY_MARGIN_SECS;
+
+        let prepared = create_test_prepared_transfer(valid_until);
+        // now < (valid_until - 1) => now < now => false
+        assert!(!prepared.is_valid());
+    }
+
+    #[test]
+    fn test_prepared_transfer_just_past_safety_margin() {
+        // Transfer expires in (safety_margin + 1) seconds
+        // Should be VALID because now < (valid_until - 1)
+        let now = crate::current_timestamp_secs();
+        let valid_until = now + EXPIRATION_SAFETY_MARGIN_SECS + 1;
+
+        let prepared = create_test_prepared_transfer(valid_until);
+        // now < (valid_until - 1) => now < now + 1 => true
+        assert!(prepared.is_valid());
+    }
+
+    #[test]
+    fn test_transfer_expired_error_details() {
+        let now = crate::current_timestamp_secs();
+        let valid_until = now.saturating_sub(100);
+
+        let prepared = create_test_prepared_transfer(valid_until);
+        let err = prepared.validate_expiry().unwrap_err();
+
+        match err {
+            FxError::TransferExpired {
+                expired_at,
+                current_time,
+            } => {
+                assert_eq!(expired_at, valid_until);
+                // current_time should be approximately now (within 1 second)
+                assert!(current_time >= now && current_time <= now + 1);
+            }
+            _ => panic!("Expected TransferExpired error"),
+        }
+    }
 }
 
 #[cfg(test)]
