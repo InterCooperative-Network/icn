@@ -548,6 +548,20 @@ impl Ledger {
             // is in the future (due to NTP drift), age is treated as 0 (fresh).
             let now = crate::current_timestamp_secs();
             let rate_age = now.saturating_sub(rate.aggregated_at);
+
+            // Warn when rate is approaching staleness (>80% of max age)
+            let warning_threshold = max_age * 80 / 100;
+            if rate_age > warning_threshold && rate_age <= max_age {
+                tracing::warn!(
+                    from_currency = from_currency,
+                    to_currency = to_currency,
+                    rate_age_secs = rate_age,
+                    max_age_secs = max_age,
+                    remaining_secs = max_age.saturating_sub(rate_age),
+                    "Exchange rate approaching staleness threshold"
+                );
+            }
+
             if rate_age > max_age {
                 return Err(FxError::StaleRateAge {
                     from: from_currency.to_string(),
@@ -746,6 +760,20 @@ impl Ledger {
             // Time-based staleness check
             let now = crate::current_timestamp_secs();
             let rate_age = now.saturating_sub(rate.aggregated_at);
+
+            // Warn when rate is approaching staleness (>80% of max age)
+            let warning_threshold = max_age * 80 / 100;
+            if rate_age > warning_threshold && rate_age <= max_age {
+                tracing::warn!(
+                    from_currency = from_currency,
+                    to_currency = to_currency,
+                    rate_age_secs = rate_age,
+                    max_age_secs = max_age,
+                    remaining_secs = max_age.saturating_sub(rate_age),
+                    "Exchange rate approaching staleness threshold"
+                );
+            }
+
             if rate_age > max_age {
                 return Err(FxError::StaleRateAge {
                     from: from_currency.to_string(),
