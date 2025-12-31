@@ -8,6 +8,7 @@ use icn_identity::Did;
 use icn_ledger::{
     entry::JournalEntryBuilder, CurrencyPair, FxConversionDetails, Ledger, SharedEventEmitter,
 };
+use icn_obs::metrics::gateway as metrics;
 use icn_store::{SledStore, Store};
 
 use crate::models::{CrossPaymentQuote, CrossPaymentResponse};
@@ -378,15 +379,41 @@ impl LedgerManager {
         };
 
         // Execute the transfer (writes to ledger) - needs write lock
-        let (hash, details) = {
+        let (hash, details, clearing_balances) = {
             let mut ledger = ledger_arc
                 .write()
                 .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
             let (hash, details) = ledger.execute_cross_currency_transfer(prepared)?;
 
-            (hash.to_hex(), details)
+            // Query clearing account balances for metrics
+            let clearing_balances = if let Some(fx_config) = ledger.fx_config() {
+                let clearing_did = &fx_config.clearing_did;
+                let source_balance = ledger.get_balance(clearing_did, from_currency);
+                let target_balance = ledger.get_balance(clearing_did, to_currency);
+                Some((source_balance, target_balance))
+            } else {
+                None
+            };
+
+            (hash.to_hex(), details, clearing_balances)
         };
+
+        // Emit FX clearing metrics
+        metrics::fx_clearing_transfers_inc(from_currency, to_currency);
+        if let Some((source_balance, target_balance)) = clearing_balances {
+            metrics::emit_clearing_balance(from_currency, source_balance);
+            metrics::emit_clearing_balance(to_currency, target_balance);
+        } else {
+            // FX config was unavailable - balance metrics cannot be emitted.
+            // This is unexpected since we just executed an FX transfer successfully.
+            tracing::warn!(
+                coop_id = %coop_id,
+                from_currency = from_currency,
+                to_currency = to_currency,
+                "Unable to emit FX clearing balance metrics: FX config unavailable"
+            );
+        }
 
         // Record spending in budget store
         if let Some(store) = &self.budget_store {
