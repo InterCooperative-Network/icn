@@ -44,6 +44,7 @@ jobs:
       - name: Run benchmarks
         run: cargo bench --workspace -- --noplot --save-baseline main
         working-directory: ./icn
+        timeout-minutes: 30
 
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
@@ -52,97 +53,132 @@ jobs:
           path: icn/target/criterion
           retention-days: 90
 
-  # Compare PR benchmarks against main (only on PRs)
+  # Compare PR benchmarks against base commit (only on PRs)
   compare:
-    name: Compare Against Main
+    name: Compare Against Base
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     steps:
-      - uses: actions/checkout@v6
+      # Checkout PR base commit for baseline (deterministic - won't change during run)
+      - name: Checkout base commit
+        uses: actions/checkout@v6
         with:
-          fetch-depth: 0
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: baseline
 
       - name: Free disk space
         uses: ./.github/actions/free-disk-space
 
       - uses: dtolnay/rust-toolchain@stable
 
-      # Cache for main branch baseline build
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: "icn -> target"
+          workspaces: "baseline/icn -> baseline/icn/target"
+          prefix-key: "bench-baseline-${{ github.event.pull_request.base.sha }}"
           cache-on-failure: true
-          prefix-key: "bench-baseline"
-
-      - name: Checkout main branch for baseline
-        run: git checkout -B main origin/main
 
       - name: Run baseline benchmarks
-        run: cargo bench --workspace -- --noplot --save-baseline main
-        working-directory: ./icn
+        run: cargo bench --workspace -- --noplot --save-baseline base
+        working-directory: ./baseline/icn
+        timeout-minutes: 30
 
-      - name: Checkout PR branch
-        run: git checkout ${{ github.event.pull_request.head.sha }}
+      # Checkout PR head commit for comparison
+      - name: Checkout PR commit
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: pr
+
+      # Copy baseline results to PR directory for comparison
+      - name: Copy baseline results
+        run: |
+          mkdir -p pr/icn/target/criterion
+          cp -r baseline/icn/target/criterion/* pr/icn/target/criterion/ || true
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "pr/icn -> pr/icn/target"
+          prefix-key: "bench-pr-${{ github.event.pull_request.head.sha }}"
+          cache-on-failure: true
 
       - name: Run PR benchmarks and compare
         id: bench_compare
         run: |
-          # Run benchmarks and capture output
-          cargo bench --workspace -- --noplot --baseline main 2>&1 | tee bench_output.txt
+          # Run benchmarks with comparison against baseline
+          cargo bench --workspace -- --noplot --baseline base 2>&1 | tee bench_output.txt
 
-          # Extract regressions - look for Criterion's regression indicators:
-          # - "Performance has regressed" (explicit message)
-          # - "regressed" in change analysis
-          # - Significant percentage changes like "+15.234%"
-          if grep -qiE "(regressed|Performance has regressed|\+[0-9]+\.[0-9]+%.*slower)" bench_output.txt; then
+          # Check for actual benchmark output
+          if [ ! -s bench_output.txt ]; then
+            echo "Warning: No benchmark output captured"
+            echo "has_regressions=false" >> $GITHUB_OUTPUT
+            echo "<!-- ICN-BENCHMARK-COMMENT -->" > regression_report.md
+            echo "## Benchmark Results" >> regression_report.md
+            echo "" >> regression_report.md
+            echo "⚠️ No benchmark output captured. Check workflow logs." >> regression_report.md
+            exit 0
+          fi
+
+          # Extract regressions - Criterion outputs "Performance has regressed" for significant changes
+          REGRESSION_COUNT=$(grep -ciE "regressed" bench_output.txt || echo "0")
+
+          if [ "$REGRESSION_COUNT" -gt 0 ]; then
             echo "has_regressions=true" >> $GITHUB_OUTPUT
 
-            # Extract regression details
-            echo "## Performance Regressions Detected" > regression_report.md
-            echo "" >> regression_report.md
-            echo "The following benchmarks show regression compared to main:" >> regression_report.md
-            echo "" >> regression_report.md
-            echo '```' >> regression_report.md
-            grep -B5 -A2 -iE "(regressed|Performance has regressed|\+[0-9]+\.[0-9]+%.*slower)" bench_output.txt >> regression_report.md || true
-            echo '```' >> regression_report.md
-            echo "" >> regression_report.md
-            echo "---" >> regression_report.md
-            echo "*Add the \`perf-regression-ok\` label to acknowledge and merge anyway.*" >> regression_report.md
+            # Build regression report with HTML marker for reliable detection
+            {
+              echo "<!-- ICN-BENCHMARK-COMMENT -->"
+              echo "## ⚠️ Performance Regressions Detected"
+              echo ""
+              echo "Found **$REGRESSION_COUNT** benchmark(s) with regressions compared to base commit."
+              echo ""
+              echo "<details>"
+              echo "<summary>Regression Details</summary>"
+              echo ""
+              echo '```'
+              grep -B3 -A1 -iE "regressed" bench_output.txt | head -100
+              echo '```'
+              echo "</details>"
+              echo ""
+              echo "---"
+              echo "*Add the \`perf-regression-ok\` label to acknowledge and merge anyway.*"
+            } > regression_report.md
           else
             echo "has_regressions=false" >> $GITHUB_OUTPUT
-            echo "## Benchmark Results" > regression_report.md
-            echo "" >> regression_report.md
-            echo "No performance regressions detected compared to main branch." >> regression_report.md
+            {
+              echo "<!-- ICN-BENCHMARK-COMMENT -->"
+              echo "## ✅ Benchmark Results"
+              echo ""
+              echo "No performance regressions detected compared to base commit (\`${{ github.event.pull_request.base.sha }}\`)."
+            } > regression_report.md
           fi
-        working-directory: ./icn
+        working-directory: ./pr/icn
+        timeout-minutes: 30
 
       - name: Comment on PR
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
-            const report = fs.readFileSync('icn/regression_report.md', 'utf8');
+            const report = fs.readFileSync('pr/icn/regression_report.md', 'utf8');
 
-            // Find existing comment
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
             });
 
-            // Find benchmark comment from bot or github-actions
-            const botComment = comments.find(c =>
-              (c.user.type === 'Bot' || c.user.login.includes('[bot]') || c.user.login === 'github-actions') &&
-              (c.body.includes('Performance Regressions Detected') || c.body.includes('Benchmark Results'))
+            // Find existing benchmark comment using HTML marker
+            const markerComment = comments.find(c =>
+              c.body.includes('<!-- ICN-BENCHMARK-COMMENT -->')
             );
 
             const body = report + '\n\n*Updated: ' + new Date().toISOString() + '*';
 
-            if (botComment) {
+            if (markerComment) {
               await github.rest.issues.updateComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                comment_id: botComment.id,
+                comment_id: markerComment.id,
                 body: body
               });
             } else {
@@ -164,8 +200,8 @@ jobs:
             exit 0
           else
             echo "::warning::Performance regressions detected. Add 'perf-regression-ok' label to merge anyway."
-            # Don't fail the check, just warn
-            exit 0
+            # Exit 1 to fail the check - require explicit acknowledgment
+            exit 1
           fi
         env:
           GH_TOKEN: ${{ github.token }}
