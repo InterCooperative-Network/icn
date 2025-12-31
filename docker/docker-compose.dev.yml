@@ -54,13 +54,13 @@ services:
     ports:
       - "4434:4433/udp"
       - "5051:5050"
-      - "9101:9101"
+      - "9101:9100"
       - "8081:8080"
     volumes:
       - ./volumes/beta:/data
     environment:
       - ICN_DATA_DIR=/data
-      - ICN_OBSERVABILITY_METRICS_PORT=9101
+      - ICN_OBSERVABILITY_METRICS_PORT=9100
       - ICN_OBSERVABILITY_LOG_LEVEL=debug
       - ICN_NETWORK_MDNS_ENABLED=false
     restart: "no"

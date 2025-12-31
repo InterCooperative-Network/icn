@@ -22,7 +22,7 @@ scrape_configs:
   # ICN Beta Node
   - job_name: 'icn-beta'
     static_configs:
-      - targets: ['icn-beta:9101']
+      - targets: ['icn-beta:9100']
         labels:
           node: 'beta'
           environment: 'docker'

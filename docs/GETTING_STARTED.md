@@ -220,7 +220,7 @@ Store backups:
 
 2. **Prometheus Metrics**:
    ```
-   curl http://localhost:9090/metrics
+   curl http://localhost:9100/metrics
    ```
 
 3. **Health Check**:

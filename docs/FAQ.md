@@ -145,7 +145,7 @@ RUN cd icn && cargo build --release
 FROM debian:bookworm-slim
 COPY --from=builder /icn/icn/target/release/icnd /usr/local/bin/
 COPY --from=builder /icn/icn/target/release/icnctl /usr/local/bin/
-EXPOSE 5600/tcp 5600/udp 8080/tcp 9090/tcp
+EXPOSE 5600/tcp 5600/udp 8080/tcp 9100/tcp
 CMD ["icnd"]
 ```
 
@@ -156,7 +156,7 @@ Mount `~/.icn` as a volume to persist identity and state.
 
 - **5600/TCP+UDP**: QUIC networking (P2P connections)
 - **8080/TCP**: Gateway API (REST + WebSocket)
-- **9090/TCP**: Prometheus metrics
+- **9100/TCP**: Prometheus metrics
 - **5353/UDP**: mDNS discovery (LAN only)
 
 **Firewall configuration:**
@@ -169,7 +169,7 @@ sudo ufw allow 5600/udp
 sudo ufw allow 8080/tcp
 
 # Allow metrics (if using Prometheus)
-sudo ufw allow 9090/tcp
+sudo ufw allow 9100/tcp
 ```
 
 ---

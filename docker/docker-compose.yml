@@ -69,7 +69,7 @@ services:
     ports:
       - "4434:4433/udp"  # QUIC peer transport
       - "5051:5050"      # RPC API
-      - "9101:9101"      # Prometheus metrics
+      - "9101:9100"      # Prometheus metrics
       - "8081:8080"      # Health check
     volumes:
       - icn-beta-data:/data
@@ -78,7 +78,7 @@ services:
       - ICN_DATA_DIR=/data
       - ICN_NETWORK_LISTEN_ADDR=0.0.0.0:4433
       - ICN_OBSERVABILITY_HEALTH_PORT=8080
-      - ICN_OBSERVABILITY_METRICS_PORT=9101
+      - ICN_OBSERVABILITY_METRICS_PORT=9100
       - ICN_OBSERVABILITY_LOG_LEVEL=info
       - ICN_NETWORK_MDNS_ENABLED=false
     command:
