@@ -514,6 +514,8 @@ impl Ledger {
         // Check staleness based on configuration
         if let Some(max_age) = fx_config.max_rate_age_secs {
             // Time-based staleness check
+            // Note: saturating_sub handles clock skew gracefully - if rate timestamp
+            // is in the future (due to NTP drift), age is treated as 0 (fresh).
             let now = crate::current_timestamp_secs();
             let rate_age = now.saturating_sub(rate.aggregated_at);
             if rate_age > max_age {
