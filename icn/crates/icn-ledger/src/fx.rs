@@ -186,7 +186,7 @@ impl FxConfig {
     ///
     /// # Logging
     ///
-    /// Logs a warning when rate age exceeds 50% of the threshold but is still valid,
+    /// Logs a warning when rate age exceeds 80% of the threshold but is still valid,
     /// providing early warning of potential staleness issues.
     pub fn validate_rate_staleness(
         &self,
@@ -205,10 +205,11 @@ impl FxConfig {
             let warning_threshold = max_age * 80 / 100;
             if rate_age > warning_threshold && rate_age <= max_age {
                 tracing::warn!(
-                    from = from_currency,
-                    to = to_currency,
+                    from_currency = from_currency,
+                    to_currency = to_currency,
                     rate_age_secs = rate_age,
                     max_age_secs = max_age,
+                    remaining_secs = max_age.saturating_sub(rate_age),
                     "Exchange rate approaching staleness threshold"
                 );
             }
