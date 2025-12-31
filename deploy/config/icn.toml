@@ -23,7 +23,7 @@ min_trust_threshold = 0.0
 
 [observability]
 # Prometheus metrics
-metrics_port = 9090
+metrics_port = 9100
 
 # Health check port
 health_port = 9091

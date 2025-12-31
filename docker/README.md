@@ -26,8 +26,8 @@ Once running, you can access:
 
 - **Alpha Node RPC**: `http://localhost:5050`
 - **Beta Node RPC**: `http://localhost:5051`
-- **Alpha Metrics**: `http://localhost:9090/metrics`
-- **Beta Metrics**: `http://localhost:9091/metrics`
+- **Alpha Metrics**: `http://localhost:9100/metrics`
+- **Beta Metrics**: `http://localhost:9101/metrics`
 - **Prometheus UI**: `http://localhost:9000`
 
 ### Test the Network
@@ -63,7 +63,7 @@ Multi-stage Dockerfile that:
 1. Builds `icnd` and `icnctl` binaries in a Rust builder image
 2. Creates a minimal Debian runtime image with just the binaries
 3. Runs as non-root user `icn`
-4. Exposes ports: 4433 (QUIC), 5050 (RPC), 9090 (metrics), 8080 (health)
+4. Exposes ports: 4433 (QUIC), 5050 (RPC), 9100 (metrics), 8080 (health)
 
 ### `docker-compose.yml`
 Production-ready stack with:
@@ -112,7 +112,7 @@ environment:
   - ICN_NETWORK_LISTEN_ADDR=0.0.0.0:4433
   - ICN_NETWORK_MDNS_ENABLED=false
   - ICN_OBSERVABILITY_LOG_LEVEL=info
-  - ICN_OBSERVABILITY_METRICS_PORT=9090
+  - ICN_OBSERVABILITY_METRICS_PORT=9100
 ```
 
 ### Custom Configuration

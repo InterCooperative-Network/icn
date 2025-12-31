@@ -29,7 +29,7 @@ scrape_configs:
   # ICN Alpha Node (local demo)
   - job_name: 'icn-alpha'
     static_configs:
-      - targets: ['localhost:9090']
+      - targets: ['localhost:9100']
         labels:
           node: 'alpha'
           environment: 'dev'
@@ -37,7 +37,7 @@ scrape_configs:
   # ICN Beta Node (local demo)
   - job_name: 'icn-beta'
     static_configs:
-      - targets: ['localhost:9091']
+      - targets: ['localhost:9101']
         labels:
           node: 'beta'
           environment: 'dev'
