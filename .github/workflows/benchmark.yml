@@ -74,7 +74,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: "baseline/icn -> baseline/icn/target"
-          prefix-key: "bench-baseline-${{ github.event.pull_request.base.sha }}"
+          prefix-key: "bench-baseline-${{ github.run_id }}-${{ github.event.pull_request.base.sha }}"
           cache-on-failure: true
 
       - name: Run baseline benchmarks
@@ -93,39 +93,48 @@ jobs:
       - name: Copy baseline results
         run: |
           mkdir -p pr/icn/target/criterion
-          if [ -d "baseline/icn/target/criterion" ] && [ "$(ls -A baseline/icn/target/criterion 2>/dev/null)" ]; then
+          # Check for valid Criterion baseline directories (named 'base')
+          if [ -d "baseline/icn/target/criterion" ] && [ "$(find baseline/icn/target/criterion -name 'base' -type d 2>/dev/null | wc -l)" -gt 0 ]; then
             cp -r baseline/icn/target/criterion/* pr/icn/target/criterion/
-            echo "Copied baseline results successfully"
+            BASELINE_COUNT=$(find pr/icn/target/criterion -name 'base' -type d | wc -l)
+            echo "Copied $BASELINE_COUNT baseline benchmark(s) successfully"
           else
-            echo "::warning::No baseline benchmark results found to copy"
+            echo "::error::Baseline benchmarks missing or empty - cannot perform valid comparison"
+            exit 1
           fi
 
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: "pr/icn -> pr/icn/target"
-          prefix-key: "bench-pr-${{ github.event.pull_request.head.sha }}"
+          prefix-key: "bench-pr-${{ github.run_id }}-${{ github.event.pull_request.head.sha }}"
           cache-on-failure: true
 
       - name: Run PR benchmarks and compare
         id: bench_compare
         run: |
+          set -uo pipefail
+
           # Run benchmarks with comparison against baseline
-          cargo bench --workspace -- --noplot --baseline base 2>&1 | tee bench_output.txt
+          # Use process substitution to capture exit code while still using tee
+          BENCH_EXIT=0
+          cargo bench --workspace -- --noplot --baseline base 2>&1 | tee bench_output.txt || BENCH_EXIT=$?
+
+          if [ "$BENCH_EXIT" -ne 0 ]; then
+            echo "::error::Benchmark execution failed with exit code $BENCH_EXIT"
+            exit 1
+          fi
 
           # Check for actual benchmark output
           if [ ! -s bench_output.txt ]; then
-            echo "Warning: No benchmark output captured"
-            echo "has_regressions=false" >> $GITHUB_OUTPUT
-            echo "<!-- ICN-BENCHMARK-COMMENT -->" > regression_report.md
-            echo "## Benchmark Results" >> regression_report.md
-            echo "" >> regression_report.md
-            echo "⚠️ No benchmark output captured. Check workflow logs." >> regression_report.md
-            exit 0
+            echo "::error::No benchmark output captured"
+            exit 1
           fi
 
-          # Extract regressions - Criterion outputs "Performance has regressed" for significant changes
-          # Pattern matches: "regressed", "Performance has regressed", "regression detected"
-          REGRESSION_COUNT=$(grep -ciE "(Performance has regressed|regressed|regression detected)" bench_output.txt || echo "0")
+          # Extract regressions - Criterion outputs various indicators:
+          # - "Performance has regressed" (explicit message)
+          # - "regressed" in change analysis
+          # - Positive percentage changes like "change: +15.234%"
+          REGRESSION_COUNT=$(grep -ciE "(Performance has regressed|regressed|change:.*\+[0-9]+\.[0-9]+%)" bench_output.txt || echo "0")
 
           if [ "$REGRESSION_COUNT" -gt 0 ]; then
             echo "has_regressions=true" >> $GITHUB_OUTPUT
@@ -141,7 +150,7 @@ jobs:
               echo "<summary>Regression Details</summary>"
               echo ""
               echo '```'
-              REGRESSION_OUTPUT=$(grep -B3 -A1 -iE "(Performance has regressed|regressed|regression detected)" bench_output.txt)
+              REGRESSION_OUTPUT=$(grep -B3 -A1 -iE "(Performance has regressed|regressed|change:.*\+[0-9]+\.[0-9]+%)" bench_output.txt)
               REGRESSION_LINES=$(echo "$REGRESSION_OUTPUT" | wc -l)
               echo "$REGRESSION_OUTPUT" | head -100
               if [ "$REGRESSION_LINES" -gt 100 ]; then
