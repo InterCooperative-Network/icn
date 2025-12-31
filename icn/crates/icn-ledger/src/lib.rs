@@ -62,6 +62,7 @@ pub mod fork_resolution;
 pub mod freeze;
 pub mod fx;
 pub mod hash;
+pub mod labor_shares;
 pub mod ledger;
 pub mod membership;
 pub mod merge;
@@ -100,6 +101,13 @@ pub use treasury::{
 pub use types::{
     AccountBalances, AccountDelta, ContentHash, CreditLimit, Currency, Dispute, DisputeOutcome,
     DisputeStatus, JournalEntry, QuarantineReason, QuarantinedEntry, Resolution, Signature,
+};
+
+// Labor shares and cooperative bonds (Razeto integration)
+pub use labor_shares::{
+    BondId, BondOffering, BondPayment, BondPaymentType, BondStatus, Collateral, CooperativeBond,
+    LaborShare, PaymentSchedule, ScheduledPayout, ShareEvent, ShareId, ShareStatus,
+    SurplusAllocation,
 };
 
 // FX (cross-currency) support
