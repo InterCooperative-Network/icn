@@ -684,11 +684,11 @@ export class ICNClient {
    *
    * @throws {ValidationError} If amount <= 0, currencies are invalid, or same currency used
    * @throws {AuthorizationError} If authenticated DID doesn't match the sender
-   * @throws {ICNError} With `code: 'SLIPPAGE_EXCEEDED'` if converted amount exceeds max_target_amount
-   * @throws {ICNError} With `code: 'STALE_RATE'` if exchange rate is stale and stale rates not allowed
-   * @throws {ICNError} With `code: 'RATE_EXPIRED'` if prepared transfer expired before execution
-   * @throws {ICNError} With `code: 'BUDGET_EXCEEDED'` if sender exceeds budget limits
-   * @throws {ICNError} With `code: 'INSUFFICIENT_BALANCE'` if sender has insufficient funds
+   * @throws {ICNError} For FX-related errors including:
+   *   - Slippage exceeded (converted amount > max_target_amount)
+   *   - Stale exchange rate (when stale rates are not allowed)
+   *   - Rate expired (prepared transfer expired before execution)
+   *   - Budget exceeded or insufficient balance
    *
    * @example
    * ```typescript
@@ -710,8 +710,9 @@ export class ICNClient {
    *     console.error('Invalid request:', e.fieldErrors);
    *   } else if (e instanceof AuthorizationError) {
    *     console.error('Not authorized to send from this account');
-   *   } else if (e instanceof ICNError && e.code === 'SLIPPAGE_EXCEEDED') {
-   *     console.error('Rate changed too much, try again');
+   *   } else if (e instanceof ICNError) {
+   *     // FX errors include: slippage exceeded, stale/expired rate, insufficient balance
+   *     console.error('Payment failed:', e.message);
    *   }
    * }
    * ```
@@ -732,8 +733,7 @@ export class ICNClient {
    * @returns Promise resolving to the quote with rate, fees, and validity info
    *
    * @throws {ValidationError} If amount <= 0, currencies are invalid, or same currency used
-   * @throws {ICNError} With `code: 'ORACLE_NOT_CONFIGURED'` if exchange rate oracle not set up
-   * @throws {ICNError} With `code: 'RATE_NOT_AVAILABLE'` if no rate exists for the currency pair
+   * @throws {ICNError} If exchange rate oracle is not configured or no rate exists for the currency pair
    *
    * @example
    * ```typescript
