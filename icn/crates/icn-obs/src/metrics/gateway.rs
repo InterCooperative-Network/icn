@@ -547,11 +547,12 @@ pub fn fx_clearing_balance_set(currency: &str, balance: i64) {
 /// Note: This function applies `.abs()` internally, so callers should pass
 /// the raw signed balance value - no need to compute absolute value beforehand.
 pub fn fx_clearing_balance_abs_set(currency: &str, balance: i64) {
+    // Use unsigned_abs() to safely handle i64::MIN without overflow
     gauge!(
         "icn_gateway_fx_clearing_balance_abs",
         "currency" => currency.to_string()
     )
-    .set(balance.abs() as f64);
+    .set(balance.unsigned_abs() as f64);
 }
 
 /// Increment clearing account transfers counter
@@ -564,4 +565,55 @@ pub fn fx_clearing_transfers_inc(from_currency: &str, to_currency: &str) {
         "to_currency" => to_currency.to_string()
     )
     .increment(1);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Test that FX clearing metrics functions don't panic with valid inputs
+    #[test]
+    fn test_fx_clearing_balance_set() {
+        // Positive balance (clearing account is owed)
+        fx_clearing_balance_set("USD", 1000);
+        fx_clearing_balance_set("hours", 50);
+
+        // Negative balance (clearing account owes)
+        fx_clearing_balance_set("USD", -500);
+        fx_clearing_balance_set("EUR", -1234);
+
+        // Zero balance
+        fx_clearing_balance_set("GBP", 0);
+
+        // Edge cases
+        fx_clearing_balance_set("USD", i64::MAX);
+        fx_clearing_balance_set("USD", i64::MIN);
+    }
+
+    #[test]
+    fn test_fx_clearing_balance_abs_set() {
+        // Positive values
+        fx_clearing_balance_abs_set("USD", 1000);
+
+        // Negative values (should be converted to positive internally)
+        fx_clearing_balance_abs_set("USD", -1000);
+
+        // Zero
+        fx_clearing_balance_abs_set("EUR", 0);
+
+        // Edge cases - i64::MIN.abs() overflows, but as f64 it's fine
+        fx_clearing_balance_abs_set("GBP", i64::MIN);
+        fx_clearing_balance_abs_set("JPY", i64::MAX);
+    }
+
+    #[test]
+    fn test_fx_clearing_transfers_inc() {
+        // Various currency pairs
+        fx_clearing_transfers_inc("hours", "USD");
+        fx_clearing_transfers_inc("USD", "EUR");
+        fx_clearing_transfers_inc("EUR", "GBP");
+
+        // Same source/target (unusual but shouldn't panic)
+        fx_clearing_transfers_inc("USD", "USD");
+    }
 }
