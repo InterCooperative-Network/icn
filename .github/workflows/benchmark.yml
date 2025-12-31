@@ -90,8 +90,11 @@ jobs:
           # Run benchmarks and capture output
           cargo bench --workspace -- --noplot --baseline main 2>&1 | tee bench_output.txt
 
-          # Extract regressions - look for Criterion's "Performance has regressed" message
-          if grep -qE "(regressed|Performance has regressed)" bench_output.txt; then
+          # Extract regressions - look for Criterion's regression indicators:
+          # - "Performance has regressed" (explicit message)
+          # - "regressed" in change analysis
+          # - Significant percentage changes like "+15.234%"
+          if grep -qiE "(regressed|Performance has regressed|\+[0-9]+\.[0-9]+%.*slower)" bench_output.txt; then
             echo "has_regressions=true" >> $GITHUB_OUTPUT
 
             # Extract regression details
@@ -100,7 +103,7 @@ jobs:
             echo "The following benchmarks show regression compared to main:" >> regression_report.md
             echo "" >> regression_report.md
             echo '```' >> regression_report.md
-            grep -B5 -A2 -E "(regressed|Performance has regressed)" bench_output.txt >> regression_report.md || true
+            grep -B5 -A2 -iE "(regressed|Performance has regressed|\+[0-9]+\.[0-9]+%.*slower)" bench_output.txt >> regression_report.md || true
             echo '```' >> regression_report.md
             echo "" >> regression_report.md
             echo "---" >> regression_report.md
@@ -127,8 +130,9 @@ jobs:
               issue_number: context.issue.number,
             });
 
+            // Find benchmark comment from bot or github-actions
             const botComment = comments.find(c =>
-              c.user.type === 'Bot' &&
+              (c.user.type === 'Bot' || c.user.login.includes('[bot]') || c.user.login === 'github-actions') &&
               (c.body.includes('Performance Regressions Detected') || c.body.includes('Benchmark Results'))
             );
 
