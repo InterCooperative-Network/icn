@@ -1202,4 +1202,139 @@ mod tests {
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), actix_web::http::StatusCode::FORBIDDEN);
     }
+
+    /// Test that FX errors return structured error response with code field (Issue #374)
+    ///
+    /// This test verifies that when an FxError is returned from LedgerManager,
+    /// the HTTP response includes both 'error' and 'code' fields for programmatic handling.
+    #[actix_web::test]
+    async fn test_fx_error_response_includes_error_code() {
+        let ledger_mgr = Arc::new(LedgerManager::new());
+        let db = sled::Config::new().temporary(true).open().unwrap();
+        let budget_store = BudgetStore::new(db);
+        let velocity_limiter = VelocityLimiter::default();
+        let trust_mgr = Arc::new(TrustManager::new());
+        let alice = IdentityBundle::generate().unwrap();
+        let bob = IdentityBundle::generate().unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(ledger_mgr.clone()))
+                .app_data(web::Data::new(budget_store.clone()))
+                .app_data(web::Data::new(velocity_limiter.clone()))
+                .app_data(web::Data::new(trust_mgr.clone()))
+                .service(web::scope("/ledger").service(create_cross_payment)),
+        )
+        .await;
+
+        // Cross-payment with different currencies - will reach FX code which returns
+        // FX_NOT_CONFIGURED since no oracle is configured in test LedgerManager
+        let req_body = CreateCrossPaymentRequest {
+            from: alice.did().to_string(),
+            to: bob.did().to_string(),
+            amount: 100,
+            from_currency: "hours".to_string(),
+            to_currency: "USD".to_string(), // Different currencies -> reaches FX code
+            max_target_amount: None,
+            memo: None,
+        };
+
+        let claims = TokenClaims {
+            sub: alice.did().to_string(),
+            iat: 1000000000,
+            coop_id: "test-coop".to_string(),
+            scopes: vec!["ledger:write".to_string()],
+            exp: 9999999999,
+        };
+
+        let req = test::TestRequest::post()
+            .uri("/ledger/test-coop/payment/convert")
+            .set_json(&req_body)
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        // FX not configured is a server error (500)
+        assert_eq!(
+            resp.status(),
+            actix_web::http::StatusCode::INTERNAL_SERVER_ERROR
+        );
+
+        // Verify the response body has both error and code fields
+        let body = test::read_body(resp).await;
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+
+        assert!(
+            json.get("error").is_some(),
+            "Response should have 'error' field"
+        );
+        assert!(
+            json.get("code").is_some(),
+            "Response should have 'code' field"
+        );
+        assert_eq!(
+            json["code"], "FX_NOT_CONFIGURED",
+            "Error code should be FX_NOT_CONFIGURED"
+        );
+    }
+
+    /// Test that quote endpoint also returns structured error codes (Issue #374)
+    #[actix_web::test]
+    async fn test_fx_quote_error_response_includes_error_code() {
+        let ledger_mgr = Arc::new(LedgerManager::new());
+        let alice = IdentityBundle::generate().unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(ledger_mgr.clone()))
+                .service(web::scope("/ledger").service(get_cross_payment_quote)),
+        )
+        .await;
+
+        // Quote with different currencies - will reach FX code which returns
+        // FX_NOT_CONFIGURED since no oracle is configured in test LedgerManager
+        let req_body = CrossPaymentQuoteRequest {
+            amount: 100,
+            from_currency: "hours".to_string(),
+            to_currency: "USD".to_string(), // Different currencies -> reaches FX code
+        };
+
+        let claims = TokenClaims {
+            sub: alice.did().to_string(),
+            iat: 1000000000,
+            coop_id: "test-coop".to_string(),
+            scopes: vec!["ledger:read".to_string()],
+            exp: 9999999999,
+        };
+
+        let req = test::TestRequest::post()
+            .uri("/ledger/test-coop/payment/convert/quote")
+            .set_json(&req_body)
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        // FX not configured is a server error (500)
+        assert_eq!(
+            resp.status(),
+            actix_web::http::StatusCode::INTERNAL_SERVER_ERROR
+        );
+
+        // Verify the response body has both error and code fields
+        let body = test::read_body(resp).await;
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+
+        assert!(
+            json.get("error").is_some(),
+            "Response should have 'error' field"
+        );
+        assert!(
+            json.get("code").is_some(),
+            "Response should have 'code' field"
+        );
+        assert_eq!(
+            json["code"], "FX_NOT_CONFIGURED",
+            "Error code should be FX_NOT_CONFIGURED"
+        );
+    }
 }

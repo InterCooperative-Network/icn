@@ -4,6 +4,22 @@
 //! in one currency and the recipient receives in another, using the oracle
 //! for rate conversion.
 //!
+//! # Error Codes
+//!
+//! All FX errors provide machine-readable error codes for SDK clients:
+//!
+//! | Error Code | HTTP Status | Description |
+//! |------------|-------------|-------------|
+//! | `FX_NOT_CONFIGURED` | 500 | FX module not configured for this coop |
+//! | `ORACLE_NOT_CONFIGURED` | 500 | Exchange rate oracle not set up |
+//! | `SAME_CURRENCY` | 400 | Same currency specified for source and target |
+//! | `RATE_NOT_AVAILABLE` | 404 | No exchange rate available for currency pair |
+//! | `STALE_RATE` | 400 | Rate is stale and stale rates are not allowed |
+//! | `SLIPPAGE_EXCEEDED` | 400 | Converted amount exceeds max_target_amount |
+//! | `RATE_EXPIRED` | 400 | Prepared transfer expired before execution |
+//! | `INVALID_AMOUNT` | 400 | Amount is invalid or cannot be processed |
+//! | `CONVERSION_OVERFLOW` | 400 | Conversion would exceed numeric limits |
+//!
 //! # Example
 //!
 //! ```rust,no_run

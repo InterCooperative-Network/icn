@@ -470,13 +470,24 @@ impl LedgerManager {
         }
 
         // Calculate conversion
-        let gross_target_amount =
-            rate.convert(amount)
-                .ok_or_else(|| icn_ledger::fx::FxError::ConversionOverflow {
-                    source_amount: amount,
-                    from_currency: from_currency.to_string(),
-                    rate: rate.rate,
-                })?;
+        let gross_target_amount = rate.convert(amount).ok_or_else(|| {
+            // Log a warning if overflow occurs with a suspiciously high rate
+            // This could indicate oracle misconfiguration
+            if rate.rate > 1000.0 {
+                tracing::warn!(
+                    rate = rate.rate,
+                    amount = amount,
+                    from_currency = from_currency,
+                    to_currency = to_currency,
+                    "Conversion overflow with high exchange rate - possible oracle misconfiguration"
+                );
+            }
+            icn_ledger::fx::FxError::ConversionOverflow {
+                source_amount: amount,
+                from_currency: from_currency.to_string(),
+                rate: rate.rate,
+            }
+        })?;
 
         // Calculate fee using same logic as actual execution for consistency
         let fee_amount = fx_config.calculate_fee(gross_target_amount);
