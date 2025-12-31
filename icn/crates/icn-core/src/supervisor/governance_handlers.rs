@@ -41,6 +41,12 @@ pub type EventBus = Arc<crate::events::EventBus>;
 /// Returns `true` if the amount is valid (positive), `false` otherwise.
 /// On failure, logs an error, enqueues to DLQ, and increments the execution failure metric.
 ///
+/// The error code in the DLQ metadata is derived from `field_name`:
+/// - "Amount" → "invalid_amount"
+/// - "Threshold amount" → "invalid_threshold_amount"
+/// - "Transfer amount" → "invalid_transfer_amount"
+/// - "Reclaim amount" → "invalid_reclaim_amount"
+///
 /// # Arguments
 /// * `amount` - The amount to validate
 /// * `proposal_id` - The proposal ID for error context
@@ -57,6 +63,10 @@ fn validate_positive_amount(
     dlq: &DeadLetterQueue,
 ) -> bool {
     if amount <= 0 {
+        // Derive error code from field_name to preserve backward compatibility
+        // e.g., "Threshold amount" -> "invalid_threshold_amount"
+        let error_code = format!("invalid_{}", field_name.to_lowercase().replace(' ', "_"));
+
         error!(
             "❌ Invalid {} for proposal {}: {} (must be positive)",
             field_name.to_lowercase(),
@@ -68,7 +78,7 @@ fn validate_positive_amount(
             FailureType::TreasuryOperationFailed,
             serde_json::json!({
                 "proposal_id": proposal_id.0,
-                "error": "invalid_amount",
+                "error": error_code,
                 "amount": amount,
             }),
             format!("{field_name} must be positive, got: {amount}"),
@@ -2885,9 +2895,9 @@ mod tests {
         assert!(entry.error_message.contains("Transfer amount"));
         assert!(entry.error_message.contains("-50"));
 
-        // Verify context contains amount
+        // Verify context contains amount and derived error code
         let context = &entry.context;
-        assert_eq!(context["error"], "invalid_amount");
+        assert_eq!(context["error"], "invalid_transfer_amount"); // Derived from "Transfer amount"
         assert_eq!(context["amount"], -50);
     }
 
@@ -2896,7 +2906,8 @@ mod tests {
         let dlq = test_dlq();
         let proposal_id = test_proposal_id();
 
-        // Test with "Threshold amount" field name
+        // Test with "Threshold amount" field name - verifies backward compatibility
+        // Original code used "invalid_threshold_amount", helper should preserve this
         assert!(!validate_positive_amount(
             -1,
             &proposal_id,
@@ -2909,6 +2920,9 @@ mod tests {
         let pending = dlq.list_pending().unwrap();
         assert_eq!(pending.len(), 1);
         assert!(pending[0].error_message.contains("Threshold amount"));
+
+        // Verify the error code is derived correctly for backward compatibility
+        assert_eq!(pending[0].context["error"], "invalid_threshold_amount");
     }
 
     // =========================================================================
