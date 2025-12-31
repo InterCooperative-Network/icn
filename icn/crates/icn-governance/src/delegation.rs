@@ -136,8 +136,11 @@ pub trait ProposalDomainLookup {
 
 /// Check if two delegation scopes overlap (for cycle detection).
 ///
-/// This is the shared implementation used by DelegationManager, GovernanceActor,
-/// and GovernanceMgr to determine if two delegations could conflict.
+/// This is the shared implementation used by DelegationManager and GovernanceMgr
+/// to determine if two delegations could conflict.
+///
+/// Note: GovernanceActor uses its own implementation due to special error handling
+/// requirements (distinguishing storage errors from "not found" cases).
 ///
 /// # Arguments
 ///
