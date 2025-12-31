@@ -240,12 +240,12 @@ ${ICNCTL} --endpoint ${BETA_ENDPOINT} trust show ${ALPHA_DID}
 print_step "Monitoring Endpoints"
 
 print_info "Prometheus metrics are available at:"
-echo "  • Alpha: http://localhost:9090/metrics"
-echo "  • Beta:  http://localhost:9091/metrics"
+echo "  • Alpha: http://localhost:9100/metrics"
+echo "  • Beta:  http://localhost:9101/metrics"
 echo ""
 print_info "Try these commands to view metrics:"
-echo "  curl http://localhost:9090/metrics | grep icn_network"
-echo "  curl http://localhost:9091/metrics | grep icn_gossip"
+echo "  curl http://localhost:9100/metrics | grep icn_network"
+echo "  curl http://localhost:9101/metrics | grep icn_gossip"
 
 # Summary
 print_step "Demo Complete!"

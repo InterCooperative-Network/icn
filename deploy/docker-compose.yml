@@ -26,7 +26,7 @@ services:
     ports:
       - "8080:8080"   # Gateway API
       - "7777:7777"   # QUIC/P2P
-      - "9090:9090"   # Prometheus metrics
+      - "9100:9100"   # Prometheus metrics
       - "5601:5601"   # gRPC
     volumes:
       - icn-data:/root/.icn

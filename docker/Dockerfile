@@ -7,7 +7,7 @@
 #   docker build -f docker/Dockerfile -t icn:latest .
 #
 # Run:
-#   docker run -p 4433:4433/udp -p 5050:5050 -p 9090:9090 \
+#   docker run -p 4433:4433/udp -p 5050:5050 -p 9100:9100 \
 #     -v ~/.icn:/data icn:latest
 
 # ============================================================================
@@ -72,9 +72,9 @@ ENV ICN_DATA_DIR=/data
 # Expose ports
 # 4433/udp - QUIC peer transport
 # 5050/tcp - RPC API
-# 9090/tcp - Prometheus metrics
+# 9100/tcp - Prometheus metrics
 # 8080/tcp - Health checks
-EXPOSE 4433/udp 5050/tcp 9090/tcp 8080/tcp
+EXPOSE 4433/udp 5050/tcp 9100/tcp 8080/tcp
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

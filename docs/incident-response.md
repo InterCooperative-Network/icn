@@ -194,7 +194,7 @@ This document provides operational procedures for responding to common incidents
    curl http://localhost:8080/health | jq '.ledger_quarantine_size'
 
    # Or check Prometheus metrics
-   curl http://localhost:9090/metrics | grep icn_ledger_quarantine_size
+   curl http://localhost:9100/metrics | grep icn_ledger_quarantine_size
    ```
 
 2. **List quarantined entries** (future command):
@@ -489,7 +489,7 @@ journalctl -u icnd --since "1 week ago" | grep upgrade
    curl http://localhost:8080/health | jq '.active_connections'
 
    # Check network metrics
-   curl http://localhost:9090/metrics | grep icn_network_connections_active
+   curl http://localhost:9100/metrics | grep icn_network_connections_active
    ```
 
 3. **Check mDNS discovery**:
@@ -549,7 +549,7 @@ journalctl -u icnd --since "1 week ago" | grep upgrade
 
 1. **Check gossip metrics**:
    ```bash
-   curl http://localhost:9090/metrics | grep icn_gossip
+   curl http://localhost:9100/metrics | grep icn_gossip
    ```
 
 2. **Identify problematic topic**:

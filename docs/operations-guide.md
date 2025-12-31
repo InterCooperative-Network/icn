@@ -57,7 +57,7 @@ icnctl status
 **3. Check metrics endpoint:**
 ```bash
 # Verify Prometheus metrics are being exported
-curl -s http://localhost:9090/metrics | grep icn_network_connections_active
+curl -s http://localhost:9100/metrics | grep icn_network_connections_active
 ```
 
 **Expected output:**
@@ -696,7 +696,7 @@ icnctl status
 curl http://localhost:8080/health | jq
 
 # 2. Check recent metrics (optional)
-curl -s http://localhost:9090/metrics | grep icn_snapshot
+curl -s http://localhost:9100/metrics | grep icn_snapshot
 
 # 3. Perform graceful restart
 sudo systemctl restart icnd
@@ -718,21 +718,21 @@ icnctl gossip topics
 Prometheus metrics for operational visibility:
 ```bash
 # Snapshot operation timing
-curl -s http://localhost:9090/metrics | grep icn_snapshot_save_duration
-curl -s http://localhost:9090/metrics | grep icn_snapshot_load_duration
+curl -s http://localhost:9100/metrics | grep icn_snapshot_save_duration
+curl -s http://localhost:9100/metrics | grep icn_snapshot_load_duration
 
 # Snapshot contents
-curl -s http://localhost:9090/metrics | grep icn_snapshot_gossip_vector_clock_entries
-curl -s http://localhost:9090/metrics | grep icn_snapshot_gossip_subscriptions
-curl -s http://localhost:9090/metrics | grep icn_snapshot_network_x25519_keys
+curl -s http://localhost:9100/metrics | grep icn_snapshot_gossip_vector_clock_entries
+curl -s http://localhost:9100/metrics | grep icn_snapshot_gossip_subscriptions
+curl -s http://localhost:9100/metrics | grep icn_snapshot_network_x25519_keys
 
 # Snapshot file size
-curl -s http://localhost:9090/metrics | grep icn_snapshot_size_bytes
+curl -s http://localhost:9100/metrics | grep icn_snapshot_size_bytes
 
 # Operation counters
-curl -s http://localhost:9090/metrics | grep icn_snapshot_save_total
-curl -s http://localhost:9090/metrics | grep icn_snapshot_load_total
-curl -s http://localhost:9090/metrics | grep icn_snapshot_errors_total
+curl -s http://localhost:9100/metrics | grep icn_snapshot_save_total
+curl -s http://localhost:9100/metrics | grep icn_snapshot_load_total
+curl -s http://localhost:9100/metrics | grep icn_snapshot_errors_total
 ```
 
 **Snapshot Alerts (Recommended):**
@@ -885,10 +885,10 @@ icnctl ledger quarantine resolve <entry-id> --action <keep|discard>
 
 ```bash
 # Query Prometheus metrics
-curl http://localhost:9090/metrics
+curl http://localhost:9100/metrics
 
 # Query specific metric
-curl -s http://localhost:9090/metrics | grep icn_network_connections_active
+curl -s http://localhost:9100/metrics | grep icn_network_connections_active
 
 # Check health status
 curl http://localhost:8080/health | jq
@@ -987,7 +987,7 @@ icnctl ledger quarantine list --format json | jq '.[] | .account' | sort | uniq 
 ps aux | grep icnd
 
 # Check metrics for growth indicators
-curl -s http://localhost:9090/metrics | grep -E "(gossip_entries_total|ledger_accounts_total|trust_edges_total)"
+curl -s http://localhost:9100/metrics | grep -E "(gossip_entries_total|ledger_accounts_total|trust_edges_total)"
 ```
 
 **Solutions:**
@@ -1005,7 +1005,7 @@ curl -s http://localhost:9090/metrics | grep -E "(gossip_entries_total|ledger_ac
 **Diagnosis:**
 ```bash
 # Check ledger metrics
-curl -s http://localhost:9090/metrics | grep icn_ledger
+curl -s http://localhost:9100/metrics | grep icn_ledger
 
 # Check gossip sync status
 icnctl gossip stats

@@ -11,8 +11,8 @@
 # Access:
 #   - Alpha RPC: http://localhost:5050
 #   - Beta RPC: http://localhost:5051
-#   - Alpha Metrics: http://localhost:9090
-#   - Beta Metrics: http://localhost:9091
+#   - Alpha Metrics: http://localhost:9100
+#   - Beta Metrics: http://localhost:9101
 #   - Prometheus: http://localhost:9000
 
 version: '3.9'
@@ -32,7 +32,7 @@ services:
     ports:
       - "4433:4433/udp"  # QUIC peer transport
       - "5050:5050"      # RPC API
-      - "9090:9090"      # Prometheus metrics
+      - "9100:9100"      # Prometheus metrics
       - "8080:8080"      # Health check
     volumes:
       - icn-alpha-data:/data
@@ -40,8 +40,8 @@ services:
     environment:
       - ICN_DATA_DIR=/data
       - ICN_NETWORK_LISTEN_ADDR=0.0.0.0:4433
-      - ICN_OBSERVABILITY_METRICS_PORT=9090
       - ICN_OBSERVABILITY_HEALTH_PORT=8080
+      - ICN_OBSERVABILITY_METRICS_PORT=9100
       - ICN_OBSERVABILITY_LOG_LEVEL=info
       - ICN_NETWORK_MDNS_ENABLED=false  # Use direct addressing in Docker
     command:
@@ -69,7 +69,7 @@ services:
     ports:
       - "4434:4433/udp"  # QUIC peer transport
       - "5051:5050"      # RPC API
-      - "9091:9090"      # Prometheus metrics
+      - "9101:9100"      # Prometheus metrics
       - "8081:8080"      # Health check
     volumes:
       - icn-beta-data:/data
@@ -77,8 +77,8 @@ services:
     environment:
       - ICN_DATA_DIR=/data
       - ICN_NETWORK_LISTEN_ADDR=0.0.0.0:4433
-      - ICN_OBSERVABILITY_METRICS_PORT=9090
       - ICN_OBSERVABILITY_HEALTH_PORT=8080
+      - ICN_OBSERVABILITY_METRICS_PORT=9100
       - ICN_OBSERVABILITY_LOG_LEVEL=info
       - ICN_NETWORK_MDNS_ENABLED=false
     command:
@@ -106,7 +106,7 @@ services:
     ports:
       - "9000:9090"  # Prometheus UI (on 9000 to avoid conflict with ICN)
     volumes:
-      - ../config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'

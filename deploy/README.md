@@ -431,7 +431,7 @@ Common issues:
 
 1. Check Prometheus is scraping: http://localhost:9091/targets
 2. Verify datasource in Grafana: Configuration > Data Sources
-3. Check icnd metrics: `curl http://localhost:9090/metrics`
+3. Check icnd metrics: `curl http://localhost:9100/metrics`
 
 ### Web UI can't connect
 

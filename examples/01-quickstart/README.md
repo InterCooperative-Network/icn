@@ -23,7 +23,7 @@ This example demonstrates setting up a two-node ICN network on your local machin
 ├─────────────────┤                        ├─────────────────┤
 │ QUIC:  4433     │◄──────QUIC/TLS───────►│ QUIC:  4434     │
 │ RPC:   5050     │                        │ RPC:   5051     │
-│ Metrics: 9090   │                        │ Metrics: 9091   │
+│ Metrics: 9100   │                        │ Metrics: 9101   │
 │ Data: /tmp/icn- │                        │ Data: /tmp/icn- │
 │       alpha/    │                        │       beta/     │
 └─────────────────┘                        └─────────────────┘
@@ -60,7 +60,7 @@ Confirm passphrase:
 INFO icn_identity: Identity created: did:icn:z6Mk...
 INFO icn_net: QUIC listener started on 0.0.0.0:4433
 INFO icn_net: mDNS discovery enabled
-INFO icn_obs: Metrics server started on :9090
+INFO icn_obs: Metrics server started on :9100
 INFO icn_core::supervisor: All actors spawned successfully
 ```
 
@@ -140,8 +140,8 @@ Copy these DIDs for the next step.
 
 Open your browser and visit:
 
-- **Alpha metrics:** http://localhost:9090/metrics
-- **Beta metrics:** http://localhost:9091/metrics
+- **Alpha metrics:** http://localhost:9100/metrics
+- **Beta metrics:** http://localhost:9101/metrics
 
 Look for metrics like:
 - `icn_network_connections_active`

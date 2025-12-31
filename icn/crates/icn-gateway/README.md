@@ -446,7 +446,7 @@ icn-gateway/
 - API layer: Tracks business operations (auth, coops, ledger)
 - Middleware layer: Tracks authorization and rate limit violations
 - WebSocket layer: Tracks connections, disconnections, and messages
-- All metrics available via daemon's `/metrics` endpoint (default: `http://localhost:9090/metrics`)
+- All metrics available via daemon's `/metrics` endpoint (default: `http://localhost:9100/metrics`)
 
 **Background Cleanup Task:**
 - Single tokio task running every 5 minutes

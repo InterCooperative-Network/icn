@@ -29,12 +29,13 @@ services:
     ports:
       - "4433:4433/udp"
       - "5050:5050"
-      - "9090:9090"
+      - "9100:9100"
       - "8080:8080"
     volumes:
       - ./volumes/alpha:/data
     environment:
       - ICN_DATA_DIR=/data
+      - ICN_OBSERVABILITY_METRICS_PORT=9100
       - ICN_OBSERVABILITY_LOG_LEVEL=debug
       - ICN_NETWORK_MDNS_ENABLED=false
     restart: "no"  # Don't auto-restart in dev mode
@@ -53,12 +54,13 @@ services:
     ports:
       - "4434:4433/udp"
       - "5051:5050"
-      - "9091:9090"
+      - "9101:9100"
       - "8081:8080"
     volumes:
       - ./volumes/beta:/data
     environment:
       - ICN_DATA_DIR=/data
+      - ICN_OBSERVABILITY_METRICS_PORT=9100
       - ICN_OBSERVABILITY_LOG_LEVEL=debug
       - ICN_NETWORK_MDNS_ENABLED=false
     restart: "no"

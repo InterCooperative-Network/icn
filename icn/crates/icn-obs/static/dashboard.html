@@ -130,7 +130,7 @@
     </div>
 
     <script>
-        const METRICS_URL = 'http://localhost:9090/metrics';
+        const METRICS_URL = 'http://localhost:9100/metrics';
         const HEALTH_URL = '/health';
         const REFRESH_INTERVAL = 5000; // 5 seconds
 
@@ -370,7 +370,7 @@
                         <strong>Error loading metrics</strong>
                         <p style="margin-top: 0.5rem;">${error.message}</p>
                         <p style="margin-top: 0.5rem; font-size: 0.875rem;">
-                            Make sure ICNd is running and Prometheus metrics are enabled on port 9090.
+                            Make sure ICNd is running and Prometheus metrics are enabled on port 9100.
                         </p>
                     </div>
                 `;

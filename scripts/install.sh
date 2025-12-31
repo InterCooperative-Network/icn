@@ -283,7 +283,7 @@ rpc_port = 5601
 
 [observability]
 # Prometheus metrics port
-metrics_port = 9090
+metrics_port = 9100
 
 # Health check and dashboard port
 health_port = 8080
