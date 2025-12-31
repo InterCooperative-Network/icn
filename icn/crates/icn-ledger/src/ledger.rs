@@ -47,6 +47,11 @@ pub struct ForkStats {
 /// Key prefix for cached balances in storage
 const BALANCE_PREFIX: &str = "ledger:balance:";
 
+/// Threshold for logging warnings about suspiciously high exchange rates.
+/// Most major currency pairs range from 0.01 to ~150. Rates above this threshold
+/// may indicate oracle misconfiguration (decimal point errors, stale data, bugs).
+const SUSPICIOUS_RATE_THRESHOLD: f64 = 1000.0;
+
 /// Key prefix for cleared volume index (total credits received per account/currency)
 const CLEARED_VOLUME_PREFIX: &str = "ledger:cleared_volume:";
 
@@ -446,6 +451,36 @@ impl Ledger {
         self.fx_config.as_ref()
     }
 
+    /// Get prerequisites for cross-currency transfers
+    ///
+    /// Returns cloned copies of FxConfig and OracleManager for use outside
+    /// the ledger lock. This enables fetching exchange rates without holding
+    /// a lock on the ledger.
+    ///
+    /// # Returns
+    /// Tuple of (FxConfig, Arc<OracleManager>)
+    ///
+    /// # Errors
+    /// - `FxError::NotConfigured` if FX config not set
+    /// - `FxError::OracleNotConfigured` if oracle not set
+    pub fn fx_prerequisites(
+        &self,
+    ) -> std::result::Result<
+        (crate::fx::FxConfig, Arc<crate::oracle::OracleManager>),
+        crate::fx::FxError,
+    > {
+        use crate::fx::FxError;
+
+        let fx_config = self.fx_config.clone().ok_or(FxError::NotConfigured)?;
+
+        let oracle = self
+            .oracle_manager
+            .clone()
+            .ok_or(FxError::OracleNotConfigured)?;
+
+        Ok((fx_config, oracle))
+    }
+
     /// Prepare a cross-currency transfer without committing
     ///
     /// This fetches the current exchange rate and builds a journal entry
@@ -518,6 +553,20 @@ impl Ledger {
             // is in the future (due to NTP drift), age is treated as 0 (fresh).
             let now = crate::current_timestamp_secs();
             let rate_age = now.saturating_sub(rate.aggregated_at);
+
+            // Warn when rate is approaching staleness (>80% of max age)
+            let warning_threshold = max_age * 80 / 100;
+            if rate_age > warning_threshold && rate_age <= max_age {
+                tracing::warn!(
+                    from_currency = from_currency,
+                    to_currency = to_currency,
+                    rate_age_secs = rate_age,
+                    max_age_secs = max_age,
+                    remaining_secs = max_age.saturating_sub(rate_age),
+                    "Exchange rate approaching staleness threshold"
+                );
+            }
+
             if rate_age > max_age {
                 return Err(FxError::StaleRateAge {
                     from: from_currency.to_string(),
@@ -537,8 +586,7 @@ impl Ledger {
         // Convert amount using oracle rate
         let gross_target_amount = rate.convert(source_amount).ok_or_else(|| {
             // Log a warning if overflow occurs with a suspiciously high rate
-            // This could indicate oracle misconfiguration
-            if rate.rate > 1000.0 {
+            if rate.rate > SUSPICIOUS_RATE_THRESHOLD {
                 tracing::warn!(
                     rate = rate.rate,
                     source_amount = source_amount,
@@ -634,6 +682,209 @@ impl Ledger {
             gross_target_amount,
             fee_amount,
             recipient_amount, // Uses same logic as journal entry builder
+            fx_config.fee_basis_points,
+        );
+
+        Ok(PreparedFxTransfer {
+            entry,
+            details,
+            valid_until,
+        })
+    }
+
+    /// Prepare a cross-currency transfer with a pre-fetched exchange rate
+    ///
+    /// This is a synchronous version of `prepare_cross_currency_transfer` that
+    /// takes an already-fetched exchange rate. Use this when you need to avoid
+    /// holding a lock during the async oracle call.
+    ///
+    /// # Workflow
+    /// 1. Call `fx_prerequisites()` to get FxConfig and OracleManager (short lock)
+    /// 2. Fetch rate from oracle outside the lock: `oracle.get_rate(&pair).await`
+    /// 3. Call this method with the fetched rate (read lock, but sync - no await)
+    /// 4. Call `execute_cross_currency_transfer()` to commit (write lock)
+    ///
+    /// # Arguments
+    /// * `from` - Sender DID
+    /// * `to` - Recipient DID
+    /// * `source_amount` - Amount to debit from sender (in source currency)
+    /// * `from_currency` - Source currency code
+    /// * `to_currency` - Target currency code
+    /// * `max_target_amount` - Optional slippage protection
+    /// * `rate` - Pre-fetched exchange rate from the oracle
+    ///
+    /// # Errors
+    /// - `FxError::NotConfigured` if FX config not set
+    /// - `FxError::SameCurrency` if from/to currencies match
+    /// - `FxError::StaleRate` / `FxError::StaleRateAge` if rate is stale
+    /// - `FxError::SlippageExceeded` if converted amount exceeds max
+    /// - `FxError::RateNotAvailable` if rate is for wrong currency pair
+    pub fn prepare_cross_currency_transfer_with_rate(
+        &self,
+        from: &Did,
+        to: &Did,
+        source_amount: i64,
+        from_currency: &str,
+        to_currency: &str,
+        max_target_amount: Option<i64>,
+        rate: &crate::oracle::ExchangeRate,
+    ) -> std::result::Result<crate::fx::PreparedFxTransfer, crate::fx::FxError> {
+        use crate::entry::JournalEntryBuilder;
+        use crate::fx::{FxConversionDetails, FxError, PreparedFxTransfer};
+
+        // Validate configuration
+        let fx_config = self.fx_config.as_ref().ok_or(FxError::NotConfigured)?;
+
+        // Validate currencies differ
+        if from_currency == to_currency {
+            return Err(FxError::SameCurrency(from_currency.to_string()));
+        }
+
+        // Validate amount
+        if source_amount <= 0 {
+            return Err(FxError::InvalidAmount(format!(
+                "Source amount must be positive, got: {source_amount}"
+            )));
+        }
+
+        // Validate rate is for the correct currency pair
+        // Note: This comparison is intentionally case-sensitive. Currency codes
+        // should be normalized (e.g., uppercase) at the API boundary. The oracle
+        // and ledger use consistent codes from CurrencyPair::new() which stores
+        // strings as-is without normalization.
+        if rate.pair.from != from_currency || rate.pair.to != to_currency {
+            return Err(FxError::RateNotAvailable {
+                from: from_currency.to_string(),
+                to: to_currency.to_string(),
+                reason: format!(
+                    "Rate is for {}/{} but expected {}/{}",
+                    rate.pair.from, rate.pair.to, from_currency, to_currency
+                ),
+            });
+        }
+
+        // Check staleness based on configuration
+        if let Some(max_age) = fx_config.max_rate_age_secs {
+            // Time-based staleness check
+            let now = crate::current_timestamp_secs();
+            let rate_age = now.saturating_sub(rate.aggregated_at);
+
+            // Warn when rate is approaching staleness (>80% of max age)
+            let warning_threshold = max_age * 80 / 100;
+            if rate_age > warning_threshold && rate_age <= max_age {
+                tracing::warn!(
+                    from_currency = from_currency,
+                    to_currency = to_currency,
+                    rate_age_secs = rate_age,
+                    max_age_secs = max_age,
+                    remaining_secs = max_age.saturating_sub(rate_age),
+                    "Exchange rate approaching staleness threshold"
+                );
+            }
+
+            if rate_age > max_age {
+                return Err(FxError::StaleRateAge {
+                    from: from_currency.to_string(),
+                    to: to_currency.to_string(),
+                    age_secs: rate_age,
+                    max_age_secs: max_age,
+                });
+            }
+        } else if rate.is_stale {
+            // Fallback to oracle's is_stale flag when max_rate_age_secs is None
+            return Err(FxError::StaleRate {
+                from: from_currency.to_string(),
+                to: to_currency.to_string(),
+            });
+        }
+
+        // Convert amount using oracle rate
+        let gross_target_amount = rate.convert(source_amount).ok_or_else(|| {
+            // Log a warning if overflow occurs with a suspiciously high rate
+            if rate.rate > SUSPICIOUS_RATE_THRESHOLD {
+                tracing::warn!(
+                    rate = rate.rate,
+                    source_amount = source_amount,
+                    from_currency = from_currency,
+                    to_currency = to_currency,
+                    "Conversion overflow with high exchange rate - possible oracle misconfiguration"
+                );
+            }
+            FxError::ConversionOverflow {
+                source_amount,
+                from_currency: from_currency.to_string(),
+                rate: rate.rate,
+            }
+        })?;
+
+        // Check slippage if max specified
+        if let Some(max) = max_target_amount {
+            if gross_target_amount > max {
+                return Err(FxError::SlippageExceeded {
+                    expected: max,
+                    actual: gross_target_amount,
+                    max_slippage_bps: fx_config.max_slippage_basis_points,
+                });
+            }
+        }
+
+        // Calculate fee and net amount
+        let fee_amount = fx_config.calculate_fee(gross_target_amount);
+        let net_target_amount = gross_target_amount - fee_amount;
+
+        // Build 4-leg (or 5-leg with fee) journal entry
+        let mut builder = JournalEntryBuilder::new(from.clone())
+            .credit(from.clone(), from_currency.to_string(), source_amount)
+            .debit(
+                fx_config.clearing_did.clone(),
+                from_currency.to_string(),
+                source_amount,
+            )
+            .credit(
+                fx_config.clearing_did.clone(),
+                to_currency.to_string(),
+                gross_target_amount,
+            );
+
+        // Add treasury fee leg if applicable
+        let (recipient_amount, has_treasury_fee) =
+            if fee_amount > 0 && fx_config.treasury_did.is_some() {
+                (net_target_amount, true)
+            } else {
+                (gross_target_amount, false)
+            };
+
+        if has_treasury_fee {
+            if let Some(treasury) = &fx_config.treasury_did {
+                builder = builder
+                    .debit(treasury.clone(), to_currency.to_string(), fee_amount)
+                    .debit(to.clone(), to_currency.to_string(), recipient_amount);
+            }
+        } else {
+            builder = builder.debit(to.clone(), to_currency.to_string(), recipient_amount);
+        }
+
+        let entry = builder
+            .build()
+            .map_err(|e| FxError::InvalidAmount(format!("Failed to build journal entry: {e}")))?;
+
+        // Calculate expiration (use rate TTL)
+        let valid_until = rate.aggregated_at.saturating_add(rate.ttl_secs);
+
+        // Build conversion details for audit
+        let details = FxConversionDetails::new(
+            from.to_string(),
+            to.to_string(),
+            from_currency.to_string(),
+            to_currency.to_string(),
+            source_amount,
+            rate.rate,
+            rate.aggregated_at,
+            rate.sources(),
+            rate.is_stale,
+            gross_target_amount,
+            fee_amount,
+            recipient_amount,
             fx_config.fee_basis_points,
         );
 
