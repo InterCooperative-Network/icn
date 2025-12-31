@@ -17,11 +17,11 @@
 
 use anyhow::Result;
 use icn_governance::{
-    Comment, CommentId, Delegation, DelegationId, DelegationScope, Discussion, DiscussionStore,
-    GovernanceConfig, GovernanceDomain, GovernanceDomainId, GovernanceOps, GovernanceParams,
-    GovernanceProfileId, InMemoryDiscussionStore, MembershipConfig, MembershipSource, Proposal,
-    ProposalId, ProposalPayload, ProposalState, Timestamp, Vote, VoteChoice, VoteTally,
-    DEFAULT_MAX_DELEGATION_DEPTH,
+    scopes_overlap, Comment, CommentId, Delegation, DelegationId, DelegationScope, Discussion,
+    DiscussionStore, GovernanceConfig, GovernanceDomain, GovernanceDomainId, GovernanceOps,
+    GovernanceParams, GovernanceProfileId, InMemoryDiscussionStore, MembershipConfig,
+    MembershipSource, Proposal, ProposalDomainLookup, ProposalId, ProposalPayload, ProposalState,
+    Timestamp, Vote, VoteChoice, VoteTally, DEFAULT_MAX_DELEGATION_DEPTH,
 };
 use icn_identity::Did;
 use std::collections::{HashMap, HashSet};
@@ -958,40 +958,35 @@ impl Default for GovernanceManager {
 // Delegation Cycle Detection Helpers
 // ============================================================================
 
+/// Wrapper to implement `ProposalDomainLookup` for HashMap<ProposalId, Proposal>.
+///
+/// Used to pass proposal storage to the shared `scopes_overlap` function.
+struct ProposalMapLookup<'a>(&'a HashMap<ProposalId, Proposal>);
+
+impl ProposalDomainLookup for ProposalMapLookup<'_> {
+    fn lookup_proposal_domain(&self, proposal_id: &ProposalId) -> Option<GovernanceDomainId> {
+        self.0.get(proposal_id).map(|p| p.domain_id.clone())
+    }
+}
+
 /// Check if two delegation scopes overlap (for cycle detection)
 ///
 /// Returns true if delegations with these scopes could conflict.
-/// Uses proposal domain lookup for precise Domain/Proposal overlap checking.
+/// Delegates to the shared `scopes_overlap` function from icn-governance.
 ///
 /// # Eventual Consistency
 ///
 /// If proposal is not found, assumes NO overlap (proposal-specific delegations
 /// are narrower than domain delegations). This allows delegations to proceed
 /// when proposal info hasn't propagated via gossip yet.
-///
-/// Cycles that form during this window are detected when the proposal is
-/// registered in [`DelegationManager::register_proposal`], which triggers
-/// reconciliation and emits metrics for operator alerting.
-fn scopes_overlap(
+fn gateway_scopes_overlap(
     a: &DelegationScope,
     b: &DelegationScope,
     proposals: &HashMap<ProposalId, Proposal>,
 ) -> bool {
-    match (a, b) {
-        (DelegationScope::Blanket, _) | (_, DelegationScope::Blanket) => true,
-        (DelegationScope::Domain(d1), DelegationScope::Domain(d2)) => d1 == d2,
-        (DelegationScope::Domain(d), DelegationScope::Proposal(p))
-        | (DelegationScope::Proposal(p), DelegationScope::Domain(d)) => {
-            // Use proposal lookup for precise domain checking
-            match proposals.get(p) {
-                Some(proposal) => &proposal.domain_id == d,
-                // Proposal-specific delegations are narrower than domain delegations,
-                // so assume no overlap when proposal is not found
-                None => false,
-            }
-        }
-        (DelegationScope::Proposal(p1), DelegationScope::Proposal(p2)) => p1 == p2,
-    }
+    let lookup = ProposalMapLookup(proposals);
+    // Use permissive default: assume no overlap when proposal unknown
+    scopes_overlap(a, b, &lookup, false)
 }
 
 /// Find a delegation cycle if adding delegator→delegate would create one
@@ -1041,7 +1036,7 @@ fn find_delegation_cycle(
             .find(|d| {
                 d.delegator == current
                     && d.is_active(now)
-                    && scopes_overlap(&d.scope, scope, proposals)
+                    && gateway_scopes_overlap(&d.scope, scope, proposals)
             })
             .map(|d| d.delegate.clone());
 
@@ -1101,7 +1096,7 @@ fn compute_incoming_depth_recursive(
         .filter(|d| {
             d.delegate == *delegate
                 && d.is_active(now)
-                && scopes_overlap(&d.scope, scope, proposals)
+                && gateway_scopes_overlap(&d.scope, scope, proposals)
         })
         .map(|d| d.delegator.clone())
         .collect();
