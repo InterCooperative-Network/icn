@@ -135,7 +135,12 @@ jobs:
               echo "<summary>Regression Details</summary>"
               echo ""
               echo '```'
-              grep -B3 -A1 -iE "regressed" bench_output.txt | head -100
+              REGRESSION_OUTPUT=$(grep -B3 -A1 -iE "regressed" bench_output.txt)
+              REGRESSION_LINES=$(echo "$REGRESSION_OUTPUT" | wc -l)
+              echo "$REGRESSION_OUTPUT" | head -100
+              if [ "$REGRESSION_LINES" -gt 100 ]; then
+                echo "... (truncated, showing 100 of $REGRESSION_LINES lines)"
+              fi
               echo '```'
               echo "</details>"
               echo ""
@@ -199,9 +204,17 @@ jobs:
             echo "Performance regression acknowledged via label"
             exit 0
           else
-            echo "::warning::Performance regressions detected. Add 'perf-regression-ok' label to merge anyway."
+            echo "::error::Performance regressions detected. Add 'perf-regression-ok' label to merge anyway."
             # Exit 1 to fail the check - require explicit acknowledgment
             exit 1
           fi
         env:
           GH_TOKEN: ${{ github.token }}
+
+      - name: Upload PR benchmark results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-pr-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          path: pr/icn/target/criterion
+          retention-days: 30
