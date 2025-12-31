@@ -406,6 +406,15 @@ impl LedgerManager {
             metrics::fx_clearing_balance_abs_set(from_currency, source_balance);
             metrics::fx_clearing_balance_set(to_currency, target_balance);
             metrics::fx_clearing_balance_abs_set(to_currency, target_balance);
+        } else {
+            // FX config was unavailable - balance metrics cannot be emitted.
+            // This is unexpected since we just executed an FX transfer successfully.
+            tracing::warn!(
+                coop_id = %coop_id,
+                from_currency = from_currency,
+                to_currency = to_currency,
+                "Unable to emit FX clearing balance metrics: FX config unavailable"
+            );
         }
 
         // Record spending in budget store
