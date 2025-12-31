@@ -11,7 +11,7 @@ services:
     ports:
       - "3000:3000/udp"  # P2P QUIC
       - "8000:8000"      # Gateway HTTP/WS
-      - "9090:9090"      # Metrics
+      - "9100:9100"      # Metrics
     environment:
       - RUST_LOG=icn=info,actix_web=info
       # REQUIRED: Set JWT_SECRET in .env file or environment
