@@ -744,6 +744,10 @@ impl Ledger {
         }
 
         // Validate rate is for the correct currency pair
+        // Note: This comparison is intentionally case-sensitive. Currency codes
+        // should be normalized (e.g., uppercase) at the API boundary. The oracle
+        // and ledger use consistent codes from CurrencyPair::new() which stores
+        // strings as-is without normalization.
         if rate.pair.from != from_currency || rate.pair.to != to_currency {
             return Err(FxError::RateNotAvailable {
                 from: from_currency.to_string(),
