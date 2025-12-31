@@ -1248,4 +1248,78 @@ mod integration_tests {
     // The configuration tests (test_max_rate_age_configuration) verify the feature works.
     // The staleness logic itself is simple (subtraction + comparison).
     // Full end-to-end staleness testing would require mocking the cache or time.
+
+    #[tokio::test]
+    async fn test_fx_prerequisites() {
+        let (ledger, _, _, _) = setup_ledger_with_fx().await;
+
+        // Should return FxConfig and OracleManager
+        let (fx_config, oracle) = ledger.fx_prerequisites().expect("get prerequisites");
+
+        // Verify config was cloned correctly
+        assert_eq!(fx_config.fee_basis_points, 100);
+
+        // Verify oracle works
+        let pair = crate::oracle::CurrencyPair::new("hours", "USD");
+        let rate = oracle.get_rate(&pair).await.expect("get rate");
+        assert!((rate.rate - 25.0).abs() < 0.001);
+    }
+
+    #[tokio::test]
+    async fn test_fx_prerequisites_no_config() {
+        let store = Arc::new(SledStore::temporary().expect("create temp store"));
+        let ledger = Ledger::new(store).expect("create ledger");
+
+        let result = ledger.fx_prerequisites();
+        assert!(matches!(result, Err(FxError::NotConfigured)));
+    }
+
+    #[tokio::test]
+    async fn test_fx_prerequisites_no_oracle() {
+        let store = Arc::new(SledStore::temporary().expect("create temp store"));
+        let mut ledger = Ledger::new(store).expect("create ledger");
+
+        let clearing = KeyPair::generate().expect("generate").did().clone();
+        ledger.set_fx_config(FxConfig::new(clearing));
+
+        let result = ledger.fx_prerequisites();
+        assert!(matches!(result, Err(FxError::OracleNotConfigured)));
+    }
+
+    #[tokio::test]
+    async fn test_prepare_with_rate() {
+        let (ledger, alice, bob, _) = setup_ledger_with_fx().await;
+
+        // Get prerequisites and fetch rate outside lock (simulating gateway pattern)
+        let (_fx_config, oracle) = ledger.fx_prerequisites().expect("get prerequisites");
+        let pair = crate::oracle::CurrencyPair::new("hours", "USD");
+        let rate = oracle.get_rate(&pair).await.expect("get rate");
+
+        // Use prepare_cross_currency_transfer_with_rate
+        let prepared = ledger
+            .prepare_cross_currency_transfer_with_rate(
+                &alice, &bob, 10, "hours", "USD", None, &rate,
+            )
+            .expect("prepare with rate");
+
+        assert_eq!(prepared.details.source_amount, 10);
+        assert_eq!(prepared.details.gross_target_amount, 250);
+        assert!(prepared.is_valid());
+    }
+
+    #[tokio::test]
+    async fn test_prepare_with_rate_wrong_pair() {
+        let (ledger, alice, bob, _) = setup_ledger_with_fx().await;
+
+        // Get rate for hours/USD
+        let (_fx_config, oracle) = ledger.fx_prerequisites().expect("get prerequisites");
+        let pair = crate::oracle::CurrencyPair::new("hours", "USD");
+        let rate = oracle.get_rate(&pair).await.expect("get rate");
+
+        // Try to use it for EUR/USD - should fail
+        let result = ledger
+            .prepare_cross_currency_transfer_with_rate(&alice, &bob, 10, "EUR", "USD", None, &rate);
+
+        assert!(matches!(result, Err(FxError::RateNotAvailable { .. })));
+    }
 }

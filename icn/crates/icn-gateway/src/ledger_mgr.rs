@@ -305,20 +305,13 @@ impl LedgerManager {
     ///
     /// Returns the entry hash and conversion details for audit/display.
     ///
-    /// # Note on locking
+    /// # Locking Strategy
     ///
-    /// This method holds a read lock across an await point during the
-    /// `prepare_cross_currency_transfer` call, which fetches the exchange rate
-    /// from the oracle.
-    ///
-    /// This is acceptable because:
-    /// - Read locks allow concurrent readers (other payments can proceed)
-    /// - The oracle call typically completes quickly (cached rates)
-    /// - Write lock is only held during the final `execute_cross_currency_transfer`
-    ///
-    /// For high-throughput scenarios, consider refactoring to extract the oracle
-    /// call outside the lock (see issue #367).
-    #[allow(clippy::await_holding_lock)]
+    /// This method uses a lock-free pattern for the async oracle call:
+    /// 1. Short read lock to get FX config and oracle reference
+    /// 2. No lock during async oracle rate fetch
+    /// 3. Read lock for synchronous transfer preparation
+    /// 4. Write lock for final execution
     pub async fn create_cross_payment(
         &self,
         coop_id: &CoopId,
@@ -330,6 +323,8 @@ impl LedgerManager {
         max_target_amount: Option<i64>,
         _memo: Option<String>,
     ) -> Result<CrossPaymentResponse> {
+        use icn_ledger::oracle::CurrencyPair;
+
         // Enforce budget limits if store is available
         if let Some(store) = &self.budget_store {
             let from_account = from.to_string();
@@ -345,22 +340,41 @@ impl LedgerManager {
 
         let ledger_arc = self.get_ledger(coop_id)?;
 
-        // Prepare the transfer (fetches rate from oracle) - only needs read lock
+        // Step 1: Get FX prerequisites (short read lock)
+        let oracle = {
+            let ledger = ledger_arc
+                .read()
+                .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
+
+            let (_fx_config, oracle) = ledger.fx_prerequisites()?;
+            oracle
+        };
+
+        // Step 2: Fetch exchange rate from oracle (no lock held)
+        let pair = CurrencyPair::new(from_currency, to_currency);
+        let rate = oracle.get_rate(&pair).await.map_err(|e| {
+            icn_ledger::fx::FxError::RateNotAvailable {
+                from: from_currency.to_string(),
+                to: to_currency.to_string(),
+                reason: e.to_string(),
+            }
+        })?;
+
+        // Step 3: Prepare the transfer with the fetched rate (read lock, sync)
         let prepared = {
             let ledger = ledger_arc
                 .read()
                 .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
-            ledger
-                .prepare_cross_currency_transfer(
-                    from,
-                    to,
-                    amount,
-                    from_currency,
-                    to_currency,
-                    max_target_amount,
-                )
-                .await?
+            ledger.prepare_cross_currency_transfer_with_rate(
+                from,
+                to,
+                amount,
+                from_currency,
+                to_currency,
+                max_target_amount,
+                &rate,
+            )?
         };
 
         // Execute the transfer (writes to ledger) - needs write lock
