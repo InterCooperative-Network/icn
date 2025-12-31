@@ -42,6 +42,20 @@ pub fn init_descriptions() {
         "icn_gateway_websocket_messages_sent_total",
         "Total number of WebSocket messages sent to clients"
     );
+
+    // FX Clearing Account metrics
+    describe_gauge!(
+        "icn_gateway_fx_clearing_balance",
+        "Balance of FX clearing account by currency (positive = owed to clearing, negative = owed by clearing)"
+    );
+    describe_gauge!(
+        "icn_gateway_fx_clearing_balance_abs",
+        "Absolute balance of FX clearing account by currency (for alerting)"
+    );
+    describe_counter!(
+        "icn_gateway_fx_clearing_transfers_total",
+        "Total number of cross-currency transfers through clearing account"
+    );
 }
 
 // Connection metrics
@@ -499,6 +513,45 @@ pub fn fx_stale_rate_rejections_inc(from_currency: &str, to_currency: &str) {
 pub fn fx_expired_rate_rejections_inc(from_currency: &str, to_currency: &str) {
     counter!(
         "icn_gateway_fx_expired_rate_rejections_total",
+        "from_currency" => from_currency.to_string(),
+        "to_currency" => to_currency.to_string()
+    )
+    .increment(1);
+}
+
+// FX Clearing Account metrics
+
+/// Set clearing account balance for a currency
+///
+/// Tracks the balance of the FX clearing account in each currency.
+/// Positive values indicate the clearing account is owed (debit position).
+/// Negative values indicate the clearing account owes (credit position).
+pub fn fx_clearing_balance_set(currency: &str, balance: i64) {
+    gauge!(
+        "icn_gateway_fx_clearing_balance",
+        "currency" => currency.to_string()
+    )
+    .set(balance as f64);
+}
+
+/// Set absolute clearing account balance for alerting
+///
+/// Tracks absolute value of clearing balance for simpler alerting rules.
+/// High values in either direction may indicate imbalanced trading.
+pub fn fx_clearing_balance_abs_set(currency: &str, balance: i64) {
+    gauge!(
+        "icn_gateway_fx_clearing_balance_abs",
+        "currency" => currency.to_string()
+    )
+    .set(balance.abs() as f64);
+}
+
+/// Increment clearing account transfers counter
+///
+/// Counts the number of cross-currency transfers processed through clearing.
+pub fn fx_clearing_transfers_inc(from_currency: &str, to_currency: &str) {
+    counter!(
+        "icn_gateway_fx_clearing_transfers_total",
         "from_currency" => from_currency.to_string(),
         "to_currency" => to_currency.to_string()
     )
