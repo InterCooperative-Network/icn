@@ -73,7 +73,6 @@ pub enum ShareStatus {
     },
 }
 
-
 /// Scheduled payout for share redemption or bond payment
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ScheduledPayout {
@@ -272,8 +271,8 @@ impl LaborShare {
 
         // Check if all payouts are complete
         if let ShareStatus::Redeeming {
-            approved_at,
-            ref mut payout_schedule,
+            ref payout_schedule,
+            ..
         } = self.status
         {
             let total_paid: i64 = payout_schedule
@@ -290,9 +289,6 @@ impl LaborShare {
                     total_payout: total_paid + amount,
                 };
                 self.provenance.push(ShareEvent::FullyRedeemed { at });
-            } else {
-                // Keep the approved_at value when updating status
-                let _ = approved_at;
             }
         }
     }
@@ -347,7 +343,6 @@ pub enum PaymentSchedule {
         interval_days: u32,
     },
 }
-
 
 /// Type of bond payment
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
