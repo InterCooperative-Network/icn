@@ -360,8 +360,7 @@ impl LedgerManager {
                     to_currency,
                     max_target_amount,
                 )
-                .await
-                .map_err(|e| GatewayError::InternalError(format!("FX error: {e}")))?
+                .await?
         };
 
         // Execute the transfer (writes to ledger) - needs write lock
@@ -370,9 +369,7 @@ impl LedgerManager {
                 .write()
                 .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
-            let (hash, details) = ledger
-                .execute_cross_currency_transfer(prepared)
-                .map_err(|e| GatewayError::InternalError(format!("FX execution error: {e}")))?;
+            let (hash, details) = ledger.execute_cross_currency_transfer(prepared)?;
 
             (hash.to_hex(), details)
         };
@@ -440,35 +437,57 @@ impl LedgerManager {
                 .read()
                 .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
-            let fx_config = ledger.fx_config().cloned().ok_or_else(|| {
-                GatewayError::InternalError("Cross-currency payments not configured".to_string())
-            })?;
+            let fx_config = ledger
+                .fx_config()
+                .cloned()
+                .ok_or(icn_ledger::fx::FxError::NotConfigured)?;
 
-            let oracle = ledger.oracle_manager().cloned().ok_or_else(|| {
-                GatewayError::InternalError("Exchange rate oracle not configured".to_string())
-            })?;
+            let oracle = ledger
+                .oracle_manager()
+                .cloned()
+                .ok_or(icn_ledger::fx::FxError::OracleNotConfigured)?;
 
             (fx_config, oracle)
         };
 
         // Get current rate (after releasing lock)
         let pair = CurrencyPair::new(from_currency, to_currency);
-        let rate = oracle
-            .get_rate(&pair)
-            .await
-            .map_err(|e| GatewayError::InternalError(format!("Oracle error: {e}")))?;
+        let rate = oracle.get_rate(&pair).await.map_err(|e| {
+            icn_ledger::fx::FxError::RateNotAvailable {
+                from: from_currency.to_string(),
+                to: to_currency.to_string(),
+                reason: e.to_string(),
+            }
+        })?;
 
         // Check staleness
         if rate.is_stale && !fx_config.allow_stale_rates {
-            return Err(GatewayError::InternalError(
-                "Exchange rate is stale and stale rates are not allowed".to_string(),
-            ));
+            return Err(icn_ledger::fx::FxError::StaleRate {
+                from: from_currency.to_string(),
+                to: to_currency.to_string(),
+            }
+            .into());
         }
 
         // Calculate conversion
-        let gross_target_amount = rate
-            .convert(amount)
-            .ok_or_else(|| GatewayError::InternalError("Conversion would overflow".to_string()))?;
+        let gross_target_amount = rate.convert(amount).ok_or_else(|| {
+            // Log a warning if overflow occurs with a suspiciously high rate
+            // This could indicate oracle misconfiguration
+            if rate.rate > 1000.0 {
+                tracing::warn!(
+                    rate = rate.rate,
+                    amount = amount,
+                    from_currency = from_currency,
+                    to_currency = to_currency,
+                    "Conversion overflow with high exchange rate - possible oracle misconfiguration"
+                );
+            }
+            icn_ledger::fx::FxError::ConversionOverflow {
+                source_amount: amount,
+                from_currency: from_currency.to_string(),
+                rate: rate.rate,
+            }
+        })?;
 
         // Calculate fee using same logic as actual execution for consistency
         let fee_amount = fx_config.calculate_fee(gross_target_amount);

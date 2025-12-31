@@ -520,13 +520,24 @@ impl Ledger {
         }
 
         // Convert amount using oracle rate
-        let gross_target_amount =
-            rate.convert(source_amount)
-                .ok_or(FxError::ConversionOverflow {
-                    source_amount,
-                    from_currency: from_currency.to_string(),
-                    rate: rate.rate,
-                })?;
+        let gross_target_amount = rate.convert(source_amount).ok_or_else(|| {
+            // Log a warning if overflow occurs with a suspiciously high rate
+            // This could indicate oracle misconfiguration
+            if rate.rate > 1000.0 {
+                tracing::warn!(
+                    rate = rate.rate,
+                    source_amount = source_amount,
+                    from_currency = from_currency,
+                    to_currency = to_currency,
+                    "Conversion overflow with high exchange rate - possible oracle misconfiguration"
+                );
+            }
+            FxError::ConversionOverflow {
+                source_amount,
+                from_currency: from_currency.to_string(),
+                rate: rate.rate,
+            }
+        })?;
 
         // Check slippage if max specified
         if let Some(max) = max_target_amount {

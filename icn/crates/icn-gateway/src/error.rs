@@ -1,6 +1,7 @@
 //! Error types for ICN Gateway
 
 use actix_web::{http::StatusCode, HttpResponse, ResponseError};
+use icn_ledger::fx::FxError;
 
 /// Gateway result type
 pub type Result<T> = std::result::Result<T, GatewayError>;
@@ -40,6 +41,33 @@ pub enum GatewayError {
 
     #[error("I/O error: {0}")]
     IoError(#[from] std::io::Error),
+
+    #[error("FX error: {0}")]
+    Fx(#[from] FxError),
+}
+
+impl GatewayError {
+    /// Get the error code for structured error responses
+    ///
+    /// Returns a machine-readable error code that SDK clients can use for
+    /// programmatic error handling.
+    pub fn error_code(&self) -> Option<&'static str> {
+        match self {
+            GatewayError::AuthenticationFailed(_) => Some("AUTHENTICATION_FAILED"),
+            GatewayError::AuthorizationFailed(_) => Some("AUTHORIZATION_FAILED"),
+            GatewayError::Forbidden(_) => Some("FORBIDDEN"),
+            GatewayError::NotFound(_) => Some("NOT_FOUND"),
+            GatewayError::BadRequest(_) => Some("BAD_REQUEST"),
+            GatewayError::RateLimitExceeded(_) => Some("RATE_LIMIT_EXCEEDED"),
+            GatewayError::BudgetExceeded(_) => Some("BUDGET_EXCEEDED"),
+            GatewayError::ServiceUnavailable(_) => Some("SERVICE_UNAVAILABLE"),
+            GatewayError::Fx(fx_err) => Some(fx_err.error_code()),
+            // Internal errors don't expose codes
+            GatewayError::InternalError(_) => None,
+            GatewayError::SubstrateError(_) => None,
+            GatewayError::IoError(_) => None,
+        }
+    }
 }
 
 impl ResponseError for GatewayError {
@@ -56,6 +84,15 @@ impl ResponseError for GatewayError {
             GatewayError::ServiceUnavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
             GatewayError::SubstrateError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             GatewayError::IoError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            GatewayError::Fx(fx_err) => {
+                if fx_err.is_client_error() {
+                    StatusCode::BAD_REQUEST
+                } else if fx_err.is_not_found() {
+                    StatusCode::NOT_FOUND
+                } else {
+                    StatusCode::INTERNAL_SERVER_ERROR
+                }
+            }
         }
     }
 
@@ -73,6 +110,9 @@ impl ResponseError for GatewayError {
             GatewayError::BudgetExceeded(msg) => msg.clone(),
             GatewayError::ServiceUnavailable(msg) => msg.clone(),
 
+            // FX errors - user-facing with structured codes
+            GatewayError::Fx(fx_err) => fx_err.to_string(),
+
             // Internal errors - sanitize to prevent information leakage
             // Log the full error for debugging but return generic message to client
             GatewayError::InternalError(details) => {
@@ -89,8 +129,15 @@ impl ResponseError for GatewayError {
             }
         };
 
-        HttpResponse::build(self.status_code()).json(serde_json::json!({
+        // Build response with optional error code
+        let mut response = serde_json::json!({
             "error": error_message,
-        }))
+        });
+
+        if let Some(code) = self.error_code() {
+            response["code"] = serde_json::Value::String(code.to_string());
+        }
+
+        HttpResponse::build(self.status_code()).json(response)
     }
 }

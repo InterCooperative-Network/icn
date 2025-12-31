@@ -636,10 +636,10 @@ mod tests {
 
         assert_eq!(tracker.pair_count().await, 2);
 
-        // Cleanup with 0 retention - should remove nothing (entries are fresh)
-        // Actually with 0 retention, entries created "now" shouldn't be removed
-        // because their timestamp is >= cutoff
-        let removed = tracker.cleanup_stale_entries(0).await.unwrap();
+        // Cleanup with 1 second retention - should remove nothing (entries are fresh)
+        // Note: We use 1 second instead of 0 to avoid timing races where
+        // the cleanup timestamp is slightly after the entry creation timestamp
+        let removed = tracker.cleanup_stale_entries(1).await.unwrap();
         assert_eq!(removed, 0);
 
         // Cleanup with very long retention - should remove nothing

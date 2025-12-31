@@ -4,6 +4,22 @@
 //! in one currency and the recipient receives in another, using the oracle
 //! for rate conversion.
 //!
+//! # Error Codes
+//!
+//! All FX errors provide machine-readable error codes for SDK clients:
+//!
+//! | Error Code | HTTP Status | Description |
+//! |------------|-------------|-------------|
+//! | `FX_NOT_CONFIGURED` | 500 | FX module not configured for this coop |
+//! | `ORACLE_NOT_CONFIGURED` | 500 | Exchange rate oracle not set up |
+//! | `SAME_CURRENCY` | 400 | Same currency specified for source and target |
+//! | `RATE_NOT_AVAILABLE` | 404 | No exchange rate available for currency pair |
+//! | `STALE_RATE` | 400 | Rate is stale and stale rates are not allowed |
+//! | `SLIPPAGE_EXCEEDED` | 400 | Converted amount exceeds max_target_amount |
+//! | `RATE_EXPIRED` | 400 | Prepared transfer expired before execution |
+//! | `INVALID_AMOUNT` | 400 | Amount is invalid or cannot be processed |
+//! | `CONVERSION_OVERFLOW` | 400 | Conversion would exceed numeric limits |
+//!
 //! # Example
 //!
 //! ```rust,no_run
@@ -422,6 +438,51 @@ pub enum FxError {
     },
 }
 
+impl FxError {
+    /// Get the machine-readable error code for this FX error
+    ///
+    /// These codes are stable and can be used by SDK clients for
+    /// programmatic error handling.
+    pub fn error_code(&self) -> &'static str {
+        match self {
+            FxError::NotConfigured => "FX_NOT_CONFIGURED",
+            FxError::OracleNotConfigured => "ORACLE_NOT_CONFIGURED",
+            FxError::SameCurrency(_) => "SAME_CURRENCY",
+            FxError::RateNotAvailable { .. } => "RATE_NOT_AVAILABLE",
+            FxError::StaleRate { .. } => "STALE_RATE",
+            FxError::SlippageExceeded { .. } => "SLIPPAGE_EXCEEDED",
+            FxError::TransferExpired { .. } => "RATE_EXPIRED",
+            FxError::InvalidAmount(_) => "INVALID_AMOUNT",
+            FxError::ConversionOverflow { .. } => "CONVERSION_OVERFLOW",
+        }
+    }
+
+    /// Check if this error is a client error (bad request)
+    ///
+    /// Returns true for errors caused by invalid client input.
+    pub fn is_client_error(&self) -> bool {
+        matches!(
+            self,
+            FxError::SameCurrency(_)
+                | FxError::SlippageExceeded { .. }
+                | FxError::StaleRate { .. }
+                | FxError::TransferExpired { .. }
+                | FxError::InvalidAmount(_)
+                | FxError::ConversionOverflow { .. }
+        )
+    }
+
+    /// Check if this error is a not-found error
+    pub fn is_not_found(&self) -> bool {
+        matches!(self, FxError::RateNotAvailable { .. })
+    }
+
+    /// Check if this error is a server configuration error
+    pub fn is_server_error(&self) -> bool {
+        matches!(self, FxError::NotConfigured | FxError::OracleNotConfigured)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -652,6 +713,117 @@ mod tests {
             }
             _ => panic!("Expected TransferExpired error"),
         }
+    }
+
+    #[test]
+    fn test_fx_error_codes() {
+        // Test error codes for each variant
+        assert_eq!(FxError::NotConfigured.error_code(), "FX_NOT_CONFIGURED");
+        assert_eq!(
+            FxError::OracleNotConfigured.error_code(),
+            "ORACLE_NOT_CONFIGURED"
+        );
+        assert_eq!(
+            FxError::SameCurrency("USD".to_string()).error_code(),
+            "SAME_CURRENCY"
+        );
+        assert_eq!(
+            FxError::RateNotAvailable {
+                from: "A".to_string(),
+                to: "B".to_string(),
+                reason: "test".to_string()
+            }
+            .error_code(),
+            "RATE_NOT_AVAILABLE"
+        );
+        assert_eq!(
+            FxError::StaleRate {
+                from: "A".to_string(),
+                to: "B".to_string()
+            }
+            .error_code(),
+            "STALE_RATE"
+        );
+        assert_eq!(
+            FxError::SlippageExceeded {
+                expected: 100,
+                actual: 110,
+                max_slippage_bps: 100
+            }
+            .error_code(),
+            "SLIPPAGE_EXCEEDED"
+        );
+        assert_eq!(
+            FxError::TransferExpired {
+                expired_at: 100,
+                current_time: 200
+            }
+            .error_code(),
+            "RATE_EXPIRED"
+        );
+        assert_eq!(
+            FxError::InvalidAmount("test".to_string()).error_code(),
+            "INVALID_AMOUNT"
+        );
+        assert_eq!(
+            FxError::ConversionOverflow {
+                source_amount: 100,
+                from_currency: "USD".to_string(),
+                rate: 1.5
+            }
+            .error_code(),
+            "CONVERSION_OVERFLOW"
+        );
+    }
+
+    #[test]
+    fn test_fx_error_classification() {
+        // Client errors
+        assert!(FxError::SameCurrency("USD".to_string()).is_client_error());
+        assert!(FxError::SlippageExceeded {
+            expected: 100,
+            actual: 110,
+            max_slippage_bps: 100
+        }
+        .is_client_error());
+        assert!(FxError::StaleRate {
+            from: "A".to_string(),
+            to: "B".to_string()
+        }
+        .is_client_error());
+        assert!(FxError::TransferExpired {
+            expired_at: 100,
+            current_time: 200
+        }
+        .is_client_error());
+        assert!(FxError::InvalidAmount("test".to_string()).is_client_error());
+        assert!(FxError::ConversionOverflow {
+            source_amount: 1000,
+            from_currency: "USD".to_string(),
+            rate: 1e20,
+        }
+        .is_client_error());
+
+        // Not found errors
+        assert!(FxError::RateNotAvailable {
+            from: "A".to_string(),
+            to: "B".to_string(),
+            reason: "test".to_string()
+        }
+        .is_not_found());
+
+        // Server errors
+        assert!(FxError::NotConfigured.is_server_error());
+        assert!(FxError::OracleNotConfigured.is_server_error());
+
+        // Cross-check: client errors are not server errors
+        assert!(!FxError::SlippageExceeded {
+            expected: 100,
+            actual: 110,
+            max_slippage_bps: 100
+        }
+        .is_server_error());
+        assert!(!FxError::NotConfigured.is_client_error());
     }
 }
 
