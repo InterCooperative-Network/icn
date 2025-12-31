@@ -1379,6 +1379,17 @@ impl GovernanceActor {
     /// The shared function only has a single `default_on_unknown` parameter and
     /// cannot distinguish between "not found" and "storage error" cases.
     ///
+    /// ## Example Error Handling Difference
+    ///
+    /// ```text
+    /// Shared helper with default_on_unknown=false:
+    ///   - Storage error → returns false (permissive, no metric)
+    ///
+    /// GovernanceActor (this implementation):
+    ///   - Proposal not found → returns false (permissive)
+    ///   - Storage error → returns true (conservative) + emits metric
+    /// ```
+    ///
     /// # Eventual Consistency
     ///
     /// In a distributed gossip-based system, proposal info may not have propagated
