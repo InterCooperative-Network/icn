@@ -60,6 +60,7 @@ pub mod events;
 #[allow(missing_docs)]
 pub mod fork_resolution;
 pub mod freeze;
+pub mod fx;
 pub mod hash;
 pub mod ledger;
 pub mod membership;
@@ -101,11 +102,14 @@ pub use types::{
     DisputeStatus, JournalEntry, QuarantineReason, QuarantinedEntry, Resolution, Signature,
 };
 
+// FX (cross-currency) support
+pub use fx::{FxConfig, FxConversionDetails, FxError, PreparedFxTransfer};
+
 // Event types for real-time notifications
 pub use events::{
-    create_shared_emitter, BalanceChanged, BatchBalanceChanged, ForkDetected, ForkResolved,
-    LedgerEvent, LedgerEventEmitter, MemberFrozen, MemberUnfrozen, RollbackPerformed,
-    SharedEventEmitter, TransactionConfirmed, TransactionCreated, Transfer,
+    create_shared_emitter, BalanceChanged, BatchBalanceChanged, CrossCurrencyTransfer,
+    ForkDetected, ForkResolved, LedgerEvent, LedgerEventEmitter, MemberFrozen, MemberUnfrozen,
+    RollbackPerformed, SharedEventEmitter, TransactionConfirmed, TransactionCreated, Transfer,
 };
 
 // Exchange rate oracle

@@ -218,6 +218,27 @@ impl LedgerEventBridge {
                     .await;
                 warn!("Forwarded RollbackPerformed event");
             }
+
+            LedgerEvent::CrossCurrencyTransfer(cct) => {
+                let coop_id = cct
+                    .domain_id
+                    .unwrap_or_else(|| self.default_coop_id.clone());
+                let gateway_event = GatewayEvent::CrossPaymentCreated {
+                    coop_id: coop_id.clone(),
+                    hash: cct.entry_hash,
+                    from: cct.from,
+                    to: cct.to,
+                    source_amount: cct.source_amount,
+                    from_currency: cct.from_currency,
+                    target_amount: cct.net_target_amount,
+                    to_currency: cct.to_currency,
+                    rate: cct.rate,
+                };
+                self.gateway_broadcaster
+                    .broadcast(&coop_id, gateway_event)
+                    .await;
+                debug!("Forwarded CrossCurrencyTransfer event");
+            }
         }
     }
 }

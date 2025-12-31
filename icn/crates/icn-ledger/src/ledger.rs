@@ -146,6 +146,10 @@ pub struct Ledger {
     /// Exchange rate oracle for multi-currency support
     /// When set, enables currency conversion operations.
     oracle_manager: Option<Arc<crate::oracle::OracleManager>>,
+
+    /// FX configuration for cross-currency transfers
+    /// When set, enables cross-currency payment operations.
+    fx_config: Option<crate::fx::FxConfig>,
 }
 
 impl Ledger {
@@ -179,6 +183,7 @@ impl Ledger {
             progressive_limit_manager: None, // Set via set_progressive_limit_manager()
             dynamic_limit_manager: None,     // Set via set_dynamic_limit_manager()
             oracle_manager: None,            // Set via set_oracle_manager()
+            fx_config: None,                 // Set via set_fx_config()
         };
 
         // Load cached balances from storage
@@ -426,6 +431,297 @@ impl Ledger {
 
         let converted = oracle.convert_amount(amount, from, to).await?;
         Ok(Some(converted))
+    }
+
+    /// Set the FX configuration for cross-currency transfers
+    ///
+    /// This must be set before calling cross-currency transfer methods.
+    /// The clearing account DID in the config must be a valid system account.
+    pub fn set_fx_config(&mut self, config: crate::fx::FxConfig) {
+        self.fx_config = Some(config);
+    }
+
+    /// Get the FX configuration (if set)
+    pub fn fx_config(&self) -> Option<&crate::fx::FxConfig> {
+        self.fx_config.as_ref()
+    }
+
+    /// Prepare a cross-currency transfer without committing
+    ///
+    /// This fetches the current exchange rate and builds a journal entry
+    /// that can be inspected before committing. The prepared transfer
+    /// expires after the rate's TTL.
+    ///
+    /// # Arguments
+    /// * `from` - Sender DID
+    /// * `to` - Recipient DID
+    /// * `source_amount` - Amount to debit from sender (in source currency)
+    /// * `from_currency` - Source currency code
+    /// * `to_currency` - Target currency code
+    /// * `max_target_amount` - Optional slippage protection (reject if converted > max)
+    ///
+    /// # Errors
+    /// - `FxError::NotConfigured` if FX config not set
+    /// - `FxError::OracleNotConfigured` if oracle not set
+    /// - `FxError::SameCurrency` if from/to currencies match
+    /// - `FxError::RateNotAvailable` if oracle has no rate
+    /// - `FxError::StaleRate` if rate is stale and not allowed
+    /// - `FxError::SlippageExceeded` if converted amount exceeds max
+    pub async fn prepare_cross_currency_transfer(
+        &self,
+        from: &Did,
+        to: &Did,
+        source_amount: i64,
+        from_currency: &str,
+        to_currency: &str,
+        max_target_amount: Option<i64>,
+    ) -> std::result::Result<crate::fx::PreparedFxTransfer, crate::fx::FxError> {
+        use crate::entry::JournalEntryBuilder;
+        use crate::fx::{FxConversionDetails, FxError, PreparedFxTransfer};
+        use crate::oracle::CurrencyPair;
+
+        // Validate configuration
+        let fx_config = self.fx_config.as_ref().ok_or(FxError::NotConfigured)?;
+
+        let oracle = self
+            .oracle_manager
+            .as_ref()
+            .ok_or(FxError::OracleNotConfigured)?;
+
+        // Validate currencies differ
+        if from_currency == to_currency {
+            return Err(FxError::SameCurrency(from_currency.to_string()));
+        }
+
+        // Validate amount
+        if source_amount <= 0 {
+            return Err(FxError::InvalidAmount(format!(
+                "Source amount must be positive, got: {source_amount}"
+            )));
+        }
+
+        // Get exchange rate from oracle
+        let pair = CurrencyPair::new(from_currency, to_currency);
+        let rate = oracle
+            .get_rate(&pair)
+            .await
+            .map_err(|e| FxError::RateNotAvailable {
+                from: from_currency.to_string(),
+                to: to_currency.to_string(),
+                reason: e.to_string(),
+            })?;
+
+        // Check staleness
+        if rate.is_stale && !fx_config.allow_stale_rates {
+            return Err(FxError::StaleRate {
+                from: from_currency.to_string(),
+                to: to_currency.to_string(),
+            });
+        }
+
+        // Convert amount using oracle rate
+        let gross_target_amount =
+            rate.convert(source_amount)
+                .ok_or(FxError::ConversionOverflow {
+                    source_amount,
+                    from_currency: from_currency.to_string(),
+                    rate: rate.rate,
+                })?;
+
+        // Check slippage if max specified
+        if let Some(max) = max_target_amount {
+            if gross_target_amount > max {
+                return Err(FxError::SlippageExceeded {
+                    expected: max,
+                    actual: gross_target_amount,
+                    max_slippage_bps: fx_config.max_slippage_basis_points,
+                });
+            }
+        }
+
+        // Calculate fee and net amount
+        let fee_amount = fx_config.calculate_fee(gross_target_amount);
+        let net_target_amount = gross_target_amount - fee_amount;
+
+        // Build 4-leg (or 5-leg with fee) journal entry
+        // In ICN mutual credit: CREDIT = sending (balance decreases), DEBIT = receiving (balance increases)
+        // 1. CREDIT sender (source currency) - sender's balance decreases
+        // 2. DEBIT clearing (source currency) - clearing receives source
+        // 3. CREDIT clearing (target currency) - clearing sends target
+        // 4. DEBIT recipient (target currency) - recipient's balance increases
+        // 5. DEBIT treasury (target currency) - treasury receives fee, only if fee > 0
+        let mut builder = JournalEntryBuilder::new(from.clone())
+            .credit(from.clone(), from_currency.to_string(), source_amount)
+            .debit(
+                fx_config.clearing_did.clone(),
+                from_currency.to_string(),
+                source_amount,
+            )
+            .credit(
+                fx_config.clearing_did.clone(),
+                to_currency.to_string(),
+                gross_target_amount,
+            );
+
+        // Add treasury fee leg if applicable
+        // Simplified logic: fee is only collected when both fee_amount > 0 AND treasury is configured
+        // Note: calculate_fee() already returns 0 when treasury_did.is_none(), but we make this
+        // explicit here for clarity and to prevent any drift between the two conditions.
+        let (recipient_amount, has_treasury_fee) =
+            if fee_amount > 0 && fx_config.treasury_did.is_some() {
+                (net_target_amount, true)
+            } else {
+                (gross_target_amount, false)
+            };
+
+        if has_treasury_fee {
+            // Use if-let pattern to satisfy clippy::unwrap_used lint
+            // has_treasury_fee is true only when treasury_did.is_some()
+            if let Some(treasury) = &fx_config.treasury_did {
+                builder = builder
+                    .debit(treasury.clone(), to_currency.to_string(), fee_amount)
+                    .debit(to.clone(), to_currency.to_string(), recipient_amount);
+            }
+        } else {
+            builder = builder.debit(to.clone(), to_currency.to_string(), recipient_amount);
+        }
+
+        let entry = builder
+            .build()
+            .map_err(|e| FxError::InvalidAmount(format!("Failed to build journal entry: {e}")))?;
+
+        // Calculate expiration (use rate TTL)
+        let valid_until = rate.aggregated_at.saturating_add(rate.ttl_secs);
+
+        // Build conversion details for audit
+        // Note: recipient_amount is calculated above and matches the journal entry logic
+        let details = FxConversionDetails::new(
+            from.to_string(),
+            to.to_string(),
+            from_currency.to_string(),
+            to_currency.to_string(),
+            source_amount,
+            rate.rate,
+            rate.aggregated_at,
+            rate.sources(),
+            rate.is_stale,
+            gross_target_amount,
+            fee_amount,
+            recipient_amount, // Uses same logic as journal entry builder
+            fx_config.fee_basis_points,
+        );
+
+        Ok(PreparedFxTransfer {
+            entry,
+            details,
+            valid_until,
+        })
+    }
+
+    /// Execute a prepared cross-currency transfer
+    ///
+    /// Commits the journal entry from a prepared transfer to the ledger.
+    /// The prepared transfer must not be expired.
+    ///
+    /// # Arguments
+    /// * `prepared` - The prepared transfer from `prepare_cross_currency_transfer`
+    ///
+    /// # Returns
+    /// The content hash of the committed entry and conversion details.
+    pub fn execute_cross_currency_transfer(
+        &mut self,
+        prepared: crate::fx::PreparedFxTransfer,
+    ) -> std::result::Result<(ContentHash, crate::fx::FxConversionDetails), crate::fx::FxError>
+    {
+        use crate::fx::FxError;
+
+        // Check if prepared transfer is still valid
+        // Safety margin: reject 1 second before expiry to prevent TOCTOU race conditions
+        // (e.g., GC pause between check and append could allow expired rate to be committed)
+        const EXPIRATION_SAFETY_MARGIN_SECS: u64 = 1;
+        let now = crate::current_timestamp_secs();
+        let effective_expiry = prepared
+            .valid_until
+            .saturating_sub(EXPIRATION_SAFETY_MARGIN_SECS);
+        if now >= effective_expiry {
+            return Err(FxError::TransferExpired {
+                expired_at: prepared.valid_until,
+                current_time: now,
+            });
+        }
+
+        // Append the entry to the ledger
+        let hash = self
+            .append_entry(prepared.entry)
+            .map_err(|e| FxError::InvalidAmount(format!("Failed to append entry: {e}")))?;
+
+        // Emit cross-currency transfer event
+        if let Some(ref emitter) = self.event_emitter {
+            // Parse DIDs from the details (they were just converted to strings from DIDs)
+            if let (Ok(from_did), Ok(to_did)) = (
+                Did::from_str(&prepared.details.from_did),
+                Did::from_str(&prepared.details.to_did),
+            ) {
+                emitter.emit_cross_currency_transfer(
+                    &hash,
+                    &from_did,
+                    &to_did,
+                    prepared.details.source_amount,
+                    &prepared.details.from_currency,
+                    prepared.details.gross_target_amount,
+                    prepared.details.fee_amount,
+                    prepared.details.net_target_amount,
+                    &prepared.details.to_currency,
+                    prepared.details.rate,
+                    prepared.details.rate_timestamp,
+                    prepared.details.rate_sources.clone(),
+                    now,
+                    self.domain_id.clone(),
+                );
+            }
+        }
+
+        Ok((hash, prepared.details))
+    }
+
+    /// Execute a cross-currency transfer in one step
+    ///
+    /// Convenience method that prepares and executes a transfer atomically.
+    /// Use `prepare_cross_currency_transfer` + `execute_cross_currency_transfer`
+    /// if you need to inspect the transfer before committing.
+    ///
+    /// # Arguments
+    /// * `from` - Sender DID
+    /// * `to` - Recipient DID
+    /// * `source_amount` - Amount to debit from sender (in source currency)
+    /// * `from_currency` - Source currency code
+    /// * `to_currency` - Target currency code
+    /// * `max_target_amount` - Optional slippage protection
+    ///
+    /// # Returns
+    /// The content hash and conversion details.
+    pub async fn transfer_with_conversion(
+        &mut self,
+        from: &Did,
+        to: &Did,
+        source_amount: i64,
+        from_currency: &str,
+        to_currency: &str,
+        max_target_amount: Option<i64>,
+    ) -> std::result::Result<(ContentHash, crate::fx::FxConversionDetails), crate::fx::FxError>
+    {
+        let prepared = self
+            .prepare_cross_currency_transfer(
+                from,
+                to,
+                source_amount,
+                from_currency,
+                to_currency,
+                max_target_amount,
+            )
+            .await?;
+
+        self.execute_cross_currency_transfer(prepared)
     }
 
     /// Append a journal entry to the ledger

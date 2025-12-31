@@ -43,6 +43,9 @@ pub enum LedgerEvent {
 
     /// A ledger rollback occurred
     RollbackPerformed(RollbackPerformed),
+
+    /// A cross-currency transfer was executed
+    CrossCurrencyTransfer(CrossCurrencyTransfer),
 }
 
 /// Event: A new transaction was created
@@ -221,6 +224,52 @@ pub struct RollbackPerformed {
 
     /// Unix timestamp when performed
     pub performed_at: u64,
+}
+
+/// Event: A cross-currency transfer was executed
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CrossCurrencyTransfer {
+    /// Hash of the journal entry
+    pub entry_hash: String,
+
+    /// Sender DID
+    pub from: String,
+
+    /// Recipient DID
+    pub to: String,
+
+    /// Amount debited from sender
+    pub source_amount: i64,
+
+    /// Source currency
+    pub from_currency: String,
+
+    /// Gross amount before fees
+    pub gross_target_amount: i64,
+
+    /// Fee amount (sent to treasury)
+    pub fee_amount: i64,
+
+    /// Net amount credited to recipient
+    pub net_target_amount: i64,
+
+    /// Target currency
+    pub to_currency: String,
+
+    /// Exchange rate used
+    pub rate: f64,
+
+    /// When the rate was fetched
+    pub rate_timestamp: u64,
+
+    /// Sources that provided the rate
+    pub rate_sources: Vec<String>,
+
+    /// Unix timestamp of the transfer
+    pub timestamp: u64,
+
+    /// Domain/cooperative this belongs to (if known)
+    pub domain_id: Option<String>,
 }
 
 /// Event emitter for broadcasting ledger events
@@ -409,6 +458,43 @@ impl LedgerEventEmitter {
             archived_count,
             reason: reason.to_string(),
             performed_at,
+        }))
+    }
+
+    /// Emit a CrossCurrencyTransfer event
+    #[allow(clippy::too_many_arguments)]
+    pub fn emit_cross_currency_transfer(
+        &self,
+        entry_hash: &ContentHash,
+        from: &Did,
+        to: &Did,
+        source_amount: i64,
+        from_currency: &str,
+        gross_target_amount: i64,
+        fee_amount: i64,
+        net_target_amount: i64,
+        to_currency: &str,
+        rate: f64,
+        rate_timestamp: u64,
+        rate_sources: Vec<String>,
+        timestamp: u64,
+        domain_id: Option<String>,
+    ) -> usize {
+        self.emit(LedgerEvent::CrossCurrencyTransfer(CrossCurrencyTransfer {
+            entry_hash: entry_hash.to_hex(),
+            from: from.to_string(),
+            to: to.to_string(),
+            source_amount,
+            from_currency: from_currency.to_string(),
+            gross_target_amount,
+            fee_amount,
+            net_target_amount,
+            to_currency: to_currency.to_string(),
+            rate,
+            rate_timestamp,
+            rate_sources,
+            timestamp,
+            domain_id,
         }))
     }
 }

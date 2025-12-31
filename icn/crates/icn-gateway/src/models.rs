@@ -404,3 +404,94 @@ pub struct DelegationListResponse {
     /// Delegations received by the caller
     pub received: Vec<DelegationResponse>,
 }
+
+// === Cross-Currency Payments ===
+
+/// Create a cross-currency payment
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct CreateCrossPaymentRequest {
+    /// Sender DID
+    pub from: String,
+    /// Recipient DID
+    pub to: String,
+    /// Amount to send in source currency
+    pub amount: i64,
+    /// Source currency (what sender pays)
+    pub from_currency: String,
+    /// Target currency (what recipient receives)
+    pub to_currency: String,
+    /// Optional slippage protection: max target amount to receive
+    /// If the converted amount exceeds this, the transfer is rejected
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_target_amount: Option<i64>,
+    /// Optional memo/note for the payment
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub memo: Option<String>,
+}
+
+/// Response for a cross-currency payment
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct CrossPaymentResponse {
+    /// Hash of the journal entry
+    pub hash: String,
+    /// Sender DID
+    pub from: String,
+    /// Recipient DID
+    pub to: String,
+    /// Amount debited from sender
+    pub source_amount: i64,
+    /// Source currency
+    pub from_currency: String,
+    /// Gross amount before fees
+    pub gross_target_amount: i64,
+    /// Fee amount (sent to treasury)
+    pub fee_amount: i64,
+    /// Net amount credited to recipient
+    pub net_target_amount: i64,
+    /// Target currency
+    pub to_currency: String,
+    /// Exchange rate used
+    pub rate_used: f64,
+    /// When the rate was fetched (Unix seconds)
+    pub rate_timestamp: u64,
+    /// Sources that provided the rate
+    pub rate_sources: Vec<String>,
+}
+
+/// Request for a cross-currency payment quote
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct CrossPaymentQuoteRequest {
+    /// Amount to send in source currency
+    pub amount: i64,
+    /// Source currency (what sender pays)
+    pub from_currency: String,
+    /// Target currency (what recipient receives)
+    pub to_currency: String,
+}
+
+/// Quote for a cross-currency payment (preview without execution)
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct CrossPaymentQuote {
+    /// Amount that would be debited from sender
+    pub source_amount: i64,
+    /// Source currency
+    pub from_currency: String,
+    /// Gross amount before fees
+    pub gross_target_amount: i64,
+    /// Fee amount that would be deducted
+    pub fee_amount: i64,
+    /// Net amount that would be credited to recipient
+    pub net_target_amount: i64,
+    /// Target currency
+    pub to_currency: String,
+    /// Exchange rate
+    pub rate: f64,
+    /// When the rate was fetched (Unix seconds)
+    pub rate_timestamp: u64,
+    /// Sources that provided the rate
+    pub rate_sources: Vec<String>,
+    /// When this quote expires (Unix seconds)
+    pub valid_until: u64,
+    /// Whether the rate is considered stale
+    pub is_stale: bool,
+}

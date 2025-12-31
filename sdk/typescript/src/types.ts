@@ -150,6 +150,101 @@ export interface PaymentResponse {
   timestamp: number;
 }
 
+// ============================================================================
+// Cross-Currency Payments
+// ============================================================================
+
+/**
+ * Request for a cross-currency payment where sender pays in one currency
+ * and recipient receives in another.
+ */
+export interface CrossPaymentRequest {
+  /** Sender DID */
+  from: string;
+  /** Recipient DID */
+  to: string;
+  /** Amount to send in source currency */
+  amount: number;
+  /** Source currency (what sender pays) */
+  from_currency: string;
+  /** Target currency (what recipient receives) */
+  to_currency: string;
+  /** Maximum target amount for slippage protection (optional) */
+  max_target_amount?: number;
+  /** Optional memo */
+  memo?: string;
+}
+
+/**
+ * Response from a cross-currency payment
+ */
+export interface CrossPaymentResponse {
+  /** Transaction hash */
+  hash: string;
+  /** Sender DID */
+  from: string;
+  /** Recipient DID */
+  to: string;
+  /** Amount debited from sender */
+  source_amount: number;
+  /** Source currency */
+  from_currency: string;
+  /** Gross amount before fees */
+  gross_target_amount: number;
+  /** Fee amount deducted */
+  fee_amount: number;
+  /** Net amount credited to recipient */
+  net_target_amount: number;
+  /** Target currency */
+  to_currency: string;
+  /** Exchange rate used */
+  rate_used: number;
+  /** When the rate was fetched */
+  rate_timestamp: number;
+  /** Sources that provided the rate */
+  rate_sources: string[];
+}
+
+/**
+ * Request for a cross-currency payment quote (preview without execution)
+ */
+export interface CrossPaymentQuoteRequest {
+  /** Amount to send in source currency */
+  amount: number;
+  /** Source currency (what sender pays) */
+  from_currency: string;
+  /** Target currency (what recipient receives) */
+  to_currency: string;
+}
+
+/**
+ * Quote for a cross-currency payment
+ */
+export interface CrossPaymentQuote {
+  /** Amount that would be debited from sender */
+  source_amount: number;
+  /** Source currency */
+  from_currency: string;
+  /** Gross amount before fees */
+  gross_target_amount: number;
+  /** Fee amount that would be deducted */
+  fee_amount: number;
+  /** Net amount that would be credited to recipient */
+  net_target_amount: number;
+  /** Target currency */
+  to_currency: string;
+  /** Exchange rate */
+  rate: number;
+  /** When the rate was fetched */
+  rate_timestamp: number;
+  /** Sources that provided the rate */
+  rate_sources: string[];
+  /** When this quote expires (Unix seconds) */
+  valid_until: number;
+  /** Whether the rate is considered stale */
+  is_stale: boolean;
+}
+
 export interface Transaction {
   id: string;
   from: string;

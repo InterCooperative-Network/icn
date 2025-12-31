@@ -160,6 +160,51 @@ impl LedgerNotificationTrigger {
                 );
             }
 
+            LedgerEvent::CrossCurrencyTransfer(cct) => {
+                let coop_id = cct
+                    .domain_id
+                    .unwrap_or_else(|| self.default_coop_id.clone());
+
+                // Notify recipient of cross-currency payment
+                let notif = QueuedNotification::new(
+                    &cct.to,
+                    &coop_id,
+                    "Cross-Currency Payment Received",
+                    format!(
+                        "You received {} {} (converted from {} {}) from {}",
+                        cct.net_target_amount,
+                        &cct.to_currency,
+                        cct.source_amount,
+                        &cct.from_currency,
+                        &cct.from
+                    ),
+                    NotificationType::PaymentReceived,
+                );
+                self.queue.queue(notif).await?;
+
+                // Notify sender
+                let notif = QueuedNotification::new(
+                    &cct.from,
+                    &coop_id,
+                    "Cross-Currency Payment Sent",
+                    format!(
+                        "You sent {} {} (converted to {} {}) to {}",
+                        cct.source_amount,
+                        &cct.from_currency,
+                        cct.net_target_amount,
+                        &cct.to_currency,
+                        &cct.to
+                    ),
+                    NotificationType::PaymentSent,
+                );
+                self.queue.queue(notif).await?;
+
+                debug!(
+                    entry_hash = %cct.entry_hash,
+                    "Queued cross-currency payment notifications"
+                );
+            }
+
             // Skip other events for notification purposes
             LedgerEvent::TransactionConfirmed(_) => {}
             LedgerEvent::BatchBalanceChanged(_) => {}
