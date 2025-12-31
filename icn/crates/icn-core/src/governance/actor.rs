@@ -1414,6 +1414,7 @@ impl GovernanceActor {
                             "Storage error during cycle detection - assuming overlap conservatively. \
                              This may block valid delegations; check storage health."
                         );
+                        icn_obs::metrics::governance::scope_overlap_storage_errors_inc();
                         true
                     }
                 }

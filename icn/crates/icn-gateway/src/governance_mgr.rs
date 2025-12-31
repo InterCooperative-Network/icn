@@ -985,7 +985,8 @@ fn gateway_scopes_overlap(
     proposals: &HashMap<ProposalId, Proposal>,
 ) -> bool {
     let lookup = ProposalMapLookup(proposals);
-    // Use permissive default: assume no overlap when proposal unknown
+    // default_on_unknown=false: assume no overlap when proposal is unknown
+    // (permissive behavior allows delegations to proceed during gossip propagation)
     scopes_overlap(a, b, &lookup, false)
 }
 

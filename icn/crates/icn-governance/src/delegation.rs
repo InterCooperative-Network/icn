@@ -1586,4 +1586,132 @@ mod tests {
             "Error should mention cycle"
         );
     }
+
+    /// Test the shared `scopes_overlap` function directly to document its behavior matrix.
+    ///
+    /// This tests all combinations of scope types and the `default_on_unknown` parameter.
+    #[test]
+    fn test_scopes_overlap_behavior_matrix() {
+        use std::collections::HashMap;
+
+        let domain_a = GovernanceDomainId::new("domain-a");
+        let domain_b = GovernanceDomainId::new("domain-b");
+        let proposal_1 = ProposalId::new("proposal-1");
+        let proposal_2 = ProposalId::new("proposal-2");
+        let unknown_proposal = ProposalId::new("unknown");
+
+        // Lookup that knows proposal_1 is in domain_a
+        struct TestLookup(HashMap<ProposalId, GovernanceDomainId>);
+        impl ProposalDomainLookup for TestLookup {
+            fn lookup_proposal_domain(
+                &self,
+                proposal_id: &ProposalId,
+            ) -> Option<GovernanceDomainId> {
+                self.0.get(proposal_id).cloned()
+            }
+        }
+
+        let mut known_proposals = HashMap::new();
+        known_proposals.insert(proposal_1.clone(), domain_a.clone());
+        known_proposals.insert(proposal_2.clone(), domain_b.clone());
+        let lookup = TestLookup(known_proposals);
+
+        // === Blanket scope tests ===
+        // Blanket overlaps with everything
+        assert!(scopes_overlap(
+            &DelegationScope::Blanket,
+            &DelegationScope::Blanket,
+            &lookup,
+            false
+        ));
+        assert!(scopes_overlap(
+            &DelegationScope::Blanket,
+            &DelegationScope::Domain(domain_a.clone()),
+            &lookup,
+            false
+        ));
+        assert!(scopes_overlap(
+            &DelegationScope::Domain(domain_a.clone()),
+            &DelegationScope::Blanket,
+            &lookup,
+            false
+        ));
+        assert!(scopes_overlap(
+            &DelegationScope::Blanket,
+            &DelegationScope::Proposal(proposal_1.clone()),
+            &lookup,
+            false
+        ));
+
+        // === Domain scope tests ===
+        // Same domain overlaps
+        assert!(scopes_overlap(
+            &DelegationScope::Domain(domain_a.clone()),
+            &DelegationScope::Domain(domain_a.clone()),
+            &lookup,
+            false
+        ));
+        // Different domains don't overlap
+        assert!(!scopes_overlap(
+            &DelegationScope::Domain(domain_a.clone()),
+            &DelegationScope::Domain(domain_b.clone()),
+            &lookup,
+            false
+        ));
+
+        // === Proposal scope tests ===
+        // Same proposal overlaps
+        assert!(scopes_overlap(
+            &DelegationScope::Proposal(proposal_1.clone()),
+            &DelegationScope::Proposal(proposal_1.clone()),
+            &lookup,
+            false
+        ));
+        // Different proposals don't overlap
+        assert!(!scopes_overlap(
+            &DelegationScope::Proposal(proposal_1.clone()),
+            &DelegationScope::Proposal(proposal_2.clone()),
+            &lookup,
+            false
+        ));
+
+        // === Domain/Proposal combination tests ===
+        // Known proposal in same domain overlaps
+        assert!(scopes_overlap(
+            &DelegationScope::Domain(domain_a.clone()),
+            &DelegationScope::Proposal(proposal_1.clone()),
+            &lookup,
+            false
+        ));
+        // Known proposal in different domain doesn't overlap
+        assert!(!scopes_overlap(
+            &DelegationScope::Domain(domain_b.clone()),
+            &DelegationScope::Proposal(proposal_1.clone()),
+            &lookup,
+            false
+        ));
+        // Symmetry check
+        assert!(scopes_overlap(
+            &DelegationScope::Proposal(proposal_1.clone()),
+            &DelegationScope::Domain(domain_a.clone()),
+            &lookup,
+            false
+        ));
+
+        // === Unknown proposal tests (default_on_unknown behavior) ===
+        // Unknown proposal with default_on_unknown=false (permissive)
+        assert!(!scopes_overlap(
+            &DelegationScope::Domain(domain_a.clone()),
+            &DelegationScope::Proposal(unknown_proposal.clone()),
+            &lookup,
+            false // permissive: assume no overlap
+        ));
+        // Unknown proposal with default_on_unknown=true (conservative)
+        assert!(scopes_overlap(
+            &DelegationScope::Domain(domain_a.clone()),
+            &DelegationScope::Proposal(unknown_proposal.clone()),
+            &lookup,
+            true // conservative: assume overlap
+        ));
+    }
 }

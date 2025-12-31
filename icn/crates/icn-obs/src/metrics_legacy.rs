@@ -2317,6 +2317,19 @@ pub mod governance {
     pub fn delegation_reconciliation_duration_observe(duration_secs: f64) {
         histogram!("icn_governance_delegation_reconciliation_duration_seconds").record(duration_secs);
     }
+
+    /// Record when a storage error occurs during scope overlap checking
+    ///
+    /// This can indicate:
+    /// - Disk corruption or sled database issues
+    /// - Storage exhaustion (potential DoS vector)
+    /// - Transient I/O failures
+    ///
+    /// When this occurs, the system conservatively assumes overlap to prevent
+    /// potentially dangerous delegations from being created.
+    pub fn scope_overlap_storage_errors_inc() {
+        counter!("icn_governance_scope_overlap_storage_errors_total").increment(1);
+    }
 }
 
 /// Protocol parameter metrics (delayed execution)
