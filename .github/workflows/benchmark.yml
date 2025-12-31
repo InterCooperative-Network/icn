@@ -1,0 +1,163 @@
+name: Benchmarks
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'icn/**/*.rs'
+      - 'icn/Cargo.toml'
+      - 'icn/Cargo.lock'
+  push:
+    branches: [main]
+    paths:
+      - 'icn/**/*.rs'
+      - 'icn/Cargo.toml'
+      - 'icn/Cargo.lock'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  benchmark:
+    name: Performance Benchmarks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free disk space
+        uses: ./.github/actions/free-disk-space
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "icn -> target"
+          cache-on-failure: true
+
+      - name: Run benchmarks
+        run: cargo bench --workspace -- --noplot --save-baseline current
+        working-directory: ./icn
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results-${{ github.sha }}
+          path: icn/target/criterion
+          retention-days: 30
+
+  # Compare PR benchmarks against main (only on PRs)
+  compare:
+    name: Compare Against Main
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Free disk space
+        uses: ./.github/actions/free-disk-space
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "icn -> target"
+          cache-on-failure: true
+
+      - name: Checkout main branch for baseline
+        run: git checkout origin/main
+
+      - name: Run baseline benchmarks
+        run: cargo bench --workspace -- --noplot --save-baseline main
+        working-directory: ./icn
+
+      - name: Checkout PR branch
+        run: git checkout ${{ github.head_ref }}
+
+      - name: Run PR benchmarks and compare
+        id: bench_compare
+        run: |
+          # Run benchmarks and capture output
+          cargo bench --workspace -- --noplot --baseline main 2>&1 | tee bench_output.txt
+
+          # Extract regressions (lines with "regressed" and percentage)
+          if grep -q "regressed" bench_output.txt; then
+            echo "has_regressions=true" >> $GITHUB_OUTPUT
+
+            # Extract regression details
+            echo "## Performance Regressions Detected" > regression_report.md
+            echo "" >> regression_report.md
+            echo "The following benchmarks show regression compared to main:" >> regression_report.md
+            echo "" >> regression_report.md
+            echo '```' >> regression_report.md
+            grep -B2 "regressed" bench_output.txt >> regression_report.md || true
+            echo '```' >> regression_report.md
+            echo "" >> regression_report.md
+            echo "---" >> regression_report.md
+            echo "*Add the \`perf-regression-ok\` label to acknowledge and merge anyway.*" >> regression_report.md
+          else
+            echo "has_regressions=false" >> $GITHUB_OUTPUT
+            echo "## Benchmark Results" > regression_report.md
+            echo "" >> regression_report.md
+            echo "No performance regressions detected compared to main branch." >> regression_report.md
+          fi
+        working-directory: ./icn
+
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('icn/regression_report.md', 'utf8');
+
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(c =>
+              c.user.type === 'Bot' &&
+              c.body.includes('Performance Regressions Detected') || c.body.includes('Benchmark Results')
+            );
+
+            const body = report + '\n\n*Updated: ' + new Date().toISOString() + '*';
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body
+              });
+            }
+
+      - name: Check for regressions
+        if: steps.bench_compare.outputs.has_regressions == 'true'
+        run: |
+          # Check if perf-regression-ok label is present
+          LABELS=$(gh pr view ${{ github.event.pull_request.number }} --json labels --jq '.labels[].name')
+          if echo "$LABELS" | grep -q "perf-regression-ok"; then
+            echo "Performance regression acknowledged via label"
+            exit 0
+          else
+            echo "::warning::Performance regressions detected. Add 'perf-regression-ok' label to merge anyway."
+            # Don't fail the check, just warn
+            exit 0
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
