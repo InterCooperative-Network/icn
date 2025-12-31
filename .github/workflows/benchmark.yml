@@ -44,10 +44,10 @@ jobs:
       - name: Run benchmarks
         run: cargo bench --workspace -- --noplot --save-baseline main
         working-directory: ./icn
-        timeout-minutes: 30
+        timeout-minutes: 45
 
       - name: Upload benchmark results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: benchmark-baseline-${{ github.sha }}
           path: icn/target/criterion
@@ -80,7 +80,7 @@ jobs:
       - name: Run baseline benchmarks
         run: cargo bench --workspace -- --noplot --save-baseline base
         working-directory: ./baseline/icn
-        timeout-minutes: 30
+        timeout-minutes: 45
 
       # Checkout PR head commit for comparison
       - name: Checkout PR commit
@@ -93,7 +93,12 @@ jobs:
       - name: Copy baseline results
         run: |
           mkdir -p pr/icn/target/criterion
-          cp -r baseline/icn/target/criterion/* pr/icn/target/criterion/ || true
+          if [ -d "baseline/icn/target/criterion" ] && [ "$(ls -A baseline/icn/target/criterion 2>/dev/null)" ]; then
+            cp -r baseline/icn/target/criterion/* pr/icn/target/criterion/
+            echo "Copied baseline results successfully"
+          else
+            echo "::warning::No baseline benchmark results found to copy"
+          fi
 
       - uses: Swatinem/rust-cache@v2
         with:
@@ -119,7 +124,8 @@ jobs:
           fi
 
           # Extract regressions - Criterion outputs "Performance has regressed" for significant changes
-          REGRESSION_COUNT=$(grep -ciE "regressed" bench_output.txt || echo "0")
+          # Pattern matches: "regressed", "Performance has regressed", "regression detected"
+          REGRESSION_COUNT=$(grep -ciE "(Performance has regressed|regressed|regression detected)" bench_output.txt || echo "0")
 
           if [ "$REGRESSION_COUNT" -gt 0 ]; then
             echo "has_regressions=true" >> $GITHUB_OUTPUT
@@ -135,7 +141,7 @@ jobs:
               echo "<summary>Regression Details</summary>"
               echo ""
               echo '```'
-              REGRESSION_OUTPUT=$(grep -B3 -A1 -iE "regressed" bench_output.txt)
+              REGRESSION_OUTPUT=$(grep -B3 -A1 -iE "(Performance has regressed|regressed|regression detected)" bench_output.txt)
               REGRESSION_LINES=$(echo "$REGRESSION_OUTPUT" | wc -l)
               echo "$REGRESSION_OUTPUT" | head -100
               if [ "$REGRESSION_LINES" -gt 100 ]; then
@@ -157,7 +163,7 @@ jobs:
             } > regression_report.md
           fi
         working-directory: ./pr/icn
-        timeout-minutes: 30
+        timeout-minutes: 45
 
       - name: Comment on PR
         uses: actions/github-script@v7
@@ -213,7 +219,7 @@ jobs:
 
       - name: Upload PR benchmark results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: benchmark-pr-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
           path: pr/icn/target/criterion
