@@ -41,6 +41,7 @@ services:
       - ICN_DATA_DIR=/data
       - ICN_NETWORK_LISTEN_ADDR=0.0.0.0:4433
       - ICN_OBSERVABILITY_HEALTH_PORT=8080
+      - ICN_OBSERVABILITY_METRICS_PORT=9100
       - ICN_OBSERVABILITY_LOG_LEVEL=info
       - ICN_NETWORK_MDNS_ENABLED=false  # Use direct addressing in Docker
     command:
@@ -77,6 +78,7 @@ services:
       - ICN_DATA_DIR=/data
       - ICN_NETWORK_LISTEN_ADDR=0.0.0.0:4433
       - ICN_OBSERVABILITY_HEALTH_PORT=8080
+      - ICN_OBSERVABILITY_METRICS_PORT=9101
       - ICN_OBSERVABILITY_LOG_LEVEL=info
       - ICN_NETWORK_MDNS_ENABLED=false
     command:
@@ -104,7 +106,7 @@ services:
     ports:
       - "9000:9090"  # Prometheus UI (on 9000 to avoid conflict with ICN)
     volumes:
-      - ../config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'

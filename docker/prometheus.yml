@@ -1,0 +1,33 @@
+# Prometheus Configuration for ICN Docker Compose
+# This configuration scrapes metrics from ICN nodes running in Docker.
+#
+# Unlike config/prometheus.yml which uses localhost (for local development),
+# this config uses Docker container hostnames for the icn-network bridge.
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'icn-docker'
+
+scrape_configs:
+  # ICN Alpha Node
+  - job_name: 'icn-alpha'
+    static_configs:
+      - targets: ['icn-alpha:9100']
+        labels:
+          node: 'alpha'
+          environment: 'docker'
+
+  # ICN Beta Node
+  - job_name: 'icn-beta'
+    static_configs:
+      - targets: ['icn-beta:9101']
+        labels:
+          node: 'beta'
+          environment: 'docker'
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

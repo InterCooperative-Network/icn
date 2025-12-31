@@ -13,7 +13,7 @@ spec:
     metadata:
       annotations:
         prometheus.io/scrape: "true"
-        prometheus.io/port: "9090"
+        prometheus.io/port: "9100"
       labels:
         {{- include "icn.selectorLabels" . | nindent 8 }}
     spec:
@@ -28,7 +28,7 @@ spec:
         - name: gateway
           containerPort: 8000
         - name: metrics
-          containerPort: 9090
+          containerPort: 9100
         env:
         - name: RUST_LOG
           value: {{ .Values.icn.env.RUST_LOG | quote }}
