@@ -91,8 +91,8 @@ pub use charter::{
 pub use charter_store::{CharterStore, CharterStoreBackend, InMemoryCharterStore};
 pub use config::{EmergencyThresholds, GovernanceConfig, GovernanceParams};
 pub use delegation::{
-    Delegation, DelegationError, DelegationId, DelegationManager, DelegationScope,
-    DEFAULT_MAX_DELEGATION_DEPTH,
+    scopes_overlap, Delegation, DelegationError, DelegationId, DelegationManager, DelegationScope,
+    ProposalDomainLookup, DEFAULT_MAX_DELEGATION_DEPTH,
 };
 pub use discussion::{
     Comment, CommentId, Discussion, DiscussionError, DiscussionStore, InMemoryDiscussionStore,

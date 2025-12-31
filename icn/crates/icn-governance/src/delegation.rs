@@ -114,6 +114,98 @@ impl DelegationScope {
     }
 }
 
+/// Trait for looking up which domain a proposal belongs to.
+///
+/// This abstracts the proposal domain lookup mechanism, allowing the shared
+/// `scopes_overlap` function to work with different storage backends:
+/// - In-memory HashMap (DelegationManager, GovernanceMgr)
+/// - Persistent store with error handling (GovernanceActor)
+///
+/// # Implementation Notes
+///
+/// Implementations should return `Some(domain_id)` if the proposal exists and
+/// its domain is known, or `None` if the proposal is not registered/found.
+/// Storage errors should be converted to `None` or handled by the caller.
+pub trait ProposalDomainLookup {
+    /// Look up the governance domain for a proposal.
+    ///
+    /// Returns `Some(GovernanceDomainId)` if the proposal's domain is known,
+    /// or `None` if the proposal is not registered or an error occurred.
+    fn lookup_proposal_domain(&self, proposal_id: &ProposalId) -> Option<GovernanceDomainId>;
+}
+
+/// Check if two delegation scopes overlap (for cycle detection).
+///
+/// This is the shared implementation used by DelegationManager and GovernanceMgr
+/// to determine if two delegations could conflict.
+///
+/// Note: GovernanceActor uses its own implementation due to special error handling
+/// requirements (distinguishing storage errors from "not found" cases).
+///
+/// # Arguments
+///
+/// * `a` - First delegation scope
+/// * `b` - Second delegation scope
+/// * `lookup` - Implementation of `ProposalDomainLookup` for resolving proposal domains
+/// * `default_on_unknown` - Value to return when a proposal's domain is unknown:
+///   - `false`: Assume no overlap (allow delegation, used for permissive behavior)
+///   - `true`: Assume overlap (block delegation, used for conservative behavior)
+///
+/// # Behavior
+///
+/// - Blanket scope overlaps with all scopes
+/// - Domain scopes overlap only if they match
+/// - Proposal scopes overlap only if they match
+/// - Domain + Proposal: uses lookup to determine if proposal is in the domain.
+///   If lookup returns None, uses `default_on_unknown`.
+///
+/// # Example
+///
+/// ```rust
+/// use icn_governance::delegation::{DelegationScope, ProposalDomainLookup, scopes_overlap};
+/// use icn_governance::domain::GovernanceDomainId;
+/// use icn_governance::proposal::ProposalId;
+/// use std::collections::HashMap;
+///
+/// // Simple HashMap-based lookup
+/// struct MapLookup(HashMap<ProposalId, GovernanceDomainId>);
+///
+/// impl ProposalDomainLookup for MapLookup {
+///     fn lookup_proposal_domain(&self, proposal_id: &ProposalId) -> Option<GovernanceDomainId> {
+///         self.0.get(proposal_id).cloned()
+///     }
+/// }
+///
+/// let lookup = MapLookup(HashMap::new());
+///
+/// // Blanket overlaps with everything
+/// assert!(scopes_overlap(
+///     &DelegationScope::Blanket,
+///     &DelegationScope::Domain(GovernanceDomainId::new("test")),
+///     &lookup,
+///     false,
+/// ));
+/// ```
+pub fn scopes_overlap<L: ProposalDomainLookup>(
+    a: &DelegationScope,
+    b: &DelegationScope,
+    lookup: &L,
+    default_on_unknown: bool,
+) -> bool {
+    match (a, b) {
+        (DelegationScope::Blanket, _) | (_, DelegationScope::Blanket) => true,
+        (DelegationScope::Domain(d1), DelegationScope::Domain(d2)) => d1 == d2,
+        (DelegationScope::Domain(d), DelegationScope::Proposal(p))
+        | (DelegationScope::Proposal(p), DelegationScope::Domain(d)) => {
+            match lookup.lookup_proposal_domain(p) {
+                Some(proposal_domain) => &proposal_domain == d,
+                None => default_on_unknown,
+            }
+        }
+        (DelegationScope::Proposal(p1), DelegationScope::Proposal(p2)) => p1 == p2,
+    }
+}
+
 /// A vote delegation from one member to another
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Delegation {
@@ -254,6 +346,12 @@ pub struct DelegationManager {
 
     /// Proposal to domain mapping for precise scope overlap checking
     proposal_domains: HashMap<ProposalId, GovernanceDomainId>,
+}
+
+impl ProposalDomainLookup for DelegationManager {
+    fn lookup_proposal_domain(&self, proposal_id: &ProposalId) -> Option<GovernanceDomainId> {
+        self.proposal_domains.get(proposal_id).cloned()
+    }
 }
 
 impl DelegationManager {
@@ -732,34 +830,13 @@ impl DelegationManager {
 
     /// Check if two scopes overlap (for cycle detection)
     ///
-    /// This function is used to determine if two delegations could conflict.
-    /// Uses registered proposal domains for precise overlap checking when available.
-    ///
-    /// # Behavior
-    ///
-    /// - Blanket scope overlaps with all scopes
-    /// - Domain scopes overlap only if they match
-    /// - Proposal scopes overlap only if they match
-    /// - Domain + Proposal: uses registered domain mapping for precise check.
-    ///   If proposal is not registered, assumes NO overlap (proposal-specific
-    ///   delegations are narrower than domain delegations, so actual conflicts
-    ///   will be detected when the proposal is properly registered).
+    /// Delegates to the shared [`scopes_overlap`] function with `default_on_unknown=false`
+    /// (assumes no overlap when proposal domain is unknown, as proposal-specific
+    /// delegations are narrower than domain delegations).
     fn scopes_overlap(&self, a: &DelegationScope, b: &DelegationScope) -> bool {
-        match (a, b) {
-            (DelegationScope::Blanket, _) | (_, DelegationScope::Blanket) => true,
-            (DelegationScope::Domain(d1), DelegationScope::Domain(d2)) => d1 == d2,
-            (DelegationScope::Domain(d), DelegationScope::Proposal(p))
-            | (DelegationScope::Proposal(p), DelegationScope::Domain(d)) => {
-                // Use registered domain mapping for precise check
-                match self.proposal_domains.get(p) {
-                    Some(proposal_domain) => proposal_domain == d,
-                    // Proposal-specific delegations are narrower than domain delegations,
-                    // so assume no overlap when proposal domain is unknown
-                    None => false,
-                }
-            }
-            (DelegationScope::Proposal(p1), DelegationScope::Proposal(p2)) => p1 == p2,
-        }
+        // Use shared helper with permissive default: assume no overlap when proposal unknown
+        // This allows delegations to proceed; conflicts detected when proposal is registered
+        scopes_overlap(a, b, self, false)
     }
 
     /// Compute the incoming delegation chain depth to a person
@@ -1508,5 +1585,133 @@ mod tests {
             result.unwrap_err().to_string().contains("cycle"),
             "Error should mention cycle"
         );
+    }
+
+    /// Test the shared `scopes_overlap` function directly to document its behavior matrix.
+    ///
+    /// This tests all combinations of scope types and the `default_on_unknown` parameter.
+    #[test]
+    fn test_scopes_overlap_behavior_matrix() {
+        use std::collections::HashMap;
+
+        let domain_a = GovernanceDomainId::new("domain-a");
+        let domain_b = GovernanceDomainId::new("domain-b");
+        let proposal_1 = ProposalId::new("proposal-1");
+        let proposal_2 = ProposalId::new("proposal-2");
+        let unknown_proposal = ProposalId::new("unknown");
+
+        // Lookup that knows proposal_1 is in domain_a
+        struct TestLookup(HashMap<ProposalId, GovernanceDomainId>);
+        impl ProposalDomainLookup for TestLookup {
+            fn lookup_proposal_domain(
+                &self,
+                proposal_id: &ProposalId,
+            ) -> Option<GovernanceDomainId> {
+                self.0.get(proposal_id).cloned()
+            }
+        }
+
+        let mut known_proposals = HashMap::new();
+        known_proposals.insert(proposal_1.clone(), domain_a.clone());
+        known_proposals.insert(proposal_2.clone(), domain_b.clone());
+        let lookup = TestLookup(known_proposals);
+
+        // === Blanket scope tests ===
+        // Blanket overlaps with everything
+        assert!(scopes_overlap(
+            &DelegationScope::Blanket,
+            &DelegationScope::Blanket,
+            &lookup,
+            false
+        ));
+        assert!(scopes_overlap(
+            &DelegationScope::Blanket,
+            &DelegationScope::Domain(domain_a.clone()),
+            &lookup,
+            false
+        ));
+        assert!(scopes_overlap(
+            &DelegationScope::Domain(domain_a.clone()),
+            &DelegationScope::Blanket,
+            &lookup,
+            false
+        ));
+        assert!(scopes_overlap(
+            &DelegationScope::Blanket,
+            &DelegationScope::Proposal(proposal_1.clone()),
+            &lookup,
+            false
+        ));
+
+        // === Domain scope tests ===
+        // Same domain overlaps
+        assert!(scopes_overlap(
+            &DelegationScope::Domain(domain_a.clone()),
+            &DelegationScope::Domain(domain_a.clone()),
+            &lookup,
+            false
+        ));
+        // Different domains don't overlap
+        assert!(!scopes_overlap(
+            &DelegationScope::Domain(domain_a.clone()),
+            &DelegationScope::Domain(domain_b.clone()),
+            &lookup,
+            false
+        ));
+
+        // === Proposal scope tests ===
+        // Same proposal overlaps
+        assert!(scopes_overlap(
+            &DelegationScope::Proposal(proposal_1.clone()),
+            &DelegationScope::Proposal(proposal_1.clone()),
+            &lookup,
+            false
+        ));
+        // Different proposals don't overlap
+        assert!(!scopes_overlap(
+            &DelegationScope::Proposal(proposal_1.clone()),
+            &DelegationScope::Proposal(proposal_2.clone()),
+            &lookup,
+            false
+        ));
+
+        // === Domain/Proposal combination tests ===
+        // Known proposal in same domain overlaps
+        assert!(scopes_overlap(
+            &DelegationScope::Domain(domain_a.clone()),
+            &DelegationScope::Proposal(proposal_1.clone()),
+            &lookup,
+            false
+        ));
+        // Known proposal in different domain doesn't overlap
+        assert!(!scopes_overlap(
+            &DelegationScope::Domain(domain_b.clone()),
+            &DelegationScope::Proposal(proposal_1.clone()),
+            &lookup,
+            false
+        ));
+        // Symmetry check
+        assert!(scopes_overlap(
+            &DelegationScope::Proposal(proposal_1.clone()),
+            &DelegationScope::Domain(domain_a.clone()),
+            &lookup,
+            false
+        ));
+
+        // === Unknown proposal tests (default_on_unknown behavior) ===
+        // Unknown proposal with default_on_unknown=false (permissive)
+        assert!(!scopes_overlap(
+            &DelegationScope::Domain(domain_a.clone()),
+            &DelegationScope::Proposal(unknown_proposal.clone()),
+            &lookup,
+            false // permissive: assume no overlap
+        ));
+        // Unknown proposal with default_on_unknown=true (conservative)
+        assert!(scopes_overlap(
+            &DelegationScope::Domain(domain_a.clone()),
+            &DelegationScope::Proposal(unknown_proposal.clone()),
+            &lookup,
+            true // conservative: assume overlap
+        ));
     }
 }
