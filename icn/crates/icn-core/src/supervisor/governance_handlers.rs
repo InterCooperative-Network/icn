@@ -32,6 +32,98 @@ pub type TreasuryManagerHandle = Arc<RwLock<TreasuryManager>>;
 /// Type alias for the event bus
 pub type EventBus = Arc<crate::events::EventBus>;
 
+// =============================================================================
+// Validation helpers - shared logic for treasury operation validation
+// =============================================================================
+
+/// Validate that an amount is positive, handling DLQ and metrics on failure.
+///
+/// Returns `true` if the amount is valid (positive), `false` otherwise.
+/// On failure, logs an error, enqueues to DLQ, and increments the execution failure metric.
+///
+/// # Arguments
+/// * `amount` - The amount to validate
+/// * `proposal_id` - The proposal ID for error context
+/// * `operation_key` - Key for DLQ (e.g., "budget", "rule", "transfer", "reclaim")
+/// * `metric_label` - Label for the execution failure metric
+/// * `field_name` - Human-readable field name for error messages (e.g., "Amount", "Threshold amount")
+/// * `dlq` - Dead-letter queue for failed operations
+fn validate_positive_amount(
+    amount: i64,
+    proposal_id: &ProposalId,
+    operation_key: &str,
+    metric_label: &str,
+    field_name: &str,
+    dlq: &DeadLetterQueue,
+) -> bool {
+    if amount <= 0 {
+        error!(
+            "❌ Invalid {} for proposal {}: {} (must be positive)",
+            field_name.to_lowercase(),
+            proposal_id.0,
+            amount
+        );
+        let failed_op = FailedOperation::new(
+            format!("treasury:{}:{}", operation_key, proposal_id.0),
+            FailureType::TreasuryOperationFailed,
+            serde_json::json!({
+                "proposal_id": proposal_id.0,
+                "error": "invalid_amount",
+                "amount": amount,
+            }),
+            format!("{field_name} must be positive, got: {amount}"),
+        );
+        if let Err(dlq_err) = dlq.enqueue(failed_op) {
+            error!("   Failed to write to dead-letter queue: {}", dlq_err);
+        }
+        icn_obs::metrics::governance::execution_failures_inc(metric_label);
+        return false;
+    }
+    true
+}
+
+/// Validate that two currencies match, handling DLQ and metrics on failure.
+///
+/// Returns `true` if the currencies match, `false` otherwise.
+/// On failure, logs an error, enqueues to DLQ, and increments the execution failure metric.
+///
+/// # Arguments
+/// * `actual` - The actual currency value
+/// * `expected` - The expected currency value
+/// * `proposal_id` - The proposal ID for error context
+/// * `operation_key` - Key for DLQ (e.g., "budget", "rule", "transfer", "reclaim")
+/// * `metric_label` - Label for the execution failure metric
+/// * `metadata` - JSON metadata for the DLQ entry
+/// * `dlq` - Dead-letter queue for failed operations
+fn validate_currency_match(
+    actual: &str,
+    expected: &str,
+    proposal_id: &ProposalId,
+    operation_key: &str,
+    metric_label: &str,
+    metadata: serde_json::Value,
+    dlq: &DeadLetterQueue,
+) -> bool {
+    if actual != expected {
+        error!(
+            "❌ Currency mismatch for proposal {}: got '{}', expected '{}'",
+            proposal_id.0, actual, expected
+        );
+        let failed_op = FailedOperation::new(
+            format!("treasury:{}:{}", operation_key, proposal_id.0),
+            FailureType::TreasuryOperationFailed,
+            metadata,
+            format!("Currency mismatch: got '{actual}', expected '{expected}'"),
+        );
+        if let Err(dlq_err) = dlq.enqueue(failed_op) {
+            error!("   Failed to write to dead-letter queue: {}", dlq_err);
+        }
+        icn_obs::metrics::governance::execution_failures_inc(metric_label);
+        return false;
+    }
+    true
+}
+
 /// Handler for governance proposal events
 ///
 /// Encapsulates all dependencies needed to execute governance proposals,
@@ -419,25 +511,14 @@ impl GovernanceEventHandler {
             }
 
             // Validation: Amount must be positive
-            if amount <= 0 {
-                error!(
-                    "❌ Invalid amount for budget proposal {}: {} (must be positive)",
-                    proposal_id.0, amount
-                );
-                let failed_op = FailedOperation::new(
-                    format!("treasury:budget:{}", proposal_id.0),
-                    FailureType::TreasuryOperationFailed,
-                    serde_json::json!({
-                        "proposal_id": proposal_id.0,
-                        "error": "invalid_amount",
-                        "amount": amount,
-                    }),
-                    format!("Amount must be positive, got: {amount}"),
-                );
-                if let Err(dlq_err) = dlq.enqueue(failed_op) {
-                    error!("   Failed to write to dead-letter queue: {}", dlq_err);
-                }
-                icn_obs::metrics::governance::execution_failures_inc("treasury_create_budget");
+            if !validate_positive_amount(
+                amount,
+                &proposal_id,
+                "budget",
+                "treasury_create_budget",
+                "Amount",
+                &dlq,
+            ) {
                 return;
             }
 
@@ -445,29 +526,20 @@ impl GovernanceEventHandler {
 
             // Validation: Currency must match treasury's configured currency
             if let Some(treasury) = treasury_guard.get_treasury(&treasury_did) {
-                if treasury.currency != currency {
-                    error!(
-                        "❌ Currency mismatch for budget proposal {}: got '{}', treasury uses '{}'",
-                        proposal_id.0, currency, treasury.currency
-                    );
-                    let failed_op = FailedOperation::new(
-                        format!("treasury:budget:{}", proposal_id.0),
-                        FailureType::TreasuryOperationFailed,
-                        serde_json::json!({
-                            "proposal_id": proposal_id.0,
-                            "error": "currency_mismatch",
-                            "requested_currency": currency,
-                            "treasury_currency": treasury.currency,
-                        }),
-                        format!(
-                            "Currency mismatch: got '{}', expected '{}'",
-                            currency, treasury.currency
-                        ),
-                    );
-                    if let Err(dlq_err) = dlq.enqueue(failed_op) {
-                        error!("   Failed to write to dead-letter queue: {}", dlq_err);
-                    }
-                    icn_obs::metrics::governance::execution_failures_inc("treasury_create_budget");
+                if !validate_currency_match(
+                    &currency,
+                    &treasury.currency,
+                    &proposal_id,
+                    "budget",
+                    "treasury_create_budget",
+                    serde_json::json!({
+                        "proposal_id": proposal_id.0,
+                        "error": "currency_mismatch",
+                        "requested_currency": currency,
+                        "treasury_currency": treasury.currency,
+                    }),
+                    &dlq,
+                ) {
                     return;
                 }
             } else {
@@ -679,25 +751,14 @@ impl GovernanceEventHandler {
             }
 
             // Validation: Threshold amount must be positive
-            if threshold_amount <= 0 {
-                error!(
-                    "❌ Invalid threshold amount for spending rule proposal {}: {} (must be positive)",
-                    proposal_id.0, threshold_amount
-                );
-                let failed_op = FailedOperation::new(
-                    format!("treasury:rule:{}", proposal_id.0),
-                    FailureType::TreasuryOperationFailed,
-                    serde_json::json!({
-                        "proposal_id": proposal_id.0,
-                        "error": "invalid_threshold_amount",
-                        "threshold_amount": threshold_amount,
-                    }),
-                    format!("Threshold amount must be positive, got: {threshold_amount}"),
-                );
-                if let Err(dlq_err) = dlq.enqueue(failed_op) {
-                    error!("   Failed to write to dead-letter queue: {}", dlq_err);
-                }
-                icn_obs::metrics::governance::execution_failures_inc("treasury_modify_rule");
+            if !validate_positive_amount(
+                threshold_amount,
+                &proposal_id,
+                "rule",
+                "treasury_modify_rule",
+                "Threshold amount",
+                &dlq,
+            ) {
                 return;
             }
 
@@ -705,29 +766,20 @@ impl GovernanceEventHandler {
 
             // Validation: Currency must match treasury's configured currency
             if let Some(treasury) = treasury_guard.get_treasury(&treasury_did) {
-                if treasury.currency != currency {
-                    error!(
-                        "❌ Currency mismatch for spending rule proposal {}: got '{}', treasury uses '{}'",
-                        proposal_id.0, currency, treasury.currency
-                    );
-                    let failed_op = FailedOperation::new(
-                        format!("treasury:rule:{}", proposal_id.0),
-                        FailureType::TreasuryOperationFailed,
-                        serde_json::json!({
-                            "proposal_id": proposal_id.0,
-                            "error": "currency_mismatch",
-                            "requested_currency": currency,
-                            "treasury_currency": treasury.currency,
-                        }),
-                        format!(
-                            "Currency mismatch: got '{}', expected '{}'",
-                            currency, treasury.currency
-                        ),
-                    );
-                    if let Err(dlq_err) = dlq.enqueue(failed_op) {
-                        error!("   Failed to write to dead-letter queue: {}", dlq_err);
-                    }
-                    icn_obs::metrics::governance::execution_failures_inc("treasury_modify_rule");
+                if !validate_currency_match(
+                    &currency,
+                    &treasury.currency,
+                    &proposal_id,
+                    "rule",
+                    "treasury_modify_rule",
+                    serde_json::json!({
+                        "proposal_id": proposal_id.0,
+                        "error": "currency_mismatch",
+                        "requested_currency": currency,
+                        "treasury_currency": treasury.currency,
+                    }),
+                    &dlq,
+                ) {
                     return;
                 }
             } else {
@@ -901,27 +953,14 @@ impl GovernanceEventHandler {
             }
 
             // Validation: Amount must be positive
-            if amount <= 0 {
-                error!(
-                    "❌ Invalid transfer amount for proposal {}: {} (must be positive)",
-                    proposal_id.0, amount
-                );
-                let failed_op = FailedOperation::new(
-                    format!("treasury:transfer:{}", proposal_id.0),
-                    FailureType::TreasuryOperationFailed,
-                    serde_json::json!({
-                        "proposal_id": proposal_id.0,
-                        "error": "invalid_amount",
-                        "amount": amount,
-                    }),
-                    format!("Amount must be positive, got: {amount}"),
-                );
-                if let Err(dlq_err) = dlq.enqueue(failed_op) {
-                    error!("   Failed to write to dead-letter queue: {}", dlq_err);
-                }
-                icn_obs::metrics::governance::execution_failures_inc(
-                    "treasury_transfer_between_budgets",
-                );
+            if !validate_positive_amount(
+                amount,
+                &proposal_id,
+                "transfer",
+                "treasury_transfer_between_budgets",
+                "Transfer amount",
+                &dlq,
+            ) {
                 return;
             }
 
@@ -1040,33 +1079,22 @@ impl GovernanceEventHandler {
                 }
 
                 // Validate currencies match
-                if to_budget_data.currency != from_currency {
-                    error!(
-                        "❌ Currency mismatch for transfer proposal {}: source='{}', destination='{}'",
-                        proposal_id.0, from_currency, to_budget_data.currency
-                    );
-                    let failed_op = FailedOperation::new(
-                        format!("treasury:transfer:{}", proposal_id.0),
-                        FailureType::TreasuryOperationFailed,
-                        serde_json::json!({
-                            "proposal_id": proposal_id.0,
-                            "error": "currency_mismatch",
-                            "from_budget": from_budget,
-                            "from_currency": from_currency,
-                            "to_budget": to_budget,
-                            "to_currency": to_budget_data.currency,
-                        }),
-                        format!(
-                            "Currency mismatch: source='{}', destination='{}'",
-                            from_currency, to_budget_data.currency
-                        ),
-                    );
-                    if let Err(dlq_err) = dlq.enqueue(failed_op) {
-                        error!("   Failed to write to dead-letter queue: {}", dlq_err);
-                    }
-                    icn_obs::metrics::governance::execution_failures_inc(
-                        "treasury_transfer_between_budgets",
-                    );
+                if !validate_currency_match(
+                    &to_budget_data.currency,
+                    &from_currency,
+                    &proposal_id,
+                    "transfer",
+                    "treasury_transfer_between_budgets",
+                    serde_json::json!({
+                        "proposal_id": proposal_id.0,
+                        "error": "currency_mismatch",
+                        "from_budget": from_budget,
+                        "from_currency": from_currency,
+                        "to_budget": to_budget,
+                        "to_currency": to_budget_data.currency,
+                    }),
+                    &dlq,
+                ) {
                     return;
                 }
             } else {
@@ -1568,25 +1596,14 @@ impl GovernanceEventHandler {
             }
 
             // Validation: Amount must be positive (no lock needed)
-            if amount <= 0 {
-                error!(
-                    "❌ Invalid reclaim amount for proposal {}: {} (must be positive)",
-                    proposal_id.0, amount
-                );
-                let failed_op = FailedOperation::new(
-                    format!("treasury:reclaim:{}", proposal_id.0),
-                    FailureType::TreasuryOperationFailed,
-                    serde_json::json!({
-                        "proposal_id": proposal_id.0,
-                        "error": "invalid_amount",
-                        "amount": amount,
-                    }),
-                    format!("Amount must be positive, got: {amount}"),
-                );
-                if let Err(dlq_err) = dlq.enqueue(failed_op) {
-                    error!("   Failed to write to dead-letter queue: {}", dlq_err);
-                }
-                icn_obs::metrics::governance::execution_failures_inc("treasury_reclaim");
+            if !validate_positive_amount(
+                amount,
+                &proposal_id,
+                "reclaim",
+                "treasury_reclaim",
+                "Reclaim amount",
+                &dlq,
+            ) {
                 return;
             }
 
@@ -1599,30 +1616,21 @@ impl GovernanceEventHandler {
             let (treasury_did, remaining) = {
                 if let Some(budget) = treasury_guard.get_budget(&budget_id) {
                     // Validate currency matches
-                    if budget.currency != currency {
-                        error!(
-                            "❌ Currency mismatch for reclaim proposal {}: budget has '{}', request has '{}'",
-                            proposal_id.0, budget.currency, currency
-                        );
-                        let failed_op = FailedOperation::new(
-                            format!("treasury:reclaim:{}", proposal_id.0),
-                            FailureType::TreasuryOperationFailed,
-                            serde_json::json!({
-                                "proposal_id": proposal_id.0,
-                                "error": "currency_mismatch",
-                                "budget_id": budget_id,
-                                "budget_currency": budget.currency,
-                                "requested_currency": currency,
-                            }),
-                            format!(
-                                "Currency mismatch: budget has '{}', request has '{}'",
-                                budget.currency, currency
-                            ),
-                        );
-                        if let Err(dlq_err) = dlq.enqueue(failed_op) {
-                            error!("   Failed to write to dead-letter queue: {}", dlq_err);
-                        }
-                        icn_obs::metrics::governance::execution_failures_inc("treasury_reclaim");
+                    if !validate_currency_match(
+                        &budget.currency,
+                        &currency,
+                        &proposal_id,
+                        "reclaim",
+                        "treasury_reclaim",
+                        serde_json::json!({
+                            "proposal_id": proposal_id.0,
+                            "error": "currency_mismatch",
+                            "budget_id": budget_id,
+                            "budget_currency": budget.currency,
+                            "requested_currency": currency,
+                        }),
+                        &dlq,
+                    ) {
                         return;
                     }
                     (budget.treasury_did.clone(), budget.remaining())
@@ -2785,11 +2793,246 @@ pub fn create_policy_subscription(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use icn_store::SledStore;
+
+    fn test_dlq() -> DeadLetterQueue {
+        Arc::new(crate::dead_letter::DeadLetterQueue::new(Arc::new(
+            SledStore::temporary().unwrap(),
+        )))
+    }
+
+    fn test_proposal_id() -> ProposalId {
+        ProposalId("test-proposal-123".to_string())
+    }
 
     #[test]
     fn test_governance_event_handler_clone() {
         // Verify GovernanceEventHandler implements Clone
         fn assert_clone<T: Clone>() {}
         assert_clone::<GovernanceEventHandler>();
+    }
+
+    // =========================================================================
+    // Tests for validate_positive_amount helper
+    // =========================================================================
+
+    #[test]
+    fn test_validate_positive_amount_valid() {
+        let dlq = test_dlq();
+        let proposal_id = test_proposal_id();
+
+        // Test positive amount returns true
+        assert!(validate_positive_amount(
+            100,
+            &proposal_id,
+            "budget",
+            "treasury_create_budget",
+            "Amount",
+            &dlq,
+        ));
+
+        // Verify no DLQ entries were created
+        let pending = dlq.list_pending().unwrap();
+        assert!(pending.is_empty());
+    }
+
+    #[test]
+    fn test_validate_positive_amount_zero() {
+        let dlq = test_dlq();
+        let proposal_id = test_proposal_id();
+
+        // Test zero amount returns false
+        assert!(!validate_positive_amount(
+            0,
+            &proposal_id,
+            "budget",
+            "treasury_create_budget",
+            "Amount",
+            &dlq,
+        ));
+
+        // Verify DLQ entry was created
+        let pending = dlq.list_pending().unwrap();
+        assert_eq!(pending.len(), 1);
+        assert!(pending[0].id.contains("treasury:budget:"));
+        assert_eq!(
+            pending[0].failure_type,
+            crate::dead_letter::FailureType::TreasuryOperationFailed
+        );
+    }
+
+    #[test]
+    fn test_validate_positive_amount_negative() {
+        let dlq = test_dlq();
+        let proposal_id = test_proposal_id();
+
+        // Test negative amount returns false
+        assert!(!validate_positive_amount(
+            -50,
+            &proposal_id,
+            "transfer",
+            "treasury_transfer",
+            "Transfer amount",
+            &dlq,
+        ));
+
+        // Verify DLQ entry was created with correct metadata
+        let pending = dlq.list_pending().unwrap();
+        assert_eq!(pending.len(), 1);
+
+        let entry = &pending[0];
+        assert!(entry.id.contains("treasury:transfer:"));
+        assert!(entry.error_message.contains("Transfer amount"));
+        assert!(entry.error_message.contains("-50"));
+
+        // Verify context contains amount
+        let context = &entry.context;
+        assert_eq!(context["error"], "invalid_amount");
+        assert_eq!(context["amount"], -50);
+    }
+
+    #[test]
+    fn test_validate_positive_amount_threshold_field_name() {
+        let dlq = test_dlq();
+        let proposal_id = test_proposal_id();
+
+        // Test with "Threshold amount" field name
+        assert!(!validate_positive_amount(
+            -1,
+            &proposal_id,
+            "rule",
+            "treasury_modify_rule",
+            "Threshold amount",
+            &dlq,
+        ));
+
+        let pending = dlq.list_pending().unwrap();
+        assert_eq!(pending.len(), 1);
+        assert!(pending[0].error_message.contains("Threshold amount"));
+    }
+
+    // =========================================================================
+    // Tests for validate_currency_match helper
+    // =========================================================================
+
+    #[test]
+    fn test_validate_currency_match_valid() {
+        let dlq = test_dlq();
+        let proposal_id = test_proposal_id();
+
+        // Test matching currencies returns true
+        assert!(validate_currency_match(
+            "USD",
+            "USD",
+            &proposal_id,
+            "budget",
+            "treasury_create_budget",
+            serde_json::json!({
+                "proposal_id": proposal_id.0,
+                "error": "currency_mismatch",
+            }),
+            &dlq,
+        ));
+
+        // Verify no DLQ entries were created
+        let pending = dlq.list_pending().unwrap();
+        assert!(pending.is_empty());
+    }
+
+    #[test]
+    fn test_validate_currency_match_mismatch() {
+        let dlq = test_dlq();
+        let proposal_id = test_proposal_id();
+
+        let metadata = serde_json::json!({
+            "proposal_id": proposal_id.0,
+            "error": "currency_mismatch",
+            "requested_currency": "EUR",
+            "treasury_currency": "USD",
+        });
+
+        // Test mismatched currencies returns false
+        assert!(!validate_currency_match(
+            "EUR",
+            "USD",
+            &proposal_id,
+            "budget",
+            "treasury_create_budget",
+            metadata.clone(),
+            &dlq,
+        ));
+
+        // Verify DLQ entry was created
+        let pending = dlq.list_pending().unwrap();
+        assert_eq!(pending.len(), 1);
+
+        let entry = &pending[0];
+        assert!(entry.id.contains("treasury:budget:"));
+        assert_eq!(
+            entry.failure_type,
+            crate::dead_letter::FailureType::TreasuryOperationFailed
+        );
+        assert!(entry.error_message.contains("EUR"));
+        assert!(entry.error_message.contains("USD"));
+
+        // Verify metadata preserved
+        assert_eq!(entry.context["error"], "currency_mismatch");
+        assert_eq!(entry.context["requested_currency"], "EUR");
+        assert_eq!(entry.context["treasury_currency"], "USD");
+    }
+
+    #[test]
+    fn test_validate_currency_match_case_sensitive() {
+        let dlq = test_dlq();
+        let proposal_id = test_proposal_id();
+
+        // Test that currency comparison is case-sensitive
+        assert!(!validate_currency_match(
+            "usd",
+            "USD",
+            &proposal_id,
+            "budget",
+            "treasury_create_budget",
+            serde_json::json!({"error": "currency_mismatch"}),
+            &dlq,
+        ));
+
+        // Verify DLQ entry was created (currencies don't match due to case)
+        let pending = dlq.list_pending().unwrap();
+        assert_eq!(pending.len(), 1);
+    }
+
+    #[test]
+    fn test_validate_currency_match_transfer_metadata() {
+        let dlq = test_dlq();
+        let proposal_id = test_proposal_id();
+
+        // Test with transfer-specific metadata (different format)
+        let metadata = serde_json::json!({
+            "proposal_id": proposal_id.0,
+            "error": "currency_mismatch",
+            "from_budget": "budget-1",
+            "from_currency": "USD",
+            "to_budget": "budget-2",
+            "to_currency": "EUR",
+        });
+
+        assert!(!validate_currency_match(
+            "EUR",
+            "USD",
+            &proposal_id,
+            "transfer",
+            "treasury_transfer_between_budgets",
+            metadata.clone(),
+            &dlq,
+        ));
+
+        // Verify metadata is preserved exactly as passed
+        let pending = dlq.list_pending().unwrap();
+        let entry = &pending[0];
+        assert_eq!(entry.context["from_budget"], "budget-1");
+        assert_eq!(entry.context["to_budget"], "budget-2");
+        assert_eq!(entry.context["from_currency"], "USD");
+        assert_eq!(entry.context["to_currency"], "EUR");
     }
 }
