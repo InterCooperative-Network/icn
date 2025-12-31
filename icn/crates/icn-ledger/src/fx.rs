@@ -138,7 +138,40 @@ impl FxConfig {
 
     /// Calculate fee amount from gross target amount
     ///
-    /// Returns the fee portion that goes to treasury.
+    /// Returns the fee portion that goes to treasury. Returns 0 if no treasury
+    /// is configured.
+    ///
+    /// # Fee Rounding Behavior
+    ///
+    /// Fees are calculated using integer division, which **truncates** fractional
+    /// amounts (rounds toward zero). This means fees always round down in favor
+    /// of the user:
+    ///
+    /// - 1% fee on 50 units = 0 (not 0.5)
+    /// - 1% fee on 149 units = 1 (not 1.49)
+    /// - 1% fee on 250 units = 2 (exact)
+    ///
+    /// For large transactions, this rounding difference is negligible. For very
+    /// small transactions, users may effectively pay no fee.
+    ///
+    /// # Negative Amounts
+    ///
+    /// If `gross_amount` is negative (which should not occur in normal usage),
+    /// the function defensively returns 0 to prevent negative fees.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use icn_ledger::fx::FxConfig;
+    /// # use icn_identity::Did;
+    /// let config = FxConfig::new(Did::from_anchor_id(&[1; 32]))
+    ///     .with_treasury(Did::from_anchor_id(&[2; 32]))
+    ///     .with_fee(100);  // 1% fee (100 basis points)
+    ///
+    /// assert_eq!(config.calculate_fee(250), 2);   // 1% of 250 = 2.5 → 2
+    /// assert_eq!(config.calculate_fee(149), 1);   // 1% of 149 = 1.49 → 1
+    /// assert_eq!(config.calculate_fee(50), 0);    // 1% of 50 = 0.5 → 0
+    /// ```
     pub fn calculate_fee(&self, gross_amount: i64) -> i64 {
         if self.treasury_did.is_none() {
             return 0;
@@ -146,9 +179,10 @@ impl FxConfig {
 
         // fee = gross_amount * fee_basis_points / BASIS_POINTS_SCALE
         // Use i128 to avoid overflow during multiplication
+        // Integer division truncates (rounds toward zero)
         let fee =
             (gross_amount as i128 * self.fee_basis_points as i128 / BASIS_POINTS_SCALE) as i64;
-        fee.max(0) // Ensure non-negative
+        fee.max(0) // Ensure non-negative (defensive)
     }
 
     /// Calculate net amount after fee deduction
@@ -291,11 +325,36 @@ pub struct PreparedFxTransfer {
     pub valid_until: u64,
 }
 
+/// Safety margin before rate expiry (1 second)
+///
+/// This margin prevents TOCTOU race conditions where a GC pause or network
+/// delay between validation and execution could allow an expired rate to
+/// be committed.
+const EXPIRATION_SAFETY_MARGIN_SECS: u64 = 1;
+
 impl PreparedFxTransfer {
     /// Check if this prepared transfer is still valid
+    ///
+    /// Uses a 1-second safety margin before the actual expiry time to prevent
+    /// TOCTOU race conditions (e.g., GC pause between validation and commit).
     pub fn is_valid(&self) -> bool {
         let now = crate::current_timestamp_secs();
-        now < self.valid_until
+        let effective_expiry = self
+            .valid_until
+            .saturating_sub(EXPIRATION_SAFETY_MARGIN_SECS);
+        now < effective_expiry
+    }
+
+    /// Check if this prepared transfer is still valid, returning error details if not
+    pub fn validate_expiry(&self) -> Result<(), FxError> {
+        if self.is_valid() {
+            Ok(())
+        } else {
+            Err(FxError::TransferExpired {
+                expired_at: self.valid_until,
+                current_time: crate::current_timestamp_secs(),
+            })
+        }
     }
 
     /// Get the entry hash (if computed)
@@ -491,6 +550,108 @@ mod tests {
 
         // Effective rate: 248 / 10 = 24.8
         assert!((details.effective_rate() - 24.8).abs() < 0.001);
+    }
+
+    fn create_test_prepared_transfer(valid_until: u64) -> PreparedFxTransfer {
+        use crate::types::JournalEntry;
+        let sender = Did::from_anchor_id(&[3u8; 32]);
+        let entry = JournalEntry {
+            id: None,
+            timestamp: crate::current_timestamp_secs() * 1000, // millis
+            author: sender.clone(),
+            contract_ref: None,
+            accounts: vec![],
+            parents: vec![],
+            signature: None,
+        };
+
+        PreparedFxTransfer {
+            entry,
+            details: FxConversionDetails::new(
+                sender.to_string(),
+                Did::from_anchor_id(&[4u8; 32]).to_string(),
+                "hours".to_string(),
+                "USD".to_string(),
+                10,
+                25.0,
+                crate::current_timestamp_secs(),
+                vec!["test".to_string()],
+                false,
+                250,
+                0,
+                250,
+                0,
+            ),
+            valid_until,
+        }
+    }
+
+    #[test]
+    fn test_prepared_transfer_is_valid_future() {
+        // Transfer valid for 1 hour from now
+        let now = crate::current_timestamp_secs();
+        let valid_until = now + 3600;
+
+        let prepared = create_test_prepared_transfer(valid_until);
+        assert!(prepared.is_valid());
+        assert!(prepared.validate_expiry().is_ok());
+    }
+
+    #[test]
+    fn test_prepared_transfer_is_valid_expired() {
+        // Transfer expired 10 seconds ago
+        let now = crate::current_timestamp_secs();
+        let valid_until = now.saturating_sub(10);
+
+        let prepared = create_test_prepared_transfer(valid_until);
+        assert!(!prepared.is_valid());
+
+        let err = prepared.validate_expiry().unwrap_err();
+        assert!(matches!(err, FxError::TransferExpired { .. }));
+    }
+
+    #[test]
+    fn test_prepared_transfer_safety_margin() {
+        // Transfer expires exactly now + 1 second (the safety margin)
+        // Effective expiry = (now + 1) - 1 = now, so now < now => false (INVALID)
+        let now = crate::current_timestamp_secs();
+        let valid_until = now + EXPIRATION_SAFETY_MARGIN_SECS;
+
+        let prepared = create_test_prepared_transfer(valid_until);
+        assert!(!prepared.is_valid());
+    }
+
+    #[test]
+    fn test_prepared_transfer_just_past_safety_margin() {
+        // Transfer expires in (safety_margin + 1) = 2 seconds
+        // Effective expiry = (now + 2) - 1 = now + 1, so now < now + 1 => true (VALID)
+        let now = crate::current_timestamp_secs();
+        let valid_until = now + EXPIRATION_SAFETY_MARGIN_SECS + 1;
+
+        let prepared = create_test_prepared_transfer(valid_until);
+        assert!(prepared.is_valid());
+    }
+
+    #[test]
+    fn test_transfer_expired_error_details() {
+        let now = crate::current_timestamp_secs();
+        let valid_until = now.saturating_sub(100);
+
+        let prepared = create_test_prepared_transfer(valid_until);
+        let err = prepared.validate_expiry().unwrap_err();
+
+        match err {
+            FxError::TransferExpired {
+                expired_at,
+                current_time,
+            } => {
+                assert_eq!(expired_at, valid_until);
+                // current_time should be approximately now (within 2 seconds to account
+                // for potential GC pauses or test timing variations)
+                assert!(current_time >= now && current_time <= now + 2);
+            }
+            _ => panic!("Expected TransferExpired error"),
+        }
     }
 }
 

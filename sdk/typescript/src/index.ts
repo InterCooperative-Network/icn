@@ -678,18 +678,46 @@ export class ICNClient {
    * Executes a payment where the sender pays in one currency and the recipient
    * receives in another. Uses the exchange rate oracle for conversion.
    *
+   * @param coopId - Cooperative ID where the payment is recorded
+   * @param req - Cross-currency payment request
+   * @returns Promise resolving to the payment response with conversion details
+   *
+   * @throws {ValidationError} If amount <= 0, currencies are invalid, or same currency used
+   * @throws {AuthorizationError} If authenticated DID doesn't match the sender
+   * @throws {ICNError} For FX-related error conditions including:
+   *   - Slippage exceeded (converted amount > max_target_amount)
+   *   - Stale exchange rate (when stale rates are not allowed)
+   *   - Rate expired (prepared transfer expired before execution)
+   *   - Budget exceeded or insufficient balance
+   *
+   *   Note: FX errors are currently wrapped as internal server errors by the gateway.
+   *   Check the error message for specific failure details.
+   *
    * @example
    * ```typescript
    * // Send 10 hours, recipient receives USD equivalent
-   * const result = await client.crossPay('my-coop', {
-   *   from: 'did:icn:alice...',
-   *   to: 'did:icn:bob...',
-   *   amount: 10,
-   *   from_currency: 'hours',
-   *   to_currency: 'USD',
-   *   max_target_amount: 260, // Slippage protection
-   * });
-   * console.log(`Bob received ${result.net_target_amount} USD`);
+   * try {
+   *   const result = await client.crossPay('my-coop', {
+   *     from: 'did:icn:alice...',
+   *     to: 'did:icn:bob...',
+   *     amount: 10,
+   *     from_currency: 'hours',
+   *     to_currency: 'USD',
+   *     max_target_amount: 260, // Slippage protection
+   *   });
+   *   console.log(`Bob received ${result.net_target_amount} USD`);
+   *   console.log(`Exchange rate: ${result.rate_used}`);
+   *   console.log(`Fee charged: ${result.fee_amount} USD`);
+   * } catch (e) {
+   *   if (e instanceof ValidationError) {
+   *     console.error('Invalid request:', e.fieldErrors);
+   *   } else if (e instanceof AuthorizationError) {
+   *     console.error('Not authorized to send from this account');
+   *   } else if (e instanceof ICNError) {
+   *     // FX errors include: slippage exceeded, stale/expired rate, insufficient balance
+   *     console.error('Payment failed:', e.message);
+   *   }
+   * }
    * ```
    */
   async crossPay(coopId: string, req: CrossPaymentRequest): Promise<CrossPaymentResponse> {
@@ -700,7 +728,16 @@ export class ICNClient {
    * Get a cross-currency payment quote
    *
    * Returns a preview of what a cross-currency payment would look like without
-   * actually executing it. Useful for showing users the expected conversion.
+   * actually executing it. Useful for showing users the expected conversion
+   * before committing to a transaction.
+   *
+   * @param coopId - Cooperative ID where the quote is calculated
+   * @param req - Quote request with amount and currencies
+   * @returns Promise resolving to the quote with rate, fees, and validity info
+   *
+   * @throws {ValidationError} If amount <= 0, currencies are invalid, or same currency used
+   * @throws {ICNError} If exchange rate oracle is not configured or no rate exists for the currency pair.
+   *   Note: These conditions are currently wrapped as internal server errors by the gateway.
    *
    * @example
    * ```typescript
@@ -710,11 +747,22 @@ export class ICNClient {
    *   from_currency: 'hours',
    *   to_currency: 'USD',
    * });
-   * console.log(`Rate: ${quote.rate}, Fee: ${quote.fee_amount}`);
-   * console.log(`You would receive: ${quote.net_target_amount} USD`);
+   *
+   * console.log(`Rate: ${quote.rate}`);
+   * console.log(`Gross amount: ${quote.gross_target_amount} USD`);
+   * console.log(`Fee: ${quote.fee_amount} USD`);
+   * console.log(`Net amount: ${quote.net_target_amount} USD`);
+   * console.log(`Valid until: ${new Date(quote.valid_until * 1000)}`);
+   *
    * if (quote.is_stale) {
    *   console.warn('Warning: Rate may be outdated');
    * }
+   *
+   * // Use quote.net_target_amount as max_target_amount for slippage protection
+   * const result = await client.crossPay('my-coop', {
+   *   ...paymentDetails,
+   *   max_target_amount: Math.floor(quote.net_target_amount * 1.01), // 1% slippage tolerance
+   * });
    * ```
    */
   async getCrossPaymentQuote(coopId: string, req: CrossPaymentQuoteRequest): Promise<CrossPaymentQuote> {

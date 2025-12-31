@@ -635,20 +635,10 @@ impl Ledger {
     {
         use crate::fx::FxError;
 
-        // Check if prepared transfer is still valid
-        // Safety margin: reject 1 second before expiry to prevent TOCTOU race conditions
-        // (e.g., GC pause between check and append could allow expired rate to be committed)
-        const EXPIRATION_SAFETY_MARGIN_SECS: u64 = 1;
+        // Check if prepared transfer is still valid (includes safety margin)
+        prepared.validate_expiry()?;
+
         let now = crate::current_timestamp_secs();
-        let effective_expiry = prepared
-            .valid_until
-            .saturating_sub(EXPIRATION_SAFETY_MARGIN_SECS);
-        if now >= effective_expiry {
-            return Err(FxError::TransferExpired {
-                expired_at: prepared.valid_until,
-                current_time: now,
-            });
-        }
 
         // Append the entry to the ledger
         let hash = self

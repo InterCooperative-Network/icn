@@ -306,8 +306,18 @@ impl LedgerManager {
     /// Returns the entry hash and conversion details for audit/display.
     ///
     /// # Note on locking
-    /// This method holds a read lock across an await point during preparation.
-    /// This is acceptable because read locks allow concurrent readers and don't block.
+    ///
+    /// This method holds a read lock across an await point during the
+    /// `prepare_cross_currency_transfer` call, which fetches the exchange rate
+    /// from the oracle.
+    ///
+    /// This is acceptable because:
+    /// - Read locks allow concurrent readers (other payments can proceed)
+    /// - The oracle call typically completes quickly (cached rates)
+    /// - Write lock is only held during the final `execute_cross_currency_transfer`
+    ///
+    /// For high-throughput scenarios, consider refactoring to extract the oracle
+    /// call outside the lock (see issue #367).
     #[allow(clippy::await_holding_lock)]
     pub async fn create_cross_payment(
         &self,
