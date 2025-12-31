@@ -159,11 +159,9 @@ impl FxConfig {
     /// ```
     /// # use icn_ledger::fx::FxConfig;
     /// # use icn_identity::Did;
-    /// let config = FxConfig::new(
-    ///     Did::from_anchor_id(&[1; 32]),  // clearing
-    ///     Some(Did::from_anchor_id(&[2; 32])),  // treasury
-    ///     100,  // 1% fee (100 basis points)
-    /// );
+    /// let config = FxConfig::new(Did::from_anchor_id(&[1; 32]))
+    ///     .with_treasury(Did::from_anchor_id(&[2; 32]))
+    ///     .with_fee(100);  // 1% fee (100 basis points)
     ///
     /// assert_eq!(config.calculate_fee(250), 2);   // 1% of 250 = 2.5 → 2
     /// assert_eq!(config.calculate_fee(149), 1);   // 1% of 149 = 1.49 → 1
