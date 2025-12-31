@@ -781,6 +781,12 @@ mod tests {
         }
         .is_client_error());
         assert!(FxError::InvalidAmount("test".to_string()).is_client_error());
+        assert!(FxError::ConversionOverflow {
+            source_amount: 1000,
+            from_currency: "USD".to_string(),
+            rate: 1e20,
+        }
+        .is_client_error());
 
         // Not found errors
         assert!(FxError::RateNotAvailable {

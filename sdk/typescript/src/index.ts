@@ -689,6 +689,7 @@ export class ICNClient {
    *   - `STALE_RATE` - Exchange rate is stale and stale rates not allowed
    *   - `RATE_EXPIRED` - Prepared transfer expired before execution
    *   - `SAME_CURRENCY` - Same currency specified (use regular payment)
+   *   - `INVALID_AMOUNT` - Amount is invalid or cannot be processed
    *   - `RATE_NOT_AVAILABLE` - No rate available for currency pair
    *   - `CONVERSION_OVERFLOW` - Conversion would exceed numeric limits
    *
