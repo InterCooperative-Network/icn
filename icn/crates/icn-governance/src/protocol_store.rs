@@ -496,7 +496,8 @@ impl ProtocolParameterStore for InMemoryParameterStore {
         let old_value = if let Some(ref stored) = stored_param {
             // Use shared validation helpers for constraint bypass prevention,
             // scope override permission, and optimistic locking
-            validate_parameter_value(&id, &param.value, &param, Some(stored))?;
+            validate_parameter_value(&param.value, &param, Some(stored))
+                .map_err(|e| anyhow::anyhow!("Parameter validation failed for '{id}': {e}"))?;
             validate_scope_override(&id, &param.scope, Some(stored))?;
             validate_version(&id, param.version, stored.version)?;
 
@@ -505,7 +506,8 @@ impl ProtocolParameterStore for InMemoryParameterStore {
             Some(stored.value.clone())
         } else {
             // For new parameters (initial setup), validate against the parameter's own constraints
-            validate_parameter_value(&id, &param.value, &param, None)?;
+            validate_parameter_value(&param.value, &param, None)
+                .map_err(|e| anyhow::anyhow!("Parameter validation failed for '{id}': {e}"))?;
             // New parameter starts at version 0
             param.version = 0;
             None
@@ -1118,7 +1120,8 @@ impl ProtocolParameterStore for SledParameterStore {
         // - The transaction verifies version hasn't changed, which implicitly verifies constraints
         // - For scoped parameters, we explicitly verify allow_override inside the transaction
         let global_param = self.get(&id)?;
-        validate_parameter_value(&id, &param.value, &param, global_param.as_ref())?;
+        validate_parameter_value(&param.value, &param, global_param.as_ref())
+            .map_err(|e| anyhow::anyhow!("Parameter validation failed for '{id}': {e}"))?;
         validate_scope_override(&id, &param.scope, global_param.as_ref())?;
 
         // Prepare the key for this parameter

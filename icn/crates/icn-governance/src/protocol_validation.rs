@@ -36,7 +36,6 @@ use crate::protocol_store::ParameterStoreError;
 ///
 /// # Arguments
 ///
-/// * `param_id` - The parameter ID (for error messages)
 /// * `new_value` - The value to validate
 /// * `new_param` - The incoming parameter (used for new parameter validation)
 /// * `stored_param` - The existing stored parameter, if updating
@@ -45,8 +44,16 @@ use crate::protocol_store::ParameterStoreError;
 ///
 /// * `Ok(())` if validation passes
 /// * `Err(ParameterStoreError::Validation)` if validation fails
+///
+/// # Note
+///
+/// This function returns a generic validation error. Callers should wrap the error
+/// with context including the parameter ID for better debugging, e.g.:
+/// ```ignore
+/// validate_parameter_value(&param.value, &param, stored.as_ref())
+///     .map_err(|e| anyhow::anyhow!("Parameter validation failed for '{}': {e}", id))?;
+/// ```
 pub fn validate_parameter_value(
-    _param_id: &str,
     new_value: &ParameterValue,
     new_param: &ProtocolParameter,
     stored_param: Option<&ProtocolParameter>,
@@ -154,7 +161,7 @@ pub fn validate_parameter_update(
     stored_param: Option<&ProtocolParameter>,
 ) -> Result<(), ParameterStoreError> {
     // 1. Validate value against constraints
-    validate_parameter_value(&param.id, &param.value, param, stored_param)?;
+    validate_parameter_value(&param.value, param, stored_param)?;
 
     // 2. Check scope override permissions
     validate_scope_override(&param.id, &param.scope, stored_param)?;
@@ -207,21 +214,14 @@ mod tests {
         let new_param = make_param("test.param", 75, 1, true);
 
         // Valid value within constraints
-        assert!(validate_parameter_value(
-            "test.param",
-            &ParameterValue::Integer(75),
-            &new_param,
-            Some(&stored)
-        )
-        .is_ok());
+        assert!(
+            validate_parameter_value(&ParameterValue::Integer(75), &new_param, Some(&stored))
+                .is_ok()
+        );
 
         // Invalid value (exceeds max)
-        let result = validate_parameter_value(
-            "test.param",
-            &ParameterValue::Integer(150),
-            &new_param,
-            Some(&stored),
-        );
+        let result =
+            validate_parameter_value(&ParameterValue::Integer(150), &new_param, Some(&stored));
         assert!(matches!(result, Err(ParameterStoreError::Validation(_))));
     }
 
@@ -230,21 +230,10 @@ mod tests {
         let new_param = make_param("test.param", 50, 0, true);
 
         // Valid value for new param
-        assert!(validate_parameter_value(
-            "test.param",
-            &ParameterValue::Integer(50),
-            &new_param,
-            None
-        )
-        .is_ok());
+        assert!(validate_parameter_value(&ParameterValue::Integer(50), &new_param, None).is_ok());
 
         // Invalid value for new param
-        let result = validate_parameter_value(
-            "test.param",
-            &ParameterValue::Integer(150),
-            &new_param,
-            None,
-        );
+        let result = validate_parameter_value(&ParameterValue::Integer(150), &new_param, None);
         assert!(matches!(result, Err(ParameterStoreError::Validation(_))));
     }
 
