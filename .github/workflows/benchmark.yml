@@ -19,15 +19,17 @@ env:
   CARGO_TERM_COLOR: always
 
 permissions:
-  contents: write
+  contents: read
   pull-requests: write
 
 jobs:
+  # Run benchmarks and save baseline (only on main branch pushes)
   benchmark:
-    name: Performance Benchmarks
+    name: Save Benchmark Baseline
     runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Free disk space
         uses: ./.github/actions/free-disk-space
@@ -40,15 +42,15 @@ jobs:
           cache-on-failure: true
 
       - name: Run benchmarks
-        run: cargo bench --workspace -- --noplot --save-baseline current
+        run: cargo bench --workspace -- --noplot --save-baseline main
         working-directory: ./icn
 
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
         with:
-          name: benchmark-results-${{ github.sha }}
+          name: benchmark-baseline-${{ github.sha }}
           path: icn/target/criterion
-          retention-days: 30
+          retention-days: 90
 
   # Compare PR benchmarks against main (only on PRs)
   compare:
@@ -56,7 +58,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -65,20 +67,22 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
+      # Cache for main branch baseline build
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: "icn -> target"
           cache-on-failure: true
+          prefix-key: "bench-baseline"
 
       - name: Checkout main branch for baseline
-        run: git checkout origin/main
+        run: git checkout -B main origin/main
 
       - name: Run baseline benchmarks
         run: cargo bench --workspace -- --noplot --save-baseline main
         working-directory: ./icn
 
       - name: Checkout PR branch
-        run: git checkout ${{ github.head_ref }}
+        run: git checkout ${{ github.event.pull_request.head.sha }}
 
       - name: Run PR benchmarks and compare
         id: bench_compare
@@ -86,8 +90,8 @@ jobs:
           # Run benchmarks and capture output
           cargo bench --workspace -- --noplot --baseline main 2>&1 | tee bench_output.txt
 
-          # Extract regressions (lines with "regressed" and percentage)
-          if grep -q "regressed" bench_output.txt; then
+          # Extract regressions - look for Criterion's "Performance has regressed" message
+          if grep -qE "(regressed|Performance has regressed)" bench_output.txt; then
             echo "has_regressions=true" >> $GITHUB_OUTPUT
 
             # Extract regression details
@@ -96,7 +100,7 @@ jobs:
             echo "The following benchmarks show regression compared to main:" >> regression_report.md
             echo "" >> regression_report.md
             echo '```' >> regression_report.md
-            grep -B2 "regressed" bench_output.txt >> regression_report.md || true
+            grep -B5 -A2 -E "(regressed|Performance has regressed)" bench_output.txt >> regression_report.md || true
             echo '```' >> regression_report.md
             echo "" >> regression_report.md
             echo "---" >> regression_report.md
@@ -125,7 +129,7 @@ jobs:
 
             const botComment = comments.find(c =>
               c.user.type === 'Bot' &&
-              c.body.includes('Performance Regressions Detected') || c.body.includes('Benchmark Results')
+              (c.body.includes('Performance Regressions Detected') || c.body.includes('Benchmark Results'))
             );
 
             const body = report + '\n\n*Updated: ' + new Date().toISOString() + '*';
