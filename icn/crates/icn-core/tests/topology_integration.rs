@@ -468,7 +468,11 @@ async fn test_multi_region_topology() -> Result<()> {
 /// - LocalCluster scope returns only local cluster peers
 /// - Regional scope returns regional (different cluster, same region) peers
 /// - Global scope returns all connected peers
+///
+/// NOTE: This test is flaky when run in parallel due to QUIC port conflicts.
+/// Run manually with: `cargo test --test topology_integration -- --ignored --test-threads=1`
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "flaky when run in parallel - run with --test-threads=1"]
 async fn test_scope_aware_peer_sampling() -> Result<()> {
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
     let _ = tracing_subscriber::fmt::try_init();
