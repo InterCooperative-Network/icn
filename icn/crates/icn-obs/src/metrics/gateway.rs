@@ -526,6 +526,11 @@ pub fn fx_expired_rate_rejections_inc(from_currency: &str, to_currency: &str) {
 /// Tracks the balance of the FX clearing account in each currency.
 /// Positive values indicate the clearing account is owed (debit position).
 /// Negative values indicate the clearing account owes (credit position).
+///
+/// # Cardinality Note
+/// The `currency` label creates a time series per currency. In typical ICN
+/// deployments with a bounded set of currencies, this is safe. If supporting
+/// arbitrary custom currencies, consider adding validation or aggregation.
 pub fn fx_clearing_balance_set(currency: &str, balance: i64) {
     gauge!(
         "icn_gateway_fx_clearing_balance",
@@ -538,6 +543,9 @@ pub fn fx_clearing_balance_set(currency: &str, balance: i64) {
 ///
 /// Tracks absolute value of clearing balance for simpler alerting rules.
 /// High values in either direction may indicate imbalanced trading.
+///
+/// Note: This function applies `.abs()` internally, so callers should pass
+/// the raw signed balance value - no need to compute absolute value beforehand.
 pub fn fx_clearing_balance_abs_set(currency: &str, balance: i64) {
     gauge!(
         "icn_gateway_fx_clearing_balance_abs",
