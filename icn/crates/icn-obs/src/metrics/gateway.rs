@@ -3,6 +3,35 @@
 //! Metrics for WebSocket connections, event broadcasting, and backpressure.
 
 use metrics::{counter, describe_counter, describe_gauge, gauge};
+use std::collections::HashSet;
+use std::sync::{Mutex, OnceLock};
+
+/// Maximum number of currencies to track in FX clearing metrics.
+/// Beyond this limit, new currencies are logged but not tracked to prevent
+/// unbounded metric cardinality in Prometheus.
+const MAX_FX_CLEARING_CURRENCIES: usize = 100;
+
+/// Tracked currencies for FX clearing balance metrics (cardinality protection).
+static FX_CLEARING_CURRENCIES: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
+
+/// Check if a currency can be tracked (within cardinality limit).
+/// Returns true if the currency is already tracked or can be added.
+fn can_track_currency(currency: &str) -> bool {
+    let currencies = FX_CLEARING_CURRENCIES.get_or_init(|| Mutex::new(HashSet::new()));
+    let mut guard = currencies.lock().unwrap_or_else(|e| e.into_inner());
+
+    if guard.contains(currency) {
+        return true;
+    }
+
+    if guard.len() < MAX_FX_CLEARING_CURRENCIES {
+        guard.insert(currency.to_string());
+        return true;
+    }
+
+    // Cardinality limit exceeded
+    false
+}
 
 /// Initialize gateway metric descriptions
 pub fn init_descriptions() {
@@ -527,11 +556,19 @@ pub fn fx_expired_rate_rejections_inc(from_currency: &str, to_currency: &str) {
 /// Positive values indicate the clearing account is owed (debit position).
 /// Negative values indicate the clearing account owes (credit position).
 ///
-/// # Cardinality Note
-/// The `currency` label creates a time series per currency. In typical ICN
-/// deployments with a bounded set of currencies, this is safe. If supporting
-/// arbitrary custom currencies, consider adding validation or aggregation.
+/// # Cardinality Protection
+/// This function enforces a maximum of 100 tracked currencies to prevent
+/// unbounded metric cardinality in Prometheus. New currencies beyond the
+/// limit are logged but not tracked.
 pub fn fx_clearing_balance_set(currency: &str, balance: i64) {
+    if !can_track_currency(currency) {
+        tracing::warn!(
+            currency = %currency,
+            "FX clearing balance metric skipped: currency cardinality limit ({}) reached",
+            MAX_FX_CLEARING_CURRENCIES
+        );
+        return;
+    }
     gauge!(
         "icn_gateway_fx_clearing_balance",
         "currency" => currency.to_string()
@@ -544,15 +581,38 @@ pub fn fx_clearing_balance_set(currency: &str, balance: i64) {
 /// Tracks absolute value of clearing balance for simpler alerting rules.
 /// High values in either direction may indicate imbalanced trading.
 ///
-/// Note: This function applies `.abs()` internally, so callers should pass
-/// the raw signed balance value - no need to compute absolute value beforehand.
+/// Note: This function applies `.unsigned_abs()` internally, so callers should
+/// pass the raw signed balance value - no need to compute absolute value beforehand.
+///
+/// # Cardinality Protection
+/// Uses the same cardinality limit as `fx_clearing_balance_set`.
 pub fn fx_clearing_balance_abs_set(currency: &str, balance: i64) {
+    if !can_track_currency(currency) {
+        // Warning already logged by fx_clearing_balance_set (called together)
+        return;
+    }
     // Use unsigned_abs() to safely handle i64::MIN without overflow
     gauge!(
         "icn_gateway_fx_clearing_balance_abs",
         "currency" => currency.to_string()
     )
     .set(balance.unsigned_abs() as f64);
+}
+
+/// Emit both clearing balance metrics for a currency
+///
+/// Convenience function that sets both the signed and absolute balance
+/// metrics for a single currency in one call.
+///
+/// # Example
+/// ```ignore
+/// // After a cross-currency transfer, emit balance for each currency
+/// emit_clearing_balance("USD", source_balance);
+/// emit_clearing_balance("EUR", target_balance);
+/// ```
+pub fn emit_clearing_balance(currency: &str, balance: i64) {
+    fx_clearing_balance_set(currency, balance);
+    fx_clearing_balance_abs_set(currency, balance);
 }
 
 /// Increment clearing account transfers counter
@@ -615,5 +675,28 @@ mod tests {
 
         // Same source/target (unusual but shouldn't panic)
         fx_clearing_transfers_inc("USD", "USD");
+    }
+
+    #[test]
+    fn test_emit_clearing_balance_helper() {
+        // Helper should emit both signed and absolute metrics
+        emit_clearing_balance("CHF", 5000);
+        emit_clearing_balance("CHF", -5000);
+        emit_clearing_balance("CHF", 0);
+
+        // Edge cases
+        emit_clearing_balance("BTC", i64::MAX);
+        emit_clearing_balance("BTC", i64::MIN);
+    }
+
+    #[test]
+    fn test_cardinality_tracking() {
+        // Verify that can_track_currency works for normal use
+        // (Full cardinality limit testing would require isolating the static)
+        assert!(can_track_currency("TEST_CURRENCY_1"));
+        assert!(can_track_currency("TEST_CURRENCY_2"));
+
+        // Already tracked currencies should return true
+        assert!(can_track_currency("TEST_CURRENCY_1"));
     }
 }
