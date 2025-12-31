@@ -481,46 +481,33 @@ impl ProtocolParameterStore for InMemoryParameterStore {
         proposal_id: Option<String>,
         changed_by: Option<String>,
     ) -> Result<()> {
+        use crate::protocol_validation::{
+            validate_parameter_value, validate_scope_override, validate_version,
+        };
+
         let id = param.id.clone();
         let scope_key = Self::scope_key(&param.scope);
 
         // Warn about unknown categories (non-blocking)
         warn_unknown_category(&id);
 
-        // For updates, validate against the STORED parameter's constraints (not the new one's)
-        // This prevents constraint bypass attacks where an attacker submits a parameter
-        // with modified constraints that allow any value
-        let old_value = if let Some(stored_param) = self.get(&id)? {
-            stored_param
-                .validate(&param.value)
+        // Validate and update parameter
+        let stored_param = self.get(&id)?;
+        let old_value = if let Some(ref stored) = stored_param {
+            // Use shared validation helpers for constraint bypass prevention,
+            // scope override permission, and optimistic locking
+            validate_parameter_value(&param.value, &param, Some(stored))
                 .map_err(|e| anyhow::anyhow!("Parameter validation failed for '{id}': {e}"))?;
-
-            // Validate scope override permissions for non-global scopes
-            if !matches!(param.scope, ParameterScope::Global)
-                && !stored_param.constraints.allow_override
-            {
-                return Err(anyhow::anyhow!(
-                    "Parameter '{id}' does not allow scope overrides"
-                ));
-            }
-
-            // Optimistic locking: check version matches
-            if param.version != stored_param.version {
-                return Err(anyhow::anyhow!(
-                    "Concurrent modification detected for parameter '{id}': \
-                     expected version {}, found {}. Please retry.",
-                    param.version,
-                    stored_param.version
-                ));
-            }
+            validate_scope_override(&id, &param.scope, Some(stored))
+                .map_err(|e| anyhow::anyhow!("Parameter '{id}' scope validation failed: {e}"))?;
+            validate_version(&id, param.version, stored.version)?;
 
             // Increment version for the update
-            param.version = stored_param.version + 1;
-            Some(stored_param.value)
+            param.version = stored.version + 1;
+            Some(stored.value.clone())
         } else {
             // For new parameters (initial setup), validate against the parameter's own constraints
-            param
-                .validate(&param.value)
+            validate_parameter_value(&param.value, &param, None)
                 .map_err(|e| anyhow::anyhow!("Parameter validation failed for '{id}': {e}"))?;
             // New parameter starts at version 0
             param.version = 0;
@@ -1117,6 +1104,7 @@ impl ProtocolParameterStore for SledParameterStore {
         proposal_id: Option<String>,
         changed_by: Option<String>,
     ) -> Result<()> {
+        use crate::protocol_validation::{validate_parameter_value, validate_scope_override};
         use sled::transaction::ConflictableTransactionError;
 
         let id = param.id.clone();
@@ -1125,35 +1113,18 @@ impl ProtocolParameterStore for SledParameterStore {
         // Warn about unknown categories (non-blocking)
         warn_unknown_category(&id);
 
-        // For updates, validate against the STORED parameter's constraints (not the new one's)
-        // This prevents constraint bypass attacks where an attacker submits a parameter
-        // with modified constraints that allow any value
+        // Pre-validation for efficiency (additional verification happens inside transaction)
+        // Use shared validation helpers for constraint bypass prevention and scope override checks.
+        // NOTE: Version check is NOT done here - it must happen inside the transaction for atomicity.
         //
-        // NOTE: Pre-validation is done outside the transaction for efficiency with additional
-        // verification inside the transaction for safety:
         // - Constraints (including allow_override) are immutable once a parameter is created
         // - The transaction verifies version hasn't changed, which implicitly verifies constraints
         // - For scoped parameters, we explicitly verify allow_override inside the transaction
         let global_param = self.get(&id)?;
-        if let Some(ref stored_param) = global_param {
-            stored_param
-                .validate(&param.value)
-                .map_err(|e| anyhow::anyhow!("Parameter validation failed for '{id}': {e}"))?;
-
-            // Pre-check scope override permissions (will be re-verified inside transaction)
-            if !matches!(param.scope, ParameterScope::Global)
-                && !stored_param.constraints.allow_override
-            {
-                return Err(anyhow::anyhow!(
-                    "Parameter '{id}' does not allow scope overrides"
-                ));
-            }
-        } else {
-            // For new parameters (initial setup), validate against the parameter's own constraints
-            param
-                .validate(&param.value)
-                .map_err(|e| anyhow::anyhow!("Parameter validation failed for '{id}': {e}"))?;
-        }
+        validate_parameter_value(&param.value, &param, global_param.as_ref())
+            .map_err(|e| anyhow::anyhow!("Parameter validation failed for '{id}': {e}"))?;
+        validate_scope_override(&id, &param.scope, global_param.as_ref())
+            .map_err(|e| anyhow::anyhow!("Parameter '{id}' scope validation failed: {e}"))?;
 
         // Prepare the key for this parameter
         let is_scoped = !matches!(param.scope, ParameterScope::Global);
@@ -1211,7 +1182,18 @@ impl ProtocolParameterStore for SledParameterStore {
         let global_key = Self::param_key(&id);
         let global_key_clone = global_key.clone();
 
-        // Use transaction to atomically verify version, update parameter, and record history
+        // Use transaction to atomically verify version, update parameter, and record history.
+        //
+        // NOTE: Validation is intentionally duplicated between pre-validation (using shared helpers)
+        // and transaction validation (inline). This is NOT redundant - it's required for security:
+        //
+        // - Pre-validation (above): Catches most errors quickly, uses shared helpers for consistency
+        // - Transaction validation (below): Detects TOCTOU races where state changed between
+        //   pre-validation and transaction. CANNOT use shared helpers because Sled transactions
+        //   don't allow calling &self methods, and validation must happen atomically.
+        //
+        // The shared helpers ensure pre-validation logic stays consistent with InMemoryParameterStore.
+        // The transaction validation ensures atomic correctness for concurrent operations.
         self.db
             .transaction(|tx| {
                 // Read stored parameter INSIDE the transaction for atomic state check
