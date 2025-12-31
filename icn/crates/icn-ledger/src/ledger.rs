@@ -47,6 +47,11 @@ pub struct ForkStats {
 /// Key prefix for cached balances in storage
 const BALANCE_PREFIX: &str = "ledger:balance:";
 
+/// Threshold for logging warnings about suspiciously high exchange rates.
+/// Most major currency pairs range from 0.01 to ~150. Rates above this threshold
+/// may indicate oracle misconfiguration (decimal point errors, stale data, bugs).
+const SUSPICIOUS_RATE_THRESHOLD: f64 = 1000.0;
+
 /// Key prefix for cleared volume index (total credits received per account/currency)
 const CLEARED_VOLUME_PREFIX: &str = "ledger:cleared_volume:";
 
@@ -580,12 +585,8 @@ impl Ledger {
 
         // Convert amount using oracle rate
         let gross_target_amount = rate.convert(source_amount).ok_or_else(|| {
-            // Log a warning if overflow occurs with a suspiciously high rate.
-            // Threshold of 1000.0 catches potential oracle misconfigurations:
-            // - Most major currency pairs range from 0.01 to ~150
-            // - Rates above 1000.0 are rare even for exotic pairs
-            // - Common causes: decimal point errors, stale data, oracle bugs
-            if rate.rate > 1000.0 {
+            // Log a warning if overflow occurs with a suspiciously high rate
+            if rate.rate > SUSPICIOUS_RATE_THRESHOLD {
                 tracing::warn!(
                     rate = rate.rate,
                     source_amount = source_amount,
@@ -799,12 +800,8 @@ impl Ledger {
 
         // Convert amount using oracle rate
         let gross_target_amount = rate.convert(source_amount).ok_or_else(|| {
-            // Log a warning if overflow occurs with a suspiciously high rate.
-            // Threshold of 1000.0 catches potential oracle misconfigurations:
-            // - Most major currency pairs range from 0.01 to ~150
-            // - Rates above 1000.0 are rare even for exotic pairs
-            // - Common causes: decimal point errors, stale data, oracle bugs
-            if rate.rate > 1000.0 {
+            // Log a warning if overflow occurs with a suspiciously high rate
+            if rate.rate > SUSPICIOUS_RATE_THRESHOLD {
                 tracing::warn!(
                     rate = rate.rate,
                     source_amount = source_amount,
