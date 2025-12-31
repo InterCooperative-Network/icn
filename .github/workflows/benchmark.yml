@@ -67,7 +67,7 @@ jobs:
           path: baseline
 
       - name: Free disk space
-        uses: ./.github/actions/free-disk-space
+        uses: ./baseline/.github/actions/free-disk-space
 
       - uses: dtolnay/rust-toolchain@stable
 
