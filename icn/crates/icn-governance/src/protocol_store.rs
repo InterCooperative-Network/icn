@@ -498,7 +498,8 @@ impl ProtocolParameterStore for InMemoryParameterStore {
             // scope override permission, and optimistic locking
             validate_parameter_value(&param.value, &param, Some(stored))
                 .map_err(|e| anyhow::anyhow!("Parameter validation failed for '{id}': {e}"))?;
-            validate_scope_override(&id, &param.scope, Some(stored))?;
+            validate_scope_override(&id, &param.scope, Some(stored))
+                .map_err(|e| anyhow::anyhow!("Parameter '{id}' scope validation failed: {e}"))?;
             validate_version(&id, param.version, stored.version)?;
 
             // Increment version for the update
@@ -1122,7 +1123,8 @@ impl ProtocolParameterStore for SledParameterStore {
         let global_param = self.get(&id)?;
         validate_parameter_value(&param.value, &param, global_param.as_ref())
             .map_err(|e| anyhow::anyhow!("Parameter validation failed for '{id}': {e}"))?;
-        validate_scope_override(&id, &param.scope, global_param.as_ref())?;
+        validate_scope_override(&id, &param.scope, global_param.as_ref())
+            .map_err(|e| anyhow::anyhow!("Parameter '{id}' scope validation failed: {e}"))?;
 
         // Prepare the key for this parameter
         let is_scoped = !matches!(param.scope, ParameterScope::Global);
@@ -1180,7 +1182,18 @@ impl ProtocolParameterStore for SledParameterStore {
         let global_key = Self::param_key(&id);
         let global_key_clone = global_key.clone();
 
-        // Use transaction to atomically verify version, update parameter, and record history
+        // Use transaction to atomically verify version, update parameter, and record history.
+        //
+        // NOTE: Validation is intentionally duplicated between pre-validation (using shared helpers)
+        // and transaction validation (inline). This is NOT redundant - it's required for security:
+        //
+        // - Pre-validation (above): Catches most errors quickly, uses shared helpers for consistency
+        // - Transaction validation (below): Detects TOCTOU races where state changed between
+        //   pre-validation and transaction. CANNOT use shared helpers because Sled transactions
+        //   don't allow calling &self methods, and validation must happen atomically.
+        //
+        // The shared helpers ensure pre-validation logic stays consistent with InMemoryParameterStore.
+        // The transaction validation ensures atomic correctness for concurrent operations.
         self.db
             .transaction(|tx| {
                 // Read stored parameter INSIDE the transaction for atomic state check

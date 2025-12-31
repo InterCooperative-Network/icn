@@ -11,6 +11,16 @@
 //! 2. Scope override permission check
 //! 3. Version check (optimistic locking)
 //!
+//! # New vs. Existing Parameters
+//!
+//! Validation differs based on whether the parameter already exists:
+//!
+//! - **Existing parameter (update)**: Validates against the STORED parameter's constraints.
+//!   This prevents constraint bypass attacks where an attacker submits modified constraints.
+//!
+//! - **New parameter (create)**: Validates against the parameter's OWN constraints since
+//!   there is no stored version. New parameters start at version 0.
+//!
 //! # Security Considerations
 //!
 //! - **Constraint Bypass Prevention**: For updates, we validate against the STORED
