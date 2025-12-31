@@ -58,6 +58,8 @@ pub mod protocol_defaults;
 #[allow(missing_docs)]
 pub mod protocol_store;
 #[allow(missing_docs)]
+pub mod protocol_validation;
+#[allow(missing_docs)]
 pub mod resolver;
 #[allow(missing_docs)]
 pub mod sdis;
@@ -131,6 +133,9 @@ pub use protocol::{
 pub use protocol_defaults::{default_parameters, get_default_parameter, ParameterCategory};
 pub use protocol_store::{
     InMemoryParameterStore, ParameterStoreError, ProtocolParameterStore, SledParameterStore,
+};
+pub use protocol_validation::{
+    validate_parameter_update, validate_parameter_value, validate_scope_override, validate_version,
 };
 
 // Orphan cleanup types (Phase 21)
