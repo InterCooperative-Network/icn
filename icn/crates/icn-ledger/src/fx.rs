@@ -14,7 +14,8 @@
 //! | `ORACLE_NOT_CONFIGURED` | 500 | Exchange rate oracle not set up |
 //! | `SAME_CURRENCY` | 400 | Same currency specified for source and target |
 //! | `RATE_NOT_AVAILABLE` | 404 | No exchange rate available for currency pair |
-//! | `STALE_RATE` | 400 | Rate is stale and stale rates are not allowed |
+//! | `STALE_RATE` | 400 | Rate is stale (oracle-based check) |
+//! | `STALE_RATE_AGE` | 400 | Rate age exceeds configured maximum |
 //! | `SLIPPAGE_EXCEEDED` | 400 | Converted amount exceeds max_target_amount |
 //! | `RATE_EXPIRED` | 400 | Prepared transfer expired before execution |
 //! | `INVALID_AMOUNT` | 400 | Amount is invalid or cannot be processed |
@@ -90,11 +91,15 @@ pub struct FxConfig {
     /// this percentage, the transfer is rejected.
     pub max_slippage_basis_points: u16,
 
-    /// Whether to accept stale rates from the oracle
+    /// Maximum acceptable rate age in seconds
     ///
-    /// If false (default), transfers with stale rates are rejected.
-    /// If true, stale rates are used with a warning in the details.
-    pub allow_stale_rates: bool,
+    /// Controls how old an exchange rate can be before it's rejected:
+    /// - `Some(n)`: Reject rates older than n seconds
+    /// - `None`: Fall back to oracle's `is_stale` flag (24-hour threshold)
+    ///
+    /// Default is `Some(60)` (1 minute) for user-facing operations.
+    /// Use `None` for batch operations where oracle staleness is sufficient.
+    pub max_rate_age_secs: Option<u64>,
 }
 
 impl Default for FxConfig {
@@ -114,7 +119,7 @@ impl Default for FxConfig {
             treasury_did: None,
             clearing_did: placeholder_clearing,
             max_slippage_basis_points: 100,
-            allow_stale_rates: false,
+            max_rate_age_secs: Some(60), // 1 minute default
         }
     }
 }
@@ -146,9 +151,19 @@ impl FxConfig {
         self
     }
 
-    /// Allow stale rates from oracle
+    /// Set maximum acceptable rate age in seconds
+    ///
+    /// Use `None` to fall back to oracle's staleness check.
+    pub fn with_max_rate_age(mut self, max_age_secs: Option<u64>) -> Self {
+        self.max_rate_age_secs = max_age_secs;
+        self
+    }
+
+    /// Allow any rate age (use oracle's staleness check only)
+    ///
+    /// Equivalent to `with_max_rate_age(None)`.
     pub fn allow_stale(mut self) -> Self {
-        self.allow_stale_rates = true;
+        self.max_rate_age_secs = None;
         self
     }
 
@@ -407,9 +422,18 @@ pub enum FxError {
         reason: String,
     },
 
-    /// Rate is stale and stale rates are not allowed
-    #[error("Exchange rate is stale for {from}/{to}; set allow_stale_rates=true to accept")]
+    /// Rate is stale (oracle-based check)
+    #[error("Exchange rate is stale for {from}/{to}; use allow_stale() or set max_rate_age_secs")]
     StaleRate { from: String, to: String },
+
+    /// Rate age exceeds configured maximum
+    #[error("Exchange rate too old for {from}/{to}: age {age_secs}s exceeds max {max_age_secs}s")]
+    StaleRateAge {
+        from: String,
+        to: String,
+        age_secs: u64,
+        max_age_secs: u64,
+    },
 
     /// Slippage exceeded
     #[error("Slippage exceeded: expected {expected}, got {actual} (max {max_slippage_bps} bps)")]
@@ -450,6 +474,7 @@ impl FxError {
             FxError::SameCurrency(_) => "SAME_CURRENCY",
             FxError::RateNotAvailable { .. } => "RATE_NOT_AVAILABLE",
             FxError::StaleRate { .. } => "STALE_RATE",
+            FxError::StaleRateAge { .. } => "STALE_RATE_AGE",
             FxError::SlippageExceeded { .. } => "SLIPPAGE_EXCEEDED",
             FxError::TransferExpired { .. } => "RATE_EXPIRED",
             FxError::InvalidAmount(_) => "INVALID_AMOUNT",
@@ -466,6 +491,7 @@ impl FxError {
             FxError::SameCurrency(_)
                 | FxError::SlippageExceeded { .. }
                 | FxError::StaleRate { .. }
+                | FxError::StaleRateAge { .. }
                 | FxError::TransferExpired { .. }
                 | FxError::InvalidAmount(_)
                 | FxError::ConversionOverflow { .. }
@@ -501,7 +527,7 @@ mod tests {
         assert_eq!(config.fee_basis_points, 0);
         assert_eq!(config.max_fee_basis_points, 500);
         assert_eq!(config.max_slippage_basis_points, 100);
-        assert!(!config.allow_stale_rates);
+        assert_eq!(config.max_rate_age_secs, Some(60)); // 1 minute default
         assert!(config.treasury_did.is_none());
     }
 
@@ -519,6 +545,27 @@ mod tests {
         assert_eq!(config.max_slippage_basis_points, 200);
         assert_eq!(config.clearing_did, clearing);
         assert_eq!(config.treasury_did, Some(treasury));
+    }
+
+    #[test]
+    fn test_max_rate_age_configuration() {
+        let clearing = test_clearing_did();
+
+        // Default has 60s max age
+        let config = FxConfig::new(clearing.clone());
+        assert_eq!(config.max_rate_age_secs, Some(60));
+
+        // Custom max age
+        let config = FxConfig::new(clearing.clone()).with_max_rate_age(Some(300));
+        assert_eq!(config.max_rate_age_secs, Some(300));
+
+        // Disable age checking with None
+        let config = FxConfig::new(clearing.clone()).with_max_rate_age(None);
+        assert_eq!(config.max_rate_age_secs, None);
+
+        // allow_stale() disables age checking
+        let config = FxConfig::new(clearing).allow_stale();
+        assert_eq!(config.max_rate_age_secs, None);
     }
 
     #[test]
@@ -745,6 +792,16 @@ mod tests {
             "STALE_RATE"
         );
         assert_eq!(
+            FxError::StaleRateAge {
+                from: "A".to_string(),
+                to: "B".to_string(),
+                age_secs: 120,
+                max_age_secs: 60,
+            }
+            .error_code(),
+            "STALE_RATE_AGE"
+        );
+        assert_eq!(
             FxError::SlippageExceeded {
                 expected: 100,
                 actual: 110,
@@ -789,6 +846,13 @@ mod tests {
         assert!(FxError::StaleRate {
             from: "A".to_string(),
             to: "B".to_string()
+        }
+        .is_client_error());
+        assert!(FxError::StaleRateAge {
+            from: "A".to_string(),
+            to: "B".to_string(),
+            age_secs: 120,
+            max_age_secs: 60,
         }
         .is_client_error());
         assert!(FxError::TransferExpired {
