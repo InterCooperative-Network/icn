@@ -684,11 +684,14 @@ export class ICNClient {
    *
    * @throws {ValidationError} If amount <= 0, currencies are invalid, or same currency used
    * @throws {AuthorizationError} If authenticated DID doesn't match the sender
-   * @throws {ICNError} For FX-related errors including:
+   * @throws {ICNError} For FX-related error conditions including:
    *   - Slippage exceeded (converted amount > max_target_amount)
    *   - Stale exchange rate (when stale rates are not allowed)
    *   - Rate expired (prepared transfer expired before execution)
    *   - Budget exceeded or insufficient balance
+   *
+   *   Note: FX errors are currently wrapped as internal server errors by the gateway.
+   *   Check the error message for specific failure details.
    *
    * @example
    * ```typescript
@@ -733,7 +736,8 @@ export class ICNClient {
    * @returns Promise resolving to the quote with rate, fees, and validity info
    *
    * @throws {ValidationError} If amount <= 0, currencies are invalid, or same currency used
-   * @throws {ICNError} If exchange rate oracle is not configured or no rate exists for the currency pair
+   * @throws {ICNError} If exchange rate oracle is not configured or no rate exists for the currency pair.
+   *   Note: These conditions are currently wrapped as internal server errors by the gateway.
    *
    * @example
    * ```typescript

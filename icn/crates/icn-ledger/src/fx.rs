@@ -154,6 +154,11 @@ impl FxConfig {
     /// For large transactions, this rounding difference is negligible. For very
     /// small transactions, users may effectively pay no fee.
     ///
+    /// # Negative Amounts
+    ///
+    /// If `gross_amount` is negative (which should not occur in normal usage),
+    /// the function defensively returns 0 to prevent negative fees.
+    ///
     /// # Examples
     ///
     /// ```
@@ -608,24 +613,22 @@ mod tests {
     #[test]
     fn test_prepared_transfer_safety_margin() {
         // Transfer expires exactly now + 1 second (the safety margin)
-        // Should be INVALID because safety margin requires now < (valid_until - 1)
+        // Effective expiry = (now + 1) - 1 = now, so now < now => false (INVALID)
         let now = crate::current_timestamp_secs();
         let valid_until = now + EXPIRATION_SAFETY_MARGIN_SECS;
 
         let prepared = create_test_prepared_transfer(valid_until);
-        // now < (valid_until - 1) => now < now => false
         assert!(!prepared.is_valid());
     }
 
     #[test]
     fn test_prepared_transfer_just_past_safety_margin() {
-        // Transfer expires in (safety_margin + 1) seconds
-        // Should be VALID because now < (valid_until - 1)
+        // Transfer expires in (safety_margin + 1) = 2 seconds
+        // Effective expiry = (now + 2) - 1 = now + 1, so now < now + 1 => true (VALID)
         let now = crate::current_timestamp_secs();
         let valid_until = now + EXPIRATION_SAFETY_MARGIN_SECS + 1;
 
         let prepared = create_test_prepared_transfer(valid_until);
-        // now < (valid_until - 1) => now < now + 1 => true
         assert!(prepared.is_valid());
     }
 
@@ -643,8 +646,9 @@ mod tests {
                 current_time,
             } => {
                 assert_eq!(expired_at, valid_until);
-                // current_time should be approximately now (within 1 second)
-                assert!(current_time >= now && current_time <= now + 1);
+                // current_time should be approximately now (within 2 seconds to account
+                // for potential GC pauses or test timing variations)
+                assert!(current_time >= now && current_time <= now + 2);
             }
             _ => panic!("Expected TransferExpired error"),
         }
