@@ -653,10 +653,22 @@ mod tests {
             steward_did: test_did(),
         };
 
-        // Just verify serialization works
-        let _ = serde_json::to_string(&anchor_target).unwrap();
-        let _ = serde_json::to_string(&keybundle_target).unwrap();
-        let _ = serde_json::to_string(&attestation_target).unwrap();
-        let _ = serde_json::to_string(&steward_target).unwrap();
+        // Verify all variants serialize successfully
+        assert!(
+            serde_json::to_string(&anchor_target).is_ok(),
+            "Anchor variant should serialize"
+        );
+        assert!(
+            serde_json::to_string(&keybundle_target).is_ok(),
+            "KeyBundle variant should serialize"
+        );
+        assert!(
+            serde_json::to_string(&attestation_target).is_ok(),
+            "Attestation variant should serialize"
+        );
+        assert!(
+            serde_json::to_string(&steward_target).is_ok(),
+            "StewardStatus variant should serialize"
+        );
     }
 }
