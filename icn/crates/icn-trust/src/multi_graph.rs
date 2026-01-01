@@ -159,37 +159,86 @@ impl MultiTrustGraph {
     /// followed by economic (30%) and technical (20%).
     pub const COMBINED_WEIGHTS: (f64, f64, f64) = (0.5, 0.3, 0.2);
 
+    /// Fallback score used when trust computation fails
+    ///
+    /// This is set to 0.05 (slightly above Banned threshold of 0.0) to indicate
+    /// "unknown due to error" rather than "explicitly untrusted". This prevents
+    /// storage errors from causing legitimate peers to appear banned.
+    pub const ERROR_FALLBACK_SCORE: f64 = 0.05;
+
     /// Compute a combined trust score across all three graphs
     ///
     /// This provides backward compatibility for consumers that haven't
     /// migrated to typed access yet. The combined score is a weighted
     /// average: 50% social + 30% economic + 20% technical.
     ///
+    /// **Error Handling**: If any graph fails to compute (e.g., storage error),
+    /// that graph's contribution uses `ERROR_FALLBACK_SCORE` (0.05) and the error
+    /// is logged. This ensures storage failures don't cause legitimate peers
+    /// to appear untrusted (0.0), while still indicating degraded confidence.
+    ///
     /// **Note**: New code should prefer typed access via `graph()` for
     /// domain-appropriate scoring.
     pub fn compute_combined_trust_score(&self, target: &Did) -> Result<f64> {
-        // Issue #181: Track computation errors while still providing fallback scores
+        let mut errors_occurred = false;
+
+        // Compute social trust with error fallback
         let social = match self.social.compute_trust_score(target) {
             Ok(score) => score,
-            Err(_) => {
+            Err(e) => {
+                tracing::warn!(
+                    target = %target,
+                    graph = "social",
+                    error = %e,
+                    "Trust computation failed, using fallback score"
+                );
                 icn_obs::metrics::trust::computation_errors_inc();
-                0.0
+                errors_occurred = true;
+                Self::ERROR_FALLBACK_SCORE
             }
         };
+
+        // Compute economic trust with error fallback
         let economic = match self.economic.compute_trust_score(target) {
             Ok(score) => score,
-            Err(_) => {
+            Err(e) => {
+                tracing::warn!(
+                    target = %target,
+                    graph = "economic",
+                    error = %e,
+                    "Trust computation failed, using fallback score"
+                );
                 icn_obs::metrics::trust::computation_errors_inc();
-                0.0
+                errors_occurred = true;
+                Self::ERROR_FALLBACK_SCORE
             }
         };
+
+        // Compute technical trust with error fallback
         let technical = match self.technical.compute_trust_score(target) {
             Ok(score) => score,
-            Err(_) => {
+            Err(e) => {
+                tracing::warn!(
+                    target = %target,
+                    graph = "technical",
+                    error = %e,
+                    "Trust computation failed, using fallback score"
+                );
                 icn_obs::metrics::trust::computation_errors_inc();
-                0.0
+                errors_occurred = true;
+                Self::ERROR_FALLBACK_SCORE
             }
         };
+
+        if errors_occurred {
+            tracing::debug!(
+                target = %target,
+                social = social,
+                economic = economic,
+                technical = technical,
+                "Combined trust score computed with fallback values"
+            );
+        }
 
         let (sw, ew, tw) = Self::COMBINED_WEIGHTS;
         Ok((social * sw + economic * ew + technical * tw).min(1.0))

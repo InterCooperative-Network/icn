@@ -27,6 +27,7 @@ pub type CandidateCache = Arc<icn_net::CandidateCache>;
 pub type FederationGossipHandle = Arc<icn_federation::FederationGossipHandler>;
 pub type AttestationRateLimiterHandle = Arc<crate::trust_propagation::AttestationRateLimiter>;
 pub type ContractRegistryHolder = Arc<RwLock<Option<icn_ccl::ContractRegistryHandle>>>;
+pub type CommunityStoreHandle = Arc<icn_community::CommunityStore>;
 
 /// Dependencies required for notification callback handlers
 #[derive(Clone)]
@@ -59,6 +60,8 @@ pub struct NotificationDeps {
     pub profile_cache: ProfileCache,
     /// Cooperative store
     pub coop_store: Arc<icn_coop::CoopStore>,
+    /// Community store for civic engine sync
+    pub community_store: CommunityStoreHandle,
     /// Optional federation handler
     pub federation_handler: Option<FederationGossipHandle>,
     /// Rate limiter for trust attestations
@@ -679,6 +682,76 @@ pub async fn handle_coop_update(entry_data: Vec<u8>, coop_store: Arc<icn_coop::C
     }
 }
 
+/// Handle community update entries from gossip
+///
+/// Uses last-write-wins merge strategy based on `updated_at` timestamp.
+pub async fn handle_community_update(entry_data: Vec<u8>, community_store: CommunityStoreHandle) {
+    match bincode::serde::decode_from_slice::<icn_community::Community, _>(
+        &entry_data,
+        bincode::config::legacy(),
+    )
+    .map(|(v, _)| v)
+    {
+        Ok(remote_community) => {
+            // Check for existing community and use last-write-wins merge
+            match community_store.get(&remote_community.id) {
+                Ok(Some(local_community)) => {
+                    // Only update if remote is newer
+                    if remote_community.updated_at > local_community.updated_at {
+                        if let Err(e) = community_store.put(&remote_community) {
+                            warn!(
+                                community_id = %remote_community.id,
+                                error = %e,
+                                "Failed to merge community from gossip"
+                            );
+                        } else {
+                            debug!(
+                                community_id = %remote_community.id,
+                                community_name = %remote_community.name,
+                                "Merged newer community state from gossip"
+                            );
+                        }
+                    } else {
+                        debug!(
+                            community_id = %remote_community.id,
+                            "Ignoring older community state from gossip"
+                        );
+                    }
+                }
+                Ok(None) => {
+                    // New community, save it
+                    if let Err(e) = community_store.put(&remote_community) {
+                        warn!(
+                            community_id = %remote_community.id,
+                            error = %e,
+                            "Failed to save new community from gossip"
+                        );
+                    } else {
+                        info!(
+                            community_id = %remote_community.id,
+                            community_name = %remote_community.name,
+                            "Synced new community from gossip"
+                        );
+                    }
+                }
+                Err(e) => {
+                    warn!(
+                        community_id = %remote_community.id,
+                        error = %e,
+                        "Failed to check existing community for merge"
+                    );
+                }
+            }
+        }
+        Err(e) => {
+            warn!(
+                error = %e,
+                "Failed to deserialize community from gossip"
+            );
+        }
+    }
+}
+
 /// Handle federation topic messages
 pub async fn handle_federation_message(
     topic: &str,
@@ -789,6 +862,13 @@ pub fn create_notification_callback(
                 let coop_store = deps.coop_store.clone();
                 tokio::spawn(async move {
                     handle_coop_update(data, coop_store).await;
+                });
+            }
+        } else if topic == icn_community::COMMUNITY_TOPIC {
+            if let Some(data) = entry_data {
+                let community_store = deps.community_store.clone();
+                tokio::spawn(async move {
+                    handle_community_update(data, community_store).await;
                 });
             }
         } else if topic == icn_federation::TOPIC_FEDERATION_REGISTRY

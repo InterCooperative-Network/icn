@@ -117,18 +117,18 @@ impl CompressedVectorClock {
 
     /// Compress a vector clock using median as baseline
     pub fn from_vector_clock(clock: &VectorClock) -> Self {
-        if clock.clock.is_empty() {
+        if clock.is_empty() {
             return CompressedVectorClock::new(0);
         }
 
         // Calculate baseline as median of all values
-        let mut values: Vec<u64> = clock.clock.values().copied().collect();
+        let mut values: Vec<u64> = clock.values().collect();
         values.sort_unstable();
         let baseline_version = values[values.len() / 2];
 
         // Calculate deltas from baseline
         let mut deltas = HashMap::new();
-        for (did, &version) in &clock.clock {
+        for (did, version) in clock.iter() {
             let delta = version as i64 - baseline_version as i64;
             if delta != 0 {
                 deltas.insert(did.clone(), delta);
@@ -153,7 +153,7 @@ impl CompressedVectorClock {
             };
 
             // Insert all peers, even with version 0 (fixes roundtrip consistency)
-            clock.clock.insert(peer.clone(), version);
+            clock.insert(peer.clone(), version);
         }
 
         clock
@@ -611,11 +611,11 @@ mod tests {
         // Create clock where some peers have version 0
         let mut original = VectorClock::new();
         // peer1 stays at 0 (never incremented)
-        original.clock.insert(peer1.clone(), 0);
+        original.insert(peer1.clone(), 0);
         // peer2 at version 0 (explicitly set)
-        original.clock.insert(peer2.clone(), 0);
+        original.insert(peer2.clone(), 0);
         // peer3 at version 0
-        original.clock.insert(peer3.clone(), 0);
+        original.insert(peer3.clone(), 0);
 
         // Compress (baseline should be 0, median of [0, 0, 0])
         let compressed = CompressedVectorClock::from_vector_clock(&original);
@@ -629,7 +629,7 @@ mod tests {
         assert_eq!(decompressed.get(&peer1), 0, "peer1 should have version 0");
         assert_eq!(decompressed.get(&peer2), 0, "peer2 should have version 0");
         assert_eq!(decompressed.get(&peer3), 0, "peer3 should have version 0");
-        assert_eq!(decompressed.clock.len(), 3, "all 3 peers should be present");
+        assert_eq!(decompressed.len(), 3, "all 3 peers should be present");
     }
 
     #[test]
@@ -640,9 +640,9 @@ mod tests {
         let peer3 = make_test_did();
 
         let mut original = VectorClock::new();
-        original.clock.insert(peer1.clone(), 0); // At baseline
-        original.clock.insert(peer2.clone(), 0); // At baseline
-        original.clock.insert(peer3.clone(), 5); // Above baseline
+        original.insert(peer1.clone(), 0); // At baseline
+        original.insert(peer2.clone(), 0); // At baseline
+        original.insert(peer3.clone(), 5); // Above baseline
 
         // Compress (baseline should be 0, median of [0, 0, 5])
         let compressed = CompressedVectorClock::from_vector_clock(&original);
@@ -656,7 +656,7 @@ mod tests {
         assert_eq!(decompressed.get(&peer1), 0, "peer1 should have version 0");
         assert_eq!(decompressed.get(&peer2), 0, "peer2 should have version 0");
         assert_eq!(decompressed.get(&peer3), 5, "peer3 should have version 5");
-        assert_eq!(decompressed.clock.len(), 3, "all 3 peers should be present");
+        assert_eq!(decompressed.len(), 3, "all 3 peers should be present");
     }
 
     #[test]

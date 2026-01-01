@@ -195,8 +195,8 @@ mod tests {
     fn make_param(id: &str, value: i64, version: u64, allow_override: bool) -> ProtocolParameter {
         ProtocolParameter {
             id: id.to_string(),
-            name: format!("{} Name", id),
-            description: format!("{} Description", id),
+            name: format!("{id} Name"),
+            description: format!("{id} Description"),
             value: ParameterValue::Integer(value),
             constraints: ParameterConstraints {
                 min: Some(ParameterValue::Integer(0)),

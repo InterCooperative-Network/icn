@@ -318,7 +318,7 @@ impl GossipActor {
         }
 
         // Collect all peers from vector clock (they've sent us messages)
-        for did in self.clock.clock.keys() {
+        for did in self.clock.keys() {
             peers.insert(did.clone());
         }
 
@@ -1294,9 +1294,8 @@ impl GossipActor {
         // Export vector clock
         let vector_clock: std::collections::HashMap<String, u64> = self
             .clock
-            .clock
             .iter()
-            .map(|(did, count)| (did.to_string(), *count))
+            .map(|(did, count)| (did.to_string(), count))
             .collect();
 
         // Export subscriptions
@@ -1363,10 +1362,10 @@ impl GossipActor {
         );
 
         // Restore vector clock
-        self.clock.clock.clear();
+        self.clock.clear();
         for (did_str, count) in state.vector_clock {
             let did = Did::from_str(&did_str).context("Failed to parse DID from vector clock")?;
-            self.clock.clock.insert(did, count);
+            self.clock.insert(did, count);
         }
 
         // Restore topic metadata (must happen before restoring subscriptions)

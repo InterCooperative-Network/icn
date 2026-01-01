@@ -56,13 +56,8 @@ pub async fn init_community_services(
 
     // Subscribe to gossip topic for distributed community updates
     // This allows communities created on one node to sync to others
-    //
-    // TODO(Phase 2): Implement gossip notification handler to process incoming
-    // community updates from other nodes. The handler should:
-    // 1. Deserialize incoming Community updates
-    // 2. Merge with local store (last-write-wins based on updated_at)
-    // 3. Handle conflicts for concurrent member operations
-    // See icn-coop/src/gossip.rs for the cooperative sync pattern
+    // Note: Incoming updates are processed by the notification callback in
+    // init_notifications.rs which uses last-write-wins merge strategy.
     {
         let mut gossip = gossip_handle.write().await;
         if let Err(e) = gossip.subscribe(COMMUNITY_TOPIC, node_did) {
