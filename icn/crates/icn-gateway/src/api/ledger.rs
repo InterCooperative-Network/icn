@@ -235,41 +235,49 @@ pub async fn get_history(
         .unwrap_or(DEFAULT_PAGE_SIZE)
         .clamp(1, MAX_PAGE_SIZE);
 
-    // Decode cursor if provided
+    // Decode cursor to get timestamp for continuation
     let decoded_cursor = cursor.as_ref().and_then(|c| Cursor::decode(c));
+    let cursor_ts = decoded_cursor.as_ref().map(|c| c.ts);
 
-    // Determine starting offset for cursor-based pagination
-    // For now, we fall back to loading all data and filtering in memory
-    // TODO: Update icn-ledger to support native cursor-based queries
-    let offset: usize = if decoded_cursor.is_some() {
-        // When using cursor, we need to load enough data to find the cursor position
-        0
-    } else {
-        query
-            .get("offset")
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(0)
-    };
+    // For legacy offset-based pagination, we still need to support it
+    let offset: usize = query
+        .get("offset")
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0);
 
     // Validate pagination parameters
-    // SECURITY: Validate offset to prevent integer overflow in pagination arithmetic
-    let offset = validation::validate_history_offset(offset)?;
     let validated_limit = validation::validate_history_limit(limit)?;
-
-    // Request one extra to determine if there are more items
-    let fetch_limit = if decoded_cursor.is_some() {
-        validation::MAX_HISTORY_LIMIT // Need more for cursor-based
-    } else {
-        validated_limit + 1
-    };
-
-    let entries = ledger_mgr.get_history(&coop_id, filter_did.as_ref(), offset, fetch_limit)?;
 
     // Track history query
     gateway::history_queries_inc();
 
+    // Use memory-efficient paginated query
+    // This streams entries and stops after collecting enough, never loading all into memory
+    let (entries, next_cursor_ts) = if cursor_ts.is_some() || filter_did.is_some() {
+        // Use the new streaming pagination for cursor-based or filtered queries
+        ledger_mgr.get_history_paginated(
+            &coop_id,
+            filter_did.as_ref(),
+            cursor_ts,
+            validated_limit,
+        )?
+    } else {
+        // For simple offset-based queries without filters, use the offset method
+        let offset = validation::validate_history_offset(offset)?;
+        let entries =
+            ledger_mgr.get_history(&coop_id, filter_did.as_ref(), offset, validated_limit + 1)?;
+        let has_more = entries.len() > validated_limit;
+        let entries: Vec<_> = entries.into_iter().take(validated_limit).collect();
+        let next_ts = if has_more {
+            entries.last().map(|e| e.timestamp)
+        } else {
+            None
+        };
+        (entries, next_ts)
+    };
+
     // Convert to response format
-    let mut history: Vec<TransactionHistoryEntry> = entries
+    let history: Vec<TransactionHistoryEntry> = entries
         .into_iter()
         .map(|entry| {
             let accounts: Vec<AccountDeltaResponse> = entry
@@ -292,78 +300,33 @@ pub async fn get_history(
         })
         .collect();
 
-    // Apply cursor-based pagination if cursor provided
-    let (page_transactions, pagination) = if let Some(ref cur) = decoded_cursor {
-        // Find the position after the cursor
-        let start_idx = history
-            .iter()
-            .position(|tx| tx.timestamp < cur.ts || (tx.timestamp == cur.ts && tx.id <= cur.id))
-            .unwrap_or(history.len());
-
-        // Get page items
-        let page: Vec<TransactionHistoryEntry> = history
-            .iter()
-            .skip(start_idx)
-            .take(limit)
-            .cloned()
-            .collect();
-
-        let has_more = start_idx + limit < history.len();
-
-        // Build next cursor from last item
-        let next_cursor = if has_more {
-            page.last()
-                .map(|tx| Cursor::from_seconds(tx.timestamp, &tx.id).encode())
-        } else {
-            None
-        };
-
-        // Build prev cursor
-        let prev_cursor = if start_idx > 0 {
-            history
-                .get(start_idx.saturating_sub(1))
-                .map(|tx| Cursor::from_seconds(tx.timestamp, &tx.id).encode())
-        } else {
-            None
-        };
-
-        let count = page.len();
-        (
-            page,
-            PaginationInfo::cursor_based(next_cursor, prev_cursor, count, has_more, limit),
-        )
+    // Build pagination info
+    let has_more = next_cursor_ts.is_some();
+    let next_cursor = if let Some(ts) = next_cursor_ts {
+        history
+            .last()
+            .map(|tx| Cursor::from_seconds(ts, &tx.id).encode())
     } else {
-        // Offset-based pagination (legacy mode)
-        let has_more = history.len() > validated_limit;
-        if has_more {
-            history.pop(); // Remove the extra item we fetched
-        }
+        None
+    };
 
-        // Generate cursor for next page if there are more items
-        let next_cursor = if has_more {
-            history
-                .last()
-                .map(|tx| Cursor::from_seconds(tx.timestamp, &tx.id).encode())
+    let count = history.len();
+    let pagination = PaginationInfo {
+        total: None, // Total not efficiently available for filtered queries
+        next_cursor,
+        prev_cursor: None, // Prev cursor requires storing state, not supported
+        count,
+        has_more,
+        offset: if cursor_ts.is_none() {
+            Some(offset)
         } else {
             None
-        };
-
-        let count = history.len();
-        let pagination = PaginationInfo {
-            total: None, // Total not efficiently available
-            next_cursor,
-            prev_cursor: None,
-            count,
-            has_more,
-            offset: Some(offset),
-            limit: validated_limit,
-        };
-
-        (history, pagination)
+        },
+        limit: validated_limit,
     };
 
     let response = TransactionHistoryResponse {
-        transactions: page_transactions,
+        transactions: history,
         pagination,
     };
 

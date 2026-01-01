@@ -117,7 +117,7 @@ pub use steward::{
     StewardContact, StewardId, StewardRecord, StewardStatus,
 };
 pub use steward_store::{InMemoryStewardStore, StewardStore, StewardStoreBackend};
-pub use store::{GovernanceStore, InMemoryGovernanceStore};
+pub use store::{GovernanceStore, InMemoryGovernanceStore, PaginatedResult};
 pub use tally::{
     compute_detailed_tally_with_delegations, compute_tally_with_delegations, DelegatedTallyResult,
     VoteTally,

@@ -268,6 +268,36 @@ impl LedgerManager {
         Ok(entries[offset..end].to_vec())
     }
 
+    /// Get history with cursor-based pagination (memory efficient)
+    ///
+    /// Unlike `get_history`, this method uses streaming pagination and never loads
+    /// all entries into memory. Use this for filtered queries on large ledgers.
+    ///
+    /// # Arguments
+    /// * `coop_id` - Cooperative ID
+    /// * `filter_did` - Optional DID to filter transactions by
+    /// * `cursor_ts` - Optional timestamp to continue from (exclusive)
+    /// * `limit` - Maximum entries to return
+    ///
+    /// # Returns
+    /// Tuple of (entries, next_cursor_timestamp)
+    pub fn get_history_paginated(
+        &self,
+        coop_id: &CoopId,
+        filter_did: Option<&Did>,
+        cursor_ts: Option<u64>,
+        limit: usize,
+    ) -> Result<(Vec<icn_ledger::JournalEntry>, Option<u64>)> {
+        let ledger_arc = self.get_ledger(coop_id)?;
+        let ledger = ledger_arc
+            .read()
+            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
+
+        ledger
+            .get_entries_filtered_paginated(filter_did, cursor_ts, limit)
+            .map_err(GatewayError::SubstrateError)
+    }
+
     /// Get aggregate transaction statistics for a cooperative
     ///
     /// Returns (transaction_count, total_hours_exchanged) for public stats display.

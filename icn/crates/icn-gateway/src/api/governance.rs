@@ -156,9 +156,38 @@ pub async fn list_domains(
         .validate_filters()
         .map_err(crate::error::GatewayError::BadRequest)?;
 
-    // TODO(performance): Currently loads all domains into memory for filtering/sorting.
-    // For large deployments, consider pushing filtering/sorting to storage layer.
-    // See: https://github.com/InterCooperative-Network/icn/issues/322#performance
+    let has_filters = query.filter("name").is_some();
+    let has_custom_sort = !query.sort_fields().is_empty();
+    let limit = query.limit;
+
+    // Optimization: Use storage-layer pagination when no filters or custom sorting.
+    // This avoids loading all domains into memory for the common case.
+    if !has_filters && !has_custom_sort {
+        let result = gov_mgr
+            .list_domains_paginated(query.cursor.as_deref(), limit)
+            .await?;
+
+        // Sort by name (default) - domains are returned in storage order
+        let mut paginated = result.items;
+        paginated.sort_by(|a, b| a.name.cmp(&b.name));
+
+        let count = paginated.len();
+        let total = result.total.unwrap_or(count);
+        let has_more = result.next_cursor.is_some();
+
+        let pagination = if has_more {
+            ListPagination::with_cursor(result.next_cursor.unwrap_or_default(), count)
+                .with_total(total)
+        } else {
+            ListPagination::last_page(count).with_total(total)
+        };
+
+        let response: ListResponse<_> = ListResponse::new(paginated, pagination);
+        return Ok(HttpResponse::Ok().json(response));
+    }
+
+    // Fallback: Load all domains for filtering/sorting
+    // This is required when filters or custom sorting are applied.
     let mut domains = gov_mgr.list_domains().await?;
 
     // Apply filters
@@ -206,7 +235,6 @@ pub async fn list_domains(
     }
 
     // Apply pagination
-    let limit = query.limit;
     let total = domains.len();
 
     // Parse cursor to get offset (format: "offset:<number>")

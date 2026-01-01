@@ -20,8 +20,8 @@ use icn_governance::{
     scopes_overlap, Comment, CommentId, Delegation, DelegationId, DelegationScope, Discussion,
     DiscussionStore, GovernanceConfig, GovernanceDomain, GovernanceDomainId, GovernanceOps,
     GovernanceParams, GovernanceProfileId, InMemoryDiscussionStore, MembershipConfig,
-    MembershipSource, Proposal, ProposalDomainLookup, ProposalId, ProposalPayload, ProposalState,
-    Timestamp, Vote, VoteChoice, VoteTally, DEFAULT_MAX_DELEGATION_DEPTH,
+    MembershipSource, PaginatedResult, Proposal, ProposalDomainLookup, ProposalId, ProposalPayload,
+    ProposalState, Timestamp, Vote, VoteChoice, VoteTally, DEFAULT_MAX_DELEGATION_DEPTH,
 };
 use icn_identity::Did;
 use std::collections::{HashMap, HashSet};
@@ -181,6 +181,57 @@ impl GovernanceManager {
             anyhow::anyhow!("Domains storage lock poisoned (concurrent panic?): {e}")
         })?;
         Ok(domains.values().cloned().collect())
+    }
+
+    /// List governance domains with pagination
+    ///
+    /// Returns a page of domains. Use this for large datasets to avoid
+    /// loading all domains into memory at once.
+    ///
+    /// # Arguments
+    /// * `cursor` - Optional cursor from a previous page
+    /// * `limit` - Maximum number of items to return
+    pub async fn list_domains_paginated(
+        &self,
+        cursor: Option<&str>,
+        limit: usize,
+    ) -> Result<PaginatedResult<GovernanceDomain>> {
+        if let Some(ref handle) = self.governance_handle {
+            // Actor-backed mode: delegate to GovernanceActor
+            return handle.list_domains_paginated(cursor, limit).await;
+        }
+
+        // Standalone mode: in-memory storage with offset-based pagination
+        let domains = self.domains.read().map_err(|e| {
+            anyhow::anyhow!("Domains storage lock poisoned (concurrent panic?): {e}")
+        })?;
+
+        // Parse cursor as offset (format: "offset:<number>")
+        let offset: usize = cursor
+            .and_then(|c| c.strip_prefix("offset:"))
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0);
+
+        // Get sorted keys for deterministic ordering
+        let mut keys: Vec<_> = domains.keys().cloned().collect();
+        keys.sort_by(|a, b| a.0.cmp(&b.0));
+
+        let total = keys.len();
+        let items: Vec<GovernanceDomain> = keys
+            .into_iter()
+            .skip(offset)
+            .take(limit)
+            .filter_map(|k| domains.get(&k).cloned())
+            .collect();
+
+        let next_offset = offset + items.len();
+        let next_cursor = if next_offset < total {
+            Some(format!("offset:{next_offset}"))
+        } else {
+            None
+        };
+
+        Ok(PaginatedResult::new(items, next_cursor).with_total(total))
     }
 
     /// Create a new proposal

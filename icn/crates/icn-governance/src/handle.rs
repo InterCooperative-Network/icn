@@ -6,8 +6,8 @@ use icn_identity::Did;
 
 use crate::{
     Delegation, DelegationId, GovernanceDomain, GovernanceDomainId, GovernanceParams,
-    MembershipConfig, ParameterChange, Proposal, ProposalId, ProposalPayload, ProtocolParameter,
-    Timestamp, VoteChoice, VoteTally,
+    MembershipConfig, PaginatedResult, ParameterChange, Proposal, ProposalId, ProposalPayload,
+    ProtocolParameter, Timestamp, VoteChoice, VoteTally,
 };
 use icn_entity::EntityId;
 
@@ -21,6 +21,20 @@ pub trait GovernanceOps: Send + Sync {
 
     /// List all governance domains
     async fn list_domains(&self) -> Result<Vec<GovernanceDomain>>;
+
+    /// List governance domains with pagination
+    ///
+    /// Returns a page of domains. Use this for large datasets to avoid
+    /// loading all domains into memory.
+    ///
+    /// # Arguments
+    /// * `cursor` - Optional cursor from a previous page
+    /// * `limit` - Maximum number of items to return
+    async fn list_domains_paginated(
+        &self,
+        cursor: Option<&str>,
+        limit: usize,
+    ) -> Result<PaginatedResult<GovernanceDomain>>;
 
     /// Get a specific domain by ID
     async fn get_domain(&self, id: &GovernanceDomainId) -> Result<Option<GovernanceDomain>>;

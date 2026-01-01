@@ -1672,6 +1672,133 @@ impl Ledger {
         Ok((entries, total))
     }
 
+    /// Get journal entries with filtered pagination (oldest first)
+    ///
+    /// This is a memory-efficient version of filtered queries. Instead of loading
+    /// all entries and then filtering, it streams through entries one by one,
+    /// applying the filter during iteration and stopping once `limit` matches found.
+    ///
+    /// Uses cursor-based pagination: pass the timestamp from the last entry of
+    /// the previous page to continue from that point.
+    ///
+    /// # Arguments
+    /// * `filter_did` - Optional DID to filter by (entry must involve this DID)
+    /// * `cursor_ts` - Optional timestamp to start after (exclusive)
+    /// * `limit` - Maximum number of entries to return
+    ///
+    /// # Returns
+    /// Tuple of (entries, next_cursor_timestamp)
+    /// The next_cursor is Some if there may be more entries to fetch.
+    pub fn get_entries_filtered_paginated(
+        &self,
+        filter_did: Option<&Did>,
+        cursor_ts: Option<u64>,
+        limit: usize,
+    ) -> Result<(Vec<JournalEntry>, Option<u64>)> {
+        // If no filter, use the efficient offset-based method
+        if filter_did.is_none() {
+            let offset = if let Some(ts) = cursor_ts {
+                // Find the offset for this timestamp in the index
+                // For simplicity, we count entries up to this timestamp
+                let ts_prefix = JOURNAL_TS_PREFIX.as_bytes();
+                let all_ts = self.store.scan(ts_prefix)?;
+                all_ts
+                    .iter()
+                    .take_while(|(key, _)| {
+                        // Key format: "journal_ts:{timestamp:016x}:{hash}"
+                        // Extract timestamp and compare
+                        let key_str = String::from_utf8_lossy(key);
+                        if let Some(ts_str) = key_str.strip_prefix(JOURNAL_TS_PREFIX) {
+                            if let Some(ts_hex) = ts_str.split(':').next() {
+                                if let Ok(entry_ts) = u64::from_str_radix(ts_hex, 16) {
+                                    return entry_ts <= ts;
+                                }
+                            }
+                        }
+                        false
+                    })
+                    .count()
+            } else {
+                0
+            };
+
+            let (entries, _total) = self.get_entries_paginated_asc(offset, limit + 1)?;
+            let has_more = entries.len() > limit;
+            let entries: Vec<_> = entries.into_iter().take(limit).collect();
+            let next_cursor = if has_more {
+                entries.last().map(|e| e.timestamp)
+            } else {
+                None
+            };
+            return Ok((entries, next_cursor));
+        }
+
+        // With DID filter, stream through entries applying filter
+        // At this point filter_did is guaranteed to be Some (checked above via early return)
+        let Some(did_filter) = filter_did else {
+            // This branch is unreachable due to the early return above,
+            // but we handle it gracefully to avoid expect/unwrap
+            return Ok((Vec::new(), None));
+        };
+
+        let ts_prefix = JOURNAL_TS_PREFIX.as_bytes();
+        let ts_pairs = self.store.scan(ts_prefix)?;
+
+        let mut entries = Vec::with_capacity(limit);
+
+        for (key, hash_bytes) in ts_pairs {
+            // Extract timestamp from key to check cursor
+            let key_str = String::from_utf8_lossy(&key);
+            if let Some(ts_str) = key_str.strip_prefix(JOURNAL_TS_PREFIX) {
+                if let Some(ts_hex) = ts_str.split(':').next() {
+                    if let Ok(entry_ts) = u64::from_str_radix(ts_hex, 16) {
+                        // Skip entries at or before the cursor
+                        if let Some(cursor) = cursor_ts {
+                            if entry_ts <= cursor {
+                                continue;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Look up the full entry
+            let entry_key = format!("{}{}", JOURNAL_PREFIX, hex::encode(&hash_bytes));
+            if let Some(entry_data) = self.store.get(entry_key.as_bytes())? {
+                let entry: JournalEntry = serde_json::from_slice(&entry_data)?;
+
+                // Apply DID filter
+                if entry
+                    .accounts
+                    .iter()
+                    .any(|delta| &delta.account_id == did_filter)
+                {
+                    entries.push(entry);
+
+                    // Stop once we have enough + 1 (to check if there are more)
+                    if entries.len() > limit {
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Check if there are more entries
+        let has_more = entries.len() > limit;
+        if has_more {
+            entries.pop(); // Remove the extra entry
+        }
+
+        // Next cursor is the timestamp of the last entry
+        let next_cursor = if has_more {
+            entries.last().map(|e| e.timestamp)
+        } else {
+            None
+        };
+
+        Ok((entries, next_cursor))
+    }
+
     // === Phase 18 Week 5: Fork Detection and Resolution ===
 
     /// Rebuild the fork detection index from stored entries
