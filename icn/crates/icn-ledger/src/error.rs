@@ -72,6 +72,10 @@ pub enum LedgerError {
     /// Internal error
     #[error("internal error: {0}")]
     Internal(String),
+
+    /// Arithmetic overflow in balance calculation
+    #[error("arithmetic overflow: {0}")]
+    ArithmeticOverflow(String),
 }
 
 impl From<serde_json::Error> for LedgerError {

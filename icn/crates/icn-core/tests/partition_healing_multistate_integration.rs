@@ -173,7 +173,7 @@ impl MultiStateNode {
 
 /// Verify balance invariant across all nodes
 fn verify_balance_invariant(entries: &[icn_ledger::JournalEntry]) -> Result<()> {
-    let all_balances = compute_all_balances(entries);
+    let all_balances = compute_all_balances(entries)?;
 
     let mut currency_totals: HashMap<String, i64> = HashMap::new();
     for balances in all_balances.values() {

@@ -87,7 +87,7 @@ impl TestLedgerNode {
 
 /// Verify the balance invariant: sum of all balances per currency = 0
 fn verify_balance_invariant(entries: &[icn_ledger::JournalEntry]) -> Result<()> {
-    let all_balances = compute_all_balances(entries);
+    let all_balances = compute_all_balances(entries)?;
 
     // Aggregate balances by currency
     let mut currency_totals: HashMap<String, i64> = HashMap::new();
