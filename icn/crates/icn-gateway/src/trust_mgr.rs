@@ -11,6 +11,22 @@
 //! - Gossip synchronization of trust edges
 //!
 //! When created with `new()`, it uses in-memory storage (suitable for testing only).
+//!
+//! ## Sync vs Async Methods
+//!
+//! This module provides both sync and async variants of most methods:
+//!
+//! - **Async methods** (e.g., `add_edge_async`, `get_edge_async`): Preferred for use
+//!   in async contexts. These use proper async RwLock operations and don't block
+//!   any Tokio worker threads.
+//!
+//! - **Sync methods** (e.g., `add_edge`, `get_edge`): Provided for backward
+//!   compatibility. These use `block_in_place` which tells Tokio to move other
+//!   tasks off the current thread before blocking. While this prevents blocking
+//!   the entire runtime, it still occupies a worker thread during Sled I/O.
+//!
+//! **Recommendation**: Use async methods whenever possible. The sync methods are
+//! deprecated for use in async contexts and may be removed in a future version.
 
 use dashmap::DashMap;
 use icn_identity::Did;
@@ -18,7 +34,7 @@ use icn_trust::{TrustEdge, TrustGraph};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::debug;
+use tracing::{debug, warn};
 
 // ============================================================================
 // Trust Score Constants
@@ -126,18 +142,37 @@ impl TrustManager {
         self.own_did = Some(did);
     }
 
-    /// Add or update a trust edge
+    /// Add or update a trust edge (sync version)
     ///
     /// In actor-backed mode, this requires acquiring a write lock on the TrustGraph.
-    /// Use the async version `add_edge_async` for non-blocking operation.
+    ///
+    /// # Warning: Blocking I/O
+    ///
+    /// This method uses `block_in_place` which allows other Tokio tasks to be moved
+    /// off the current thread, but still blocks a worker thread during Sled I/O
+    /// (which can take milliseconds during compaction).
+    ///
+    /// **For async contexts, use [`add_edge_async`] instead.**
+    ///
+    /// # When to use this method
+    ///
+    /// - Non-async contexts (e.g., synchronous HTTP handlers, tests)
+    /// - Performance-insensitive code paths
+    /// - Quick prototyping (prefer async for production)
+    #[deprecated(
+        since = "0.2.0",
+        note = "Use add_edge_async for async contexts to avoid blocking worker threads"
+    )]
     pub fn add_edge(&self, edge: TrustEdge) -> Result<(), String> {
         if let Some(ref handle) = self.trust_graph {
             // Actor-backed mode: delegate to TrustGraph
-            // Note: This blocks on the write lock. For async contexts, use add_edge_async
-            let mut graph = handle.blocking_write();
-            graph
-                .add_edge(edge)
-                .map_err(|e| format!("TrustGraph error: {e}"))
+            // Use block_in_place to properly isolate blocking I/O
+            tokio::task::block_in_place(|| {
+                let mut graph = handle.blocking_write();
+                graph
+                    .add_edge(edge)
+                    .map_err(|e| format!("TrustGraph error: {e}"))
+            })
         } else {
             // Standalone mode: in-memory storage
             let key = format!("{}:{}", edge.source.as_str(), edge.target.as_str());
@@ -160,12 +195,23 @@ impl TrustManager {
         }
     }
 
-    /// Get a trust edge
+    /// Get a trust edge (sync version)
+    ///
+    /// # Warning: Blocking I/O
+    ///
+    /// This method uses `block_in_place` which still blocks a worker thread.
+    /// **For async contexts, use [`get_edge_async`] instead.**
+    #[deprecated(
+        since = "0.2.0",
+        note = "Use get_edge_async for async contexts to avoid blocking worker threads"
+    )]
     pub fn get_edge(&self, from: &Did, to: &Did) -> Option<TrustEdge> {
         if let Some(ref handle) = self.trust_graph {
             // Actor-backed mode: delegate to TrustGraph
-            let graph = handle.blocking_read();
-            graph.get_edge(from, to).ok().flatten()
+            tokio::task::block_in_place(|| {
+                let graph = handle.blocking_read();
+                graph.get_edge(from, to).ok().flatten()
+            })
         } else {
             // Standalone mode: in-memory storage
             let key = format!("{}:{}", from.as_str(), to.as_str());
@@ -184,14 +230,25 @@ impl TrustManager {
         }
     }
 
-    /// Remove a trust edge
+    /// Remove a trust edge (sync version)
+    ///
+    /// # Warning: Blocking I/O
+    ///
+    /// This method uses `block_in_place` which still blocks a worker thread.
+    /// **For async contexts, use [`remove_edge_async`] instead.**
+    #[deprecated(
+        since = "0.2.0",
+        note = "Use remove_edge_async for async contexts to avoid blocking worker threads"
+    )]
     pub fn remove_edge(&self, from: &Did, to: &Did) -> Result<(), String> {
         if let Some(ref handle) = self.trust_graph {
             // Actor-backed mode: delegate to TrustGraph
-            let mut graph = handle.blocking_write();
-            graph
-                .remove_edge(from, to)
-                .map_err(|e| format!("TrustGraph error: {e}"))
+            tokio::task::block_in_place(|| {
+                let mut graph = handle.blocking_write();
+                graph
+                    .remove_edge(from, to)
+                    .map_err(|e| format!("TrustGraph error: {e}"))
+            })
         } else {
             // Standalone mode: in-memory storage
             let key = format!("{}:{}", from.as_str(), to.as_str());
@@ -203,12 +260,44 @@ impl TrustManager {
         }
     }
 
-    /// Get all edges from a DID
+    /// Remove a trust edge (async version)
+    pub async fn remove_edge_async(&self, from: &Did, to: &Did) -> Result<(), String> {
+        if let Some(ref handle) = self.trust_graph {
+            let mut graph = handle.write().await;
+            graph
+                .remove_edge(from, to)
+                .map_err(|e| format!("TrustGraph error: {e}"))
+        } else {
+            let key = format!("{}:{}", from.as_str(), to.as_str());
+            if self.edges.remove(&key).is_some() {
+                Ok(())
+            } else {
+                Err("Trust edge not found".to_string())
+            }
+        }
+    }
+
+    /// Get all edges from a DID (sync version)
+    ///
+    /// # Warning: Blocking I/O
+    ///
+    /// This method uses `block_in_place` which still blocks a worker thread.
+    /// **For async contexts, use [`get_outgoing_edges_async`] instead.**
+    #[deprecated(
+        since = "0.2.0",
+        note = "Use get_outgoing_edges_async for async contexts to avoid blocking worker threads"
+    )]
     pub fn get_outgoing_edges(&self, from: &Did) -> Vec<TrustEdge> {
         if let Some(ref handle) = self.trust_graph {
             // Actor-backed mode: delegate to TrustGraph
-            let graph = handle.blocking_read();
-            graph.get_outgoing_edges(from).unwrap_or_default()
+            // Use block_in_place to properly isolate blocking I/O
+            tokio::task::block_in_place(|| {
+                let graph = handle.blocking_read();
+                graph.get_outgoing_edges(from).unwrap_or_else(|e| {
+                    warn!("Failed to get outgoing edges for {}: {e}", from);
+                    Vec::new()
+                })
+            })
         } else {
             // Standalone mode: in-memory storage
             let prefix = format!("{}:", from.as_str());
@@ -220,21 +309,53 @@ impl TrustManager {
         }
     }
 
-    /// Get all edges to a DID
-    ///
-    /// Note: TrustGraph doesn't support incoming edge queries directly.
-    /// In actor-backed mode, this operation is not supported and returns empty vec.
-    /// Use get_outgoing_edges() which is the primary query pattern for trust graphs.
-    ///
-    /// TODO: Add incoming edge index to TrustGraph if this is needed for production.
-    pub fn get_incoming_edges(&self, to: &Did) -> Vec<TrustEdge> {
-        if self.trust_graph.is_some() {
-            // Actor-backed mode: TrustGraph doesn't support incoming edge queries
-            // This would require scanning all edges which is O(n) - not recommended
-            debug!("get_incoming_edges not supported in actor-backed mode");
-            Vec::new()
+    /// Get all edges from a DID (async version)
+    pub async fn get_outgoing_edges_async(&self, from: &Did) -> Vec<TrustEdge> {
+        if let Some(ref handle) = self.trust_graph {
+            let graph = handle.read().await;
+            graph.get_outgoing_edges(from).unwrap_or_else(|e| {
+                warn!("Failed to get outgoing edges for {}: {e}", from);
+                Vec::new()
+            })
         } else {
-            // Standalone mode: in-memory storage supports this efficiently
+            let prefix = format!("{}:", from.as_str());
+            self.edges
+                .iter()
+                .filter(|entry| entry.key().starts_with(&prefix))
+                .map(|entry| entry.value().clone())
+                .collect()
+        }
+    }
+
+    /// Get all edges to a DID ("who trusts me?") (sync version)
+    ///
+    /// # Performance Warning
+    ///
+    /// This operation scans all edges and is **O(n)** where n is the total number
+    /// of edges in the graph. Use sparingly for operations like user profile display.
+    /// For high-frequency operations, consider caching the results.
+    ///
+    /// # Warning: Blocking I/O
+    ///
+    /// This method uses `block_in_place` which still blocks a worker thread.
+    /// **For async contexts, use [`get_incoming_edges_async`] instead.**
+    #[deprecated(
+        since = "0.2.0",
+        note = "Use get_incoming_edges_async for async contexts to avoid blocking worker threads"
+    )]
+    pub fn get_incoming_edges(&self, to: &Did) -> Vec<TrustEdge> {
+        if let Some(ref handle) = self.trust_graph {
+            // Actor-backed mode: delegate to TrustGraph
+            // Use block_in_place to properly isolate blocking I/O
+            tokio::task::block_in_place(|| {
+                let graph = handle.blocking_read();
+                graph.get_incoming_edges(to).unwrap_or_else(|e| {
+                    warn!("Failed to get incoming edges for {}: {e}", to);
+                    Vec::new()
+                })
+            })
+        } else {
+            // Standalone mode: in-memory storage
             let to_str = to.as_str();
             self.edges
                 .iter()
@@ -244,7 +365,27 @@ impl TrustManager {
         }
     }
 
-    /// Compute trust score for a DID
+    /// Get all edges to a DID (async version)
+    ///
+    /// Note: This operation scans all edges and is O(n). Use sparingly.
+    pub async fn get_incoming_edges_async(&self, to: &Did) -> Vec<TrustEdge> {
+        if let Some(ref handle) = self.trust_graph {
+            let graph = handle.read().await;
+            graph.get_incoming_edges(to).unwrap_or_else(|e| {
+                warn!("Failed to get incoming edges for {}: {e}", to);
+                Vec::new()
+            })
+        } else {
+            let to_str = to.as_str();
+            self.edges
+                .iter()
+                .filter(|entry| entry.value().target.as_str() == to_str)
+                .map(|entry| entry.value().clone())
+                .collect()
+        }
+    }
+
+    /// Compute trust score for a DID (sync version)
     ///
     /// In actor-backed mode, delegates to TrustGraph's optimized computation
     /// which includes caching, bloom filters, and priority queue pathfinding.
@@ -252,21 +393,60 @@ impl TrustManager {
     /// In standalone mode, uses a simplified PageRank-like algorithm:
     /// - 70% direct trust
     /// - 30% transitive trust (average of weighted paths)
+    ///
+    /// # Warning: Blocking I/O
+    ///
+    /// This method uses `block_in_place` which still blocks a worker thread.
+    /// **For async contexts, use [`compute_trust_score_async`] instead.**
+    #[deprecated(
+        since = "0.2.0",
+        note = "Use compute_trust_score_async for async contexts to avoid blocking worker threads"
+    )]
     pub fn compute_trust_score(&self, from: &Did, to: &Did) -> f64 {
         if let Some(ref handle) = self.trust_graph {
             // Actor-backed mode: delegate to TrustGraph
-            // Note: TrustGraph computes from its own_did perspective
-            // We need to check if from matches own_did
-            let graph = handle.blocking_read();
-            if graph.own_did() == from {
-                graph.compute_trust_score(to).unwrap_or(0.0)
-            } else {
-                // For non-own perspective, fall back to local computation
-                self.compute_trust_score_local(from, to)
-            }
+            // Use block_in_place to properly isolate blocking I/O
+            tokio::task::block_in_place(|| {
+                let graph = handle.blocking_read();
+                // Note: TrustGraph computes from its own_did perspective
+                // We need to check if from matches own_did
+                if graph.own_did() == from {
+                    graph.compute_trust_score(to).unwrap_or_else(|e| {
+                        warn!("Failed to compute trust score for {}: {e}", to);
+                        0.0
+                    })
+                } else {
+                    // For non-own perspective, fall back to local computation
+                    // Note: this still uses the underlying graph for edges
+                    drop(graph); // Release lock before local computation
+                    self.compute_trust_score_local(from, to)
+                }
+            })
         } else {
             // Standalone mode: local computation
             self.compute_trust_score_local(from, to)
+        }
+    }
+
+    /// Compute trust score for a DID (async version)
+    ///
+    /// Prefer this over the sync version when calling from async context
+    /// to avoid blocking the Tokio runtime.
+    pub async fn compute_trust_score_async(&self, from: &Did, to: &Did) -> f64 {
+        if let Some(ref handle) = self.trust_graph {
+            let graph = handle.read().await;
+            if graph.own_did() == from {
+                graph.compute_trust_score(to).unwrap_or_else(|e| {
+                    warn!("Failed to compute trust score for {}: {e}", to);
+                    0.0
+                })
+            } else {
+                // For non-own perspective, fall back to local computation
+                drop(graph); // Release lock before local computation
+                self.compute_trust_score_local_async(from, to).await
+            }
+        } else {
+            self.compute_trust_score_local_async(from, to).await
         }
     }
 
@@ -297,13 +477,17 @@ impl TrustManager {
         if let Some(ref handle) = self.trust_graph {
             // Actor-backed mode: delegate to TrustGraph
             let graph = handle.read().await;
-            graph
-                .compute_trust_score(target)
-                .unwrap_or(DEFAULT_TRUST_SCORE)
+            graph.compute_trust_score(target).unwrap_or_else(|e| {
+                warn!(
+                    "Failed to compute trust score for velocity limiting ({}): {e}, using default",
+                    target
+                );
+                DEFAULT_TRUST_SCORE
+            })
         } else {
             // Standalone mode: use own_did if set, otherwise return default
             if let Some(ref own_did) = self.own_did {
-                self.compute_trust_score_local(own_did, target)
+                self.compute_trust_score_local_async(own_did, target).await
             } else {
                 // No perspective set - see DEFAULT_TRUST_SCORE documentation
                 DEFAULT_TRUST_SCORE
@@ -312,6 +496,10 @@ impl TrustManager {
     }
 
     /// Compute trust score using local (in-memory or fallback) algorithm
+    ///
+    /// Note: This is a sync method that uses sync edge getters. In async contexts,
+    /// prefer `compute_trust_score_local_async` for better performance.
+    #[allow(deprecated)] // Uses sync edge methods intentionally
     fn compute_trust_score_local(&self, from: &Did, to: &Did) -> f64 {
         // Direct trust
         let direct_score = self.get_edge(from, to).map(|e| e.score).unwrap_or(0.0);
@@ -346,9 +534,56 @@ impl TrustManager {
         (direct_score * 0.7 + transitive_score * 0.3).min(1.0)
     }
 
+    /// Compute trust score using local (in-memory or fallback) algorithm (async version)
+    ///
+    /// Uses async edge getters to avoid blocking the Tokio runtime.
+    async fn compute_trust_score_local_async(&self, from: &Did, to: &Did) -> f64 {
+        // Direct trust
+        let direct_score = self
+            .get_edge_async(from, to)
+            .await
+            .map(|e| e.score)
+            .unwrap_or(0.0);
+
+        // Transitive trust (via intermediates)
+        let outgoing = self.get_outgoing_edges_async(from).await;
+        let mut transitive_sum = 0.0;
+        let mut transitive_count = 0;
+
+        for intermediate_edge in outgoing {
+            // Skip if intermediate is the target
+            if intermediate_edge.target == *to {
+                continue;
+            }
+
+            // Get edge from intermediate to target
+            if let Some(indirect_edge) = self.get_edge_async(&intermediate_edge.target, to).await {
+                // Weight: trust in intermediate * trust from intermediate to target
+                let weight = intermediate_edge.score * indirect_edge.score;
+                transitive_sum += weight;
+                transitive_count += 1;
+            }
+        }
+
+        let transitive_score = if transitive_count > 0 {
+            transitive_sum / transitive_count as f64
+        } else {
+            0.0
+        };
+
+        // Combine (70% direct, 30% transitive)
+        (direct_score * 0.7 + transitive_score * 0.3).min(1.0)
+    }
+
     /// Get trust network around a DID (for visualization)
     ///
-    /// Returns nodes and edges within `max_distance` hops
+    /// Returns nodes and edges within `max_distance` hops.
+    ///
+    /// # Note
+    ///
+    /// This method uses sync APIs internally. Consider adding an async version
+    /// (`get_trust_network_async`) if this becomes a performance bottleneck.
+    #[allow(deprecated)] // Uses sync APIs intentionally for now
     pub fn get_trust_network(&self, center: &Did, max_distance: u32) -> TrustNetwork {
         use std::collections::{HashMap, HashSet, VecDeque};
 
@@ -447,9 +682,14 @@ impl Default for TrustManager {
 }
 
 #[cfg(test)]
+#[allow(deprecated)] // Tests exercise both sync and async APIs
 mod tests {
     use super::*;
     use icn_identity::KeyPair;
+
+    // ============================================================================
+    // Sync API Tests (deprecated but still need coverage)
+    // ============================================================================
 
     #[test]
     fn test_add_and_get_edge() {
@@ -528,5 +768,136 @@ mod tests {
             .unwrap();
         assert_eq!(alice_node.trust_score, 1.0);
         assert_eq!(alice_node.distance, 0);
+    }
+
+    #[test]
+    fn test_incoming_edges() {
+        let manager = TrustManager::new();
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+        let carol = KeyPair::generate().unwrap().did().clone();
+
+        // Both Alice and Carol trust Bob
+        manager
+            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), 0.8))
+            .unwrap();
+        manager
+            .add_edge(TrustEdge::new(carol.clone(), bob.clone(), 0.6))
+            .unwrap();
+
+        // Get incoming edges to Bob ("who trusts Bob?")
+        let incoming = manager.get_incoming_edges(&bob);
+        assert_eq!(incoming.len(), 2);
+
+        // Verify both edges are present
+        let sources: Vec<String> = incoming.iter().map(|e| e.source.to_string()).collect();
+        assert!(sources.contains(&alice.to_string()));
+        assert!(sources.contains(&carol.to_string()));
+    }
+
+    // ============================================================================
+    // Async Tests
+    // ============================================================================
+
+    #[tokio::test]
+    async fn test_async_add_and_get_edge() {
+        let manager = TrustManager::new();
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        let edge = TrustEdge::new(alice.clone(), bob.clone(), 0.8);
+        manager.add_edge_async(edge).await.unwrap();
+
+        let retrieved = manager.get_edge_async(&alice, &bob).await.unwrap();
+        assert_eq!(retrieved.score, 0.8);
+    }
+
+    #[tokio::test]
+    async fn test_async_compute_trust_score() {
+        let manager = TrustManager::new();
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+        let carol = KeyPair::generate().unwrap().did().clone();
+
+        // Alice trusts Bob, Bob trusts Carol
+        manager
+            .add_edge_async(TrustEdge::new(alice.clone(), bob.clone(), 0.8))
+            .await
+            .unwrap();
+        manager
+            .add_edge_async(TrustEdge::new(bob.clone(), carol.clone(), 0.6))
+            .await
+            .unwrap();
+
+        // Test direct trust
+        let direct_score = manager.compute_trust_score_async(&alice, &bob).await;
+        // 0.8 * 0.7 (direct) = 0.56
+        assert!((0.55..=0.57).contains(&direct_score));
+
+        // Test transitive trust
+        let transitive_score = manager.compute_trust_score_async(&alice, &carol).await;
+        // 0 * 0.7 (no direct) + (0.8 * 0.6) * 0.3 (transitive) = 0.144
+        assert!((0.14..=0.15).contains(&transitive_score));
+    }
+
+    #[tokio::test]
+    async fn test_async_incoming_and_outgoing_edges() {
+        let manager = TrustManager::new();
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+        let carol = KeyPair::generate().unwrap().did().clone();
+
+        // Alice trusts Bob, Carol trusts Bob
+        manager
+            .add_edge_async(TrustEdge::new(alice.clone(), bob.clone(), 0.8))
+            .await
+            .unwrap();
+        manager
+            .add_edge_async(TrustEdge::new(carol.clone(), bob.clone(), 0.6))
+            .await
+            .unwrap();
+
+        // Test outgoing edges
+        let outgoing = manager.get_outgoing_edges_async(&alice).await;
+        assert_eq!(outgoing.len(), 1);
+        assert_eq!(outgoing[0].target, bob);
+
+        // Test incoming edges
+        let incoming = manager.get_incoming_edges_async(&bob).await;
+        assert_eq!(incoming.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_async_concurrent_access() {
+        use std::sync::Arc;
+
+        let manager = Arc::new(TrustManager::new());
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        // Seed with an edge
+        manager
+            .add_edge_async(TrustEdge::new(alice.clone(), bob.clone(), 0.5))
+            .await
+            .unwrap();
+
+        // Spawn multiple concurrent reads
+        let mut handles = Vec::new();
+        for _ in 0..10 {
+            let mgr = Arc::clone(&manager);
+            let a = alice.clone();
+            let b = bob.clone();
+            handles.push(tokio::spawn(async move {
+                let edge = mgr.get_edge_async(&a, &b).await;
+                assert!(edge.is_some());
+                let score = mgr.compute_trust_score_async(&a, &b).await;
+                assert!(score > 0.0);
+            }));
+        }
+
+        // Wait for all to complete
+        for handle in handles {
+            handle.await.unwrap();
+        }
     }
 }

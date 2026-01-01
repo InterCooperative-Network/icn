@@ -377,6 +377,30 @@ impl TrustGraph {
         Ok(edges)
     }
 
+    /// Get all incoming edges to a DID (edges where target == did)
+    ///
+    /// Note: This requires scanning all edges in the graph, which is O(n).
+    /// Use sparingly for operations like "who trusts me?" queries.
+    /// For high-frequency operations, consider caching the results.
+    pub fn get_incoming_edges(&self, target: &Did) -> Result<Vec<TrustEdge>> {
+        let prefix = self.all_edges_prefix();
+        let mut edges = Vec::new();
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)?
+            .as_secs();
+
+        let results = self.store.scan(prefix.as_bytes())?;
+        for (_key, value) in results.into_iter() {
+            let edge: TrustEdge = serde_json::from_slice(&value)?;
+            if !edge.is_expired(now) && edge.target == *target {
+                edges.push(edge);
+            }
+        }
+
+        Ok(edges)
+    }
+
     /// Compute trust score for a DID using default weights (70% direct, 30% transitive)
     ///
     /// Uses a simplified PageRank-like algorithm:
@@ -877,5 +901,85 @@ mod tests {
         let highly_trusted = graph.get_dids_above_threshold(0.5).unwrap();
         assert_eq!(highly_trusted.len(), 1);
         assert!(highly_trusted.contains(&bob));
+    }
+
+    #[test]
+    fn test_get_incoming_edges() {
+        let store = Arc::new(SledStore::temporary().unwrap());
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+        let carol = KeyPair::generate().unwrap().did().clone();
+        let dave = KeyPair::generate().unwrap().did().clone();
+
+        let mut graph = TrustGraph::new(store, alice.clone());
+
+        // Alice trusts Bob
+        graph
+            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), 0.8))
+            .unwrap();
+
+        // Carol trusts Bob
+        graph
+            .add_edge(TrustEdge::new(carol.clone(), bob.clone(), 0.7))
+            .unwrap();
+
+        // Dave trusts Bob
+        graph
+            .add_edge(TrustEdge::new(dave.clone(), bob.clone(), 0.6))
+            .unwrap();
+
+        // Alice also trusts Carol
+        graph
+            .add_edge(TrustEdge::new(alice.clone(), carol.clone(), 0.5))
+            .unwrap();
+
+        // Get incoming edges to Bob (who trusts Bob?)
+        let incoming_to_bob = graph.get_incoming_edges(&bob).unwrap();
+        assert_eq!(incoming_to_bob.len(), 3);
+
+        // Verify sources
+        let sources: Vec<_> = incoming_to_bob.iter().map(|e| e.source.clone()).collect();
+        assert!(sources.contains(&alice));
+        assert!(sources.contains(&carol));
+        assert!(sources.contains(&dave));
+
+        // Get incoming edges to Carol (only Alice trusts Carol)
+        let incoming_to_carol = graph.get_incoming_edges(&carol).unwrap();
+        assert_eq!(incoming_to_carol.len(), 1);
+        assert_eq!(incoming_to_carol[0].source, alice);
+
+        // Get incoming edges to Alice (no one trusts Alice in this test)
+        let incoming_to_alice = graph.get_incoming_edges(&alice).unwrap();
+        assert_eq!(incoming_to_alice.len(), 0);
+    }
+
+    #[test]
+    fn test_get_incoming_edges_filters_expired() {
+        let store = Arc::new(SledStore::temporary().unwrap());
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+        let carol = KeyPair::generate().unwrap().did().clone();
+
+        let mut graph = TrustGraph::new(store, alice.clone());
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        // Alice trusts Bob (not expired)
+        graph
+            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), 0.8))
+            .unwrap();
+
+        // Carol trusts Bob (expired - set expiry to 100 seconds ago)
+        graph
+            .add_edge(TrustEdge::new(carol.clone(), bob.clone(), 0.7).with_expiry(now - 100))
+            .unwrap();
+
+        // Get incoming edges to Bob - should only include non-expired edge from Alice
+        let incoming = graph.get_incoming_edges(&bob).unwrap();
+        assert_eq!(incoming.len(), 1, "Expired edges should be filtered out");
+        assert_eq!(incoming[0].source, alice);
     }
 }
