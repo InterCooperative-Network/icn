@@ -100,8 +100,28 @@ impl AccountDelta {
     }
 
     /// Get the net change for this delta (debit - credit)
-    pub fn net_change(&self) -> i64 {
-        self.debit.unwrap_or(0) - self.credit.unwrap_or(0)
+    ///
+    /// Uses checked arithmetic to prevent overflow. Returns error if
+    /// the calculation would overflow.
+    pub fn net_change(&self) -> Result<i64, crate::LedgerError> {
+        let debit = self.debit.unwrap_or(0);
+        let credit = self.credit.unwrap_or(0);
+        debit.checked_sub(credit).ok_or_else(|| {
+            crate::LedgerError::ArithmeticOverflow(format!(
+                "arithmetic overflow in net_change: {debit} - {credit} for account {}",
+                self.account_id
+            ))
+        })
+    }
+
+    /// Get the net change, saturating on overflow instead of erroring.
+    ///
+    /// Use this only when overflow is acceptable (e.g., display purposes).
+    /// For ledger mutations, use `net_change()` which returns Result.
+    pub fn net_change_saturating(&self) -> i64 {
+        let debit = self.debit.unwrap_or(0);
+        let credit = self.credit.unwrap_or(0);
+        debit.saturating_sub(credit)
     }
 }
 
@@ -173,14 +193,24 @@ impl AccountBalances {
     }
 
     /// Apply a delta to the balances
-    pub fn apply_delta(&mut self, delta: &AccountDelta) {
+    ///
+    /// Uses checked arithmetic to prevent overflow. Returns error if
+    /// the calculation would overflow.
+    pub fn apply_delta(&mut self, delta: &AccountDelta) -> Result<(), crate::LedgerError> {
         if delta.account_id != self.account_id {
-            return; // Delta is for a different account
+            return Ok(()); // Delta is for a different account
         }
 
         let current = self.get(&delta.currency);
-        let new_balance = current + delta.net_change();
+        let change = delta.net_change()?;
+        let new_balance = current.checked_add(change).ok_or_else(|| {
+            crate::LedgerError::ArithmeticOverflow(format!(
+                "overflow in apply_delta: {} + {} for account {} currency {}",
+                current, change, self.account_id, delta.currency
+            ))
+        })?;
         self.balances.insert(delta.currency.clone(), new_balance);
+        Ok(())
     }
 }
 

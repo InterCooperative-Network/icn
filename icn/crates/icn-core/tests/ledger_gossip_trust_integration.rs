@@ -227,7 +227,7 @@ async fn test_ledger_sync_with_trust_levels() -> Result<()> {
 
     // Verify balance invariant: sum should be 0
     let all_entries = vec![entry1, entry2];
-    let all_balances = compute_all_balances(&all_entries);
+    let all_balances = compute_all_balances(&all_entries).unwrap();
     let sum: i64 = all_balances
         .values()
         .flat_map(|b| b.balances.values())
@@ -418,7 +418,7 @@ async fn test_multi_currency_sync() -> Result<()> {
     assert_eq!(node2.get_balance(alice.did(), "kWh").await, 50);
 
     // Verify balance invariant for each currency
-    let all_balances = compute_all_balances(&[entry]);
+    let all_balances = compute_all_balances(&[entry]).unwrap();
 
     let hours_sum: i64 = all_balances
         .values()

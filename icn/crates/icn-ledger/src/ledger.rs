@@ -3,6 +3,7 @@
 use crate::balance::compute_all_balances;
 use crate::credit_policy::CreditPolicyManager;
 use crate::dynamic_limits::DynamicCreditLimitManager;
+use crate::error::LedgerError;
 use crate::events::{BalanceChanged, SharedEventEmitter, Transfer};
 use crate::fork_resolution::{
     Fork, ForkDetector, ForkResolution, ForkResolutionStrategy, ForkResolver,
@@ -1080,7 +1081,7 @@ impl Ledger {
                 .entry(delta.account_id.clone())
                 .or_insert_with(|| AccountBalances::new(delta.account_id.clone()));
 
-            account_balances.apply_delta(delta);
+            account_balances.apply_delta(delta)?;
 
             // Capture new balance after update
             let new_balance = account_balances.get(&delta.currency);
@@ -1246,7 +1247,9 @@ impl Ledger {
         // This MUST be done after the entry is committed to storage
         if let Some(ref prog_manager) = self.progressive_limit_manager {
             for delta in &entry.accounts {
-                let net_change = delta.net_change();
+                // Use saturating version since velocity tracking is best-effort
+                // and we already validated the entry above
+                let net_change = delta.net_change_saturating();
                 if let Err(e) = prog_manager.record_change(
                     delta.account_id.as_str(),
                     &delta.currency,
@@ -2014,7 +2017,7 @@ impl Ledger {
 
         // Take snapshot of entries
         let entries = self.get_all_entries()?;
-        let balances = compute_all_balances(&entries);
+        let balances = compute_all_balances(&entries)?;
 
         // Also recompute cleared volume index
         let mut cleared_volumes: HashMap<(Did, String), i64> = HashMap::new();
@@ -2092,7 +2095,7 @@ impl Ledger {
         let entries = self.get_all_entries()?;
 
         // Recompute balances from scratch
-        let computed_balances = compute_all_balances(&entries);
+        let computed_balances = compute_all_balances(&entries)?;
 
         // Compare with cached balances
         if computed_balances != self.cached_balances {
@@ -2754,7 +2757,13 @@ impl Ledger {
         let mut currency_sums: HashMap<String, i64> = HashMap::new();
         for delta in &entry.accounts {
             let sum = currency_sums.entry(delta.currency.clone()).or_insert(0);
-            *sum += delta.net_change();
+            let change = delta.net_change()?;
+            *sum = sum.checked_add(change).ok_or_else(|| {
+                LedgerError::ArithmeticOverflow(format!(
+                    "overflow in double-entry check: {sum} + {change} for currency {}",
+                    delta.currency
+                ))
+            })?;
         }
 
         // All currencies must sum to zero (double-entry)
@@ -2783,7 +2792,7 @@ impl Ledger {
 
             for delta in &entry.accounts {
                 // Only check accounts that are going more negative (spending credit)
-                let transaction_delta = delta.net_change();
+                let transaction_delta = delta.net_change()?;
                 if transaction_delta >= 0 {
                     // Account is receiving, not spending credit
                     continue;
@@ -2876,14 +2885,18 @@ impl Ledger {
             for delta in &entry.accounts {
                 let account = &delta.account_id;
                 let currency = &delta.currency;
-                let net_change = delta.net_change();
+                let net_change = delta.net_change()?;
 
                 // Get POPLevel for the account (defaults to Weak if unknown)
                 let pop_level = prog_manager.get_pop_level(account.as_str());
 
                 // Calculate new balance after this transaction
                 let current_balance = self.get_balance(account, currency);
-                let new_balance = current_balance + net_change;
+                let new_balance = current_balance.checked_add(net_change).ok_or_else(|| {
+                    LedgerError::ArithmeticOverflow(format!(
+                        "overflow calculating new balance: {current_balance} + {net_change} for account {account} currency {currency}"
+                    ))
+                })?;
 
                 // Check balance limits based on POPLevel
                 if let Err(e) = prog_manager.check_balance_limits(
