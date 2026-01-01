@@ -56,6 +56,10 @@
 //! # }
 //! ```
 
+use crate::labor_shares::{
+    BondId, BondPaymentType, BondStatus, CooperativeBond, LaborShare, ScheduledPayout, ShareId,
+    SurplusAllocation,
+};
 use crate::types::{ContentHash, JournalEntry};
 use anyhow::{bail, Result};
 use icn_entity::EntityId;
@@ -74,6 +78,18 @@ const SPENDING_RULE_PREFIX: &str = "ledger:treasury:rule:";
 const TREASURY_AUDIT_PREFIX: &str = "ledger:treasury:audit:";
 const TREASURY_IDX_COOP_PREFIX: &str = "ledger:treasury:idx:coop:";
 const TREASURY_IDX_BUDGETS_PREFIX: &str = "ledger:treasury:idx:budgets:";
+
+// Labor share storage prefixes
+const LABOR_SHARE_PREFIX: &str = "ledger:labor_share:";
+const BOND_PREFIX: &str = "ledger:bond:";
+const SURPLUS_ALLOCATION_PREFIX: &str = "ledger:surplus_allocation:";
+// Index prefixes for future direct lookups (indices currently rebuilt on load)
+#[allow(dead_code)]
+const LABOR_SHARE_IDX_HOLDER_PREFIX: &str = "ledger:labor_share:idx:holder:";
+#[allow(dead_code)]
+const LABOR_SHARE_IDX_COOP_PREFIX: &str = "ledger:labor_share:idx:coop:";
+#[allow(dead_code)]
+const BOND_IDX_ISSUER_PREFIX: &str = "ledger:bond:idx:issuer:";
 
 /// Treasury account configuration for a cooperative
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -568,6 +584,64 @@ pub enum TreasuryOperation {
         new_approval_type: Option<ApprovalType>,
         is_active: Option<bool>,
     },
+
+    // === Labor Share Operations (Razeto Integration) ===
+    /// Allocate surplus to labor shareholders
+    ///
+    /// Distributes surplus proportionally based on labor days.
+    /// Requires governance approval via SurplusAllocation proposal.
+    AllocateSurplus {
+        /// The surplus allocation details
+        allocation: SurplusAllocation,
+    },
+
+    /// Redeem labor share (payout to departing member)
+    ///
+    /// Initiates share redemption with a payout schedule.
+    /// Requires governance approval via ShareRedemption proposal.
+    RedeemShare {
+        /// Share being redeemed
+        share_id: ShareId,
+        /// Total payout amount
+        payout_amount: i64,
+        /// Recipient member
+        recipient: Did,
+        /// Payout schedule (immediate or installments)
+        payout_schedule: Vec<ScheduledPayout>,
+    },
+
+    /// Issue cooperative bond
+    ///
+    /// Creates a new bond for inter-coop financing.
+    /// Requires governance approval via BondIssuance proposal.
+    IssueBond {
+        /// The bond being issued
+        bond: CooperativeBond,
+    },
+
+    /// Make bond payment (interest or principal)
+    ///
+    /// Executes a scheduled bond payment from treasury.
+    BondPayment {
+        /// Bond ID
+        bond_id: BondId,
+        /// Type of payment
+        payment_type: BondPaymentType,
+        /// Payment amount
+        amount: i64,
+    },
+
+    /// Record labor contribution to a share
+    ///
+    /// Updates the labor_days on a member's share.
+    RecordLaborContribution {
+        /// Share to update
+        share_id: ShareId,
+        /// Labor days to add
+        labor_days: u64,
+        /// Description of work performed
+        description: Option<String>,
+    },
 }
 
 /// Audit record for treasury operations
@@ -686,6 +760,25 @@ pub struct TreasuryManager {
 
     /// Velocity tracking windows: (treasury_did, currency) -> window state
     velocity_windows: HashMap<(Did, String), VelocityWindow>,
+
+    // === Labor Share State (Razeto Integration) ===
+    /// Labor shares by ID
+    labor_shares: HashMap<ShareId, LaborShare>,
+
+    /// Index: holder DID -> share IDs
+    holder_shares: HashMap<Did, Vec<ShareId>>,
+
+    /// Index: cooperative ID -> share IDs
+    coop_shares: HashMap<String, Vec<ShareId>>,
+
+    /// Cooperative bonds by ID
+    bonds: HashMap<BondId, CooperativeBond>,
+
+    /// Index: issuer coop ID -> bond IDs
+    issuer_bonds: HashMap<String, Vec<BondId>>,
+
+    /// Surplus allocations by ID
+    surplus_allocations: HashMap<String, SurplusAllocation>,
 }
 
 impl TreasuryManager {
@@ -702,6 +795,13 @@ impl TreasuryManager {
             velocity_limits: HashMap::new(),
             treasury_velocity_limits: HashMap::new(),
             velocity_windows: HashMap::new(),
+            // Labor share state
+            labor_shares: HashMap::new(),
+            holder_shares: HashMap::new(),
+            coop_shares: HashMap::new(),
+            bonds: HashMap::new(),
+            issuer_bonds: HashMap::new(),
+            surplus_allocations: HashMap::new(),
         }
     }
 
@@ -718,6 +818,13 @@ impl TreasuryManager {
             velocity_limits: HashMap::new(),
             treasury_velocity_limits: HashMap::new(),
             velocity_windows: HashMap::new(),
+            // Labor share state
+            labor_shares: HashMap::new(),
+            holder_shares: HashMap::new(),
+            coop_shares: HashMap::new(),
+            bonds: HashMap::new(),
+            issuer_bonds: HashMap::new(),
+            surplus_allocations: HashMap::new(),
         };
 
         manager.load_from_store()?;
@@ -1313,6 +1420,414 @@ impl TreasuryManager {
         Ok(())
     }
 
+    // === Labor Share Operations (Razeto Integration) ===
+
+    /// Create a new labor share for a cooperative member
+    ///
+    /// This should be called when a member joins the cooperative.
+    /// The share starts with 0 labor_days and 0 accumulated_surplus.
+    ///
+    /// # Important
+    /// **Callers MUST validate that `holder` is an active member of `cooperative_id`
+    /// before calling this function.** This validation should be performed against
+    /// `icn-entity` membership records. Creating shares for non-members violates
+    /// the cooperative ownership model.
+    pub fn create_labor_share(
+        &mut self,
+        holder: Did,
+        cooperative_id: String,
+        currency: String,
+    ) -> Result<LaborShare> {
+        let now = icn_time::current_timestamp_secs();
+        let share_id = ShareId::new(format!("share-{}-{}", now, uuid_simple()));
+
+        let share = LaborShare::new(
+            share_id.clone(),
+            holder.clone(),
+            cooperative_id.clone(),
+            currency,
+            now,
+        );
+
+        info!(
+            share_id = %share_id,
+            holder = %holder,
+            cooperative_id = %cooperative_id,
+            "Creating labor share"
+        );
+
+        // Add to indexes
+        self.labor_shares.insert(share_id.clone(), share.clone());
+        self.holder_shares
+            .entry(holder.clone())
+            .or_default()
+            .push(share_id.clone());
+        self.coop_shares
+            .entry(cooperative_id.clone())
+            .or_default()
+            .push(share_id.clone());
+
+        // Persist
+        if let Some(ref store) = self.store {
+            self.persist_labor_share(&share, store)?;
+        }
+
+        Ok(share)
+    }
+
+    /// Get a labor share by ID
+    pub fn get_labor_share(&self, share_id: &ShareId) -> Option<&LaborShare> {
+        self.labor_shares.get(share_id)
+    }
+
+    /// Get mutable labor share by ID
+    pub fn get_labor_share_mut(&mut self, share_id: &ShareId) -> Option<&mut LaborShare> {
+        self.labor_shares.get_mut(share_id)
+    }
+
+    /// List all labor shares for a holder
+    pub fn list_holder_shares(&self, holder: &Did) -> Vec<&LaborShare> {
+        self.holder_shares
+            .get(holder)
+            .map(|ids| {
+                ids.iter()
+                    .filter_map(|id| self.labor_shares.get(id))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// List all labor shares for a cooperative
+    pub fn list_coop_shares(&self, cooperative_id: &str) -> Vec<&LaborShare> {
+        self.coop_shares
+            .get(cooperative_id)
+            .map(|ids| {
+                ids.iter()
+                    .filter_map(|id| self.labor_shares.get(id))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Record labor contribution to a share
+    ///
+    /// Updates the labor_days and adds a provenance event.
+    pub fn record_labor_contribution(
+        &mut self,
+        share_id: &ShareId,
+        labor_days: u64,
+        description: Option<String>,
+    ) -> Result<()> {
+        let now = icn_time::current_timestamp_secs();
+
+        let share = self
+            .labor_shares
+            .get_mut(share_id)
+            .ok_or_else(|| anyhow::anyhow!("Labor share not found: {share_id}"))?;
+
+        if !share.is_active() {
+            bail!("Cannot record labor on inactive share: {share_id}");
+        }
+
+        info!(
+            share_id = %share_id,
+            labor_days = labor_days,
+            "Recording labor contribution"
+        );
+
+        share
+            .record_labor(labor_days, now, description)
+            .map_err(|e| anyhow::anyhow!("{e}"))?;
+
+        let share_clone = share.clone();
+        if let Some(ref store) = self.store {
+            self.persist_labor_share(&share_clone, store)?;
+        }
+
+        Ok(())
+    }
+
+    /// Execute a surplus allocation to all active shareholders
+    ///
+    /// This distributes surplus proportionally based on labor days.
+    /// Requires governance approval (allocation should contain proposal_id).
+    pub fn execute_surplus_allocation(&mut self, allocation: SurplusAllocation) -> Result<()> {
+        info!(
+            allocation_id = %allocation.id,
+            cooperative_id = %allocation.cooperative_id,
+            total_surplus = allocation.total_surplus,
+            period = %allocation.period,
+            "Executing surplus allocation"
+        );
+
+        // Validate all shares belong to the specified cooperative
+        for (share_id, _) in &allocation.allocations {
+            if let Some(share) = self.labor_shares.get(share_id) {
+                if share.cooperative_id != allocation.cooperative_id {
+                    bail!(
+                        "Share {} belongs to cooperative '{}', not '{}'",
+                        share_id,
+                        share.cooperative_id,
+                        allocation.cooperative_id
+                    );
+                }
+            } else {
+                bail!("Share not found: {share_id}");
+            }
+        }
+
+        let now = icn_time::current_timestamp_secs();
+
+        // Apply allocations to each share
+        for (share_id, amount) in &allocation.allocations {
+            if let Some(share) = self.labor_shares.get_mut(share_id) {
+                share
+                    .allocate_surplus(*amount, allocation.period.clone(), now)
+                    .map_err(|e| anyhow::anyhow!("{e}"))?;
+            }
+        }
+
+        // Store the allocation record
+        self.surplus_allocations
+            .insert(allocation.id.clone(), allocation.clone());
+
+        // Persist all updated shares
+        if let Some(ref store) = self.store {
+            for (share_id, _) in &allocation.allocations {
+                if let Some(share) = self.labor_shares.get(share_id) {
+                    self.persist_labor_share(share, store)?;
+                }
+            }
+            self.persist_surplus_allocation(&allocation, store)?;
+        }
+
+        Ok(())
+    }
+
+    /// Start share redemption process
+    ///
+    /// Transitions the share to Redeeming status with a payout schedule.
+    /// Requires governance approval.
+    pub fn start_share_redemption(
+        &mut self,
+        share_id: &ShareId,
+        payout_schedule: Vec<ScheduledPayout>,
+        proposal_id: String,
+    ) -> Result<()> {
+        let now = icn_time::current_timestamp_secs();
+
+        let share = self
+            .labor_shares
+            .get_mut(share_id)
+            .ok_or_else(|| anyhow::anyhow!("Labor share not found: {share_id}"))?;
+
+        if !share.is_active() {
+            bail!("Cannot redeem inactive share: {share_id}");
+        }
+
+        info!(
+            share_id = %share_id,
+            payout_count = payout_schedule.len(),
+            "Starting share redemption"
+        );
+
+        share.start_redemption(payout_schedule, proposal_id, now);
+
+        let share_clone = share.clone();
+        if let Some(ref store) = self.store {
+            self.persist_labor_share(&share_clone, store)?;
+        }
+
+        Ok(())
+    }
+
+    /// Record a redemption payout
+    ///
+    /// Records that a scheduled payout has been completed.
+    pub fn record_redemption_payout(&mut self, share_id: &ShareId, amount: i64) -> Result<()> {
+        let now = icn_time::current_timestamp_secs();
+
+        let share = self
+            .labor_shares
+            .get_mut(share_id)
+            .ok_or_else(|| anyhow::anyhow!("Labor share not found: {share_id}"))?;
+
+        info!(
+            share_id = %share_id,
+            amount = amount,
+            "Recording redemption payout"
+        );
+
+        share.record_payout(amount, now);
+
+        let share_clone = share.clone();
+        if let Some(ref store) = self.store {
+            self.persist_labor_share(&share_clone, store)?;
+        }
+
+        Ok(())
+    }
+
+    // === Bond Operations ===
+
+    /// Create a new cooperative bond
+    ///
+    /// Requires governance approval (bond should contain approval_proposal).
+    pub fn create_bond(&mut self, bond: CooperativeBond) -> Result<()> {
+        if self.bonds.contains_key(&bond.id) {
+            bail!("Bond already exists: {}", bond.id);
+        }
+
+        // Validate bond parameters
+        if bond.principal <= 0 {
+            bail!("Bond principal must be positive: {}", bond.principal);
+        }
+
+        info!(
+            bond_id = %bond.id,
+            issuer_id = %bond.issuer_id,
+            principal = bond.principal,
+            "Creating cooperative bond"
+        );
+
+        self.issuer_bonds
+            .entry(bond.issuer_id.clone())
+            .or_default()
+            .push(bond.id.clone());
+        self.bonds.insert(bond.id.clone(), bond.clone());
+
+        if let Some(ref store) = self.store {
+            self.persist_bond(&bond, store)?;
+        }
+
+        Ok(())
+    }
+
+    /// Get a bond by ID
+    pub fn get_bond(&self, bond_id: &BondId) -> Option<&CooperativeBond> {
+        self.bonds.get(bond_id)
+    }
+
+    /// Get mutable bond by ID
+    pub fn get_bond_mut(&mut self, bond_id: &BondId) -> Option<&mut CooperativeBond> {
+        self.bonds.get_mut(bond_id)
+    }
+
+    /// List all bonds issued by a cooperative
+    pub fn list_issuer_bonds(&self, issuer_id: &str) -> Vec<&CooperativeBond> {
+        self.issuer_bonds
+            .get(issuer_id)
+            .map(|ids| ids.iter().filter_map(|id| self.bonds.get(id)).collect())
+            .unwrap_or_default()
+    }
+
+    /// Record a bond payment
+    ///
+    /// Only accepts payments on Active bonds. Bonds in Offering, Matured,
+    /// or Defaulted status cannot receive payments.
+    pub fn record_bond_payment(
+        &mut self,
+        bond_id: &BondId,
+        payment_type: BondPaymentType,
+        amount: i64,
+    ) -> Result<()> {
+        let now = icn_time::current_timestamp_secs();
+
+        let bond = self
+            .bonds
+            .get_mut(bond_id)
+            .ok_or_else(|| anyhow::anyhow!("Bond not found: {bond_id}"))?;
+
+        // Validate bond is in Active status
+        if !matches!(bond.status, BondStatus::Active) {
+            bail!(
+                "Cannot record payment on bond {}: status is {:?}, expected Active",
+                bond_id,
+                bond.status
+            );
+        }
+
+        // Validate payment amount is positive
+        if amount <= 0 {
+            bail!("Payment amount must be positive: {amount}");
+        }
+
+        // Validate payment doesn't exceed outstanding balance
+        let outstanding = bond.total_owed().saturating_sub(bond.total_paid());
+        if amount > outstanding {
+            bail!(
+                "Payment amount {amount} exceeds outstanding balance {outstanding} for bond {bond_id}"
+            );
+        }
+
+        info!(
+            bond_id = %bond_id,
+            payment_type = ?payment_type,
+            amount = amount,
+            "Recording bond payment"
+        );
+
+        bond.record_payment(payment_type, amount, now);
+
+        // Check if bond is fully repaid (principal + interest)
+        if bond.total_paid() >= bond.total_owed() {
+            bond.mark_matured(now);
+        }
+
+        let bond_clone = bond.clone();
+        if let Some(ref store) = self.store {
+            self.persist_bond(&bond_clone, store)?;
+        }
+
+        Ok(())
+    }
+
+    /// Activate a bond (move from Offering to Active)
+    pub fn activate_bond(&mut self, bond_id: &BondId) -> Result<()> {
+        let bond = self
+            .bonds
+            .get_mut(bond_id)
+            .ok_or_else(|| anyhow::anyhow!("Bond not found: {bond_id}"))?;
+
+        info!(bond_id = %bond_id, "Activating bond");
+
+        bond.activate().map_err(|e| anyhow::anyhow!("{e}"))?;
+
+        let bond_clone = bond.clone();
+        if let Some(ref store) = self.store {
+            self.persist_bond(&bond_clone, store)?;
+        }
+
+        Ok(())
+    }
+
+    // === Labor Share Persistence ===
+
+    fn persist_labor_share(&self, share: &LaborShare, store: &Arc<dyn Store>) -> Result<()> {
+        let key = format!("{}{}", LABOR_SHARE_PREFIX, share.id);
+        let value = serde_json::to_vec(share)?;
+        store.put(key.as_bytes(), &value)?;
+        Ok(())
+    }
+
+    fn persist_bond(&self, bond: &CooperativeBond, store: &Arc<dyn Store>) -> Result<()> {
+        let key = format!("{}{}", BOND_PREFIX, bond.id);
+        let value = serde_json::to_vec(bond)?;
+        store.put(key.as_bytes(), &value)?;
+        Ok(())
+    }
+
+    fn persist_surplus_allocation(
+        &self,
+        allocation: &SurplusAllocation,
+        store: &Arc<dyn Store>,
+    ) -> Result<()> {
+        let key = format!("{}{}", SURPLUS_ALLOCATION_PREFIX, allocation.id);
+        let value = serde_json::to_vec(allocation)?;
+        store.put(key.as_bytes(), &value)?;
+        Ok(())
+    }
+
     // === Validation ===
 
     /// Validate a journal entry against treasury spending rules
@@ -1512,10 +2027,62 @@ impl TreasuryManager {
             }
         }
 
+        // Load labor shares
+        let share_pairs = store.scan(LABOR_SHARE_PREFIX.as_bytes())?;
+        for (key, value) in share_pairs {
+            let key_str = String::from_utf8_lossy(&key);
+            // Skip index entries
+            if key_str.contains(":idx:") {
+                continue;
+            }
+            if let Ok(share) = serde_json::from_slice::<LaborShare>(&value) {
+                // Build indices
+                self.holder_shares
+                    .entry(share.holder.clone())
+                    .or_default()
+                    .push(share.id.clone());
+                self.coop_shares
+                    .entry(share.cooperative_id.clone())
+                    .or_default()
+                    .push(share.id.clone());
+                self.labor_shares.insert(share.id.clone(), share);
+            }
+        }
+
+        // Load bonds
+        let bond_pairs = store.scan(BOND_PREFIX.as_bytes())?;
+        for (key, value) in bond_pairs {
+            let key_str = String::from_utf8_lossy(&key);
+            // Skip index entries
+            if key_str.contains(":idx:") {
+                continue;
+            }
+            if let Ok(bond) = serde_json::from_slice::<CooperativeBond>(&value) {
+                // Build indices
+                self.issuer_bonds
+                    .entry(bond.issuer_id.clone())
+                    .or_default()
+                    .push(bond.id.clone());
+                self.bonds.insert(bond.id.clone(), bond);
+            }
+        }
+
+        // Load surplus allocations
+        let allocation_pairs = store.scan(SURPLUS_ALLOCATION_PREFIX.as_bytes())?;
+        for (_, value) in allocation_pairs {
+            if let Ok(allocation) = serde_json::from_slice::<SurplusAllocation>(&value) {
+                self.surplus_allocations
+                    .insert(allocation.id.clone(), allocation);
+            }
+        }
+
         info!(
             treasuries = self.treasuries.len(),
             budgets = self.budgets.len(),
             rules = self.spending_rules.len(),
+            labor_shares = self.labor_shares.len(),
+            bonds = self.bonds.len(),
+            surplus_allocations = self.surplus_allocations.len(),
             "Loaded treasury data from store"
         );
 
@@ -2178,5 +2745,304 @@ mod tests {
         // Verify transfer completed
         assert_eq!(manager.get_budget(&from_id).unwrap().allocated_amount, 700);
         assert_eq!(manager.get_budget(&to_id).unwrap().allocated_amount, 800);
+    }
+
+    // === Labor Share Tests ===
+
+    #[test]
+    fn test_create_labor_share() {
+        let mut manager = TreasuryManager::new();
+        let holder = test_did("member");
+        let coop_id = "food-coop".to_string();
+
+        let share = manager
+            .create_labor_share(holder.clone(), coop_id.clone(), "hours".to_string())
+            .unwrap();
+
+        assert_eq!(share.holder, holder);
+        assert_eq!(share.cooperative_id, coop_id);
+        assert_eq!(share.currency, "hours");
+        assert_eq!(share.labor_days, 0);
+        assert_eq!(share.accumulated_surplus, 0);
+        assert!(share.is_active());
+
+        // Should be retrievable
+        assert!(manager.get_labor_share(&share.id).is_some());
+    }
+
+    #[test]
+    fn test_record_labor_contribution() {
+        let mut manager = TreasuryManager::new();
+        let holder = test_did("member");
+
+        let share = manager
+            .create_labor_share(holder, "food-coop".to_string(), "hours".to_string())
+            .unwrap();
+
+        let share_id = share.id.clone();
+
+        // Record labor contribution
+        manager
+            .record_labor_contribution(&share_id, 10, Some("Week 1 work".to_string()))
+            .unwrap();
+
+        let share = manager.get_labor_share(&share_id).unwrap();
+        assert_eq!(share.labor_days, 10);
+        assert_eq!(share.provenance.len(), 2); // Created + LaborRecorded
+
+        // Record more labor
+        manager
+            .record_labor_contribution(&share_id, 5, None)
+            .unwrap();
+        let share = manager.get_labor_share(&share_id).unwrap();
+        assert_eq!(share.labor_days, 15);
+    }
+
+    #[test]
+    fn test_list_holder_shares() {
+        let mut manager = TreasuryManager::new();
+        let holder1 = test_did("member1");
+        let holder2 = test_did("member2");
+
+        // Create shares for holder1 in two coops
+        manager
+            .create_labor_share(holder1.clone(), "coop-a".to_string(), "hours".to_string())
+            .unwrap();
+        manager
+            .create_labor_share(holder1.clone(), "coop-b".to_string(), "hours".to_string())
+            .unwrap();
+
+        // Create share for holder2
+        manager
+            .create_labor_share(holder2.clone(), "coop-a".to_string(), "hours".to_string())
+            .unwrap();
+
+        // holder1 should have 2 shares
+        let holder1_shares = manager.list_holder_shares(&holder1);
+        assert_eq!(holder1_shares.len(), 2);
+
+        // holder2 should have 1 share
+        let holder2_shares = manager.list_holder_shares(&holder2);
+        assert_eq!(holder2_shares.len(), 1);
+    }
+
+    #[test]
+    fn test_list_coop_shares() {
+        let mut manager = TreasuryManager::new();
+        let holder1 = test_did("member1");
+        let holder2 = test_did("member2");
+
+        // Create shares in coop-a for both holders
+        manager
+            .create_labor_share(holder1.clone(), "coop-a".to_string(), "hours".to_string())
+            .unwrap();
+        manager
+            .create_labor_share(holder2.clone(), "coop-a".to_string(), "hours".to_string())
+            .unwrap();
+
+        // Create share in coop-b for holder1 only
+        manager
+            .create_labor_share(holder1, "coop-b".to_string(), "hours".to_string())
+            .unwrap();
+
+        // coop-a should have 2 shares
+        let coop_a_shares = manager.list_coop_shares("coop-a");
+        assert_eq!(coop_a_shares.len(), 2);
+
+        // coop-b should have 1 share
+        let coop_b_shares = manager.list_coop_shares("coop-b");
+        assert_eq!(coop_b_shares.len(), 1);
+    }
+
+    #[test]
+    fn test_create_and_activate_bond() {
+        use crate::labor_shares::{BondStatus, PaymentSchedule};
+
+        let mut manager = TreasuryManager::new();
+        let holder = test_did("investor");
+        let now = icn_time::current_timestamp_secs();
+
+        let bond = CooperativeBond::new_offering(
+            BondId::new("bond-001".to_string()),
+            "food-coop".to_string(),
+            holder.clone(),
+            10000,                                               // principal
+            300,                                                 // 3% interest (basis points)
+            now + 31536000,                                      // 1 year maturity
+            PaymentSchedule::InterestOnly { interval_days: 90 }, // Quarterly interest
+            "hours".to_string(),
+            "proposal-001".to_string(),
+            now,
+        );
+
+        manager.create_bond(bond.clone()).unwrap();
+
+        // Should be retrievable
+        let retrieved = manager.get_bond(&bond.id).unwrap();
+        assert_eq!(retrieved.principal, 10000);
+        assert!(matches!(retrieved.status, BondStatus::Offering { .. }));
+
+        // Activate the bond
+        manager.activate_bond(&bond.id).unwrap();
+        let activated = manager.get_bond(&bond.id).unwrap();
+        assert!(matches!(activated.status, BondStatus::Active));
+    }
+
+    #[test]
+    fn test_record_bond_payment() {
+        use crate::labor_shares::PaymentSchedule;
+
+        let mut manager = TreasuryManager::new();
+        let holder = test_did("investor");
+        let now = icn_time::current_timestamp_secs();
+
+        let bond = CooperativeBond::new_offering(
+            BondId::new("bond-002".to_string()),
+            "tech-coop".to_string(),
+            holder,
+            5000,
+            200, // 2% interest
+            now + 31536000,
+            PaymentSchedule::InterestOnly { interval_days: 30 }, // Monthly interest
+            "hours".to_string(),
+            "proposal-002".to_string(),
+            now,
+        );
+
+        manager.create_bond(bond.clone()).unwrap();
+        manager.activate_bond(&bond.id).unwrap();
+
+        // Record interest payment
+        manager
+            .record_bond_payment(&bond.id, BondPaymentType::Interest, 25)
+            .unwrap();
+
+        let bond = manager.get_bond(&bond.id).unwrap();
+        assert_eq!(bond.payments.len(), 1);
+        assert_eq!(bond.payments[0].amount, 25);
+        assert!(matches!(
+            bond.payments[0].payment_type,
+            BondPaymentType::Interest
+        ));
+    }
+
+    #[test]
+    fn test_list_issuer_bonds() {
+        use crate::labor_shares::PaymentSchedule;
+
+        let mut manager = TreasuryManager::new();
+        let holder1 = test_did("investor1");
+        let holder2 = test_did("investor2");
+        let now = icn_time::current_timestamp_secs();
+
+        // Create bonds for food-coop
+        manager
+            .create_bond(CooperativeBond::new_offering(
+                BondId::new("food-bond-1".to_string()),
+                "food-coop".to_string(),
+                holder1.clone(),
+                1000,
+                100,
+                now + 31536000,
+                PaymentSchedule::Bullet, // All at maturity
+                "hours".to_string(),
+                "proposal-f1".to_string(),
+                now,
+            ))
+            .unwrap();
+        manager
+            .create_bond(CooperativeBond::new_offering(
+                BondId::new("food-bond-2".to_string()),
+                "food-coop".to_string(),
+                holder2,
+                2000,
+                150,
+                now + 31536000,
+                PaymentSchedule::Bullet,
+                "hours".to_string(),
+                "proposal-f2".to_string(),
+                now,
+            ))
+            .unwrap();
+
+        // Create bond for tech-coop
+        manager
+            .create_bond(CooperativeBond::new_offering(
+                BondId::new("tech-bond-1".to_string()),
+                "tech-coop".to_string(),
+                holder1,
+                1500,
+                120,
+                now + 31536000,
+                PaymentSchedule::Amortizing { interval_days: 90 }, // Quarterly amortizing
+                "hours".to_string(),
+                "proposal-t1".to_string(),
+                now,
+            ))
+            .unwrap();
+
+        // food-coop should have 2 bonds
+        let food_bonds = manager.list_issuer_bonds("food-coop");
+        assert_eq!(food_bonds.len(), 2);
+
+        // tech-coop should have 1 bond
+        let tech_bonds = manager.list_issuer_bonds("tech-coop");
+        assert_eq!(tech_bonds.len(), 1);
+    }
+
+    #[test]
+    fn test_surplus_allocation_execution() {
+        let mut manager = TreasuryManager::new();
+        let holder1 = test_did("member1");
+        let holder2 = test_did("member2");
+        let coop_id = "workers-coop".to_string();
+        let now = icn_time::current_timestamp_secs();
+
+        // Create shares with different labor contributions
+        let share1 = manager
+            .create_labor_share(holder1.clone(), coop_id.clone(), "hours".to_string())
+            .unwrap();
+        manager
+            .record_labor_contribution(&share1.id, 100, None)
+            .unwrap(); // 100 labor days
+
+        let share2 = manager
+            .create_labor_share(holder2.clone(), coop_id.clone(), "hours".to_string())
+            .unwrap();
+        manager
+            .record_labor_contribution(&share2.id, 50, None)
+            .unwrap(); // 50 labor days
+
+        // Get the shares to pass to the allocation
+        let shares: Vec<LaborShare> = manager
+            .list_coop_shares(&coop_id)
+            .into_iter()
+            .cloned()
+            .collect();
+
+        // Create a surplus allocation (1500 total surplus, 150 total labor days = 10 per day)
+        let allocation = SurplusAllocation::new(
+            "alloc-2025-q1".to_string(),
+            coop_id,
+            1500, // total surplus
+            "2025-Q1".to_string(),
+            &shares,
+            "proposal-123".to_string(),
+            now,
+            "hours".to_string(),
+        )
+        .unwrap();
+
+        // Execute the allocation
+        manager.execute_surplus_allocation(allocation).unwrap();
+
+        // Check that surplus was distributed proportionally
+        // holder1: 100/150 * 1500 = 1000
+        // holder2: 50/150 * 1500 = 500
+        let share1 = manager.get_labor_share(&share1.id).unwrap();
+        let share2 = manager.get_labor_share(&share2.id).unwrap();
+
+        assert_eq!(share1.accumulated_surplus, 1000);
+        assert_eq!(share2.accumulated_surplus, 500);
     }
 }
