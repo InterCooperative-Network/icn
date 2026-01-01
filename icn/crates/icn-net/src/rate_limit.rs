@@ -242,13 +242,23 @@ impl RateLimiter {
 
     /// Check if a message from the given peer should be allowed.
     /// Returns true if allowed, false if rate limited.
+    ///
+    /// This implementation acquires the write lock on buckets BEFORE looking up
+    /// the trust class to prevent TOCTOU race conditions. This ensures the bucket
+    /// is created or updated with the current trust class, not a stale one.
     pub async fn check_rate_limit(&self, peer: &Did) -> bool {
-        // Determine which config and trust class to use
+        // Acquire write lock on buckets FIRST to prevent TOCTOU race with trust class lookup.
+        // If we looked up trust class first and released that lock, another thread could
+        // update the trust graph between our read and the bucket creation/update.
+        let mut buckets = self.buckets.write().await;
+
+        // Now determine which config and trust class to use while holding the write lock
         let (config, trust_class) = if let (Some(trust_gated_config), Some(trust_graph)) =
             (&self.trust_gated_config, &self.trust_graph)
         {
             // Trust-gated mode: look up peer's trust class
-            // Uses read lock - TrustGraph cache uses interior mutability (Mutex)
+            // Read lock acquired while holding buckets write lock - safe because trust_graph
+            // is only read here and never writes while holding buckets lock.
             let trust_class = {
                 let graph = trust_graph.read().await;
                 graph.trust_class(peer).unwrap_or(TrustClass::Isolated)
@@ -259,8 +269,6 @@ impl RateLimiter {
             // Fallback mode: use single config for all peers
             (&self.fallback_config, None)
         };
-
-        let mut buckets = self.buckets.write().await;
 
         // Calculate refill rate: tokens per interval
         let refill_rate =

@@ -39,4 +39,7 @@ pub use error::{Result, TimeError};
 pub use sync::{
     start_clock_sync_task, ClockSync, RoughTimeServer, MAX_CLOCK_SKEW, MIN_SERVERS, QUERY_TIMEOUT,
 };
-pub use timestamp::{current_timestamp_millis, current_timestamp_nanos, current_timestamp_secs};
+pub use timestamp::{
+    current_timestamp_millis, current_timestamp_nanos, current_timestamp_secs,
+    try_current_timestamp_millis, try_current_timestamp_nanos, try_current_timestamp_secs,
+};
