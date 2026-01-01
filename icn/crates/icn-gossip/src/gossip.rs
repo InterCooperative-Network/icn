@@ -683,8 +683,10 @@ impl GossipActor {
                                         evidence,
                                     );
                                 });
+                            } else {
+                                warn!("No Tokio runtime for violation recording - Byzantine penalty skipped for unauthorized_subscription");
+                                icn_obs::metrics::gossip::runtime_unavailable_inc();
                             }
-                            // If no runtime, skip recording - violation still causes rejection
                         });
                     }
 
@@ -730,8 +732,10 @@ impl GossipActor {
                                 evidence,
                             );
                         });
+                    } else {
+                        warn!("No Tokio runtime for violation recording - Byzantine penalty skipped for acl_violation");
+                        icn_obs::metrics::gossip::runtime_unavailable_inc();
                     }
-                    // If no runtime, skip recording - violation still causes rejection
                 });
             }
 
@@ -766,8 +770,10 @@ impl GossipActor {
                                 evidence,
                             );
                         });
+                    } else {
+                        warn!("No Tokio runtime for violation recording - Byzantine penalty skipped for peer_subscriptions");
+                        icn_obs::metrics::gossip::runtime_unavailable_inc();
                     }
-                    // If no runtime, skip recording - violation still causes rejection
                 });
             }
 
@@ -815,8 +821,10 @@ impl GossipActor {
                                     evidence,
                                 );
                             });
+                        } else {
+                            warn!("No Tokio runtime for violation recording - Byzantine penalty skipped for topic_subscribers");
+                            icn_obs::metrics::gossip::runtime_unavailable_inc();
                         }
-                        // If no runtime, skip recording - violation still causes rejection
                     });
                 }
 
