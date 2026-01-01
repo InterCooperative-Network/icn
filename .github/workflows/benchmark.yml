@@ -17,6 +17,10 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  # Only these crates have Criterion benchmarks defined (with harness = false)
+  # Running --workspace includes crates without benchmarks which use libtest harness
+  # that doesn't recognize Criterion flags like --noplot
+  BENCH_PACKAGES: "-p icn-compute -p icn-gateway -p icn-gossip -p icn-ledger -p icn-net -p icn-trust"
 
 permissions:
   contents: read
@@ -42,7 +46,7 @@ jobs:
           cache-on-failure: true
 
       - name: Run benchmarks
-        run: cargo bench --workspace -- --noplot --save-baseline main
+        run: cargo bench $BENCH_PACKAGES -- --noplot --save-baseline main
         working-directory: ./icn
         timeout-minutes: 45
 
@@ -78,7 +82,7 @@ jobs:
           cache-on-failure: true
 
       - name: Run baseline benchmarks
-        run: cargo bench --workspace -- --noplot --save-baseline base
+        run: cargo bench $BENCH_PACKAGES -- --noplot --save-baseline base
         working-directory: ./baseline/icn
         timeout-minutes: 45
 
@@ -117,7 +121,7 @@ jobs:
           # Run benchmarks with comparison against baseline
           # Use process substitution to capture exit code while still using tee
           BENCH_EXIT=0
-          cargo bench --workspace -- --noplot --baseline base 2>&1 | tee bench_output.txt || BENCH_EXIT=$?
+          cargo bench $BENCH_PACKAGES -- --noplot --baseline base 2>&1 | tee bench_output.txt || BENCH_EXIT=$?
 
           if [ "$BENCH_EXIT" -ne 0 ]; then
             echo "::error::Benchmark execution failed with exit code $BENCH_EXIT"
