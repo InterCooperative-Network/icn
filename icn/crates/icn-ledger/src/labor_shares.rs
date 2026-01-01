@@ -265,28 +265,34 @@ impl LaborShare {
     }
 
     /// Record a completed payout during redemption
+    ///
+    /// Marks the first unpaid scheduled payout with matching amount as paid.
+    /// If all payouts are now complete, transitions to Redeemed status.
     pub fn record_payout(&mut self, amount: i64, at: u64) {
         self.provenance
             .push(ShareEvent::PayoutCompleted { at, amount });
 
-        // Check if all payouts are complete
+        // Mark the matching payout as paid and check if all complete
         if let ShareStatus::Redeeming {
-            ref payout_schedule,
+            ref mut payout_schedule,
             ..
         } = self.status
         {
-            let total_paid: i64 = payout_schedule
-                .iter()
-                .filter(|p| p.paid)
-                .map(|p| p.amount)
-                .sum();
+            // Find and mark the first unpaid payout with matching amount
+            if let Some(payout) = payout_schedule
+                .iter_mut()
+                .find(|p| !p.paid && p.amount == amount)
+            {
+                payout.mark_paid(at);
+            }
 
-            let total_scheduled: i64 = payout_schedule.iter().map(|p| p.amount).sum();
-
-            if total_paid + amount >= total_scheduled {
+            // Check if all payouts are now complete
+            let all_paid = payout_schedule.iter().all(|p| p.paid);
+            if all_paid {
+                let total_payout: i64 = payout_schedule.iter().map(|p| p.amount).sum();
                 self.status = ShareStatus::Redeemed {
                     completed_at: at,
-                    total_payout: total_paid + amount,
+                    total_payout,
                 };
                 self.provenance.push(ShareEvent::FullyRedeemed { at });
             }
@@ -529,6 +535,8 @@ impl SurplusAllocation {
     /// Create a new surplus allocation
     ///
     /// Calculates individual allocations based on labor days for each share.
+    /// Uses integer arithmetic to ensure the sum of allocations equals total_surplus
+    /// (no rounding losses). Remainder is distributed using largest-remainder method.
     pub fn new(
         id: String,
         cooperative_id: String,
@@ -539,25 +547,64 @@ impl SurplusAllocation {
         allocated_at: u64,
         currency: String,
     ) -> Self {
-        // Calculate total labor days
-        let total_labor_days: u64 = shares.iter().map(|s| s.labor_days).sum();
+        // Calculate total labor days from active shares only
+        let active_shares: Vec<_> = shares.iter().filter(|s| s.is_active()).collect();
+        let total_labor_days: u64 = active_shares.iter().map(|s| s.labor_days).sum();
 
-        // Calculate unit value (surplus per labor day)
+        // Calculate unit value (informational, for display purposes)
         let share_unit_value = if total_labor_days > 0 {
             (total_surplus as f64) / (total_labor_days as f64)
         } else {
             0.0
         };
 
-        // Calculate individual allocations
-        let allocations: Vec<(ShareId, i64)> = shares
-            .iter()
-            .filter(|s| s.is_active())
-            .map(|s| {
-                let allocation = (s.labor_days as f64 * share_unit_value) as i64;
-                (s.id.clone(), allocation)
-            })
-            .collect();
+        // Calculate individual allocations using integer arithmetic
+        // to avoid floating-point rounding losses
+        let allocations: Vec<(ShareId, i64)> = if total_labor_days == 0 {
+            // No labor days - allocate zero to all
+            active_shares
+                .iter()
+                .map(|s| (s.id.clone(), 0_i64))
+                .collect()
+        } else {
+            // Use i128 for intermediate calculations to prevent overflow
+            let total_labor_i128 = total_labor_days as i128;
+            let total_surplus_i128 = total_surplus as i128;
+
+            // Calculate base allocations (may sum to less than total due to truncation)
+            let mut base_allocations: Vec<(ShareId, i64, i64)> = active_shares
+                .iter()
+                .map(|s| {
+                    let labor_i128 = s.labor_days as i128;
+                    let base = ((total_surplus_i128 * labor_i128) / total_labor_i128) as i64;
+                    // Calculate remainder for largest-remainder distribution
+                    let remainder = ((total_surplus_i128 * labor_i128) % total_labor_i128) as i64;
+                    (s.id.clone(), base, remainder)
+                })
+                .collect();
+
+            // Calculate how much we've allocated so far
+            let allocated_sum: i64 = base_allocations.iter().map(|(_, base, _)| base).sum();
+            let mut remainder = total_surplus - allocated_sum;
+
+            // Distribute remainder using largest-remainder method
+            // Sort by remainder descending, add 1 to each until remainder is distributed
+            if remainder > 0 {
+                base_allocations.sort_by(|a, b| b.2.cmp(&a.2));
+                for (_, base, _) in base_allocations.iter_mut() {
+                    if remainder <= 0 {
+                        break;
+                    }
+                    *base += 1;
+                    remainder -= 1;
+                }
+            }
+
+            base_allocations
+                .into_iter()
+                .map(|(id, base, _)| (id, base))
+                .collect()
+        };
 
         SurplusAllocation {
             id,
@@ -673,13 +720,13 @@ mod tests {
     #[test]
     fn test_share_id_display() {
         let id = ShareId::new("share-001");
-        assert_eq!(format!("{}", id), "share-001");
+        assert_eq!(format!("{id}"), "share-001");
     }
 
     #[test]
     fn test_bond_id_display() {
         let id = BondId::new("bond-001");
-        assert_eq!(format!("{}", id), "bond-001");
+        assert_eq!(format!("{id}"), "bond-001");
     }
 
     #[test]
@@ -842,5 +889,95 @@ mod tests {
             amount: 5000,
         };
         assert_eq!(guarantee.value(), 5000);
+    }
+
+    #[test]
+    fn test_surplus_allocation_sums_exactly() {
+        // Test that integer allocation sums to exactly the total surplus
+        // (no rounding loss from floating-point arithmetic)
+        let holder = test_did();
+
+        // Create shares with labor days that don't divide evenly
+        let shares: Vec<LaborShare> = (1..=7)
+            .map(|i| {
+                let mut s = LaborShare::new(
+                    ShareId::new(format!("share-{i:03}")),
+                    holder.clone(),
+                    "coop-001".to_string(),
+                    "hours".to_string(),
+                    1000,
+                );
+                s.labor_days = 17 * i; // 17, 34, 51, 68, 85, 102, 119 = 476 total
+                s
+            })
+            .collect();
+
+        let total_surplus = 1000_i64;
+
+        let allocation = SurplusAllocation::new(
+            "alloc-001".to_string(),
+            "coop-001".to_string(),
+            total_surplus,
+            "2025-Q4".to_string(),
+            &shares,
+            "proposal-001".to_string(),
+            2000,
+            "hours".to_string(),
+        );
+
+        // Sum all allocations - must equal exactly total_surplus
+        let allocated_sum: i64 = allocation.allocations.iter().map(|(_, amt)| amt).sum();
+        assert_eq!(
+            allocated_sum, total_surplus,
+            "Allocation sum {allocated_sum} != total surplus {total_surplus}",
+        );
+    }
+
+    #[test]
+    fn test_record_payout_marks_schedule() {
+        let mut share = LaborShare::new(
+            ShareId::new("share-001"),
+            test_did(),
+            "coop-001".to_string(),
+            "hours".to_string(),
+            1000,
+        );
+
+        share.allocate_surplus(1000, "2025-Q4".to_string(), 2000);
+
+        let schedule = vec![
+            ScheduledPayout::new(3000, 400),
+            ScheduledPayout::new(4000, 600),
+        ];
+
+        share.start_redemption(schedule, "proposal-001".to_string(), 2500);
+
+        // Record first payout
+        share.record_payout(400, 3000);
+
+        // Should still be redeeming (one payout left)
+        assert!(matches!(share.status, ShareStatus::Redeeming { .. }));
+
+        if let ShareStatus::Redeeming {
+            ref payout_schedule,
+            ..
+        } = share.status
+        {
+            // First payout should be marked paid
+            assert!(payout_schedule[0].paid);
+            assert!(!payout_schedule[1].paid);
+        }
+
+        // Record second payout
+        share.record_payout(600, 4000);
+
+        // Should now be fully redeemed
+        assert!(matches!(
+            share.status,
+            ShareStatus::Redeemed {
+                total_payout: 1000,
+                ..
+            }
+        ));
     }
 }
