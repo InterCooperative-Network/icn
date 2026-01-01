@@ -110,10 +110,10 @@ impl VectorClock {
     /// - All entries in this clock are <= corresponding entries in other
     /// - At least one entry in this clock is < corresponding entry in other
     pub fn happened_before(&self, other: &VectorClock) -> bool {
-        let all_less_or_equal = true;
         let mut at_least_one_less = false;
 
         // Check all entries in this clock
+        // If any entry in this > other, return false immediately
         for (node, entry) in &self.entries {
             let other_count = other.get(node);
             if entry.count > other_count {
@@ -131,7 +131,9 @@ impl VectorClock {
             }
         }
 
-        all_less_or_equal && at_least_one_less
+        // If we reach here, all entries are <= (no early return)
+        // Return true only if at least one entry was strictly less
+        at_least_one_less
     }
 
     /// Check if this clock happened after another (this > other)
