@@ -24,6 +24,9 @@ pub enum TimeError {
 
     #[error("Clock not synchronized yet")]
     NotSynchronized,
+
+    #[error("System clock error: time before UNIX epoch")]
+    SystemClockError,
 }
 
 pub type Result<T> = std::result::Result<T, TimeError>;

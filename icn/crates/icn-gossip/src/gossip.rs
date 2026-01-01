@@ -633,12 +633,19 @@ impl GossipActor {
                 // Use blocking operation since we're in a sync context
                 let trust_score = {
                     // block_in_place allows blocking in async runtime context
+                    // Use try_current() to avoid panic if not in a runtime
                     tokio::task::block_in_place(|| {
-                        let rt = tokio::runtime::Handle::current();
-                        rt.block_on(async {
-                            let graph = trust_graph.read().await;
-                            graph.compute_trust_score(&subscriber).unwrap_or(0.0)
-                        })
+                        match tokio::runtime::Handle::try_current() {
+                            Ok(rt) => rt.block_on(async {
+                                let graph = trust_graph.read().await;
+                                graph.compute_trust_score(&subscriber).unwrap_or(0.0)
+                            }),
+                            Err(_) => {
+                                warn!("No Tokio runtime available for trust score lookup");
+                                icn_obs::metrics::gossip::runtime_unavailable_inc();
+                                0.0 // Fallback: untrusted
+                            }
+                        }
                     })
                 };
 
@@ -668,14 +675,18 @@ impl GossipActor {
                         };
 
                         tokio::task::block_in_place(|| {
-                            let rt = tokio::runtime::Handle::current();
-                            rt.block_on(async {
-                                detector.write().await.record_violation(
-                                    &subscriber,
-                                    violation,
-                                    evidence,
-                                );
-                            })
+                            if let Ok(rt) = tokio::runtime::Handle::try_current() {
+                                rt.block_on(async {
+                                    detector.write().await.record_violation(
+                                        &subscriber,
+                                        violation,
+                                        evidence,
+                                    );
+                                });
+                            } else {
+                                warn!("No Tokio runtime for violation recording - Byzantine penalty skipped for unauthorized_subscription");
+                                icn_obs::metrics::gossip::runtime_unavailable_inc();
+                            }
                         });
                     }
 
@@ -713,13 +724,18 @@ impl GossipActor {
                 };
 
                 tokio::task::block_in_place(|| {
-                    let rt = tokio::runtime::Handle::current();
-                    rt.block_on(async {
-                        detector
-                            .write()
-                            .await
-                            .record_violation(&subscriber, violation, evidence);
-                    })
+                    if let Ok(rt) = tokio::runtime::Handle::try_current() {
+                        rt.block_on(async {
+                            detector.write().await.record_violation(
+                                &subscriber,
+                                violation,
+                                evidence,
+                            );
+                        });
+                    } else {
+                        warn!("No Tokio runtime for violation recording - Byzantine penalty skipped for acl_violation");
+                        icn_obs::metrics::gossip::runtime_unavailable_inc();
+                    }
                 });
             }
 
@@ -746,13 +762,18 @@ impl GossipActor {
                 };
 
                 tokio::task::block_in_place(|| {
-                    let rt = tokio::runtime::Handle::current();
-                    rt.block_on(async {
-                        detector
-                            .write()
-                            .await
-                            .record_violation(&subscriber, violation, evidence);
-                    })
+                    if let Ok(rt) = tokio::runtime::Handle::try_current() {
+                        rt.block_on(async {
+                            detector.write().await.record_violation(
+                                &subscriber,
+                                violation,
+                                evidence,
+                            );
+                        });
+                    } else {
+                        warn!("No Tokio runtime for violation recording - Byzantine penalty skipped for peer_subscriptions");
+                        icn_obs::metrics::gossip::runtime_unavailable_inc();
+                    }
                 });
             }
 
@@ -792,14 +813,18 @@ impl GossipActor {
                     };
 
                     tokio::task::block_in_place(|| {
-                        let rt = tokio::runtime::Handle::current();
-                        rt.block_on(async {
-                            detector.write().await.record_violation(
-                                &subscriber,
-                                violation,
-                                evidence,
-                            );
-                        })
+                        if let Ok(rt) = tokio::runtime::Handle::try_current() {
+                            rt.block_on(async {
+                                detector.write().await.record_violation(
+                                    &subscriber,
+                                    violation,
+                                    evidence,
+                                );
+                            });
+                        } else {
+                            warn!("No Tokio runtime for violation recording - Byzantine penalty skipped for topic_subscribers");
+                            icn_obs::metrics::gossip::runtime_unavailable_inc();
+                        }
                     });
                 }
 

@@ -520,10 +520,11 @@ impl DisputeResolutionSystem {
         };
 
         // Update status to investigating
-        // SAFETY: dispute_id was validated above in get() call on line 511-514
         {
-            #[allow(clippy::unwrap_used)]
-            let dispute = self.disputes.get_mut(&dispute_id).unwrap();
+            let dispute = self
+                .disputes
+                .get_mut(&dispute_id)
+                .ok_or_else(|| anyhow!("Dispute removed during investigation"))?;
             dispute.status = DisputeStatus::Investigating;
             dispute.updated_at = SystemTime::now();
         }
@@ -567,10 +568,11 @@ impl DisputeResolutionSystem {
                     );
 
                     // If re-execution fails, mark as inconclusive
-                    // SAFETY: dispute_id was validated at function entry
-                    #[allow(clippy::unwrap_used)]
                     let mediator = {
-                        let dispute = self.disputes.get(&dispute_id).unwrap();
+                        let dispute = self
+                            .disputes
+                            .get(&dispute_id)
+                            .ok_or_else(|| anyhow!("Dispute removed during investigation"))?;
                         self.assign_mediator(dispute)?
                     };
 
@@ -579,10 +581,11 @@ impl DisputeResolutionSystem {
                         mediator_assigned: mediator,
                     };
 
-                    // SAFETY: dispute_id was validated at function entry
-                    #[allow(clippy::unwrap_used)]
                     {
-                        let dispute = self.disputes.get_mut(&dispute_id).unwrap();
+                        let dispute = self
+                            .disputes
+                            .get_mut(&dispute_id)
+                            .ok_or_else(|| anyhow!("Dispute removed during investigation"))?;
                         dispute.status = DisputeStatus::Resolved {
                             outcome: outcome.clone(),
                             resolved_at: SystemTime::now(),
@@ -598,10 +601,11 @@ impl DisputeResolutionSystem {
                         join_error
                     );
 
-                    // SAFETY: dispute_id was validated at function entry
-                    #[allow(clippy::unwrap_used)]
                     let mediator = {
-                        let dispute = self.disputes.get(&dispute_id).unwrap();
+                        let dispute = self
+                            .disputes
+                            .get(&dispute_id)
+                            .ok_or_else(|| anyhow!("Dispute removed during investigation"))?;
                         self.assign_mediator(dispute)?
                     };
 
@@ -610,10 +614,11 @@ impl DisputeResolutionSystem {
                         mediator_assigned: mediator,
                     };
 
-                    // SAFETY: dispute_id was validated at function entry
-                    #[allow(clippy::unwrap_used)]
                     {
-                        let dispute = self.disputes.get_mut(&dispute_id).unwrap();
+                        let dispute = self
+                            .disputes
+                            .get_mut(&dispute_id)
+                            .ok_or_else(|| anyhow!("Dispute removed during investigation"))?;
                         dispute.status = DisputeStatus::Resolved {
                             outcome: outcome.clone(),
                             resolved_at: SystemTime::now(),
@@ -630,10 +635,11 @@ impl DisputeResolutionSystem {
                         hex::encode(dispute_id)
                     );
 
-                    // SAFETY: dispute_id was validated at function entry
-                    #[allow(clippy::unwrap_used)]
                     let mediator = {
-                        let dispute = self.disputes.get(&dispute_id).unwrap();
+                        let dispute = self
+                            .disputes
+                            .get(&dispute_id)
+                            .ok_or_else(|| anyhow!("Dispute removed during investigation"))?;
                         self.assign_mediator(dispute)?
                     };
 
@@ -645,10 +651,11 @@ impl DisputeResolutionSystem {
                         mediator_assigned: mediator,
                     };
 
-                    // SAFETY: dispute_id was validated at function entry
-                    #[allow(clippy::unwrap_used)]
                     {
-                        let dispute = self.disputes.get_mut(&dispute_id).unwrap();
+                        let dispute = self
+                            .disputes
+                            .get_mut(&dispute_id)
+                            .ok_or_else(|| anyhow!("Dispute removed during investigation"))?;
                         dispute.status = DisputeStatus::Resolved {
                             outcome: outcome.clone(),
                             resolved_at: SystemTime::now(),
@@ -660,10 +667,11 @@ impl DisputeResolutionSystem {
             };
 
         // Get dispute reason for penalty calculation
-        // SAFETY: dispute_id was validated at function entry
-        #[allow(clippy::unwrap_used)]
         let dispute_reason = {
-            let dispute = self.disputes.get(&dispute_id).unwrap();
+            let dispute = self
+                .disputes
+                .get(&dispute_id)
+                .ok_or_else(|| anyhow!("Dispute removed during investigation"))?;
             dispute.evidence.reason.clone()
         };
 
@@ -675,10 +683,11 @@ impl DisputeResolutionSystem {
             }
         } else {
             // Check if challenger's expected result matches re-execution
-            // SAFETY: dispute_id was validated at function entry
-            #[allow(clippy::unwrap_used)]
             let challenger_correct = {
-                let dispute = self.disputes.get(&dispute_id).unwrap();
+                let dispute = self
+                    .disputes
+                    .get(&dispute_id)
+                    .ok_or_else(|| anyhow!("Dispute removed during investigation"))?;
                 match &dispute.evidence.reason {
                     DisputeReason::IncorrectResult { expected, .. } => {
                         *expected == re_execution_result
@@ -729,10 +738,11 @@ impl DisputeResolutionSystem {
         );
 
         // Update dispute status
-        // SAFETY: dispute_id was validated at function entry
-        #[allow(clippy::unwrap_used)]
         let dispute_for_persist = {
-            let dispute = self.disputes.get_mut(&dispute_id).unwrap();
+            let dispute = self
+                .disputes
+                .get_mut(&dispute_id)
+                .ok_or_else(|| anyhow!("Dispute removed during investigation"))?;
             dispute.status = DisputeStatus::Resolved {
                 outcome: outcome.clone(),
                 resolved_at: SystemTime::now(),
@@ -2612,5 +2622,33 @@ mod tests {
 
         // No penalty should be applied when disabled
         assert_eq!(penalty_count.load(Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test]
+    async fn test_investigate_dispute_not_found_error() {
+        // Test that investigate_dispute returns an error (not panic) for non-existent dispute
+        let config = DisputeConfig::default();
+        let store = Arc::new(SledStore::temporary().unwrap()) as Arc<dyn Store>;
+        let mut system = DisputeResolutionSystem::new(config, store);
+
+        let contract = make_test_contract();
+
+        // Try to investigate a dispute that doesn't exist
+        let fake_dispute_id = [99u8; 32];
+        let mut args = std::collections::HashMap::new();
+        args.insert("a".to_string(), Value::Int(2));
+        args.insert("b".to_string(), Value::Int(3));
+
+        let result = system
+            .investigate_dispute(fake_dispute_id, &contract, "add", args)
+            .await;
+
+        // Should return error, not panic
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("not found"),
+            "Error should mention dispute not found: {err_msg}"
+        );
     }
 }
