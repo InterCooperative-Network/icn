@@ -27,7 +27,10 @@ pub fn compute_all_balances(entries: &[JournalEntry]) -> Result<HashMap<Did, Acc
 /// Compute balance for a specific account from journal entries
 ///
 /// Returns error if any arithmetic overflow occurs during balance calculation.
-pub fn compute_account_balance(account_id: &Did, entries: &[JournalEntry]) -> Result<AccountBalances> {
+pub fn compute_account_balance(
+    account_id: &Did,
+    entries: &[JournalEntry],
+) -> Result<AccountBalances> {
     let mut balance = AccountBalances::new(account_id.clone());
 
     for entry in entries {
@@ -241,5 +244,77 @@ mod tests {
         let result = validate_credit_limit(&entry, &current_balances, &credit_limits);
 
         assert!(result.is_ok(), "Should pass credit limit check");
+    }
+
+    #[test]
+    fn test_overflow_protection_net_change() {
+        use crate::types::AccountDelta;
+        let keypair = KeyPair::generate().unwrap();
+        let account = keypair.did().clone();
+
+        // Test extreme values that would cause overflow in subtraction
+        let delta = AccountDelta {
+            account_id: account,
+            currency: "hours".to_string(),
+            debit: Some(i64::MIN), // Very negative debit (unusual but test edge case)
+            credit: Some(i64::MAX), // Very large credit
+        };
+
+        // This should return an error, not panic or produce wrong result
+        let result = delta.net_change();
+        assert!(result.is_err(), "Should return error on overflow");
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("arithmetic overflow"),
+            "Error should mention arithmetic overflow"
+        );
+    }
+
+    #[test]
+    fn test_overflow_protection_apply_delta() {
+        use crate::types::{AccountBalances, AccountDelta};
+        let keypair = KeyPair::generate().unwrap();
+        let account = keypair.did().clone();
+
+        let mut balances = AccountBalances::new(account.clone());
+        balances.balances.insert("hours".to_string(), i64::MAX);
+
+        // Try to add more - should overflow
+        let delta = AccountDelta::debit(account.clone(), "hours".to_string(), 1);
+        let result = balances.apply_delta(&delta);
+
+        assert!(result.is_err(), "Should return error on overflow");
+        assert!(
+            result.unwrap_err().to_string().contains("overflow"),
+            "Error should mention overflow"
+        );
+    }
+
+    #[test]
+    fn test_overflow_protection_compute_balance() {
+        let keypair = KeyPair::generate().unwrap();
+        let alice = keypair.did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        // Create entries that would overflow when summed
+        let entry1 = JournalEntryBuilder::new(alice.clone())
+            .debit(alice.clone(), "hours".to_string(), i64::MAX / 2)
+            .credit(bob.clone(), "hours".to_string(), i64::MAX / 2)
+            .build()
+            .unwrap();
+
+        let entry2 = JournalEntryBuilder::new(alice.clone())
+            .debit(alice.clone(), "hours".to_string(), i64::MAX / 2 + 100)
+            .credit(bob.clone(), "hours".to_string(), i64::MAX / 2 + 100)
+            .build()
+            .unwrap();
+
+        let entries = vec![entry1, entry2];
+
+        // Should detect overflow when computing alice's balance
+        let result = compute_balance(&alice, "hours", &entries);
+        assert!(result.is_err(), "Should return error on overflow");
     }
 }

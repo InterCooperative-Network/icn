@@ -2760,8 +2760,8 @@ impl Ledger {
             let change = delta.net_change()?;
             *sum = sum.checked_add(change).ok_or_else(|| {
                 LedgerError::ArithmeticOverflow(format!(
-                    "overflow in double-entry check: {} + {} for currency {}",
-                    sum, change, delta.currency
+                    "overflow in double-entry check: {sum} + {change} for currency {}",
+                    delta.currency
                 ))
             })?;
         }

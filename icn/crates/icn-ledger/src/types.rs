@@ -108,8 +108,8 @@ impl AccountDelta {
         let credit = self.credit.unwrap_or(0);
         debit.checked_sub(credit).ok_or_else(|| {
             crate::LedgerError::ArithmeticOverflow(format!(
-                "underflow in net_change: {} - {} for account {}",
-                debit, credit, self.account_id
+                "arithmetic overflow in net_change: {debit} - {credit} for account {}",
+                self.account_id
             ))
         })
     }
