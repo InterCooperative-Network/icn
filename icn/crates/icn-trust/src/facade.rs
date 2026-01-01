@@ -144,6 +144,25 @@ impl TrustGraphFacade {
         self.multi.graph(graph_type).get_outgoing_edges(source)
     }
 
+    /// Get all incoming edges to a DID (from Social graph)
+    ///
+    /// Returns edges where target == did ("who trusts me?").
+    /// For backward compatibility, returns edges from Social graph only.
+    ///
+    /// Note: This operation scans all edges and is O(n). Use sparingly.
+    pub fn get_incoming_edges(&self, target: &Did) -> Result<Vec<TrustEdge>> {
+        self.multi.social().get_incoming_edges(target)
+    }
+
+    /// Get all incoming edges from a specific graph type
+    pub fn get_incoming_edges_from(
+        &self,
+        graph_type: TrustGraphType,
+        target: &Did,
+    ) -> Result<Vec<TrustEdge>> {
+        self.multi.graph(graph_type).get_incoming_edges(target)
+    }
+
     /// Compute combined trust score (backward compatible)
     ///
     /// Returns a weighted average: 50% social + 30% economic + 20% technical

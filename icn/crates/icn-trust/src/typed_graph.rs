@@ -110,6 +110,13 @@ impl TypedTrustGraph {
         self.inner.get_outgoing_edges(source)
     }
 
+    /// Get all incoming edges to a DID
+    ///
+    /// Note: This operation scans all edges and is O(n). Use sparingly.
+    pub fn get_incoming_edges(&self, target: &Did) -> Result<Vec<TrustEdge>> {
+        self.inner.get_incoming_edges(target)
+    }
+
     /// Remove a trust edge
     pub fn remove_edge(&mut self, source: &Did, target: &Did) -> Result<()> {
         self.inner.remove_edge(source, target)

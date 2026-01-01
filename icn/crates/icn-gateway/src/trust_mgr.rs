@@ -203,6 +203,23 @@ impl TrustManager {
         }
     }
 
+    /// Remove a trust edge (async version)
+    pub async fn remove_edge_async(&self, from: &Did, to: &Did) -> Result<(), String> {
+        if let Some(ref handle) = self.trust_graph {
+            let mut graph = handle.write().await;
+            graph
+                .remove_edge(from, to)
+                .map_err(|e| format!("TrustGraph error: {e}"))
+        } else {
+            let key = format!("{}:{}", from.as_str(), to.as_str());
+            if self.edges.remove(&key).is_some() {
+                Ok(())
+            } else {
+                Err("Trust edge not found".to_string())
+            }
+        }
+    }
+
     /// Get all edges from a DID
     pub fn get_outgoing_edges(&self, from: &Did) -> Vec<TrustEdge> {
         if let Some(ref handle) = self.trust_graph {
@@ -220,21 +237,50 @@ impl TrustManager {
         }
     }
 
-    /// Get all edges to a DID
-    ///
-    /// Note: TrustGraph doesn't support incoming edge queries directly.
-    /// In actor-backed mode, this operation is not supported and returns empty vec.
-    /// Use get_outgoing_edges() which is the primary query pattern for trust graphs.
-    ///
-    /// TODO: Add incoming edge index to TrustGraph if this is needed for production.
-    pub fn get_incoming_edges(&self, to: &Did) -> Vec<TrustEdge> {
-        if self.trust_graph.is_some() {
-            // Actor-backed mode: TrustGraph doesn't support incoming edge queries
-            // This would require scanning all edges which is O(n) - not recommended
-            debug!("get_incoming_edges not supported in actor-backed mode");
-            Vec::new()
+    /// Get all edges from a DID (async version)
+    pub async fn get_outgoing_edges_async(&self, from: &Did) -> Vec<TrustEdge> {
+        if let Some(ref handle) = self.trust_graph {
+            let graph = handle.read().await;
+            graph.get_outgoing_edges(from).unwrap_or_default()
         } else {
-            // Standalone mode: in-memory storage supports this efficiently
+            let prefix = format!("{}:", from.as_str());
+            self.edges
+                .iter()
+                .filter(|entry| entry.key().starts_with(&prefix))
+                .map(|entry| entry.value().clone())
+                .collect()
+        }
+    }
+
+    /// Get all edges to a DID ("who trusts me?")
+    ///
+    /// Note: This operation scans all edges and is O(n). Use sparingly for
+    /// operations like user profile display. For high-frequency operations,
+    /// consider caching the results.
+    pub fn get_incoming_edges(&self, to: &Did) -> Vec<TrustEdge> {
+        if let Some(ref handle) = self.trust_graph {
+            // Actor-backed mode: delegate to TrustGraph
+            let graph = handle.blocking_read();
+            graph.get_incoming_edges(to).unwrap_or_default()
+        } else {
+            // Standalone mode: in-memory storage
+            let to_str = to.as_str();
+            self.edges
+                .iter()
+                .filter(|entry| entry.value().target.as_str() == to_str)
+                .map(|entry| entry.value().clone())
+                .collect()
+        }
+    }
+
+    /// Get all edges to a DID (async version)
+    ///
+    /// Note: This operation scans all edges and is O(n). Use sparingly.
+    pub async fn get_incoming_edges_async(&self, to: &Did) -> Vec<TrustEdge> {
+        if let Some(ref handle) = self.trust_graph {
+            let graph = handle.read().await;
+            graph.get_incoming_edges(to).unwrap_or_default()
+        } else {
             let to_str = to.as_str();
             self.edges
                 .iter()
@@ -266,6 +312,23 @@ impl TrustManager {
             }
         } else {
             // Standalone mode: local computation
+            self.compute_trust_score_local(from, to)
+        }
+    }
+
+    /// Compute trust score for a DID (async version)
+    ///
+    /// Prefer this over the sync version when calling from async context
+    /// to avoid blocking the Tokio runtime.
+    pub async fn compute_trust_score_async(&self, from: &Did, to: &Did) -> f64 {
+        if let Some(ref handle) = self.trust_graph {
+            let graph = handle.read().await;
+            if graph.own_did() == from {
+                graph.compute_trust_score(to).unwrap_or(0.0)
+            } else {
+                self.compute_trust_score_local(from, to)
+            }
+        } else {
             self.compute_trust_score_local(from, to)
         }
     }
