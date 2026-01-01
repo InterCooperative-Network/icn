@@ -79,7 +79,11 @@ pub async fn get_member_profile(
         if let Ok(requester_did) = claims.sub.parse::<Did>() {
             // Don't compute self-trust
             if requester_did != did_obj {
-                Some(trust_manager.compute_trust_score(&requester_did, &did_obj))
+                Some(
+                    trust_manager
+                        .compute_trust_score_async(&requester_did, &did_obj)
+                        .await,
+                )
             } else {
                 Some(1.0) // Self-trust is always 1.0
             }

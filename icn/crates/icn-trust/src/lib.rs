@@ -952,4 +952,34 @@ mod tests {
         let incoming_to_alice = graph.get_incoming_edges(&alice).unwrap();
         assert_eq!(incoming_to_alice.len(), 0);
     }
+
+    #[test]
+    fn test_get_incoming_edges_filters_expired() {
+        let store = Arc::new(SledStore::temporary().unwrap());
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+        let carol = KeyPair::generate().unwrap().did().clone();
+
+        let mut graph = TrustGraph::new(store, alice.clone());
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        // Alice trusts Bob (not expired)
+        graph
+            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), 0.8))
+            .unwrap();
+
+        // Carol trusts Bob (expired - set expiry to 100 seconds ago)
+        graph
+            .add_edge(TrustEdge::new(carol.clone(), bob.clone(), 0.7).with_expiry(now - 100))
+            .unwrap();
+
+        // Get incoming edges to Bob - should only include non-expired edge from Alice
+        let incoming = graph.get_incoming_edges(&bob).unwrap();
+        assert_eq!(incoming.len(), 1, "Expired edges should be filtered out");
+        assert_eq!(incoming[0].source, alice);
+    }
 }

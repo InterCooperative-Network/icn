@@ -413,11 +413,13 @@ pub async fn verify_level2(
     // Verify steward has sufficient trust
     // Stewards need a trust score of at least 0.4 (Partner level) to vouch
     // Self-trust is 1.0, so we check from steward's own perspective
-    let steward_trust = trust_mgr.compute_trust_score(&steward_did, &steward_did);
+    let steward_trust = trust_mgr
+        .compute_trust_score_async(&steward_did, &steward_did)
+        .await;
 
     // For self-trust computation, we look at incoming edges to the steward
     // A new node with no incoming edges gets 0.0, bootstrapped stewards get higher
-    let incoming_edges = trust_mgr.get_incoming_edges(&steward_did);
+    let incoming_edges = trust_mgr.get_incoming_edges_async(&steward_did).await;
     let avg_incoming_trust = if incoming_edges.is_empty() {
         0.0
     } else {
@@ -602,7 +604,7 @@ pub async fn complete_enrollment(
                 0.5, // Initial trust from vouch
             )
             .with_label("enrollment-vouch");
-            let _ = trust_mgr.add_edge(edge);
+            let _ = trust_mgr.add_edge_async(edge).await;
             Some(steward_did)
         } else {
             None
@@ -1031,7 +1033,7 @@ pub async fn get_steward_stats(
 
     // Calculate reputation score from trust graph
     // Based on: average incoming trust * 100, weighted by number of edges
-    let incoming_edges = trust_mgr.get_incoming_edges(&steward_did);
+    let incoming_edges = trust_mgr.get_incoming_edges_async(&steward_did).await;
     let reputation_score = if incoming_edges.is_empty() {
         // No incoming edges - use base score based on vouch history
         // More vouches = higher initial reputation

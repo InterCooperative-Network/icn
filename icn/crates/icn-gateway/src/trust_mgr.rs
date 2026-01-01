@@ -11,6 +11,22 @@
 //! - Gossip synchronization of trust edges
 //!
 //! When created with `new()`, it uses in-memory storage (suitable for testing only).
+//!
+//! ## Sync vs Async Methods
+//!
+//! This module provides both sync and async variants of most methods:
+//!
+//! - **Async methods** (e.g., `add_edge_async`, `get_edge_async`): Preferred for use
+//!   in async contexts. These use proper async RwLock operations and don't block
+//!   any Tokio worker threads.
+//!
+//! - **Sync methods** (e.g., `add_edge`, `get_edge`): Provided for backward
+//!   compatibility. These use `block_in_place` which tells Tokio to move other
+//!   tasks off the current thread before blocking. While this prevents blocking
+//!   the entire runtime, it still occupies a worker thread during Sled I/O.
+//!
+//! **Recommendation**: Use async methods whenever possible. The sync methods are
+//! deprecated for use in async contexts and may be removed in a future version.
 
 use dashmap::DashMap;
 use icn_identity::Did;
@@ -126,11 +142,27 @@ impl TrustManager {
         self.own_did = Some(did);
     }
 
-    /// Add or update a trust edge
+    /// Add or update a trust edge (sync version)
     ///
     /// In actor-backed mode, this requires acquiring a write lock on the TrustGraph.
-    /// Uses `block_in_place` to properly isolate blocking I/O from Tokio runtime.
-    /// For async contexts, prefer `add_edge_async` for better performance.
+    ///
+    /// # Warning: Blocking I/O
+    ///
+    /// This method uses `block_in_place` which allows other Tokio tasks to be moved
+    /// off the current thread, but still blocks a worker thread during Sled I/O
+    /// (which can take milliseconds during compaction).
+    ///
+    /// **For async contexts, use [`add_edge_async`] instead.**
+    ///
+    /// # When to use this method
+    ///
+    /// - Non-async contexts (e.g., synchronous HTTP handlers, tests)
+    /// - Performance-insensitive code paths
+    /// - Quick prototyping (prefer async for production)
+    #[deprecated(
+        since = "0.2.0",
+        note = "Use add_edge_async for async contexts to avoid blocking worker threads"
+    )]
     pub fn add_edge(&self, edge: TrustEdge) -> Result<(), String> {
         if let Some(ref handle) = self.trust_graph {
             // Actor-backed mode: delegate to TrustGraph
@@ -163,10 +195,16 @@ impl TrustManager {
         }
     }
 
-    /// Get a trust edge
+    /// Get a trust edge (sync version)
     ///
-    /// Uses `block_in_place` to properly isolate blocking I/O from Tokio runtime.
-    /// For async contexts, prefer `get_edge_async` for better performance.
+    /// # Warning: Blocking I/O
+    ///
+    /// This method uses `block_in_place` which still blocks a worker thread.
+    /// **For async contexts, use [`get_edge_async`] instead.**
+    #[deprecated(
+        since = "0.2.0",
+        note = "Use get_edge_async for async contexts to avoid blocking worker threads"
+    )]
     pub fn get_edge(&self, from: &Did, to: &Did) -> Option<TrustEdge> {
         if let Some(ref handle) = self.trust_graph {
             // Actor-backed mode: delegate to TrustGraph
@@ -192,10 +230,16 @@ impl TrustManager {
         }
     }
 
-    /// Remove a trust edge
+    /// Remove a trust edge (sync version)
     ///
-    /// Uses `block_in_place` to properly isolate blocking I/O from Tokio runtime.
-    /// For async contexts, prefer `remove_edge_async` for better performance.
+    /// # Warning: Blocking I/O
+    ///
+    /// This method uses `block_in_place` which still blocks a worker thread.
+    /// **For async contexts, use [`remove_edge_async`] instead.**
+    #[deprecated(
+        since = "0.2.0",
+        note = "Use remove_edge_async for async contexts to avoid blocking worker threads"
+    )]
     pub fn remove_edge(&self, from: &Did, to: &Did) -> Result<(), String> {
         if let Some(ref handle) = self.trust_graph {
             // Actor-backed mode: delegate to TrustGraph
@@ -233,10 +277,16 @@ impl TrustManager {
         }
     }
 
-    /// Get all edges from a DID
+    /// Get all edges from a DID (sync version)
     ///
-    /// Uses `block_in_place` to properly isolate blocking I/O from Tokio runtime.
-    /// For async contexts, prefer `get_outgoing_edges_async` for better performance.
+    /// # Warning: Blocking I/O
+    ///
+    /// This method uses `block_in_place` which still blocks a worker thread.
+    /// **For async contexts, use [`get_outgoing_edges_async`] instead.**
+    #[deprecated(
+        since = "0.2.0",
+        note = "Use get_outgoing_edges_async for async contexts to avoid blocking worker threads"
+    )]
     pub fn get_outgoing_edges(&self, from: &Did) -> Vec<TrustEdge> {
         if let Some(ref handle) = self.trust_graph {
             // Actor-backed mode: delegate to TrustGraph
@@ -277,14 +327,22 @@ impl TrustManager {
         }
     }
 
-    /// Get all edges to a DID ("who trusts me?")
+    /// Get all edges to a DID ("who trusts me?") (sync version)
     ///
-    /// Note: This operation scans all edges and is O(n). Use sparingly for
-    /// operations like user profile display. For high-frequency operations,
-    /// consider caching the results.
+    /// # Performance Warning
     ///
-    /// Uses `block_in_place` to properly isolate blocking I/O from Tokio runtime.
-    /// For async contexts, prefer `get_incoming_edges_async` for better performance.
+    /// This operation scans all edges and is **O(n)** where n is the total number
+    /// of edges in the graph. Use sparingly for operations like user profile display.
+    /// For high-frequency operations, consider caching the results.
+    ///
+    /// # Warning: Blocking I/O
+    ///
+    /// This method uses `block_in_place` which still blocks a worker thread.
+    /// **For async contexts, use [`get_incoming_edges_async`] instead.**
+    #[deprecated(
+        since = "0.2.0",
+        note = "Use get_incoming_edges_async for async contexts to avoid blocking worker threads"
+    )]
     pub fn get_incoming_edges(&self, to: &Did) -> Vec<TrustEdge> {
         if let Some(ref handle) = self.trust_graph {
             // Actor-backed mode: delegate to TrustGraph
@@ -327,7 +385,7 @@ impl TrustManager {
         }
     }
 
-    /// Compute trust score for a DID
+    /// Compute trust score for a DID (sync version)
     ///
     /// In actor-backed mode, delegates to TrustGraph's optimized computation
     /// which includes caching, bloom filters, and priority queue pathfinding.
@@ -336,8 +394,14 @@ impl TrustManager {
     /// - 70% direct trust
     /// - 30% transitive trust (average of weighted paths)
     ///
-    /// Uses `block_in_place` to properly isolate blocking I/O from Tokio runtime.
-    /// For async contexts, prefer `compute_trust_score_async` for better performance.
+    /// # Warning: Blocking I/O
+    ///
+    /// This method uses `block_in_place` which still blocks a worker thread.
+    /// **For async contexts, use [`compute_trust_score_async`] instead.**
+    #[deprecated(
+        since = "0.2.0",
+        note = "Use compute_trust_score_async for async contexts to avoid blocking worker threads"
+    )]
     pub fn compute_trust_score(&self, from: &Did, to: &Did) -> f64 {
         if let Some(ref handle) = self.trust_graph {
             // Actor-backed mode: delegate to TrustGraph
@@ -435,6 +499,7 @@ impl TrustManager {
     ///
     /// Note: This is a sync method that uses sync edge getters. In async contexts,
     /// prefer `compute_trust_score_local_async` for better performance.
+    #[allow(deprecated)] // Uses sync edge methods intentionally
     fn compute_trust_score_local(&self, from: &Did, to: &Did) -> f64 {
         // Direct trust
         let direct_score = self.get_edge(from, to).map(|e| e.score).unwrap_or(0.0);
@@ -512,7 +577,13 @@ impl TrustManager {
 
     /// Get trust network around a DID (for visualization)
     ///
-    /// Returns nodes and edges within `max_distance` hops
+    /// Returns nodes and edges within `max_distance` hops.
+    ///
+    /// # Note
+    ///
+    /// This method uses sync APIs internally. Consider adding an async version
+    /// (`get_trust_network_async`) if this becomes a performance bottleneck.
+    #[allow(deprecated)] // Uses sync APIs intentionally for now
     pub fn get_trust_network(&self, center: &Did, max_distance: u32) -> TrustNetwork {
         use std::collections::{HashMap, HashSet, VecDeque};
 
@@ -611,9 +682,14 @@ impl Default for TrustManager {
 }
 
 #[cfg(test)]
+#[allow(deprecated)] // Tests exercise both sync and async APIs
 mod tests {
     use super::*;
     use icn_identity::KeyPair;
+
+    // ============================================================================
+    // Sync API Tests (deprecated but still need coverage)
+    // ============================================================================
 
     #[test]
     fn test_add_and_get_edge() {

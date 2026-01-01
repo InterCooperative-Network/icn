@@ -46,7 +46,9 @@ pub async fn get_trust_score(
         .map_err(|e| GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
 
     let from = from_did.into_inner();
-    let trust_score = trust_manager.compute_trust_score(&from, &target_did);
+    let trust_score = trust_manager
+        .compute_trust_score_async(&from, &target_did)
+        .await;
 
     let trust_class = if trust_score < 0.1 {
         "Isolated"
@@ -78,7 +80,7 @@ pub async fn get_trust_edges(
         .parse::<Did>()
         .map_err(|e| GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
 
-    let edges = trust_manager.get_outgoing_edges(&did);
+    let edges = trust_manager.get_outgoing_edges_async(&did).await;
 
     let response: Vec<_> = edges
         .into_iter()
@@ -127,7 +129,8 @@ pub async fn create_trust_attestation(
     }
 
     trust_manager
-        .add_edge(edge)
+        .add_edge_async(edge)
+        .await
         .map_err(GatewayError::InternalError)?;
 
     // Broadcast event to target DID (they received a trust attestation)
@@ -200,7 +203,8 @@ pub async fn revoke_trust_attestation(
     let from = from_did.into_inner();
 
     trust_manager
-        .remove_edge(&from, &to_did)
+        .remove_edge_async(&from, &to_did)
+        .await
         .map_err(GatewayError::InternalError)?;
 
     // Broadcast event to target DID (they lost a trust attestation)
@@ -232,7 +236,7 @@ mod tests {
         let bob = KeyPair::generate().unwrap().did().clone();
 
         let edge = TrustEdge::new(alice.clone(), bob.clone(), 0.7);
-        trust_manager.add_edge(edge).unwrap();
+        trust_manager.add_edge_async(edge).await.unwrap();
 
         let app = test::init_service(
             App::new()
