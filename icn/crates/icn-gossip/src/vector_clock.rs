@@ -74,7 +74,10 @@ impl VectorClock {
     /// Increment the clock for a given node
     pub fn increment(&mut self, node: &Did) {
         self.maybe_evict();
-        let entry = self.entries.entry(node.clone()).or_insert_with(|| ClockEntry::new(0));
+        let entry = self
+            .entries
+            .entry(node.clone())
+            .or_insert_with(|| ClockEntry::new(0));
         entry.count += 1;
         entry.touch();
     }
@@ -98,7 +101,10 @@ impl VectorClock {
     pub fn merge(&mut self, other: &VectorClock) {
         for (node, other_entry) in &other.entries {
             self.maybe_evict();
-            let entry = self.entries.entry(node.clone()).or_insert_with(|| ClockEntry::new(0));
+            let entry = self
+                .entries
+                .entry(node.clone())
+                .or_insert_with(|| ClockEntry::new(0));
             entry.count = entry.count.max(other_entry.count);
             entry.touch();
         }
@@ -178,7 +184,9 @@ impl VectorClock {
         }
 
         // Collect entries sorted by last_seen (oldest first)
-        let mut entries_by_age: Vec<_> = self.entries.iter()
+        let mut entries_by_age: Vec<_> = self
+            .entries
+            .iter()
             .map(|(did, entry)| (did.clone(), entry.last_seen))
             .collect();
         entries_by_age.sort_by_key(|(_, last_seen)| *last_seen);
@@ -195,9 +203,8 @@ impl VectorClock {
     /// Call this periodically (e.g., every minute) to clean up inactive nodes.
     pub fn prune_stale(&mut self, max_age: std::time::Duration) {
         let now = Instant::now();
-        self.entries.retain(|_, entry| {
-            now.duration_since(entry.last_seen) < max_age
-        });
+        self.entries
+            .retain(|_, entry| now.duration_since(entry.last_seen) < max_age);
     }
 
     /// Get an iterator over all DIDs in the clock (for backward compatibility)
@@ -262,7 +269,8 @@ impl Serialize for VectorClock {
         S: serde::Serializer,
     {
         // Serialize only the counts, not the last_seen times
-        let clock: HashMap<Did, u64> = self.entries
+        let clock: HashMap<Did, u64> = self
+            .entries
             .iter()
             .map(|(did, entry)| (did.clone(), entry.count))
             .collect();
@@ -276,7 +284,8 @@ impl<'de> Deserialize<'de> for VectorClock {
         D: serde::Deserializer<'de>,
     {
         let serialized = SerializedClock::deserialize(deserializer)?;
-        let entries = serialized.clock
+        let entries = serialized
+            .clock
             .into_iter()
             .map(|(did, count)| (did, ClockEntry::new(count)))
             .collect();
@@ -489,7 +498,8 @@ mod tests {
         clock.increment(&node_a);
         clock.increment(&node_b);
 
-        let entries: HashMap<Did, u64> = clock.iter()
+        let entries: HashMap<Did, u64> = clock
+            .iter()
             .map(|(did, count)| (did.clone(), count))
             .collect();
 
