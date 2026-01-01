@@ -36,6 +36,12 @@ pub struct ReplayGuard {
     max_peer_age_secs: u64,
 }
 
+/// Maximum entries before Bloom filter rotation (80% of capacity)
+const BLOOM_ROTATION_THRESHOLD: u64 = 8_000;
+
+/// Bloom filter capacity
+const BLOOM_CAPACITY: usize = 10_000;
+
 /// Sequence window for a single peer
 struct SequenceWindow {
     /// Highest sequence number seen from this peer
@@ -44,6 +50,10 @@ struct SequenceWindow {
     /// Bloom filter of recent sequences (for out-of-order detection)
     /// Size: ~10KB for 10,000 sequences with 0.1% false positive rate
     recent: BloomFilter,
+
+    /// Count of entries inserted since last Bloom filter reset
+    /// Used to detect when the filter is approaching saturation
+    insertion_count: u64,
 
     /// Finalized sequences (permanently non-replayable)
     /// These are sequences that have been processed (e.g., ledger entry written)
@@ -121,7 +131,7 @@ impl ReplayGuard {
         if envelope.sequence > window.max_seq {
             window.max_seq = envelope.sequence;
         }
-        window.recent.insert(&seq_hash);
+        window.insert_sequence(&seq_hash);
         window.last_update = Instant::now();
 
         Ok(())
@@ -218,10 +228,46 @@ impl SequenceWindow {
     fn new() -> Self {
         SequenceWindow {
             max_seq: 0,
-            recent: BloomFilter::new(10000, 0.001),
+            recent: BloomFilter::new(BLOOM_CAPACITY, 0.001),
+            insertion_count: 0,
             finalized: HashMap::new(),
             last_update: Instant::now(),
         }
+    }
+
+    /// Insert a sequence hash into the Bloom filter, rotating if necessary
+    ///
+    /// When the filter approaches saturation (80% capacity), it is reset
+    /// to prevent false positives. The max_seq provides replay protection
+    /// for sequences below the threshold even after reset.
+    fn insert_sequence(&mut self, seq_hash: &[u8; 32]) {
+        // Check if we need to rotate before inserting
+        if self.insertion_count >= BLOOM_ROTATION_THRESHOLD {
+            self.rotate_bloom_filter();
+        }
+
+        self.recent.insert(seq_hash);
+        self.insertion_count += 1;
+    }
+
+    /// Rotate (reset) the Bloom filter to prevent saturation
+    ///
+    /// After rotation:
+    /// - The filter is empty and can accept new sequences
+    /// - max_seq still prevents replay of old sequences
+    /// - Finalized sequences are still protected
+    /// - There's a brief window where some out-of-order sequences
+    ///   might be accepted twice, but this is acceptable as:
+    ///   1. Finalized sequences are never replayed
+    ///   2. Double-processing of non-finalized sequences is idempotent
+    fn rotate_bloom_filter(&mut self) {
+        tracing::debug!(
+            max_seq = self.max_seq,
+            insertion_count = self.insertion_count,
+            "Rotating Bloom filter to prevent saturation"
+        );
+        self.recent = BloomFilter::new(BLOOM_CAPACITY, 0.001);
+        self.insertion_count = 0;
     }
 }
 
@@ -550,5 +596,58 @@ mod tests {
 
         // Peer still tracked (finalized sequences kept)
         assert_eq!(guard.peer_count(), 1);
+    }
+
+    #[test]
+    fn test_bloom_filter_rotation() {
+        // Test that Bloom filter rotates to prevent saturation
+        let mut guard = ReplayGuard::new(300, 3600);
+        let keypair = KeyPair::generate().unwrap();
+
+        // Send many messages (more than BLOOM_ROTATION_THRESHOLD)
+        for seq in 1..=9000 {
+            let envelope = SignedEnvelope::new(
+                keypair.did(),
+                &keypair,
+                seq,
+                PayloadType::Gossip,
+                format!("msg{seq}").as_bytes().to_vec(),
+            )
+            .unwrap();
+
+            // All should be accepted
+            assert!(
+                guard.check(&envelope).is_ok(),
+                "Message {seq} should be accepted"
+            );
+        }
+
+        // Verify max_seq was tracked correctly
+        assert_eq!(guard.get_max_seq(keypair.did()), Some(9000));
+
+        // After rotation, new messages should still be accepted
+        let new_envelope = SignedEnvelope::new(
+            keypair.did(),
+            &keypair,
+            9001,
+            PayloadType::Gossip,
+            b"new_msg".to_vec(),
+        )
+        .unwrap();
+        assert!(guard.check(&new_envelope).is_ok());
+
+        // Finalized sequences should still be protected after rotation
+        guard.finalize(keypair.did(), 100).unwrap();
+        let old_envelope = SignedEnvelope::new(
+            keypair.did(),
+            &keypair,
+            100,
+            PayloadType::Gossip,
+            b"replayed".to_vec(),
+        )
+        .unwrap();
+        let result = guard.check(&old_envelope);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("finalized"));
     }
 }

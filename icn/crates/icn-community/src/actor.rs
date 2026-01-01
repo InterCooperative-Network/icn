@@ -19,12 +19,9 @@ use uuid::Uuid;
 /// Gossip topic for community state updates
 pub const COMMUNITY_TOPIC: &str = "community:updates";
 
-// TODO(Phase 2): Add gossip subscription handler to receive remote community updates.
-// Currently only publishes updates; receiving and merging remote state is Phase 2.
-// This will require:
-// - Subscribe to COMMUNITY_TOPIC on startup
-// - Handle incoming Community state messages
-// - Merge strategy for conflicting updates (last-write-wins or CRDT)
+// Note: Gossip subscription and merge handling is implemented in
+// icn-core/src/supervisor/init_notifications.rs using last-write-wins
+// merge strategy based on the `updated_at` timestamp.
 
 /// Actor message channel buffer size
 const ACTOR_CHANNEL_SIZE: usize = 100;

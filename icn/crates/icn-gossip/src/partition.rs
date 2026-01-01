@@ -177,7 +177,7 @@ impl VectorClockMerger {
             .unwrap_or(0);
 
         // For each peer in remote clock
-        for (remote_did, &remote_version) in &remote_clock.clock {
+        for (remote_did, remote_version) in remote_clock.iter() {
             let local_version = self.local_clock.get(remote_did);
 
             // Check for version gaps
@@ -212,7 +212,7 @@ impl VectorClockMerger {
         }
 
         // Check for peers in our clock that aren't in remote clock
-        for (local_did, &local_version) in &self.local_clock.clock {
+        for (local_did, local_version) in self.local_clock.iter() {
             if remote_clock.get(local_did) == 0 && local_version > 0 {
                 debug!(
                     "Peer {} in local clock but not remote: version={}",
@@ -574,13 +574,13 @@ mod tests {
 
         let mut local_clock = VectorClock::new();
         local_clock.increment(&did1);
-        local_clock.clock.insert(did2.clone(), 5);
+        local_clock.insert(did2.clone(), 5);
 
         let mut remote_clock = VectorClock::new();
         remote_clock.increment(&did2);
         remote_clock.increment(&did2);
-        remote_clock.clock.insert(did1.clone(), 1);
-        remote_clock.clock.insert(did3.clone(), 3);
+        remote_clock.insert(did1.clone(), 1);
+        remote_clock.insert(did3.clone(), 3);
 
         let mut merger = VectorClockMerger::new(local_clock);
         let conflicts = merger.merge(&did2, remote_clock).unwrap();

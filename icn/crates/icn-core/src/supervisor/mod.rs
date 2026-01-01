@@ -268,8 +268,7 @@ impl Supervisor {
             )
             .await?;
             icn_obs::metrics::supervisor::actor_spawned_inc("community");
-            // TODO: Wire community_store into gossip sync handler for incoming updates
-            let _community_store = community_services.community_store.clone();
+            let community_store = community_services.community_store.clone();
 
             // Initialize entity services (persistent storage)
             let entity_services = init_entity::init_entity_services(&self.config)?;
@@ -494,6 +493,7 @@ impl Supervisor {
                 let recovery_store_for_notifications = recovery_store.clone();
                 let ledger_for_notifications = ledger_handle.clone();
                 let coop_store_for_notifications = coop_store.clone();
+                let community_store_for_notifications = community_store.clone();
 
                 // Create candidate cache for NAT traversal
                 let candidate_cache = Arc::new(icn_net::CandidateCache::new());
@@ -629,6 +629,7 @@ impl Supervisor {
                         node_profile: node_profile_for_notifications,
                         profile_cache: profile_cache_for_notifications,
                         coop_store: coop_store_for_notifications,
+                        community_store: community_store_for_notifications,
                         federation_handler: federation_handler_for_notifications,
                         attestation_rate_limiter,
                         contract_registry: contract_registry_holder.clone(),

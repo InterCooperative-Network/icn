@@ -56,9 +56,9 @@ impl GossipActor {
 
         // Check if we're behind this peer's sequence
         let mut are_we_behind = false;
-        for (did, remote_seq) in &vector.clock {
+        for (did, remote_seq) in vector.iter() {
             let our_seq = self.clock.get(did);
-            if *remote_seq > our_seq {
+            if remote_seq > our_seq {
                 debug!(
                     "We're behind on {}: remote_seq={} > our_seq={}",
                     did, remote_seq, our_seq
