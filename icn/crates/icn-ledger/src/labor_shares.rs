@@ -220,20 +220,44 @@ impl LaborShare {
     }
 
     /// Record a labor contribution to this share
-    pub fn record_labor(&mut self, days: u64, at: u64, description: Option<String>) {
-        self.labor_days = self.labor_days.saturating_add(days);
+    ///
+    /// # Errors
+    /// Returns error if adding days would overflow u64 (practically impossible).
+    pub fn record_labor(
+        &mut self,
+        days: u64,
+        at: u64,
+        description: Option<String>,
+    ) -> Result<(), String> {
+        self.labor_days = self
+            .labor_days
+            .checked_add(days)
+            .ok_or_else(|| format!("Labor days overflow: {} + {}", self.labor_days, days))?;
         self.provenance.push(ShareEvent::LaborContributed {
             at,
             days,
             description,
         });
+        Ok(())
     }
 
     /// Allocate surplus to this share
-    pub fn allocate_surplus(&mut self, amount: i64, period: String, at: u64) {
-        self.accumulated_surplus = self.accumulated_surplus.saturating_add(amount);
+    ///
+    /// # Errors
+    /// Returns error if adding amount would overflow i64.
+    pub fn allocate_surplus(&mut self, amount: i64, period: String, at: u64) -> Result<(), String> {
+        self.accumulated_surplus =
+            self.accumulated_surplus
+                .checked_add(amount)
+                .ok_or_else(|| {
+                    format!(
+                        "Accumulated surplus overflow: {} + {}",
+                        self.accumulated_surplus, amount
+                    )
+                })?;
         self.provenance
             .push(ShareEvent::SurplusAllocated { at, amount, period });
+        Ok(())
     }
 
     /// Calculate the current value of this share
@@ -450,12 +474,31 @@ impl CooperativeBond {
 
     /// Calculate interest for a period
     ///
-    /// Returns the interest amount for the given number of days
+    /// Returns the interest amount for the given number of days.
+    /// Uses banker's rounding to minimize cumulative error.
     pub fn calculate_interest(&self, days: u32) -> i64 {
         // Interest = principal * rate * (days / 365)
         // Rate is in basis points (100 = 1%)
-        let annual_interest = (self.principal * i64::from(self.interest_rate_bps)) / 10_000;
-        (annual_interest * i64::from(days)) / 365
+        // Use i128 for intermediate calculation to prevent overflow
+        let numerator =
+            i128::from(self.principal) * i128::from(self.interest_rate_bps) * i128::from(days);
+        let denominator = 10_000_i128 * 365;
+        // Round to nearest (banker's rounding: add half denominator before division)
+        let rounded = (numerator + denominator / 2) / denominator;
+        rounded as i64
+    }
+
+    /// Calculate total amount owed (principal + interest to maturity)
+    ///
+    /// For a fully-paid bond, total_paid() should equal or exceed total_owed().
+    pub fn total_owed(&self) -> i64 {
+        // Calculate days from creation to maturity
+        let days = if self.maturity_date > self.created_at {
+            ((self.maturity_date - self.created_at) / 86400) as u32
+        } else {
+            0
+        };
+        self.principal + self.calculate_interest(days)
     }
 
     /// Check if this bond has reached maturity
@@ -478,8 +521,20 @@ impl CooperativeBond {
     }
 
     /// Activate the bond (move from Offering to Active)
-    pub fn activate(&mut self) {
-        self.status = BondStatus::Active;
+    ///
+    /// # Errors
+    /// Returns error if bond is not in Offering status.
+    pub fn activate(&mut self) -> Result<(), String> {
+        match &self.status {
+            BondStatus::Offering { .. } => {
+                self.status = BondStatus::Active;
+                Ok(())
+            }
+            _ => Err(format!(
+                "Cannot activate bond: status is {:?}, expected Offering",
+                self.status
+            )),
+        }
     }
 
     /// Mark the bond as matured (fully repaid)
@@ -537,6 +592,12 @@ impl SurplusAllocation {
     /// Calculates individual allocations based on labor days for each share.
     /// Uses integer arithmetic to ensure the sum of allocations equals total_surplus
     /// (no rounding losses). Remainder is distributed using largest-remainder method.
+    ///
+    /// # Errors
+    /// Returns error if:
+    /// - Total surplus is not positive
+    /// - Period is empty
+    /// - Any share does not belong to the specified cooperative
     pub fn new(
         id: String,
         cooperative_id: String,
@@ -546,7 +607,25 @@ impl SurplusAllocation {
         proposal_id: String,
         allocated_at: u64,
         currency: String,
-    ) -> Self {
+    ) -> Result<Self, String> {
+        // Validate inputs
+        if total_surplus <= 0 {
+            return Err(format!(
+                "Total surplus must be positive, got {total_surplus}"
+            ));
+        }
+        if period.is_empty() {
+            return Err("Period cannot be empty".to_string());
+        }
+        // Verify all shares belong to this cooperative
+        for share in shares {
+            if share.cooperative_id != cooperative_id {
+                return Err(format!(
+                    "Share {} belongs to cooperative '{}', not '{}'",
+                    share.id, share.cooperative_id, cooperative_id
+                ));
+            }
+        }
         // Calculate total labor days from active shares only
         let active_shares: Vec<_> = shares.iter().filter(|s| s.is_active()).collect();
         let total_labor_days: u64 = active_shares.iter().map(|s| s.labor_days).sum();
@@ -606,7 +685,7 @@ impl SurplusAllocation {
                 .collect()
         };
 
-        SurplusAllocation {
+        Ok(SurplusAllocation {
             id,
             cooperative_id,
             total_surplus,
@@ -617,7 +696,7 @@ impl SurplusAllocation {
             proposal_id,
             allocated_at,
             currency,
-        }
+        })
     }
 
     /// Get the allocation amount for a specific share
@@ -755,8 +834,10 @@ mod tests {
             1000,
         );
 
-        share.record_labor(10, 1001, Some("Week 1 work".to_string()));
-        share.record_labor(8, 1002, None);
+        share
+            .record_labor(10, 1001, Some("Week 1 work".to_string()))
+            .unwrap();
+        share.record_labor(8, 1002, None).unwrap();
 
         assert_eq!(share.labor_days, 18);
         assert_eq!(share.provenance.len(), 3);
@@ -772,8 +853,10 @@ mod tests {
             1000,
         );
 
-        share.record_labor(100, 1001, None);
-        share.allocate_surplus(500, "2025-Q4".to_string(), 2000);
+        share.record_labor(100, 1001, None).unwrap();
+        share
+            .allocate_surplus(500, "2025-Q4".to_string(), 2000)
+            .unwrap();
 
         assert_eq!(share.accumulated_surplus, 500);
         assert_eq!(share.current_value(), 500);
@@ -789,7 +872,9 @@ mod tests {
             1000,
         );
 
-        share.allocate_surplus(1000, "2025-Q4".to_string(), 2000);
+        share
+            .allocate_surplus(1000, "2025-Q4".to_string(), 2000)
+            .unwrap();
 
         let schedule = vec![
             ScheduledPayout::new(3000, 500),
@@ -861,7 +946,8 @@ mod tests {
             "proposal-001".to_string(),
             2000,
             "hours".to_string(),
-        );
+        )
+        .unwrap();
 
         // share-001 has 100/300 = 1/3 of labor days -> 100 units
         assert_eq!(
@@ -923,7 +1009,8 @@ mod tests {
             "proposal-001".to_string(),
             2000,
             "hours".to_string(),
-        );
+        )
+        .unwrap();
 
         // Sum all allocations - must equal exactly total_surplus
         let allocated_sum: i64 = allocation.allocations.iter().map(|(_, amt)| amt).sum();
@@ -943,7 +1030,9 @@ mod tests {
             1000,
         );
 
-        share.allocate_surplus(1000, "2025-Q4".to_string(), 2000);
+        share
+            .allocate_surplus(1000, "2025-Q4".to_string(), 2000)
+            .unwrap();
 
         let schedule = vec![
             ScheduledPayout::new(3000, 400),
