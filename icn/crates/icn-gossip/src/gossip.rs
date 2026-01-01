@@ -642,6 +642,7 @@ impl GossipActor {
                             }),
                             Err(_) => {
                                 warn!("No Tokio runtime available for trust score lookup");
+                                icn_obs::metrics::gossip::runtime_unavailable_inc();
                                 0.0 // Fallback: untrusted
                             }
                         }

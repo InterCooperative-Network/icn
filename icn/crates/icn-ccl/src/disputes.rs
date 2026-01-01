@@ -2623,4 +2623,32 @@ mod tests {
         // No penalty should be applied when disabled
         assert_eq!(penalty_count.load(Ordering::SeqCst), 0);
     }
+
+    #[tokio::test]
+    async fn test_investigate_dispute_not_found_error() {
+        // Test that investigate_dispute returns an error (not panic) for non-existent dispute
+        let config = DisputeConfig::default();
+        let store = Arc::new(SledStore::temporary().unwrap()) as Arc<dyn Store>;
+        let mut system = DisputeResolutionSystem::new(config, store);
+
+        let contract = make_test_contract();
+
+        // Try to investigate a dispute that doesn't exist
+        let fake_dispute_id = [99u8; 32];
+        let mut args = std::collections::HashMap::new();
+        args.insert("a".to_string(), Value::Int(2));
+        args.insert("b".to_string(), Value::Int(3));
+
+        let result = system
+            .investigate_dispute(fake_dispute_id, &contract, "add", args)
+            .await;
+
+        // Should return error, not panic
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("not found"),
+            "Error should mention dispute not found: {err_msg}"
+        );
+    }
 }

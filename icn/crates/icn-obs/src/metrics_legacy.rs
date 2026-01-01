@@ -1883,6 +1883,13 @@ pub mod gossip {
         .increment(1);
     }
 
+    /// Track when Tokio runtime is unavailable during gossip operations.
+    /// This should never happen in production - if it does, it indicates
+    /// a serious runtime configuration issue.
+    pub fn runtime_unavailable_inc() {
+        counter!("icn_gossip_runtime_unavailable_total").increment(1);
+    }
+
     pub fn subscribes_received_inc() {
         counter!("icn_gossip_subscribes_received_total").increment(1);
     }

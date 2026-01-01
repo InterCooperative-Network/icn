@@ -7,15 +7,19 @@
 //! - DID operations for networking
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use icn_identity::Did;
+use icn_identity::{Did, KeyPair};
 use icn_net::{
     MessagePayload, NetworkMessage, RateLimitConfig, RateLimiter, TrustGatedRateLimitConfig,
 };
 use icn_trust::TrustClass;
 
-/// Create a test DID from a seed byte
-fn test_did(seed: u8) -> Did {
-    Did::from_anchor_id(&[seed; 32])
+/// Create a test DID using a real keypair.
+/// This ensures the DID contains a valid Ed25519 public key for serialization.
+/// Note: The seed parameter is ignored - keypairs are randomly generated.
+/// This is fine for benchmarks since we only care about serialization performance,
+/// not the specific DID values.
+fn test_did(_seed: u8) -> Did {
+    KeyPair::generate().unwrap().did().clone()
 }
 
 /// Create a test network message
