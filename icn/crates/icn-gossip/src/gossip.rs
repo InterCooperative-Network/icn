@@ -9,7 +9,7 @@ use icn_identity::{Did, KeyPair};
 use icn_trust::TrustClass;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::RwLock;
 use tracing::{debug, info, instrument, warn};
 
@@ -51,6 +51,72 @@ fn topics_per_peer_limit(trust_class: Option<TrustClass>) -> usize {
     }
 }
 
+/// Cache for trust scores to avoid blocking async operations
+/// Uses std::sync::Mutex for synchronous access from non-async code
+struct TrustScoreCache {
+    scores: std::sync::Mutex<HashMap<Did, (f64, Instant)>>,
+    ttl: Duration,
+}
+
+impl TrustScoreCache {
+    fn new(ttl: Duration) -> Self {
+        Self {
+            scores: std::sync::Mutex::new(HashMap::new()),
+            ttl,
+        }
+    }
+
+    /// Get cached trust score if valid, or compute and cache it
+    fn get_or_compute<F>(&self, did: &Did, compute: F) -> f64
+    where
+        F: FnOnce() -> f64,
+    {
+        // Try to get from cache first
+        {
+            if let Ok(cache) = self.scores.lock() {
+                if let Some((score, cached_at)) = cache.get(did) {
+                    if cached_at.elapsed() < self.ttl {
+                        return *score;
+                    }
+                }
+            }
+        }
+
+        // Compute new score
+        let score = compute();
+
+        // Cache it
+        if let Ok(mut cache) = self.scores.lock() {
+            cache.insert(did.clone(), (score, Instant::now()));
+            // Limit cache size to prevent unbounded growth
+            if cache.len() > 10_000 {
+                // Remove oldest entries (simple eviction)
+                let now = Instant::now();
+                cache.retain(|_, (_, cached_at)| now.duration_since(*cached_at) < self.ttl);
+            }
+        }
+
+        score
+    }
+}
+
+/// Default TTL for trust score cache (5 seconds)
+const TRUST_CACHE_TTL: Duration = Duration::from_secs(5);
+
+/// Spawn a violation recording task without blocking
+/// This is fire-and-forget - we don't wait for the result
+fn spawn_violation_recording(
+    detector: Arc<RwLock<icn_security::MisbehaviorDetector>>,
+    did: Did,
+    violation: icn_security::Violation,
+    evidence: Vec<u8>,
+) {
+    tokio::spawn(async move {
+        let mut det = detector.write().await;
+        det.record_violation(&did, violation, evidence);
+    });
+}
+
 /// Gossip actor manages topics and entry synchronization
 pub struct GossipActor {
     /// This node's DID
@@ -84,6 +150,9 @@ pub struct GossipActor {
     /// Trust graph for fine-grained trust score computation (optional)
     /// When provided, enables trust-gated subscription authorization
     trust_graph: Option<Arc<RwLock<icn_trust::TrustGraph>>>,
+
+    /// Trust score cache to avoid blocking async operations
+    trust_cache: TrustScoreCache,
 
     /// Send message callback (optional, for sending responses)
     send_callback: Option<SendMessageCallback>,
@@ -137,6 +206,7 @@ impl GossipActor {
             subscriptions: HashMap::new(),
             trust_lookup,
             trust_graph,
+            trust_cache: TrustScoreCache::new(TRUST_CACHE_TTL),
             send_callback: None,
             notification_callback: None,
             peer_sampling: None,
@@ -454,19 +524,10 @@ impl GossipActor {
         }
 
         // Phase 18 Week 6: Check storage quota for author
+        // Use block_in_place to safely call blocking_read from async context
         if let Some(quota_manager) = &self.storage_quota_manager {
             let can_store = tokio::task::block_in_place(|| {
-                let rt = tokio::runtime::Handle::try_current();
-                if let Ok(handle) = rt {
-                    handle.block_on(async {
-                        let manager = quota_manager.read().await;
-                        manager.can_store(&author, entry_size)
-                    })
-                } else {
-                    // No async runtime, try sync access
-                    let manager = quota_manager.blocking_read();
-                    manager.can_store(&author, entry_size)
-                }
+                quota_manager.blocking_read().can_store(&author, entry_size)
             });
 
             if let Err(e) = can_store {
@@ -500,26 +561,14 @@ impl GossipActor {
                     topic_entries.remove(&oldest_hash);
 
                     // Phase 18 Week 6: Release quota for evicted entry
+                    // Use block_in_place to safely call blocking_write from async context
                     if let Some(quota_manager) = &self.storage_quota_manager {
                         tokio::task::block_in_place(|| {
-                            let rt = tokio::runtime::Handle::try_current();
-                            if let Ok(handle) = rt {
-                                handle.block_on(async {
-                                    let mut manager = quota_manager.write().await;
-                                    let _ = manager.release_usage(
-                                        &oldest_author,
-                                        &oldest_hash,
-                                        oldest_size,
-                                    );
-                                });
-                            } else {
-                                let mut manager = quota_manager.blocking_write();
-                                let _ = manager.release_usage(
-                                    &oldest_author,
-                                    &oldest_hash,
-                                    oldest_size,
-                                );
-                            }
+                            let _ = quota_manager.blocking_write().release_usage(
+                                &oldest_author,
+                                &oldest_hash,
+                                oldest_size,
+                            );
                         });
                     }
                 }
@@ -535,52 +584,27 @@ impl GossipActor {
         topic_entries.insert(hash, entry.clone());
 
         // Phase 18 Week 6: Record quota usage for new entry
+        // Use block_in_place to safely call blocking_write from async context
         if let Some(quota_manager) = &self.storage_quota_manager {
             tokio::task::block_in_place(|| {
-                let rt = tokio::runtime::Handle::try_current();
-                if let Ok(handle) = rt {
-                    handle.block_on(async {
-                        let mut manager = quota_manager.write().await;
-                        // Use Normal priority for gossip entries (evicted before ledger/contracts)
-                        let _ = manager.record_usage(
-                            &author,
-                            hash.to_vec(),
-                            entry_size,
-                            icn_store::QuotaPriority::Normal,
-                        );
+                let mut manager = quota_manager.blocking_write();
+                // Use Normal priority for gossip entries (evicted before ledger/contracts)
+                let _ = manager.record_usage(
+                    &author,
+                    hash.to_vec(),
+                    entry_size,
+                    icn_store::QuotaPriority::Normal,
+                );
 
-                        // Check if eviction is needed
-                        if manager.needs_eviction() {
-                            if let Ok(evicted) = manager.evict_if_needed() {
-                                if !evicted.is_empty() {
-                                    info!(
-                                        evicted_count = evicted.len(),
-                                        "Storage quota eviction triggered"
-                                    );
-                                    icn_obs::metrics::storage_quotas::evicted_inc(
-                                        evicted.len() as u64
-                                    );
-                                }
-                            }
-                        }
-                    });
-                } else {
-                    let mut manager = quota_manager.blocking_write();
-                    let _ = manager.record_usage(
-                        &author,
-                        hash.to_vec(),
-                        entry_size,
-                        icn_store::QuotaPriority::Normal,
-                    );
-                    if manager.needs_eviction() {
-                        if let Ok(evicted) = manager.evict_if_needed() {
-                            if !evicted.is_empty() {
-                                info!(
-                                    evicted_count = evicted.len(),
-                                    "Storage quota eviction triggered"
-                                );
-                                icn_obs::metrics::storage_quotas::evicted_inc(evicted.len() as u64);
-                            }
+                // Check if eviction is needed
+                if manager.needs_eviction() {
+                    if let Ok(evicted) = manager.evict_if_needed() {
+                        if !evicted.is_empty() {
+                            info!(
+                                evicted_count = evicted.len(),
+                                "Storage quota eviction triggered"
+                            );
+                            icn_obs::metrics::storage_quotas::evicted_inc(evicted.len() as u64);
                         }
                     }
                 }
@@ -629,16 +653,17 @@ impl GossipActor {
         // Priority 1: Check fine-grained trust threshold (if configured)
         if let Some(threshold) = topic_obj.min_trust_threshold {
             if let Some(trust_graph) = &self.trust_graph {
-                // Compute exact trust score from trust graph
-                // Use blocking operation since we're in a sync context
-                let trust_score = {
-                    // block_in_place allows blocking in async runtime context
-                    // Use try_current() to avoid panic if not in a runtime
+                // Get trust score from cache or compute it
+                // Cache avoids blocking async operations on every subscription check
+                let trust_graph_clone = Arc::clone(trust_graph);
+                let subscriber_clone = subscriber.clone();
+                let trust_score = self.trust_cache.get_or_compute(&subscriber, || {
+                    // Compute score - only blocks if cache miss
                     tokio::task::block_in_place(|| {
                         match tokio::runtime::Handle::try_current() {
                             Ok(rt) => rt.block_on(async {
-                                let graph = trust_graph.read().await;
-                                graph.compute_trust_score(&subscriber).unwrap_or(0.0)
+                                let graph = trust_graph_clone.read().await;
+                                graph.compute_trust_score(&subscriber_clone).unwrap_or(0.0)
                             }),
                             Err(_) => {
                                 warn!("No Tokio runtime available for trust score lookup");
@@ -647,7 +672,7 @@ impl GossipActor {
                             }
                         }
                     })
-                };
+                });
 
                 // Enforce trust threshold
                 if trust_score < threshold {
@@ -659,7 +684,7 @@ impl GossipActor {
                     // Track rejection metrics
                     icn_obs::metrics::gossip::subscriptions_rejected_inc(topic, trust_score);
 
-                    // Record misbehavior violation (Phase 18 Week 1-2)
+                    // Record misbehavior violation (fire-and-forget, non-blocking)
                     if let Some(ref detector) = self.misbehavior_detector {
                         use sha2::{Digest, Sha256};
                         let mut hasher = Sha256::new();
@@ -674,20 +699,12 @@ impl GossipActor {
                             limit: 0,
                         };
 
-                        tokio::task::block_in_place(|| {
-                            if let Ok(rt) = tokio::runtime::Handle::try_current() {
-                                rt.block_on(async {
-                                    detector.write().await.record_violation(
-                                        &subscriber,
-                                        violation,
-                                        evidence,
-                                    );
-                                });
-                            } else {
-                                warn!("No Tokio runtime for violation recording - Byzantine penalty skipped for unauthorized_subscription");
-                                icn_obs::metrics::gossip::runtime_unavailable_inc();
-                            }
-                        });
+                        spawn_violation_recording(
+                            Arc::clone(detector),
+                            subscriber.clone(),
+                            violation,
+                            evidence,
+                        );
                     }
 
                     bail!("Insufficient trust: score {trust_score:.3} < required {threshold:.3}");
@@ -708,7 +725,7 @@ impl GossipActor {
         // Priority 2: Check AccessControl-based ACL (coarse-grained)
         let trust_class = (self.trust_lookup)(&subscriber);
         if !topic_obj.can_subscribe(&subscriber, trust_class) {
-            // Record misbehavior violation (Phase 18 Week 1-2)
+            // Record misbehavior violation (fire-and-forget, non-blocking)
             if let Some(ref detector) = self.misbehavior_detector {
                 use sha2::{Digest, Sha256};
                 let mut hasher = Sha256::new();
@@ -723,20 +740,12 @@ impl GossipActor {
                     limit: 0,
                 };
 
-                tokio::task::block_in_place(|| {
-                    if let Ok(rt) = tokio::runtime::Handle::try_current() {
-                        rt.block_on(async {
-                            detector.write().await.record_violation(
-                                &subscriber,
-                                violation,
-                                evidence,
-                            );
-                        });
-                    } else {
-                        warn!("No Tokio runtime for violation recording - Byzantine penalty skipped for acl_violation");
-                        icn_obs::metrics::gossip::runtime_unavailable_inc();
-                    }
-                });
+                spawn_violation_recording(
+                    Arc::clone(detector),
+                    subscriber.clone(),
+                    violation,
+                    evidence,
+                );
             }
 
             bail!("Not authorized to subscribe to topic: {topic}");
@@ -747,7 +756,7 @@ impl GossipActor {
         let peer_topics = self.get_subscriptions(&subscriber);
         let peer_limit = topics_per_peer_limit(trust_class);
         if peer_topics.len() >= peer_limit {
-            // Record misbehavior violation
+            // Record misbehavior violation (fire-and-forget, non-blocking)
             if let Some(ref detector) = self.misbehavior_detector {
                 use sha2::{Digest, Sha256};
                 let mut hasher = Sha256::new();
@@ -761,20 +770,12 @@ impl GossipActor {
                     limit: peer_limit as u64,
                 };
 
-                tokio::task::block_in_place(|| {
-                    if let Ok(rt) = tokio::runtime::Handle::try_current() {
-                        rt.block_on(async {
-                            detector.write().await.record_violation(
-                                &subscriber,
-                                violation,
-                                evidence,
-                            );
-                        });
-                    } else {
-                        warn!("No Tokio runtime for violation recording - Byzantine penalty skipped for peer_subscriptions");
-                        icn_obs::metrics::gossip::runtime_unavailable_inc();
-                    }
-                });
+                spawn_violation_recording(
+                    Arc::clone(detector),
+                    subscriber.clone(),
+                    violation,
+                    evidence,
+                );
             }
 
             warn!(
@@ -797,7 +798,7 @@ impl GossipActor {
         if !subscribers.contains(&subscriber) {
             // Check per-topic subscriber limit to prevent unbounded growth
             if subscribers.len() >= MAX_SUBSCRIBERS_PER_TOPIC {
-                // Record misbehavior violation (Phase 18 Week 1-2)
+                // Record misbehavior violation (fire-and-forget, non-blocking)
                 if let Some(ref detector) = self.misbehavior_detector {
                     use sha2::{Digest, Sha256};
                     let mut hasher = Sha256::new();
@@ -812,20 +813,12 @@ impl GossipActor {
                         limit: MAX_SUBSCRIBERS_PER_TOPIC as u64,
                     };
 
-                    tokio::task::block_in_place(|| {
-                        if let Ok(rt) = tokio::runtime::Handle::try_current() {
-                            rt.block_on(async {
-                                detector.write().await.record_violation(
-                                    &subscriber,
-                                    violation,
-                                    evidence,
-                                );
-                            });
-                        } else {
-                            warn!("No Tokio runtime for violation recording - Byzantine penalty skipped for topic_subscribers");
-                            icn_obs::metrics::gossip::runtime_unavailable_inc();
-                        }
-                    });
+                    spawn_violation_recording(
+                        Arc::clone(detector),
+                        subscriber.clone(),
+                        violation,
+                        evidence,
+                    );
                 }
 
                 bail!(
