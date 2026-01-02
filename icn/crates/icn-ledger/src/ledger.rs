@@ -1695,34 +1695,9 @@ impl Ledger {
         cursor_ts: Option<u64>,
         limit: usize,
     ) -> Result<(Vec<JournalEntry>, Option<u64>)> {
-        // If no filter, use the efficient offset-based method
-        if filter_did.is_none() {
-            let offset = if let Some(ts) = cursor_ts {
-                // Find the offset for this timestamp in the index
-                // For simplicity, we count entries up to this timestamp
-                let ts_prefix = JOURNAL_TS_PREFIX.as_bytes();
-                let all_ts = self.store.scan(ts_prefix)?;
-                all_ts
-                    .iter()
-                    .take_while(|(key, _)| {
-                        // Key format: "journal_ts:{timestamp:016x}:{hash}"
-                        // Extract timestamp and compare
-                        let key_str = String::from_utf8_lossy(key);
-                        if let Some(ts_str) = key_str.strip_prefix(JOURNAL_TS_PREFIX) {
-                            if let Some(ts_hex) = ts_str.split(':').next() {
-                                if let Ok(entry_ts) = u64::from_str_radix(ts_hex, 16) {
-                                    return entry_ts <= ts;
-                                }
-                            }
-                        }
-                        false
-                    })
-                    .count()
-            } else {
-                0
-            };
-
-            let (entries, _total) = self.get_entries_paginated_asc(offset, limit + 1)?;
+        // Fast path: No filter AND no cursor - use efficient offset-based pagination
+        if filter_did.is_none() && cursor_ts.is_none() {
+            let (entries, _total) = self.get_entries_paginated_asc(0, limit + 1)?;
             let has_more = entries.len() > limit;
             let entries: Vec<_> = entries.into_iter().take(limit).collect();
             let next_cursor = if has_more {
@@ -1733,25 +1708,21 @@ impl Ledger {
             return Ok((entries, next_cursor));
         }
 
-        // With DID filter, stream through entries applying filter
-        // At this point filter_did is guaranteed to be Some (checked above via early return)
-        let Some(did_filter) = filter_did else {
-            // This branch is unreachable due to the early return above,
-            // but we handle it gracefully to avoid expect/unwrap
-            return Ok((Vec::new(), None));
-        };
-
+        // Streaming path: Either has filter OR has cursor (or both)
+        // Stream through timestamp index, applying filter and cursor, stopping early
         let ts_prefix = JOURNAL_TS_PREFIX.as_bytes();
         let ts_pairs = self.store.scan(ts_prefix)?;
 
         let mut entries = Vec::with_capacity(limit);
 
         for (key, hash_bytes) in ts_pairs {
-            // Extract timestamp from key to check cursor
+            // Extract timestamp from key
+            // Key format: "ledger:journal_ts:{timestamp:020}:{hash}"
+            // Timestamp is stored as zero-padded decimal (not hex)
             let key_str = String::from_utf8_lossy(&key);
             if let Some(ts_str) = key_str.strip_prefix(JOURNAL_TS_PREFIX) {
-                if let Some(ts_hex) = ts_str.split(':').next() {
-                    if let Ok(entry_ts) = u64::from_str_radix(ts_hex, 16) {
+                if let Some(ts_decimal) = ts_str.split(':').next() {
+                    if let Ok(entry_ts) = ts_decimal.parse::<u64>() {
                         // Skip entries at or before the cursor
                         if let Some(cursor) = cursor_ts {
                             if entry_ts <= cursor {
@@ -1767,12 +1738,13 @@ impl Ledger {
             if let Some(entry_data) = self.store.get(entry_key.as_bytes())? {
                 let entry: JournalEntry = serde_json::from_slice(&entry_data)?;
 
-                // Apply DID filter
-                if entry
-                    .accounts
-                    .iter()
-                    .any(|delta| &delta.account_id == did_filter)
-                {
+                // Apply DID filter if present
+                let matches_filter = match filter_did {
+                    Some(did) => entry.accounts.iter().any(|delta| &delta.account_id == did),
+                    None => true, // No filter means all entries match
+                };
+
+                if matches_filter {
                     entries.push(entry);
 
                     // Stop once we have enough + 1 (to check if there are more)
