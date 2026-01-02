@@ -378,9 +378,19 @@ pub struct PlacementOffer {
     pub offered_at: u64,
 }
 
+impl Eq for PlacementOffer {}
+
+impl Ord for PlacementOffer {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        // Use total_cmp for deterministic ordering even with NaN values
+        // (NaN is considered less than all other values including -Inf)
+        self.score.total_cmp(&other.score)
+    }
+}
+
 impl PartialOrd for PlacementOffer {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.score.partial_cmp(&other.score)
+        Some(self.cmp(other))
     }
 }
 
