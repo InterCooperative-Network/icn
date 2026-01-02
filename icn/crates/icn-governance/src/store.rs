@@ -184,16 +184,31 @@ impl GovernanceStore for InMemoryGovernanceStore {
         });
 
         // Parse cursor as offset (format: "offset:<number>")
-        let offset: usize = cursor
-            .and_then(|c| c.strip_prefix("offset:"))
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(0);
+        // Log invalid cursors for debugging but default to 0 for resilience
+        let offset: usize = match cursor {
+            Some(c) => match c.strip_prefix("offset:") {
+                Some(s) => match s.parse::<usize>() {
+                    Ok(n) => n,
+                    Err(e) => {
+                        warn!(cursor = %c, error = %e, "Invalid cursor format - starting from beginning");
+                        0
+                    }
+                },
+                None => {
+                    warn!(cursor = %c, "Cursor missing 'offset:' prefix - starting from beginning");
+                    0
+                }
+            },
+            None => 0,
+        };
 
         // Get sorted keys for deterministic ordering
         let mut keys: Vec<_> = domains.keys().collect();
         keys.sort();
 
         let total = keys.len();
+        // Clamp offset to valid range to prevent out-of-bounds access
+        let offset = offset.min(total);
         let items: Vec<GovernanceDomain> = keys
             .into_iter()
             .skip(offset)
@@ -477,12 +492,27 @@ impl GovernanceStore for SledGovernanceStore {
             .unwrap_or_default();
 
         // Parse cursor as offset (format: "offset:<number>")
-        let offset: usize = cursor
-            .and_then(|c| c.strip_prefix("offset:"))
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(0);
+        // Log invalid cursors for debugging but default to 0 for resilience
+        let offset: usize = match cursor {
+            Some(c) => match c.strip_prefix("offset:") {
+                Some(s) => match s.parse::<usize>() {
+                    Ok(n) => n,
+                    Err(e) => {
+                        warn!(cursor = %c, error = %e, "Invalid cursor format - starting from beginning");
+                        0
+                    }
+                },
+                None => {
+                    warn!(cursor = %c, "Cursor missing 'offset:' prefix - starting from beginning");
+                    0
+                }
+            },
+            None => 0,
+        };
 
         let total = domain_ids.len();
+        // Clamp offset to valid range to prevent out-of-bounds access
+        let offset = offset.min(total);
 
         // Only fetch the domains we need for this page
         let page_ids: Vec<_> = domain_ids.into_iter().skip(offset).take(limit).collect();

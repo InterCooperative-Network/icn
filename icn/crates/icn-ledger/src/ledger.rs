@@ -1785,7 +1785,13 @@ impl Ledger {
             };
 
             // Skip entries at or before the cursor (using hash for tie-breaking)
-            // Entries are sorted by (timestamp ASC, hash ASC) in the index
+            // Entries are sorted by (timestamp ASC, hash ASC) in the index.
+            //
+            // The cursor points to the LAST entry returned in the previous page.
+            // We use <= (not <) for the hash comparison because:
+            // - If entry_hash == cursor_hash: this is the same entry, skip to avoid duplicates
+            // - If entry_hash < cursor_hash: this entry was already returned, skip it
+            // - If entry_hash > cursor_hash: this is a new entry, include it
             if let Some(cursor) = cursor_ts {
                 if entry_ts < cursor {
                     continue;
