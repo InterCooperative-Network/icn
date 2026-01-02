@@ -235,9 +235,19 @@ pub async fn get_history(
         .unwrap_or(DEFAULT_PAGE_SIZE)
         .clamp(1, MAX_PAGE_SIZE);
 
-    // Decode cursor to get timestamp for continuation
+    // Decode cursor to get timestamp and hash for continuation
     let decoded_cursor = cursor.as_ref().and_then(|c| Cursor::decode(c));
-    let cursor_ts = decoded_cursor.as_ref().map(|c| c.ts);
+    // Convert Cursor to the format expected by ledger: (timestamp, optional_hash)
+    let cursor_tuple = decoded_cursor.as_ref().map(|c| {
+        // Cursor stores timestamp in milliseconds, convert to seconds
+        let ts = c.ts / 1000;
+        let hash = if c.id.is_empty() {
+            None
+        } else {
+            Some(c.id.clone())
+        };
+        (ts, hash)
+    });
 
     // For legacy offset-based pagination, we still need to support it
     let offset: usize = query
@@ -251,14 +261,17 @@ pub async fn get_history(
     // Track history query
     gateway::history_queries_inc();
 
+    // Track whether we're using cursor-based pagination (for offset field)
+    let using_cursor = cursor_tuple.is_some();
+
     // Use memory-efficient paginated query
     // This streams entries and stops after collecting enough, never loading all into memory
-    let (entries, next_cursor_ts) = if cursor_ts.is_some() || filter_did.is_some() {
+    let (entries, next_cursor_tuple) = if cursor_tuple.is_some() || filter_did.is_some() {
         // Use the new streaming pagination for cursor-based or filtered queries
         ledger_mgr.get_history_paginated(
             &coop_id,
             filter_did.as_ref(),
-            cursor_ts,
+            cursor_tuple,
             validated_limit,
         )?
     } else {
@@ -268,12 +281,15 @@ pub async fn get_history(
             ledger_mgr.get_history(&coop_id, filter_did.as_ref(), offset, validated_limit + 1)?;
         let has_more = entries.len() > validated_limit;
         let entries: Vec<_> = entries.into_iter().take(validated_limit).collect();
-        let next_ts = if has_more {
-            entries.last().map(|e| e.timestamp)
+        let next = if has_more {
+            entries.last().map(|e| {
+                let hash = e.id.as_ref().map(|h| h.to_hex()).unwrap_or_default();
+                (e.timestamp, hash)
+            })
         } else {
             None
         };
-        (entries, next_ts)
+        (entries, next)
     };
 
     // Convert to response format
@@ -301,14 +317,8 @@ pub async fn get_history(
         .collect();
 
     // Build pagination info
-    let has_more = next_cursor_ts.is_some();
-    let next_cursor = if let Some(ts) = next_cursor_ts {
-        history
-            .last()
-            .map(|tx| Cursor::from_seconds(ts, &tx.id).encode())
-    } else {
-        None
-    };
+    let has_more = next_cursor_tuple.is_some();
+    let next_cursor = next_cursor_tuple.map(|(ts, hash)| Cursor::from_seconds(ts, &hash).encode());
 
     let count = history.len();
     let pagination = PaginationInfo {
@@ -317,11 +327,7 @@ pub async fn get_history(
         prev_cursor: None, // Prev cursor requires storing state, not supported
         count,
         has_more,
-        offset: if cursor_ts.is_none() {
-            Some(offset)
-        } else {
-            None
-        },
+        offset: if using_cursor { None } else { Some(offset) },
         limit: validated_limit,
     };
 

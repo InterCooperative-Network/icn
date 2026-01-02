@@ -28,6 +28,9 @@ use tracing::{debug, error, info, instrument, warn};
 /// Type alias for validation hook callback
 pub type ValidationHook = Box<dyn Fn(&JournalEntry) -> Result<()> + Send + Sync>;
 
+/// Type alias for pagination cursor (timestamp, hash for tie-breaking)
+pub type PaginationCursor = (u64, String);
+
 /// Key prefix for journal entries in storage
 const JOURNAL_PREFIX: &str = "ledger:journal:";
 
@@ -1616,9 +1619,14 @@ impl Ledger {
         // Look up entries by hash (values in timestamp index are hashes)
         let mut entries = Vec::with_capacity(ts_pairs.len());
         for (_key, hash_bytes) in ts_pairs {
-            let entry_key = format!("{}{}", JOURNAL_PREFIX, hex::encode(&hash_bytes));
+            let hash_hex = hex::encode(&hash_bytes);
+            let entry_key = format!("{}{}", JOURNAL_PREFIX, &hash_hex);
             if let Some(entry_data) = self.store.get(entry_key.as_bytes())? {
-                let entry: JournalEntry = serde_json::from_slice(&entry_data)?;
+                let mut entry: JournalEntry = serde_json::from_slice(&entry_data)?;
+                // Restore the id from the hash (not serialized due to #[serde(skip)])
+                if let Ok(hash_arr) = <[u8; 32]>::try_from(hash_bytes.as_slice()) {
+                    entry.id = Some(ContentHash::from_bytes(hash_arr));
+                }
                 entries.push(entry);
             }
         }
@@ -1662,9 +1670,14 @@ impl Ledger {
         // Look up entries by hash (values in timestamp index are hashes)
         let mut entries = Vec::with_capacity(ts_pairs.len());
         for (_key, hash_bytes) in ts_pairs {
-            let entry_key = format!("{}{}", JOURNAL_PREFIX, hex::encode(&hash_bytes));
+            let hash_hex = hex::encode(&hash_bytes);
+            let entry_key = format!("{}{}", JOURNAL_PREFIX, &hash_hex);
             if let Some(entry_data) = self.store.get(entry_key.as_bytes())? {
-                let entry: JournalEntry = serde_json::from_slice(&entry_data)?;
+                let mut entry: JournalEntry = serde_json::from_slice(&entry_data)?;
+                // Restore the id from the hash (not serialized due to #[serde(skip)])
+                if let Ok(hash_arr) = <[u8; 32]>::try_from(hash_bytes.as_slice()) {
+                    entry.id = Some(ContentHash::from_bytes(hash_arr));
+                }
                 entries.push(entry);
             }
         }
@@ -1695,24 +1708,35 @@ impl Ledger {
     /// - Uses N+1 query pattern: one index scan + one lookup per entry
     /// - Acceptable for local Sled storage; would need batch fetching for network storage
     /// - Filtered queries scan all index entries but only deserialize matching entries
+    ///
+    /// # Cursor Format
+    /// The cursor is a tuple of (timestamp, optional_hash) for proper tie-breaking.
+    /// When multiple entries share the same timestamp, the hash provides deterministic ordering.
     pub fn get_entries_filtered_paginated(
         &self,
         filter_did: Option<&Did>,
-        cursor_ts: Option<u64>,
+        cursor: Option<(u64, Option<String>)>,
         limit: usize,
-    ) -> Result<(Vec<JournalEntry>, Option<u64>)> {
+    ) -> Result<(Vec<JournalEntry>, Option<PaginationCursor>)> {
         // Fast path: No filter AND no cursor - use efficient offset-based pagination
-        if filter_did.is_none() && cursor_ts.is_none() {
+        if filter_did.is_none() && cursor.is_none() {
             let (entries, _total) = self.get_entries_paginated_asc(0, limit + 1)?;
             let has_more = entries.len() > limit;
             let entries: Vec<_> = entries.into_iter().take(limit).collect();
             let next_cursor = if has_more {
-                entries.last().map(|e| e.timestamp)
+                entries.last().map(|e| {
+                    let hash = e.id.as_ref().map(|h| h.to_hex()).unwrap_or_default();
+                    (e.timestamp, hash)
+                })
             } else {
                 None
             };
             return Ok((entries, next_cursor));
         }
+
+        // Extract cursor components
+        let cursor_ts = cursor.as_ref().map(|(ts, _)| *ts);
+        let cursor_hash = cursor.as_ref().and_then(|(_, h)| h.clone());
 
         // Streaming path: Either has filter OR has cursor (or both)
         // Stream through timestamp index, applying filter and cursor, stopping early
@@ -1722,10 +1746,11 @@ impl Ledger {
         let mut entries = Vec::with_capacity(limit);
 
         for (key, hash_bytes) in ts_pairs {
-            // Extract timestamp from key
+            // Extract timestamp and hash from key
             // Key format: "ledger:journal_ts:{timestamp:020}:{hash}"
             // Timestamp is stored as zero-padded decimal (not hex)
             let key_str = String::from_utf8_lossy(&key);
+            let entry_hash = hex::encode(&hash_bytes);
 
             // Parse timestamp from key - log errors instead of silently skipping
             let entry_ts = match key_str.strip_prefix(JOURNAL_TS_PREFIX) {
@@ -1759,17 +1784,30 @@ impl Ledger {
                 }
             };
 
-            // Skip entries at or before the cursor
+            // Skip entries at or before the cursor (using hash for tie-breaking)
+            // Entries are sorted by (timestamp ASC, hash ASC) in the index
             if let Some(cursor) = cursor_ts {
-                if entry_ts <= cursor {
+                if entry_ts < cursor {
                     continue;
+                }
+                if entry_ts == cursor {
+                    // Same timestamp - use hash for tie-breaking
+                    if let Some(ref cursor_h) = cursor_hash {
+                        if entry_hash <= *cursor_h {
+                            continue;
+                        }
+                    }
                 }
             }
 
             // Look up the full entry
-            let entry_key = format!("{}{}", JOURNAL_PREFIX, hex::encode(&hash_bytes));
+            let entry_key = format!("{}{}", JOURNAL_PREFIX, &entry_hash);
             if let Some(entry_data) = self.store.get(entry_key.as_bytes())? {
-                let entry: JournalEntry = serde_json::from_slice(&entry_data)?;
+                let mut entry: JournalEntry = serde_json::from_slice(&entry_data)?;
+                // Restore the id from the hash (not serialized due to #[serde(skip)])
+                if let Ok(hash_arr) = <[u8; 32]>::try_from(hash_bytes.as_slice()) {
+                    entry.id = Some(ContentHash::from_bytes(hash_arr));
+                }
 
                 // Apply DID filter if present
                 let matches_filter = match filter_did {
@@ -1794,9 +1832,12 @@ impl Ledger {
             entries.pop(); // Remove the extra entry
         }
 
-        // Next cursor is the timestamp of the last entry
+        // Next cursor includes both timestamp and hash for proper tie-breaking
         let next_cursor = if has_more {
-            entries.last().map(|e| e.timestamp)
+            entries.last().map(|e| {
+                let hash = e.id.as_ref().map(|h| h.to_hex()).unwrap_or_default();
+                (e.timestamp, hash)
+            })
         } else {
             None
         };
@@ -3872,9 +3913,10 @@ mod tests {
         assert_eq!(entries.len(), 5);
         assert!(next_cursor.is_some());
 
-        // Get second page using cursor
+        // Get second page using cursor (convert (ts, hash) to (ts, Some(hash)))
+        let cursor_for_next = next_cursor.map(|(ts, hash)| (ts, Some(hash)));
         let (entries2, next_cursor2) = ledger
-            .get_entries_filtered_paginated(None, next_cursor, 5)
+            .get_entries_filtered_paginated(None, cursor_for_next, 5)
             .unwrap();
         assert_eq!(entries2.len(), 5);
         assert!(next_cursor2.is_none()); // No more pages
@@ -3925,9 +3967,10 @@ mod tests {
         assert_eq!(page1.len(), 3);
         assert!(cursor1.is_some());
 
-        // Get second page
+        // Get second page (convert (ts, hash) to (ts, Some(hash)))
+        let cursor1_for_next = cursor1.map(|(ts, hash)| (ts, Some(hash)));
         let (page2, cursor2) = ledger
-            .get_entries_filtered_paginated(Some(&alice), cursor1, 3)
+            .get_entries_filtered_paginated(Some(&alice), cursor1_for_next, 3)
             .unwrap();
         assert_eq!(page2.len(), 2);
         assert!(cursor2.is_none());
@@ -3946,7 +3989,7 @@ mod tests {
         let (ledger, _temp, _dids) = create_ledger_with_entries(15);
 
         let mut all_entries = Vec::new();
-        let mut cursor = None;
+        let mut cursor: Option<(u64, Option<String>)> = None;
 
         // Paginate through all entries with page size 4
         loop {
@@ -3959,7 +4002,8 @@ mod tests {
             }
 
             all_entries.extend(entries);
-            cursor = next_cursor;
+            // Convert (ts, hash) to (ts, Some(hash)) for next iteration
+            cursor = next_cursor.map(|(ts, hash)| (ts, Some(hash)));
 
             if cursor.is_none() {
                 break;

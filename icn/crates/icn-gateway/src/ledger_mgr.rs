@@ -276,25 +276,28 @@ impl LedgerManager {
     /// # Arguments
     /// * `coop_id` - Cooperative ID
     /// * `filter_did` - Optional DID to filter transactions by
-    /// * `cursor_ts` - Optional timestamp to continue from (exclusive)
+    /// * `cursor` - Optional (timestamp, hash) tuple to continue from (exclusive)
     /// * `limit` - Maximum entries to return
     ///
     /// # Returns
-    /// Tuple of (entries, next_cursor_timestamp)
+    /// Tuple of (entries, next_cursor) where cursor is (timestamp, hash)
     pub fn get_history_paginated(
         &self,
         coop_id: &CoopId,
         filter_did: Option<&Did>,
-        cursor_ts: Option<u64>,
+        cursor: Option<(u64, Option<String>)>,
         limit: usize,
-    ) -> Result<(Vec<icn_ledger::JournalEntry>, Option<u64>)> {
+    ) -> Result<(
+        Vec<icn_ledger::JournalEntry>,
+        Option<icn_ledger::PaginationCursor>,
+    )> {
         let ledger_arc = self.get_ledger(coop_id)?;
         let ledger = ledger_arc
             .read()
             .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
 
         ledger
-            .get_entries_filtered_paginated(filter_did, cursor_ts, limit)
+            .get_entries_filtered_paginated(filter_did, cursor, limit)
             .map_err(GatewayError::SubstrateError)
     }
 
