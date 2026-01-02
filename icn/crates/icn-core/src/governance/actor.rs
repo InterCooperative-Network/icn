@@ -22,9 +22,9 @@ use icn_governance::{
     DecisionOutcome, Delegation, DelegationId, GovernanceConfig, GovernanceDomain,
     GovernanceDomainId, GovernanceMessage, GovernanceParams, GovernanceProfile,
     GovernanceProfileId, GovernanceRule, MembershipAction, MembershipConfig, MembershipResolver,
-    MembershipSource, ParameterChange, Proposal, ProposalId, ProposalOutcome, ProposalPayload,
-    ProposalState, ProtocolParameter, ProtocolParameterStore, TallySnapshot, Timestamp, Vote,
-    VoteChoice, VoteTally,
+    MembershipSource, PaginatedResult, ParameterChange, Proposal, ProposalId, ProposalOutcome,
+    ProposalPayload, ProposalState, ProtocolParameter, ProtocolParameterStore, TallySnapshot,
+    Timestamp, Vote, VoteChoice, VoteTally,
 };
 
 use crate::events::{EventBus, SystemEvent};
@@ -165,6 +165,20 @@ impl GovernanceHandle {
     /// List all governance domains
     pub async fn list_domains(&self) -> Result<Vec<GovernanceDomain>> {
         self.inner.read().await.list_domains()
+    }
+
+    /// List governance domains with pagination
+    ///
+    /// Returns a page of domains starting from the cursor position.
+    pub async fn list_domains_paginated(
+        &self,
+        cursor: Option<&str>,
+        limit: usize,
+    ) -> Result<PaginatedResult<GovernanceDomain>> {
+        self.inner
+            .read()
+            .await
+            .list_domains_paginated(cursor, limit)
     }
 
     /// List all proposals
@@ -351,6 +365,14 @@ impl icn_governance::GovernanceOps for GovernanceHandle {
 
     async fn list_domains(&self) -> Result<Vec<GovernanceDomain>> {
         Self::list_domains(self).await
+    }
+
+    async fn list_domains_paginated(
+        &self,
+        cursor: Option<&str>,
+        limit: usize,
+    ) -> Result<PaginatedResult<GovernanceDomain>> {
+        Self::list_domains_paginated(self, cursor, limit).await
     }
 
     async fn get_domain(&self, id: &GovernanceDomainId) -> Result<Option<GovernanceDomain>> {
@@ -1199,6 +1221,55 @@ impl GovernanceActor {
         rows.into_iter()
             .map(|(_k, v)| Ok(serde_json::from_slice::<GovernanceDomain>(&v)?))
             .collect()
+    }
+
+    /// List domains with pagination
+    ///
+    /// Returns a page of domains starting from the cursor position.
+    /// Uses offset-based pagination with cursor format "offset:<number>".
+    fn list_domains_paginated(
+        &self,
+        cursor: Option<&str>,
+        limit: usize,
+    ) -> Result<PaginatedResult<GovernanceDomain>> {
+        // Parse offset from cursor
+        let offset = match cursor {
+            Some(c) => {
+                if let Some(offset_str) = c.strip_prefix("offset:") {
+                    offset_str.parse::<usize>().unwrap_or(0)
+                } else {
+                    0
+                }
+            }
+            None => 0,
+        };
+
+        // Scan all domains (storage layer doesn't support native pagination)
+        let prefix = domain_key_prefix();
+        let all_rows = self.store.scan(prefix)?;
+        let total = all_rows.len();
+
+        // Skip to offset and take limit
+        let page: Vec<GovernanceDomain> = all_rows
+            .into_iter()
+            .skip(offset)
+            .take(limit)
+            .map(|(_k, v)| serde_json::from_slice::<GovernanceDomain>(&v))
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+
+        // Calculate next cursor
+        let next_offset = offset + page.len();
+        let next_cursor = if next_offset < total {
+            Some(format!("offset:{next_offset}"))
+        } else {
+            None
+        };
+
+        Ok(PaginatedResult {
+            items: page,
+            next_cursor,
+            total: Some(total),
+        })
     }
 
     /// List all proposals

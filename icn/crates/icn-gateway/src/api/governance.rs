@@ -156,9 +156,16 @@ pub async fn list_domains(
         .validate_filters()
         .map_err(crate::error::GatewayError::BadRequest)?;
 
-    // TODO(performance): Currently loads all domains into memory for filtering/sorting.
-    // For large deployments, consider pushing filtering/sorting to storage layer.
-    // See: https://github.com/InterCooperative-Network/icn/issues/322#performance
+    let limit = query.limit;
+
+    // NOTE: We load all domains for filtering/sorting because:
+    // 1. The API contract requires default sorting by name
+    // 2. Storage-layer pagination returns items in storage order (by ID)
+    // 3. Sorting after pagination breaks cursor semantics
+    //
+    // TODO(performance): For very large domain counts (10K+), consider:
+    // - Adding a name-sorted secondary index in storage
+    // - Offering an unsorted API variant for raw pagination
     let mut domains = gov_mgr.list_domains().await?;
 
     // Apply filters
@@ -206,7 +213,6 @@ pub async fn list_domains(
     }
 
     // Apply pagination
-    let limit = query.limit;
     let total = domains.len();
 
     // Parse cursor to get offset (format: "offset:<number>")

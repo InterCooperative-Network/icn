@@ -10,6 +10,39 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::warn;
 
+/// Result of a paginated query
+#[derive(Debug, Clone)]
+pub struct PaginatedResult<T> {
+    /// Items in the current page
+    pub items: Vec<T>,
+    /// Cursor for the next page, if any
+    pub next_cursor: Option<String>,
+    /// Total count of items (if available)
+    pub total: Option<usize>,
+}
+
+impl<T> PaginatedResult<T> {
+    /// Create a new paginated result
+    pub fn new(items: Vec<T>, next_cursor: Option<String>) -> Self {
+        Self {
+            items,
+            next_cursor,
+            total: None,
+        }
+    }
+
+    /// Create a paginated result with total count
+    pub fn with_total(mut self, total: usize) -> Self {
+        self.total = Some(total);
+        self
+    }
+
+    /// Check if there are more pages
+    pub fn has_more(&self) -> bool {
+        self.next_cursor.is_some()
+    }
+}
+
 /// Trait for governance storage operations
 pub trait GovernanceStore: Send + Sync {
     /// Store a governance domain
@@ -18,8 +51,22 @@ pub trait GovernanceStore: Send + Sync {
     /// Retrieve a governance domain
     fn get_domain(&self, id: &GovernanceDomainId) -> Result<Option<GovernanceDomain>>;
 
-    /// List all domains
+    /// List all domains (deprecated - use list_domains_paginated for large datasets)
     fn list_domains(&self) -> Result<Vec<GovernanceDomain>>;
+
+    /// List domains with pagination
+    ///
+    /// Returns a page of domains starting from the cursor position.
+    /// If cursor is None, starts from the beginning.
+    ///
+    /// # Arguments
+    /// * `cursor` - Optional cursor from previous page
+    /// * `limit` - Maximum number of items to return
+    fn list_domains_paginated(
+        &self,
+        cursor: Option<&str>,
+        limit: usize,
+    ) -> Result<PaginatedResult<GovernanceDomain>>;
 
     /// Store a proposal
     fn store_proposal(&self, proposal: &Proposal) -> Result<()>;
@@ -124,6 +171,59 @@ impl GovernanceStore for InMemoryGovernanceStore {
             poisoned.into_inner()
         });
         Ok(domains.values().cloned().collect())
+    }
+
+    fn list_domains_paginated(
+        &self,
+        cursor: Option<&str>,
+        limit: usize,
+    ) -> Result<PaginatedResult<GovernanceDomain>> {
+        let domains = self.domains.read().unwrap_or_else(|poisoned| {
+            warn!("Domains lock poisoned, recovering");
+            poisoned.into_inner()
+        });
+
+        // Parse cursor as offset (format: "offset:<number>")
+        // Log invalid cursors for debugging but default to 0 for resilience
+        let offset: usize = match cursor {
+            Some(c) => match c.strip_prefix("offset:") {
+                Some(s) => match s.parse::<usize>() {
+                    Ok(n) => n,
+                    Err(e) => {
+                        warn!(cursor = %c, error = %e, "Invalid cursor format - starting from beginning");
+                        0
+                    }
+                },
+                None => {
+                    warn!(cursor = %c, "Cursor missing 'offset:' prefix - starting from beginning");
+                    0
+                }
+            },
+            None => 0,
+        };
+
+        // Get sorted keys for deterministic ordering
+        let mut keys: Vec<_> = domains.keys().collect();
+        keys.sort();
+
+        let total = keys.len();
+        // Clamp offset to valid range to prevent out-of-bounds access
+        let offset = offset.min(total);
+        let items: Vec<GovernanceDomain> = keys
+            .into_iter()
+            .skip(offset)
+            .take(limit)
+            .filter_map(|k| domains.get(k).cloned())
+            .collect();
+
+        let next_offset = offset + items.len();
+        let next_cursor = if next_offset < total {
+            Some(format!("offset:{next_offset}"))
+        } else {
+            None
+        };
+
+        Ok(PaginatedResult::new(items, next_cursor).with_total(total))
     }
 
     fn store_proposal(&self, proposal: &Proposal) -> Result<()> {
@@ -377,6 +477,61 @@ impl GovernanceStore for SledGovernanceStore {
         }
 
         Ok(domains)
+    }
+
+    fn list_domains_paginated(
+        &self,
+        cursor: Option<&str>,
+        limit: usize,
+    ) -> Result<PaginatedResult<GovernanceDomain>> {
+        let index_key = Self::domain_index_key();
+        let domain_ids: Vec<String> = self
+            .db
+            .get(&index_key)?
+            .map(|v| serde_json::from_slice(&v).unwrap_or_default())
+            .unwrap_or_default();
+
+        // Parse cursor as offset (format: "offset:<number>")
+        // Log invalid cursors for debugging but default to 0 for resilience
+        let offset: usize = match cursor {
+            Some(c) => match c.strip_prefix("offset:") {
+                Some(s) => match s.parse::<usize>() {
+                    Ok(n) => n,
+                    Err(e) => {
+                        warn!(cursor = %c, error = %e, "Invalid cursor format - starting from beginning");
+                        0
+                    }
+                },
+                None => {
+                    warn!(cursor = %c, "Cursor missing 'offset:' prefix - starting from beginning");
+                    0
+                }
+            },
+            None => 0,
+        };
+
+        let total = domain_ids.len();
+        // Clamp offset to valid range to prevent out-of-bounds access
+        let offset = offset.min(total);
+
+        // Only fetch the domains we need for this page
+        let page_ids: Vec<_> = domain_ids.into_iter().skip(offset).take(limit).collect();
+
+        let mut domains = Vec::with_capacity(page_ids.len());
+        for id in page_ids {
+            if let Some(domain) = self.get_domain(&GovernanceDomainId(id))? {
+                domains.push(domain);
+            }
+        }
+
+        let next_offset = offset + domains.len();
+        let next_cursor = if next_offset < total {
+            Some(format!("offset:{next_offset}"))
+        } else {
+            None
+        };
+
+        Ok(PaginatedResult::new(domains, next_cursor).with_total(total))
     }
 
     fn store_proposal(&self, proposal: &Proposal) -> Result<()> {
