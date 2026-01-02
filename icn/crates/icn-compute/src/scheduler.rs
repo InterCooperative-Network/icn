@@ -1008,7 +1008,11 @@ mod tests {
         assert!(offer_neg_inf < offer_valid);
 
         // Sorting should not panic and should be deterministic
-        let mut offers = [offer_valid.clone(), offer_nan.clone(), offer_neg_inf.clone()];
+        let mut offers = [
+            offer_valid.clone(),
+            offer_nan.clone(),
+            offer_neg_inf.clone(),
+        ];
         offers.sort();
 
         // After sorting: -Inf < 0.5 < NaN
