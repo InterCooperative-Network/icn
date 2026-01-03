@@ -10,6 +10,17 @@
 //! charters/by_type/<org_type>/<charter_id> -> timestamp (type index)
 //! charters/status/<status>/<charter_id>    -> timestamp (status index)
 //! ```
+//!
+//! ## Lock Poisoning Handling
+//!
+//! This module uses two patterns for lock poison recovery:
+//!
+//! - **Backend operations** (get, put, delete, scan): Fail-fast with error.
+//!   Poisoned locks indicate a prior panic and possibly corrupt state.
+//!   Silent recovery would risk data integrity issues.
+//!
+//! - **Cache operations**: Graceful degradation. Cache is non-critical; poison
+//!   is logged but the operation continues using the backend directly.
 
 use crate::charter::{Charter, CharterId, CharterStatus, OrgType};
 use anyhow::{Context, Result};
@@ -17,7 +28,7 @@ use lru::LruCache;
 use std::collections::BTreeMap;
 use std::num::NonZeroUsize;
 use std::sync::{Arc, RwLock};
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 
 /// Storage key prefixes
 const CHARTER_PREFIX: &[u8] = b"charters/";
@@ -47,44 +58,36 @@ impl InMemoryCharterStore {
 
 impl CharterStoreBackend for InMemoryCharterStore {
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
-        Ok(self
-            .data
-            .read()
-            .unwrap_or_else(|poisoned| {
-                warn!("Data lock poisoned, recovering");
-                poisoned.into_inner()
-            })
-            .get(key)
-            .cloned())
+        let data = self.data.read().map_err(|e| {
+            error!("Lock poisoned in charter store get: {e}");
+            anyhow::anyhow!("Lock poisoned in get - store may contain corrupt state")
+        })?;
+        Ok(data.get(key).cloned())
     }
 
     fn put(&self, key: &[u8], value: &[u8]) -> Result<()> {
-        self.data
-            .write()
-            .unwrap_or_else(|poisoned| {
-                warn!("Data lock poisoned, recovering");
-                poisoned.into_inner()
-            })
-            .insert(key.to_vec(), value.to_vec());
+        let mut data = self.data.write().map_err(|e| {
+            error!("Lock poisoned in charter store put: {e}");
+            anyhow::anyhow!("Lock poisoned in put - store may contain corrupt state")
+        })?;
+        data.insert(key.to_vec(), value.to_vec());
         Ok(())
     }
 
     fn delete(&self, key: &[u8]) -> Result<()> {
-        self.data
-            .write()
-            .unwrap_or_else(|poisoned| {
-                warn!("Data lock poisoned, recovering");
-                poisoned.into_inner()
-            })
-            .remove(key);
+        let mut data = self.data.write().map_err(|e| {
+            error!("Lock poisoned in charter store delete: {e}");
+            anyhow::anyhow!("Lock poisoned in delete - store may contain corrupt state")
+        })?;
+        data.remove(key);
         Ok(())
     }
 
     fn scan(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
-        let data = self.data.read().unwrap_or_else(|poisoned| {
-            warn!("Data lock poisoned, recovering");
-            poisoned.into_inner()
-        });
+        let data = self.data.read().map_err(|e| {
+            error!("Lock poisoned in charter store scan: {e}");
+            anyhow::anyhow!("Lock poisoned in scan - store may contain corrupt state")
+        })?;
         Ok(data
             .range(prefix.to_vec()..)
             .take_while(|(k, _)| k.starts_with(prefix))
@@ -214,14 +217,12 @@ impl<S: CharterStoreBackend> CharterStore<S> {
         let status_key = Self::status_index_key(status_str, charter_id);
         self.store.put(&status_key, &timestamp)?;
 
-        // Update cache
-        self.cache
-            .write()
-            .unwrap_or_else(|poisoned| {
-                warn!("Cache lock poisoned, recovering");
-                poisoned.into_inner()
-            })
-            .put(*charter_id.as_bytes(), charter.clone());
+        // Update cache (non-critical - skip on poison)
+        if let Ok(mut cache) = self.cache.write() {
+            cache.put(*charter_id.as_bytes(), charter.clone());
+        } else {
+            warn!("Cache lock poisoned in store - skipping cache update");
+        }
 
         debug!("Stored Charter: {}", charter_id);
         Ok(())
@@ -229,17 +230,13 @@ impl<S: CharterStoreBackend> CharterStore<S> {
 
     /// Get a Charter by ID
     pub fn get(&self, charter_id: &CharterId) -> Result<Option<Charter>> {
-        // Check cache first
-        if let Some(cached) = self
-            .cache
-            .write()
-            .unwrap_or_else(|poisoned| {
-                warn!("Cache lock poisoned, recovering");
-                poisoned.into_inner()
-            })
-            .get(charter_id.as_bytes())
-        {
-            return Ok(Some(cached.clone()));
+        // Check cache first (non-critical - skip on poison)
+        if let Ok(mut cache) = self.cache.write() {
+            if let Some(cached) = cache.get(charter_id.as_bytes()) {
+                return Ok(Some(cached.clone()));
+            }
+        } else {
+            warn!("Cache lock poisoned in get - falling back to backend");
         }
 
         // Load from storage
@@ -248,14 +245,12 @@ impl<S: CharterStoreBackend> CharterStore<S> {
             let charter: Charter =
                 serde_json::from_slice(&value).context("Failed to deserialize Charter")?;
 
-            // Update cache
-            self.cache
-                .write()
-                .unwrap_or_else(|poisoned| {
-                    warn!("Cache lock poisoned, recovering");
-                    poisoned.into_inner()
-                })
-                .put(*charter_id.as_bytes(), charter.clone());
+            // Update cache (non-critical - skip on poison)
+            if let Ok(mut cache) = self.cache.write() {
+                cache.put(*charter_id.as_bytes(), charter.clone());
+            } else {
+                warn!("Cache lock poisoned in get - skipping cache update");
+            }
 
             return Ok(Some(charter));
         }
@@ -296,14 +291,12 @@ impl<S: CharterStoreBackend> CharterStore<S> {
             let status_key = Self::status_index_key(status_str, charter_id);
             self.store.delete(&status_key)?;
 
-            // Remove from cache
-            self.cache
-                .write()
-                .unwrap_or_else(|poisoned| {
-                    warn!("Cache lock poisoned, recovering");
-                    poisoned.into_inner()
-                })
-                .pop(charter_id.as_bytes());
+            // Remove from cache (non-critical - skip on poison)
+            if let Ok(mut cache) = self.cache.write() {
+                cache.pop(charter_id.as_bytes());
+            } else {
+                warn!("Cache lock poisoned in delete - skipping cache update");
+            }
 
             debug!("Deleted Charter: {}", charter_id);
             return Ok(true);
@@ -496,13 +489,11 @@ impl<S: CharterStoreBackend> CharterStore<S> {
 
     /// Clear the cache
     pub fn clear_cache(&self) {
-        self.cache
-            .write()
-            .unwrap_or_else(|poisoned| {
-                warn!("Cache lock poisoned, recovering");
-                poisoned.into_inner()
-            })
-            .clear();
+        if let Ok(mut cache) = self.cache.write() {
+            cache.clear();
+        } else {
+            warn!("Cache lock poisoned in clear_cache - cache already cleared by poison");
+        }
     }
 }
 
@@ -748,5 +739,147 @@ mod tests {
         // Now should be gone
         let gone = store.get(&charter_id).unwrap();
         assert!(gone.is_none());
+    }
+
+    // ========== Lock Poisoning Tests ==========
+
+    /// A backend that can simulate poison/failure states for testing
+    struct FailingBackend {
+        inner: InMemoryCharterStore,
+        should_fail: std::sync::atomic::AtomicBool,
+    }
+
+    impl FailingBackend {
+        fn new() -> Self {
+            Self {
+                inner: InMemoryCharterStore::new(),
+                should_fail: std::sync::atomic::AtomicBool::new(false),
+            }
+        }
+
+        fn set_failing(&self, fail: bool) {
+            self.should_fail
+                .store(fail, std::sync::atomic::Ordering::SeqCst);
+        }
+    }
+
+    impl CharterStoreBackend for FailingBackend {
+        fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
+            if self.should_fail.load(std::sync::atomic::Ordering::SeqCst) {
+                anyhow::bail!("Lock poisoned - store may contain corrupt state")
+            }
+            self.inner.get(key)
+        }
+
+        fn put(&self, key: &[u8], value: &[u8]) -> Result<()> {
+            if self.should_fail.load(std::sync::atomic::Ordering::SeqCst) {
+                anyhow::bail!("Lock poisoned - store may contain corrupt state")
+            }
+            self.inner.put(key, value)
+        }
+
+        fn delete(&self, key: &[u8]) -> Result<()> {
+            if self.should_fail.load(std::sync::atomic::Ordering::SeqCst) {
+                anyhow::bail!("Lock poisoned - store may contain corrupt state")
+            }
+            self.inner.delete(key)
+        }
+
+        fn scan(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
+            if self.should_fail.load(std::sync::atomic::Ordering::SeqCst) {
+                anyhow::bail!("Lock poisoned - store may contain corrupt state")
+            }
+            self.inner.scan(prefix)
+        }
+    }
+
+    #[test]
+    fn test_backend_poison_fails_fast() {
+        // Test that backend failures propagate as errors (fail-fast behavior)
+        let backend = Arc::new(FailingBackend::new());
+        let store = CharterStore::new(backend.clone());
+
+        // Simulate backend poison BEFORE any operations
+        backend.set_failing(true);
+
+        // Store operation should fail
+        let charter = create_test_charter("test", OrgType::Cooperative);
+        let result = store.store(&charter);
+        assert!(
+            result.is_err(),
+            "store should fail when backend is poisoned"
+        );
+        assert!(
+            result.unwrap_err().to_string().contains("Lock poisoned"),
+            "error should mention lock poisoning"
+        );
+
+        // Get should fail (nothing in cache, backend is poisoned)
+        let result = store.get(&charter.charter_id);
+        assert!(result.is_err(), "get should fail when backend is poisoned");
+
+        // scan (via list_all) should fail
+        let result = store.list_all();
+        assert!(
+            result.is_err(),
+            "list_all should fail when backend is poisoned"
+        );
+
+        // Verify that when backend is restored, operations succeed
+        backend.set_failing(false);
+        let result = store.store(&charter);
+        assert!(
+            result.is_ok(),
+            "store should succeed when backend is restored"
+        );
+    }
+
+    #[test]
+    fn test_cache_poison_graceful_degradation() {
+        // Test that cache failures don't break the store (graceful degradation)
+        let store = create_test_store();
+
+        // Store a record
+        let charter = create_test_charter("test", OrgType::Cooperative);
+        store.store(&charter).expect("store should succeed");
+
+        // Poison the cache by panicking while holding the lock
+        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _guard = store.cache.write().unwrap();
+            panic!("intentional panic to poison cache");
+        }));
+
+        // Verify the cache is actually poisoned
+        assert!(
+            store.cache.write().is_err(),
+            "cache should be poisoned after panic"
+        );
+
+        // The cache is now poisoned, but operations should still work via backend
+        // Store another record - should succeed (cache update is non-critical)
+        let charter2 = create_test_charter("test2", OrgType::Community);
+        let result = store.store(&charter2);
+        assert!(
+            result.is_ok(),
+            "store should succeed even with poisoned cache"
+        );
+
+        // Get should work (falls back to backend when cache is poisoned)
+        let result = store.get(&charter.charter_id);
+        assert!(
+            result.is_ok(),
+            "get should succeed even with poisoned cache"
+        );
+        assert!(
+            result.unwrap().is_some(),
+            "should retrieve charter from backend"
+        );
+
+        // Delete should work (cache update is non-critical)
+        let result = store.delete(&charter2.charter_id);
+        assert!(
+            result.is_ok(),
+            "delete should succeed even with poisoned cache"
+        );
     }
 }

@@ -1,4 +1,11 @@
 //! Health check and monitoring endpoints
+//!
+//! ## Lock Poisoning Handling
+//!
+//! This module uses graceful degradation for lock poisoning. Health monitoring
+//! is critical infrastructure - a failed health check could cause cascading
+//! issues with load balancers and orchestrators. Better to report stale health
+//! data than to fail the health endpoint entirely.
 
 use axum::{
     extract::State,
@@ -10,7 +17,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use tracing::warn;
+use tracing::error;
 
 /// Health status of the ICN node
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -69,10 +76,15 @@ impl HealthService {
 
     /// Update health metrics
     pub fn update(&self, active_connections: u64, gossip_topics: u64, ledger_quarantine_size: u64) {
-        let mut status = self.inner.write().unwrap_or_else(|poisoned| {
-            warn!("Health status lock poisoned, recovering");
-            poisoned.into_inner()
-        });
+        // Use graceful degradation - skip update if lock is poisoned
+        // Health monitoring must remain available for load balancers
+        let mut status = match self.inner.write() {
+            Ok(guard) => guard,
+            Err(e) => {
+                error!("Health status lock poisoned in update - skipping update: {e}");
+                return;
+            }
+        };
 
         status.uptime_seconds = self
             .start_time
@@ -100,13 +112,32 @@ impl HealthService {
 
     /// Get current health status
     pub fn get_status(&self) -> HealthStatus {
-        self.inner
-            .read()
-            .unwrap_or_else(|poisoned| {
-                warn!("Health status lock poisoned, recovering");
-                poisoned.into_inner()
-            })
-            .clone()
+        // Use graceful degradation - return degraded status if lock is poisoned
+        // Health monitoring must remain available for load balancers
+        match self.inner.read() {
+            Ok(guard) => guard.clone(),
+            Err(e) => {
+                error!(
+                    "Health status lock poisoned in get_status - returning degraded status: {e}"
+                );
+                // Return a degraded status to indicate something is wrong
+                HealthStatus {
+                    status: HealthState::Degraded,
+                    uptime_seconds: self
+                        .start_time
+                        .elapsed()
+                        .unwrap_or(Duration::from_secs(0))
+                        .as_secs(),
+                    active_connections: 0,
+                    gossip_topics: 0,
+                    ledger_quarantine_size: 0,
+                    timestamp: SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .unwrap_or(Duration::from_secs(0))
+                        .as_secs(),
+                }
+            }
+        }
     }
 }
 
@@ -221,5 +252,49 @@ mod tests {
         health.update(5, 10, 1001);
         let status = health.get_status();
         assert_eq!(status.status, HealthState::Unhealthy);
+    }
+
+    // ========== Lock Poisoning Tests ==========
+
+    #[test]
+    fn test_lock_poison_graceful_degradation() {
+        // Test that poisoned locks result in graceful degradation, not errors
+        let health = HealthService::new();
+
+        // Set initial state
+        health.update(5, 10, 50);
+        let status = health.get_status();
+        assert_eq!(status.status, HealthState::Healthy);
+
+        // Poison the lock by panicking while holding it
+        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _guard = health.inner.write().unwrap();
+            panic!("intentional panic to poison lock");
+        }));
+
+        // Verify the lock is actually poisoned
+        assert!(
+            health.inner.write().is_err(),
+            "inner lock should be poisoned after panic"
+        );
+
+        // get_status should still work and return degraded status
+        let status = health.get_status();
+        assert_eq!(
+            status.status,
+            HealthState::Degraded,
+            "should return degraded status when lock is poisoned"
+        );
+
+        // update should not panic - it should gracefully skip
+        health.update(10, 20, 100); // Should not panic
+
+        // get_status should still work
+        let status = health.get_status();
+        assert_eq!(
+            status.status,
+            HealthState::Degraded,
+            "should still return degraded status"
+        );
     }
 }
