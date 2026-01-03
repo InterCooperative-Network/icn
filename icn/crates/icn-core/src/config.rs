@@ -175,15 +175,16 @@ pub struct NetworkConfig {
     /// will be encrypted with the recipient's X25519 public key before signing.
     /// Messages from non-supporting peers remain signed-only (backward compatible).
     ///
-    /// ## Fallback Behavior
+    /// ## Fail-Closed Behavior
     ///
     /// If encryption fails (e.g., serialization error, missing key), the message
-    /// is sent unencrypted as a fallback (fail-open). This ensures message delivery
-    /// but represents a security degradation. Fallbacks are:
-    /// - Logged at WARN level for visibility
-    /// - Tracked via `icn_network_encryption_fallback_total` metric
+    /// is **dropped** rather than sent unencrypted. This ensures confidential data
+    /// is never leaked over the network. Encryption failures are:
+    /// - Logged at ERROR level for immediate visibility
+    /// - Tracked via `icn_network_encryption_failed_total` metric
     ///
-    /// Monitor this metric in production to detect systematic encryption issues.
+    /// Monitor this metric in production to detect systematic encryption issues
+    /// that may be causing message loss.
     ///
     /// Default: true (recommended for pilot and production)
     #[serde(default = "default_true")]

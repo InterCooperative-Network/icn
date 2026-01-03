@@ -96,8 +96,8 @@ pub fn init_descriptions() {
         "Total number of E2E encrypted messages sent"
     );
     describe_counter!(
-        "icn_network_encryption_fallback_total",
-        "Total number of fallbacks from encrypted to signed-only transmission"
+        "icn_network_encryption_failed_total",
+        "Total number of messages dropped due to encryption failure (fail-closed)"
     );
     describe_counter!(
         "icn_network_encryption_rejected_total",
@@ -218,12 +218,12 @@ pub fn encrypted_messages_sent_inc() {
     counter!("icn_network_encrypted_messages_sent_total").increment(1);
 }
 
-/// Increment encryption fallback counter with reason
+/// Increment encryption failed counter with reason (fail-closed: message dropped)
 ///
 /// Reasons: "encryption_error", "peer_key_missing", "serialization_failed"
-pub fn encryption_fallback_inc(reason: &str) {
+pub fn encryption_failed_inc(reason: &str) {
     counter!(
-        "icn_network_encryption_fallback_total",
+        "icn_network_encryption_failed_total",
         "reason" => reason.to_string()
     )
     .increment(1);

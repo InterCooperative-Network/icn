@@ -29,7 +29,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::select;
 use tokio::task::JoinSet;
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 
 use crate::config::Config;
 use crate::runtime::ShutdownTx;
@@ -640,20 +640,17 @@ impl Supervisor {
                                             net_handle.send_message(target_did, net_msg).await
                                         }
                                         Err(e) => {
-                                            // Fall back to unencrypted on failure (security degradation)
-                                            // This is logged at WARN level for visibility in production
-                                            warn!(
-                                                "Encryption failed for {}, falling back to signed-only: {}",
+                                            // Fail-closed: drop the message rather than transmit plaintext.
+                                            // This ensures we never leak confidential data unencrypted.
+                                            error!(
+                                                "Encryption failed for {}, dropping message (fail-closed): {}",
                                                 target_did, e
                                             );
-                                            icn_obs::metrics::network::encryption_fallback_inc(
+                                            icn_obs::metrics::network::encryption_failed_inc(
                                                 "encryption_error",
                                             );
-                                            let net_msg = icn_net::NetworkMessage::signed(
-                                                Some(target_did.clone()),
-                                                inner_envelope,
-                                            );
-                                            net_handle.send_message(target_did, net_msg).await
+                                            // Return Ok to avoid triggering retry logic - this is intentional drop
+                                            Ok(())
                                         }
                                     }
                                 } else {
