@@ -18,6 +18,11 @@ use std::time::Duration;
 use tokio::sync::RwLock;
 use tracing::{info, warn};
 
+/// Get an available port for testing
+fn get_available_port() -> u16 {
+    portpicker::pick_unused_port().expect("No available ports")
+}
+
 /// Helper to create a test node with subscription handling
 struct TestNode {
     _keypair: KeyPair,
@@ -179,7 +184,7 @@ impl TestNode {
 }
 
 #[tokio::test]
-#[ignore] // Requires network interfaces and QUIC handshake
+#[ignore] // Uses blocking_write() in async context - needs refactoring to use async handlers
 async fn test_subscription_end_to_end() -> Result<()> {
     // Install rustls crypto provider
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
@@ -191,8 +196,8 @@ async fn test_subscription_end_to_end() -> Result<()> {
         .try_init();
 
     // Spawn two nodes
-    let node1 = TestNode::spawn(15001).await?;
-    let node2 = TestNode::spawn(15002).await?;
+    let node1 = TestNode::spawn(get_available_port()).await?;
+    let node2 = TestNode::spawn(get_available_port()).await?;
 
     info!("Node 1 DID: {}", node1.did);
     info!("Node 2 DID: {}", node2.did);

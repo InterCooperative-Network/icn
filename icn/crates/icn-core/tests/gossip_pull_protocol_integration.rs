@@ -20,6 +20,11 @@ use std::time::Duration;
 use tokio::sync::{Mutex, RwLock};
 use tracing::{info, warn};
 
+/// Get an available port for testing
+fn get_available_port() -> u16 {
+    portpicker::pick_unused_port().expect("No available ports")
+}
+
 /// Test node helper with pull protocol tracking
 struct TestNode {
     _keypair: KeyPair,
@@ -172,7 +177,6 @@ impl TestNode {
 }
 
 #[tokio::test]
-#[ignore] // Uses hardcoded ports (17001-17002) - may conflict in CI; passes locally
 async fn test_two_node_convergence_via_pull_protocol() -> Result<()> {
     // Install rustls crypto provider
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
@@ -186,8 +190,8 @@ async fn test_two_node_convergence_via_pull_protocol() -> Result<()> {
     info!("=== Starting pull protocol convergence test ===");
 
     // Spawn two nodes
-    let node1 = TestNode::spawn(17001).await?;
-    let node2 = TestNode::spawn(17002).await?;
+    let node1 = TestNode::spawn(get_available_port()).await?;
+    let node2 = TestNode::spawn(get_available_port()).await?;
 
     info!("Node 1 DID: {}", node1.did);
     info!("Node 2 DID: {}", node2.did);
@@ -322,7 +326,6 @@ async fn test_two_node_convergence_via_pull_protocol() -> Result<()> {
 }
 
 #[tokio::test]
-#[ignore] // Uses hardcoded ports (17003-17004) - may conflict in CI; passes locally
 async fn test_pull_request_respects_backpressure() -> Result<()> {
     // Install rustls crypto provider
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
@@ -336,8 +339,8 @@ async fn test_pull_request_respects_backpressure() -> Result<()> {
     info!("=== Starting backpressure test ===");
 
     // Spawn two nodes
-    let node1 = TestNode::spawn(17003).await?;
-    let node2 = TestNode::spawn(17004).await?;
+    let node1 = TestNode::spawn(get_available_port()).await?;
+    let node2 = TestNode::spawn(get_available_port()).await?;
 
     // Create topic
     let topic = "test:backpressure";

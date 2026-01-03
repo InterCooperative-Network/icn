@@ -21,6 +21,11 @@ use std::time::Duration;
 use tokio::sync::RwLock;
 use tracing::{info, warn};
 
+/// Get an available port for testing
+fn get_available_port() -> u16 {
+    portpicker::pick_unused_port().expect("No available ports")
+}
+
 /// Helper to create a test node with trust graph
 struct TestNode {
     keypair: KeyPair,
@@ -190,8 +195,8 @@ impl TestNode {
     }
 }
 
-#[tokio::test]
-#[ignore] // Requires network interfaces and QUIC handshake
+#[tokio::test(flavor = "multi_thread")]
+#[ignore] // Uses blocking_write() in async context - needs refactoring to use async handlers
 async fn test_trust_attestation_propagation() -> Result<()> {
     // Install rustls crypto provider
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
@@ -205,8 +210,8 @@ async fn test_trust_attestation_propagation() -> Result<()> {
     info!("=== Starting trust attestation propagation test ===");
 
     // Spawn two nodes
-    let alice = TestNode::spawn(15100).await?;
-    let bob = TestNode::spawn(15101).await?;
+    let alice = TestNode::spawn(get_available_port()).await?;
+    let bob = TestNode::spawn(get_available_port()).await?;
 
     info!("Alice DID: {}", alice.did);
     info!("Bob DID: {}", bob.did);
@@ -283,8 +288,8 @@ async fn test_trust_attestation_propagation() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test]
-#[ignore] // Requires network interfaces and QUIC handshake
+#[tokio::test(flavor = "multi_thread")]
+#[ignore] // Uses blocking_write() in async context - needs refactoring to use async handlers
 async fn test_three_node_transitive_trust() -> Result<()> {
     // Install rustls crypto provider
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
@@ -298,9 +303,9 @@ async fn test_three_node_transitive_trust() -> Result<()> {
     info!("=== Starting three-node transitive trust test ===");
 
     // Spawn three nodes
-    let alice = TestNode::spawn(15200).await?;
-    let bob = TestNode::spawn(15201).await?;
-    let carol = TestNode::spawn(15202).await?;
+    let alice = TestNode::spawn(get_available_port()).await?;
+    let bob = TestNode::spawn(get_available_port()).await?;
+    let carol = TestNode::spawn(get_available_port()).await?;
 
     info!("Alice DID: {}", alice.did);
     info!("Bob DID: {}", bob.did);

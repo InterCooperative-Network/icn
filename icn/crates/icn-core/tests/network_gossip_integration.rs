@@ -14,6 +14,11 @@ use std::time::Duration;
 use tokio::sync::RwLock;
 use tracing::{info, warn};
 
+/// Get an available port for testing
+fn get_available_port() -> u16 {
+    portpicker::pick_unused_port().expect("No available ports")
+}
+
 /// Helper to create a test node
 struct TestNode {
     _keypair: KeyPair,
@@ -90,7 +95,6 @@ impl TestNode {
 }
 
 #[tokio::test]
-#[ignore] // Flaky in CI due to hardcoded ports - uses 14433/14434 which may conflict
 async fn test_two_node_gossip_flow() -> Result<()> {
     // Install rustls crypto provider
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
@@ -104,8 +108,8 @@ async fn test_two_node_gossip_flow() -> Result<()> {
     info!("=== Starting two-node gossip integration test ===");
 
     // Spawn two nodes
-    let node1 = TestNode::spawn(14433).await?;
-    let node2 = TestNode::spawn(14434).await?;
+    let node1 = TestNode::spawn(get_available_port()).await?;
+    let node2 = TestNode::spawn(get_available_port()).await?;
 
     info!("Node 1 DID: {}", node1.did);
     info!("Node 2 DID: {}", node2.did);
@@ -177,7 +181,6 @@ async fn test_two_node_gossip_flow() -> Result<()> {
 }
 
 #[tokio::test]
-#[ignore] // Flaky in CI due to hardcoded ports - uses 14435-14437 which may conflict
 async fn test_broadcast_to_multiple_peers() -> Result<()> {
     // Install rustls crypto provider
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
@@ -185,9 +188,9 @@ async fn test_broadcast_to_multiple_peers() -> Result<()> {
     info!("=== Starting broadcast integration test ===");
 
     // Spawn three nodes
-    let node1 = TestNode::spawn(14435).await?;
-    let node2 = TestNode::spawn(14436).await?;
-    let node3 = TestNode::spawn(14437).await?;
+    let node1 = TestNode::spawn(get_available_port()).await?;
+    let node2 = TestNode::spawn(get_available_port()).await?;
+    let node3 = TestNode::spawn(get_available_port()).await?;
 
     // Node 1 connects to both Node 2 and Node 3
     node1

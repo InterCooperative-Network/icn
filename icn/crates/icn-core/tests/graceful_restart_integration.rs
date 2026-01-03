@@ -18,6 +18,11 @@ use tempfile::TempDir;
 use tokio::sync::RwLock;
 use tracing::{info, warn};
 
+/// Get an available port for testing
+fn get_available_port() -> u16 {
+    portpicker::pick_unused_port().expect("No available ports")
+}
+
 /// Helper to create a test node with snapshot support
 struct TestNode {
     keypair: KeyPair,
@@ -344,7 +349,6 @@ async fn test_graceful_restart_preserves_state() -> Result<()> {
 }
 
 #[tokio::test]
-#[ignore] // Flaky in CI due to hardcoded ports - uses 50200/50201 which may conflict
 async fn test_x25519_keys_persist_across_restart() -> Result<()> {
     // Install rustls crypto provider
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
@@ -365,11 +369,15 @@ async fn test_x25519_keys_persist_across_restart() -> Result<()> {
     std::fs::create_dir_all(&node1_data_dir)?;
     std::fs::create_dir_all(&node2_data_dir)?;
 
+    // Get available ports dynamically
+    let port1 = get_available_port();
+    let port2 = get_available_port();
+
     // ===== Phase 1: Create two nodes and exchange keys =====
     info!("\n=== Phase 1: Two-node key exchange ===");
 
-    let node1 = TestNode::spawn(50200, node1_data_dir.clone()).await?;
-    let node2 = TestNode::spawn(50201, node2_data_dir.clone()).await?;
+    let node1 = TestNode::spawn(port1, node1_data_dir.clone()).await?;
+    let node2 = TestNode::spawn(port2, node2_data_dir.clone()).await?;
 
     let did1 = node1.did.clone();
     let did2 = node2.did.clone();
@@ -449,7 +457,9 @@ async fn test_x25519_keys_persist_across_restart() -> Result<()> {
         }
     });
 
-    let listen_addr_restart: SocketAddr = "127.0.0.1:50200".parse()?;
+    // Use a new available port for restart (the state persistence test doesn't require same port)
+    let port_restart = get_available_port();
+    let listen_addr_restart: SocketAddr = format!("127.0.0.1:{port_restart}").parse()?;
     let identity_bundle_restart = IdentityBundle::from_keypair(node1_keypair.clone())?;
     let network_handle_restart = NetworkActor::spawn(
         identity_bundle_restart,
