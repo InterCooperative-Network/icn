@@ -342,6 +342,50 @@ pub enum ProposalPayload {
         /// The treasury operation to execute
         operation: TreasuryProposalOperation,
     },
+
+    // === Labor Share Operations (Issue #389) ===
+    /// Approve periodic surplus allocation to labor shareholders
+    ///
+    /// Distributes cooperative surplus to active labor shareholders in
+    /// proportion to their labor days. This is Razeto's core mechanism
+    /// for equitable value distribution.
+    ///
+    /// Requires quorum vote from membership. Upon approval, the surplus
+    /// is allocated to each share based on their labor contribution ratio.
+    SurplusAllocation {
+        /// The calculated surplus allocation
+        allocation: icn_ledger::SurplusAllocation,
+    },
+
+    /// Approve share redemption for a departing member
+    ///
+    /// When a member leaves the cooperative, their labor shares must be
+    /// redeemed at unit value. Governance approves the payout schedule
+    /// to ensure treasury can meet obligations.
+    ///
+    /// Can be immediate or installment-based depending on treasury capacity.
+    ShareRedemption {
+        /// Member whose shares are being redeemed
+        member: Did,
+        /// Share IDs to redeem
+        share_ids: Vec<icn_ledger::ShareId>,
+        /// Approved payout schedule
+        payout_schedule: Vec<icn_ledger::ScheduledPayout>,
+        /// Reason for redemption (voluntary departure, retirement, etc.)
+        reason: String,
+    },
+
+    /// Approve bond issuance for cooperative financing
+    ///
+    /// Cooperatives can issue bonds to raise capital from other cooperatives
+    /// or members. This enables solidarity-based lending where stronger
+    /// cooperatives support developing ones.
+    ///
+    /// Requires governance approval with purpose justification.
+    BondIssuance {
+        /// The bond offering details
+        bond_offering: icn_ledger::BondOffering,
+    },
 }
 
 /// Treasury operations that require governance approval
@@ -964,5 +1008,129 @@ mod tests {
             if *outcome == crate::ProposalOutcome::Accepted && reason == "Emergency acceptance"
         ));
         assert!(proposal.state.is_closed());
+    }
+
+    // ========== Labor Share Proposal Tests ==========
+
+    #[test]
+    fn test_surplus_allocation_proposal() {
+        let kp = KeyPair::generate().unwrap();
+        let did = kp.did().clone();
+        let domain_id = GovernanceDomainId::new("test-coop");
+
+        // Create a surplus allocation
+        let allocation = icn_ledger::SurplusAllocation {
+            id: "alloc-2025-q4".to_string(),
+            cooperative_id: "test-coop".to_string(),
+            total_surplus: 100_000,
+            period: "2025-Q4".to_string(),
+            share_unit_value: 100.0,
+            total_labor_days: 1000,
+            allocations: vec![
+                (icn_ledger::ShareId::new("share-001"), 50_000),
+                (icn_ledger::ShareId::new("share-002"), 50_000),
+            ],
+            proposal_id: String::new(), // Will be set after proposal creation
+            allocated_at: 0,            // Will be set on execution
+            currency: "COOP".to_string(),
+        };
+
+        let proposal = Proposal::new(
+            domain_id,
+            did,
+            "Q4 2025 Surplus Allocation".to_string(),
+            "Distribute Q4 surplus to labor shareholders".to_string(),
+            ProposalPayload::SurplusAllocation { allocation },
+        );
+
+        assert_eq!(proposal.title, "Q4 2025 Surplus Allocation");
+        assert!(matches!(
+            proposal.payload,
+            ProposalPayload::SurplusAllocation { ref allocation }
+            if allocation.total_surplus == 100_000
+        ));
+    }
+
+    #[test]
+    fn test_share_redemption_proposal() {
+        let kp = KeyPair::generate().unwrap();
+        let did = kp.did().clone();
+        let domain_id = GovernanceDomainId::new("test-coop");
+
+        let member_kp = KeyPair::generate().unwrap();
+        let member_did = member_kp.did().clone();
+
+        // Create a payout schedule (3 installments over 90 days)
+        let payout_schedule = vec![
+            icn_ledger::ScheduledPayout::new(
+                icn_time::current_timestamp_secs() + 30 * 86400,
+                10_000,
+            ),
+            icn_ledger::ScheduledPayout::new(
+                icn_time::current_timestamp_secs() + 60 * 86400,
+                10_000,
+            ),
+            icn_ledger::ScheduledPayout::new(
+                icn_time::current_timestamp_secs() + 90 * 86400,
+                10_000,
+            ),
+        ];
+
+        let proposal = Proposal::new(
+            domain_id,
+            did,
+            "Share Redemption - Member Departure".to_string(),
+            "Approve redemption of shares for departing member".to_string(),
+            ProposalPayload::ShareRedemption {
+                member: member_did.clone(),
+                share_ids: vec![
+                    icn_ledger::ShareId::new("share-001"),
+                    icn_ledger::ShareId::new("share-002"),
+                ],
+                payout_schedule,
+                reason: "Voluntary departure".to_string(),
+            },
+        );
+
+        assert!(matches!(
+            proposal.payload,
+            ProposalPayload::ShareRedemption { ref member, ref share_ids, ref payout_schedule, .. }
+            if *member == member_did && share_ids.len() == 2 && payout_schedule.len() == 3
+        ));
+    }
+
+    #[test]
+    fn test_bond_issuance_proposal() {
+        let kp = KeyPair::generate().unwrap();
+        let did = kp.did().clone();
+        let domain_id = GovernanceDomainId::new("test-coop");
+
+        let bond_offering = icn_ledger::BondOffering {
+            issuer_id: "test-coop".to_string(),
+            principal_requested: 500_000,
+            interest_rate_bps: 300, // 3%
+            term_days: 365,
+            purpose: "Equipment purchase for new production line".to_string(),
+            payment_schedule: icn_ledger::PaymentSchedule::InterestOnly { interval_days: 90 },
+            currency: "COOP".to_string(),
+            collateral: vec![icn_ledger::Collateral::Equipment {
+                description: "CNC Machine Model X".to_string(),
+                value: 200_000,
+            }],
+        };
+
+        let proposal = Proposal::new(
+            domain_id,
+            did,
+            "Bond Issuance - Equipment Financing".to_string(),
+            "Issue bonds to finance equipment purchase".to_string(),
+            ProposalPayload::BondIssuance { bond_offering },
+        );
+
+        assert!(matches!(
+            proposal.payload,
+            ProposalPayload::BondIssuance { ref bond_offering }
+            if bond_offering.principal_requested == 500_000 && bond_offering.interest_rate_bps == 300
+        ));
     }
 }

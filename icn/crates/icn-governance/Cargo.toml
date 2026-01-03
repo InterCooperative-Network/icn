@@ -13,6 +13,7 @@ serde = { workspace = true, features = ["derive"] }
 serde_json = "1.0"
 icn-entity = { path = "../icn-entity" }
 icn-identity = { path = "../icn-identity" }
+icn-ledger = { path = "../icn-ledger" }
 icn-obs = { path = "../icn-obs" }
 icn-trust = { path = "../icn-trust" }
 icn-time.workspace = true

@@ -342,6 +342,45 @@ impl GovernanceEventHandler {
             ProposalPayload::ProtocolChange { proposal } => {
                 self.handle_protocol_change(proposal_id, proposal);
             }
+            // Labor Share Operations (Issue #389)
+            // These trigger treasury operations when executed
+            ProposalPayload::SurplusAllocation { allocation } => {
+                info!(
+                    "💰 Surplus allocation {} approved: {} {} to {} shareholders",
+                    proposal_id.0,
+                    allocation.total_surplus,
+                    allocation.currency,
+                    allocation.allocations.len()
+                );
+                // TODO: Trigger treasury disbursement to shareholders
+            }
+            ProposalPayload::ShareRedemption {
+                member,
+                share_ids,
+                payout_schedule,
+                reason,
+            } => {
+                info!(
+                    "🎫 Share redemption {} approved: {} shares for {} ({}), {} payouts scheduled",
+                    proposal_id.0,
+                    share_ids.len(),
+                    member,
+                    reason,
+                    payout_schedule.len()
+                );
+                // TODO: Start redemption process and schedule payouts
+            }
+            ProposalPayload::BondIssuance { bond_offering } => {
+                info!(
+                    "📜 Bond issuance {} approved: {} {} at {}bps for {} days",
+                    proposal_id.0,
+                    bond_offering.principal_requested,
+                    bond_offering.currency,
+                    bond_offering.interest_rate_bps,
+                    bond_offering.term_days
+                );
+                // TODO: Open bond for subscription
+            }
         }
     }
 

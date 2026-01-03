@@ -2999,6 +2999,7 @@ dependencies = [
  "hex",
  "icn-entity",
  "icn-identity",
+ "icn-ledger",
  "icn-obs",
  "icn-store",
  "icn-time",
