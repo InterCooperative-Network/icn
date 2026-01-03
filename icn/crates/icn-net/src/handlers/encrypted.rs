@@ -444,4 +444,135 @@ mod tests {
         assert!(ConnectionContext::is_encrypted_payload(&encrypted_env));
         assert!(!ConnectionContext::is_encrypted_payload(&gossip_env));
     }
+
+    #[tokio::test]
+    async fn test_decryption_failure_on_tampered_ciphertext() {
+        // Create sender identity
+        let sender_bundle = IdentityBundle::generate().unwrap();
+
+        // Create receiver context with sender's X25519 key
+        let (ctx, forward_count) = create_test_context_with_peer(
+            sender_bundle.did(),
+            *sender_bundle.x25519_public_bytes(),
+        );
+
+        // Create an inner signed message
+        let inner_envelope = SignedEnvelope::new(
+            sender_bundle.did(),
+            sender_bundle.keypair(),
+            1,
+            PayloadType::Gossip,
+            b"secret gossip data".to_vec(),
+        )
+        .unwrap();
+
+        // Serialize the inner envelope
+        let inner_bytes =
+            bincode::serde::encode_to_vec(&inner_envelope, bincode::config::legacy()).unwrap();
+
+        // Encrypt for the receiver
+        let receiver_x25519_public =
+            x25519_dalek::PublicKey::from(*ctx.identity_bundle.x25519_public_bytes());
+
+        let mut encrypted = EncryptedEnvelope::encrypt(
+            sender_bundle.did(),
+            &ctx.own_did,
+            1,
+            &sender_bundle.x25519_secret(),
+            &receiver_x25519_public,
+            &inner_bytes,
+        )
+        .unwrap();
+
+        // TAMPER with the ciphertext!
+        if !encrypted.ciphertext.is_empty() {
+            encrypted.ciphertext[0] ^= 0xFF; // Flip bits
+        }
+
+        // Create outer signed envelope with tampered ciphertext
+        let encrypted_bytes =
+            bincode::serde::encode_to_vec(&encrypted, bincode::config::legacy()).unwrap();
+        let outer_envelope = SignedEnvelope::new(
+            sender_bundle.did(),
+            sender_bundle.keypair(),
+            1,
+            PayloadType::Encrypted,
+            encrypted_bytes,
+        )
+        .unwrap();
+
+        // Create network message
+        let message = NetworkMessage {
+            version: 1,
+            from: sender_bundle.did().clone(),
+            to: Some(ctx.own_did.clone()),
+            trace_context: None,
+            payload: MessagePayload::Signed(outer_envelope.clone()),
+        };
+
+        // Handle the encrypted message - should fail decryption due to tampering
+        ctx.handle_encrypted_payload(message, &outer_envelope).await;
+
+        // Message should NOT be forwarded (decryption failed)
+        assert_eq!(forward_count.load(Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test]
+    async fn test_invalid_encrypted_envelope_deserialization() {
+        // Create sender identity
+        let sender_bundle = IdentityBundle::generate().unwrap();
+
+        // Create receiver context with sender's X25519 key
+        let (ctx, forward_count) = create_test_context_with_peer(
+            sender_bundle.did(),
+            *sender_bundle.x25519_public_bytes(),
+        );
+
+        // Create a truncated/corrupted EncryptedEnvelope serialization
+        // that will fail deserialization gracefully.
+        // Start with valid envelope, then truncate it to cause parse failure.
+        let receiver_x25519_public =
+            x25519_dalek::PublicKey::from(*ctx.identity_bundle.x25519_public_bytes());
+
+        let valid_encrypted = EncryptedEnvelope::encrypt(
+            sender_bundle.did(),
+            &ctx.own_did,
+            1,
+            &sender_bundle.x25519_secret(),
+            &receiver_x25519_public,
+            b"some data",
+        )
+        .unwrap();
+
+        let mut valid_bytes =
+            bincode::serde::encode_to_vec(&valid_encrypted, bincode::config::legacy()).unwrap();
+
+        // Truncate the bytes to make it invalid
+        valid_bytes.truncate(10);
+
+        // Create outer signed envelope with truncated/invalid payload
+        let outer_envelope = SignedEnvelope::new(
+            sender_bundle.did(),
+            sender_bundle.keypair(),
+            1,
+            PayloadType::Encrypted,
+            valid_bytes,
+        )
+        .unwrap();
+
+        // Create network message
+        let message = NetworkMessage {
+            version: 1,
+            from: sender_bundle.did().clone(),
+            to: Some(ctx.own_did.clone()),
+            trace_context: None,
+            payload: MessagePayload::Signed(outer_envelope.clone()),
+        };
+
+        // Handle the encrypted message - should fail deserialization
+        ctx.handle_encrypted_payload(message, &outer_envelope).await;
+
+        // Message should NOT be forwarded (deserialization failed)
+        assert_eq!(forward_count.load(Ordering::SeqCst), 0);
+    }
 }

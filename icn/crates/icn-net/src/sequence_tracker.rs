@@ -715,4 +715,96 @@ mod tests {
         assert_eq!(removed, 0);
         assert_eq!(tracker.pair_count().await, 2);
     }
+
+    #[tokio::test]
+    async fn test_multiple_restarts_compound_safety_gap() {
+        // Tests that multiple restarts correctly compound the safety gap
+        // This is critical for ensuring nonce uniqueness across crashes/restarts
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+
+        let alice = generate_did();
+        let bob = generate_did();
+
+        // First "session" - get some sequences
+        let final_seq_session1 = {
+            let tracker = OutgoingSequenceTracker::new(store.clone()).unwrap();
+            tracker.load_and_apply_safety_gap().await.unwrap();
+
+            // Get sequences 1, 2, 3
+            for _ in 0..3 {
+                tracker.next_sequence(&alice, &bob).await.unwrap();
+            }
+
+            tracker.current_sequence(&alice, &bob).await.unwrap()
+        };
+        assert_eq!(final_seq_session1, 3);
+
+        // Second "session" (first restart) - safety gap applied
+        let final_seq_session2 = {
+            let tracker = OutgoingSequenceTracker::new(store.clone()).unwrap();
+            tracker.load_and_apply_safety_gap().await.unwrap();
+
+            // Current should be 3 + gap
+            let current = tracker.current_sequence(&alice, &bob).await.unwrap();
+            assert_eq!(current, 3 + RESTART_SAFETY_GAP);
+
+            // Get a few more sequences
+            tracker.next_sequence(&alice, &bob).await.unwrap();
+            tracker.next_sequence(&alice, &bob).await.unwrap();
+
+            tracker.current_sequence(&alice, &bob).await.unwrap()
+        };
+        assert_eq!(final_seq_session2, 3 + RESTART_SAFETY_GAP + 2);
+
+        // Third "session" (second restart) - another safety gap applied
+        {
+            let tracker = OutgoingSequenceTracker::new(store.clone()).unwrap();
+            tracker.load_and_apply_safety_gap().await.unwrap();
+
+            // Current should be (3 + gap + 2) + gap = 3 + 2*gap + 2
+            let current = tracker.current_sequence(&alice, &bob).await.unwrap();
+            assert_eq!(current, 3 + RESTART_SAFETY_GAP + 2 + RESTART_SAFETY_GAP);
+
+            // Verify next sequence continues from there
+            let next = tracker.next_sequence(&alice, &bob).await.unwrap();
+            assert_eq!(next, 3 + 2 * RESTART_SAFETY_GAP + 3);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_safety_gap_only_applied_once_per_instance() {
+        // Tests that calling load_and_apply_safety_gap multiple times
+        // only applies the gap once per tracker instance
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+
+        let alice = generate_did();
+        let bob = generate_did();
+
+        // First session - create a sequence
+        {
+            let tracker = OutgoingSequenceTracker::new(store.clone()).unwrap();
+            tracker.load_and_apply_safety_gap().await.unwrap();
+            tracker.next_sequence(&alice, &bob).await.unwrap();
+            assert_eq!(tracker.current_sequence(&alice, &bob).await.unwrap(), 1);
+        }
+
+        // Second session - gap should be applied exactly once
+        {
+            let tracker = OutgoingSequenceTracker::new(store.clone()).unwrap();
+
+            // Call load_and_apply_safety_gap multiple times
+            let loaded1 = tracker.load_and_apply_safety_gap().await.unwrap();
+            let loaded2 = tracker.load_and_apply_safety_gap().await.unwrap();
+            let loaded3 = tracker.load_and_apply_safety_gap().await.unwrap();
+
+            // First call should load, subsequent calls should skip
+            assert_eq!(loaded1, 1); // Loaded 1 pair
+            assert_eq!(loaded2, 0); // Already applied
+            assert_eq!(loaded3, 0); // Already applied
+
+            // Current should be 1 + gap (not 1 + 3*gap)
+            let current = tracker.current_sequence(&alice, &bob).await.unwrap();
+            assert_eq!(current, 1 + RESTART_SAFETY_GAP);
+        }
+    }
 }

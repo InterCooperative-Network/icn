@@ -111,6 +111,10 @@ pub fn init_descriptions() {
         "icn_network_encryption_sequence_pairs",
         "Current number of active (sender, recipient) encryption sequence pairs being tracked"
     );
+    describe_counter!(
+        "icn_network_encryption_circuit_breaker_trips_total",
+        "Total number of times the encryption cleanup circuit breaker has tripped"
+    );
 }
 
 // Simple counters
@@ -261,6 +265,15 @@ pub fn encryption_sequence_cleanup_failed_inc() {
 /// The value represents active (sender, recipient) pairs with sequence numbers.
 pub fn encryption_sequence_pairs_set(count: u64) {
     gauge!("icn_network_encryption_sequence_pairs").set(count as f64);
+}
+
+/// Increment circuit breaker trip counter
+///
+/// This is a critical alert metric - any non-zero value indicates that
+/// encryption cleanup has failed repeatedly (5+ times) and storage may
+/// be degraded. Operators should investigate immediately.
+pub fn encryption_circuit_breaker_trips_inc() {
+    counter!("icn_network_encryption_circuit_breaker_trips_total").increment(1);
 }
 
 // Complex function with custom logic

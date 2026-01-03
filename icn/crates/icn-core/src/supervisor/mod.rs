@@ -517,6 +517,18 @@ impl Supervisor {
                         .await
                         .context("Failed to apply encryption sequence safety gap")?;
 
+                    // Run initial cleanup on startup (Issue #404 review feedback)
+                    // This handles the edge case where a node accumulates >50K recipient pairs
+                    // before the first hourly cleanup runs. Without this, new encryptions would
+                    // fail if the capacity limit is hit before the first cleanup.
+                    if let Err(e) = encryption_sequence_tracker
+                        .cleanup_stale_entries(86400)
+                        .await
+                    {
+                        warn!("Initial encryption sequence cleanup failed: {}", e);
+                        // Non-fatal: cleanup task will retry hourly
+                    }
+
                     // Periodic cleanup task for stale sequence tracker entries (Issue #404 review feedback)
                     // Removes entries not used in the last 24 hours to prevent unbounded memory growth.
                     //
@@ -557,7 +569,7 @@ impl Supervisor {
                                             icn_obs::metrics::network::encryption_sequence_cleanup_failed_inc();
 
                                             if consecutive_failures >= CIRCUIT_BREAKER_THRESHOLD {
-                                                // Circuit breaker tripped - escalate to ERROR
+                                                // Circuit breaker tripped - escalate to ERROR and alert via metric
                                                 error!(
                                                     consecutive_failures = consecutive_failures,
                                                     "Encryption sequence cleanup has failed {} consecutive times! \
@@ -565,6 +577,8 @@ impl Supervisor {
                                                      Error: {}",
                                                     consecutive_failures, e
                                                 );
+                                                // Critical alert metric - operators should alert on this
+                                                icn_obs::metrics::network::encryption_circuit_breaker_trips_inc();
                                             } else {
                                                 warn!(
                                                     consecutive_failures = consecutive_failures,
