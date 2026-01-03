@@ -86,6 +86,55 @@ impl ConnectionContext {
             }
         }
     }
+
+    /// Handle an inner signed envelope from an encrypted payload
+    ///
+    /// This is called after decrypting an EncryptedEnvelope. It verifies the
+    /// signature but SKIPS replay checking because:
+    /// 1. The outer envelope already passed replay protection
+    /// 2. The inner content is authenticated by ChaCha20-Poly1305
+    /// 3. The inner and outer envelopes share the same sequence number
+    ///
+    /// Using the same sequence for both avoids consuming two sequence numbers
+    /// per encrypted message.
+    pub async fn handle_signed_inner(&self, message: NetworkMessage, envelope: &SignedEnvelope) {
+        // Verify signature and age first (same as handle_signed)
+        let sig_result = envelope.verify(300);
+
+        if let Err(e) = sig_result {
+            warn!(
+                "Inner envelope signature/age verification failed from {}: {}",
+                envelope.from, e
+            );
+
+            // Record InvalidSignature violation
+            if let Some(ref detector) = self.misbehavior_detector {
+                let message_hash = compute_message_hash(envelope);
+
+                let violation = icn_security::Violation::InvalidSignature {
+                    message_hash: message_hash.clone().try_into().unwrap_or([0u8; 32]),
+                };
+
+                detector
+                    .write()
+                    .await
+                    .record_violation(&envelope.from, violation, message_hash);
+            }
+            return;
+        }
+
+        debug!(
+            "Verified inner signed envelope from {} (seq={}, type={:?})",
+            envelope.from, envelope.sequence, envelope.payload_type
+        );
+
+        // Skip replay check - the outer envelope already provided replay protection.
+        // The inner content was inside authenticated encryption, so it couldn't have
+        // been extracted and replayed separately.
+
+        // Forward verified message to handler
+        self.forward_to_handler(message);
+    }
 }
 
 /// Compute a hash of the message for violation tracking

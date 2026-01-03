@@ -105,13 +105,21 @@ async fn resolve_address(addr_str: &str) -> Result<SocketAddr> {
 ///
 /// # Sequence Numbers
 ///
-/// Two separate sequence spaces are used:
-/// - `outer_sequence`: From the signing sequence counter, used for replay protection
-/// - Encryption nonce: From OutgoingSequenceTracker, used for ChaCha20-Poly1305 nonce derivation
+/// Three sequence spaces are involved, but only TWO are incremented per message:
 ///
-/// These must be separate because:
-/// - Signing sequences are per-sender (shared across all recipients)
-/// - Encryption nonces are per-(sender, recipient) pair for nonce uniqueness
+/// 1. **Signing sequence** (`outer_sequence` parameter):
+///    - Per-sender, shared across all recipients
+///    - Used for BOTH inner and outer SignedEnvelope (same value)
+///    - The inner envelope's sequence doesn't trigger replay check (handled by
+///      `handle_signed_inner()`) because the outer envelope already provides protection
+///
+/// 2. **Encryption nonce** (from `enc_seq_tracker`):
+///    - Per-(sender, recipient) pair, persistent across restarts
+///    - Used only for ChaCha20-Poly1305 nonce derivation (not for replay protection)
+///    - Must be unique per pair to prevent nonce reuse attacks
+///
+/// This design ensures encrypted messages consume ONE signing sequence (not two),
+/// maintaining consistent sequence advancement between encrypted and unencrypted paths.
 async fn try_encrypt_envelope(
     net_handle: &icn_net::NetworkHandle,
     from_did: &Did,
@@ -499,41 +507,45 @@ impl Supervisor {
                         .context("Failed to create encryption sequence tracker")?,
                 );
 
-                // Initialize sequence tracker on startup (apply restart safety gap)
-                let tracker_for_init = encryption_sequence_tracker.clone();
-                tokio::spawn(async move {
-                    if let Err(e) = tracker_for_init.load_and_apply_safety_gap().await {
-                        warn!("Failed to apply encryption sequence safety gap: {}", e);
-                    }
-                });
+                // Only start encryption-related tasks if encryption is enabled
+                if encryption_enabled {
+                    // Initialize sequence tracker on startup (apply restart safety gap)
+                    let tracker_for_init = encryption_sequence_tracker.clone();
+                    tokio::spawn(async move {
+                        if let Err(e) = tracker_for_init.load_and_apply_safety_gap().await {
+                            warn!("Failed to apply encryption sequence safety gap: {}", e);
+                        }
+                    });
 
-                // Periodic cleanup task for stale sequence tracker entries (Issue #404 review feedback)
-                // Removes entries not used in the last 24 hours to prevent unbounded memory growth
-                let tracker_for_cleanup = encryption_sequence_tracker.clone();
-                let shutdown_rx_for_cleanup = self.shutdown_tx.subscribe();
-                background_tasks.spawn(async move {
-                    let mut interval = tokio::time::interval(std::time::Duration::from_secs(3600));
-                    let mut shutdown_rx = shutdown_rx_for_cleanup;
-                    loop {
-                        tokio::select! {
-                            _ = interval.tick() => {
-                                match tracker_for_cleanup.cleanup_stale_entries(86400).await {
-                                    Ok(removed) if removed > 0 => {
-                                        debug!("Cleaned up {} stale encryption sequence entries", removed);
-                                    }
-                                    Ok(_) => {} // No entries removed
-                                    Err(e) => {
-                                        warn!("Encryption sequence cleanup failed: {}", e);
+                    // Periodic cleanup task for stale sequence tracker entries (Issue #404 review feedback)
+                    // Removes entries not used in the last 24 hours to prevent unbounded memory growth
+                    let tracker_for_cleanup = encryption_sequence_tracker.clone();
+                    let shutdown_rx_for_cleanup = self.shutdown_tx.subscribe();
+                    background_tasks.spawn(async move {
+                        let mut interval =
+                            tokio::time::interval(std::time::Duration::from_secs(3600));
+                        let mut shutdown_rx = shutdown_rx_for_cleanup;
+                        loop {
+                            tokio::select! {
+                                _ = interval.tick() => {
+                                    match tracker_for_cleanup.cleanup_stale_entries(86400).await {
+                                        Ok(removed) if removed > 0 => {
+                                            debug!("Cleaned up {} stale encryption sequence entries", removed);
+                                        }
+                                        Ok(_) => {} // No entries removed
+                                        Err(e) => {
+                                            warn!("Encryption sequence cleanup failed: {}", e);
+                                        }
                                     }
                                 }
-                            }
-                            _ = shutdown_rx.recv() => {
-                                debug!("Encryption sequence cleanup task shutting down");
-                                break;
+                                _ = shutdown_rx.recv() => {
+                                    debug!("Encryption sequence cleanup task shutting down");
+                                    break;
+                                }
                             }
                         }
-                    }
-                });
+                    });
+                }
 
                 let send_callback: icn_gossip::SendMessageCallback = Arc::new(
                     move |recipient, gossip_msg| {
@@ -596,11 +608,10 @@ impl Supervisor {
                             let result = if let Some(target_did) = recipient {
                                 // Unicast
                                 if should_encrypt {
-                                    // Get outer sequence from signing counter (separate from encryption nonce)
-                                    let outer_sequence = sequence_ctr
-                                        .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-
-                                    // Try to encrypt the message
+                                    // Try to encrypt the message.
+                                    // Both inner and outer envelopes use the SAME signing sequence.
+                                    // This is safe because handle_signed_inner skips replay check
+                                    // for the inner envelope (protected by outer's replay check).
                                     match try_encrypt_envelope(
                                         &net_handle,
                                         &from_did,
@@ -609,7 +620,7 @@ impl Supervisor {
                                         &keypair,
                                         &x25519_secret,
                                         &enc_seq_tracker,
-                                        outer_sequence,
+                                        sequence, // Use same sequence as inner envelope
                                     )
                                     .await
                                     {

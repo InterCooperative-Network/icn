@@ -120,9 +120,10 @@ impl ConnectionContext {
                     payload: MessagePayload::Signed(inner_envelope.clone()),
                 };
 
-                // Forward to signed handler for signature verification and replay check
-                // Use Box::pin to break the async recursion (signed -> encrypted -> signed)
-                Box::pin(self.handle_signed(decrypted_message, &inner_envelope)).await;
+                // Forward to inner handler for signature verification only (no replay check).
+                // Replay protection is already provided by the outer envelope.
+                // Use Box::pin to break the async recursion (signed -> encrypted -> signed_inner)
+                Box::pin(self.handle_signed_inner(decrypted_message, &inner_envelope)).await;
             }
             Err(_) => {
                 // No inner envelope - encrypted raw data without inner signing
