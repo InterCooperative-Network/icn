@@ -284,6 +284,15 @@ impl StewardActor {
                 let _ = response.send(result);
             }
 
+            StewardMsg::CheckAndReserveVui {
+                vui_hash,
+                registered_by,
+                response,
+            } => {
+                let result = self.check_and_reserve_vui(vui_hash, registered_by);
+                let _ = response.send(result);
+            }
+
             StewardMsg::GetEnrollmentStatus {
                 ceremony_id,
                 response,
@@ -642,6 +651,75 @@ impl StewardActor {
         Ok(())
     }
 
+    /// Atomically check if VUI is available and reserve it (Issue #397)
+    ///
+    /// This method is processed sequentially by the actor, ensuring no race
+    /// condition between check and reservation on this node.
+    ///
+    /// Note: For true distributed consistency across multiple gateway nodes,
+    /// a distributed consensus mechanism would be needed. This fix addresses
+    /// the single-node race condition identified in #397.
+    fn check_and_reserve_vui(
+        &mut self,
+        vui_hash: [u8; 32],
+        registered_by: Did,
+    ) -> Result<crate::handle::VuiReservationResult> {
+        use crate::handle::VuiReservationResult;
+
+        // Check current state
+        match self.vui_registry.check_local(&vui_hash) {
+            crate::vui_registry::LocalCheckResult::NotRegistered => {
+                // VUI is available - register it atomically
+                match self
+                    .vui_registry
+                    .register(vui_hash, registered_by, self.own_did.clone())
+                {
+                    Ok(()) => {
+                        // Broadcast new VUI for distributed sync
+                        // NOTE: Signatures are empty pending implementation of steward signing
+                        // infrastructure. VUI sync is currently authenticated at the transport
+                        // layer (QUIC/TLS with DID binding). TODO: Add message-level signatures
+                        // for defense-in-depth when multi-steward federation is implemented.
+                        if let Some(ref send_gossip) = self.send_gossip {
+                            let now = icn_time::current_timestamp_secs();
+                            let msg = crate::gossip::VuiSyncMessage::NewVui {
+                                from_did: self.own_did.clone(),
+                                vui_hash,
+                                timestamp: now,
+                                signature: vec![], // Transport-layer auth; message signing TODO
+                            };
+                            send_gossip(crate::gossip::StewardMessage::VuiSync(msg));
+                        }
+
+                        debug!("Reserved VUI atomically: {:?}", hex::encode(vui_hash));
+
+                        Ok(VuiReservationResult::Reserved)
+                    }
+                    Err(e) => {
+                        // This shouldn't happen since we just checked, but handle it
+                        warn!(
+                            "Failed to reserve VUI after check: {:?} - {}",
+                            hex::encode(vui_hash),
+                            e
+                        );
+                        bail!("VUI reservation failed: {e}")
+                    }
+                }
+            }
+            crate::vui_registry::LocalCheckResult::Registered(registration) => {
+                debug!("VUI already registered: {:?}", hex::encode(vui_hash));
+                Ok(VuiReservationResult::AlreadyRegistered(registration))
+            }
+            crate::vui_registry::LocalCheckResult::PossiblyRegistered => {
+                debug!(
+                    "VUI possibly registered (Bloom positive): {:?}",
+                    hex::encode(vui_hash)
+                );
+                Ok(VuiReservationResult::PossiblyRegistered)
+            }
+        }
+    }
+
     /// Issue an enrollment token
     fn issue_token(
         &mut self,
@@ -950,5 +1028,125 @@ mod tests {
         // Stats should show 1 token issued
         let stats = handle.get_stats().await.unwrap();
         assert_eq!(stats.tokens_issued, 1);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_atomic_vui_reservation() {
+        // Test for Issue #397 - atomic check-and-reserve VUI
+        let (own_did, keypair) = test_did();
+        let config = StewardConfig::default();
+        let (shutdown_tx, _shutdown_rx) = broadcast::channel(16);
+
+        let handle = StewardActor::spawn(own_did.clone(), keypair, config, shutdown_tx, None)
+            .await
+            .unwrap();
+
+        // Let the actor task start
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+
+        let vui_hash = [42u8; 32];
+        let (user_did, _) = test_did();
+
+        // First reservation should succeed
+        let result = handle
+            .check_and_reserve_vui(vui_hash, user_did.clone())
+            .await
+            .unwrap();
+
+        match result {
+            crate::handle::VuiReservationResult::Reserved => {
+                // Expected - VUI was available
+            }
+            other => panic!("Expected Reserved, got {other:?}"),
+        }
+
+        // Second reservation of same VUI should fail with AlreadyRegistered
+        let (another_user, _) = test_did();
+        let result2 = handle
+            .check_and_reserve_vui(vui_hash, another_user)
+            .await
+            .unwrap();
+
+        match result2 {
+            crate::handle::VuiReservationResult::AlreadyRegistered(reg) => {
+                // Expected - VUI was already registered
+                assert_eq!(reg.vui_hash, vui_hash);
+                assert_eq!(reg.registered_by, user_did);
+            }
+            other => panic!("Expected AlreadyRegistered, got {other:?}"),
+        }
+
+        // Stats should show 1 VUI
+        let stats = handle.get_stats().await.unwrap();
+        assert_eq!(stats.vui_registry_size, 1);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_atomic_reservation_prevents_race() {
+        // Verify that concurrent reservation attempts are handled correctly
+        let (own_did, keypair) = test_did();
+        let config = StewardConfig::default();
+        let (shutdown_tx, _shutdown_rx) = broadcast::channel(16);
+
+        let handle = StewardActor::spawn(own_did.clone(), keypair, config, shutdown_tx, None)
+            .await
+            .unwrap();
+
+        // Let the actor task start
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+
+        let vui_hash = [99u8; 32];
+
+        // Spawn multiple concurrent reservation attempts
+        let handle1 = handle.clone();
+        let handle2 = handle.clone();
+        let handle3 = handle.clone();
+
+        let (user1, _) = test_did();
+        let (user2, _) = test_did();
+        let (user3, _) = test_did();
+
+        let user1_clone = user1.clone();
+        let user2_clone = user2.clone();
+        let user3_clone = user3.clone();
+
+        let task1 =
+            tokio::spawn(async move { handle1.check_and_reserve_vui(vui_hash, user1_clone).await });
+
+        let task2 =
+            tokio::spawn(async move { handle2.check_and_reserve_vui(vui_hash, user2_clone).await });
+
+        let task3 =
+            tokio::spawn(async move { handle3.check_and_reserve_vui(vui_hash, user3_clone).await });
+
+        let (r1, r2, r3) = tokio::join!(task1, task2, task3);
+
+        let results = [
+            r1.unwrap().unwrap(),
+            r2.unwrap().unwrap(),
+            r3.unwrap().unwrap(),
+        ];
+
+        // Exactly one should be Reserved
+        let reserved_count = results
+            .iter()
+            .filter(|r| matches!(r, crate::handle::VuiReservationResult::Reserved))
+            .count();
+
+        // The rest should be AlreadyRegistered
+        let already_registered_count = results
+            .iter()
+            .filter(|r| matches!(r, crate::handle::VuiReservationResult::AlreadyRegistered(_)))
+            .count();
+
+        assert_eq!(reserved_count, 1, "Exactly one reservation should succeed");
+        assert_eq!(
+            already_registered_count, 2,
+            "Two reservations should fail with AlreadyRegistered"
+        );
+
+        // Stats should show 1 VUI
+        let stats = handle.get_stats().await.unwrap();
+        assert_eq!(stats.vui_registry_size, 1);
     }
 }

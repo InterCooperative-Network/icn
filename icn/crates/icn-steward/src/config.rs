@@ -41,6 +41,13 @@ pub struct StewardConfig {
     /// Rate limit: token requests per hour per VUI commitment
     pub rate_limit_per_vui_hour: u32,
 
+    /// Rate limit: maximum vouches per steward per day (Issue #396 - sybil resistance)
+    ///
+    /// This limits how many new identities a single steward can vouch for per day,
+    /// preventing sybil attacks where a malicious steward mass-creates identities.
+    /// Combined with trust decay for stewards who vouch for bad actors.
+    pub max_vouches_per_steward_per_day: u32,
+
     /// Enable VUI registry synchronization
     pub enable_vui_sync: bool,
 
@@ -75,6 +82,10 @@ impl Default for StewardConfig {
 
             // Rate limiting (10 per hour per VUI)
             rate_limit_per_vui_hour: 10,
+
+            // Steward vouching limit (Issue #396 - sybil resistance)
+            // Conservative default: 10 vouches per day per steward
+            max_vouches_per_steward_per_day: 10,
 
             // VUI sync enabled by default, every 5 minutes
             enable_vui_sync: true,
