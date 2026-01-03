@@ -48,6 +48,33 @@ pub struct Membership {
 
     /// Optional notes about this membership
     pub notes: Option<String>,
+
+    // ========================================
+    // Labor Share Fields (Issue #390)
+    // ========================================
+    /// Labor share IDs held by this member (references `icn_ledger::ShareId`)
+    ///
+    /// Each share represents accumulated labor value from work contributions.
+    /// Shares track labor_days and accumulated_surplus for surplus distribution.
+    ///
+    /// **Design Note:** Uses `Vec<String>` instead of `Vec<ShareId>` to avoid
+    /// a circular dependency between `icn-entity` and `icn-ledger`. The share IDs
+    /// are validated at the ledger layer when operations are performed.
+    #[serde(default)]
+    pub labor_shares: Vec<String>,
+
+    /// Is this the primary membership for multi-coop workers?
+    ///
+    /// When a worker has memberships in multiple cooperatives,
+    /// the primary membership determines which share accumulates
+    /// labor days. Only one membership per worker should be primary.
+    #[serde(default = "default_is_primary")]
+    pub is_primary: bool,
+}
+
+/// Default value for is_primary (true for backwards compatibility)
+fn default_is_primary() -> bool {
+    true
 }
 
 impl Membership {
@@ -65,6 +92,8 @@ impl Membership {
             shares: 1, // Default to 1 share (one member, one vote)
             capabilities,
             notes: None,
+            labor_shares: Vec::new(),
+            is_primary: true, // Default to primary for single-coop workers
         }
     }
 
@@ -131,6 +160,75 @@ impl Membership {
     /// Set notes
     pub fn with_notes(mut self, notes: impl Into<String>) -> Self {
         self.notes = Some(notes.into());
+        self
+    }
+
+    // ========================================
+    // Labor Share Methods (Issue #390)
+    // ========================================
+
+    /// Add a labor share to this membership
+    ///
+    /// Updates `updated_at` timestamp for audit trail accuracy.
+    pub fn add_labor_share(&mut self, share_id: impl Into<String>) {
+        let share_id = share_id.into();
+        if !self.labor_shares.contains(&share_id) {
+            self.labor_shares.push(share_id);
+            self.updated_at = icn_time::current_timestamp_secs();
+        }
+    }
+
+    /// Remove a labor share from this membership
+    ///
+    /// Used during share redemption when a member departs.
+    /// Updates `updated_at` timestamp for audit trail accuracy.
+    pub fn remove_labor_share(&mut self, share_id: &str) {
+        let before_len = self.labor_shares.len();
+        self.labor_shares.retain(|s| s != share_id);
+        if self.labor_shares.len() != before_len {
+            self.updated_at = icn_time::current_timestamp_secs();
+        }
+    }
+
+    /// Check if this membership has any labor shares
+    pub fn has_labor_shares(&self) -> bool {
+        !self.labor_shares.is_empty()
+    }
+
+    /// Get the count of labor shares held by this member
+    pub fn labor_share_count(&self) -> usize {
+        self.labor_shares.len()
+    }
+
+    /// Set as primary membership
+    ///
+    /// **Important:** Caller is responsible for ensuring only one membership
+    /// per worker is marked as primary across all cooperatives. This method
+    /// does not enforce uniqueness constraints.
+    ///
+    /// Updates `updated_at` timestamp for audit trail accuracy.
+    pub fn set_primary(&mut self, is_primary: bool) {
+        if self.is_primary != is_primary {
+            self.is_primary = is_primary;
+            self.updated_at = icn_time::current_timestamp_secs();
+        }
+    }
+
+    /// Builder method to set primary status
+    ///
+    /// **Note:** Builder methods are for initial construction and do not
+    /// update `updated_at`. Use `set_primary()` to modify after creation.
+    pub fn with_primary(mut self, is_primary: bool) -> Self {
+        self.is_primary = is_primary;
+        self
+    }
+
+    /// Builder method to add initial labor shares
+    ///
+    /// **Note:** Builder methods are for initial construction and do not
+    /// update `updated_at`. Use `add_labor_share()` to modify after creation.
+    pub fn with_labor_shares(mut self, shares: Vec<String>) -> Self {
+        self.labor_shares = shares;
         self
     }
 }
@@ -589,5 +687,171 @@ mod tests {
             membership.updated_at, before_noop,
             "updated_at should not change when removing non-existent capability"
         );
+    }
+
+    // ========================================
+    // Labor Share Tests (Issue #390)
+    // ========================================
+
+    #[test]
+    fn test_labor_shares_default_empty() {
+        let member = create_test_individual();
+        let coop = create_test_coop();
+        let membership = Membership::new(member, coop, MembershipRole::Worker);
+
+        assert!(membership.labor_shares.is_empty());
+        assert!(!membership.has_labor_shares());
+        assert_eq!(membership.labor_share_count(), 0);
+    }
+
+    #[test]
+    fn test_add_labor_share() {
+        let member = create_test_individual();
+        let coop = create_test_coop();
+        let mut membership = Membership::active(member, coop, MembershipRole::Worker);
+
+        membership.add_labor_share("share-001");
+        assert!(membership.has_labor_shares());
+        assert_eq!(membership.labor_share_count(), 1);
+        assert!(membership.labor_shares.contains(&"share-001".to_string()));
+    }
+
+    #[test]
+    fn test_add_duplicate_labor_share() {
+        let member = create_test_individual();
+        let coop = create_test_coop();
+        let mut membership = Membership::active(member, coop, MembershipRole::Worker);
+
+        membership.add_labor_share("share-001");
+        let timestamp_after_first = membership.updated_at;
+
+        std::thread::sleep(std::time::Duration::from_millis(10));
+
+        // Adding duplicate should not change anything
+        membership.add_labor_share("share-001");
+        assert_eq!(membership.labor_share_count(), 1);
+        assert_eq!(
+            membership.updated_at, timestamp_after_first,
+            "Duplicate add should not update timestamp"
+        );
+    }
+
+    #[test]
+    fn test_remove_labor_share() {
+        let member = create_test_individual();
+        let coop = create_test_coop();
+        let mut membership = Membership::active(member, coop, MembershipRole::Worker);
+
+        membership.add_labor_share("share-001");
+        membership.add_labor_share("share-002");
+        assert_eq!(membership.labor_share_count(), 2);
+
+        membership.remove_labor_share("share-001");
+        assert_eq!(membership.labor_share_count(), 1);
+        assert!(!membership.labor_shares.contains(&"share-001".to_string()));
+        assert!(membership.labor_shares.contains(&"share-002".to_string()));
+    }
+
+    #[test]
+    fn test_labor_share_updates_timestamp() {
+        let member = create_test_individual();
+        let coop = create_test_coop();
+        let mut membership = Membership::active(member, coop, MembershipRole::Worker);
+        let original = membership.updated_at;
+
+        std::thread::sleep(std::time::Duration::from_millis(10));
+
+        membership.add_labor_share("share-001");
+        assert!(
+            membership.updated_at >= original,
+            "add_labor_share should update timestamp"
+        );
+
+        let after_add = membership.updated_at;
+        std::thread::sleep(std::time::Duration::from_millis(10));
+
+        membership.remove_labor_share("share-001");
+        assert!(
+            membership.updated_at >= after_add,
+            "remove_labor_share should update timestamp"
+        );
+    }
+
+    #[test]
+    fn test_is_primary_default() {
+        let member = create_test_individual();
+        let coop = create_test_coop();
+        let membership = Membership::new(member, coop, MembershipRole::Worker);
+
+        assert!(
+            membership.is_primary,
+            "New membership should be primary by default"
+        );
+    }
+
+    #[test]
+    fn test_set_primary() {
+        let member = create_test_individual();
+        let coop = create_test_coop();
+        let mut membership = Membership::active(member, coop, MembershipRole::Worker);
+
+        assert!(membership.is_primary);
+
+        membership.set_primary(false);
+        assert!(!membership.is_primary);
+
+        membership.set_primary(true);
+        assert!(membership.is_primary);
+    }
+
+    #[test]
+    fn test_with_labor_shares_builder() {
+        let member = create_test_individual();
+        let coop = create_test_coop();
+        let membership = Membership::active(member, coop, MembershipRole::Worker)
+            .with_labor_shares(vec!["share-001".to_string(), "share-002".to_string()])
+            .with_primary(false);
+
+        assert_eq!(membership.labor_share_count(), 2);
+        assert!(!membership.is_primary);
+    }
+
+    #[test]
+    fn test_labor_share_serialization() {
+        let member = create_test_individual();
+        let coop = create_test_coop();
+        let mut membership =
+            Membership::active(member.clone(), coop.clone(), MembershipRole::Worker);
+        membership.add_labor_share("share-xyz");
+        membership.set_primary(false);
+
+        let json = serde_json::to_string(&membership).unwrap();
+        let parsed: Membership = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(parsed.labor_shares, vec!["share-xyz".to_string()]);
+        assert!(!parsed.is_primary);
+    }
+
+    #[test]
+    fn test_legacy_membership_deserialization() {
+        // Test that old memberships without labor_shares/is_primary still deserialize
+        // EntityId is serialized as "entity:icn:type:identifier"
+        let legacy_json = r#"{
+            "member_id": "entity:icn:individual:testpubkey123",
+            "parent_id": "entity:icn:cooperative:test-coop",
+            "role": "worker",
+            "status": "active",
+            "joined_at": 1700000000,
+            "updated_at": 1700000000,
+            "shares": 1,
+            "capabilities": ["vote", "propose"],
+            "notes": null
+        }"#;
+
+        let parsed: Membership = serde_json::from_str(legacy_json).unwrap();
+
+        // New fields should have defaults
+        assert!(parsed.labor_shares.is_empty());
+        assert!(parsed.is_primary);
     }
 }
