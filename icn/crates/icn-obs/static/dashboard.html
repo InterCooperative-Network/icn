@@ -130,8 +130,9 @@
     </div>
 
     <script>
-        const METRICS_URL = 'http://localhost:9100/metrics';
-        const HEALTH_URL = '/health';
+        // Use relative URL for same-origin metrics, or override via global variable
+        const METRICS_URL = window.METRICS_URL || '/metrics';
+        const HEALTH_URL = window.HEALTH_URL || '/health';
         const REFRESH_INTERVAL = 5000; // 5 seconds
 
         async function fetchHealth() {

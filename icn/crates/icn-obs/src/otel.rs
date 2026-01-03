@@ -44,7 +44,9 @@ fn default_enabled() -> bool {
 }
 
 fn default_otlp_endpoint() -> String {
-    "http://localhost:4317".to_string()
+    // Check standard OpenTelemetry environment variable first
+    std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT")
+        .unwrap_or_else(|_| "http://localhost:4317".to_string())
 }
 
 fn default_sampling_rate() -> f64 {
