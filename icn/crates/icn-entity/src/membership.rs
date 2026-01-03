@@ -52,10 +52,14 @@ pub struct Membership {
     // ========================================
     // Labor Share Fields (Issue #390)
     // ========================================
-    /// Labor share IDs held by this member (references icn_ledger::ShareId)
+    /// Labor share IDs held by this member (references `icn_ledger::ShareId`)
     ///
     /// Each share represents accumulated labor value from work contributions.
     /// Shares track labor_days and accumulated_surplus for surplus distribution.
+    ///
+    /// **Design Note:** Uses `Vec<String>` instead of `Vec<ShareId>` to avoid
+    /// a circular dependency between `icn-entity` and `icn-ledger`. The share IDs
+    /// are validated at the ledger layer when operations are performed.
     #[serde(default)]
     pub labor_shares: Vec<String>,
 
@@ -198,6 +202,10 @@ impl Membership {
 
     /// Set as primary membership
     ///
+    /// **Important:** Caller is responsible for ensuring only one membership
+    /// per worker is marked as primary across all cooperatives. This method
+    /// does not enforce uniqueness constraints.
+    ///
     /// Updates `updated_at` timestamp for audit trail accuracy.
     pub fn set_primary(&mut self, is_primary: bool) {
         if self.is_primary != is_primary {
@@ -207,12 +215,18 @@ impl Membership {
     }
 
     /// Builder method to set primary status
+    ///
+    /// **Note:** Builder methods are for initial construction and do not
+    /// update `updated_at`. Use `set_primary()` to modify after creation.
     pub fn with_primary(mut self, is_primary: bool) -> Self {
         self.is_primary = is_primary;
         self
     }
 
     /// Builder method to add initial labor shares
+    ///
+    /// **Note:** Builder methods are for initial construction and do not
+    /// update `updated_at`. Use `add_labor_share()` to modify after creation.
     pub fn with_labor_shares(mut self, shares: Vec<String>) -> Self {
         self.labor_shares = shares;
         self
