@@ -521,6 +521,7 @@ fn status_to_key(status: &StewardStatus) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicBool, Ordering};
 
     /// Valid test DIDs (proper multibase-encoded Ed25519 public keys)
     /// Generated from deterministic seeds
@@ -780,5 +781,131 @@ mod tests {
         assert!(store.get(&record1.steward_id).await.unwrap().is_some());
         assert!(store.get(&record2.steward_id).await.unwrap().is_some());
         assert!(store.get(&record3.steward_id).await.unwrap().is_some());
+    }
+
+    // ========== Lock Poisoning Tests ==========
+
+    /// A backend that can simulate poison/failure states for testing
+    struct FailingBackend {
+        inner: InMemoryStewardStore,
+        should_fail: AtomicBool,
+    }
+
+    impl FailingBackend {
+        fn new() -> Self {
+            Self {
+                inner: InMemoryStewardStore::new(),
+                should_fail: AtomicBool::new(false),
+            }
+        }
+
+        fn set_failing(&self, fail: bool) {
+            self.should_fail.store(fail, Ordering::SeqCst);
+        }
+    }
+
+    #[async_trait]
+    impl StewardStoreBackend for FailingBackend {
+        async fn get(&self, key: &[u8]) -> anyhow::Result<Option<Vec<u8>>> {
+            if self.should_fail.load(Ordering::SeqCst) {
+                anyhow::bail!("Lock poisoned - store may contain corrupt state")
+            }
+            self.inner.get(key).await
+        }
+
+        async fn set(&self, key: &[u8], value: &[u8]) -> anyhow::Result<()> {
+            if self.should_fail.load(Ordering::SeqCst) {
+                anyhow::bail!("Lock poisoned - store may contain corrupt state")
+            }
+            self.inner.set(key, value).await
+        }
+
+        async fn delete(&self, key: &[u8]) -> anyhow::Result<()> {
+            if self.should_fail.load(Ordering::SeqCst) {
+                anyhow::bail!("Lock poisoned - store may contain corrupt state")
+            }
+            self.inner.delete(key).await
+        }
+
+        async fn list_keys(&self, prefix: &[u8]) -> anyhow::Result<Vec<Vec<u8>>> {
+            if self.should_fail.load(Ordering::SeqCst) {
+                anyhow::bail!("Lock poisoned - store may contain corrupt state")
+            }
+            self.inner.list_keys(prefix).await
+        }
+    }
+
+    #[tokio::test]
+    async fn test_backend_poison_fails_fast() {
+        // Test that backend failures propagate as errors (fail-fast behavior)
+        let backend = FailingBackend::new();
+        let store = StewardStore::with_default_cache(backend);
+
+        // Now simulate backend poison BEFORE any operations
+        store.backend.set_failing(true);
+
+        // Store operation should fail
+        let record = create_test_record();
+        let result = store.store(&record).await;
+        assert!(result.is_err(), "store should fail when backend is poisoned");
+        assert!(
+            result.unwrap_err().to_string().contains("Lock poisoned"),
+            "error should mention lock poisoning"
+        );
+
+        // Get should fail (nothing in cache, backend is poisoned)
+        let result = store.get(&record.steward_id).await;
+        assert!(result.is_err(), "get should fail when backend is poisoned");
+
+        // list_keys (via count) should fail
+        let result = store.count().await;
+        assert!(result.is_err(), "count should fail when backend is poisoned");
+
+        // Verify that when backend is restored, operations succeed
+        store.backend.set_failing(false);
+        let result = store.store(&record).await;
+        assert!(result.is_ok(), "store should succeed when backend is restored");
+    }
+
+    #[tokio::test]
+    async fn test_cache_poison_graceful_degradation() {
+        // Test that cache failures don't break the store (graceful degradation)
+        // We simulate this by poisoning the cache and verifying operations still succeed
+        let backend = InMemoryStewardStore::new();
+        let store = StewardStore::with_default_cache(backend);
+
+        // Store a record
+        let record = create_test_record();
+        store.store(&record).await.expect("store should succeed");
+
+        // Poison the cache by panicking while holding the lock
+        // We use catch_unwind to safely panic and poison the lock
+        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _guard = store.cache.write().unwrap();
+            panic!("intentional panic to poison cache");
+        }));
+
+        // Verify the cache is actually poisoned
+        assert!(
+            store.cache.write().is_err(),
+            "cache should be poisoned after panic"
+        );
+
+        // The cache is now poisoned, but operations should still work via backend
+        // Store another record - should succeed (cache update is non-critical)
+        let mut record2 = create_test_record();
+        record2.steward_did = TEST_DID_3.parse().unwrap();
+        record2.holder_did = TEST_DID_4.parse().unwrap();
+        let result = store.store(&record2).await;
+        assert!(result.is_ok(), "store should succeed even with poisoned cache");
+
+        // Get should work (falls back to backend when cache is poisoned)
+        let result = store.get(&record.steward_id).await;
+        assert!(result.is_ok(), "get should succeed even with poisoned cache");
+        assert!(result.unwrap().is_some(), "should retrieve record from backend");
+
+        // Delete should work (cache update is non-critical)
+        let result = store.delete(&record2.steward_id).await;
+        assert!(result.is_ok(), "delete should succeed even with poisoned cache");
     }
 }
