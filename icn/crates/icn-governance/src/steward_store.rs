@@ -71,35 +71,35 @@ impl Default for InMemoryStewardStore {
 #[async_trait]
 impl StewardStoreBackend for InMemoryStewardStore {
     async fn get(&self, key: &[u8]) -> anyhow::Result<Option<Vec<u8>>> {
-        let data = self.data.read().map_err(|_| {
-            error!("Lock poisoned in steward store get - previous holder panicked");
-            anyhow::anyhow!("Lock poisoned - store may contain corrupt state")
+        let data = self.data.read().map_err(|e| {
+            error!("Lock poisoned in steward store get: {e}");
+            anyhow::anyhow!("Lock poisoned in get - store may contain corrupt state")
         })?;
         Ok(data.get(key).cloned())
     }
 
     async fn set(&self, key: &[u8], value: &[u8]) -> anyhow::Result<()> {
-        let mut data = self.data.write().map_err(|_| {
-            error!("Lock poisoned in steward store set - previous holder panicked");
-            anyhow::anyhow!("Lock poisoned - store may contain corrupt state")
+        let mut data = self.data.write().map_err(|e| {
+            error!("Lock poisoned in steward store set: {e}");
+            anyhow::anyhow!("Lock poisoned in set - store may contain corrupt state")
         })?;
         data.insert(key.to_vec(), value.to_vec());
         Ok(())
     }
 
     async fn delete(&self, key: &[u8]) -> anyhow::Result<()> {
-        let mut data = self.data.write().map_err(|_| {
-            error!("Lock poisoned in steward store delete - previous holder panicked");
-            anyhow::anyhow!("Lock poisoned - store may contain corrupt state")
+        let mut data = self.data.write().map_err(|e| {
+            error!("Lock poisoned in steward store delete: {e}");
+            anyhow::anyhow!("Lock poisoned in delete - store may contain corrupt state")
         })?;
         data.remove(key);
         Ok(())
     }
 
     async fn list_keys(&self, prefix: &[u8]) -> anyhow::Result<Vec<Vec<u8>>> {
-        let data = self.data.read().map_err(|_| {
-            error!("Lock poisoned in steward store list_keys - previous holder panicked");
-            anyhow::anyhow!("Lock poisoned - store may contain corrupt state")
+        let data = self.data.read().map_err(|e| {
+            error!("Lock poisoned in steward store list_keys: {e}");
+            anyhow::anyhow!("Lock poisoned in list_keys - store may contain corrupt state")
         })?;
         let keys: Vec<Vec<u8>> = data
             .keys()
