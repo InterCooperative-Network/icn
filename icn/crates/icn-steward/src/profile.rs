@@ -71,7 +71,12 @@ pub struct StewardStats {
     pub last_heartbeat: u64,
 
     /// Daily vouch tracking (Issue #396 - sybil resistance)
+    ///
     /// Tuple: (day_start_timestamp, vouch_count_for_day)
+    ///
+    /// Day boundaries are calculated using UTC (via `icn_time::current_timestamp_secs()`).
+    /// This counter is in-memory only and resets if the steward actor restarts mid-day.
+    /// For pilot phase, this is acceptable; production may need persistent storage.
     #[serde(default)]
     pub daily_vouches: (u64, u32),
 }
