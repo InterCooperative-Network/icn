@@ -46,6 +46,7 @@ tracing-subscriber.workspace = true
 rand_core.workspace = true
 criterion = "0.5"
 tempfile = "3.24"
+portpicker.workspace = true
 
 [[bench]]
 name = "net_bench"

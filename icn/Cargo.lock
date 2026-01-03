@@ -3102,6 +3102,7 @@ dependencies = [
  "icn-time",
  "icn-trust",
  "mdns-sd",
+ "portpicker",
  "quinn",
  "rand 0.8.5",
  "rand_core 0.6.4",
