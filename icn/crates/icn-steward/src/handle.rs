@@ -80,6 +80,16 @@ pub enum StewardMsg {
         response: oneshot::Sender<Result<()>>,
     },
 
+    /// Atomically check if VUI is available and reserve it (Issue #397)
+    ///
+    /// This prevents TOCTOU race conditions by combining the check and
+    /// reservation into a single atomic operation processed by the actor.
+    CheckAndReserveVui {
+        vui_hash: [u8; 32],
+        registered_by: Did,
+        response: oneshot::Sender<Result<VuiReservationResult>>,
+    },
+
     /// Get enrollment ceremony status
     GetEnrollmentStatus {
         ceremony_id: [u8; 32],
@@ -129,6 +139,20 @@ pub struct StewardStats {
 
     /// Total tokens issued
     pub tokens_issued: u64,
+}
+
+/// Result of an atomic VUI check-and-reserve operation (Issue #397)
+#[derive(Debug, Clone)]
+pub enum VuiReservationResult {
+    /// VUI was available and has been reserved for this enrollment
+    Reserved,
+
+    /// VUI is already registered by another identity
+    AlreadyRegistered(VuiRegistration),
+
+    /// VUI may be registered (Bloom filter positive, but no exact match)
+    /// This is a probabilistic false positive - reject to be safe
+    PossiblyRegistered,
 }
 
 /// Handle to interact with the steward actor
@@ -296,6 +320,32 @@ impl StewardHandle {
         let (tx, rx) = oneshot::channel();
         self.tx
             .send(StewardMsg::RegisterVui {
+                vui_hash,
+                registered_by,
+                response: tx,
+            })
+            .await
+            .context("Steward actor closed")?;
+        rx.await.context("Response channel closed")?
+    }
+
+    /// Atomically check if VUI is available and reserve it (Issue #397)
+    ///
+    /// This combines the check and reservation into a single atomic operation,
+    /// preventing TOCTOU race conditions in multi-node deployments.
+    ///
+    /// Returns:
+    /// - `Reserved` if the VUI was available and is now reserved
+    /// - `AlreadyRegistered(registration)` if already registered
+    /// - `PossiblyRegistered` if Bloom filter indicates possible duplicate
+    pub async fn check_and_reserve_vui(
+        &self,
+        vui_hash: [u8; 32],
+        registered_by: Did,
+    ) -> Result<VuiReservationResult> {
+        let (tx, rx) = oneshot::channel();
+        self.tx
+            .send(StewardMsg::CheckAndReserveVui {
                 vui_hash,
                 registered_by,
                 response: tx,

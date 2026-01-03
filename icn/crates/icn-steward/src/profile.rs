@@ -69,6 +69,11 @@ pub struct StewardStats {
 
     /// Last heartbeat timestamp
     pub last_heartbeat: u64,
+
+    /// Daily vouch tracking (Issue #396 - sybil resistance)
+    /// Tuple: (day_start_timestamp, vouch_count_for_day)
+    #[serde(default)]
+    pub daily_vouches: (u64, u32),
 }
 
 /// Steward operational status
@@ -211,6 +216,45 @@ impl StewardProfile {
     pub fn record_recovery_participation(&mut self) {
         self.stats.recoveries_participated += 1;
     }
+
+    /// Check if steward can vouch today (Issue #396 - sybil resistance)
+    ///
+    /// Returns the number of vouches remaining for today, or 0 if limit reached.
+    pub fn vouches_remaining_today(&self, max_per_day: u32) -> u32 {
+        let now = icn_time::current_timestamp_secs();
+        let day_start = now - (now % 86400); // Start of current UTC day
+
+        let (last_day, count) = self.stats.daily_vouches;
+        if last_day == day_start {
+            max_per_day.saturating_sub(count)
+        } else {
+            // New day, reset count
+            max_per_day
+        }
+    }
+
+    /// Record a vouch and check if within daily limit (Issue #396 - sybil resistance)
+    ///
+    /// Returns `Some(remaining)` if vouch was allowed, `None` if limit exceeded.
+    pub fn record_vouch(&mut self, max_per_day: u32) -> Option<u32> {
+        let now = icn_time::current_timestamp_secs();
+        let day_start = now - (now % 86400); // Start of current UTC day
+
+        let (last_day, count) = self.stats.daily_vouches;
+        let new_count = if last_day == day_start {
+            // Same day - increment
+            if count >= max_per_day {
+                return None;
+            }
+            count + 1
+        } else {
+            // New day - reset to 1
+            1
+        };
+
+        self.stats.daily_vouches = (day_start, new_count);
+        Some(max_per_day.saturating_sub(new_count))
+    }
 }
 
 impl StewardStats {
@@ -346,5 +390,71 @@ mod tests {
 
         assert_ne!(tier1, tier2);
         assert_ne!(tier2, tier3);
+    }
+
+    #[test]
+    fn test_vouch_rate_limiting() {
+        // Issue #396 - test daily vouch limits
+        let steward_did = test_did();
+        let citizen_did = test_did();
+
+        let mut profile = StewardProfile::new_pending(
+            steward_did,
+            citizen_did,
+            "US".to_string(),
+            vec![1, 2, 3],
+            [42u8; 32],
+        );
+
+        profile.activate(1000, None);
+
+        let max_per_day = 3;
+
+        // Initially should have all vouches available
+        assert_eq!(profile.vouches_remaining_today(max_per_day), 3);
+
+        // Record vouches
+        assert_eq!(profile.record_vouch(max_per_day), Some(2)); // 2 remaining
+        assert_eq!(profile.record_vouch(max_per_day), Some(1)); // 1 remaining
+        assert_eq!(profile.record_vouch(max_per_day), Some(0)); // 0 remaining
+
+        // Should be at limit now
+        assert_eq!(profile.vouches_remaining_today(max_per_day), 0);
+
+        // Should reject additional vouches
+        assert_eq!(profile.record_vouch(max_per_day), None);
+        assert_eq!(profile.record_vouch(max_per_day), None);
+
+        // Still at 0 remaining
+        assert_eq!(profile.vouches_remaining_today(max_per_day), 0);
+    }
+
+    #[test]
+    fn test_vouch_limit_resets_daily() {
+        // Issue #396 - test that vouch limit resets at day boundary
+        let steward_did = test_did();
+        let citizen_did = test_did();
+
+        let mut profile = StewardProfile::new_pending(
+            steward_did,
+            citizen_did,
+            "US".to_string(),
+            vec![1, 2, 3],
+            [42u8; 32],
+        );
+
+        profile.activate(1000, None);
+
+        // Simulate yesterday's vouches
+        let yesterday = icn_time::current_timestamp_secs() - 86400;
+        let yesterday_day_start = yesterday - (yesterday % 86400);
+        profile.stats.daily_vouches = (yesterday_day_start, 10);
+
+        // Should have full quota today since it's a new day
+        let max_per_day = 5;
+        assert_eq!(profile.vouches_remaining_today(max_per_day), 5);
+
+        // First vouch of the new day should succeed
+        assert_eq!(profile.record_vouch(max_per_day), Some(4));
     }
 }

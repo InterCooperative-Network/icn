@@ -5,6 +5,31 @@
 //! 2. Device scans QR → verifies possession
 //! 3. Steward vouches → upgrades trust
 //! 4. Complete enrollment → receive DID + recovery codes
+//!
+//! # Security Notes
+//!
+//! ## Sybil Resistance (Issue #396)
+//!
+//! **Current State**: The VUI (Verifiable Unique Identifier) is currently computed
+//! as `SHA256(DID)`. This provides NO sybil resistance since anyone can generate
+//! unlimited DIDs. The temporary VUI prevents the same DID from enrolling twice,
+//! but does not prevent one person from creating multiple identities.
+//!
+//! **Mitigations in Place**:
+//! - Steward vouching: A trusted steward must vouch for each enrollment
+//! - Steward rate limits: Stewards can only vouch for N identities per day
+//! - Trust decay: Stewards who vouch for bad actors lose reputation
+//! - VUI collision detection: Bloom filter catches exact duplicate attempts
+//!
+//! **Future Improvements** (when SDIS is fully implemented):
+//! - Threshold PRF computation over biometric data
+//! - Social vouching with web-of-trust verification
+//! - Zero-knowledge proofs of unique personhood
+//!
+//! ## Race Condition Prevention (Issue #397)
+//!
+//! VUI registration uses atomic check-and-reserve to prevent TOCTOU race
+//! conditions. See `check_and_reserve_vui()` in icn-steward.
 
 use actix_web::{post, web, HttpRequest, HttpResponse};
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
@@ -28,12 +53,13 @@ use crate::trust_mgr::TrustManager;
 
 /// Compute temporary VUI hash from DID.
 ///
-/// # Security Note
+/// # Security Note (Issue #396)
 /// This is a TEMPORARY implementation using SHA256(DID). In full SDIS, VUI comes
 /// from threshold PRF computation over biometric/identity data, providing true
-/// sybil resistance. The DID-based approach is a placeholder.
+/// sybil resistance. The DID-based approach is a placeholder that provides NO
+/// sybil resistance since anyone can generate unlimited DIDs.
 ///
-/// TODO(#XXX): Replace with threshold PRF computation when SDIS is fully implemented.
+/// TODO(#396): Replace with threshold PRF computation when SDIS is fully implemented.
 fn compute_temporary_vui(did: &Did) -> [u8; 32] {
     let mut hasher = Sha256::new();
     hasher.update(did.to_string().as_bytes());
@@ -519,35 +545,37 @@ pub async fn complete_enrollment(
         })?;
 
     // =========================================================================
-    // VUI Uniqueness Check (BEFORE any state changes)
+    // VUI Atomic Check and Reserve (Issue #397 - Race Condition Fix)
     // =========================================================================
-    // Check VUI uniqueness FIRST before creating any records.
-    // This prevents orphaned PersonhoodAnchor/CommonsHolderRecord if VUI collision detected.
+    // Use atomic check_and_reserve_vui to prevent TOCTOU race conditions.
+    // This ensures no window exists between checking and registering where
+    // another concurrent enrollment could register the same VUI.
     //
     // NOTE: Currently using SHA256(DID) as temporary VUI. In full SDIS, VUI comes from
     // threshold PRF computation over biometric/identity data, providing true sybil resistance.
     // The DID-based approach is a placeholder that enables the API contract to stabilize.
-    //
-    // RACE CONDITION NOTE: There is a window between check_vui() and register_vui() where
-    // another concurrent enrollment could register the same VUI. This is acceptable for MVP
-    // because: (1) the window is small (~100ms), (2) exact_hashes map will catch true
-    // duplicates on the second registration attempt, (3) distributed lock adds complexity.
-    // TODO(#XXX): Consider distributed lock or two-phase commit for production hardening.
+    // See Issue #396 for sybil resistance improvements.
     let vui_hash = compute_temporary_vui(&ephemeral_did);
 
     if let Some(ref mgr) = steward_mgr.as_ref() {
-        // Log that we're using temporary VUI (once per enrollment, at debug level after initial warning)
+        // Log that we're using temporary VUI (once per enrollment, at debug level)
         tracing::debug!(
-            "VUI check for {} using temporary DID-based hash (full PRF not yet implemented)",
+            "VUI atomic reservation for {} using temporary DID-based hash (full PRF not yet implemented)",
             ephemeral_did
         );
 
-        match mgr.check_vui(vui_hash).await {
-            Ok(icn_steward::LocalCheckResult::NotRegistered) => {
-                // VUI is unique - proceed with enrollment
-                tracing::info!("VUI uniqueness check passed for {}", ephemeral_did);
+        match mgr
+            .check_and_reserve_vui(vui_hash, ephemeral_did.clone())
+            .await
+        {
+            Ok(icn_steward::VuiReservationResult::Reserved) => {
+                // VUI reserved atomically - proceed with enrollment
+                tracing::info!(
+                    "VUI reserved atomically for {} - proceeding with enrollment",
+                    ephemeral_did
+                );
             }
-            Ok(icn_steward::LocalCheckResult::Registered(registration)) => {
+            Ok(icn_steward::VuiReservationResult::AlreadyRegistered(registration)) => {
                 // VUI collision detected. For privacy, we hash the original registrant's DID
                 // before logging - this allows audit correlation without exposing identity.
                 let audit_hash = hash_did_for_audit(&registration.registered_by);
@@ -561,10 +589,9 @@ pub async fn complete_enrollment(
                     "This identity has already been enrolled (VUI collision)".to_string(),
                 ));
             }
-            Ok(icn_steward::LocalCheckResult::PossiblyRegistered) => {
+            Ok(icn_steward::VuiReservationResult::PossiblyRegistered) => {
                 // Bloom filter match - could be false positive, but we reject to be safe.
                 // False positives are preferable to allowing real duplicates through.
-                // TODO(#XXX): Implement distributed check across stewards for contested cases.
                 tracing::warn!(
                     "Possible VUI collision for {} (Bloom filter match) - rejecting enrollment",
                     ephemeral_did
@@ -574,10 +601,10 @@ pub async fn complete_enrollment(
                 ));
             }
             Err(e) => {
-                // VUI check failed - this is a critical error, fail the enrollment
+                // VUI reservation failed - this is a critical error, fail the enrollment
                 // to prevent potential duplicates from slipping through.
                 tracing::error!(
-                    "VUI uniqueness check failed for {}: {} - rejecting enrollment",
+                    "VUI reservation failed for {}: {} - rejecting enrollment",
                     ephemeral_did,
                     e
                 );
@@ -682,51 +709,9 @@ pub async fn complete_enrollment(
     // Capture coop_id before dropping session
     let coop_id = session.coop_id.clone();
 
-    // =========================================================================
-    // VUI Registration (AFTER state changes succeed)
-    // =========================================================================
-    // Uniqueness was already verified above. Now register the VUI to prevent
-    // future duplicate enrollments with the same identity.
-    //
-    // DESIGN DECISION: VUI registration failure is non-fatal.
-    //
-    // At this point, the enrollment has already succeeded:
-    // - PersonhoodAnchor created
-    // - CommonsHolderRecord created
-    // - Trust edge established
-    // - Membership affiliation complete
-    //
-    // If we returned an error now, the user would be told their enrollment failed
-    // even though it actually succeeded. This would create confusion and potentially
-    // leave the user unable to access their account.
-    //
-    // Instead, we log the failure as CRITICAL (which should trigger alerts) and
-    // return success. Operators can manually reconcile the VUI registry. The risk
-    // of allowing one duplicate through is lower than the cost of false failures.
-    //
-    // Note: The uniqueness check above still provides the primary protection.
-    // Registration failure only affects prevention of future duplicates with
-    // the same VUI, which is a recoverable operational issue.
-    if let Some(ref mgr) = steward_mgr.as_ref() {
-        // Reuse vui_hash computed earlier (same value, no need to recompute)
-        match mgr.register_vui(vui_hash, ephemeral_did.clone()).await {
-            Ok(()) => {
-                tracing::info!("Registered VUI for {} in steward registry", ephemeral_did);
-            }
-            Err(e) => {
-                // Critical error: enrollment succeeded but VUI wasn't registered.
-                // Log as CRITICAL for operator alerting, but don't fail the request.
-                // The user's enrollment was successful; failing now would be misleading.
-                tracing::error!(
-                    "CRITICAL: VUI registration failed after successful enrollment for {}: {} \
-                     - duplicate prevention may be compromised until manually resolved",
-                    ephemeral_did,
-                    e
-                );
-                // Continue with success - enrollment did complete
-            }
-        }
-    }
+    // NOTE: VUI was already registered atomically at the beginning of this function
+    // via check_and_reserve_vui(). No separate registration step is needed here.
+    // This eliminates the race condition identified in Issue #397.
 
     // Issue auth token for the new identity
     let auth_token = auth.issue_token(

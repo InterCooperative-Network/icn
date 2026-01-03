@@ -66,7 +66,7 @@ pub use config::StewardConfig;
 pub use gossip::{
     EnrollmentMessage, RecoveryMessage, StewardAnnouncement, StewardMessage, VuiSyncMessage,
 };
-pub use handle::{StewardHandle, StewardMsg, StewardStats as ActorStats};
+pub use handle::{StewardHandle, StewardMsg, StewardStats as ActorStats, VuiReservationResult};
 pub use profile::{JurisdictionTier, StewardProfile, StewardStats, StewardStatus};
 pub use token::{EnrollmentToken, TokenIssuanceRecord, TokenRequest, TokenResponse};
 pub use vui_registry::{DistributedCheckResult, LocalCheckResult, VuiRegistry, VuiRegistryError};

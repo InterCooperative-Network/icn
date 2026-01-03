@@ -7,7 +7,7 @@ use crate::error::{GatewayError, Result};
 use icn_identity::Did;
 use icn_steward::{
     ActorStats, EnrollmentCeremony, EnrollmentResult, LocalCheckResult, RecoveryCeremony,
-    RecoveryResult, StewardHandle,
+    RecoveryResult, StewardHandle, VuiReservationResult,
 };
 
 /// Re-export StewardHandle for use by the supervisor
@@ -53,6 +53,24 @@ impl StewardManager {
     pub async fn register_vui(&self, vui_hash: [u8; 32], registered_by: Did) -> Result<()> {
         self.handle
             .register_vui(vui_hash, registered_by)
+            .await
+            .map_err(|e| GatewayError::InternalError(format!("StewardActor error: {e}")))
+    }
+
+    /// Atomically check if VUI is available and reserve it (Issue #397)
+    ///
+    /// This prevents TOCTOU race conditions by combining the check and
+    /// reservation into a single atomic operation.
+    ///
+    /// Use this instead of separate check_vui + register_vui calls when
+    /// you need to ensure no race condition between the check and registration.
+    pub async fn check_and_reserve_vui(
+        &self,
+        vui_hash: [u8; 32],
+        registered_by: Did,
+    ) -> Result<VuiReservationResult> {
+        self.handle
+            .check_and_reserve_vui(vui_hash, registered_by)
             .await
             .map_err(|e| GatewayError::InternalError(format!("StewardActor error: {e}")))
     }
