@@ -235,6 +235,29 @@ impl GossipActor {
             .with_scope(crate::types::Scope::Regional), // Trust attestations are regional
         );
 
+        // Labor share topics (Issue #391)
+        gossip.create_topic(
+            Topic::new(
+                crate::labor_shares::topics::LABOR_SHARES_ALLOCATIONS.to_string(),
+                AccessControl::TrustClass(TrustClass::Known), // FederationOpen equivalent
+            )
+            .with_scope(crate::types::Scope::Global), // Labor share events propagate globally
+        );
+        gossip.create_topic(
+            Topic::new(
+                crate::labor_shares::topics::BONDS_ISSUANCE.to_string(),
+                AccessControl::TrustClass(TrustClass::Known), // FederationOpen equivalent
+            )
+            .with_scope(crate::types::Scope::Global), // Bond offerings propagate globally
+        );
+        gossip.create_topic(
+            Topic::new(
+                crate::labor_shares::topics::BONDS_PAYMENTS.to_string(),
+                AccessControl::TrustClass(TrustClass::Partner), // TrustGated - Partner+
+            )
+            .with_scope(crate::types::Scope::Regional), // Payment notifications are regional
+        );
+
         gossip
     }
 

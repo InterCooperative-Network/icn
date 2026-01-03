@@ -41,6 +41,7 @@ pub mod bloom;
 pub mod error;
 pub mod gossip;
 mod handlers;
+pub mod labor_shares;
 #[allow(missing_docs)]
 pub mod partition;
 #[allow(missing_docs)]
@@ -67,3 +68,8 @@ pub use types::{
     TrustResourceLimits,
 };
 pub use vector_clock::VectorClock;
+
+// Labor share gossip messages (Issue #391)
+pub use labor_shares::{
+    topics as labor_share_topics, BondMessage, BondPaymentType, LaborShareMessage,
+};
