@@ -1044,6 +1044,10 @@ impl NetworkActor {
 
         let mut shutdown_rx = shutdown_tx.subscribe();
 
+        // Cleanup interval for replay guard and rate limiter (60 seconds)
+        let mut cleanup_interval =
+            tokio::time::interval(tokio::time::Duration::from_secs(60));
+
         loop {
             tokio::select! {
                 msg = self.rx.recv() => {
@@ -1054,6 +1058,38 @@ impl NetworkActor {
                             break;
                         }
                     }
+                }
+                _ = cleanup_interval.tick() => {
+                    // Cleanup stale replay guard entries
+                    let peer_count_before = {
+                        let guard = self.replay_guard.read().await;
+                        guard.peer_count()
+                    };
+
+                    {
+                        let mut guard = self.replay_guard.write().await;
+                        guard.cleanup();
+                    }
+
+                    let peer_count_after = {
+                        let guard = self.replay_guard.read().await;
+                        guard.peer_count()
+                    };
+
+                    // Update metric
+                    icn_obs::metrics::network::replay_guard_peers_set(peer_count_after as u64);
+
+                    if peer_count_before != peer_count_after {
+                        info!(
+                            "Replay guard cleanup: {} -> {} peers",
+                            peer_count_before, peer_count_after
+                        );
+                    }
+
+                    // Also cleanup stale rate limiter buckets
+                    self.rate_limiter
+                        .cleanup_old_buckets(std::time::Duration::from_secs(300))
+                        .await;
                 }
                 _ = shutdown_rx.recv() => {
                     info!("Network actor received shutdown signal");
