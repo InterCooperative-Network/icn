@@ -525,23 +525,54 @@ impl Supervisor {
                     // - Each SequenceEntry is ~50 bytes (DID strings + u64 sequence + timestamp)
                     // - Maximum memory: 10K × 50 bytes = 500KB (acceptable for production)
                     // - Cleanup runs hourly with 24h retention, so active pairs are retained
+                    //
+                    // Circuit breaker: After 5 consecutive failures, escalate to ERROR level.
+                    // This helps operators detect persistent storage issues before they cause
+                    // unbounded memory growth.
                     let tracker_for_cleanup = encryption_sequence_tracker.clone();
                     let shutdown_rx_for_cleanup = self.shutdown_tx.subscribe();
                     background_tasks.spawn(async move {
                         let mut interval =
                             tokio::time::interval(std::time::Duration::from_secs(3600));
                         let mut shutdown_rx = shutdown_rx_for_cleanup;
+                        let mut consecutive_failures: u32 = 0;
+                        const CIRCUIT_BREAKER_THRESHOLD: u32 = 5;
+
                         loop {
                             tokio::select! {
                                 _ = interval.tick() => {
                                     match tracker_for_cleanup.cleanup_stale_entries(86400).await {
-                                        Ok(removed) if removed > 0 => {
-                                            debug!("Cleaned up {} stale encryption sequence entries", removed);
+                                        Ok(removed) => {
+                                            if removed > 0 {
+                                                debug!("Cleaned up {} stale encryption sequence entries", removed);
+                                            }
+                                            consecutive_failures = 0; // Reset on success
+
+                                            // Update gauge with current pair count for observability
+                                            let pair_count = tracker_for_cleanup.pair_count().await;
+                                            icn_obs::metrics::network::encryption_sequence_pairs_set(pair_count as u64);
                                         }
-                                        Ok(_) => {} // No entries removed
                                         Err(e) => {
-                                            warn!("Encryption sequence cleanup failed: {}", e);
+                                            consecutive_failures += 1;
                                             icn_obs::metrics::network::encryption_sequence_cleanup_failed_inc();
+
+                                            if consecutive_failures >= CIRCUIT_BREAKER_THRESHOLD {
+                                                // Circuit breaker tripped - escalate to ERROR
+                                                error!(
+                                                    consecutive_failures = consecutive_failures,
+                                                    "Encryption sequence cleanup has failed {} consecutive times! \
+                                                     Storage may be degraded. Sequence tracker memory may grow unbounded. \
+                                                     Error: {}",
+                                                    consecutive_failures, e
+                                                );
+                                            } else {
+                                                warn!(
+                                                    consecutive_failures = consecutive_failures,
+                                                    threshold = CIRCUIT_BREAKER_THRESHOLD,
+                                                    "Encryption sequence cleanup failed ({}/{}): {}",
+                                                    consecutive_failures, CIRCUIT_BREAKER_THRESHOLD, e
+                                                );
+                                            }
                                         }
                                     }
                                 }

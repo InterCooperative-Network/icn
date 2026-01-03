@@ -37,15 +37,25 @@ impl ConnectionContext {
         message: NetworkMessage,
         envelope: &SignedEnvelope,
     ) {
+        // Extract trace context for debugging (if available)
+        // The traceparent field contains the W3C trace-id and span-id
+        let trace_id = message
+            .trace_context
+            .as_ref()
+            .and_then(|tc| tc.traceparent.clone())
+            .unwrap_or_else(|| "none".to_string());
+
         // 1. Deserialize EncryptedEnvelope from the signed payload
         let encrypted: EncryptedEnvelope =
             match bincode::serde::decode_from_slice(&envelope.payload, bincode::config::legacy()) {
                 Ok((enc, _)) => enc,
                 Err(e) => {
                     warn!(
-                        "Failed to deserialize EncryptedEnvelope from {}: {}",
-                        envelope.from, e
+                        trace_id = %trace_id,
+                        sender = %envelope.from,
+                        "Failed to deserialize EncryptedEnvelope: {}", e
                     );
+                    icn_obs::metrics::network::encryption_rejected_inc("deserialization_failed");
                     return;
                 }
             };
@@ -53,8 +63,11 @@ impl ConnectionContext {
         // 2. Verify we are the intended recipient
         if encrypted.to != self.own_did {
             warn!(
-                "Encrypted message not for us: to={}, own_did={}",
-                encrypted.to, self.own_did
+                trace_id = %trace_id,
+                sender = %envelope.from,
+                intended_recipient = %encrypted.to,
+                own_did = %self.own_did,
+                "Encrypted message not for us"
             );
             icn_obs::metrics::network::encryption_rejected_inc("wrong_recipient");
             return;
@@ -67,8 +80,9 @@ impl ConnectionContext {
                 Some(info) => info.x25519_key,
                 None => {
                     warn!(
-                        "Cannot decrypt: no X25519 key for sender {} (Hello not exchanged?)",
-                        envelope.from
+                        trace_id = %trace_id,
+                        sender = %envelope.from,
+                        "Cannot decrypt: no X25519 key for sender (Hello not exchanged?)"
                     );
                     icn_obs::metrics::network::encryption_rejected_inc("missing_peer_key");
                     return;
@@ -84,12 +98,12 @@ impl ConnectionContext {
             Ok(pt) => pt,
             Err(e) => {
                 warn!(
-                    "Decryption failed from {} (seq={}): {}",
-                    envelope.from, encrypted.sequence, e
+                    trace_id = %trace_id,
+                    sender = %envelope.from,
+                    sequence = encrypted.sequence,
+                    "Decryption failed (possible tampering or key mismatch): {}", e
                 );
                 icn_obs::metrics::network::encryption_rejected_inc("decryption_failed");
-                // Could record Byzantine violation here for decryption failures
-                // (may indicate tampering or key mismatch)
                 return;
             }
         };

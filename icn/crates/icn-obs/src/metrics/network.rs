@@ -107,6 +107,10 @@ pub fn init_descriptions() {
         "icn_network_encryption_sequence_cleanup_failed_total",
         "Total number of encryption sequence cleanup failures"
     );
+    describe_gauge!(
+        "icn_network_encryption_sequence_pairs",
+        "Current number of active (sender, recipient) encryption sequence pairs being tracked"
+    );
 }
 
 // Simple counters
@@ -249,6 +253,14 @@ pub fn encryption_rejected_inc(reason: &str) {
 /// This metric helps operators detect storage issues before they cause problems.
 pub fn encryption_sequence_cleanup_failed_inc() {
     counter!("icn_network_encryption_sequence_cleanup_failed_total").increment(1);
+}
+
+/// Set the current number of encryption sequence pairs being tracked
+///
+/// This gauge helps operators monitor memory usage in the sequence tracker.
+/// The value represents active (sender, recipient) pairs with sequence numbers.
+pub fn encryption_sequence_pairs_set(count: u64) {
+    gauge!("icn_network_encryption_sequence_pairs").set(count as f64);
 }
 
 // Complex function with custom logic

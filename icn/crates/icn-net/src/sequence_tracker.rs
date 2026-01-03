@@ -40,6 +40,7 @@ use icn_identity::Did;
 use icn_store::Store;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -51,6 +52,15 @@ use tokio::sync::RwLock;
 /// - At 100 msg/sec, covers 100 seconds
 /// - In practice, sequences are persisted immediately after increment
 const RESTART_SAFETY_GAP: u64 = 10_000;
+
+/// Maximum number of (sender, recipient) pairs to track.
+///
+/// This limit prevents unbounded memory growth if cleanup fails persistently.
+/// At ~50 bytes per entry, 50K entries = ~2.5MB - acceptable for production.
+///
+/// When exceeded, new encryptions will fail with an error until cleanup succeeds
+/// or old pairs naturally expire. This is a safety measure, not expected in normal operation.
+const MAX_SEQUENCE_PAIRS: usize = 50_000;
 
 /// Key prefix for sequence storage.
 const SEQUENCE_PREFIX: &[u8] = b"outgoing_seq:";
@@ -73,8 +83,9 @@ pub struct OutgoingSequenceTracker {
     cache: RwLock<HashMap<(Did, Did), u64>>,
     /// Persistent storage backend
     store: Arc<dyn Store>,
-    /// Whether we've applied the restart safety gap
-    restart_gap_applied: RwLock<bool>,
+    /// Whether we've applied the restart safety gap.
+    /// Uses AtomicBool with compare_exchange for lock-free, race-free initialization.
+    restart_gap_applied: AtomicBool,
 }
 
 impl OutgoingSequenceTracker {
@@ -86,7 +97,7 @@ impl OutgoingSequenceTracker {
         let tracker = Self {
             cache: RwLock::new(HashMap::new()),
             store,
-            restart_gap_applied: RwLock::new(false),
+            restart_gap_applied: AtomicBool::new(false),
         };
 
         Ok(tracker)
@@ -98,7 +109,7 @@ impl OutgoingSequenceTracker {
         Self {
             cache: RwLock::new(HashMap::new()),
             store: Arc::new(icn_store::SledStore::temporary().unwrap()),
-            restart_gap_applied: RwLock::new(true), // No gap needed for tests
+            restart_gap_applied: AtomicBool::new(true), // No gap needed for tests
         }
     }
 
@@ -106,12 +117,26 @@ impl OutgoingSequenceTracker {
     ///
     /// This should be called during node startup, after the store is ready.
     /// It loads all persisted sequences and adds RESTART_SAFETY_GAP to each.
+    ///
+    /// # Thread Safety
+    ///
+    /// Uses compare_exchange on AtomicBool to ensure the safety gap is applied
+    /// exactly once, even if multiple threads call this method concurrently.
+    /// Only the thread that successfully flips false->true performs the work.
     pub async fn load_and_apply_safety_gap(&self) -> Result<usize> {
-        let mut applied = self.restart_gap_applied.write().await;
-        if *applied {
+        // Atomically try to claim the initialization slot.
+        // Only one thread will succeed at changing false -> true.
+        // All others will see that it's already true and return early.
+        if self
+            .restart_gap_applied
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_err()
+        {
+            // Another thread already applied the gap or is applying it
             return Ok(0);
         }
 
+        // We successfully claimed the slot - now apply the safety gap
         let entries = self
             .store
             .scan(SEQUENCE_PREFIX)
@@ -143,8 +168,6 @@ impl OutgoingSequenceTracker {
             }
         }
 
-        *applied = true;
-
         tracing::info!(
             loaded_sequences = count,
             safety_gap = RESTART_SAFETY_GAP,
@@ -158,27 +181,63 @@ impl OutgoingSequenceTracker {
     ///
     /// Automatically increments and persists the sequence.
     /// Thread-safe and guaranteed to return unique, monotonically increasing values.
+    ///
+    /// # Persistence-First Safety
+    ///
+    /// Critical: We persist to storage BEFORE updating the cache. This ensures that
+    /// if persistence fails (disk full, network partition), we never return a sequence
+    /// that might be reused after restart. The alternative (cache-then-persist) could
+    /// lead to nonce reuse which completely breaks ChaCha20-Poly1305 security.
+    ///
+    /// # Atomicity
+    ///
+    /// The write lock is held through the entire read-persist-update cycle to prevent
+    /// two threads from reading the same value and returning duplicate sequences.
+    /// While this means persistence happens under lock (blocking other callers),
+    /// cryptographic nonce uniqueness is more important than throughput.
+    ///
+    /// Sequence of operations (all under write lock):
+    /// 1. Read current value from cache
+    /// 2. Persist incremented value to storage (fail fast)
+    /// 3. Update cache with new value (only after successful persist)
+    ///
+    /// If persistence fails, we return an error and the cache is unchanged.
     pub async fn next_sequence(&self, sender: &Did, recipient: &Did) -> Result<u64> {
-        // Ensure safety gap has been applied on first access
-        {
-            let applied = self.restart_gap_applied.read().await;
-            if !*applied {
-                drop(applied);
-                self.load_and_apply_safety_gap().await?;
-            }
+        // Ensure safety gap has been applied on first access.
+        // Uses Acquire ordering to see the effects of any prior initialization.
+        if !self.restart_gap_applied.load(Ordering::Acquire) {
+            self.load_and_apply_safety_gap().await?;
         }
 
         let key = (sender.clone(), recipient.clone());
 
+        // Hold write lock through entire operation to prevent concurrent reads
+        // returning the same sequence number
         let mut cache = self.cache.write().await;
+
+        // Check if this is a new pair and we're at capacity
+        let is_new_pair = !cache.contains_key(&key);
+        if is_new_pair && cache.len() >= MAX_SEQUENCE_PAIRS {
+            // Safety limit reached - reject new pairs to prevent unbounded memory growth.
+            // Existing pairs can still increment. This is fail-safe: message won't be
+            // encrypted, which is better than running out of memory.
+            anyhow::bail!(
+                "Sequence tracker at capacity ({MAX_SEQUENCE_PAIRS} pairs). \
+                 Cannot add new recipient. Cleanup may be failing - check logs."
+            );
+        }
+
+        // Step 1: Read current value
         let next_seq = cache.get(&key).map(|s| s + 1).unwrap_or(1);
 
-        // Update cache
-        cache.insert(key, next_seq);
-
-        // Persist immediately (critical for nonce safety)
-        drop(cache); // Release lock before IO
+        // Step 2: Persist FIRST - fail fast before updating cache
+        // This ensures we never return a sequence that isn't durably stored.
+        // If this fails, cache is unchanged and caller can retry.
+        // NOTE: Persistence happens under lock, but nonce uniqueness > throughput
         self.persist_sequence(sender, recipient, next_seq).await?;
+
+        // Step 3: Update cache only after successful persistence
+        cache.insert(key, next_seq);
 
         Ok(next_seq)
     }
@@ -266,8 +325,17 @@ impl OutgoingSequenceTracker {
     /// Number of entries removed
     ///
     /// # Safety
+    ///
     /// Uses double-check pattern to avoid TOCTOU race conditions: entries are
     /// verified as still stale after acquiring the write lock before deletion.
+    ///
+    /// The cache write lock provides mutual exclusion with `next_sequence()`:
+    /// - `next_sequence()` holds the cache write lock during persistence
+    /// - `cleanup_stale_entries()` holds the cache write lock during store access
+    ///
+    /// This ensures no concurrent modifications between `store.get()` and
+    /// `store.delete()` in the cleanup loop. Any sequence updates via
+    /// `next_sequence()` must wait for cleanup to release the lock, and vice versa.
     pub async fn cleanup_stale_entries(&self, retention_secs: u64) -> Result<usize> {
         let now_ms = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -330,16 +398,16 @@ impl OutgoingSequenceTracker {
     ///
     /// Returns true if `load_and_apply_safety_gap()` has been called.
     /// Useful for startup validation.
-    pub async fn is_initialized(&self) -> bool {
-        *self.restart_gap_applied.read().await
+    pub fn is_initialized(&self) -> bool {
+        self.restart_gap_applied.load(Ordering::Acquire)
     }
 
     /// Require that safety gap has been explicitly applied.
     ///
     /// Returns error if `load_and_apply_safety_gap()` hasn't been called.
     /// Use this in strict mode when you want to enforce explicit initialization.
-    pub async fn require_initialized(&self) -> Result<()> {
-        if !*self.restart_gap_applied.read().await {
+    pub fn require_initialized(&self) -> Result<()> {
+        if !self.restart_gap_applied.load(Ordering::Acquire) {
             anyhow::bail!(
                 "Sequence tracker not initialized. Call load_and_apply_safety_gap() during startup."
             )
@@ -575,13 +643,13 @@ mod tests {
         let tracker = OutgoingSequenceTracker::new(store).unwrap();
 
         // Not initialized yet
-        assert!(!tracker.is_initialized().await);
+        assert!(!tracker.is_initialized());
 
         // Apply safety gap
         tracker.load_and_apply_safety_gap().await.unwrap();
 
         // Now initialized
-        assert!(tracker.is_initialized().await);
+        assert!(tracker.is_initialized());
     }
 
     #[tokio::test]
@@ -590,14 +658,14 @@ mod tests {
         let tracker = OutgoingSequenceTracker::new(store).unwrap();
 
         // Should error before initialization
-        let result = tracker.require_initialized().await;
+        let result = tracker.require_initialized();
         assert!(result.is_err());
 
         // Apply safety gap
         tracker.load_and_apply_safety_gap().await.unwrap();
 
         // Should succeed after initialization
-        let result = tracker.require_initialized().await;
+        let result = tracker.require_initialized();
         assert!(result.is_ok());
     }
 
@@ -610,14 +678,14 @@ mod tests {
         let bob = generate_did();
 
         // Not initialized
-        assert!(!tracker.is_initialized().await);
+        assert!(!tracker.is_initialized());
 
         // next_sequence auto-initializes
         let seq = tracker.next_sequence(&alice, &bob).await.unwrap();
         assert_eq!(seq, 1);
 
         // Now initialized
-        assert!(tracker.is_initialized().await);
+        assert!(tracker.is_initialized());
     }
 
     #[tokio::test]
