@@ -1136,6 +1136,7 @@ async fn test_contract_with_state_variables() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[ignore] // Flaky: Hardcoded ports cause conflicts - see #403, PR #432
 async fn test_contract_with_ledger_integration() {
     // Create two nodes
     let node_a = TestNode::new(19012).await.expect("Failed to create node A");
