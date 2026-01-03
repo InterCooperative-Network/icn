@@ -56,6 +56,11 @@ impl SourceUpdateInfo {
     }
 
     /// Check if this source is stale (hasn't updated in max_age seconds)
+    ///
+    /// Returns true if `(current_time - last_update) > max_age_secs`.
+    ///
+    /// **Note:** Staleness is measured from when the source was last queried
+    /// successfully, not when the source's underlying data was generated.
     pub fn is_stale(&self, max_age_secs: u64) -> bool {
         let now = crate::current_timestamp_secs();
         now.saturating_sub(self.last_update) > max_age_secs
@@ -119,12 +124,17 @@ impl OracleManager {
     }
 
     /// Remove a source by ID
+    ///
+    /// Also cleans up staleness tracking data to prevent memory leaks.
     pub async fn unregister_source(&self, source_id: &str) -> bool {
         let mut sources = self.sources.write().await;
         let initial_len = sources.len();
         sources.retain(|s| s.source_id() != source_id);
         let removed = sources.len() < initial_len;
         if removed {
+            // Clean up staleness tracking data
+            let mut updates = self.source_updates.write().await;
+            updates.remove(source_id);
             info!(source_id = %source_id, "Unregistered price feed source");
         }
         removed
@@ -895,5 +905,32 @@ mod tests {
         };
         assert!(old.is_stale(300)); // Stale if threshold is 5 minutes (300s)
         assert!(!old.is_stale(900)); // Not stale if threshold is 15 minutes (900s)
+    }
+
+    #[tokio::test]
+    async fn test_unregister_cleans_up_tracking_data() {
+        let oracle = OracleManager::new(test_store());
+        let source =
+            Arc::new(MockPriceFeed::new("test", "Test", 50).with_rate("hours", "USD", 25.0));
+        oracle.register_source(source).await;
+
+        // Fetch rate to record update
+        let pair = CurrencyPair::new("hours", "USD");
+        let _ = oracle.get_rate(&pair).await.expect("should get rate");
+
+        // Verify tracking data exists
+        let info = oracle.get_source_update_info("test").await;
+        assert!(info.is_some());
+
+        // Unregister source
+        let removed = oracle.unregister_source("test").await;
+        assert!(removed);
+
+        // Tracking data should be cleaned up
+        let info = oracle.get_source_update_info("test").await;
+        assert!(
+            info.is_none(),
+            "Tracking data should be removed on unregister"
+        );
     }
 }
