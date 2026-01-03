@@ -1045,8 +1045,7 @@ impl NetworkActor {
         let mut shutdown_rx = shutdown_tx.subscribe();
 
         // Cleanup interval for replay guard and rate limiter (60 seconds)
-        let mut cleanup_interval =
-            tokio::time::interval(tokio::time::Duration::from_secs(60));
+        let mut cleanup_interval = tokio::time::interval(tokio::time::Duration::from_secs(60));
 
         loop {
             tokio::select! {
