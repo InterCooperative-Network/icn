@@ -7,9 +7,9 @@
 //! - Byzantine fault recording
 
 use super::ConnectionContext;
-use crate::envelope::SignedEnvelope;
+use crate::envelope::{PayloadType, SignedEnvelope};
 use crate::protocol::NetworkMessage;
-use tracing::{info, warn};
+use tracing::{debug, warn};
 
 impl ConnectionContext {
     /// Handle a Signed message envelope
@@ -50,12 +50,19 @@ impl ConnectionContext {
         // Signature valid, now check for replay attack
         match self.replay_guard.write().await.check(envelope) {
             Ok(()) => {
-                info!(
-                    "Verified signed message from {} (seq={})",
-                    envelope.from, envelope.sequence
+                debug!(
+                    "Verified signed message from {} (seq={}, type={:?})",
+                    envelope.from, envelope.sequence, envelope.payload_type
                 );
-                // Forward verified message to handler
-                self.forward_to_handler(message);
+
+                // Check if this is an encrypted payload that needs decryption
+                if envelope.payload_type == PayloadType::Encrypted {
+                    // Route to encrypted handler for decryption
+                    self.handle_encrypted_payload(message, envelope).await;
+                } else {
+                    // Forward verified message to handler
+                    self.forward_to_handler(message);
+                }
             }
             Err(e) => {
                 warn!("Replay attack detected from {}: {}", envelope.from, e);

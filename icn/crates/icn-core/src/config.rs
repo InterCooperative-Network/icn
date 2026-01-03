@@ -168,6 +168,16 @@ pub struct NetworkConfig {
     /// TURN server password (optional, for authenticated TURN)
     #[serde(default)]
     pub turn_password: Option<String>,
+
+    /// Enable end-to-end encryption for all messages (when peer supports it)
+    ///
+    /// When enabled, messages sent to peers that advertise E2E_ENCRYPTION capability
+    /// will be encrypted with the recipient's X25519 public key before signing.
+    /// Messages from non-supporting peers remain signed-only (backward compatible).
+    ///
+    /// Default: true (recommended for pilot and production)
+    #[serde(default = "default_true")]
+    pub e2e_encryption_enabled: bool,
 }
 
 impl NetworkConfig {
@@ -726,6 +736,7 @@ impl Default for Config {
                 turn_server: None,
                 turn_username: None,
                 turn_password: None,
+                e2e_encryption_enabled: true,
             },
             observability: ObservabilityConfig {
                 metrics_port: 9100,

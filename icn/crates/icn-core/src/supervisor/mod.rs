@@ -96,6 +96,63 @@ async fn resolve_address(addr_str: &str) -> Result<SocketAddr> {
     Ok(addr)
 }
 
+/// Try to encrypt an inner SignedEnvelope for E2E encryption (Issue #404)
+///
+/// Creates a sign-encrypt-sign structure:
+/// 1. Serialize inner SignedEnvelope
+/// 2. Encrypt with recipient's X25519 public key
+/// 3. Wrap in outer SignedEnvelope with PayloadType::Encrypted
+async fn try_encrypt_envelope(
+    net_handle: &icn_net::NetworkHandle,
+    from_did: &Did,
+    to_did: &Did,
+    inner_envelope: &icn_net::SignedEnvelope,
+    keypair: &icn_identity::KeyPair,
+    x25519_secret: &x25519_dalek::StaticSecret,
+    enc_seq_tracker: &icn_net::OutgoingSequenceTracker,
+) -> Result<icn_net::SignedEnvelope> {
+    // Get recipient's X25519 public key
+    let recipient_x25519_bytes = net_handle
+        .get_peer_x25519_key(to_did)
+        .await
+        .context("Peer X25519 key not available")?;
+    let recipient_x25519_public = x25519_dalek::PublicKey::from(recipient_x25519_bytes);
+
+    // Serialize inner envelope
+    let inner_bytes = bincode::serde::encode_to_vec(inner_envelope, bincode::config::legacy())
+        .context("Failed to serialize inner envelope")?;
+
+    // Get encryption sequence number (persistent, unique per sender-recipient pair)
+    let enc_sequence = enc_seq_tracker.next_sequence(from_did, to_did).await?;
+
+    // Encrypt the inner envelope
+    let encrypted = icn_net::EncryptedEnvelope::encrypt(
+        from_did,
+        to_did,
+        enc_sequence,
+        x25519_secret,
+        &recipient_x25519_public,
+        &inner_bytes,
+    )
+    .context("Failed to encrypt envelope")?;
+
+    // Serialize encrypted envelope
+    let encrypted_bytes = bincode::serde::encode_to_vec(&encrypted, bincode::config::legacy())
+        .context("Failed to serialize encrypted envelope")?;
+
+    // Create outer signed envelope with PayloadType::Encrypted
+    let outer_envelope = icn_net::SignedEnvelope::new(
+        from_did,
+        keypair,
+        enc_sequence, // Use encryption sequence for outer envelope too
+        icn_net::PayloadType::Encrypted,
+        encrypted_bytes,
+    )
+    .context("Failed to create outer signed envelope")?;
+
+    Ok(outer_envelope)
+}
+
 /// Supervisor manages all actors and restarts them on failure
 pub struct Supervisor {
     config: Config,
@@ -231,7 +288,7 @@ impl Supervisor {
             .await?;
             icn_obs::metrics::supervisor::actor_spawned_inc("gossip");
             let gossip_handle = gossip_services.gossip_handle.clone();
-            let _gossip_store = gossip_services.gossip_store.clone(); // Kept for potential future use
+            let gossip_store = gossip_services.gossip_store.clone(); // Used for encryption sequence tracking
             let loaded_snapshot = gossip_services.loaded_snapshot;
 
             // Initialize ledger and contract services
@@ -421,12 +478,30 @@ impl Supervisor {
                 let keypair_clone = identity_bundle.keypair().clone();
                 let sequence_counter = Arc::new(std::sync::atomic::AtomicU64::new(0));
 
-                let send_callback: icn_gossip::SendMessageCallback =
-                    Arc::new(move |recipient, gossip_msg| {
+                // E2E encryption support (Issue #404)
+                let encryption_enabled = self.config.network.e2e_encryption_enabled;
+                let x25519_secret_bytes = *identity_bundle.x25519_secret().as_bytes();
+                let encryption_sequence_tracker = Arc::new(
+                    icn_net::OutgoingSequenceTracker::new(gossip_store.clone())
+                        .context("Failed to create encryption sequence tracker")?,
+                );
+
+                // Initialize sequence tracker on startup (apply restart safety gap)
+                let tracker_for_init = encryption_sequence_tracker.clone();
+                tokio::spawn(async move {
+                    if let Err(e) = tracker_for_init.load_and_apply_safety_gap().await {
+                        warn!("Failed to apply encryption sequence safety gap: {}", e);
+                    }
+                });
+
+                let send_callback: icn_gossip::SendMessageCallback = Arc::new(
+                    move |recipient, gossip_msg| {
                         let net_handle = network_handle_clone.clone();
                         let from_did = own_did_clone.clone();
                         let keypair = keypair_clone.clone();
                         let sequence_ctr = sequence_counter.clone();
+                        let enc_seq_tracker = encryption_sequence_tracker.clone();
+                        let x25519_secret = x25519_dalek::StaticSecret::from(x25519_secret_bytes);
 
                         // Track metrics based on message type
                         use icn_gossip::GossipMessage;
@@ -445,12 +520,12 @@ impl Supervisor {
 
                         // Spawn async task to send message
                         tokio::spawn(async move {
-                            // Get next sequence number
+                            // Get next sequence number for signed envelope
                             let sequence =
                                 sequence_ctr.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
 
-                            // Create signed envelope
-                            let envelope = match icn_net::SignedEnvelope::from_payload(
+                            // Create inner signed envelope with gossip payload
+                            let inner_envelope = match icn_net::SignedEnvelope::from_payload(
                                 &from_did,
                                 &keypair,
                                 sequence,
@@ -464,17 +539,66 @@ impl Supervisor {
                                 }
                             };
 
-                            // Send signed message
+                            // Determine if we should encrypt (unicast + encryption enabled + peer supports it)
+                            let should_encrypt = if let Some(ref target_did) = recipient {
+                                encryption_enabled
+                                    && net_handle
+                                        .peer_has_capability(
+                                            target_did,
+                                            icn_net::CapabilityFlags::E2E_ENCRYPTION,
+                                        )
+                                        .await
+                            } else {
+                                false // Broadcast cannot be encrypted
+                            };
+
                             let result = if let Some(target_did) = recipient {
                                 // Unicast
-                                let net_msg = icn_net::NetworkMessage::signed(
-                                    Some(target_did.clone()),
-                                    envelope,
-                                );
-                                net_handle.send_message(target_did, net_msg).await
+                                if should_encrypt {
+                                    // Try to encrypt the message
+                                    match try_encrypt_envelope(
+                                        &net_handle,
+                                        &from_did,
+                                        &target_did,
+                                        &inner_envelope,
+                                        &keypair,
+                                        &x25519_secret,
+                                        &enc_seq_tracker,
+                                    )
+                                    .await
+                                    {
+                                        Ok(outer_envelope) => {
+                                            debug!("Sending encrypted gossip to {}", target_did);
+                                            let net_msg = icn_net::NetworkMessage::signed(
+                                                Some(target_did.clone()),
+                                                outer_envelope,
+                                            );
+                                            net_handle.send_message(target_did, net_msg).await
+                                        }
+                                        Err(e) => {
+                                            // Fall back to unencrypted on failure
+                                            debug!(
+                                                "Encryption failed for {}, falling back to signed-only: {}",
+                                                target_did, e
+                                            );
+                                            let net_msg = icn_net::NetworkMessage::signed(
+                                                Some(target_did.clone()),
+                                                inner_envelope,
+                                            );
+                                            net_handle.send_message(target_did, net_msg).await
+                                        }
+                                    }
+                                } else {
+                                    // Send unencrypted (peer doesn't support E2E or encryption disabled)
+                                    let net_msg = icn_net::NetworkMessage::signed(
+                                        Some(target_did.clone()),
+                                        inner_envelope,
+                                    );
+                                    net_handle.send_message(target_did, net_msg).await
+                                }
                             } else {
-                                // Broadcast
-                                let net_msg = icn_net::NetworkMessage::signed(None, envelope);
+                                // Broadcast (cannot be encrypted)
+                                let net_msg = icn_net::NetworkMessage::signed(None, inner_envelope);
                                 net_handle.broadcast(net_msg).await
                             };
 
@@ -482,7 +606,8 @@ impl Supervisor {
                                 warn!("Failed to send gossip message: {}", e);
                             }
                         });
-                    });
+                    },
+                );
 
                 gossip.set_send_callback(send_callback);
 

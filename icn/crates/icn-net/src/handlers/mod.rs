@@ -3,6 +3,7 @@
 //! This module extracts the message handling logic from the main actor loop
 //! into separate, testable handler functions organized by protocol.
 
+pub mod encrypted;
 pub mod handshake;
 pub mod hello;
 pub mod onion;
