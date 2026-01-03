@@ -125,7 +125,13 @@ impl ConnectionContext {
 
                 // Forward to inner handler for signature verification only (no replay check).
                 // Replay protection is already provided by the outer envelope.
-                // Use Box::pin to break the async recursion (signed -> encrypted -> signed_inner)
+                //
+                // Box::pin is required here to break async recursion:
+                // handle_signed() -> handle_encrypted_payload() -> handle_signed_inner()
+                // Without Box::pin, Rust's async state machine would have infinite size
+                // because the future type would recursively contain itself. Box::pin
+                // heap-allocates the future, breaking the infinite type recursion.
+                // Future Rust versions may have better async recursion support.
                 Box::pin(self.handle_signed_inner(decrypted_message, &inner_envelope)).await;
             }
             Err(_) => {

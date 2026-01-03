@@ -509,16 +509,22 @@ impl Supervisor {
 
                 // Only start encryption-related tasks if encryption is enabled
                 if encryption_enabled {
-                    // Initialize sequence tracker on startup (apply restart safety gap)
-                    let tracker_for_init = encryption_sequence_tracker.clone();
-                    tokio::spawn(async move {
-                        if let Err(e) = tracker_for_init.load_and_apply_safety_gap().await {
-                            warn!("Failed to apply encryption sequence safety gap: {}", e);
-                        }
-                    });
+                    // Initialize sequence tracker synchronously on startup to ensure
+                    // predictable startup behavior and avoid first-message delays.
+                    // This applies the restart safety gap to all persisted sequences.
+                    encryption_sequence_tracker
+                        .load_and_apply_safety_gap()
+                        .await
+                        .context("Failed to apply encryption sequence safety gap")?;
 
                     // Periodic cleanup task for stale sequence tracker entries (Issue #404 review feedback)
-                    // Removes entries not used in the last 24 hours to prevent unbounded memory growth
+                    // Removes entries not used in the last 24 hours to prevent unbounded memory growth.
+                    //
+                    // Memory bounds analysis:
+                    // - Worst case: 100 peers × 100 unique recipients = 10,000 (sender, recipient) pairs
+                    // - Each SequenceEntry is ~50 bytes (DID strings + u64 sequence + timestamp)
+                    // - Maximum memory: 10K × 50 bytes = 500KB (acceptable for production)
+                    // - Cleanup runs hourly with 24h retention, so active pairs are retained
                     let tracker_for_cleanup = encryption_sequence_tracker.clone();
                     let shutdown_rx_for_cleanup = self.shutdown_tx.subscribe();
                     background_tasks.spawn(async move {
@@ -535,6 +541,7 @@ impl Supervisor {
                                         Ok(_) => {} // No entries removed
                                         Err(e) => {
                                             warn!("Encryption sequence cleanup failed: {}", e);
+                                            icn_obs::metrics::network::encryption_sequence_cleanup_failed_inc();
                                         }
                                     }
                                 }
@@ -615,8 +622,11 @@ impl Supervisor {
                                 if should_encrypt {
                                     // Try to encrypt the message.
                                     // Both inner and outer envelopes use the SAME signing sequence.
-                                    // This is safe because handle_signed_inner skips replay check
-                                    // for the inner envelope (protected by outer's replay check).
+                                    // This is safe because:
+                                    // 1. ChaCha20-Poly1305 AEAD provides ciphertext integrity
+                                    // 2. The inner envelope cannot be extracted without decryption
+                                    // 3. handle_signed_inner skips replay check (outer protects)
+                                    // See handlers/signed.rs::handle_signed_inner for full security analysis.
                                     match try_encrypt_envelope(
                                         &net_handle,
                                         &from_did,

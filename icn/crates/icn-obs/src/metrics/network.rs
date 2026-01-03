@@ -103,6 +103,10 @@ pub fn init_descriptions() {
         "icn_network_encryption_rejected_total",
         "Total number of encrypted messages rejected by reason"
     );
+    describe_counter!(
+        "icn_network_encryption_sequence_cleanup_failed_total",
+        "Total number of encryption sequence cleanup failures"
+    );
 }
 
 // Simple counters
@@ -238,6 +242,13 @@ pub fn encryption_rejected_inc(reason: &str) {
         "reason" => reason.to_string()
     )
     .increment(1);
+}
+
+/// Increment encryption sequence cleanup failure counter
+///
+/// This metric helps operators detect storage issues before they cause problems.
+pub fn encryption_sequence_cleanup_failed_inc() {
+    counter!("icn_network_encryption_sequence_cleanup_failed_total").increment(1);
 }
 
 // Complex function with custom logic

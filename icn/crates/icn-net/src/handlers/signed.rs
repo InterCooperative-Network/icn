@@ -95,6 +95,18 @@ impl ConnectionContext {
     /// 2. The inner content is authenticated by ChaCha20-Poly1305
     /// 3. The inner and outer envelopes share the same sequence number
     ///
+    /// ## Security Trust Assumption
+    ///
+    /// Skipping inner replay protection is safe because ChaCha20-Poly1305 AEAD
+    /// provides **ciphertext integrity**. An attacker cannot:
+    /// - Extract the inner envelope from an encrypted message (no decryption key)
+    /// - Modify the ciphertext without detection (Poly1305 tag verification fails)
+    /// - Replay the outer encrypted message (outer envelope replay guard)
+    ///
+    /// The only way to obtain the inner envelope is through legitimate decryption,
+    /// which requires the recipient's X25519 private key. Therefore, any inner
+    /// envelope we process was necessarily inside a replay-protected outer envelope.
+    ///
     /// Using the same sequence for both avoids consuming two sequence numbers
     /// per encrypted message.
     pub async fn handle_signed_inner(&self, message: NetworkMessage, envelope: &SignedEnvelope) {
