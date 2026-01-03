@@ -20,6 +20,53 @@ const RATE_CACHE_PREFIX: &str = "oracle:cache:";
 #[allow(dead_code)]
 const RATE_HISTORY_PREFIX: &str = "oracle:history:";
 
+/// Default staleness threshold for sources (5 minutes)
+const DEFAULT_SOURCE_STALENESS_SECS: u64 = 300;
+
+/// Tracking information for each oracle source (Issue #410)
+#[derive(Debug, Clone)]
+pub struct SourceUpdateInfo {
+    /// Last successful update timestamp (Unix seconds)
+    pub last_update: u64,
+    /// Total count of successful updates
+    pub update_count: u64,
+    /// Last rate observed from this source (for debugging)
+    pub last_rate: Option<f64>,
+    /// Last currency pair updated
+    pub last_pair: Option<String>,
+}
+
+impl SourceUpdateInfo {
+    /// Create a new update info with current timestamp
+    fn new() -> Self {
+        Self {
+            last_update: crate::current_timestamp_secs(),
+            update_count: 1,
+            last_rate: None,
+            last_pair: None,
+        }
+    }
+
+    /// Record a new observation from this source
+    fn record_observation(&mut self, rate: f64, pair: &str) {
+        self.last_update = crate::current_timestamp_secs();
+        self.update_count = self.update_count.saturating_add(1);
+        self.last_rate = Some(rate);
+        self.last_pair = Some(pair.to_string());
+    }
+
+    /// Check if this source is stale (hasn't updated in max_age seconds)
+    ///
+    /// Returns true if `(current_time - last_update) > max_age_secs`.
+    ///
+    /// **Note:** Staleness is measured from when the source was last queried
+    /// successfully, not when the source's underlying data was generated.
+    pub fn is_stale(&self, max_age_secs: u64) -> bool {
+        let now = crate::current_timestamp_secs();
+        now.saturating_sub(self.last_update) > max_age_secs
+    }
+}
+
 /// Oracle manager for exchange rate queries with caching and multi-source aggregation
 pub struct OracleManager {
     /// Persistent storage
@@ -30,6 +77,9 @@ pub struct OracleManager {
 
     /// Registered price feed sources (sorted by priority)
     sources: RwLock<Vec<Arc<dyn PriceFeed>>>,
+
+    /// Per-source update tracking (Issue #410)
+    source_updates: RwLock<HashMap<String, SourceUpdateInfo>>,
 
     /// Configuration
     config: OracleConfig,
@@ -47,6 +97,7 @@ impl OracleManager {
             store,
             cache: RwLock::new(HashMap::new()),
             sources: RwLock::new(Vec::new()),
+            source_updates: RwLock::new(HashMap::new()),
             config,
         }
     }
@@ -73,12 +124,17 @@ impl OracleManager {
     }
 
     /// Remove a source by ID
+    ///
+    /// Also cleans up staleness tracking data to prevent memory leaks.
     pub async fn unregister_source(&self, source_id: &str) -> bool {
         let mut sources = self.sources.write().await;
         let initial_len = sources.len();
         sources.retain(|s| s.source_id() != source_id);
         let removed = sources.len() < initial_len;
         if removed {
+            // Clean up staleness tracking data
+            let mut updates = self.source_updates.write().await;
+            updates.remove(source_id);
             info!(source_id = %source_id, "Unregistered price feed source");
         }
         removed
@@ -87,20 +143,54 @@ impl OracleManager {
     /// List registered sources with their status
     pub async fn list_sources(&self) -> Vec<SourceInfo> {
         let sources = self.sources.read().await;
+        let updates = self.source_updates.read().await;
         let mut infos = Vec::with_capacity(sources.len());
 
         for source in sources.iter() {
             let is_healthy = source.health_check().await;
+            let last_update = updates.get(source.source_id()).map(|info| info.last_update);
             infos.push(SourceInfo {
                 source_id: source.source_id().to_string(),
                 name: source.name().to_string(),
                 priority: source.priority(),
                 is_healthy,
-                last_update: None, // TODO: track last successful update per source
+                last_update,
             });
         }
 
         infos
+    }
+
+    /// Check if a source is stale (hasn't provided data recently)
+    ///
+    /// Returns `None` if the source has never provided data.
+    /// Uses default staleness threshold if `max_age_secs` is not specified.
+    pub async fn is_source_stale(
+        &self,
+        source_id: &str,
+        max_age_secs: Option<u64>,
+    ) -> Option<bool> {
+        let updates = self.source_updates.read().await;
+        updates
+            .get(source_id)
+            .map(|info| info.is_stale(max_age_secs.unwrap_or(DEFAULT_SOURCE_STALENESS_SECS)))
+    }
+
+    /// Get update info for a specific source
+    pub async fn get_source_update_info(&self, source_id: &str) -> Option<SourceUpdateInfo> {
+        let updates = self.source_updates.read().await;
+        updates.get(source_id).cloned()
+    }
+
+    /// Get all stale sources (sources that haven't updated within threshold)
+    pub async fn get_stale_sources(&self, max_age_secs: Option<u64>) -> Vec<String> {
+        let updates = self.source_updates.read().await;
+        let threshold = max_age_secs.unwrap_or(DEFAULT_SOURCE_STALENESS_SECS);
+        updates
+            .iter()
+            .filter(|(_, info)| info.is_stale(threshold))
+            .map(|(id, _)| id.clone())
+            .collect()
     }
 
     // === Rate Queries ===
@@ -138,6 +228,7 @@ impl OracleManager {
     pub async fn refresh_rate(&self, pair: &CurrencyPair) -> OracleResult<ExchangeRate> {
         let sources = self.sources.read().await;
         let mut observations = Vec::new();
+        let mut successful_sources: Vec<(String, f64)> = Vec::new();
 
         debug!(pair = %pair, source_count = sources.len(), "Fetching rate from sources");
 
@@ -151,6 +242,7 @@ impl OracleManager {
                             rate = obs.rate,
                             "Got rate from source"
                         );
+                        successful_sources.push((source.source_id().to_string(), obs.rate));
                         observations.push(obs);
                     }
                     Err(e) => {
@@ -162,6 +254,23 @@ impl OracleManager {
                         );
                     }
                 }
+            }
+        }
+
+        // Record successful observations for staleness tracking (Issue #410)
+        if !successful_sources.is_empty() {
+            let mut updates = self.source_updates.write().await;
+            let pair_key = pair.key();
+            for (source_id, rate) in successful_sources {
+                updates
+                    .entry(source_id)
+                    .and_modify(|info| info.record_observation(rate, &pair_key))
+                    .or_insert_with(|| {
+                        let mut info = SourceUpdateInfo::new();
+                        info.last_rate = Some(rate);
+                        info.last_pair = Some(pair_key.clone());
+                        info
+                    });
             }
         }
 
@@ -654,5 +763,174 @@ mod tests {
         // Note: This will fail because we cleared the cache
         // In real usage, the cache would still have the old value
         assert!(rate2.is_err() || rate2.as_ref().map(|r| r.is_stale).unwrap_or(false));
+    }
+
+    // === Issue #410: Source Staleness Tracking Tests ===
+
+    #[tokio::test]
+    async fn test_source_update_tracking() {
+        let oracle = OracleManager::new(test_store());
+        let source =
+            Arc::new(MockPriceFeed::new("test", "Test", 50).with_rate("hours", "USD", 25.0));
+        oracle.register_source(source).await;
+
+        // Before any rate fetch, no update info
+        let info = oracle.get_source_update_info("test").await;
+        assert!(info.is_none());
+
+        // Fetch rate - should record update
+        let pair = CurrencyPair::new("hours", "USD");
+        let _ = oracle.get_rate(&pair).await.expect("should get rate");
+
+        // Now we should have update info
+        let info = oracle.get_source_update_info("test").await;
+        assert!(info.is_some());
+        let info = info.unwrap();
+        assert_eq!(info.update_count, 1);
+        assert_eq!(info.last_rate, Some(25.0));
+        assert_eq!(info.last_pair, Some("hours:USD".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_source_staleness_check() {
+        let oracle = OracleManager::new(test_store());
+        let source =
+            Arc::new(MockPriceFeed::new("test", "Test", 50).with_rate("hours", "USD", 25.0));
+        oracle.register_source(source).await;
+
+        // Unknown source returns None
+        let is_stale = oracle.is_source_stale("unknown", None).await;
+        assert!(is_stale.is_none());
+
+        // Fetch rate to record update
+        let pair = CurrencyPair::new("hours", "USD");
+        let _ = oracle.get_rate(&pair).await.expect("should get rate");
+
+        // Just updated - not stale with reasonable threshold
+        let is_stale = oracle.is_source_stale("test", Some(1000)).await;
+        assert_eq!(is_stale, Some(false));
+
+        // Also not stale at 0 threshold since update just happened (0 > 0 is false)
+        // This tests the edge case where update time == current time
+        let is_stale = oracle.is_source_stale("test", Some(0)).await;
+        assert_eq!(is_stale, Some(false)); // 0 elapsed > 0 threshold = false
+    }
+
+    #[tokio::test]
+    async fn test_list_sources_includes_last_update() {
+        let oracle = OracleManager::new(test_store());
+        let source =
+            Arc::new(MockPriceFeed::new("test", "Test Source", 50).with_rate("hours", "USD", 25.0));
+        oracle.register_source(source).await;
+
+        // Before any fetch, last_update should be None
+        let sources = oracle.list_sources().await;
+        assert_eq!(sources.len(), 1);
+        assert!(sources[0].last_update.is_none());
+
+        // After fetch, last_update should be set
+        let pair = CurrencyPair::new("hours", "USD");
+        let _ = oracle.get_rate(&pair).await.expect("should get rate");
+
+        let sources = oracle.list_sources().await;
+        assert_eq!(sources.len(), 1);
+        assert!(sources[0].last_update.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_update_count_increments() {
+        let oracle = OracleManager::new(test_store());
+        let source =
+            Arc::new(MockPriceFeed::new("test", "Test", 50).with_rate("hours", "USD", 25.0));
+        oracle.register_source(source).await;
+
+        let pair = CurrencyPair::new("hours", "USD");
+
+        // Multiple refreshes should increment count
+        for i in 1..=3 {
+            let _ = oracle.refresh_rate(&pair).await.expect("should get rate");
+            let info = oracle.get_source_update_info("test").await.unwrap();
+            assert_eq!(info.update_count, i);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_stale_sources() {
+        let oracle = OracleManager::new(test_store());
+        oracle
+            .register_source(Arc::new(
+                MockPriceFeed::new("s1", "Source 1", 50).with_rate("hours", "USD", 25.0),
+            ))
+            .await;
+        oracle
+            .register_source(Arc::new(
+                MockPriceFeed::new("s2", "Source 2", 50).with_rate("hours", "USD", 26.0),
+            ))
+            .await;
+
+        // Fetch to record updates
+        let pair = CurrencyPair::new("hours", "USD");
+        let _ = oracle.get_rate(&pair).await.expect("should get rate");
+
+        // With reasonable threshold - nothing stale (just updated)
+        let stale = oracle.get_stale_sources(Some(1000)).await;
+        assert!(stale.is_empty());
+
+        // With 0 threshold - still not stale since update time == current time
+        // (0 elapsed > 0 threshold = false)
+        let stale = oracle.get_stale_sources(Some(0)).await;
+        assert!(stale.is_empty());
+    }
+
+    #[test]
+    fn test_source_update_info_staleness_logic() {
+        // Test the is_stale method directly with controlled timestamps
+        let now = crate::current_timestamp_secs();
+
+        // Source that was just updated
+        let fresh = SourceUpdateInfo {
+            last_update: now,
+            update_count: 1,
+            last_rate: Some(25.0),
+            last_pair: Some("hours:USD".to_string()),
+        };
+        assert!(!fresh.is_stale(60)); // Not stale within 60 seconds
+
+        // Source that was updated 10 minutes ago
+        let old = SourceUpdateInfo {
+            last_update: now.saturating_sub(600),
+            update_count: 5,
+            last_rate: Some(25.0),
+            last_pair: Some("hours:USD".to_string()),
+        };
+        assert!(old.is_stale(300)); // Stale if threshold is 5 minutes (300s)
+        assert!(!old.is_stale(900)); // Not stale if threshold is 15 minutes (900s)
+    }
+
+    #[tokio::test]
+    async fn test_unregister_cleans_up_tracking_data() {
+        let oracle = OracleManager::new(test_store());
+        let source =
+            Arc::new(MockPriceFeed::new("test", "Test", 50).with_rate("hours", "USD", 25.0));
+        oracle.register_source(source).await;
+
+        // Fetch rate to record update
+        let pair = CurrencyPair::new("hours", "USD");
+        let _ = oracle.get_rate(&pair).await.expect("should get rate");
+
+        // Verify tracking data exists
+        let info = oracle.get_source_update_info("test").await;
+        assert!(info.is_some());
+
+        // Unregister source
+        let removed = oracle.unregister_source("test").await;
+        assert!(removed);
+
+        // Tracking data should be cleaned up
+        let info = oracle.get_source_update_info("test").await;
+        assert!(
+            info.is_none(),
+            "Tracking data should be removed on unregister"
+        );
     }
 }
