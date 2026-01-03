@@ -102,6 +102,16 @@ async fn resolve_address(addr_str: &str) -> Result<SocketAddr> {
 /// 1. Serialize inner SignedEnvelope
 /// 2. Encrypt with recipient's X25519 public key
 /// 3. Wrap in outer SignedEnvelope with PayloadType::Encrypted
+///
+/// # Sequence Numbers
+///
+/// Two separate sequence spaces are used:
+/// - `outer_sequence`: From the signing sequence counter, used for replay protection
+/// - Encryption nonce: From OutgoingSequenceTracker, used for ChaCha20-Poly1305 nonce derivation
+///
+/// These must be separate because:
+/// - Signing sequences are per-sender (shared across all recipients)
+/// - Encryption nonces are per-(sender, recipient) pair for nonce uniqueness
 async fn try_encrypt_envelope(
     net_handle: &icn_net::NetworkHandle,
     from_did: &Did,
@@ -110,6 +120,7 @@ async fn try_encrypt_envelope(
     keypair: &icn_identity::KeyPair,
     x25519_secret: &x25519_dalek::StaticSecret,
     enc_seq_tracker: &icn_net::OutgoingSequenceTracker,
+    outer_sequence: u64,
 ) -> Result<icn_net::SignedEnvelope> {
     // Get recipient's X25519 public key
     let recipient_x25519_bytes = net_handle
@@ -123,6 +134,7 @@ async fn try_encrypt_envelope(
         .context("Failed to serialize inner envelope")?;
 
     // Get encryption sequence number (persistent, unique per sender-recipient pair)
+    // This is separate from signing sequence - used only for nonce derivation
     let enc_sequence = enc_seq_tracker.next_sequence(from_did, to_did).await?;
 
     // Encrypt the inner envelope
@@ -141,10 +153,11 @@ async fn try_encrypt_envelope(
         .context("Failed to serialize encrypted envelope")?;
 
     // Create outer signed envelope with PayloadType::Encrypted
+    // Uses signing sequence (outer_sequence) for replay protection, NOT encryption sequence
     let outer_envelope = icn_net::SignedEnvelope::new(
         from_did,
         keypair,
-        enc_sequence, // Use encryption sequence for outer envelope too
+        outer_sequence,
         icn_net::PayloadType::Encrypted,
         encrypted_bytes,
     )
@@ -494,6 +507,34 @@ impl Supervisor {
                     }
                 });
 
+                // Periodic cleanup task for stale sequence tracker entries (Issue #404 review feedback)
+                // Removes entries not used in the last 24 hours to prevent unbounded memory growth
+                let tracker_for_cleanup = encryption_sequence_tracker.clone();
+                let shutdown_rx_for_cleanup = self.shutdown_tx.subscribe();
+                background_tasks.spawn(async move {
+                    let mut interval = tokio::time::interval(std::time::Duration::from_secs(3600));
+                    let mut shutdown_rx = shutdown_rx_for_cleanup;
+                    loop {
+                        tokio::select! {
+                            _ = interval.tick() => {
+                                match tracker_for_cleanup.cleanup_stale_entries(86400).await {
+                                    Ok(removed) if removed > 0 => {
+                                        debug!("Cleaned up {} stale encryption sequence entries", removed);
+                                    }
+                                    Ok(_) => {} // No entries removed
+                                    Err(e) => {
+                                        warn!("Encryption sequence cleanup failed: {}", e);
+                                    }
+                                }
+                            }
+                            _ = shutdown_rx.recv() => {
+                                debug!("Encryption sequence cleanup task shutting down");
+                                break;
+                            }
+                        }
+                    }
+                });
+
                 let send_callback: icn_gossip::SendMessageCallback = Arc::new(
                     move |recipient, gossip_msg| {
                         let net_handle = network_handle_clone.clone();
@@ -555,6 +596,10 @@ impl Supervisor {
                             let result = if let Some(target_did) = recipient {
                                 // Unicast
                                 if should_encrypt {
+                                    // Get outer sequence from signing counter (separate from encryption nonce)
+                                    let outer_sequence = sequence_ctr
+                                        .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+
                                     // Try to encrypt the message
                                     match try_encrypt_envelope(
                                         &net_handle,
@@ -564,6 +609,7 @@ impl Supervisor {
                                         &keypair,
                                         &x25519_secret,
                                         &enc_seq_tracker,
+                                        outer_sequence,
                                     )
                                     .await
                                     {
@@ -576,8 +622,8 @@ impl Supervisor {
                                             net_handle.send_message(target_did, net_msg).await
                                         }
                                         Err(e) => {
-                                            // Fall back to unencrypted on failure
-                                            debug!(
+                                            // Fall back to unencrypted on failure (security degradation)
+                                            warn!(
                                                 "Encryption failed for {}, falling back to signed-only: {}",
                                                 target_did, e
                                             );
