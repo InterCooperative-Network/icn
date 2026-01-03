@@ -17,19 +17,31 @@
 //!
 //! **Mitigations in Place**:
 //! - Steward vouching: A trusted steward must vouch for each enrollment
-//! - Steward rate limits: Stewards can only vouch for N identities per day
 //! - Trust decay: Stewards who vouch for bad actors lose reputation
 //! - VUI collision detection: Bloom filter catches exact duplicate attempts
+//!
+//! **Mitigations Implemented (Not Yet Enforced)**:
+//! - Steward rate limits: Infrastructure in `StewardProfile` for limiting vouches/day
+//!   (requires connecting steward profiles to gateway - see TODO below)
 //!
 //! **Future Improvements** (when SDIS is fully implemented):
 //! - Threshold PRF computation over biometric data
 //! - Social vouching with web-of-trust verification
 //! - Zero-knowledge proofs of unique personhood
+//! - Steward rate limit enforcement in enrollment flow
 //!
 //! ## Race Condition Prevention (Issue #397)
 //!
 //! VUI registration uses atomic check-and-reserve to prevent TOCTOU race
-//! conditions. See `check_and_reserve_vui()` in icn-steward.
+//! conditions on a single node. See `check_and_reserve_vui()` in icn-steward.
+//!
+//! **Multi-Node Limitation**: In multi-node K3s deployments, concurrent enrollments
+//! on different gateway pods can still both succeed before gossip synchronizes the
+//! VUI registry. For production, consider:
+//! - Distributed lock (etcd/Redis) during enrollment
+//! - Unique constraint at storage layer
+//! - Single VUI registration pod with sticky routing
+//! - Optimistic locking with retry logic
 
 use actix_web::{post, web, HttpRequest, HttpResponse};
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};

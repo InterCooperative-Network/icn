@@ -1117,7 +1117,7 @@ mod tests {
 
         let (r1, r2, r3) = tokio::join!(task1, task2, task3);
 
-        let results = vec![
+        let results = [
             r1.unwrap().unwrap(),
             r2.unwrap().unwrap(),
             r3.unwrap().unwrap(),
