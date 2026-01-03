@@ -474,6 +474,15 @@ pub async fn verify_level2(
         )));
     }
 
+    // TODO(#396): Enforce steward vouch rate limiting here
+    // Once steward profiles are connected to the gateway, check:
+    //   let remaining = steward_profile.vouches_remaining_today(config.max_vouches_per_steward_per_day);
+    //   if remaining == 0 {
+    //       return Err(GatewayError::RateLimitExceeded("Steward vouch quota exceeded"));
+    //   }
+    //   steward_profile.record_vouch(config.max_vouches_per_steward_per_day);
+    // Infrastructure exists in StewardProfile but requires integration.
+
     let now = icn_time::current_timestamp_secs();
 
     session.level = 2;

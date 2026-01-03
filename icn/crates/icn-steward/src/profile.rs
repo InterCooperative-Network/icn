@@ -217,12 +217,15 @@ impl StewardProfile {
         self.stats.recoveries_participated += 1;
     }
 
+    /// Seconds per UTC day for vouch rate limiting calculations
+    const SECONDS_PER_DAY: u64 = 86400;
+
     /// Check if steward can vouch today (Issue #396 - sybil resistance)
     ///
     /// Returns the number of vouches remaining for today, or 0 if limit reached.
     pub fn vouches_remaining_today(&self, max_per_day: u32) -> u32 {
         let now = icn_time::current_timestamp_secs();
-        let day_start = now - (now % 86400); // Start of current UTC day
+        let day_start = now - (now % Self::SECONDS_PER_DAY); // Start of current UTC day
 
         let (last_day, count) = self.stats.daily_vouches;
         if last_day == day_start {
@@ -238,7 +241,7 @@ impl StewardProfile {
     /// Returns `Some(remaining)` if vouch was allowed, `None` if limit exceeded.
     pub fn record_vouch(&mut self, max_per_day: u32) -> Option<u32> {
         let now = icn_time::current_timestamp_secs();
-        let day_start = now - (now % 86400); // Start of current UTC day
+        let day_start = now - (now % Self::SECONDS_PER_DAY); // Start of current UTC day
 
         let (last_day, count) = self.stats.daily_vouches;
         let new_count = if last_day == day_start {
@@ -446,8 +449,9 @@ mod tests {
         profile.activate(1000, None);
 
         // Simulate yesterday's vouches
-        let yesterday = icn_time::current_timestamp_secs() - 86400;
-        let yesterday_day_start = yesterday - (yesterday % 86400);
+        const SECONDS_PER_DAY: u64 = 86400;
+        let yesterday = icn_time::current_timestamp_secs() - SECONDS_PER_DAY;
+        let yesterday_day_start = yesterday - (yesterday % SECONDS_PER_DAY);
         profile.stats.daily_vouches = (yesterday_day_start, 10);
 
         // Should have full quota today since it's a new day

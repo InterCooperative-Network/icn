@@ -675,14 +675,18 @@ impl StewardActor {
                     .register(vui_hash, registered_by, self.own_did.clone())
                 {
                     Ok(()) => {
-                        // Broadcast new VUI
+                        // Broadcast new VUI for distributed sync
+                        // NOTE: Signatures are empty pending implementation of steward signing
+                        // infrastructure. VUI sync is currently authenticated at the transport
+                        // layer (QUIC/TLS with DID binding). TODO: Add message-level signatures
+                        // for defense-in-depth when multi-steward federation is implemented.
                         if let Some(ref send_gossip) = self.send_gossip {
                             let now = icn_time::current_timestamp_secs();
                             let msg = crate::gossip::VuiSyncMessage::NewVui {
                                 from_did: self.own_did.clone(),
                                 vui_hash,
                                 timestamp: now,
-                                signature: vec![], // Would be signed in production
+                                signature: vec![], // Transport-layer auth; message signing TODO
                             };
                             send_gossip(crate::gossip::StewardMessage::VuiSync(msg));
                         }
