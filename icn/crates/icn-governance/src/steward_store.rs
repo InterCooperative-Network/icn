@@ -13,7 +13,7 @@ use lru::LruCache;
 use serde::{Deserialize, Serialize};
 use std::num::NonZeroUsize;
 use std::sync::RwLock;
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 
 /// Storage key prefixes
 const PREFIX_STEWARD: &[u8] = b"steward/records/";
@@ -60,36 +60,36 @@ impl Default for InMemoryStewardStore {
 #[async_trait]
 impl StewardStoreBackend for InMemoryStewardStore {
     async fn get(&self, key: &[u8]) -> anyhow::Result<Option<Vec<u8>>> {
-        let data = self.data.read().unwrap_or_else(|poisoned| {
-            warn!("Data lock poisoned, recovering");
-            poisoned.into_inner()
-        });
+        let data = self.data.read().map_err(|_| {
+            error!("Lock poisoned in steward store get - previous holder panicked");
+            anyhow::anyhow!("Lock poisoned - store may contain corrupt state")
+        })?;
         Ok(data.get(key).cloned())
     }
 
     async fn set(&self, key: &[u8], value: &[u8]) -> anyhow::Result<()> {
-        let mut data = self.data.write().unwrap_or_else(|poisoned| {
-            warn!("Data lock poisoned, recovering");
-            poisoned.into_inner()
-        });
+        let mut data = self.data.write().map_err(|_| {
+            error!("Lock poisoned in steward store set - previous holder panicked");
+            anyhow::anyhow!("Lock poisoned - store may contain corrupt state")
+        })?;
         data.insert(key.to_vec(), value.to_vec());
         Ok(())
     }
 
     async fn delete(&self, key: &[u8]) -> anyhow::Result<()> {
-        let mut data = self.data.write().unwrap_or_else(|poisoned| {
-            warn!("Data lock poisoned, recovering");
-            poisoned.into_inner()
-        });
+        let mut data = self.data.write().map_err(|_| {
+            error!("Lock poisoned in steward store delete - previous holder panicked");
+            anyhow::anyhow!("Lock poisoned - store may contain corrupt state")
+        })?;
         data.remove(key);
         Ok(())
     }
 
     async fn list_keys(&self, prefix: &[u8]) -> anyhow::Result<Vec<Vec<u8>>> {
-        let data = self.data.read().unwrap_or_else(|poisoned| {
-            warn!("Data lock poisoned, recovering");
-            poisoned.into_inner()
-        });
+        let data = self.data.read().map_err(|_| {
+            error!("Lock poisoned in steward store list_keys - previous holder panicked");
+            anyhow::anyhow!("Lock poisoned - store may contain corrupt state")
+        })?;
         let keys: Vec<Vec<u8>> = data
             .keys()
             .filter(|k| k.starts_with(prefix))
@@ -143,13 +143,11 @@ impl<B: StewardStoreBackend> StewardStore<B> {
         // Update indexes
         self.update_indexes(record).await?;
 
-        // Update cache
-        {
-            let mut cache = self.cache.write().unwrap_or_else(|poisoned| {
-                warn!("Cache lock poisoned, recovering");
-                poisoned.into_inner()
-            });
+        // Update cache (non-critical - skip on poison)
+        if let Ok(mut cache) = self.cache.write() {
             cache.put(*steward_id, record.clone());
+        } else {
+            warn!("Cache lock poisoned in store - skipping cache update");
         }
 
         debug!("Stored steward record: {}", record.steward_id);
@@ -160,15 +158,13 @@ impl<B: StewardStoreBackend> StewardStore<B> {
     pub async fn get(&self, steward_id: &StewardId) -> anyhow::Result<Option<StewardRecord>> {
         let id_bytes = steward_id.as_bytes();
 
-        // Check cache first
-        {
-            let mut cache = self.cache.write().unwrap_or_else(|poisoned| {
-                warn!("Cache lock poisoned, recovering");
-                poisoned.into_inner()
-            });
+        // Check cache first (non-critical - skip on poison)
+        if let Ok(mut cache) = self.cache.write() {
             if let Some(record) = cache.get(id_bytes) {
                 return Ok(Some(record.clone()));
             }
+        } else {
+            warn!("Cache lock poisoned in get - falling back to backend");
         }
 
         // Load from backend
@@ -178,13 +174,11 @@ impl<B: StewardStoreBackend> StewardStore<B> {
         if let Some(data) = self.backend.get(&key).await? {
             let record: StewardRecord = serde_json::from_slice(&data)?;
 
-            // Update cache
-            {
-                let mut cache = self.cache.write().unwrap_or_else(|poisoned| {
-                    warn!("Cache lock poisoned, recovering");
-                    poisoned.into_inner()
-                });
+            // Update cache (non-critical - skip on poison)
+            if let Ok(mut cache) = self.cache.write() {
                 cache.put(*id_bytes, record.clone());
+            } else {
+                warn!("Cache lock poisoned in get - skipping cache update");
             }
 
             Ok(Some(record))
@@ -397,13 +391,11 @@ impl<B: StewardStoreBackend> StewardStore<B> {
             key.extend_from_slice(steward_id.as_bytes());
             self.backend.delete(&key).await?;
 
-            // Remove from cache
-            {
-                let mut cache = self.cache.write().unwrap_or_else(|poisoned| {
-                    warn!("Cache lock poisoned, recovering");
-                    poisoned.into_inner()
-                });
+            // Remove from cache (non-critical - skip on poison)
+            if let Ok(mut cache) = self.cache.write() {
                 cache.pop(steward_id.as_bytes());
+            } else {
+                warn!("Cache lock poisoned in delete - skipping cache update");
             }
 
             debug!("Deleted steward record: {steward_id}");
