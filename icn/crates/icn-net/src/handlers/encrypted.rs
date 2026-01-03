@@ -56,6 +56,7 @@ impl ConnectionContext {
                 "Encrypted message not for us: to={}, own_did={}",
                 encrypted.to, self.own_did
             );
+            icn_obs::metrics::network::encryption_rejected_inc("wrong_recipient");
             return;
         }
 
@@ -69,6 +70,7 @@ impl ConnectionContext {
                         "Cannot decrypt: no X25519 key for sender {} (Hello not exchanged?)",
                         envelope.from
                     );
+                    icn_obs::metrics::network::encryption_rejected_inc("missing_peer_key");
                     return;
                 }
             }
@@ -85,6 +87,7 @@ impl ConnectionContext {
                     "Decryption failed from {} (seq={}): {}",
                     envelope.from, encrypted.sequence, e
                 );
+                icn_obs::metrics::network::encryption_rejected_inc("decryption_failed");
                 // Could record Byzantine violation here for decryption failures
                 // (may indicate tampering or key mismatch)
                 return;

@@ -120,6 +120,7 @@ impl ConnectionContext {
                     .await
                     .record_violation(&envelope.from, violation, message_hash);
             }
+            icn_obs::metrics::network::encryption_rejected_inc("invalid_inner_signature");
             return;
         }
 

@@ -90,6 +90,19 @@ pub fn init_descriptions() {
         "icn_network_replay_guard_peers",
         "Number of peers tracked in replay guard"
     );
+    // E2E Encryption metrics (Issue #404)
+    describe_counter!(
+        "icn_network_encrypted_messages_sent_total",
+        "Total number of E2E encrypted messages sent"
+    );
+    describe_counter!(
+        "icn_network_encryption_fallback_total",
+        "Total number of fallbacks from encrypted to signed-only transmission"
+    );
+    describe_counter!(
+        "icn_network_encryption_rejected_total",
+        "Total number of encrypted messages rejected by reason"
+    );
 }
 
 // Simple counters
@@ -196,6 +209,35 @@ pub fn peer_capability_set(capability: &str, count: u64) {
 /// Set the number of peers tracked in replay guard
 pub fn replay_guard_peers_set(value: u64) {
     gauge!("icn_network_replay_guard_peers").set(value as f64);
+}
+
+// E2E Encryption metrics (Issue #404)
+
+/// Increment encrypted messages sent counter
+pub fn encrypted_messages_sent_inc() {
+    counter!("icn_network_encrypted_messages_sent_total").increment(1);
+}
+
+/// Increment encryption fallback counter with reason
+///
+/// Reasons: "encryption_error", "peer_key_missing", "serialization_failed"
+pub fn encryption_fallback_inc(reason: &str) {
+    counter!(
+        "icn_network_encryption_fallback_total",
+        "reason" => reason.to_string()
+    )
+    .increment(1);
+}
+
+/// Increment encrypted message rejection counter with reason
+///
+/// Reasons: "missing_peer_key", "wrong_recipient", "decryption_failed", "invalid_inner_signature"
+pub fn encryption_rejected_inc(reason: &str) {
+    counter!(
+        "icn_network_encryption_rejected_total",
+        "reason" => reason.to_string()
+    )
+    .increment(1);
 }
 
 // Complex function with custom logic

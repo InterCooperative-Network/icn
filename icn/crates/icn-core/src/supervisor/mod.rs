@@ -539,6 +539,11 @@ impl Supervisor {
                                     }
                                 }
                                 _ = shutdown_rx.recv() => {
+                                    debug!("Running final encryption sequence cleanup before shutdown");
+                                    // Run final cleanup to remove any accumulated entries
+                                    if let Err(e) = tracker_for_cleanup.cleanup_stale_entries(86400).await {
+                                        warn!("Final encryption sequence cleanup failed: {}", e);
+                                    }
                                     debug!("Encryption sequence cleanup task shutting down");
                                     break;
                                 }
@@ -626,6 +631,8 @@ impl Supervisor {
                                     {
                                         Ok(outer_envelope) => {
                                             debug!("Sending encrypted gossip to {}", target_did);
+                                            icn_obs::metrics::network::encrypted_messages_sent_inc(
+                                            );
                                             let net_msg = icn_net::NetworkMessage::signed(
                                                 Some(target_did.clone()),
                                                 outer_envelope,
@@ -634,9 +641,13 @@ impl Supervisor {
                                         }
                                         Err(e) => {
                                             // Fall back to unencrypted on failure (security degradation)
+                                            // This is logged at WARN level for visibility in production
                                             warn!(
                                                 "Encryption failed for {}, falling back to signed-only: {}",
                                                 target_did, e
+                                            );
+                                            icn_obs::metrics::network::encryption_fallback_inc(
+                                                "encryption_error",
                                             );
                                             let net_msg = icn_net::NetworkMessage::signed(
                                                 Some(target_did.clone()),
