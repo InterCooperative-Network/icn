@@ -449,9 +449,8 @@ mod tests {
         profile.activate(1000, None);
 
         // Simulate yesterday's vouches
-        const SECONDS_PER_DAY: u64 = 86400;
-        let yesterday = icn_time::current_timestamp_secs() - SECONDS_PER_DAY;
-        let yesterday_day_start = yesterday - (yesterday % SECONDS_PER_DAY);
+        let yesterday = icn_time::current_timestamp_secs() - StewardProfile::SECONDS_PER_DAY;
+        let yesterday_day_start = yesterday - (yesterday % StewardProfile::SECONDS_PER_DAY);
         profile.stats.daily_vouches = (yesterday_day_start, 10);
 
         // Should have full quota today since it's a new day
