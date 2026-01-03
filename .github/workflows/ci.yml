@@ -153,13 +153,22 @@ jobs:
         with:
           workspaces: "icn -> target"
 
-      - name: Install cargo-audit
-        run: cargo install cargo-audit --locked
+      - name: Install security tools
+        run: |
+          cargo install cargo-audit --locked
+          cargo install cargo-deny --locked
 
-      - name: Run security audit
+      - name: Run cargo-audit
         run: cargo audit
         working-directory: ./icn
-        continue-on-error: true  # Don't fail CI on advisories yet, just warn
+
+      - name: Run cargo-deny advisories check
+        run: cargo deny check advisories
+        working-directory: ./icn
+
+      - name: Run cargo-deny licenses check
+        run: cargo deny check licenses
+        working-directory: ./icn
 
   build:
     name: Build Release
