@@ -17,6 +17,11 @@ use tempfile::TempDir;
 use tokio::sync::RwLock;
 use tokio::time::sleep;
 
+/// Get an available port for testing (avoids CI port conflicts)
+fn get_available_port() -> u16 {
+    portpicker::pick_unused_port().expect("No available ports")
+}
+
 /// Helper to create a test node with full actor stack
 struct TestNode {
     did: icn_identity::Did,
@@ -448,9 +453,13 @@ impl TestNode {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_two_node_contract_deployment() {
-    // Create two nodes
-    let node_a = TestNode::new(19001).await.expect("Failed to create node A");
-    let node_b = TestNode::new(19002).await.expect("Failed to create node B");
+    // Create two nodes with dynamic ports to avoid CI conflicts
+    let node_a = TestNode::new(get_available_port())
+        .await
+        .expect("Failed to create node A");
+    let node_b = TestNode::new(get_available_port())
+        .await
+        .expect("Failed to create node B");
 
     // Establish mutual trust (score 0.6 * 0.7 = 0.42 > MIN_DEPLOYER_TRUST 0.4)
     // Note: Trust graph applies 70% direct + 30% transitive weighting
@@ -465,7 +474,7 @@ async fn test_two_node_contract_deployment() {
 
     // Connect nodes unidirectionally (Node A dials Node B)
     // QUIC connections are bidirectional, so only one dial is needed
-    let addr_b: std::net::SocketAddr = "127.0.0.1:19002".parse().unwrap();
+    let addr_b = node_b.listen_addr;
     node_a
         .network_handle
         .dial(addr_b, node_b.did.clone())
@@ -550,9 +559,13 @@ async fn test_two_node_contract_deployment() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "Flaky in CI: QUIC stream failures in containerized environment"]
 async fn test_contract_execution_after_deployment() {
-    // Create two nodes
-    let node_a = TestNode::new(19003).await.expect("Failed to create node A");
-    let node_b = TestNode::new(19004).await.expect("Failed to create node B");
+    // Create two nodes with dynamic ports
+    let node_a = TestNode::new(get_available_port())
+        .await
+        .expect("Failed to create node A");
+    let node_b = TestNode::new(get_available_port())
+        .await
+        .expect("Failed to create node B");
 
     // Establish mutual trust (score 0.6 * 0.7 = 0.42 > MIN_DEPLOYER_TRUST 0.4)
     // Note: Trust graph applies 70% direct + 30% transitive weighting
@@ -567,7 +580,7 @@ async fn test_contract_execution_after_deployment() {
 
     // Connect nodes unidirectionally (Node A dials Node B)
     // QUIC connections are bidirectional, so only one dial is needed
-    let addr_b: std::net::SocketAddr = "127.0.0.1:19004".parse().unwrap();
+    let addr_b = node_b.listen_addr;
     node_a
         .network_handle
         .dial(addr_b, node_b.did.clone())
@@ -647,9 +660,13 @@ async fn test_contract_execution_after_deployment() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_untrusted_deployer_rejected() {
-    // Create two nodes
-    let node_a = TestNode::new(19005).await.expect("Failed to create node A");
-    let node_b = TestNode::new(19006).await.expect("Failed to create node B");
+    // Create two nodes with dynamic ports
+    let node_a = TestNode::new(get_available_port())
+        .await
+        .expect("Failed to create node A");
+    let node_b = TestNode::new(get_available_port())
+        .await
+        .expect("Failed to create node B");
 
     // Node B trusts A with LOW score (0.2 < MIN_DEPLOYER_TRUST 0.4)
     node_b
@@ -658,7 +675,7 @@ async fn test_untrusted_deployer_rejected() {
         .expect("Failed to set low trust");
 
     // Connect nodes
-    let addr_b: std::net::SocketAddr = "127.0.0.1:19006".parse().unwrap();
+    let addr_b = node_b.listen_addr;
     node_a
         .network_handle
         .dial(addr_b, node_b.did.clone())
@@ -717,14 +734,14 @@ async fn test_untrusted_deployer_rejected() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "Flaky in CI: QUIC stream failures in containerized environment"]
 async fn test_three_participant_contract_deployment() {
-    // Create three nodes (Alice, Bob, Carol)
-    let node_a = TestNode::new(19007)
+    // Create three nodes (Alice, Bob, Carol) with dynamic ports
+    let node_a = TestNode::new(get_available_port())
         .await
         .expect("Failed to create node A (Alice)");
-    let node_b = TestNode::new(19008)
+    let node_b = TestNode::new(get_available_port())
         .await
         .expect("Failed to create node B (Bob)");
-    let node_c = TestNode::new(19009)
+    let node_c = TestNode::new(get_available_port())
         .await
         .expect("Failed to create node C (Carol)");
 
@@ -928,9 +945,13 @@ async fn test_three_participant_contract_deployment() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "Flaky in CI: QUIC stream failures in containerized environment"]
 async fn test_contract_with_state_variables() {
-    // Create two nodes
-    let node_a = TestNode::new(19010).await.expect("Failed to create node A");
-    let node_b = TestNode::new(19011).await.expect("Failed to create node B");
+    // Create two nodes with dynamic ports
+    let node_a = TestNode::new(get_available_port())
+        .await
+        .expect("Failed to create node A");
+    let node_b = TestNode::new(get_available_port())
+        .await
+        .expect("Failed to create node B");
 
     // Establish mutual trust (score 0.6 * 0.7 = 0.42 > MIN_DEPLOYER_TRUST 0.4)
     node_a
@@ -944,7 +965,7 @@ async fn test_contract_with_state_variables() {
 
     // Connect nodes unidirectionally (Node A dials Node B)
     // QUIC connections are bidirectional, so only one dial is needed
-    let addr_b: std::net::SocketAddr = "127.0.0.1:19011".parse().unwrap();
+    let addr_b = node_b.listen_addr;
     node_a
         .network_handle
         .dial(addr_b, node_b.did.clone())
@@ -1137,9 +1158,13 @@ async fn test_contract_with_state_variables() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_contract_with_ledger_integration() {
-    // Create two nodes
-    let node_a = TestNode::new(19012).await.expect("Failed to create node A");
-    let node_b = TestNode::new(19013).await.expect("Failed to create node B");
+    // Create two nodes with dynamic ports
+    let node_a = TestNode::new(get_available_port())
+        .await
+        .expect("Failed to create node A");
+    let node_b = TestNode::new(get_available_port())
+        .await
+        .expect("Failed to create node B");
 
     // Establish mutual trust (score 0.6 * 0.7 = 0.42 > MIN_DEPLOYER_TRUST 0.4)
     node_a
@@ -1153,7 +1178,7 @@ async fn test_contract_with_ledger_integration() {
 
     // Connect nodes unidirectionally (Node A dials Node B)
     // QUIC connections are bidirectional, so only one dial is needed
-    let addr_b: std::net::SocketAddr = "127.0.0.1:19013".parse().unwrap();
+    let addr_b = node_b.listen_addr;
     node_a
         .network_handle
         .dial(addr_b, node_b.did.clone())
@@ -1269,9 +1294,13 @@ async fn test_contract_with_ledger_integration() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_large_contract_near_limits() {
-    // Create two nodes
-    let node_a = TestNode::new(19014).await.expect("Failed to create node A");
-    let node_b = TestNode::new(19015).await.expect("Failed to create node B");
+    // Create two nodes with dynamic ports
+    let node_a = TestNode::new(get_available_port())
+        .await
+        .expect("Failed to create node A");
+    let node_b = TestNode::new(get_available_port())
+        .await
+        .expect("Failed to create node B");
 
     // Establish mutual trust
     node_a
@@ -1284,7 +1313,7 @@ async fn test_large_contract_near_limits() {
         .expect("Failed to trust A from B");
 
     // Connect nodes - A dials B
-    let addr_b: std::net::SocketAddr = "127.0.0.1:19015".parse().unwrap();
+    let addr_b = node_b.listen_addr;
     node_a
         .network_handle
         .dial(addr_b, node_b.did.clone())
