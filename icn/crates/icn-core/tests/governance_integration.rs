@@ -25,6 +25,11 @@ use std::time::Duration;
 use tokio::sync::RwLock;
 use tracing::{info, warn};
 
+/// Get an available port for testing
+fn get_available_port() -> u16 {
+    portpicker::pick_unused_port().expect("No available ports")
+}
+
 const GOVERNANCE_TOPIC: &str = "governance:proposal";
 
 /// Helper to create a test node with governance support
@@ -493,7 +498,7 @@ where
 }
 
 #[tokio::test]
-#[ignore] // Uses hardcoded ports (16001-16002) - may conflict in CI; passes locally
+#[ignore] // Flaky: Domain propagation timeout in CI - needs investigation
 async fn test_governance_proposal_lifecycle() -> Result<()> {
     // Install rustls crypto provider
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
@@ -507,9 +512,9 @@ async fn test_governance_proposal_lifecycle() -> Result<()> {
     info!("=== Starting governance integration test ===");
 
     // Spawn three nodes
-    let node1 = TestNode::spawn(16001).await?;
-    let node2 = TestNode::spawn(16002).await?;
-    let node3 = TestNode::spawn(16003).await?;
+    let node1 = TestNode::spawn(get_available_port()).await?;
+    let node2 = TestNode::spawn(get_available_port()).await?;
+    let node3 = TestNode::spawn(get_available_port()).await?;
 
     info!("Node 1 DID: {}", node1.did);
     info!("Node 2 DID: {}", node2.did);

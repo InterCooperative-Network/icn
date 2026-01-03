@@ -26,6 +26,11 @@ use tempfile::TempDir;
 use tokio::sync::RwLock;
 use tracing::{info, warn};
 
+/// Get an available port for testing
+fn get_available_port() -> u16 {
+    portpicker::pick_unused_port().expect("No available ports")
+}
+
 /// Helper to create a test node with full recovery infrastructure
 struct RecoveryTestNode {
     keypair: KeyPair,
@@ -379,7 +384,6 @@ impl RecoveryTestNode {
 }
 
 #[tokio::test]
-#[ignore = "Uses hardcoded ports (6001-6004) - flaky in CI due to port conflicts; passes locally"]
 async fn test_full_recovery_flow() -> Result<()> {
     // Install rustls crypto provider
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
@@ -397,10 +401,10 @@ async fn test_full_recovery_flow() -> Result<()> {
     // - Alice2 (Alice's new identity after device loss)
     // - Bob (trustee #1)
     // - Carol (trustee #2)
-    let alice = RecoveryTestNode::spawn(6001).await?;
-    let alice2 = RecoveryTestNode::spawn(6002).await?;
-    let bob = RecoveryTestNode::spawn(6003).await?;
-    let carol = RecoveryTestNode::spawn(6004).await?;
+    let alice = RecoveryTestNode::spawn(get_available_port()).await?;
+    let alice2 = RecoveryTestNode::spawn(get_available_port()).await?;
+    let bob = RecoveryTestNode::spawn(get_available_port()).await?;
+    let carol = RecoveryTestNode::spawn(get_available_port()).await?;
 
     let alice_did = alice.did.clone();
     let alice2_did = alice2.did.clone();

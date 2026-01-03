@@ -23,6 +23,11 @@ use std::time::Duration;
 use tokio::sync::{Mutex, RwLock};
 use tracing::{info, warn};
 
+/// Get an available port for testing
+fn get_available_port() -> u16 {
+    portpicker::pick_unused_port().expect("No available ports")
+}
+
 /// Type alias for notification records: (topic, hash, subscriber_did)
 type NotificationList = Vec<(String, [u8; 32], icn_identity::Did)>;
 
@@ -246,7 +251,7 @@ impl TestNode {
 }
 
 #[tokio::test]
-#[ignore] // Requires network interfaces and QUIC handshake
+#[ignore] // Uses blocking_write() in async context - needs refactoring to use async handlers
 async fn test_response_handler_triggers_notifications_across_nodes() -> Result<()> {
     // Install rustls crypto provider
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
@@ -260,9 +265,9 @@ async fn test_response_handler_triggers_notifications_across_nodes() -> Result<(
     info!("=== Starting multi-node gossip convergence test ===");
 
     // Spawn three nodes
-    let node1 = TestNode::spawn(16001).await?;
-    let node2 = TestNode::spawn(16002).await?;
-    let node3 = TestNode::spawn(16003).await?;
+    let node1 = TestNode::spawn(get_available_port()).await?;
+    let node2 = TestNode::spawn(get_available_port()).await?;
+    let node3 = TestNode::spawn(get_available_port()).await?;
 
     info!("Node 1 DID: {}", node1.did);
     info!("Node 2 DID: {}", node2.did);
@@ -405,7 +410,7 @@ async fn test_response_handler_triggers_notifications_across_nodes() -> Result<(
 }
 
 #[tokio::test]
-#[ignore] // Requires network interfaces
+#[ignore] // Uses blocking_write() in async context - needs refactoring to use async handlers
 async fn test_response_handler_enforces_max_entries_across_nodes() -> Result<()> {
     // Install rustls crypto provider
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
@@ -419,8 +424,8 @@ async fn test_response_handler_enforces_max_entries_across_nodes() -> Result<()>
     info!("=== Starting max entries enforcement test ===");
 
     // Spawn two nodes
-    let node1 = TestNode::spawn(16004).await?;
-    let node2 = TestNode::spawn(16005).await?;
+    let node1 = TestNode::spawn(get_available_port()).await?;
+    let node2 = TestNode::spawn(get_available_port()).await?;
 
     // Create topic with small max_entries limit on Node 2
     let topic = "test:bounded";
