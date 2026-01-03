@@ -217,12 +217,38 @@ mod tests {
 
     #[test]
     fn test_tracing_config_defaults() {
+        // Save and clear env var to test true default
+        let saved = std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT").ok();
+        std::env::remove_var("OTEL_EXPORTER_OTLP_ENDPOINT");
+
         let config = TracingConfig::default();
         assert!(!config.enabled);
         assert_eq!(config.otlp_endpoint, "http://localhost:4317");
         assert!((config.sampling_rate - 0.1).abs() < f64::EPSILON);
         assert_eq!(config.service_name, "icnd");
         assert!(config.node_did.is_none());
+
+        // Restore env var if it was set
+        if let Some(val) = saved {
+            std::env::set_var("OTEL_EXPORTER_OTLP_ENDPOINT", val);
+        }
+    }
+
+    #[test]
+    fn test_tracing_config_respects_env_var() {
+        // Save current value
+        let saved = std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT").ok();
+
+        // Set env var and verify it's used
+        std::env::set_var("OTEL_EXPORTER_OTLP_ENDPOINT", "http://tempo:4317");
+        let config = TracingConfig::default();
+        assert_eq!(config.otlp_endpoint, "http://tempo:4317");
+
+        // Restore env var
+        match saved {
+            Some(val) => std::env::set_var("OTEL_EXPORTER_OTLP_ENDPOINT", val),
+            None => std::env::remove_var("OTEL_EXPORTER_OTLP_ENDPOINT"),
+        }
     }
 
     #[test]

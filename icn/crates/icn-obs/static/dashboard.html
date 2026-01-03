@@ -130,7 +130,8 @@
     </div>
 
     <script>
-        // Use relative URL for same-origin metrics, or override via global variable
+        // Use relative URL for same-origin requests (dashboard and metrics both served by icnd on :8080)
+        // For embedding in external sites, set window.METRICS_URL = 'http://icnd.monitoring:9100/metrics'
         const METRICS_URL = window.METRICS_URL || '/metrics';
         const HEALTH_URL = window.HEALTH_URL || '/health';
         const REFRESH_INTERVAL = 5000; // 5 seconds
