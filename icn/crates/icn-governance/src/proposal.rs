@@ -656,7 +656,8 @@ impl Proposal {
             anyhow::bail!("Can only start deliberation from Draft state");
         }
 
-        let now = icn_time::current_timestamp_secs();
+        let now = icn_time::try_current_timestamp_secs()
+            .map_err(|e| anyhow::anyhow!("Cannot start deliberation: {e}"))?;
 
         self.state = ProposalState::Deliberation {
             started_at: now,
@@ -674,7 +675,8 @@ impl Proposal {
     /// Can only be called after the deliberation period has ended.
     /// For early transition (before deliberation ends), use `force_end_deliberation()`.
     pub fn end_deliberation_and_open(&mut self, voting_period_seconds: u64) -> anyhow::Result<()> {
-        let now = icn_time::current_timestamp_secs();
+        let now = icn_time::try_current_timestamp_secs()
+            .map_err(|e| anyhow::anyhow!("Cannot end deliberation: {e}"))?;
 
         match &self.state {
             ProposalState::Deliberation { ends_at, .. } => {
@@ -708,7 +710,8 @@ impl Proposal {
             anyhow::bail!("Can only force end deliberation from Deliberation state");
         }
 
-        let now = icn_time::current_timestamp_secs();
+        let now = icn_time::try_current_timestamp_secs()
+            .map_err(|e| anyhow::anyhow!("Cannot force end deliberation: {e}"))?;
 
         self.state = ProposalState::Open {
             opened_at: now,
@@ -731,7 +734,8 @@ impl Proposal {
             anyhow::bail!("Can only open proposals in Draft state");
         }
 
-        let now = icn_time::current_timestamp_secs();
+        let now = icn_time::try_current_timestamp_secs()
+            .map_err(|e| anyhow::anyhow!("Cannot open proposal: {e}"))?;
 
         self.state = ProposalState::Open {
             opened_at: now,
@@ -753,7 +757,8 @@ impl Proposal {
         }
 
         self.state = final_state;
-        self.updated_at = icn_time::current_timestamp_secs();
+        self.updated_at = icn_time::try_current_timestamp_secs()
+            .map_err(|e| anyhow::anyhow!("Cannot close proposal: {e}"))?;
 
         Ok(())
     }
@@ -767,7 +772,8 @@ impl Proposal {
             anyhow::bail!("Cannot cancel a closed proposal");
         }
 
-        let now = icn_time::current_timestamp_secs();
+        let now = icn_time::try_current_timestamp_secs()
+            .map_err(|e| anyhow::anyhow!("Cannot cancel proposal: {e}"))?;
 
         self.state = ProposalState::Cancelled { cancelled_at: now };
         self.updated_at = now;
@@ -784,7 +790,8 @@ impl Proposal {
             anyhow::bail!("Cannot veto a closed proposal");
         }
 
-        let now = icn_time::current_timestamp_secs();
+        let now = icn_time::try_current_timestamp_secs()
+            .map_err(|e| anyhow::anyhow!("Cannot veto proposal: {e}"))?;
 
         self.state = ProposalState::Vetoed {
             vetoed_at: now,
@@ -808,7 +815,8 @@ impl Proposal {
             anyhow::bail!("Can only force close proposals in Deliberation or Open state");
         }
 
-        let now = icn_time::current_timestamp_secs();
+        let now = icn_time::try_current_timestamp_secs()
+            .map_err(|e| anyhow::anyhow!("Cannot force close proposal: {e}"))?;
 
         self.state = ProposalState::ForceClosed {
             closed_at: now,

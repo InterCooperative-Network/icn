@@ -64,8 +64,9 @@ impl JournalEntryBuilder {
         // Validate that amounts are positive
         validate_positive_amounts(&self.accounts)?;
 
-        // Get current timestamp in milliseconds
-        let timestamp = icn_time::current_timestamp_millis();
+        // Get current timestamp in milliseconds (security-critical: reject if clock is invalid)
+        let timestamp = icn_time::try_current_timestamp_millis()
+            .map_err(|e| anyhow::anyhow!("Cannot create journal entry: {e}"))?;
 
         let mut entry = JournalEntry {
             id: None,
