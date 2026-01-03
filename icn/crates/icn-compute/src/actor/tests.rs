@@ -380,10 +380,8 @@ async fn test_placement_negotiation_multi_executor() {
         "Expected 4 offers from executors above trust threshold"
     );
 
-    // Find the highest score
-    let highest = offers
-        .iter()
-        .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+    // Find the highest score (using total_cmp for deterministic NaN handling)
+    let highest = offers.iter().max_by(|a, b| a.1.total_cmp(&b.1));
 
     if let Some((winner_did, winner_score)) = highest {
         tracing::info!(

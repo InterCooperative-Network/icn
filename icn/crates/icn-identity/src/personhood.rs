@@ -39,11 +39,26 @@
 //! - **Multi-attestation**: Multiple POP attestations strengthen identity
 //! - **Auditable**: Full key rotation history preserved
 
+use std::sync::LazyLock;
+
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::anchor::Anchor;
 use crate::Did;
+
+/// Well-known genesis issuer DID (valid Ed25519 public key from seed [0u8; 32])
+/// This is used as the issuer for genesis attestations.
+/// Parsed once at first use to validate the constant.
+///
+/// SAFETY: GENESIS_ISSUER_DID is a compile-time constant that is always valid.
+/// The expect here runs once during initialization, not in response to user input.
+#[allow(clippy::expect_used)]
+static GENESIS_ISSUER: LazyLock<Did> = LazyLock::new(|| {
+    PersonhoodAnchor::GENESIS_ISSUER_DID
+        .parse()
+        .expect("GENESIS_ISSUER_DID constant must be valid")
+});
 
 /// Personhood Anchor - Layer 0 of the Commons identity model
 ///
@@ -376,12 +391,8 @@ impl PersonhoodAnchor {
         let now = icn_time::current_timestamp_secs();
 
         // Create a genesis attestation using well-known genesis issuer
-        // SAFETY: GENESIS_ISSUER_DID is a compile-time constant that is always valid
-        #[allow(clippy::expect_used)]
-        let genesis_issuer: Did = Self::GENESIS_ISSUER_DID
-            .parse()
-            .expect("Genesis issuer DID is valid");
-        let attestation = POPAttestation::genesis(&anchor.id, genesis_issuer, reason);
+        // Uses static GENESIS_ISSUER which is parsed and validated once at first use
+        let attestation = POPAttestation::genesis(&anchor.id, GENESIS_ISSUER.clone(), reason);
 
         Self {
             anchor,

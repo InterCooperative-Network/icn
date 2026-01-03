@@ -378,9 +378,25 @@ pub struct PlacementOffer {
     pub offered_at: u64,
 }
 
+impl Eq for PlacementOffer {}
+
+impl Ord for PlacementOffer {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        // Use total_cmp for deterministic ordering even with NaN values
+        // (NaN is considered greater than all other values per IEEE 754 total ordering)
+        // Compare all fields for consistency with derived PartialEq
+        self.score
+            .total_cmp(&other.score)
+            .then_with(|| self.cost.cmp(&other.cost))
+            .then_with(|| self.estimated_start.cmp(&other.estimated_start))
+            .then_with(|| self.offered_at.cmp(&other.offered_at))
+            .then_with(|| self.executor.cmp(&other.executor))
+    }
+}
+
 impl PartialOrd for PlacementOffer {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.score.partial_cmp(&other.score)
+        Some(self.cmp(other))
     }
 }
 
@@ -957,5 +973,56 @@ mod tests {
         // Release GPU
         capacity.release(&gpu_profile);
         assert!(capacity.gpu_devices[0].available);
+    }
+
+    #[test]
+    fn test_placement_offer_nan_handling() {
+        // Test that NaN scores are handled deterministically without panics
+        let offer_nan = PlacementOffer {
+            executor: "did:icn:nan".into(),
+            score: f64::NAN,
+            cost: 100,
+            estimated_start: 1000,
+            offered_at: 1000,
+        };
+
+        let offer_valid = PlacementOffer {
+            executor: "did:icn:valid".into(),
+            score: 0.5,
+            cost: 100,
+            estimated_start: 1000,
+            offered_at: 1000,
+        };
+
+        let offer_neg_inf = PlacementOffer {
+            executor: "did:icn:neg_inf".into(),
+            score: f64::NEG_INFINITY,
+            cost: 100,
+            estimated_start: 1000,
+            offered_at: 1000,
+        };
+
+        // NaN should be greater than all other values (per IEEE 754 total ordering)
+        assert!(offer_nan > offer_valid);
+        assert!(offer_nan > offer_neg_inf);
+        assert!(offer_neg_inf < offer_valid);
+
+        // Sorting should not panic and should be deterministic
+        let mut offers = [
+            offer_valid.clone(),
+            offer_nan.clone(),
+            offer_neg_inf.clone(),
+        ];
+        offers.sort();
+
+        // After sorting: -Inf < 0.5 < NaN
+        assert_eq!(offers[0].score, f64::NEG_INFINITY);
+        assert_eq!(offers[1].score, 0.5);
+        assert!(offers[2].score.is_nan());
+
+        // Test Eq/Ord consistency: two offers with same fields should be equal
+        let offer_copy = offer_valid.clone();
+        assert_eq!(offer_valid, offer_copy);
+        assert!(offer_valid.cmp(&offer_copy) == std::cmp::Ordering::Equal);
     }
 }

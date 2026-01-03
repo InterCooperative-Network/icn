@@ -218,7 +218,8 @@ fn bench_offer_evaluation(c: &mut Criterion) {
 
                 b.iter(|| {
                     let mut offers = offers.clone();
-                    offers.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
+                    // Use total_cmp for deterministic ordering (handles NaN)
+                    offers.sort_by(|a, b| b.score.total_cmp(&a.score));
                     black_box(offers)
                 });
             },
