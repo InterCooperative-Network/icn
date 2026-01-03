@@ -1,4 +1,10 @@
 //! Governance storage layer
+//!
+//! ## Lock Poisoning Handling
+//!
+//! This module uses fail-fast semantics for lock poisoning in storage operations.
+//! Poisoned locks indicate a prior panic and possibly corrupt state.
+//! Silent recovery would risk data integrity issues.
 
 use crate::{
     Delegation, DelegationId, DelegationScope, GovernanceDomain, GovernanceDomainId, Proposal,
@@ -8,7 +14,7 @@ use anyhow::Result;
 use icn_identity::Did;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::warn;
+use tracing::{error, warn};
 
 /// Result of a paginated query
 #[derive(Debug, Clone)]
@@ -149,27 +155,27 @@ impl Default for InMemoryGovernanceStore {
 
 impl GovernanceStore for InMemoryGovernanceStore {
     fn store_domain(&self, domain: &GovernanceDomain) -> Result<()> {
-        let mut domains = self.domains.write().unwrap_or_else(|poisoned| {
-            warn!("Domains lock poisoned, recovering");
-            poisoned.into_inner()
-        });
+        let mut domains = self.domains.write().map_err(|e| {
+            error!("Domains lock poisoned in store_domain: {e}");
+            anyhow::anyhow!("Lock poisoned in store_domain - store may contain corrupt state")
+        })?;
         domains.insert(domain.id.0.clone(), domain.clone());
         Ok(())
     }
 
     fn get_domain(&self, id: &GovernanceDomainId) -> Result<Option<GovernanceDomain>> {
-        let domains = self.domains.read().unwrap_or_else(|poisoned| {
-            warn!("Domains lock poisoned, recovering");
-            poisoned.into_inner()
-        });
+        let domains = self.domains.read().map_err(|e| {
+            error!("Domains lock poisoned in get_domain: {e}");
+            anyhow::anyhow!("Lock poisoned in get_domain - store may contain corrupt state")
+        })?;
         Ok(domains.get(&id.0).cloned())
     }
 
     fn list_domains(&self) -> Result<Vec<GovernanceDomain>> {
-        let domains = self.domains.read().unwrap_or_else(|poisoned| {
-            warn!("Domains lock poisoned, recovering");
-            poisoned.into_inner()
-        });
+        let domains = self.domains.read().map_err(|e| {
+            error!("Domains lock poisoned in list_domains: {e}");
+            anyhow::anyhow!("Lock poisoned in list_domains - store may contain corrupt state")
+        })?;
         Ok(domains.values().cloned().collect())
     }
 
@@ -178,10 +184,12 @@ impl GovernanceStore for InMemoryGovernanceStore {
         cursor: Option<&str>,
         limit: usize,
     ) -> Result<PaginatedResult<GovernanceDomain>> {
-        let domains = self.domains.read().unwrap_or_else(|poisoned| {
-            warn!("Domains lock poisoned, recovering");
-            poisoned.into_inner()
-        });
+        let domains = self.domains.read().map_err(|e| {
+            error!("Domains lock poisoned in list_domains_paginated: {e}");
+            anyhow::anyhow!(
+                "Lock poisoned in list_domains_paginated - store may contain corrupt state"
+            )
+        })?;
 
         // Parse cursor as offset (format: "offset:<number>")
         // Log invalid cursors for debugging but default to 0 for resilience
@@ -227,27 +235,27 @@ impl GovernanceStore for InMemoryGovernanceStore {
     }
 
     fn store_proposal(&self, proposal: &Proposal) -> Result<()> {
-        let mut proposals = self.proposals.write().unwrap_or_else(|poisoned| {
-            warn!("Proposals lock poisoned, recovering");
-            poisoned.into_inner()
-        });
+        let mut proposals = self.proposals.write().map_err(|e| {
+            error!("Proposals lock poisoned in store_proposal: {e}");
+            anyhow::anyhow!("Lock poisoned in store_proposal - store may contain corrupt state")
+        })?;
         proposals.insert(proposal.id.0.clone(), proposal.clone());
         Ok(())
     }
 
     fn get_proposal(&self, id: &ProposalId) -> Result<Option<Proposal>> {
-        let proposals = self.proposals.read().unwrap_or_else(|poisoned| {
-            warn!("Proposals lock poisoned, recovering");
-            poisoned.into_inner()
-        });
+        let proposals = self.proposals.read().map_err(|e| {
+            error!("Proposals lock poisoned in get_proposal: {e}");
+            anyhow::anyhow!("Lock poisoned in get_proposal - store may contain corrupt state")
+        })?;
         Ok(proposals.get(&id.0).cloned())
     }
 
     fn list_proposals(&self, domain_id: &GovernanceDomainId) -> Result<Vec<Proposal>> {
-        let proposals = self.proposals.read().unwrap_or_else(|poisoned| {
-            warn!("Proposals lock poisoned, recovering");
-            poisoned.into_inner()
-        });
+        let proposals = self.proposals.read().map_err(|e| {
+            error!("Proposals lock poisoned in list_proposals: {e}");
+            anyhow::anyhow!("Lock poisoned in list_proposals - store may contain corrupt state")
+        })?;
         Ok(proposals
             .values()
             .filter(|p| p.domain_id == *domain_id)
@@ -256,10 +264,10 @@ impl GovernanceStore for InMemoryGovernanceStore {
     }
 
     fn store_vote(&self, vote: &Vote) -> Result<()> {
-        let mut votes = self.votes.write().unwrap_or_else(|poisoned| {
-            warn!("Votes lock poisoned, recovering");
-            poisoned.into_inner()
-        });
+        let mut votes = self.votes.write().map_err(|e| {
+            error!("Votes lock poisoned in store_vote: {e}");
+            anyhow::anyhow!("Lock poisoned in store_vote - store may contain corrupt state")
+        })?;
         let proposal_votes = votes.entry(vote.proposal_id.0.clone()).or_default();
 
         // Replace existing vote from same voter (allow vote changes)
@@ -270,20 +278,20 @@ impl GovernanceStore for InMemoryGovernanceStore {
     }
 
     fn get_vote(&self, proposal_id: &ProposalId, voter: &Did) -> Result<Option<Vote>> {
-        let votes = self.votes.read().unwrap_or_else(|poisoned| {
-            warn!("Votes lock poisoned, recovering");
-            poisoned.into_inner()
-        });
+        let votes = self.votes.read().map_err(|e| {
+            error!("Votes lock poisoned in get_vote: {e}");
+            anyhow::anyhow!("Lock poisoned in get_vote - store may contain corrupt state")
+        })?;
         Ok(votes
             .get(&proposal_id.0)
             .and_then(|v| v.iter().find(|vote| vote.voter == *voter).cloned()))
     }
 
     fn list_votes(&self, proposal_id: &ProposalId) -> Result<Vec<Vote>> {
-        let votes = self.votes.read().unwrap_or_else(|poisoned| {
-            warn!("Votes lock poisoned, recovering");
-            poisoned.into_inner()
-        });
+        let votes = self.votes.read().map_err(|e| {
+            error!("Votes lock poisoned in list_votes: {e}");
+            anyhow::anyhow!("Lock poisoned in list_votes - store may contain corrupt state")
+        })?;
         Ok(votes.get(&proposal_id.0).cloned().unwrap_or_default())
     }
 
@@ -295,27 +303,29 @@ impl GovernanceStore for InMemoryGovernanceStore {
     // === Delegation Methods ===
 
     fn store_delegation(&self, delegation: &Delegation) -> Result<()> {
-        let mut delegations = self.delegations.write().unwrap_or_else(|poisoned| {
-            warn!("Delegations lock poisoned, recovering");
-            poisoned.into_inner()
-        });
+        let mut delegations = self.delegations.write().map_err(|e| {
+            error!("Delegations lock poisoned in store_delegation: {e}");
+            anyhow::anyhow!("Lock poisoned in store_delegation - store may contain corrupt state")
+        })?;
         delegations.insert(delegation.id.0.clone(), delegation.clone());
         Ok(())
     }
 
     fn get_delegation(&self, id: &DelegationId) -> Result<Option<Delegation>> {
-        let delegations = self.delegations.read().unwrap_or_else(|poisoned| {
-            warn!("Delegations lock poisoned, recovering");
-            poisoned.into_inner()
-        });
+        let delegations = self.delegations.read().map_err(|e| {
+            error!("Delegations lock poisoned in get_delegation: {e}");
+            anyhow::anyhow!("Lock poisoned in get_delegation - store may contain corrupt state")
+        })?;
         Ok(delegations.get(&id.0).cloned())
     }
 
     fn get_delegations_from(&self, delegator: &Did) -> Result<Vec<Delegation>> {
-        let delegations = self.delegations.read().unwrap_or_else(|poisoned| {
-            warn!("Delegations lock poisoned, recovering");
-            poisoned.into_inner()
-        });
+        let delegations = self.delegations.read().map_err(|e| {
+            error!("Delegations lock poisoned in get_delegations_from: {e}");
+            anyhow::anyhow!(
+                "Lock poisoned in get_delegations_from - store may contain corrupt state"
+            )
+        })?;
         Ok(delegations
             .values()
             .filter(|d| d.delegator == *delegator)
@@ -324,10 +334,10 @@ impl GovernanceStore for InMemoryGovernanceStore {
     }
 
     fn get_delegations_to(&self, delegate: &Did) -> Result<Vec<Delegation>> {
-        let delegations = self.delegations.read().unwrap_or_else(|poisoned| {
-            warn!("Delegations lock poisoned, recovering");
-            poisoned.into_inner()
-        });
+        let delegations = self.delegations.read().map_err(|e| {
+            error!("Delegations lock poisoned in get_delegations_to: {e}");
+            anyhow::anyhow!("Lock poisoned in get_delegations_to - store may contain corrupt state")
+        })?;
         Ok(delegations
             .values()
             .filter(|d| d.delegate == *delegate)
@@ -341,10 +351,12 @@ impl GovernanceStore for InMemoryGovernanceStore {
         scope: &DelegationScope,
     ) -> Result<Option<Delegation>> {
         let now = icn_time::current_timestamp_secs();
-        let delegations = self.delegations.read().unwrap_or_else(|poisoned| {
-            warn!("Delegations lock poisoned, recovering");
-            poisoned.into_inner()
-        });
+        let delegations = self.delegations.read().map_err(|e| {
+            error!("Delegations lock poisoned in get_active_delegation: {e}");
+            anyhow::anyhow!(
+                "Lock poisoned in get_active_delegation - store may contain corrupt state"
+            )
+        })?;
         Ok(delegations
             .values()
             .find(|d| d.delegator == *delegator && d.scope == *scope && d.is_active(now))
@@ -352,10 +364,10 @@ impl GovernanceStore for InMemoryGovernanceStore {
     }
 
     fn revoke_delegation(&self, id: &DelegationId, revoked_at: Timestamp) -> Result<()> {
-        let mut delegations = self.delegations.write().unwrap_or_else(|poisoned| {
-            warn!("Delegations lock poisoned, recovering");
-            poisoned.into_inner()
-        });
+        let mut delegations = self.delegations.write().map_err(|e| {
+            error!("Delegations lock poisoned in revoke_delegation: {e}");
+            anyhow::anyhow!("Lock poisoned in revoke_delegation - store may contain corrupt state")
+        })?;
         if let Some(delegation) = delegations.get_mut(&id.0) {
             delegation.revoked_at = Some(revoked_at);
         }
@@ -364,10 +376,12 @@ impl GovernanceStore for InMemoryGovernanceStore {
 
     fn list_active_delegations(&self) -> Result<Vec<Delegation>> {
         let now = icn_time::current_timestamp_secs();
-        let delegations = self.delegations.read().unwrap_or_else(|poisoned| {
-            warn!("Delegations lock poisoned, recovering");
-            poisoned.into_inner()
-        });
+        let delegations = self.delegations.read().map_err(|e| {
+            error!("Delegations lock poisoned in list_active_delegations: {e}");
+            anyhow::anyhow!(
+                "Lock poisoned in list_active_delegations - store may contain corrupt state"
+            )
+        })?;
         Ok(delegations
             .values()
             .filter(|d| d.is_active(now))
@@ -1000,5 +1014,50 @@ mod tests {
         // Should no longer be in active list
         let active = store.list_active_delegations().unwrap();
         assert_eq!(active.len(), 0);
+    }
+
+    // ========== Lock Poisoning Tests ==========
+
+    #[test]
+    fn test_lock_poison_fails_fast() {
+        // Test that poisoned locks result in errors rather than silent recovery
+        let store = InMemoryGovernanceStore::new();
+        let config = GovernanceConfig::cooperative_default();
+        let domain = GovernanceDomain::new("Test Coop".to_string(), config);
+
+        // Store should work initially
+        store.store_domain(&domain).unwrap();
+
+        // Poison the domains lock by panicking while holding it
+        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _guard = store.domains.write().unwrap();
+            panic!("intentional panic to poison lock");
+        }));
+
+        // Verify the lock is actually poisoned
+        assert!(
+            store.domains.write().is_err(),
+            "domains lock should be poisoned after panic"
+        );
+
+        // Now all operations that use this lock should fail
+        let result = store.store_domain(&domain);
+        assert!(
+            result.is_err(),
+            "store_domain should fail with poisoned lock"
+        );
+        assert!(
+            result.unwrap_err().to_string().contains("Lock poisoned"),
+            "error should mention lock poisoning"
+        );
+
+        let result = store.get_domain(&domain.id);
+        assert!(result.is_err(), "get_domain should fail with poisoned lock");
+
+        let result = store.list_domains();
+        assert!(
+            result.is_err(),
+            "list_domains should fail with poisoned lock"
+        );
     }
 }
