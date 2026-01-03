@@ -24,6 +24,9 @@ use crate::{
     CapabilityFlags, Discovery, PeerInfo, SessionManager,
 };
 
+/// Max age for rate limiter buckets before cleanup (5 minutes)
+const RATE_LIMITER_BUCKET_MAX_AGE_SECS: u64 = 300;
+
 /// Per-peer connection metadata
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PeerConnectionInfo {
@@ -1044,6 +1047,10 @@ impl NetworkActor {
 
         let mut shutdown_rx = shutdown_tx.subscribe();
 
+        // Cleanup interval for replay guard and rate limiter (60 seconds)
+        let mut cleanup_interval = tokio::time::interval(tokio::time::Duration::from_secs(60));
+        cleanup_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
         loop {
             tokio::select! {
                 msg = self.rx.recv() => {
@@ -1054,6 +1061,31 @@ impl NetworkActor {
                             break;
                         }
                     }
+                }
+                _ = cleanup_interval.tick() => {
+                    // Cleanup stale replay guard entries using single write lock
+                    let (peer_count_before, peer_count_after) = {
+                        let mut guard = self.replay_guard.write().await;
+                        let before = guard.peer_count();
+                        guard.cleanup();
+                        let after = guard.peer_count();
+                        (before, after)
+                    };
+
+                    // Update metric
+                    icn_obs::metrics::network::replay_guard_peers_set(peer_count_after as u64);
+
+                    if peer_count_before != peer_count_after {
+                        info!(
+                            "Replay guard cleanup: {} -> {} peers",
+                            peer_count_before, peer_count_after
+                        );
+                    }
+
+                    // Also cleanup stale rate limiter buckets
+                    self.rate_limiter
+                        .cleanup_old_buckets(std::time::Duration::from_secs(RATE_LIMITER_BUCKET_MAX_AGE_SECS))
+                        .await;
                 }
                 _ = shutdown_rx.recv() => {
                     info!("Network actor received shutdown signal");

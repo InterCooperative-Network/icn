@@ -86,6 +86,10 @@ pub fn init_descriptions() {
         "icn_network_version_negotiation_success_total",
         "Total number of successful version negotiations"
     );
+    describe_gauge!(
+        "icn_network_replay_guard_peers",
+        "Number of peers tracked in replay guard"
+    );
 }
 
 // Simple counters
@@ -187,6 +191,11 @@ pub fn peer_capability_set(capability: &str, count: u64) {
         "capability" => capability.to_string()
     )
     .set(count as f64);
+}
+
+/// Set the number of peers tracked in replay guard
+pub fn replay_guard_peers_set(value: u64) {
+    gauge!("icn_network_replay_guard_peers").set(value as f64);
 }
 
 // Complex function with custom logic
