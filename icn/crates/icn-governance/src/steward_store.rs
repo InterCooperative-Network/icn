@@ -5,6 +5,17 @@
 //! - Indexes (by DID, holder, jurisdiction, status)
 //! - LRU caching for performance
 //! - Lifecycle operations (suspend, reinstate, retire, revoke)
+//!
+//! ## Lock Poisoning Handling
+//!
+//! This module uses two patterns for lock poison recovery:
+//!
+//! - **Backend operations** (get, set, delete, list_keys): Fail-fast with error.
+//!   Poisoned locks indicate a prior panic and possibly corrupt state.
+//!   Silent recovery would risk data integrity issues.
+//!
+//! - **Cache operations**: Graceful degradation. Cache is non-critical; poison
+//!   is logged but the operation continues using the backend directly.
 
 use crate::steward::{StewardId, StewardRecord, StewardStatus};
 use async_trait::async_trait;
