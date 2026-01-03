@@ -847,7 +847,10 @@ mod tests {
         // Store operation should fail
         let record = create_test_record();
         let result = store.store(&record).await;
-        assert!(result.is_err(), "store should fail when backend is poisoned");
+        assert!(
+            result.is_err(),
+            "store should fail when backend is poisoned"
+        );
         assert!(
             result.unwrap_err().to_string().contains("Lock poisoned"),
             "error should mention lock poisoning"
@@ -859,12 +862,18 @@ mod tests {
 
         // list_keys (via count) should fail
         let result = store.count().await;
-        assert!(result.is_err(), "count should fail when backend is poisoned");
+        assert!(
+            result.is_err(),
+            "count should fail when backend is poisoned"
+        );
 
         // Verify that when backend is restored, operations succeed
         store.backend.set_failing(false);
         let result = store.store(&record).await;
-        assert!(result.is_ok(), "store should succeed when backend is restored");
+        assert!(
+            result.is_ok(),
+            "store should succeed when backend is restored"
+        );
     }
 
     #[tokio::test]
@@ -897,15 +906,27 @@ mod tests {
         record2.steward_did = TEST_DID_3.parse().unwrap();
         record2.holder_did = TEST_DID_4.parse().unwrap();
         let result = store.store(&record2).await;
-        assert!(result.is_ok(), "store should succeed even with poisoned cache");
+        assert!(
+            result.is_ok(),
+            "store should succeed even with poisoned cache"
+        );
 
         // Get should work (falls back to backend when cache is poisoned)
         let result = store.get(&record.steward_id).await;
-        assert!(result.is_ok(), "get should succeed even with poisoned cache");
-        assert!(result.unwrap().is_some(), "should retrieve record from backend");
+        assert!(
+            result.is_ok(),
+            "get should succeed even with poisoned cache"
+        );
+        assert!(
+            result.unwrap().is_some(),
+            "should retrieve record from backend"
+        );
 
         // Delete should work (cache update is non-critical)
         let result = store.delete(&record2.steward_id).await;
-        assert!(result.is_ok(), "delete should succeed even with poisoned cache");
+        assert!(
+            result.is_ok(),
+            "delete should succeed even with poisoned cache"
+        );
     }
 }
