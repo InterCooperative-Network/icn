@@ -32,10 +32,13 @@ use crate::events::{EventBus, SystemEvent};
 /// Gossip topic for governance messages
 const GOVERNANCE_TOPIC: &str = "governance:proposal";
 
-/// Interval for checking proposal expiration
+/// Interval for checking scheduled governance events (proposal close, deliberation end).
+/// 10 seconds provides reasonable responsiveness without excessive polling.
 const SCHEDULER_INTERVAL: Duration = Duration::from_secs(10);
 
-/// Default voting period when domain config is unavailable (7 days in seconds)
+/// Default voting period when domain config is unavailable.
+/// 7 days is a reasonable default for cooperative decision-making, allowing
+/// time for member participation while not delaying governance indefinitely.
 const DEFAULT_VOTING_PERIOD_SECONDS: u64 = 7 * 24 * 60 * 60;
 
 /// Scheduled governance event types
@@ -64,7 +67,9 @@ impl Eq for ScheduledGovernanceEvent {}
 
 impl PartialEq for ScheduledGovernanceEvent {
     fn eq(&self, other: &Self) -> bool {
-        self.at == other.at
+        // Compare both timestamp and proposal_id for correct equality semantics.
+        // Two events at the same time for different proposals are not equal.
+        self.at == other.at && self.proposal_id() == other.proposal_id()
     }
 }
 
@@ -852,7 +857,10 @@ impl GovernanceActor {
                             }
                         }
 
-                        // Process expired events
+                        // Process expired events.
+                        // Note: Command handlers validate proposal state before executing.
+                        // If a manual transition races with the scheduler, the command will
+                        // fail gracefully with a warning. This is expected behavior.
                         for event in expired_events {
                             match event {
                                 ScheduledEvent::CloseVoting { proposal_id } => {
@@ -860,7 +868,8 @@ impl GovernanceActor {
                                     if let Err(e) = handle_clone.submit(GovernanceCommand::CloseProposal {
                                         proposal_id: proposal_id.clone(),
                                     }).await {
-                                        warn!("Failed to auto-close proposal {}: {}", proposal_id.0, e);
+                                        // May fail if proposal was manually closed (race condition - expected)
+                                        warn!("Scheduled close for proposal {} skipped: {}", proposal_id.0, e);
                                     }
                                 }
                                 ScheduledEvent::EndDeliberation { proposal_id, voting_period_seconds } => {
@@ -869,7 +878,8 @@ impl GovernanceActor {
                                         proposal_id: proposal_id.clone(),
                                         voting_period_seconds,
                                     }).await {
-                                        warn!("Failed to auto-transition proposal {} to voting: {}", proposal_id.0, e);
+                                        // May fail if deliberation was manually ended (race condition - expected)
+                                        warn!("Scheduled deliberation end for proposal {} skipped: {}", proposal_id.0, e);
                                     }
                                 }
                             }
