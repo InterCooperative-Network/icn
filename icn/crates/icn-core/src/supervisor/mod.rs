@@ -563,6 +563,25 @@ impl Supervisor {
                     // Circuit breaker: After N consecutive failures, escalate to ERROR.
                     // This helps operators detect persistent storage issues before they cause
                     // unbounded memory growth.
+                    //
+                    // ## Recommended Prometheus Alerts
+                    //
+                    // ```yaml
+                    // # CRITICAL: Storage may be degraded, encryption at risk
+                    // - alert: ICNEncryptionCircuitBreakerTripped
+                    //   expr: increase(icn_network_encryption_circuit_breaker_trips_total[5m]) > 0
+                    //   severity: critical
+                    //
+                    // # WARNING: Cleanup failing, investigate before circuit breaker trips
+                    // - alert: ICNEncryptionCleanupFailing
+                    //   expr: increase(icn_network_encryption_sequence_cleanup_failed_total[1h]) > 0
+                    //   severity: warning
+                    //
+                    // # NOTICE: Approaching capacity limit, may need to scale or adjust retention
+                    // - alert: ICNEncryptionSequencePairsHigh
+                    //   expr: icn_network_encryption_sequence_pairs > 40000
+                    //   severity: info
+                    // ```
                     let tracker_for_cleanup = encryption_sequence_tracker.clone();
                     let shutdown_rx_for_cleanup = self.shutdown_tx.subscribe();
                     let circuit_breaker_threshold = self

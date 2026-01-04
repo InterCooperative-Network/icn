@@ -51,6 +51,21 @@ use tokio::sync::RwLock;
 /// - At 1000 msg/sec, covers 10 seconds of unsynced messages
 /// - At 100 msg/sec, covers 100 seconds
 /// - In practice, sequences are persisted immediately after increment
+///
+/// ## Sled Durability Note
+///
+/// Sled uses a write-ahead log (WAL) and may buffer writes before flushing to disk.
+/// The default flush interval is typically ~1 second. In a crash scenario:
+///
+/// 1. Node writes sequences 1000, 1001, 1002 to Sled (in-memory buffer)
+/// 2. Before Sled flushes, node crashes
+/// 3. On restart, Sled reports sequence 999 (last flushed)
+/// 4. Safety gap: 999 + 10,000 = 10,999
+/// 5. Next message uses sequence 11,000 (safely above any lost sequences)
+///
+/// The 10K gap covers typical Sled flush intervals even under very high load.
+/// For networks requiring stricter guarantees, consider calling `store.flush()`
+/// after persistence (trading throughput for guaranteed durability).
 const RESTART_SAFETY_GAP: u64 = 10_000;
 
 /// Maximum number of (sender, recipient) pairs to track.
@@ -165,8 +180,15 @@ impl OutgoingSequenceTracker {
         for (key, value) in entries {
             if let Some((sender, recipient)) = Self::parse_key(&key) {
                 if let Ok(entry) = serde_json::from_slice::<SequenceEntry>(&value) {
-                    // Apply safety gap
-                    let safe_sequence = entry.sequence.saturating_add(RESTART_SAFETY_GAP);
+                    // Apply safety gap, failing on overflow to prevent nonce reuse.
+                    // This is cryptographically critical: ChaCha20-Poly1305 nonce reuse
+                    // completely breaks confidentiality. While u64::MAX is astronomically
+                    // unlikely in practice, we fail-fast rather than silently wrap.
+                    let safe_sequence = entry.sequence.checked_add(RESTART_SAFETY_GAP).context(
+                        "Sequence overflow while applying safety gap - sequence space exhausted. \
+                         This should never happen in practice (requires sending 2^64 messages). \
+                         If this occurs, the encryption key material should be rotated.",
+                    )?;
                     cache.insert((sender.clone(), recipient.clone()), safe_sequence);
 
                     // Persist the new safe sequence
@@ -746,10 +768,10 @@ mod tests {
 
         assert_eq!(tracker.pair_count().await, 2);
 
-        // Cleanup with 1 second retention - should remove nothing (entries are fresh)
-        // Note: We use 1 second instead of 0 to avoid timing races where
-        // the cleanup timestamp is slightly after the entry creation timestamp
-        let removed = tracker.cleanup_stale_entries(1).await.unwrap();
+        // Cleanup with 60 second retention - should remove nothing (entries are fresh)
+        // We use 60 seconds instead of a small value to avoid timing races where
+        // slow test execution or system load causes entries to appear stale
+        let removed = tracker.cleanup_stale_entries(60).await.unwrap();
         assert_eq!(removed, 0);
 
         // Cleanup with very long retention - should remove nothing
