@@ -304,6 +304,12 @@ pub struct GovernanceParams {
     /// Maximum execution delay for proposals (in seconds)
     /// Limits how far into the future a proposal's effective_at can be set
     /// Default: 31536000 (1 year = 365 days)
+    ///
+    /// Example values for different cooperative needs:
+    /// - 86400 (1 day): Fast-moving tech cooperatives
+    /// - 2592000 (30 days): Standard governance changes
+    /// - 31536000 (1 year, default): Major protocol changes
+    /// - 63072000 (2 years): Constitutional amendments
     #[serde(default = "default_max_execution_delay")]
     pub max_execution_delay_seconds: u64,
 }
