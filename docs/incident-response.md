@@ -11,13 +11,17 @@ This document provides operational procedures for responding to common incidents
 ## Table of Contents
 
 1. [General Incident Response Framework](#general-incident-response-framework)
-2. [Incident: Node Compromise](#incident-node-compromise)
-3. [Incident: Ledger Corruption Detected](#incident-ledger-corruption-detected)
-4. [Incident: Key Suspected Stolen](#incident-key-suspected-stolen)
-5. [Incident: Network Partition](#incident-network-partition)
-6. [Incident: Gossip Storm](#incident-gossip-storm)
-7. [Incident: Quarantine Growth](#incident-quarantine-growth)
-8. [Monitoring and Detection](#monitoring-and-detection)
+2. [K3s Deployment Quick Reference](#k3s-deployment-quick-reference)
+3. [Incident: Node Compromise](#incident-node-compromise)
+4. [Incident: Ledger Corruption Detected](#incident-ledger-corruption-detected)
+5. [Incident: Key Suspected Stolen](#incident-key-suspected-stolen)
+6. [Incident: Network Partition](#incident-network-partition)
+7. [Incident: Pod Failure (K3s)](#incident-pod-failure-k3s)
+8. [Incident: Gossip Storm](#incident-gossip-storm)
+9. [Incident: Quarantine Growth](#incident-quarantine-growth)
+10. [Incident: Storage Issues (K3s)](#incident-storage-issues-k3s)
+11. [Monitoring and Detection](#monitoring-and-detection)
+12. [Communication Templates](#communication-templates)
 
 ---
 
@@ -49,6 +53,118 @@ This document provides operational procedures for responding to common incidents
 4. **Recover**: Restore normal operations
 5. **Document**: Record what happened and how it was resolved
 6. **Review**: Post-mortem and process improvement
+
+---
+
+## K3s Deployment Quick Reference
+
+This section provides K3s-specific commands for the live homelab deployment.
+
+### Cluster Access
+
+```bash
+# SSH to control plane
+ssh ubuntu@10.8.10.40
+
+# All kubectl commands require sudo on control plane
+sudo kubectl -n icn <command>
+```
+
+### Quick Diagnosis Commands
+
+```bash
+# Check pod status
+sudo kubectl -n icn get pods -o wide
+
+# View pod logs (live)
+sudo kubectl -n icn logs -f deployment/icn-daemon
+
+# View pod logs (last 100 lines)
+sudo kubectl -n icn logs deployment/icn-daemon --tail=100
+
+# Describe pod for events and status
+sudo kubectl -n icn describe pod -l app=icn-daemon
+
+# Check resource usage
+sudo kubectl -n icn top pods
+
+# View all ICN resources
+sudo kubectl -n icn get all
+
+# Check PVC status
+sudo kubectl -n icn get pvc
+```
+
+### Health Checks
+
+```bash
+# ICN health endpoint
+curl http://10.8.10.40:30080/health
+
+# Prometheus metrics
+curl http://10.8.10.40:30100/metrics | head -50
+
+# Grafana dashboard
+# Open: http://10.8.10.40:30300
+
+# Check node identity
+sudo kubectl -n icn exec deploy/icn-daemon -- /usr/local/bin/icnctl id show
+```
+
+### Restart Procedures
+
+```bash
+# Restart ICN daemon (graceful)
+sudo kubectl -n icn rollout restart deployment/icn-daemon
+
+# Wait for rollout to complete
+sudo kubectl -n icn rollout status deployment/icn-daemon
+
+# Force delete stuck pod
+sudo kubectl -n icn delete pod -l app=icn-daemon --force --grace-period=0
+
+# Full redeploy from local
+cd /home/matt/projects/icn/deploy/k8s && make full-deploy-dev
+```
+
+### Backup & Recovery
+
+```bash
+# Backup current state (from within pod)
+sudo kubectl -n icn exec deploy/icn-daemon -- /usr/local/bin/icnctl backup /data/backup.tar
+
+# Copy backup from pod to local
+sudo kubectl -n icn cp icn-daemon-xxx:/data/backup.tar /tmp/icn-backup.tar
+
+# View backup location (NFS)
+ls -la /mnt/atlas/k8s/icn-data/
+```
+
+### Network Diagnostics
+
+```bash
+# Check service endpoints
+sudo kubectl -n icn get endpoints
+
+# Test internal connectivity
+sudo kubectl -n icn exec deploy/icn-daemon -- curl localhost:9100/metrics
+
+# View network policies
+sudo kubectl -n icn get networkpolicies
+
+# Check node port exposure
+sudo kubectl -n icn get svc
+```
+
+### Alertmanager
+
+```bash
+# View active alerts
+curl -s http://10.8.10.40:30093/api/v1/alerts | jq '.data[] | {labels: .labels, state: .status.state}'
+
+# Silence an alert (for maintenance)
+# Use Alertmanager UI: http://10.8.10.40:30093
+```
 
 ---
 
@@ -534,6 +650,129 @@ journalctl -u icnd --since "1 week ago" | grep upgrade
 
 ---
 
+## Incident: Pod Failure (K3s)
+
+**Severity**: P1 - High
+
+### Symptoms
+
+- Pod not in `Running` state
+- Health endpoint returns 503 or times out
+- Grafana shows gaps in metrics
+- Alertmanager fires `ICNPodNotReady` alert
+
+### Diagnosis
+
+1. **Check pod status**:
+   ```bash
+   ssh ubuntu@10.8.10.40
+   sudo kubectl -n icn get pods -o wide
+   ```
+
+2. **Check pod events**:
+   ```bash
+   sudo kubectl -n icn describe pod -l app=icn-daemon
+   ```
+
+   Common issues in events:
+   - `ImagePullBackOff` - Image not available on node
+   - `CrashLoopBackOff` - Application crashing repeatedly
+   - `OOMKilled` - Out of memory
+   - `Pending` - No resources or node selector mismatch
+
+3. **Check logs**:
+   ```bash
+   # Current pod logs
+   sudo kubectl -n icn logs deployment/icn-daemon --tail=200
+
+   # Previous container (if crashed)
+   sudo kubectl -n icn logs deployment/icn-daemon --previous
+   ```
+
+4. **Check node resources**:
+   ```bash
+   sudo kubectl top nodes
+   sudo kubectl describe nodes | grep -A 5 "Allocated resources"
+   ```
+
+### Recovery
+
+#### Scenario 1: CrashLoopBackOff
+
+1. **Check logs for crash reason**:
+   ```bash
+   sudo kubectl -n icn logs deployment/icn-daemon --previous
+   ```
+
+2. **Common fixes**:
+   - **Config error**: Check ConfigMap for typos
+   - **Permission error**: Verify PVC is mounted correctly
+   - **Port conflict**: Check if ports are available
+
+3. **Restart after fix**:
+   ```bash
+   sudo kubectl -n icn rollout restart deployment/icn-daemon
+   ```
+
+#### Scenario 2: OOMKilled
+
+1. **Check memory usage before OOM**:
+   ```bash
+   sudo kubectl -n icn describe pod -l app=icn-daemon | grep -A 3 "Last State"
+   ```
+
+2. **Increase memory limit** (edit deployment):
+   ```bash
+   sudo kubectl -n icn edit deployment icn-daemon
+   # Change: resources.limits.memory: 2Gi -> 4Gi
+   ```
+
+   Or redeploy with updated manifests:
+   ```bash
+   cd /home/matt/projects/icn/deploy/k8s && make full-deploy-dev
+   ```
+
+#### Scenario 3: ImagePullBackOff
+
+1. **Check image availability**:
+   ```bash
+   sudo crictl images | grep icn
+   ```
+
+2. **Sync image to nodes**:
+   ```bash
+   cd /home/matt/projects/icn/deploy/k8s
+   make sync-images
+   ```
+
+#### Scenario 4: Stuck Pending
+
+1. **Check for resource constraints**:
+   ```bash
+   sudo kubectl -n icn describe pod -l app=icn-daemon
+   ```
+
+2. **Check PVC binding**:
+   ```bash
+   sudo kubectl -n icn get pvc
+   sudo kubectl -n icn describe pvc icn-data
+   ```
+
+3. **Check NFS server** (Atlas):
+   ```bash
+   ssh atlas "systemctl status nfs-kernel-server"
+   showmount -e 10.8.10.25
+   ```
+
+### Prevention
+
+- **Resource limits**: Set appropriate CPU/memory limits
+- **Health probes**: Liveness and readiness probes configured
+- **PodDisruptionBudget**: Prevent accidental disruption
+- **Monitoring**: Alert on pod restarts > 3 in 10 minutes
+
+---
+
 ## Incident: Gossip Storm
 
 **Severity**: P2 - Medium
@@ -634,6 +873,122 @@ journalctl -u icnd --since "1 week ago" | grep upgrade
 
 ---
 
+## Incident: Storage Issues (K3s)
+
+**Severity**: P1 - High
+
+### Symptoms
+
+- Write failures in logs (`sled error`, `I/O error`)
+- PVC shows as `Pending` or `Lost`
+- NFS mount errors
+- Disk space alerts
+- Data not persisting across pod restarts
+
+### Diagnosis
+
+1. **Check PVC status**:
+   ```bash
+   ssh ubuntu@10.8.10.40
+   sudo kubectl -n icn get pvc
+   sudo kubectl -n icn describe pvc icn-data
+   ```
+
+2. **Check disk space on NFS server**:
+   ```bash
+   ssh atlas "df -h /mnt/storage"
+   ```
+
+3. **Check NFS service**:
+   ```bash
+   ssh atlas "systemctl status nfs-kernel-server"
+   ssh atlas "exportfs -v"
+   ```
+
+4. **Check mount from pod**:
+   ```bash
+   sudo kubectl -n icn exec deploy/icn-daemon -- df -h /data
+   sudo kubectl -n icn exec deploy/icn-daemon -- ls -la /data
+   ```
+
+5. **Check for Sled database issues**:
+   ```bash
+   sudo kubectl -n icn logs deployment/icn-daemon | grep -i "sled\|error\|corrupt"
+   ```
+
+### Recovery
+
+#### Scenario 1: NFS Server Unreachable
+
+1. **Check network connectivity**:
+   ```bash
+   ping 10.8.10.25
+   ```
+
+2. **Restart NFS service**:
+   ```bash
+   ssh atlas "sudo systemctl restart nfs-kernel-server"
+   ```
+
+3. **Verify exports**:
+   ```bash
+   showmount -e 10.8.10.25
+   ```
+
+4. **Restart ICN pod** (to remount):
+   ```bash
+   sudo kubectl -n icn rollout restart deployment/icn-daemon
+   ```
+
+#### Scenario 2: Disk Full
+
+1. **Check space usage**:
+   ```bash
+   ssh atlas "du -sh /mnt/storage/k8s/icn-data/*"
+   ```
+
+2. **Clean old backups**:
+   ```bash
+   ssh atlas "find /mnt/storage/k8s/icn-data/backups -mtime +30 -delete"
+   ```
+
+3. **Compact Sled database** (if supported):
+   ```bash
+   sudo kubectl -n icn exec deploy/icn-daemon -- icnctl db compact
+   ```
+
+#### Scenario 3: Sled Corruption
+
+1. **Stop the daemon**:
+   ```bash
+   sudo kubectl -n icn scale deployment icn-daemon --replicas=0
+   ```
+
+2. **Backup current state**:
+   ```bash
+   ssh atlas "cp -r /mnt/storage/k8s/icn-data /mnt/storage/k8s/icn-data-corrupted-$(date +%Y%m%d)"
+   ```
+
+3. **Restore from backup**:
+   ```bash
+   ssh atlas "ls -la /mnt/storage/k8s/icn-data/backups/"
+   # Copy latest good backup to data directory
+   ```
+
+4. **Restart daemon**:
+   ```bash
+   sudo kubectl -n icn scale deployment icn-daemon --replicas=1
+   ```
+
+### Prevention
+
+- **Monitoring**: Alert on disk usage > 80%
+- **Automated backups**: Daily snapshots with rotation
+- **NFS redundancy**: Consider replicated storage
+- **Health checks**: Include storage health in liveness probe
+
+---
+
 ## Monitoring and Detection
 
 ### Key Metrics to Monitor
@@ -673,6 +1028,130 @@ WatchdogSec=60s
 
 # Nagios/Zabbix
 curl -f http://localhost:8080/health || exit 1
+```
+
+---
+
+## Communication Templates
+
+### Status Update Template
+
+Use this template for ongoing incident updates:
+
+```
+ICN Incident Update - [INCIDENT_ID]
+Status: [Investigating | Identified | Monitoring | Resolved]
+Severity: [P0 Critical | P1 High | P2 Medium | P3 Low]
+Time: [YYYY-MM-DD HH:MM UTC]
+
+Summary:
+[Brief description of current status]
+
+Impact:
+- Affected services: [List affected components]
+- User impact: [Description of user-facing effects]
+
+Current Actions:
+- [What is being done right now]
+
+Next Update:
+Expected in [X] minutes/hours
+
+---
+ICN Operations Team
+```
+
+### Initial Incident Notification
+
+Use when first declaring an incident:
+
+```
+Subject: [P0/P1/P2/P3] ICN Incident: [Brief Description]
+
+Team,
+
+We are investigating an incident affecting [component/service].
+
+Detected: [Time UTC]
+Severity: [P0-P3]
+Initial Symptoms: [What was observed]
+
+Current Status:
+- [What we know so far]
+
+Immediate Actions:
+- [Responder name] is investigating
+- [Any containment steps taken]
+
+Communication Channel:
+[Slack channel / Video call link]
+
+Next Update: [Time]
+
+---
+[Responder Name]
+```
+
+### Resolution Notification
+
+Use when incident is resolved:
+
+```
+Subject: [RESOLVED] ICN Incident: [Brief Description]
+
+Team,
+
+The incident affecting [component/service] has been resolved.
+
+Timeline:
+- Detected: [Time UTC]
+- Identified: [Time UTC]
+- Resolved: [Time UTC]
+- Total Duration: [X hours/minutes]
+
+Root Cause:
+[Brief explanation of what caused the incident]
+
+Resolution:
+[What was done to fix it]
+
+User Impact:
+[Summary of impact during incident]
+
+Follow-up Actions:
+- [ ] Post-mortem scheduled for [Date]
+- [ ] [Any immediate improvements planned]
+
+---
+[Responder Name]
+```
+
+### Stakeholder Briefing (Non-Technical)
+
+Use for executive or external stakeholder updates:
+
+```
+Subject: ICN Service Update - [Date]
+
+Summary:
+On [Date], the ICN network experienced [brief non-technical description].
+The issue was resolved at [Time] after [Duration].
+
+Impact:
+- [What users/cooperatives experienced]
+- [Any data or transaction concerns]
+
+Resolution:
+Our team [brief explanation of fix without technical jargon].
+
+Prevention:
+We are implementing [improvements] to prevent recurrence.
+
+Questions:
+Please contact [contact person] for additional information.
+
+---
+ICN Operations
 ```
 
 ---
@@ -728,5 +1207,5 @@ After resolving an incident, document:
 
 ## Version History
 
+- **2026-01-04**: Added K3s-specific procedures, communication templates (#324)
 - **2025-01-14**: Initial version (Track B1)
-- Future: Will be updated as ICN evolves and real incidents occur
