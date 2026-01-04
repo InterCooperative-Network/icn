@@ -802,9 +802,14 @@ impl GovernanceManager {
         proposal_id: &ProposalId,
         deliberation_period_seconds: u64,
     ) -> Result<()> {
-        // TODO: When actor-backed mode supports deliberation, delegate here
-        // For now, standalone mode only
+        if let Some(ref handle) = self.governance_handle {
+            // Actor-backed mode: delegate to GovernanceActor
+            return handle
+                .start_deliberation(proposal_id.clone(), deliberation_period_seconds)
+                .await;
+        }
 
+        // Standalone mode: in-memory storage
         let mut proposals = self.proposals.write().map_err(|e| {
             anyhow::anyhow!("Proposals storage lock poisoned (concurrent panic?): {e}")
         })?;
@@ -825,9 +830,14 @@ impl GovernanceManager {
         proposal_id: &ProposalId,
         voting_period_seconds: u64,
     ) -> Result<()> {
-        // TODO: When actor-backed mode supports deliberation, delegate here
-        // For now, standalone mode only
+        if let Some(ref handle) = self.governance_handle {
+            // Actor-backed mode: delegate to GovernanceActor
+            return handle
+                .end_deliberation_and_open(proposal_id.clone(), voting_period_seconds)
+                .await;
+        }
 
+        // Standalone mode: in-memory storage
         let mut proposals = self.proposals.write().map_err(|e| {
             anyhow::anyhow!("Proposals storage lock poisoned (concurrent panic?): {e}")
         })?;

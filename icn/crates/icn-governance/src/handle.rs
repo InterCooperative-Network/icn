@@ -66,7 +66,30 @@ pub trait GovernanceOps: Send + Sync {
         payload: ProposalPayload,
     ) -> Result<ProposalId>;
 
-    /// Open a proposal for voting
+    /// Start deliberation period for a proposal
+    ///
+    /// Transitions the proposal from Draft to Deliberation state.
+    /// Members can discuss the proposal during this period.
+    async fn start_deliberation(
+        &self,
+        proposal_id: ProposalId,
+        deliberation_period_seconds: u64,
+    ) -> Result<()>;
+
+    /// End deliberation and open for voting
+    ///
+    /// Transitions the proposal from Deliberation to Open state.
+    /// Can only be called after the deliberation period has ended.
+    async fn end_deliberation_and_open(
+        &self,
+        proposal_id: ProposalId,
+        voting_period_seconds: u64,
+    ) -> Result<()>;
+
+    /// Open a proposal for voting (skip deliberation)
+    ///
+    /// Transitions directly from Draft to Open state.
+    /// Use start_deliberation for proposals that need discussion first.
     async fn open_proposal(
         &self,
         proposal_id: ProposalId,
