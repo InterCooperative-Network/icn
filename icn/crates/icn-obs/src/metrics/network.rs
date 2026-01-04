@@ -96,6 +96,10 @@ pub fn init_descriptions() {
         "Total number of E2E encrypted messages sent"
     );
     describe_counter!(
+        "icn_network_encrypted_messages_received_total",
+        "Total number of E2E encrypted messages successfully received and decrypted"
+    );
+    describe_counter!(
         "icn_network_encryption_failed_total",
         "Total number of messages dropped due to encryption failure (fail-closed)"
     );
