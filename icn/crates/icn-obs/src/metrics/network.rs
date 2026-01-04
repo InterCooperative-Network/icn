@@ -230,6 +230,11 @@ pub fn encrypted_messages_sent_inc() {
     counter!("icn_network_encrypted_messages_sent_total").increment(1);
 }
 
+/// Increment encrypted messages received and successfully decrypted counter
+pub fn encrypted_messages_received_inc() {
+    counter!("icn_network_encrypted_messages_received_total").increment(1);
+}
+
 /// Increment encryption failed counter with reason (fail-closed: message dropped)
 ///
 /// Reasons: "encryption_error", "peer_key_missing", "serialization_failed"

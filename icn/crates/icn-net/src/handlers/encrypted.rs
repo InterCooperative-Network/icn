@@ -115,6 +115,9 @@ impl ConnectionContext {
             encrypted.sequence
         );
 
+        // Track successful decryption for observability
+        icn_obs::metrics::network::encrypted_messages_received_inc();
+
         // 5. Try to deserialize as inner SignedEnvelope (sign-encrypt-sign pattern)
         // If that fails, treat plaintext as raw application data
         match bincode::serde::decode_from_slice::<SignedEnvelope, _>(

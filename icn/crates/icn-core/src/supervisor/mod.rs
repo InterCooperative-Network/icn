@@ -509,6 +509,8 @@ impl Supervisor {
 
                 // Only start encryption-related tasks if encryption is enabled
                 if encryption_enabled {
+                    info!("E2E encryption enabled - messages to capable peers will be encrypted");
+
                     // Initialize sequence tracker synchronously on startup to ensure
                     // predictable startup behavior and avoid first-message delays.
                     // This applies the restart safety gap to all persisted sequences.
