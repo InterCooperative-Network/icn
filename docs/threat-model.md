@@ -1,8 +1,8 @@
 # ICN Threat Model
 
-**Version**: 1.0
-**Date**: 2025-11-29
-**Status**: Complete
+**Version**: 1.1
+**Date**: 2026-01-04
+**Status**: Updated for Pilot Deployment
 **Authors**: Security Review Team
 
 ## Executive Summary
@@ -714,17 +714,67 @@ This document provides a formal threat model for the InterCooperative Network (I
 | Expression Depth | MAX_EXPRESSION_DEPTH | `icn-ccl/src/ast.rs` |
 | Input Validation | Name, var, rule limits | `icn-ccl/src/ast.rs` |
 
+### 5.7 Byzantine Detection (Phase 18)
+
+| Control | Implementation | Files |
+|---------|----------------|-------|
+| MisbehaviorDetector | 7 violation types with severity levels | `icn-core/src/misbehavior/` |
+| Reputation System | 0.0-1.0 score with decay | `icn-core/src/reputation/` |
+| Auto-Quarantine | Score < 0.5 triggers quarantine | `icn-core/src/misbehavior/detector.rs` |
+| Auto-Ban | Critical violations trigger immediate ban | `icn-core/src/misbehavior/detector.rs` |
+| Trust Integration | Misbehavior reduces trust score | `icn-trust/src/lib.rs` |
+
+**Violation Types**:
+
+| Type | Severity | Description |
+|------|----------|-------------|
+| InvalidSignature | Critical (10) | Forged or invalid cryptographic signature |
+| ConflictingLedgerEntries | Critical (10) | Double-spend or fork attempt |
+| FailedComputeVerification | Major (5) | Submitted invalid computation result |
+| ExcessiveResourceUse | Major (5) | Resource exhaustion attempt |
+| TrustGraphSpam | Minor (1) | Excessive trust edge creation |
+| ConflictingSignedStatements | Critical (10) | Equivocation detected |
+| ReplayAttack | Major (5) | Attempted message replay |
+
+**Reputation Mechanics**:
+- **Score Range**: 0.0 (banned) to 1.0 (perfect)
+- **Penalty Formula**: `score -= severity * 0.05`
+- **Decay Rate**: +0.01/hour recovery
+- **Quarantine Threshold**: < 0.5
+- **Rate Limit**: Max 10 violations/hour before auto-ban
+
+### 5.8 SDIS Identity Verification
+
+| Control | Implementation | Files |
+|---------|----------------|-------|
+| Multi-Level Verification | Level 0-2 progressive trust | `icn-gateway/src/sdis/` |
+| Steward Vouching | Human verification step | `icn-governance/src/steward/` |
+| Vouch Uniqueness | Rate limiting, sybil resistance | `icn-governance/src/steward_store.rs` |
+| Device Attestation | Hardware-bound identity proofs | `icn-identity/src/device.rs` |
+
+**Verification Levels**:
+
+| Level | Requirement | Trust Impact |
+|-------|-------------|--------------|
+| 0 | Enrollment started | No trust granted |
+| 1 | Device proof verified | Minimal trust (0.1) |
+| 2 | Steward vouched | Standard trust (0.3-0.5) |
+
 ---
 
 ## 6. Gap Analysis
 
 ### 6.1 High Priority Gaps
 
-| ID | Gap | Risk | Recommendation | Effort |
-|----|-----|------|----------------|--------|
-| GAP-H1 | No Sybil attack prevention | Attackers can create many identities | Require external identity proof or stake | High |
-| GAP-H2 | Traffic analysis possible | Network metadata reveals activity patterns | Implement mix networking or padding | High |
-| GAP-H3 | No Byzantine fault tolerance | Equivocating nodes not detected | Implement BFT consensus for critical data | High |
+| ID | Gap | Risk | Recommendation | Effort | Status |
+|----|-----|------|----------------|--------|--------|
+| GAP-H1 | No Sybil attack prevention | Attackers can create many identities | Require external identity proof or stake | High | 🟡 Partial (SDIS) |
+| GAP-H2 | Traffic analysis possible | Network metadata reveals activity patterns | Implement mix networking or padding | High | Open |
+| ~~GAP-H3~~ | ~~No Byzantine fault tolerance~~ | ~~Equivocating nodes not detected~~ | ~~Implement BFT consensus~~ | ~~High~~ | ✅ **Closed (Phase 18)** |
+
+> **GAP-H3 Resolution**: Phase 18 (2025-12-04) implemented MisbehaviorDetector with 7 violation types,
+> reputation scoring (0.0-1.0), automatic quarantine at score < 0.5, and auto-ban for critical violations.
+> See [Section 5.7 Byzantine Detection](#57-byzantine-detection) for details.
 
 ### 6.2 Medium Priority Gaps
 
@@ -753,6 +803,37 @@ These are intentional design decisions, not gaps:
 | Real-time vote visibility | Prevents hidden vote manipulation |
 | Quorum not enforceable | Cannot force participation in democratic systems |
 
+### 6.5 Pilot Deployment Specific Risks
+
+The K3s homelab deployment introduces deployment-specific attack surfaces:
+
+| Risk | Description | Mitigation | Status |
+|------|-------------|------------|--------|
+| **NodePort Exposure** | Gateway API exposed on 30080, Grafana on 30300 | Firewall rules, VPN access | ✅ Mitigated |
+| **NFS Storage** | Single point of failure for persistent data | Regular backups, RAID on NFS server | 🟡 Partial |
+| **Limited Node Count** | 5 nodes insufficient for Byzantine tolerance | Accept pilot limitations | 🟡 Documented |
+| **Known Participant Set** | All pilot participants known | Reduces Sybil risk, but limits testing | 🟡 By Design |
+| **Dev-mode Secrets** | Some secrets use placeholder values | Document for production hardening | 🟡 Documented |
+| **Single Control Plane** | K3s control plane is single node | Accept for homelab, plan HA for production | 🟡 Documented |
+
+**Kubernetes-Specific Attack Vectors**:
+
+| Vector | Description | Mitigation |
+|--------|-------------|------------|
+| Container Escape | Malicious container breakout | No privileged containers, securityContext |
+| RBAC Bypass | Unauthorized API access | Minimal RBAC, namespace isolation |
+| Pod-to-Pod | Lateral movement between pods | NetworkPolicy (planned) |
+| Image Supply Chain | Compromised container images | Local image build, no external registries |
+| Secret Exposure | Secrets in etcd or environment | Kubernetes Secrets, avoid env vars |
+
+**Monitoring Coverage**:
+
+- 15 Alertmanager rules configured for ICN-specific conditions
+- Grafana dashboards for gossip, ledger, trust, compute
+- Health endpoints monitored via liveness/readiness probes
+
+See [incident-response.md](incident-response.md) for K3s-specific incident procedures.
+
 ---
 
 ## 7. Security Assumptions
@@ -769,10 +850,10 @@ These are intentional design decisions, not gaps:
 ### 7.2 What This System Does NOT Provide
 
 - **Anonymous communication** - All actions tied to DIDs
-- **Byzantine fault tolerance** - Assumes honest majority
+- ~~**Byzantine fault tolerance**~~ - **Now partially provided** via MisbehaviorDetector (Phase 18)
 - **Perfect forward secrecy** - Key compromise reveals past messages
 - **Traffic analysis resistance** - Network patterns observable
-- **Sybil resistance** - No external identity verification
+- ~~**Sybil resistance**~~ - **Now partially provided** via SDIS steward verification
 - **Legal enforceability** - Technical system only
 
 ### 7.3 Trust Assumptions
@@ -809,4 +890,10 @@ These are intentional design decisions, not gaps:
 
 ## Changelog
 
+- **2026-01-04**: Updated for pilot deployment (v1.1)
+  - Added Byzantine Detection mitigations (Phase 18)
+  - Added SDIS identity verification controls
+  - Added K3s pilot deployment specific risks
+  - Updated gap analysis (GAP-H3 closed, GAP-H1 partial)
+  - Updated security assumptions for new capabilities
 - **2025-11-29**: Initial comprehensive STRIDE analysis (v1.0)
