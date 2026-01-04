@@ -129,7 +129,7 @@ impl TestNode {
                 let gossip_handle = gossip_for_incoming.clone();
                 tokio::spawn(async move {
                     let mut gossip = gossip_handle.write().await;
-                    let _ = gossip.handle_message(&sender_did, gossip_msg);
+                    let _ = gossip.handle_message(&sender_did, gossip_msg).await;
                 });
             }
         });
@@ -275,7 +275,7 @@ impl TestNode {
             let contracts_topic = Topic::new("contracts:deploy".to_string(), AccessControl::Public)
                 .with_max_entries(100);
             gossip.create_topic(contracts_topic);
-            gossip.subscribe("contracts:deploy", did.clone())?;
+            gossip.subscribe("contracts:deploy", did.clone()).await?;
         }
 
         Ok(TestNode {
@@ -379,7 +379,7 @@ impl TestNode {
         // Publish locally and get the entry to announce
         let (hash, clock) = {
             let mut gossip = self.gossip_handle.write().await;
-            let hash = gossip.publish("contracts:deploy", message_bytes)?;
+            let hash = gossip.publish("contracts:deploy", message_bytes).await?;
             let entry = gossip
                 .get_entry("contracts:deploy", &hash)
                 .ok_or_else(|| anyhow::anyhow!("Published entry not found"))?;

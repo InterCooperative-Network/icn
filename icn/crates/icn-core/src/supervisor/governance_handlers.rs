@@ -1877,7 +1877,7 @@ impl GovernanceEventHandler {
                 .build();
 
             match entry_result {
-                Ok(entry) => match ledger_guard.append_entry(entry) {
+                Ok(entry) => match ledger_guard.append_entry(entry).await {
                     Ok(entry_hash) => {
                         info!(
                             "✅ Budget proposal {} executed: {} {} transferred to {}",
@@ -2256,7 +2256,10 @@ impl GovernanceEventHandler {
             let content_hash = ContentHash::from_bytes(target_bytes);
 
             let mut ledger_write = ledger.write().await;
-            match ledger_write.rollback_to_entry(&content_hash, &reason, true) {
+            match ledger_write
+                .rollback_to_entry(&content_hash, &reason, true)
+                .await
+            {
                 Ok(archived_hashes) => {
                     info!(
                         "✅ Ledger rollback complete: archived {} entries",

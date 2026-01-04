@@ -156,7 +156,7 @@ impl ContractRuntime {
                         .credit(from.clone(), currency.clone(), *amount)
                         .build()?;
 
-                    ledger.append_entry(entry)?;
+                    ledger.append_entry(entry).await?;
                 }
 
                 LedgerOperation::SetCreditLimit {

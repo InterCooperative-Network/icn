@@ -55,20 +55,21 @@ impl Node {
     }
 
     /// Simulate receiving gossip messages from another node
-    fn receive_from(&mut self, other: &Node, topic: &str) {
+    async fn receive_from(&mut self, other: &Node, topic: &str) {
         let other_gossip = other.gossip.blocking_read();
         let entries = other_gossip.get_entries(topic);
 
         for gossip_entry in entries {
             if let Ok(sync_msg) = serde_json::from_slice::<LedgerSyncMessage>(&gossip_entry.data) {
                 // Silently handle sync messages (errors are logged internally)
-                let _ = self.ledger.handle_sync_message(sync_msg);
+                let _ = self.ledger.handle_sync_message(sync_msg).await;
             }
         }
     }
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     println!("=== Multi-Node Ledger Synchronization Demo ===\n");
 
     // Create three nodes representing members of a cooperative
@@ -81,7 +82,7 @@ fn main() {
     let bob_did = KeyPair::generate().unwrap().did().clone();
     let charlie_did = KeyPair::generate().unwrap().did().clone();
 
-    println!("📍 Three nodes initialized: Alice, Bob, Charlie\n");
+    println!("Three nodes initialized: Alice, Bob, Charlie\n");
 
     // === Scenario 1: Alice provides service to Bob ===
     println!("Scenario 1: Alice provides 10 hours of work to Bob");
@@ -92,9 +93,9 @@ fn main() {
         .build()
         .unwrap();
 
-    node_alice.ledger.append_entry(entry1).unwrap();
+    node_alice.ledger.append_entry(entry1).await.unwrap();
 
-    println!("  ✓ Node Alice recorded transaction");
+    println!("  Node Alice recorded transaction");
     println!(
         "    - Alice's balance: {} hours",
         node_alice.get_balance(&alice_did, "hours")
@@ -109,10 +110,10 @@ fn main() {
     );
 
     // Simulate gossip propagation
-    node_bob.receive_from(&node_alice, "ledger:hours");
-    node_charlie.receive_from(&node_alice, "ledger:hours");
+    node_bob.receive_from(&node_alice, "ledger:hours").await;
+    node_charlie.receive_from(&node_alice, "ledger:hours").await;
 
-    println!("  📡 Gossip propagation complete");
+    println!("  Gossip propagation complete");
     println!("    - Node Bob entries: {}", node_bob.get_entry_count());
     println!(
         "    - Node Charlie entries: {}\n",
@@ -128,9 +129,9 @@ fn main() {
         .build()
         .unwrap();
 
-    node_bob.ledger.append_entry(entry2).unwrap();
+    node_bob.ledger.append_entry(entry2).await.unwrap();
 
-    println!("  ✓ Node Bob recorded transaction");
+    println!("  Node Bob recorded transaction");
     println!(
         "    - Bob's balance: {} hours",
         node_bob.get_balance(&bob_did, "hours")
@@ -141,10 +142,10 @@ fn main() {
     );
 
     // Simulate gossip propagation
-    node_alice.receive_from(&node_bob, "ledger:hours");
-    node_charlie.receive_from(&node_bob, "ledger:hours");
+    node_alice.receive_from(&node_bob, "ledger:hours").await;
+    node_charlie.receive_from(&node_bob, "ledger:hours").await;
 
-    println!("  📡 Gossip propagation complete\n");
+    println!("  Gossip propagation complete\n");
 
     // === Scenario 3: Charlie provides service to Alice ===
     println!("Scenario 3: Charlie provides 3 hours of work to Alice");
@@ -155,9 +156,9 @@ fn main() {
         .build()
         .unwrap();
 
-    node_charlie.ledger.append_entry(entry3).unwrap();
+    node_charlie.ledger.append_entry(entry3).await.unwrap();
 
-    println!("  ✓ Node Charlie recorded transaction");
+    println!("  Node Charlie recorded transaction");
     println!(
         "    - Charlie's balance: {} hours",
         node_charlie.get_balance(&charlie_did, "hours")
@@ -168,10 +169,10 @@ fn main() {
     );
 
     // Simulate gossip propagation
-    node_alice.receive_from(&node_charlie, "ledger:hours");
-    node_bob.receive_from(&node_charlie, "ledger:hours");
+    node_alice.receive_from(&node_charlie, "ledger:hours").await;
+    node_bob.receive_from(&node_charlie, "ledger:hours").await;
 
-    println!("  📡 Gossip propagation complete\n");
+    println!("  Gossip propagation complete\n");
 
     // === Final State ===
     println!("=== Final State Across All Nodes ===\n");
@@ -228,7 +229,7 @@ fn main() {
     assert_eq!(node_alice.get_entry_count(), 3);
     assert_eq!(node_bob.get_entry_count(), 3);
     assert_eq!(node_charlie.get_entry_count(), 3);
-    println!("✓ All nodes have synchronized all 3 entries");
+    println!("All nodes have synchronized all 3 entries");
 
     // All nodes should have same balances
     // Alice: +10 (from Bob) -3 (to Charlie) = 7
@@ -238,25 +239,25 @@ fn main() {
     assert_eq!(node_alice.get_balance(&alice_did, "hours"), 7);
     assert_eq!(node_bob.get_balance(&alice_did, "hours"), 7);
     assert_eq!(node_charlie.get_balance(&alice_did, "hours"), 7);
-    println!("✓ Alice's balance consistent across all nodes: 7 hours");
+    println!("Alice's balance consistent across all nodes: 7 hours");
 
     assert_eq!(node_alice.get_balance(&bob_did, "hours"), -5);
     assert_eq!(node_bob.get_balance(&bob_did, "hours"), -5);
     assert_eq!(node_charlie.get_balance(&bob_did, "hours"), -5);
-    println!("✓ Bob's balance consistent across all nodes: -5 hours");
+    println!("Bob's balance consistent across all nodes: -5 hours");
 
     assert_eq!(node_alice.get_balance(&charlie_did, "hours"), -2);
     assert_eq!(node_bob.get_balance(&charlie_did, "hours"), -2);
     assert_eq!(node_charlie.get_balance(&charlie_did, "hours"), -2);
-    println!("✓ Charlie's balance consistent across all nodes: -2 hours");
+    println!("Charlie's balance consistent across all nodes: -2 hours");
 
     // Conservation law: sum of all balances should be zero
     let total_alice = node_alice.get_balance(&alice_did, "hours")
         + node_alice.get_balance(&bob_did, "hours")
         + node_alice.get_balance(&charlie_did, "hours");
     assert_eq!(total_alice, 0);
-    println!("✓ Conservation law verified: Σ balances = 0");
+    println!("Conservation law verified: sum of balances = 0");
 
-    println!("\n🎉 Multi-node synchronization successful!");
+    println!("\nMulti-node synchronization successful!");
     println!("   All nodes have converged to the same ledger state.");
 }

@@ -97,7 +97,7 @@ async fn test_partition_heal_request_response() {
 
     // Publish data on gossip2 to create version divergence
     let data = b"test data from node 2".to_vec();
-    let hash = gossip2.publish("test:data", data).unwrap();
+    let hash = gossip2.publish("test:data", data).await.unwrap();
 
     // Set up message capture for gossip1
     let captured_messages = Arc::new(RwLock::new(Vec::new()));
@@ -174,6 +174,7 @@ async fn test_partition_heal_request_response() {
                     last_contact_ms: 5000,
                 },
             )
+            .await
             .unwrap();
 
         // Check that a PartitionHealResponse was sent
@@ -220,8 +221,14 @@ async fn test_vector_clock_merge_on_partition_heal() {
     gossip1.create_topic(Topic::new("test:merge".to_string(), AccessControl::Public));
 
     // Publish data to advance our vector clock
-    gossip1.publish("test:merge", b"entry1".to_vec()).unwrap();
-    gossip1.publish("test:merge", b"entry2".to_vec()).unwrap();
+    gossip1
+        .publish("test:merge", b"entry1".to_vec())
+        .await
+        .unwrap();
+    gossip1
+        .publish("test:merge", b"entry2".to_vec())
+        .await
+        .unwrap();
 
     // Get our current clock state
     let our_clock_before = gossip1.get_clock().clone();
@@ -234,15 +241,17 @@ async fn test_vector_clock_merge_on_partition_heal() {
     remote_clock.increment(kp2.did());
 
     // Simulate receiving a PartitionHealResponse
-    let result = gossip1.handle_message(
-        kp2.did(),
-        GossipMessage::PartitionHealResponse {
-            responding_peer: kp2.did().clone(),
-            vector_clock: remote_clock.clone(),
-            diverged_topics: vec!["test:merge".to_string()],
-            entries_behind: 3,
-        },
-    );
+    let result = gossip1
+        .handle_message(
+            kp2.did(),
+            GossipMessage::PartitionHealResponse {
+                responding_peer: kp2.did().clone(),
+                vector_clock: remote_clock.clone(),
+                diverged_topics: vec!["test:merge".to_string()],
+                entries_behind: 3,
+            },
+        )
+        .await;
     assert!(result.is_ok(), "Handle message should succeed");
 
     // Check that our clock was merged

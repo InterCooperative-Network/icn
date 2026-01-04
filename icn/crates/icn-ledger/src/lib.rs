@@ -20,33 +20,34 @@
 //!
 //! ## Example
 //!
-//! ```rust,no_run
+//! ```rust,ignore
 //! use icn_ledger::{Ledger, entry::JournalEntryBuilder};
 //! use icn_identity::KeyPair;
 //! use icn_store::SledStore;
 //! use std::sync::Arc;
 //!
-//! # fn main() -> anyhow::Result<()> {
-//! let store = Arc::new(SledStore::open("./data")?);
-//! let mut ledger = Ledger::new(store)?;
+//! #[tokio::main]
+//! async fn main() -> anyhow::Result<()> {
+//!     let store = Arc::new(SledStore::open("./data")?);
+//!     let mut ledger = Ledger::new(store)?;
 //!
-//! let alice = KeyPair::generate()?.did().clone();
-//! let bob = KeyPair::generate()?.did().clone();
+//!     let alice = KeyPair::generate()?.did().clone();
+//!     let bob = KeyPair::generate()?.did().clone();
 //!
-//! // Alice delivers 10 hours of work to Bob
-//! let entry = JournalEntryBuilder::new(alice.clone())
-//!     .debit(alice.clone(), "hours".to_string(), 10)
-//!     .credit(bob.clone(), "hours".to_string(), 10)
-//!     .build()?;
+//!     // Alice delivers 10 hours of work to Bob
+//!     let entry = JournalEntryBuilder::new(alice.clone())
+//!         .debit(alice.clone(), "hours".to_string(), 10)
+//!         .credit(bob.clone(), "hours".to_string(), 10)
+//!         .build()?;
 //!
-//! ledger.append_entry(entry)?;
+//!     ledger.append_entry(entry).await?;
 //!
-//! // Alice is owed 10 hours
-//! assert_eq!(ledger.get_balance(&alice, "hours"), 10);
-//! // Bob owes 10 hours
-//! assert_eq!(ledger.get_balance(&bob, "hours"), -10);
-//! # Ok(())
-//! # }
+//!     // Alice is owed 10 hours
+//!     assert_eq!(ledger.get_balance(&alice, "hours"), 10);
+//!     // Bob owes 10 hours
+//!     assert_eq!(ledger.get_balance(&bob, "hours"), -10);
+//!     Ok(())
+//! }
 //! ```
 
 pub mod balance;

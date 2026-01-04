@@ -105,7 +105,7 @@ async fn test_budget_proposal_executes_ledger_transaction() -> Result<()> {
 
                     match entry_result {
                         Ok(entry) => {
-                            match ledger_guard.append_entry(entry) {
+                            match ledger_guard.append_entry(entry).await {
                                 Ok(entry_hash) => {
                                     info!("✅ Budget proposal {} executed: {} {} transferred to {}",
                                           prop_id.0, amount, currency, recipient);
@@ -355,7 +355,7 @@ async fn test_rejected_proposal_does_not_execute() -> Result<()> {
                             .build();
 
                         if let Ok(entry) = entry_result {
-                            let _ = ledger_guard.append_entry(entry);
+                            let _ = ledger_guard.append_entry(entry).await;
                         }
                     });
                 }

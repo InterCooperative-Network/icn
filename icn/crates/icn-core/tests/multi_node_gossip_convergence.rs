@@ -96,10 +96,14 @@ impl TestNode {
 
             match net_msg.payload {
                 MessagePayload::Gossip(gossip_msg) => {
-                    let mut gossip = gossip_handle_clone.blocking_write();
-                    if let Err(e) = gossip.handle_message(&sender_did, gossip_msg) {
-                        warn!("Failed to handle gossip message: {}", e);
-                    }
+                    let gossip_handle = gossip_handle_clone.clone();
+                    let sender = sender_did.clone();
+                    tokio::spawn(async move {
+                        let mut gossip = gossip_handle.write().await;
+                        if let Err(e) = gossip.handle_message(&sender, gossip_msg).await {
+                            warn!("Failed to handle gossip message: {}", e);
+                        }
+                    });
                 }
 
                 MessagePayload::Subscribe { topics } => {
@@ -108,42 +112,44 @@ impl TestNode {
                         sender_did, topics
                     );
 
-                    let mut gossip = gossip_handle_clone.blocking_write();
-                    let mut acked_topics = Vec::new();
+                    let gossip_handle = gossip_handle_clone.clone();
+                    let sender = sender_did.clone();
+                    let network_handle_lock = network_handle_holder_clone.clone();
+                    let own_did = own_did_clone.clone();
+                    tokio::spawn(async move {
+                        let mut gossip = gossip_handle.write().await;
+                        let mut acked_topics = Vec::new();
 
-                    for topic in &topics {
-                        match gossip.subscribe(topic, sender_did.clone()) {
-                            Ok(_) => {
-                                info!("Subscribed {} to topic: {}", sender_did, topic);
-                                acked_topics.push(topic.clone());
-                            }
-                            Err(e) => {
-                                warn!(
-                                    "Failed to subscribe {} to topic {}: {}",
-                                    sender_did, topic, e
-                                );
+                        for topic in &topics {
+                            match gossip.subscribe(topic, sender.clone()).await {
+                                Ok(_) => {
+                                    info!("Subscribed {} to topic: {}", sender, topic);
+                                    acked_topics.push(topic.clone());
+                                }
+                                Err(e) => {
+                                    warn!(
+                                        "Failed to subscribe {} to topic {}: {}",
+                                        sender, topic, e
+                                    );
+                                }
                             }
                         }
-                    }
 
-                    // Send SubscribeAck back
-                    if !acked_topics.is_empty() {
-                        let network_handle_lock = network_handle_holder_clone.clone();
-                        let own_did = own_did_clone.clone();
-                        tokio::spawn(async move {
+                        // Send SubscribeAck back
+                        if !acked_topics.is_empty() {
                             tokio::time::sleep(Duration::from_millis(10)).await;
                             if let Some(net_handle) = network_handle_lock.read().await.as_ref() {
                                 let ack_msg = NetworkMessage::subscribe_ack(
                                     own_did,
-                                    sender_did.clone(),
+                                    sender.clone(),
                                     acked_topics.clone(),
                                 );
-                                if let Err(e) = net_handle.send_message(sender_did, ack_msg).await {
+                                if let Err(e) = net_handle.send_message(sender, ack_msg).await {
                                     warn!("Failed to send SubscribeAck: {}", e);
                                 }
                             }
-                        });
-                    }
+                        }
+                    });
                 }
 
                 MessagePayload::Unsubscribe { topics } => {
@@ -152,15 +158,19 @@ impl TestNode {
                         sender_did, topics
                     );
 
-                    let mut gossip = gossip_handle_clone.blocking_write();
-                    for topic in &topics {
-                        if let Err(e) = gossip.unsubscribe(topic, &sender_did) {
-                            warn!(
-                                "Failed to unsubscribe {} from topic {}: {}",
-                                sender_did, topic, e
-                            );
+                    let gossip_handle = gossip_handle_clone.clone();
+                    let sender = sender_did.clone();
+                    tokio::spawn(async move {
+                        let mut gossip = gossip_handle.write().await;
+                        for topic in &topics {
+                            if let Err(e) = gossip.unsubscribe(topic, &sender) {
+                                warn!(
+                                    "Failed to unsubscribe {} from topic {}: {}",
+                                    sender, topic, e
+                                );
+                            }
                         }
-                    }
+                    });
                 }
 
                 MessagePayload::SubscribeAck { topics } => {
@@ -329,7 +339,7 @@ async fn test_response_handler_triggers_notifications_across_nodes() -> Result<(
     let test_data = b"Test entry from Node 3".to_vec();
     let hash = {
         let mut gossip3 = node3.gossip_handle.write().await;
-        gossip3.publish(topic, test_data.clone())?
+        gossip3.publish(topic, test_data.clone()).await?
     };
 
     info!("✓ Node 3 published entry: {}", hex::encode(hash));
@@ -452,7 +462,7 @@ async fn test_response_handler_enforces_max_entries_across_nodes() -> Result<()>
         let data = format!("Entry {i}").into_bytes();
         let hash = {
             let mut gossip1 = node1.gossip_handle.write().await;
-            gossip1.publish(topic, data)?
+            gossip1.publish(topic, data).await?
         };
         hashes.push(hash);
         tokio::time::sleep(Duration::from_millis(10)).await; // Ensure distinct timestamps

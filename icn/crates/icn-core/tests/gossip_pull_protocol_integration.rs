@@ -89,7 +89,7 @@ impl TestNode {
                 let sender = sender_did.clone();
                 tokio::spawn(async move {
                     let mut gossip = gossip_handle.write().await;
-                    if let Err(e) = gossip.handle_message(&sender, gossip_msg) {
+                    if let Err(e) = gossip.handle_message(&sender, gossip_msg).await {
                         warn!("Failed to handle gossip message: {}", e);
                     }
                 });
@@ -226,7 +226,7 @@ async fn test_two_node_convergence_via_pull_protocol() -> Result<()> {
         let data = format!("Pull test entry {i}").into_bytes();
         let hash = {
             let mut gossip1 = node1.gossip_handle.write().await;
-            gossip1.publish(topic, data)?
+            gossip1.publish(topic, data).await?
         };
         hashes.push(hash);
         info!("✓ Node 1 published entry {}: {}", i, hex::encode(hash));
@@ -364,7 +364,7 @@ async fn test_pull_request_respects_backpressure() -> Result<()> {
     for i in 0..100 {
         let data = format!("Entry {i}").into_bytes();
         let mut gossip1 = node1.gossip_handle.write().await;
-        gossip1.publish(topic, data)?;
+        gossip1.publish(topic, data).await?;
     }
 
     info!("✓ Node 1 published 100 entries");

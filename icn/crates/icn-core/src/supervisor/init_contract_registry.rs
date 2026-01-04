@@ -95,7 +95,7 @@ pub async fn init_contract_registry_services(
             };
 
             let mut gossip = gossip.write().await;
-            if let Err(e) = gossip.publish(topic, bytes) {
+            if let Err(e) = gossip.publish(topic, bytes).await {
                 tracing::warn!("Failed to publish contract registry message: {}", e);
             }
         });
@@ -119,15 +119,15 @@ pub async fn init_contract_registry_services(
         let mut gossip = deps.gossip_handle.write().await;
 
         // Subscribe to all contract topics
-        if let Err(e) = gossip.subscribe(TOPIC_CONTRACTS, did.clone()) {
+        if let Err(e) = gossip.subscribe(TOPIC_CONTRACTS, did.clone()).await {
             tracing::warn!("Failed to subscribe to {}: {}", TOPIC_CONTRACTS, e);
         }
 
-        if let Err(e) = gossip.subscribe(TOPIC_CONTRACTS_DEPLOY, did.clone()) {
+        if let Err(e) = gossip.subscribe(TOPIC_CONTRACTS_DEPLOY, did.clone()).await {
             tracing::warn!("Failed to subscribe to {}: {}", TOPIC_CONTRACTS_DEPLOY, e);
         }
 
-        if let Err(e) = gossip.subscribe(TOPIC_CONTRACTS_REVOKE, did.clone()) {
+        if let Err(e) = gossip.subscribe(TOPIC_CONTRACTS_REVOKE, did.clone()).await {
             tracing::warn!("Failed to subscribe to {}: {}", TOPIC_CONTRACTS_REVOKE, e);
         }
 

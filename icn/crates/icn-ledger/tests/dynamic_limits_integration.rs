@@ -39,8 +39,8 @@ fn create_basic_test_ledger() -> (Ledger, TempDir) {
     (ledger, temp_dir)
 }
 
-#[test]
-fn test_dynamic_limits_integration_basic() {
+#[tokio::test]
+async fn test_dynamic_limits_integration_basic() {
     let (mut ledger, _temp) = create_test_ledger_with_dynamic_limits();
 
     let alice_kp = KeyPair::generate().unwrap();
@@ -55,7 +55,7 @@ fn test_dynamic_limits_integration_basic() {
         .unwrap();
 
     // Should succeed - within credit limits
-    let result = ledger.append_entry(entry);
+    let result = ledger.append_entry(entry).await;
     assert!(result.is_ok(), "Entry should succeed: {result:?}");
 
     // Check balances (in mutual credit: debit = owed to you, credit = you owe)
@@ -79,8 +79,8 @@ fn test_dynamic_limits_not_set_by_default() {
     assert!(ledger.dynamic_limit_manager().is_none());
 }
 
-#[test]
-fn test_activity_updates_dynamic_state() {
+#[tokio::test]
+async fn test_activity_updates_dynamic_state() {
     let temp_dir = TempDir::new().unwrap();
     let store = Arc::new(SledStore::open(temp_dir.path()).unwrap());
 
@@ -115,7 +115,7 @@ fn test_activity_updates_dynamic_state() {
         .build()
         .unwrap();
 
-    ledger.append_entry(entry).unwrap();
+    ledger.append_entry(entry).await.unwrap();
 
     // State should now exist for both alice and bob
     let alice_state = dynamic_manager.get_state(&alice, "hours").unwrap();
@@ -128,8 +128,8 @@ fn test_activity_updates_dynamic_state() {
     assert!(bob_state.is_some(), "Bob should have dynamic limit state");
 }
 
-#[test]
-fn test_credit_limit_enforcement_with_dynamic_manager() {
+#[tokio::test]
+async fn test_credit_limit_enforcement_with_dynamic_manager() {
     let temp_dir = TempDir::new().unwrap();
     let store = Arc::new(SledStore::open(temp_dir.path()).unwrap());
 
@@ -164,15 +164,15 @@ fn test_credit_limit_enforcement_with_dynamic_manager() {
     let bob = KeyPair::generate().unwrap().did().clone();
 
     // First transaction: Bob receives credit of 50 (goes to -50 balance)
-    // debit(alice) = Alice is owed 50 → balance +50
-    // credit(bob) = Bob owes 50 → balance -50
+    // debit(alice) = Alice is owed 50 -> balance +50
+    // credit(bob) = Bob owes 50 -> balance -50
     let entry1 = JournalEntryBuilder::new(alice.clone())
         .debit(alice.clone(), "hours".to_string(), 50)
         .credit(bob.clone(), "hours".to_string(), 50)
         .build()
         .unwrap();
 
-    assert!(ledger.append_entry(entry1).is_ok());
+    assert!(ledger.append_entry(entry1).await.is_ok());
     assert_eq!(ledger.get_balance(&alice, "hours"), 50); // Alice is owed
     assert_eq!(ledger.get_balance(&bob, "hours"), -50); // Bob owes
 
@@ -184,7 +184,7 @@ fn test_credit_limit_enforcement_with_dynamic_manager() {
         .build()
         .unwrap();
 
-    let result = ledger.append_entry(entry2);
+    let result = ledger.append_entry(entry2).await;
     assert!(
         result.is_err(),
         "Should reject entry that exceeds credit limit"
@@ -202,8 +202,8 @@ fn test_credit_limit_enforcement_with_dynamic_manager() {
     assert_eq!(ledger.get_balance(&bob, "hours"), -50);
 }
 
-#[test]
-fn test_fallback_to_static_limits_on_error() {
+#[tokio::test]
+async fn test_fallback_to_static_limits_on_error() {
     // This test verifies that if dynamic manager is set but fails,
     // we fall back to static calculation. This is hard to test directly
     // since the manager shouldn't fail normally, but we can verify the
@@ -221,11 +221,11 @@ fn test_fallback_to_static_limits_on_error() {
         .build()
         .unwrap();
 
-    assert!(ledger.append_entry(entry).is_ok());
+    assert!(ledger.append_entry(entry).await.is_ok());
 }
 
-#[test]
-fn test_multiple_currencies_tracked_separately() {
+#[tokio::test]
+async fn test_multiple_currencies_tracked_separately() {
     let temp_dir = TempDir::new().unwrap();
     let store = Arc::new(SledStore::open(temp_dir.path()).unwrap());
 
@@ -265,7 +265,7 @@ fn test_multiple_currencies_tracked_separately() {
         .build()
         .unwrap();
 
-    ledger.append_entry(hours_entry).unwrap();
+    ledger.append_entry(hours_entry).await.unwrap();
     assert_eq!(ledger.get_balance(&bob, "hours"), -50);
 
     // Transaction in different currency (kwh) - Bob goes to -80 in kwh
@@ -275,7 +275,7 @@ fn test_multiple_currencies_tracked_separately() {
         .build()
         .unwrap();
 
-    ledger.append_entry(kwh_entry).unwrap();
+    ledger.append_entry(kwh_entry).await.unwrap();
     assert_eq!(ledger.get_balance(&bob, "kwh"), -80);
 
     // Both should have separate state entries
@@ -298,7 +298,7 @@ fn test_multiple_currencies_tracked_separately() {
         .build()
         .unwrap();
 
-    let result = ledger.append_entry(hours_exceed);
+    let result = ledger.append_entry(hours_exceed).await;
     assert!(
         result.is_err(),
         "Should reject hours transaction exceeding limit"
@@ -313,7 +313,7 @@ fn test_multiple_currencies_tracked_separately() {
         .unwrap();
 
     assert!(
-        ledger.append_entry(kwh_ok).is_ok(),
+        ledger.append_entry(kwh_ok).await.is_ok(),
         "kwh transaction should succeed independently of hours limit"
     );
     assert_eq!(ledger.get_balance(&bob, "kwh"), -95);

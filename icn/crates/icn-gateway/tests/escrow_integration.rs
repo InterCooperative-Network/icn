@@ -82,13 +82,15 @@ async fn test_escrow_lifecycle() {
     if conditions_met_charlie {
         // Mock the ledger transaction call that API would do
         // Note: Ledger uses (Recipient, Payer) signature for Mutual Credit logic (Debit Recipient (+), Credit Payer (-))
-        let res = ledger_mgr.create_payment(
-            &coop_id,
-            bob.did(),   // Recipient
-            alice.did(), // Payer
-            escrow.amount,
-            escrow.currency.clone(),
-        );
+        let res = ledger_mgr
+            .create_payment(
+                &coop_id,
+                bob.did(),   // Recipient
+                alice.did(), // Payer
+                escrow.amount,
+                escrow.currency.clone(),
+            )
+            .await;
         assert!(res.is_ok());
 
         escrow.status = EscrowStatus::Released;
@@ -101,7 +103,10 @@ async fn test_escrow_lifecycle() {
     assert_eq!(final_escrow.approvals.len(), 1);
 
     // Verify Ledger State
-    let bob_balance = ledger_mgr.get_balance(&coop_id, bob.did(), "USD").unwrap();
+    let bob_balance = ledger_mgr
+        .get_balance(&coop_id, bob.did(), "USD")
+        .await
+        .unwrap();
     assert_eq!(bob_balance, 100);
 }
 

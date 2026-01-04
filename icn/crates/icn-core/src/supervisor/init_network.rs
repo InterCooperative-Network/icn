@@ -50,7 +50,7 @@ pub fn create_incoming_handler(deps: MessageHandlerDeps) -> icn_net::IncomingMes
                 let sender = sender_did.clone();
                 tokio::spawn(async move {
                     let mut gossip = gossip.write().await;
-                    if let Err(e) = gossip.handle_message(&sender, gossip_msg) {
+                    if let Err(e) = gossip.handle_message(&sender, gossip_msg).await {
                         warn!("Failed to handle gossip message: {}", e);
                     }
                 });
@@ -72,7 +72,7 @@ pub fn create_incoming_handler(deps: MessageHandlerDeps) -> icn_net::IncomingMes
                     let mut acked_topics = Vec::new();
 
                     for topic in &topics {
-                        match gossip.subscribe(topic, sender_did.clone()) {
+                        match gossip.subscribe(topic, sender_did.clone()).await {
                             Ok(_) => {
                                 info!("Subscribed {} to topic: {}", sender_did, topic);
                                 acked_topics.push(topic.clone());
@@ -185,7 +185,7 @@ pub fn create_incoming_handler(deps: MessageHandlerDeps) -> icn_net::IncomingMes
                         let sender = envelope.from.clone();
                         tokio::spawn(async move {
                             let mut gossip = gossip.write().await;
-                            if let Err(e) = gossip.handle_message(&sender, gossip_msg) {
+                            if let Err(e) = gossip.handle_message(&sender, gossip_msg).await {
                                 warn!("Failed to handle gossip message from {}: {}", sender, e);
                             }
                         });

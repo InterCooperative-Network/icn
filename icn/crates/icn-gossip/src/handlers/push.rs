@@ -106,7 +106,7 @@ impl GossipActor {
     /// 2. Vector clock merge
     /// 3. max_entries limit enforcement
     /// 4. Duplicate detection
-    pub(crate) fn handle_response(&mut self, sender: &Did, entry: GossipEntry) -> Result<()> {
+    pub(crate) async fn handle_response(&mut self, sender: &Did, entry: GossipEntry) -> Result<()> {
         icn_obs::metrics::gossip::responses_received_inc();
         debug!(
             peer_did = %sender,
@@ -118,7 +118,7 @@ impl GossipActor {
         );
 
         // Store the entry using store_entry() to ensure proper handling
-        self.store_entry(entry)?;
+        self.store_entry(entry).await?;
 
         // Track metrics
         icn_obs::metrics::gossip::entries_received_inc();

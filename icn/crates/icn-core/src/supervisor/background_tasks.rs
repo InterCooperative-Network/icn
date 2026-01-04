@@ -173,7 +173,7 @@ pub mod steward {
                 // Publish via gossip
                 {
                     let mut gossip = gossip.write().await;
-                    if let Err(e) = gossip.publish(topic, data) {
+                    if let Err(e) = gossip.publish(topic, data).await {
                         warn!("Failed to publish steward message: {}", e);
                     }
                 }
@@ -190,7 +190,7 @@ pub mod steward {
             icn_steward::topics::ENROLLMENT,
             icn_steward::topics::RECOVERY,
         ] {
-            if let Err(e) = gossip.subscribe(topic, did.clone()) {
+            if let Err(e) = gossip.subscribe(topic, did.clone()).await {
                 warn!("Failed to subscribe to steward topic {}: {}", topic, e);
             } else {
                 info!("Subscribed to steward topic: {}", topic);

@@ -50,10 +50,13 @@ impl TestNode {
         let incoming_handler: IncomingMessageHandler = Arc::new(move |net_msg| {
             if let MessagePayload::Gossip(gossip_msg) = net_msg.payload {
                 let sender = net_msg.from.clone();
-                let mut gossip = gossip_handle_clone.blocking_write();
-                if let Err(e) = gossip.handle_message(&sender, gossip_msg) {
-                    warn!("Failed to handle gossip message: {}", e);
-                }
+                let gossip_handle = gossip_handle_clone.clone();
+                tokio::spawn(async move {
+                    let mut gossip = gossip_handle.write().await;
+                    if let Err(e) = gossip.handle_message(&sender, gossip_msg).await {
+                        warn!("Failed to handle gossip message: {}", e);
+                    }
+                });
             }
         });
 
@@ -137,7 +140,7 @@ async fn test_two_node_gossip_flow() -> Result<()> {
 
     let hash = {
         let mut gossip1 = node1.gossip_handle.write().await;
-        gossip1.publish(topic, test_data.clone())?
+        gossip1.publish(topic, test_data.clone()).await?
     };
 
     info!("Published entry with hash: {:?}", hex::encode(hash));

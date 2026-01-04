@@ -67,7 +67,7 @@ pub async fn handle_contract_deploy(
 
     // Publish to contracts:deploy gossip topic
     let mut gossip = gossip_handle.write().await;
-    match gossip.publish("contracts:deploy", message_bytes) {
+    match gossip.publish("contracts:deploy", message_bytes).await {
         Ok(_) => {
             info!(
                 "Contract deployment published to gossip: {}",

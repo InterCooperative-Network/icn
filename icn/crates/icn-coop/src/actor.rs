@@ -352,7 +352,7 @@ impl CoopActor {
                 Ok(data) => {
                     // Publish to gossip topic
                     let mut gossip_actor = gossip.write().await;
-                    match gossip_actor.publish(COOP_TOPIC, data) {
+                    match gossip_actor.publish(COOP_TOPIC, data).await {
                         Ok(hash) => {
                             debug!(
                                 coop_id = %coop.id,

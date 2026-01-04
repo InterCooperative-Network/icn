@@ -60,7 +60,7 @@ pub async fn init_community_services(
     // init_notifications.rs which uses last-write-wins merge strategy.
     {
         let mut gossip = gossip_handle.write().await;
-        if let Err(e) = gossip.subscribe(COMMUNITY_TOPIC, node_did) {
+        if let Err(e) = gossip.subscribe(COMMUNITY_TOPIC, node_did).await {
             warn!("Failed to subscribe to community:updates topic: {}", e);
         } else {
             info!("Subscribed to community:updates topic");

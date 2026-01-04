@@ -87,7 +87,7 @@ impl TestNode {
             gossip.create_topic(Topic::new(topic.to_string(), AccessControl::Public));
         }
 
-        let hash = gossip.publish(topic, data)?;
+        let hash = gossip.publish(topic, data).await?;
         Ok(hash)
     }
 
@@ -109,8 +109,12 @@ impl TestNode {
         let mut peer_gossip = peer.gossip_handle.write().await;
 
         // Subscribe to each other's presence
-        let _ = my_gossip.subscribe("network:presence", peer.did.clone());
-        let _ = peer_gossip.subscribe("network:presence", self.did.clone());
+        let _ = my_gossip
+            .subscribe("network:presence", peer.did.clone())
+            .await;
+        let _ = peer_gossip
+            .subscribe("network:presence", self.did.clone())
+            .await;
 
         Ok(())
     }
@@ -227,7 +231,9 @@ async fn test_trust_weighted_selection() -> Result<()> {
         &federated_peer,
     ] {
         let mut gossip = node.gossip_handle.write().await;
-        let _ = gossip.subscribe("network:presence", (*peer_did).clone());
+        let _ = gossip
+            .subscribe("network:presence", (*peer_did).clone())
+            .await;
     }
 
     // Publish content with only node as replica

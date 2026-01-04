@@ -104,7 +104,7 @@ async fn test_duplicate_proposal_event_is_idempotent() -> Result<()> {
                             .build();
 
                         if let Ok(entry) = entry_result {
-                            if let Ok(entry_hash) = ledger_guard.append_entry(entry) {
+                            if let Ok(entry_hash) = ledger_guard.append_entry(entry).await {
                                 info!("✅ Executed: {} {}", amount, currency);
 
                                 // Store audit trail

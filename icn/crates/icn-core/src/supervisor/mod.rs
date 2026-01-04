@@ -874,6 +874,7 @@ impl Supervisor {
                                     let mut gossip = gossip.write().await;
                                     gossip
                                         .publish(&topic_owned, data)
+                                        .await
                                         .map(|_| ()) // Discard the hash, just return ()
                                         .map_err(|e| {
                                             icn_federation::FederationError::GossipPublishFailed(
@@ -947,7 +948,8 @@ impl Supervisor {
                     &mut gossip,
                     &did,
                     init_gossip::TopicSubscriptionConfig { federation_enabled },
-                );
+                )
+                .await;
 
                 // Spawn periodic federation announcement task (every 5 minutes) if enabled
                 if federation_enabled {
@@ -1114,6 +1116,7 @@ impl Supervisor {
                                 let mut gossip = gossip_handle.write().await;
                                 match gossip
                                     .publish(init_gossip::NETWORK_CANDIDATES_TOPIC, candidate_bytes)
+                                    .await
                                 {
                                     Ok(_) => info!("✓ Published connection candidate to gossip"),
                                     Err(e) => {
@@ -1133,7 +1136,10 @@ impl Supervisor {
                 let mut gossip = gossip_handle.write().await;
 
                 // Subscribe to network:profiles topic for peer capability discovery
-                if let Err(e) = gossip.subscribe(crate::node::TOPIC_NODE_PROFILES, did.clone()) {
+                if let Err(e) = gossip
+                    .subscribe(crate::node::TOPIC_NODE_PROFILES, did.clone())
+                    .await
+                {
                     warn!("Failed to subscribe to network:profiles topic: {}", e);
                 } else {
                     info!("Subscribed to network:profiles topic");
@@ -1143,7 +1149,10 @@ impl Supervisor {
                 let profile_msg = crate::node::ProfileMessage::Announce(node_profile.clone());
                 match serde_json::to_vec(&profile_msg) {
                     Ok(profile_bytes) => {
-                        match gossip.publish(crate::node::TOPIC_NODE_PROFILES, profile_bytes) {
+                        match gossip
+                            .publish(crate::node::TOPIC_NODE_PROFILES, profile_bytes)
+                            .await
+                        {
                             Ok(_) => {
                                 info!(
                                     "✓ Published node profile: {} roles ({:?}), {} extended capabilities",

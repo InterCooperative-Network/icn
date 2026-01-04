@@ -71,8 +71,12 @@ async fn test_scheduler_execution_flow() {
     // Note: get_balance requires currency string
     let alice_balance = ledger_mgr
         .get_balance(&coop_id, alice.did(), "USD")
+        .await
         .unwrap();
-    let bob_balance = ledger_mgr.get_balance(&coop_id, bob.did(), "USD").unwrap();
+    let bob_balance = ledger_mgr
+        .get_balance(&coop_id, bob.did(), "USD")
+        .await
+        .unwrap();
 
     // Since it's a credit-based ledger initiated from 0?
     // Wait, create_payment just appends entries.

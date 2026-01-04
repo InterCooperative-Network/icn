@@ -56,10 +56,13 @@ impl TestNode {
         let incoming_handler: IncomingMessageHandler = Arc::new(move |net_msg| {
             if let MessagePayload::Gossip(gossip_msg) = net_msg.payload {
                 let sender = net_msg.from.clone();
-                let mut gossip = gossip_handle_clone.blocking_write();
-                if let Err(e) = gossip.handle_message(&sender, gossip_msg) {
-                    warn!("Failed to handle gossip message: {}", e);
-                }
+                let gossip_handle = gossip_handle_clone.clone();
+                tokio::spawn(async move {
+                    let mut gossip = gossip_handle.write().await;
+                    if let Err(e) = gossip.handle_message(&sender, gossip_msg).await {
+                        warn!("Failed to handle gossip message: {}", e);
+                    }
+                });
             }
         });
 
@@ -168,10 +171,13 @@ impl TestNode {
         let incoming_handler: IncomingMessageHandler = Arc::new(move |net_msg| {
             if let MessagePayload::Gossip(gossip_msg) = net_msg.payload {
                 let sender = net_msg.from.clone();
-                let mut gossip = gossip_handle_clone.blocking_write();
-                if let Err(e) = gossip.handle_message(&sender, gossip_msg) {
-                    warn!("Failed to handle gossip message: {}", e);
-                }
+                let gossip_handle = gossip_handle_clone.clone();
+                tokio::spawn(async move {
+                    let mut gossip = gossip_handle.write().await;
+                    if let Err(e) = gossip.handle_message(&sender, gossip_msg).await {
+                        warn!("Failed to handle gossip message: {}", e);
+                    }
+                });
             }
         });
 
@@ -246,14 +252,14 @@ async fn test_high_message_volume_restart() -> Result<()> {
         let mut gossip = node.gossip_handle.write().await;
         let topic = Topic::new(topic_name.to_string(), AccessControl::Public);
         gossip.create_topic(topic);
-        gossip.subscribe(topic_name, did.clone())?;
+        gossip.subscribe(topic_name, did.clone()).await?;
     }
 
     // Publish messages
     for i in 0..message_count {
         let mut gossip = node.gossip_handle.write().await;
         let msg = format!("message {i}");
-        gossip.publish(topic_name, msg.as_bytes().to_vec())?;
+        gossip.publish(topic_name, msg.as_bytes().to_vec()).await?;
 
         if (i + 1) % 100 == 0 {
             info!("Published {} messages", i + 1);
@@ -516,7 +522,7 @@ async fn test_multi_topic_high_subscription_restart() -> Result<()> {
         let mut gossip = node.gossip_handle.write().await;
         let topic = Topic::new(topic_name.clone(), AccessControl::Public);
         gossip.create_topic(topic);
-        gossip.subscribe(&topic_name, did.clone())?;
+        gossip.subscribe(&topic_name, did.clone()).await?;
     }
 
     info!("✅ Created and subscribed to {} topics", topic_count);
@@ -531,7 +537,7 @@ async fn test_multi_topic_high_subscription_restart() -> Result<()> {
         for j in 0..messages_per_topic {
             let mut gossip = node.gossip_handle.write().await;
             let msg = format!("topic{i} msg{j}");
-            gossip.publish(&topic_name, msg.as_bytes().to_vec())?;
+            gossip.publish(&topic_name, msg.as_bytes().to_vec()).await?;
         }
     }
 

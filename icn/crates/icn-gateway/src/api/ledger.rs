@@ -34,7 +34,7 @@ pub async fn get_balance(
         .parse()
         .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
 
-    let balances = ledger_mgr.get_all_balances(&coop_id, &did)?;
+    let balances = ledger_mgr.get_all_balances(&coop_id, &did).await?;
 
     // Track balance query
     gateway::balance_queries_inc();
@@ -114,7 +114,9 @@ pub async fn create_payment(
     let trust_score = trust_mgr.compute_trust_score_for_velocity(&from).await;
     velocity_limiter.check_and_record(&req.from, trust_score)?;
 
-    let hash = ledger_mgr.create_payment(&coop_id, &from, &to, req.amount, req.currency.clone())?;
+    let hash = ledger_mgr
+        .create_payment(&coop_id, &from, &to, req.amount, req.currency.clone())
+        .await?;
 
     // Record spending in budget tracker
     let notified_budgets = budget_store
@@ -268,17 +270,15 @@ pub async fn get_history(
     // This streams entries and stops after collecting enough, never loading all into memory
     let (entries, next_cursor_tuple) = if cursor_tuple.is_some() || filter_did.is_some() {
         // Use the new streaming pagination for cursor-based or filtered queries
-        ledger_mgr.get_history_paginated(
-            &coop_id,
-            filter_did.as_ref(),
-            cursor_tuple,
-            validated_limit,
-        )?
+        ledger_mgr
+            .get_history_paginated(&coop_id, filter_did.as_ref(), cursor_tuple, validated_limit)
+            .await?
     } else {
         // For simple offset-based queries without filters, use the offset method
         let offset = validation::validate_history_offset(offset)?;
-        let entries =
-            ledger_mgr.get_history(&coop_id, filter_did.as_ref(), offset, validated_limit + 1)?;
+        let entries = ledger_mgr
+            .get_history(&coop_id, filter_did.as_ref(), offset, validated_limit + 1)
+            .await?;
         let has_more = entries.len() > validated_limit;
         let entries: Vec<_> = entries.into_iter().take(validated_limit).collect();
         let next = if has_more {
@@ -590,6 +590,7 @@ mod tests {
                 10,
                 "hours".to_string(),
             )
+            .await
             .unwrap();
 
         let app = test::init_service(
@@ -813,6 +814,7 @@ mod tests {
                 50,
                 "hours".to_string(),
             )
+            .await
             .unwrap();
 
         let app = test::init_service(

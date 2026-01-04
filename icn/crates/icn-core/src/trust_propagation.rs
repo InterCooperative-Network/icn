@@ -219,7 +219,7 @@ pub async fn broadcast_trust_attestation(
 
     // Publish to gossip
     let mut gossip_actor = gossip.write().await;
-    let hash = gossip_actor.publish(TRUST_ATTESTATIONS_TOPIC, data)?;
+    let hash = gossip_actor.publish(TRUST_ATTESTATIONS_TOPIC, data).await?;
 
     debug!(
         "Broadcasted trust attestation: {} -> {} (hash: {:?})",

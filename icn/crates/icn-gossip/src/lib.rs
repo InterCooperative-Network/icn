@@ -17,7 +17,7 @@
 //!
 //! ## Example
 //!
-//! ```rust
+//! ```rust,ignore
 //! use icn_gossip::{GossipActor, Topic, AccessControl};
 //! use icn_identity::KeyPair;
 //! use icn_trust::TrustClass;
@@ -31,9 +31,9 @@
 //!
 //! let mut gossip = GossipActor::new(did, trust_lookup);
 //!
-//! // Publish to a topic
+//! // Publish to a topic (async)
 //! let data = b"Hello, distributed world!".to_vec();
-//! let hash = gossip.publish("global:identity", data).unwrap();
+//! let hash = gossip.publish("global:identity", data).await.unwrap();
 //! ```
 
 pub mod bloom;

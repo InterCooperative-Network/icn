@@ -129,7 +129,7 @@ impl MultiStateNode {
     /// Add ledger entry
     async fn add_entry(&self, entry: icn_ledger::JournalEntry) -> Result<()> {
         let mut ledger = self.ledger.write().await;
-        ledger.append_entry(entry)?;
+        ledger.append_entry(entry).await?;
         Ok(())
     }
 
