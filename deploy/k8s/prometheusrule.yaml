@@ -133,7 +133,7 @@ spec:
 
     - alert: ICNBackupMissing
       expr: |
-        time() - kube_job_status_completion_time{namespace="icn", job_name=~"icn-backup-.*"} > 93600
+        time() - kube_job_status_completion_time{namespace="icn", job_name=~"icn-backup-[0-9].*"} > 93600
       for: 5m
       labels:
         severity: critical
@@ -144,7 +144,7 @@ spec:
 
     - alert: ICNNoRecentBackupJobs
       expr: |
-        absent(kube_job_status_completion_time{namespace="icn", job_name=~"icn-backup-.*"})
+        absent(kube_job_status_completion_time{namespace="icn", job_name=~"icn-backup-[0-9].*"})
       for: 30m
       labels:
         severity: warning
