@@ -35,6 +35,9 @@ const GOVERNANCE_TOPIC: &str = "governance:proposal";
 /// Interval for checking proposal expiration
 const SCHEDULER_INTERVAL: Duration = Duration::from_secs(10);
 
+/// Default voting period when domain config is unavailable (7 days in seconds)
+const DEFAULT_VOTING_PERIOD_SECONDS: u64 = 7 * 24 * 60 * 60;
+
 /// Scheduled governance event types
 #[derive(Clone, Debug)]
 enum ScheduledEvent {
@@ -979,7 +982,7 @@ impl GovernanceActor {
                 let voting_period_seconds = self
                     .load_domain(&proposal.domain_id)?
                     .map(|d| d.config.params.voting_period_seconds)
-                    .unwrap_or(7 * 24 * 60 * 60); // Default: 7 days
+                    .unwrap_or(DEFAULT_VOTING_PERIOD_SECONDS);
 
                 // Schedule auto-transition from Deliberation to Open when deliberation ends
                 let ends_at_instant =
