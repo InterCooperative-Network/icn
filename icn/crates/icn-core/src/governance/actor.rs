@@ -32,26 +32,66 @@ use crate::events::{EventBus, SystemEvent};
 /// Gossip topic for governance messages
 const GOVERNANCE_TOPIC: &str = "governance:proposal";
 
-/// Interval for checking proposal expiration
+/// Interval for checking scheduled governance events (proposal close, deliberation end).
+/// 10 seconds provides reasonable responsiveness without excessive polling.
 const SCHEDULER_INTERVAL: Duration = Duration::from_secs(10);
 
-/// Scheduled proposal close event
-#[derive(Clone, Debug, Eq, PartialEq)]
-struct ScheduledClose {
-    closes_at: Instant,
-    proposal_id: ProposalId,
+/// Default voting period when domain config is unavailable.
+/// 7 days is a reasonable default for cooperative decision-making, allowing
+/// time for member participation while not delaying governance indefinitely.
+const DEFAULT_VOTING_PERIOD_SECONDS: u64 = 7 * 24 * 60 * 60;
+
+/// Scheduled governance event types
+#[derive(Clone, Debug)]
+enum ScheduledEvent {
+    /// Close voting for a proposal (Open → Closed)
+    CloseVoting { proposal_id: ProposalId },
+    /// End deliberation and open voting (Deliberation → Open)
+    EndDeliberation {
+        proposal_id: ProposalId,
+        /// Voting period to use when transitioning to Open
+        voting_period_seconds: u64,
+    },
 }
 
-impl Ord for ScheduledClose {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        // Earlier times have higher priority
-        self.closes_at.cmp(&other.closes_at)
+/// Scheduled governance event with timestamp
+#[derive(Clone, Debug)]
+struct ScheduledGovernanceEvent {
+    /// When the event should fire
+    at: Instant,
+    /// The event to execute
+    event: ScheduledEvent,
+}
+
+impl Eq for ScheduledGovernanceEvent {}
+
+impl PartialEq for ScheduledGovernanceEvent {
+    fn eq(&self, other: &Self) -> bool {
+        // Compare both timestamp and proposal_id for correct equality semantics.
+        // Two events at the same time for different proposals are not equal.
+        self.at == other.at && self.proposal_id() == other.proposal_id()
     }
 }
 
-impl PartialOrd for ScheduledClose {
+impl Ord for ScheduledGovernanceEvent {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        // Earlier times have higher priority
+        self.at.cmp(&other.at)
+    }
+}
+
+impl PartialOrd for ScheduledGovernanceEvent {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
+    }
+}
+
+impl ScheduledGovernanceEvent {
+    fn proposal_id(&self) -> &ProposalId {
+        match &self.event {
+            ScheduledEvent::CloseVoting { proposal_id } => proposal_id,
+            ScheduledEvent::EndDeliberation { proposal_id, .. } => proposal_id,
+        }
     }
 }
 
@@ -720,8 +760,8 @@ pub struct GovernanceActor {
     gossip: Arc<RwLock<GossipActor>>,
     resolver: Arc<dyn MembershipResolver + Send + Sync>,
     profile: GovernanceProfile,
-    close_scheduler: Arc<RwLock<BinaryHeap<Reverse<ScheduledClose>>>>,
-    close_tx: mpsc::UnboundedSender<ProposalId>,
+    event_scheduler: Arc<RwLock<BinaryHeap<Reverse<ScheduledGovernanceEvent>>>>,
+    cancel_tx: mpsc::UnboundedSender<ProposalId>,
     event_bus: Option<Arc<EventBus>>,
 }
 
@@ -771,9 +811,9 @@ impl GovernanceActor {
             }));
         }
 
-        // Create scheduler and channel for auto-closing proposals
-        let close_scheduler = Arc::new(RwLock::new(BinaryHeap::new()));
-        let (close_tx, mut close_rx) = mpsc::unbounded_channel();
+        // Create unified event scheduler and cancellation channel
+        let event_scheduler = Arc::new(RwLock::new(BinaryHeap::new()));
+        let (cancel_tx, mut cancel_rx) = mpsc::unbounded_channel();
 
         let actor = GovernanceActor {
             did: did.clone(),
@@ -781,8 +821,8 @@ impl GovernanceActor {
             gossip: gossip.clone(),
             resolver: resolver.clone(),
             profile: GovernanceProfile::cooperative_default(),
-            close_scheduler: close_scheduler.clone(),
-            close_tx,
+            event_scheduler: event_scheduler.clone(),
+            cancel_tx,
             event_bus,
         };
 
@@ -792,46 +832,64 @@ impl GovernanceActor {
             entity_registry: None,
         };
 
-        // Spawn background timer task for auto-closing proposals
+        // Spawn background timer task for scheduled governance events
         let handle_clone = handle.clone();
-        let scheduler_clone = close_scheduler.clone();
+        let scheduler_clone = event_scheduler.clone();
         tokio::spawn(async move {
             let mut interval = tokio::time::interval(SCHEDULER_INTERVAL);
             loop {
                 tokio::select! {
                     _ = interval.tick() => {
-                        // Check for expired proposals
+                        // Check for expired events
                         let now = Instant::now();
-                        let mut expired = Vec::new();
+                        let mut expired_events = Vec::new();
 
                         {
                             let mut scheduler = scheduler_clone.write().await;
                             while let Some(Reverse(scheduled)) = scheduler.peek() {
-                                if scheduled.closes_at <= now {
+                                if scheduled.at <= now {
                                     // SAFETY: We just peeked and confirmed an element exists
                                     #[allow(clippy::unwrap_used)]
-                                    expired.push(scheduler.pop().unwrap().0.proposal_id.clone());
+                                    expired_events.push(scheduler.pop().unwrap().0.event.clone());
                                 } else {
                                     break;
                                 }
                             }
                         }
 
-                        // Auto-close expired proposals
-                        for proposal_id in expired {
-                            info!("Auto-closing expired proposal: {}", proposal_id.0);
-                            if let Err(e) = handle_clone.submit(GovernanceCommand::CloseProposal {
-                                proposal_id: proposal_id.clone(),
-                            }).await {
-                                warn!("Failed to auto-close proposal {}: {}", proposal_id.0, e);
+                        // Process expired events.
+                        // Note: Command handlers validate proposal state before executing.
+                        // If a manual transition races with the scheduler, the command will
+                        // fail gracefully with a warning. This is expected behavior.
+                        for event in expired_events {
+                            match event {
+                                ScheduledEvent::CloseVoting { proposal_id } => {
+                                    info!("Auto-closing expired proposal: {}", proposal_id.0);
+                                    if let Err(e) = handle_clone.submit(GovernanceCommand::CloseProposal {
+                                        proposal_id: proposal_id.clone(),
+                                    }).await {
+                                        // May fail if proposal was manually closed (race condition - expected)
+                                        warn!("Scheduled close for proposal {} skipped: {}", proposal_id.0, e);
+                                    }
+                                }
+                                ScheduledEvent::EndDeliberation { proposal_id, voting_period_seconds } => {
+                                    info!("Auto-transitioning proposal {} from deliberation to voting", proposal_id.0);
+                                    if let Err(e) = handle_clone.submit(GovernanceCommand::EndDeliberationAndOpen {
+                                        proposal_id: proposal_id.clone(),
+                                        voting_period_seconds,
+                                    }).await {
+                                        // May fail if deliberation was manually ended (race condition - expected)
+                                        warn!("Scheduled deliberation end for proposal {} skipped: {}", proposal_id.0, e);
+                                    }
+                                }
                             }
                         }
                     }
 
-                    Some(proposal_id) = close_rx.recv() => {
-                        // Manual close - remove from scheduler if present
+                    Some(proposal_id) = cancel_rx.recv() => {
+                        // Manual action - remove any pending events for this proposal
                         let mut scheduler = scheduler_clone.write().await;
-                        scheduler.retain(|Reverse(sc)| sc.proposal_id != proposal_id);
+                        scheduler.retain(|Reverse(sc)| sc.proposal_id() != &proposal_id);
                     }
                 }
             }
@@ -930,13 +988,37 @@ impl GovernanceActor {
                 self.store
                     .put(&proposal_key(&proposal_id), &serde_json::to_vec(&proposal)?)?;
 
-                // Note: We do NOT schedule auto-transition here because the close_scheduler
-                // is designed to call CloseProposal (for voting close), not EndDeliberationAndOpen.
-                // The deliberation → voting transition must be triggered via:
-                // 1. Manual call to end_deliberation_and_open() when deliberation ends
-                // 2. A separate background task checking proposal.can_end_deliberation()
-                // The deliberation end timestamp is stored in ProposalState::Deliberation
-                // for clients/background tasks to check.
+                // Load domain to get default voting period for auto-transition
+                // Use graceful fallback if domain load fails to avoid blocking deliberation
+                let voting_period_seconds = match self.load_domain(&proposal.domain_id) {
+                    Ok(Some(domain)) => domain.config.params.voting_period_seconds,
+                    Ok(None) => {
+                        warn!(
+                            "Domain {} not found for proposal {}, using default voting period",
+                            proposal.domain_id.0, proposal_id.0
+                        );
+                        DEFAULT_VOTING_PERIOD_SECONDS
+                    }
+                    Err(e) => {
+                        warn!(
+                            "Failed to load domain {} for proposal {}: {}, using default voting period",
+                            proposal.domain_id.0, proposal_id.0, e
+                        );
+                        DEFAULT_VOTING_PERIOD_SECONDS
+                    }
+                };
+
+                // Schedule auto-transition from Deliberation to Open when deliberation ends
+                let ends_at_instant =
+                    Instant::now() + Duration::from_secs(deliberation_period_seconds);
+                let scheduled = ScheduledGovernanceEvent {
+                    at: ends_at_instant,
+                    event: ScheduledEvent::EndDeliberation {
+                        proposal_id: proposal_id.clone(),
+                        voting_period_seconds,
+                    },
+                };
+                self.event_scheduler.write().await.push(Reverse(scheduled));
 
                 // Broadcast to network
                 self.publish(GovernanceMessage::deliberation_started(
@@ -984,11 +1066,13 @@ impl GovernanceActor {
 
                 // Schedule auto-close for voting
                 let closes_at_instant = Instant::now() + Duration::from_secs(voting_period_seconds);
-                let scheduled = ScheduledClose {
-                    closes_at: closes_at_instant,
-                    proposal_id: proposal_id.clone(),
+                let scheduled = ScheduledGovernanceEvent {
+                    at: closes_at_instant,
+                    event: ScheduledEvent::CloseVoting {
+                        proposal_id: proposal_id.clone(),
+                    },
                 };
-                self.close_scheduler.write().await.push(Reverse(scheduled));
+                self.event_scheduler.write().await.push(Reverse(scheduled));
 
                 // Broadcast deliberation ended to network
                 // Note: comment_count and participant_count are 0 since
@@ -1044,11 +1128,13 @@ impl GovernanceActor {
 
                 // Schedule auto-close
                 let closes_at_instant = Instant::now() + Duration::from_secs(voting_period_seconds);
-                let scheduled = ScheduledClose {
-                    closes_at: closes_at_instant,
-                    proposal_id: proposal_id.clone(),
+                let scheduled = ScheduledGovernanceEvent {
+                    at: closes_at_instant,
+                    event: ScheduledEvent::CloseVoting {
+                        proposal_id: proposal_id.clone(),
+                    },
                 };
-                self.close_scheduler.write().await.push(Reverse(scheduled));
+                self.event_scheduler.write().await.push(Reverse(scheduled));
 
                 // Broadcast to network
                 self.publish(GovernanceMessage::proposal_opened(
@@ -1092,8 +1178,8 @@ impl GovernanceActor {
             GovernanceCommand::CloseProposal { proposal_id } => {
                 info!("Closing proposal: {}", proposal_id.0);
 
-                // Notify scheduler to cancel auto-close (if scheduled)
-                let _ = self.close_tx.send(proposal_id.clone());
+                // Notify scheduler to cancel any pending events (if scheduled)
+                let _ = self.cancel_tx.send(proposal_id.clone());
 
                 // Load proposal
                 let mut proposal = self
@@ -1190,8 +1276,8 @@ impl GovernanceActor {
                     proposal_id.0, reason
                 );
 
-                // Notify scheduler to cancel auto-close (if scheduled)
-                let _ = self.close_tx.send(proposal_id.clone());
+                // Notify scheduler to cancel any pending events (if scheduled)
+                let _ = self.cancel_tx.send(proposal_id.clone());
 
                 // Load proposal
                 let mut proposal = self
@@ -1233,8 +1319,8 @@ impl GovernanceActor {
                     proposal_id.0, forced_outcome, reason
                 );
 
-                // Notify scheduler to cancel auto-close (if scheduled)
-                let _ = self.close_tx.send(proposal_id.clone());
+                // Notify scheduler to cancel any pending events (if scheduled)
+                let _ = self.cancel_tx.send(proposal_id.clone());
 
                 // Load proposal
                 let mut proposal = self
