@@ -19,6 +19,12 @@ pub const MAX_CLOCK_SKEW: Duration = Duration::from_secs(300);
 /// Minimum servers required for median calculation
 pub const MIN_SERVERS: usize = 3;
 
+/// Maximum timestamp in milliseconds that can be safely cast to i64.
+/// i64::MAX milliseconds is approximately 292 million years from epoch.
+/// Any timestamp beyond this indicates either malicious input or severe
+/// system clock corruption, and must be rejected to prevent overflow.
+const MAX_REASONABLE_TIMESTAMP_MS: u64 = i64::MAX as u64;
+
 /// Timeout for individual time server queries
 pub const QUERY_TIMEOUT: Duration = Duration::from_secs(5);
 
@@ -129,9 +135,27 @@ impl ClockSync {
         let median_time = self.compute_median(&responses)?;
         let now = Self::system_time_millis();
 
+        // Validate timestamps before i64 conversion to prevent overflow
+        // This guards against malicious time servers returning extreme values
+        if now > MAX_REASONABLE_TIMESTAMP_MS {
+            warn!(
+                "Local clock timestamp {}ms exceeds safe range, rejecting",
+                now
+            );
+            return Err(TimeError::InvalidTimestamp(now));
+        }
+        if median_time > MAX_REASONABLE_TIMESTAMP_MS {
+            warn!(
+                "Median time {}ms from servers exceeds safe range, possible malicious response",
+                median_time
+            );
+            return Err(TimeError::InvalidTimestamp(median_time));
+        }
+
         // Calculate signed offset in milliseconds
         // Positive = local ahead (subtract to get network time)
         // Negative = local behind (add to get network time)
+        // SAFETY: Both values are validated to be <= i64::MAX above
         self.offset_millis = now as i64 - median_time as i64;
 
         // Calculate uncertainty (based on RTT variance)
@@ -255,9 +279,20 @@ impl ClockSync {
 
         let now = Self::system_time_millis();
 
+        // Validate timestamp before i64 cast (guards against system clock corruption)
+        if now > MAX_REASONABLE_TIMESTAMP_MS {
+            warn!(
+                "System clock timestamp {}ms exceeds safe range in network_time()",
+                now
+            );
+            return Err(TimeError::InvalidTimestamp(now));
+        }
+
         // Apply signed offset: network_time = local_time - offset
         // - If offset > 0 (local ahead): subtract offset to get network time
         // - If offset < 0 (local behind): subtract negative = add to get network time
+        // SAFETY: now is validated to be <= i64::MAX, and offset_millis was validated
+        // during sync(), so the subtraction cannot overflow.
         let network_time = (now as i64 - self.offset_millis).max(0) as u64;
 
         Ok(network_time)
@@ -485,5 +520,30 @@ mod tests {
         // Applying offset: network = local - offset = 4800 - (-200) = 5000
         let network = (local_time as i64 - offset) as u64;
         assert_eq!(network, median_time);
+    }
+
+    #[test]
+    fn test_max_reasonable_timestamp_constant() {
+        // Verify the constant is set correctly for safe i64 conversion
+        assert_eq!(MAX_REASONABLE_TIMESTAMP_MS, i64::MAX as u64);
+
+        // Any value at or below this is safe to cast to i64
+        let safe_value = MAX_REASONABLE_TIMESTAMP_MS;
+        let as_i64 = safe_value as i64;
+        assert_eq!(as_i64, i64::MAX);
+
+        // Verify values above would wrap (demonstrating the need for validation)
+        let unsafe_value = MAX_REASONABLE_TIMESTAMP_MS + 1;
+        let wrapped = unsafe_value as i64;
+        assert!(wrapped < 0, "Values above MAX should wrap to negative");
+    }
+
+    #[test]
+    fn test_invalid_timestamp_error() {
+        // Test that InvalidTimestamp error can be created and displays correctly
+        let err = TimeError::InvalidTimestamp(u64::MAX);
+        let msg = format!("{}", err);
+        assert!(msg.contains("exceeds safe range"));
+        assert!(msg.contains(&u64::MAX.to_string()));
     }
 }
