@@ -927,14 +927,13 @@ impl GovernanceActor {
                 self.store
                     .put(&proposal_key(&proposal_id), &serde_json::to_vec(&proposal)?)?;
 
-                // Schedule auto-transition to voting when deliberation ends
-                let ends_at_instant =
-                    Instant::now() + Duration::from_secs(deliberation_period_seconds);
-                let scheduled = ScheduledClose {
-                    closes_at: ends_at_instant,
-                    proposal_id: proposal_id.clone(),
-                };
-                self.close_scheduler.write().await.push(Reverse(scheduled));
+                // Note: We do NOT schedule auto-transition here because the close_scheduler
+                // is designed to call CloseProposal (for voting close), not EndDeliberationAndOpen.
+                // The deliberation → voting transition must be triggered via:
+                // 1. Manual call to end_deliberation_and_open() when deliberation ends
+                // 2. A separate background task checking proposal.can_end_deliberation()
+                // The deliberation end timestamp is stored in ProposalState::Deliberation
+                // for clients/background tasks to check.
 
                 // Broadcast to network
                 self.publish(GovernanceMessage::deliberation_started(
