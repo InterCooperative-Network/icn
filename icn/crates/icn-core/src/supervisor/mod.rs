@@ -120,6 +120,19 @@ async fn resolve_address(addr_str: &str) -> Result<SocketAddr> {
 ///
 /// This design ensures encrypted messages consume ONE signing sequence (not two),
 /// maintaining consistent sequence advancement between encrypted and unencrypted paths.
+///
+/// # Sequence Allocation Design
+///
+/// The encryption sequence is allocated AFTER all fallible I/O operations (peer key lookup,
+/// serialization) but BEFORE the actual encryption. This is intentional:
+///
+/// 1. The sequence is required to derive the ChaCha20-Poly1305 nonce
+/// 2. Encryption with valid inputs is essentially infallible (ChaCha20 is deterministic)
+/// 3. The only remaining operations (bincode serialization, Ed25519 signing) are also
+///    effectively infallible with valid inputs
+///
+/// This ordering minimizes sequence waste: sequences are only consumed when all I/O and
+/// validation is complete, and the remaining crypto operations cannot practically fail.
 async fn try_encrypt_envelope(
     net_handle: &icn_net::NetworkHandle,
     from_did: &Did,
@@ -130,17 +143,22 @@ async fn try_encrypt_envelope(
     enc_seq_tracker: &icn_net::OutgoingSequenceTracker,
     outer_sequence: u64,
 ) -> Result<icn_net::SignedEnvelope> {
-    // Get recipient's X25519 public key
+    // Phase 1: All fallible I/O operations BEFORE sequence allocation
+    // This ensures sequence is only consumed when encryption is highly likely to succeed.
+
+    // Get recipient's X25519 public key (can fail if peer disconnected)
     let recipient_x25519_bytes = net_handle
         .get_peer_x25519_key(to_did)
         .await
         .context("Peer X25519 key not available")?;
     let recipient_x25519_public = x25519_dalek::PublicKey::from(recipient_x25519_bytes);
 
-    // Serialize inner envelope
+    // Serialize inner envelope (validates it's serializable before committing sequence)
     let inner_bytes = bincode::serde::encode_to_vec(inner_envelope, bincode::config::legacy())
         .context("Failed to serialize inner envelope")?;
 
+    // Phase 2: Sequence allocation - point of no return
+    // All operations after this are essentially infallible with valid inputs.
     // Get encryption sequence number (persistent, unique per sender-recipient pair)
     // This is separate from signing sequence - used only for nonce derivation
     let enc_sequence = enc_seq_tracker.next_sequence(from_did, to_did).await?;
