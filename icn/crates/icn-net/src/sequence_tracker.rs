@@ -86,6 +86,9 @@ pub struct OutgoingSequenceTracker {
     /// Whether we've applied the restart safety gap.
     /// Uses AtomicBool with compare_exchange for lock-free, race-free initialization.
     restart_gap_applied: AtomicBool,
+    /// Maximum pairs capacity (test-overridable)
+    #[cfg(test)]
+    max_pairs: usize,
 }
 
 impl OutgoingSequenceTracker {
@@ -98,6 +101,8 @@ impl OutgoingSequenceTracker {
             cache: RwLock::new(HashMap::new()),
             store,
             restart_gap_applied: AtomicBool::new(false),
+            #[cfg(test)]
+            max_pairs: MAX_SEQUENCE_PAIRS,
         };
 
         Ok(tracker)
@@ -110,6 +115,18 @@ impl OutgoingSequenceTracker {
             cache: RwLock::new(HashMap::new()),
             store: Arc::new(icn_store::SledStore::temporary().unwrap()),
             restart_gap_applied: AtomicBool::new(true), // No gap needed for tests
+            max_pairs: MAX_SEQUENCE_PAIRS,
+        }
+    }
+
+    /// Create a sequence tracker for testing with custom capacity limit.
+    #[cfg(test)]
+    pub fn in_memory_with_capacity(max_pairs: usize) -> Self {
+        Self {
+            cache: RwLock::new(HashMap::new()),
+            store: Arc::new(icn_store::SledStore::temporary().unwrap()),
+            restart_gap_applied: AtomicBool::new(true), // No gap needed for tests
+            max_pairs,
         }
     }
 
@@ -217,12 +234,17 @@ impl OutgoingSequenceTracker {
 
         // Check if this is a new pair and we're at capacity
         let is_new_pair = !cache.contains_key(&key);
-        if is_new_pair && cache.len() >= MAX_SEQUENCE_PAIRS {
+        #[cfg(test)]
+        let max_pairs = self.max_pairs;
+        #[cfg(not(test))]
+        let max_pairs = MAX_SEQUENCE_PAIRS;
+
+        if is_new_pair && cache.len() >= max_pairs {
             // Safety limit reached - reject new pairs to prevent unbounded memory growth.
             // Existing pairs can still increment. This is fail-safe: message won't be
             // encrypted, which is better than running out of memory.
             anyhow::bail!(
-                "Sequence tracker at capacity ({MAX_SEQUENCE_PAIRS} pairs). \
+                "Sequence tracker at capacity ({max_pairs} pairs). \
                  Cannot add new recipient. Cleanup may be failing - check logs."
             );
         }
@@ -806,5 +828,103 @@ mod tests {
             let current = tracker.current_sequence(&alice, &bob).await.unwrap();
             assert_eq!(current, 1 + RESTART_SAFETY_GAP);
         }
+    }
+
+    #[tokio::test]
+    async fn test_capacity_limit_rejects_new_pairs() {
+        // Tests that when capacity is reached, new pairs are rejected
+        // but existing pairs can still increment their sequences.
+        //
+        // This is a safety mechanism to prevent unbounded memory growth if
+        // cleanup fails persistently (circuit breaker scenario).
+
+        // Create a tracker with small capacity for testing
+        let tracker = OutgoingSequenceTracker::in_memory_with_capacity(5);
+
+        let sender = generate_did();
+        let mut recipients: Vec<Did> = Vec::new();
+
+        // Fill to capacity (5 pairs)
+        for _ in 0..5 {
+            let recipient = generate_did();
+            recipients.push(recipient.clone());
+            tracker.next_sequence(&sender, &recipient).await.unwrap();
+        }
+
+        assert_eq!(tracker.pair_count().await, 5);
+
+        // Try to add a new pair - should fail
+        let new_recipient = generate_did();
+        let result = tracker.next_sequence(&sender, &new_recipient).await;
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("at capacity"),
+            "Expected capacity error, got: {err_msg}"
+        );
+
+        // Existing pairs should still work
+        let seq = tracker
+            .next_sequence(&sender, &recipients[0])
+            .await
+            .unwrap();
+        assert_eq!(seq, 2); // Second sequence for this pair
+
+        let seq = tracker
+            .next_sequence(&sender, &recipients[4])
+            .await
+            .unwrap();
+        assert_eq!(seq, 2); // Second sequence for this pair
+
+        // Still at 5 pairs
+        assert_eq!(tracker.pair_count().await, 5);
+    }
+
+    #[tokio::test]
+    async fn test_capacity_limit_error_message_contains_guidance() {
+        // Test that the capacity limit error message helps with debugging.
+
+        let tracker = OutgoingSequenceTracker::in_memory_with_capacity(1);
+
+        let sender = generate_did();
+
+        // Fill to capacity
+        tracker
+            .next_sequence(&sender, &generate_did())
+            .await
+            .unwrap();
+
+        // Try to exceed capacity
+        let result = tracker.next_sequence(&sender, &generate_did()).await;
+        let err_msg = result.unwrap_err().to_string();
+
+        // Error should mention cleanup as a potential issue
+        assert!(
+            err_msg.contains("Cleanup may be failing"),
+            "Error should guide users to check cleanup: {err_msg}"
+        );
+        assert!(
+            err_msg.contains("check logs"),
+            "Error should direct to logs: {err_msg}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_default_capacity_is_50k() {
+        // Verify the production capacity limit is 50K pairs
+        assert_eq!(MAX_SEQUENCE_PAIRS, 50_000);
+
+        // Verify default in_memory() uses production limit
+        let tracker = OutgoingSequenceTracker::in_memory();
+        let sender = generate_did();
+
+        // Should be able to add at least a few pairs (way below 50K)
+        for _ in 0..10 {
+            tracker
+                .next_sequence(&sender, &generate_did())
+                .await
+                .unwrap();
+        }
+        assert_eq!(tracker.pair_count().await, 10);
     }
 }

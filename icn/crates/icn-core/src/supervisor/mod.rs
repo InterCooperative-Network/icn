@@ -533,12 +533,14 @@ impl Supervisor {
                     // Removes entries not used in the last 24 hours to prevent unbounded memory growth.
                     //
                     // Memory bounds analysis:
-                    // - Worst case: 100 peers × 100 unique recipients = 10,000 (sender, recipient) pairs
+                    // - In a fully-connected network, worst case is N×(N-1) ≈ N² pairs
+                    // - MAX_SEQUENCE_PAIRS limit is 50K, suitable for networks up to ~220 nodes
                     // - Each SequenceEntry is ~50 bytes (DID strings + u64 sequence + timestamp)
-                    // - Maximum memory: 10K × 50 bytes = 500KB (acceptable for production)
+                    // - Maximum memory: 50K × 50 bytes = 2.5MB (acceptable for production)
                     // - Cleanup runs hourly with 24h retention, so active pairs are retained
+                    // - For larger networks, increase MAX_SEQUENCE_PAIRS or reduce retention
                     //
-                    // Circuit breaker: After 5 consecutive failures, escalate to ERROR level.
+                    // Circuit breaker: After 3 consecutive failures (3 hours), escalate to ERROR.
                     // This helps operators detect persistent storage issues before they cause
                     // unbounded memory growth.
                     let tracker_for_cleanup = encryption_sequence_tracker.clone();
@@ -548,7 +550,9 @@ impl Supervisor {
                             tokio::time::interval(std::time::Duration::from_secs(3600));
                         let mut shutdown_rx = shutdown_rx_for_cleanup;
                         let mut consecutive_failures: u32 = 0;
-                        const CIRCUIT_BREAKER_THRESHOLD: u32 = 5;
+                        // Trip after 3 consecutive failures (3 hours) to catch persistent storage issues faster.
+                        // With hourly cleanup, 3 failures = 3 hours of potential unbounded memory growth.
+                        const CIRCUIT_BREAKER_THRESHOLD: u32 = 3;
 
                         loop {
                             tokio::select! {
