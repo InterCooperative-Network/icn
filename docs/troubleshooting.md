@@ -279,15 +279,15 @@ date
 timedatectl status
 ```
 
-**Force anti-entropy sync** (future feature):
+**Trigger anti-entropy** (automatic):
+Gossip anti-entropy runs automatically. To accelerate sync, restart the daemon:
 ```bash
-# Trigger full sync with a peer
-icnctl gossip sync --peer did:icn:<peer-did>
+sudo kubectl -n icn rollout restart deployment/icn-daemon
 ```
 
 ### Prevention
 
-- **Monitor sync lag**: Alert on `icn_gossip_sync_lag_seconds > 60`
+- **Monitor entry flow**: Alert on `icn_gossip_entries_received_total` stagnating
 - **Multiple peers**: Ensure at least 3 peers for redundancy
 - **NTP configured**: System clocks synchronized
 - **Network monitoring**: Watch for packet loss or latency spikes
@@ -373,16 +373,17 @@ watch -n 5 "curl -s http://10.8.10.40:30100/metrics | grep icn_ledger_entries_to
 
 **If quarantine issues**:
 ```bash
-# List quarantined entries (future command)
+# List quarantined entries
 icnctl ledger quarantine list
+
+# Get details on specific entry
+icnctl ledger quarantine get <entry-hash>
 
 # See incident-response.md for quarantine resolution
 ```
 
-**Force sync from healthy peer** (future feature):
-```bash
-icnctl ledger sync --from did:icn:<healthy-peer>
-```
+**Ledger sync is automatic** via gossip protocol. To accelerate sync after
+network partition, restart the daemon to reinitialize gossip connections.
 
 **If persistent lag with no progress**:
 ```bash
@@ -474,25 +475,22 @@ curl -s http://10.8.10.40:30100/metrics | grep icn_trust
 sudo kubectl -n icn rollout restart deployment/icn-daemon
 ```
 
-**Verify edge data**:
+**Verify edge data** via metrics:
 ```bash
-# List trust edges (future command)
-icnctl trust list --format json | jq '.edges | length'
+# Check edge count from Prometheus metrics
+curl -s http://10.8.10.40:30100/metrics | grep icn_trust_edges
 ```
 
 **If graph corruption suspected**:
-1. Export current state for analysis:
+1. Check trust-related logs:
    ```bash
-   icnctl trust export > trust-graph-backup.json
+   sudo kubectl -n icn logs deployment/icn-daemon | grep -i "trust.*error\|graph"
    ```
-2. Contact ICN team with graph data
-3. May need to rebuild from source edges
+2. Contact ICN team with log excerpts and metrics
+3. May need to restart daemon to rebuild from persisted edges
 
-**If single edge causing issues**:
-```bash
-# Remove problematic edge (future command)
-icnctl trust remove --from did:icn:<from> --to did:icn:<to>
-```
+**Note**: Direct trust edge management via CLI is planned for a future release.
+Currently, trust edges are managed through the RPC API or gossip protocol.
 
 ### Prevention
 
