@@ -419,6 +419,15 @@ impl GovernanceParams {
             );
         }
 
+        // Execution delay validation: minimum 1 hour to prevent misconfiguration
+        const MIN_EXECUTION_DELAY_SECONDS: u64 = 3600; // 1 hour
+        if self.max_execution_delay_seconds < MIN_EXECUTION_DELAY_SECONDS {
+            anyhow::bail!(
+                "Max execution delay ({} seconds) must be at least 1 hour (3600 seconds)",
+                self.max_execution_delay_seconds
+            );
+        }
+
         Ok(())
     }
 

@@ -553,9 +553,18 @@ impl icn_governance::GovernanceOps for GovernanceHandle {
                     )
                 })?;
                 if effective_at > max_allowed {
-                    let max_days = max_delay_seconds / (24 * 60 * 60);
+                    // Format the max delay in human-readable units
+                    let max_display = if max_delay_seconds >= 24 * 60 * 60 {
+                        let days = max_delay_seconds / (24 * 60 * 60);
+                        format!("{days} days")
+                    } else if max_delay_seconds >= 60 * 60 {
+                        let hours = max_delay_seconds / (60 * 60);
+                        format!("{hours} hours")
+                    } else {
+                        format!("{max_delay_seconds} seconds")
+                    };
                     bail!(
-                        "Cannot create ProtocolChange proposal: effective_at is too far in the future (max: {max_days} days)"
+                        "Cannot create ProtocolChange proposal: effective_at is too far in the future (max: {max_display})"
                     );
                 }
             }
