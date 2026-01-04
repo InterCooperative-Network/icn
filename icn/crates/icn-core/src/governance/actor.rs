@@ -979,10 +979,24 @@ impl GovernanceActor {
                     .put(&proposal_key(&proposal_id), &serde_json::to_vec(&proposal)?)?;
 
                 // Load domain to get default voting period for auto-transition
-                let voting_period_seconds = self
-                    .load_domain(&proposal.domain_id)?
-                    .map(|d| d.config.params.voting_period_seconds)
-                    .unwrap_or(DEFAULT_VOTING_PERIOD_SECONDS);
+                // Use graceful fallback if domain load fails to avoid blocking deliberation
+                let voting_period_seconds = match self.load_domain(&proposal.domain_id) {
+                    Ok(Some(domain)) => domain.config.params.voting_period_seconds,
+                    Ok(None) => {
+                        warn!(
+                            "Domain {} not found for proposal {}, using default voting period",
+                            proposal.domain_id.0, proposal_id.0
+                        );
+                        DEFAULT_VOTING_PERIOD_SECONDS
+                    }
+                    Err(e) => {
+                        warn!(
+                            "Failed to load domain {} for proposal {}: {}, using default voting period",
+                            proposal.domain_id.0, proposal_id.0, e
+                        );
+                        DEFAULT_VOTING_PERIOD_SECONDS
+                    }
+                };
 
                 // Schedule auto-transition from Deliberation to Open when deliberation ends
                 let ends_at_instant =
