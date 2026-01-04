@@ -919,7 +919,10 @@ impl GovernanceActor {
 
                 // Extract timestamps from state
                 let (started_at, ends_at) = match &proposal.state {
-                    ProposalState::Deliberation { started_at, ends_at } => (*started_at, *ends_at),
+                    ProposalState::Deliberation {
+                        started_at,
+                        ends_at,
+                    } => (*started_at, *ends_at),
                     _ => bail!("Proposal failed to transition to Deliberation state"),
                 };
 
