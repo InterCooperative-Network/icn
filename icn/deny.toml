@@ -191,6 +191,11 @@ expression = "Apache-2.0"
 license-files = []
 
 [[licenses.clarify]]
+name = "icn-time"
+expression = "Apache-2.0"
+license-files = []
+
+[[licenses.clarify]]
 name = "icnctl"
 expression = "Apache-2.0"
 license-files = []

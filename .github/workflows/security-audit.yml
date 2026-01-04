@@ -26,6 +26,7 @@ jobs:
         run: |
           cargo install cargo-audit --locked
           cargo install cargo-deny --locked
+          cargo install cargo-outdated --locked
 
       - name: Run cargo-audit
         run: cargo audit
