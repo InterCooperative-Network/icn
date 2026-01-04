@@ -428,7 +428,7 @@ curl -s http://10.8.10.40:30100/metrics | grep icn_trust
 # Key metrics:
 # - icn_trust_computation_errors_total
 # - icn_trust_cache_hits_total / icn_trust_cache_misses_total
-# - icn_trust_graph_edges_total
+# - icn_trust_edges_total
 # - icn_trust_computation_duration_seconds
 ```
 
@@ -442,7 +442,7 @@ curl -s http://10.8.10.40:30100/metrics | grep icn_trust
 2. **Verify graph consistency**:
    ```bash
    # Check edge count
-   curl -s http://10.8.10.40:30100/metrics | grep icn_trust_graph_edges
+   curl -s http://10.8.10.40:30100/metrics | grep icn_trust_edges
 
    # Check for cycles or invalid edges in logs
    sudo kubectl -n icn logs deployment/icn-daemon | grep -i "trust.*cycle\|invalid.*edge"
