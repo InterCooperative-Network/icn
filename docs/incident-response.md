@@ -60,6 +60,9 @@ This document provides operational procedures for responding to common incidents
 
 This section provides K3s-specific commands for the live homelab deployment.
 
+> **Note**: Paths like `/home/matt/projects/icn` are specific to the current deployment.
+> Adjust paths according to your local setup.
+
 ### Cluster Access
 
 ```bash
@@ -83,7 +86,7 @@ sudo kubectl -n icn logs -f deployment/icn-daemon
 sudo kubectl -n icn logs deployment/icn-daemon --tail=100
 
 # Describe pod for events and status
-sudo kubectl -n icn describe pod -l app=icn-daemon
+sudo kubectl -n icn describe pod -l app=icn
 
 # Check resource usage
 sudo kubectl -n icn top pods
@@ -99,7 +102,7 @@ sudo kubectl -n icn get pvc
 
 ```bash
 # ICN health endpoint
-curl http://10.8.10.40:30080/health
+curl http://10.8.10.40:30080/v1/health
 
 # Prometheus metrics
 curl http://10.8.10.40:30100/metrics | head -50
@@ -121,7 +124,7 @@ sudo kubectl -n icn rollout restart deployment/icn-daemon
 sudo kubectl -n icn rollout status deployment/icn-daemon
 
 # Force delete stuck pod
-sudo kubectl -n icn delete pod -l app=icn-daemon --force --grace-period=0
+sudo kubectl -n icn delete pod -l app=icn --force --grace-period=0
 
 # Full redeploy from local
 cd /home/matt/projects/icn/deploy/k8s && make full-deploy-dev
@@ -133,11 +136,12 @@ cd /home/matt/projects/icn/deploy/k8s && make full-deploy-dev
 # Backup current state (from within pod)
 sudo kubectl -n icn exec deploy/icn-daemon -- /usr/local/bin/icnctl backup /data/backup.tar
 
-# Copy backup from pod to local
-sudo kubectl -n icn cp icn-daemon-xxx:/data/backup.tar /tmp/icn-backup.tar
+# Copy backup from pod to local (get pod name first)
+POD=$(sudo kubectl -n icn get pod -l app=icn -o jsonpath='{.items[0].metadata.name}')
+sudo kubectl -n icn cp $POD:/data/backup.tar /tmp/icn-backup.tar
 
-# View backup location (NFS)
-ls -la /mnt/atlas/k8s/icn-data/
+# View backup location (NFS on Atlas)
+ssh atlas "ls -la /mnt/storage/k8s/icn-data/"
 ```
 
 ### Network Diagnostics
@@ -671,7 +675,7 @@ journalctl -u icnd --since "1 week ago" | grep upgrade
 
 2. **Check pod events**:
    ```bash
-   sudo kubectl -n icn describe pod -l app=icn-daemon
+   sudo kubectl -n icn describe pod -l app=icn
    ```
 
    Common issues in events:
@@ -718,7 +722,7 @@ journalctl -u icnd --since "1 week ago" | grep upgrade
 
 1. **Check memory usage before OOM**:
    ```bash
-   sudo kubectl -n icn describe pod -l app=icn-daemon | grep -A 3 "Last State"
+   sudo kubectl -n icn describe pod -l app=icn | grep -A 3 "Last State"
    ```
 
 2. **Increase memory limit** (edit deployment):
@@ -749,7 +753,7 @@ journalctl -u icnd --since "1 week ago" | grep upgrade
 
 1. **Check for resource constraints**:
    ```bash
-   sudo kubectl -n icn describe pod -l app=icn-daemon
+   sudo kubectl -n icn describe pod -l app=icn
    ```
 
 2. **Check PVC binding**:
@@ -952,10 +956,10 @@ journalctl -u icnd --since "1 week ago" | grep upgrade
    ssh atlas "find /mnt/storage/k8s/icn-data/backups -mtime +30 -delete"
    ```
 
-3. **Compact Sled database** (if supported):
-   ```bash
-   sudo kubectl -n icn exec deploy/icn-daemon -- icnctl db compact
-   ```
+3. **Compact Sled database**:
+   > Note: An `icnctl db compact` command does not currently exist.
+   > Sled performs automatic compaction. If manual compaction is needed,
+   > consider stopping the daemon and using Sled tools directly.
 
 #### Scenario 3: Sled Corruption
 
