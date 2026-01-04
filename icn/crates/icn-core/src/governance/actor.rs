@@ -536,14 +536,14 @@ impl icn_governance::GovernanceOps for GovernanceHandle {
                 }
 
                 // Get max delay from domain params (configurable per cooperative)
-                // Default: 1 year (31536000 seconds) if domain not found
+                // Falls back to default (1 year) if domain not found
                 let max_delay_seconds = self
                     .get_domain(&domain_id)
                     .await
                     .ok()
                     .flatten()
                     .map(|d| d.config.params.max_execution_delay_seconds)
-                    .unwrap_or(365 * 24 * 60 * 60);
+                    .unwrap_or_else(icn_governance::default_max_execution_delay);
 
                 // Use checked arithmetic to prevent overflow if now is close to u64::MAX.
                 // If overflow occurs, reject the proposal rather than allowing arbitrary future dates.

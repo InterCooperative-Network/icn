@@ -308,8 +308,9 @@ pub struct GovernanceParams {
     pub max_execution_delay_seconds: u64,
 }
 
-/// Default max execution delay: 1 year
-fn default_max_execution_delay() -> u64 {
+/// Default max execution delay: 1 year (31536000 seconds)
+/// Public so icn-core can use the same default for fallback
+pub fn default_max_execution_delay() -> u64 {
     365 * 24 * 60 * 60 // 31536000 seconds
 }
 
@@ -661,5 +662,49 @@ mod tests {
         assert_eq!(config.emergency.freeze_quorum_percentage, 80);
         assert_eq!(config.emergency.freeze_approval_percentage, 90);
         assert_eq!(config.emergency.rollback_approval_percentage, 95);
+    }
+
+    #[test]
+    fn test_max_execution_delay_default() {
+        let params = GovernanceParams::default();
+        // Default should be 1 year
+        assert_eq!(params.max_execution_delay_seconds, 365 * 24 * 60 * 60);
+        assert_eq!(
+            params.max_execution_delay_seconds,
+            default_max_execution_delay()
+        );
+    }
+
+    #[test]
+    fn test_max_execution_delay_validation_minimum() {
+        // Valid: exactly 1 hour
+        let valid_params = GovernanceParams {
+            max_execution_delay_seconds: 3600,
+            ..Default::default()
+        };
+        assert!(valid_params.validate().is_ok());
+
+        // Invalid: less than 1 hour
+        let invalid_params = GovernanceParams {
+            max_execution_delay_seconds: 3599,
+            ..Default::default()
+        };
+        let result = invalid_params.validate();
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("must be at least 1 hour"));
+    }
+
+    #[test]
+    fn test_max_execution_delay_custom_value() {
+        // Custom: 30 days
+        let params = GovernanceParams {
+            max_execution_delay_seconds: 30 * 24 * 60 * 60,
+            ..Default::default()
+        };
+        assert!(params.validate().is_ok());
+        assert_eq!(params.max_execution_delay_seconds, 2592000);
     }
 }
