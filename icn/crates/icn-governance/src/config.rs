@@ -300,6 +300,17 @@ pub struct GovernanceParams {
     /// Cannot set deliberation longer than this
     /// Default: 2592000 (30 days)
     pub max_deliberation_seconds: u64,
+
+    /// Maximum execution delay for proposals (in seconds)
+    /// Limits how far into the future a proposal's effective_at can be set
+    /// Default: 31536000 (1 year = 365 days)
+    #[serde(default = "default_max_execution_delay")]
+    pub max_execution_delay_seconds: u64,
+}
+
+/// Default max execution delay: 1 year
+fn default_max_execution_delay() -> u64 {
+    365 * 24 * 60 * 60 // 31536000 seconds
 }
 
 impl Default for GovernanceParams {
@@ -312,6 +323,7 @@ impl Default for GovernanceParams {
             require_deliberation: true,
             min_deliberation_seconds: 24 * 60 * 60, // 1 day
             max_deliberation_seconds: 30 * 24 * 60 * 60, // 30 days
+            max_execution_delay_seconds: default_max_execution_delay(),
         }
     }
 }

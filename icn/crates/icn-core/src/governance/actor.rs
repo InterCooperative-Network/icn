@@ -535,18 +535,27 @@ impl icn_governance::GovernanceOps for GovernanceHandle {
                     );
                 }
 
-                // Optional: max delay limit (1 year = 365 * 24 * 60 * 60 = 31536000 seconds)
-                const MAX_DELAY_SECONDS: u64 = 31_536_000;
+                // Get max delay from domain params (configurable per cooperative)
+                // Default: 1 year (31536000 seconds) if domain not found
+                let max_delay_seconds = self
+                    .get_domain(&domain_id)
+                    .await
+                    .ok()
+                    .flatten()
+                    .map(|d| d.config.params.max_execution_delay_seconds)
+                    .unwrap_or(365 * 24 * 60 * 60);
+
                 // Use checked arithmetic to prevent overflow if now is close to u64::MAX.
                 // If overflow occurs, reject the proposal rather than allowing arbitrary future dates.
-                let max_allowed = now.checked_add(MAX_DELAY_SECONDS).ok_or_else(|| {
+                let max_allowed = now.checked_add(max_delay_seconds).ok_or_else(|| {
                     anyhow::anyhow!(
                         "Cannot create ProtocolChange proposal: timestamp overflow when calculating max allowed effective_at"
                     )
                 })?;
                 if effective_at > max_allowed {
+                    let max_days = max_delay_seconds / (24 * 60 * 60);
                     bail!(
-                        "Cannot create ProtocolChange proposal: effective_at is too far in the future (max: 1 year)"
+                        "Cannot create ProtocolChange proposal: effective_at is too far in the future (max: {max_days} days)"
                     );
                 }
             }
