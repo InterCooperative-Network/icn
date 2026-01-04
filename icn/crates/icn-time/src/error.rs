@@ -27,6 +27,9 @@ pub enum TimeError {
 
     #[error("System clock error: time before UNIX epoch")]
     SystemClockError,
+
+    #[error("Invalid timestamp: {0}ms exceeds safe range for offset calculation")]
+    InvalidTimestamp(u64),
 }
 
 pub type Result<T> = std::result::Result<T, TimeError>;

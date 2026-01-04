@@ -19,6 +19,11 @@ pub const MAX_CLOCK_SKEW: Duration = Duration::from_secs(300);
 /// Minimum servers required for median calculation
 pub const MIN_SERVERS: usize = 3;
 
+/// Maximum reasonable timestamp in milliseconds for safe i64 conversion
+/// i64::MAX is ~292 billion years in milliseconds, but we use a more
+/// conservative limit (~292 million years) to catch clearly malicious values
+const MAX_REASONABLE_TIMESTAMP_MS: u64 = i64::MAX as u64;
+
 /// Timeout for individual time server queries
 pub const QUERY_TIMEOUT: Duration = Duration::from_secs(5);
 
@@ -129,9 +134,27 @@ impl ClockSync {
         let median_time = self.compute_median(&responses)?;
         let now = Self::system_time_millis();
 
+        // Validate timestamps before i64 conversion to prevent overflow
+        // This guards against malicious time servers returning extreme values
+        if now > MAX_REASONABLE_TIMESTAMP_MS {
+            warn!(
+                "Local clock timestamp {}ms exceeds safe range, rejecting",
+                now
+            );
+            return Err(TimeError::InvalidTimestamp(now));
+        }
+        if median_time > MAX_REASONABLE_TIMESTAMP_MS {
+            warn!(
+                "Median time {}ms from servers exceeds safe range, possible malicious response",
+                median_time
+            );
+            return Err(TimeError::InvalidTimestamp(median_time));
+        }
+
         // Calculate signed offset in milliseconds
         // Positive = local ahead (subtract to get network time)
         // Negative = local behind (add to get network time)
+        // SAFETY: Both values are validated to be <= i64::MAX above
         self.offset_millis = now as i64 - median_time as i64;
 
         // Calculate uncertainty (based on RTT variance)
