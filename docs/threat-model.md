@@ -718,23 +718,23 @@ This document provides a formal threat model for the InterCooperative Network (I
 
 | Control | Implementation | Files |
 |---------|----------------|-------|
-| MisbehaviorDetector | 7 violation types with severity levels | `icn-core/src/misbehavior/` |
-| Reputation System | 0.0-1.0 score with decay | `icn-core/src/reputation/` |
-| Auto-Quarantine | Score < 0.5 triggers quarantine | `icn-core/src/misbehavior/detector.rs` |
-| Auto-Ban | Critical violations trigger immediate ban | `icn-core/src/misbehavior/detector.rs` |
+| MisbehaviorDetector | 7 violation types with severity levels | `icn-security/src/misbehavior.rs` |
+| Reputation System | 0.0-1.0 score with decay | `icn-security/src/misbehavior.rs` |
+| Auto-Quarantine | Score < 0.5 triggers quarantine | `icn-security/src/misbehavior.rs` |
+| Auto-Ban | Critical violations trigger immediate ban | `icn-security/src/misbehavior.rs` |
 | Trust Integration | Misbehavior reduces trust score | `icn-trust/src/lib.rs` |
 
 **Violation Types**:
 
 | Type | Severity | Description |
 |------|----------|-------------|
-| InvalidSignature | Critical (10) | Forged or invalid cryptographic signature |
 | ConflictingLedgerEntries | Critical (10) | Double-spend or fork attempt |
-| FailedComputeVerification | Major (5) | Submitted invalid computation result |
-| ExcessiveResourceUse | Major (5) | Resource exhaustion attempt |
-| TrustGraphSpam | Minor (1) | Excessive trust edge creation |
 | ConflictingSignedStatements | Critical (10) | Equivocation detected |
-| ReplayAttack | Major (5) | Attempted message replay |
+| ReplayAttack | Critical (10) | Attempted message replay |
+| InvalidSignature | Major (5) | Forged or invalid cryptographic signature |
+| FailedComputeVerification | Major (5) | Submitted invalid computation result |
+| ExcessiveResourceUse | Minor (1) | Resource exhaustion attempt |
+| TrustGraphSpam | Minor (1) | Excessive trust edge creation |
 
 **Reputation Mechanics**:
 - **Score Range**: 0.0 (banned) to 1.0 (perfect)
@@ -747,10 +747,10 @@ This document provides a formal threat model for the InterCooperative Network (I
 
 | Control | Implementation | Files |
 |---------|----------------|-------|
-| Multi-Level Verification | Level 0-2 progressive trust | `icn-gateway/src/sdis/` |
-| Steward Vouching | Human verification step | `icn-governance/src/steward/` |
+| Multi-Level Verification | Level 0-2 progressive trust | `icn-gateway/src/api/sdis/` |
+| Steward Vouching | Human verification step | `icn-governance/src/steward.rs` |
 | Vouch Uniqueness | Rate limiting, sybil resistance | `icn-governance/src/steward_store.rs` |
-| Device Attestation | Hardware-bound identity proofs | `icn-identity/src/device.rs` |
+| Device Attestation | Hardware-bound identity proofs | `icn-identity/src/multi_device.rs` |
 
 **Verification Levels**:
 
