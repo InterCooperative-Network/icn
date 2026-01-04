@@ -1791,17 +1791,17 @@ mod tests {
         gossip2.handle_message(&did1, announce).await.unwrap();
 
         // Gossip2 should have sent a Request message
-        let messages = sent_messages.lock().unwrap();
-        assert_eq!(messages.len(), 1);
+        {
+            let messages = sent_messages.lock().unwrap();
+            assert_eq!(messages.len(), 1);
 
-        if let (Some(recipient), GossipMessage::Request { hash: req_hash }) = &messages[0] {
-            assert_eq!(recipient, &did1);
-            assert_eq!(req_hash, &hash);
-        } else {
-            panic!("Expected Request message");
-        }
-
-        drop(messages); // Release lock
+            if let (Some(recipient), GossipMessage::Request { hash: req_hash }) = &messages[0] {
+                assert_eq!(recipient, &did1);
+                assert_eq!(req_hash, &hash);
+            } else {
+                panic!("Expected Request message");
+            }
+        } // Lock released here
 
         // Now simulate gossip1 receiving the Request and sending Response
         let sent_messages1 = Arc::new(std::sync::Mutex::new(Vec::new()));
@@ -2993,24 +2993,26 @@ mod tests {
         gossip1.handle_message(&did2, request).await?;
 
         // Verify gossip1 responded with ReplicaOffer
-        let messages = sent_messages.lock().unwrap();
-        assert_eq!(messages.len(), 1, "Should have sent one message");
-        match &messages[0] {
-            (
-                Some(recipient),
-                GossipMessage::ReplicaOffer {
-                    content_hash: hash,
-                    offering_peer,
-                    health,
-                },
-            ) => {
-                assert_eq!(recipient, &did2, "Offer should be sent to requester");
-                assert_eq!(hash, &content_hash, "Hash should match");
-                assert_eq!(offering_peer, &did1, "Offerer should be gossip1");
-                assert_eq!(health, &ReplicaHealth::Healthy, "Health should be Healthy");
+        {
+            let messages = sent_messages.lock().unwrap();
+            assert_eq!(messages.len(), 1, "Should have sent one message");
+            match &messages[0] {
+                (
+                    Some(recipient),
+                    GossipMessage::ReplicaOffer {
+                        content_hash: hash,
+                        offering_peer,
+                        health,
+                    },
+                ) => {
+                    assert_eq!(recipient, &did2, "Offer should be sent to requester");
+                    assert_eq!(hash, &content_hash, "Hash should match");
+                    assert_eq!(offering_peer, &did1, "Offerer should be gossip1");
+                    assert_eq!(health, &ReplicaHealth::Healthy, "Health should be Healthy");
+                }
+                _ => panic!("Expected ReplicaOffer message"),
             }
-            _ => panic!("Expected ReplicaOffer message"),
-        }
+        } // Lock released here
 
         // Verify gossip1 recorded itself as a replica in its store
         let replica_count = store1.get_replica_count(&content_hash)?;
