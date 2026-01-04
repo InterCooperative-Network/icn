@@ -19,9 +19,10 @@ pub const MAX_CLOCK_SKEW: Duration = Duration::from_secs(300);
 /// Minimum servers required for median calculation
 pub const MIN_SERVERS: usize = 3;
 
-/// Maximum reasonable timestamp in milliseconds for safe i64 conversion.
-/// i64::MAX milliseconds is approximately 292 million years; we use this
-/// maximum safe value to catch clearly malicious timestamp values.
+/// Maximum timestamp in milliseconds that can be safely cast to i64.
+/// i64::MAX milliseconds is approximately 292 million years from epoch.
+/// Any timestamp beyond this indicates either malicious input or severe
+/// system clock corruption, and must be rejected to prevent overflow.
 const MAX_REASONABLE_TIMESTAMP_MS: u64 = i64::MAX as u64;
 
 /// Timeout for individual time server queries
@@ -278,9 +279,20 @@ impl ClockSync {
 
         let now = Self::system_time_millis();
 
+        // Validate timestamp before i64 cast (guards against system clock corruption)
+        if now > MAX_REASONABLE_TIMESTAMP_MS {
+            warn!(
+                "System clock timestamp {}ms exceeds safe range in network_time()",
+                now
+            );
+            return Err(TimeError::InvalidTimestamp(now));
+        }
+
         // Apply signed offset: network_time = local_time - offset
         // - If offset > 0 (local ahead): subtract offset to get network time
         // - If offset < 0 (local behind): subtract negative = add to get network time
+        // SAFETY: now is validated to be <= i64::MAX, and offset_millis was validated
+        // during sync(), so the subtraction cannot overflow.
         let network_time = (now as i64 - self.offset_millis).max(0) as u64;
 
         Ok(network_time)
