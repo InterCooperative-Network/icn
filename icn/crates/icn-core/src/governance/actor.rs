@@ -91,7 +91,31 @@ pub enum GovernanceCommand {
         /// Proposal action payload
         payload: ProposalPayload,
     },
-    /// Open a proposal for voting
+    /// Start deliberation period for a proposal
+    ///
+    /// Transitions the proposal from Draft to Deliberation state.
+    /// During deliberation, members can discuss and refine the proposal
+    /// before voting begins.
+    StartDeliberation {
+        /// Proposal to start deliberation on
+        proposal_id: ProposalId,
+        /// Duration of deliberation period in seconds
+        deliberation_period_seconds: u64,
+    },
+    /// End deliberation and open for voting
+    ///
+    /// Transitions the proposal from Deliberation to Open state.
+    /// Can be called manually or automatically when deliberation period ends.
+    EndDeliberationAndOpen {
+        /// Proposal to open for voting
+        proposal_id: ProposalId,
+        /// Duration of voting period in seconds
+        voting_period_seconds: u64,
+    },
+    /// Open a proposal for voting (skip deliberation)
+    ///
+    /// Transitions directly from Draft to Open state.
+    /// Use StartDeliberation for proposals that need discussion first.
     OpenProposal {
         /// Proposal to open
         proposal_id: ProposalId,
@@ -229,6 +253,38 @@ impl GovernanceHandle {
     /// Get list of voter DIDs for a proposal
     pub async fn get_voter_dids(&self, proposal_id: &ProposalId) -> Result<Vec<Did>> {
         self.inner.read().await.get_voter_dids(proposal_id)
+    }
+
+    /// Start deliberation period for a proposal
+    ///
+    /// Transitions the proposal from Draft to Deliberation state.
+    /// Members can discuss the proposal during this period.
+    pub async fn start_deliberation(
+        &self,
+        proposal_id: ProposalId,
+        deliberation_period_seconds: u64,
+    ) -> Result<()> {
+        self.submit(GovernanceCommand::StartDeliberation {
+            proposal_id,
+            deliberation_period_seconds,
+        })
+        .await
+    }
+
+    /// End deliberation and open for voting
+    ///
+    /// Transitions the proposal from Deliberation to Open state.
+    /// Can only be called after the deliberation period has ended.
+    pub async fn end_deliberation_and_open(
+        &self,
+        proposal_id: ProposalId,
+        voting_period_seconds: u64,
+    ) -> Result<()> {
+        self.submit(GovernanceCommand::EndDeliberationAndOpen {
+            proposal_id,
+            voting_period_seconds,
+        })
+        .await
     }
 
     /// Set the protocol parameter store
@@ -554,6 +610,22 @@ impl icn_governance::GovernanceOps for GovernanceHandle {
         Ok(proposal_id)
     }
 
+    async fn start_deliberation(
+        &self,
+        proposal_id: ProposalId,
+        deliberation_period_seconds: u64,
+    ) -> Result<()> {
+        Self::start_deliberation(self, proposal_id, deliberation_period_seconds).await
+    }
+
+    async fn end_deliberation_and_open(
+        &self,
+        proposal_id: ProposalId,
+        voting_period_seconds: u64,
+    ) -> Result<()> {
+        Self::end_deliberation_and_open(self, proposal_id, voting_period_seconds).await
+    }
+
     async fn open_proposal(
         &self,
         proposal_id: ProposalId,
@@ -829,6 +901,118 @@ impl GovernanceActor {
                     .await?;
 
                 info!("✓ Proposal created: {} (ID: {})", title, proposal_id.0);
+            }
+
+            GovernanceCommand::StartDeliberation {
+                proposal_id,
+                deliberation_period_seconds,
+            } => {
+                info!("Starting deliberation for proposal: {}", proposal_id.0);
+
+                // Load proposal
+                let mut proposal = self
+                    .load_proposal(&proposal_id)?
+                    .ok_or_else(|| anyhow::anyhow!("Proposal not found: {}", proposal_id.0))?;
+
+                // Start deliberation
+                proposal.start_deliberation(deliberation_period_seconds)?;
+
+                // Extract timestamps from state
+                let (started_at, ends_at) = match &proposal.state {
+                    ProposalState::Deliberation {
+                        started_at,
+                        ends_at,
+                    } => (*started_at, *ends_at),
+                    _ => bail!("Proposal failed to transition to Deliberation state"),
+                };
+
+                // Persist updated state
+                self.store
+                    .put(&proposal_key(&proposal_id), &serde_json::to_vec(&proposal)?)?;
+
+                // Note: We do NOT schedule auto-transition here because the close_scheduler
+                // is designed to call CloseProposal (for voting close), not EndDeliberationAndOpen.
+                // The deliberation → voting transition must be triggered via:
+                // 1. Manual call to end_deliberation_and_open() when deliberation ends
+                // 2. A separate background task checking proposal.can_end_deliberation()
+                // The deliberation end timestamp is stored in ProposalState::Deliberation
+                // for clients/background tasks to check.
+
+                // Broadcast to network
+                self.publish(GovernanceMessage::deliberation_started(
+                    proposal_id.clone(),
+                    started_at,
+                    ends_at,
+                ))
+                .await?;
+
+                info!(
+                    "✓ Deliberation started for proposal: {} (ends in {}s)",
+                    proposal_id.0, deliberation_period_seconds
+                );
+            }
+
+            GovernanceCommand::EndDeliberationAndOpen {
+                proposal_id,
+                voting_period_seconds,
+            } => {
+                info!(
+                    "Ending deliberation and opening voting for proposal: {}",
+                    proposal_id.0
+                );
+
+                // Load proposal
+                let mut proposal = self
+                    .load_proposal(&proposal_id)?
+                    .ok_or_else(|| anyhow::anyhow!("Proposal not found: {}", proposal_id.0))?;
+
+                // End deliberation and open for voting
+                proposal.end_deliberation_and_open(voting_period_seconds)?;
+
+                // Extract timestamps from state
+                let (opened_at, closes_at) = match &proposal.state {
+                    ProposalState::Open {
+                        opened_at,
+                        closes_at,
+                    } => (*opened_at, *closes_at),
+                    _ => bail!("Proposal failed to transition to Open state"),
+                };
+
+                // Persist updated state
+                self.store
+                    .put(&proposal_key(&proposal_id), &serde_json::to_vec(&proposal)?)?;
+
+                // Schedule auto-close for voting
+                let closes_at_instant = Instant::now() + Duration::from_secs(voting_period_seconds);
+                let scheduled = ScheduledClose {
+                    closes_at: closes_at_instant,
+                    proposal_id: proposal_id.clone(),
+                };
+                self.close_scheduler.write().await.push(Reverse(scheduled));
+
+                // Broadcast deliberation ended to network
+                // Note: comment_count and participant_count are 0 since
+                // comment tracking is not yet implemented in the actor
+                self.publish(GovernanceMessage::deliberation_ended(
+                    proposal_id.clone(),
+                    opened_at, // ended_at == opened_at (same moment)
+                    0,         // comment_count - not yet tracked
+                    0,         // participant_count - not yet tracked
+                ))
+                .await?;
+
+                // Broadcast proposal opened to network
+                self.publish(GovernanceMessage::proposal_opened(
+                    proposal_id.clone(),
+                    opened_at,
+                    closes_at,
+                ))
+                .await?;
+
+                info!(
+                    "✓ Deliberation ended, voting opened for proposal: {} (closes in {}s)",
+                    proposal_id.0, voting_period_seconds
+                );
             }
 
             GovernanceCommand::OpenProposal {
