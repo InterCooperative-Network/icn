@@ -168,6 +168,47 @@ pub struct NetworkConfig {
     /// TURN server password (optional, for authenticated TURN)
     #[serde(default)]
     pub turn_password: Option<String>,
+
+    /// Enable end-to-end encryption for all messages (when peer supports it)
+    ///
+    /// When enabled, messages sent to peers that advertise E2E_ENCRYPTION capability
+    /// will be encrypted with the recipient's X25519 public key before signing.
+    /// Messages from non-supporting peers remain signed-only (backward compatible).
+    ///
+    /// ## Fail-Closed Behavior
+    ///
+    /// If encryption fails (e.g., serialization error, missing key), the message
+    /// is **dropped** rather than sent unencrypted. This ensures confidential data
+    /// is never leaked over the network. Encryption failures are:
+    /// - Logged at ERROR level for immediate visibility
+    /// - Tracked via `icn_network_encryption_failed_total` metric
+    ///
+    /// Monitor this metric in production to detect systematic encryption issues
+    /// that may be causing message loss.
+    ///
+    /// Default: true (recommended for pilot and production)
+    #[serde(default = "default_true")]
+    pub e2e_encryption_enabled: bool,
+
+    /// Number of consecutive encryption sequence cleanup failures before escalating
+    /// to ERROR level and tripping the circuit breaker.
+    ///
+    /// The cleanup task runs hourly to remove stale sequence entries. If cleanup
+    /// fails repeatedly (e.g., storage issues), the circuit breaker trips to:
+    /// - Escalate logging from WARN to ERROR
+    /// - Increment `icn_network_encryption_circuit_breaker_trips_total` metric
+    ///
+    /// Lower values detect issues faster but may cause false alarms during
+    /// transient storage hiccups. Higher values are more tolerant but delay
+    /// detection of persistent issues.
+    ///
+    /// Default: 3 (failures detected within 3 hours)
+    #[serde(default = "default_circuit_breaker_threshold")]
+    pub encryption_cleanup_circuit_breaker_threshold: u32,
+}
+
+fn default_circuit_breaker_threshold() -> u32 {
+    3
 }
 
 impl NetworkConfig {
@@ -726,6 +767,8 @@ impl Default for Config {
                 turn_server: None,
                 turn_username: None,
                 turn_password: None,
+                e2e_encryption_enabled: true,
+                encryption_cleanup_circuit_breaker_threshold: 3,
             },
             observability: ObservabilityConfig {
                 metrics_port: 9100,

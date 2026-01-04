@@ -29,7 +29,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::select;
 use tokio::task::JoinSet;
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 
 use crate::config::Config;
 use crate::runtime::ShutdownTx;
@@ -94,6 +94,102 @@ async fn resolve_address(addr_str: &str) -> Result<SocketAddr> {
 
     debug!("Resolved {addr_str} -> {addr}");
     Ok(addr)
+}
+
+/// Try to encrypt an inner SignedEnvelope for E2E encryption (Issue #404)
+///
+/// Creates a sign-encrypt-sign structure:
+/// 1. Serialize inner SignedEnvelope
+/// 2. Encrypt with recipient's X25519 public key
+/// 3. Wrap in outer SignedEnvelope with PayloadType::Encrypted
+///
+/// # Sequence Numbers
+///
+/// Three sequence spaces are involved, but only TWO are incremented per message:
+///
+/// 1. **Signing sequence** (`outer_sequence` parameter):
+///    - Per-sender, shared across all recipients
+///    - Used for BOTH inner and outer SignedEnvelope (same value)
+///    - The inner envelope's sequence doesn't trigger replay check (handled by
+///      `handle_signed_inner()`) because the outer envelope already provides protection
+///
+/// 2. **Encryption nonce** (from `enc_seq_tracker`):
+///    - Per-(sender, recipient) pair, persistent across restarts
+///    - Used only for ChaCha20-Poly1305 nonce derivation (not for replay protection)
+///    - Must be unique per pair to prevent nonce reuse attacks
+///
+/// This design ensures encrypted messages consume ONE signing sequence (not two),
+/// maintaining consistent sequence advancement between encrypted and unencrypted paths.
+///
+/// # Sequence Allocation Design
+///
+/// The encryption sequence is allocated AFTER all fallible I/O operations (peer key lookup,
+/// serialization) but BEFORE the actual encryption. This is intentional:
+///
+/// 1. The sequence is required to derive the ChaCha20-Poly1305 nonce
+/// 2. Encryption with valid inputs is essentially infallible (ChaCha20 is deterministic)
+/// 3. The only remaining operations (bincode serialization, Ed25519 signing) are also
+///    effectively infallible with valid inputs
+///
+/// This ordering minimizes sequence waste: sequences are only consumed when all I/O and
+/// validation is complete, and the remaining crypto operations cannot practically fail.
+async fn try_encrypt_envelope(
+    net_handle: &icn_net::NetworkHandle,
+    from_did: &Did,
+    to_did: &Did,
+    inner_envelope: &icn_net::SignedEnvelope,
+    keypair: &icn_identity::KeyPair,
+    x25519_secret: &x25519_dalek::StaticSecret,
+    enc_seq_tracker: &icn_net::OutgoingSequenceTracker,
+    outer_sequence: u64,
+) -> Result<icn_net::SignedEnvelope> {
+    // Phase 1: All fallible I/O operations BEFORE sequence allocation
+    // This ensures sequence is only consumed when encryption is highly likely to succeed.
+
+    // Get recipient's X25519 public key (can fail if peer disconnected)
+    let recipient_x25519_bytes = net_handle
+        .get_peer_x25519_key(to_did)
+        .await
+        .context("Peer X25519 key not available")?;
+    let recipient_x25519_public = x25519_dalek::PublicKey::from(recipient_x25519_bytes);
+
+    // Serialize inner envelope (validates it's serializable before committing sequence)
+    let inner_bytes = bincode::serde::encode_to_vec(inner_envelope, bincode::config::legacy())
+        .context("Failed to serialize inner envelope")?;
+
+    // Phase 2: Sequence allocation - point of no return
+    // All operations after this are essentially infallible with valid inputs.
+    // Get encryption sequence number (persistent, unique per sender-recipient pair)
+    // This is separate from signing sequence - used only for nonce derivation
+    let enc_sequence = enc_seq_tracker.next_sequence(from_did, to_did).await?;
+
+    // Encrypt the inner envelope
+    let encrypted = icn_net::EncryptedEnvelope::encrypt(
+        from_did,
+        to_did,
+        enc_sequence,
+        x25519_secret,
+        &recipient_x25519_public,
+        &inner_bytes,
+    )
+    .context("Failed to encrypt envelope")?;
+
+    // Serialize encrypted envelope
+    let encrypted_bytes = bincode::serde::encode_to_vec(&encrypted, bincode::config::legacy())
+        .context("Failed to serialize encrypted envelope")?;
+
+    // Create outer signed envelope with PayloadType::Encrypted
+    // Uses signing sequence (outer_sequence) for replay protection, NOT encryption sequence
+    let outer_envelope = icn_net::SignedEnvelope::new(
+        from_did,
+        keypair,
+        outer_sequence,
+        icn_net::PayloadType::Encrypted,
+        encrypted_bytes,
+    )
+    .context("Failed to create outer signed envelope")?;
+
+    Ok(outer_envelope)
 }
 
 /// Supervisor manages all actors and restarts them on failure
@@ -231,7 +327,7 @@ impl Supervisor {
             .await?;
             icn_obs::metrics::supervisor::actor_spawned_inc("gossip");
             let gossip_handle = gossip_services.gossip_handle.clone();
-            let _gossip_store = gossip_services.gossip_store.clone(); // Kept for potential future use
+            let gossip_store = gossip_services.gossip_store.clone(); // Used for encryption sequence tracking
             let loaded_snapshot = gossip_services.loaded_snapshot;
 
             // Initialize ledger and contract services
@@ -421,12 +517,145 @@ impl Supervisor {
                 let keypair_clone = identity_bundle.keypair().clone();
                 let sequence_counter = Arc::new(std::sync::atomic::AtomicU64::new(0));
 
-                let send_callback: icn_gossip::SendMessageCallback =
-                    Arc::new(move |recipient, gossip_msg| {
+                // E2E encryption support (Issue #404)
+                let encryption_enabled = self.config.network.e2e_encryption_enabled;
+                let x25519_secret_bytes = *identity_bundle.x25519_secret().as_bytes();
+                let encryption_sequence_tracker = Arc::new(
+                    icn_net::OutgoingSequenceTracker::new(gossip_store.clone())
+                        .context("Failed to create encryption sequence tracker")?,
+                );
+
+                // Only start encryption-related tasks if encryption is enabled
+                if encryption_enabled {
+                    info!("E2E encryption enabled - messages to capable peers will be encrypted");
+
+                    // Initialize sequence tracker synchronously on startup to ensure
+                    // predictable startup behavior and avoid first-message delays.
+                    // This applies the restart safety gap to all persisted sequences.
+                    encryption_sequence_tracker
+                        .load_and_apply_safety_gap()
+                        .await
+                        .context("Failed to apply encryption sequence safety gap")?;
+
+                    // Run initial cleanup on startup (Issue #404 review feedback)
+                    // This handles the edge case where a node accumulates >50K recipient pairs
+                    // before the first hourly cleanup runs. Without this, new encryptions would
+                    // fail if the capacity limit is hit before the first cleanup.
+                    if let Err(e) = encryption_sequence_tracker
+                        .cleanup_stale_entries(86400)
+                        .await
+                    {
+                        warn!("Initial encryption sequence cleanup failed: {}", e);
+                        // Non-fatal: cleanup task will retry hourly
+                    }
+
+                    // Periodic cleanup task for stale sequence tracker entries (Issue #404 review feedback)
+                    // Removes entries not used in the last 24 hours to prevent unbounded memory growth.
+                    //
+                    // Memory bounds analysis:
+                    // - In a fully-connected network, worst case is N×(N-1) ≈ N² pairs
+                    // - MAX_SEQUENCE_PAIRS limit is 50K, suitable for networks up to ~220 nodes
+                    // - Each SequenceEntry is ~50 bytes (DID strings + u64 sequence + timestamp)
+                    // - Maximum memory: 50K × 50 bytes = 2.5MB (acceptable for production)
+                    // - Cleanup runs hourly with 24h retention, so active pairs are retained
+                    // - For larger networks, increase MAX_SEQUENCE_PAIRS or reduce retention
+                    //
+                    // Circuit breaker: After N consecutive failures, escalate to ERROR.
+                    // This helps operators detect persistent storage issues before they cause
+                    // unbounded memory growth.
+                    //
+                    // ## Recommended Prometheus Alerts
+                    //
+                    // ```yaml
+                    // # CRITICAL: Storage may be degraded, encryption at risk
+                    // - alert: ICNEncryptionCircuitBreakerTripped
+                    //   expr: increase(icn_network_encryption_circuit_breaker_trips_total[5m]) > 0
+                    //   severity: critical
+                    //
+                    // # WARNING: Cleanup failing, investigate before circuit breaker trips
+                    // - alert: ICNEncryptionCleanupFailing
+                    //   expr: increase(icn_network_encryption_sequence_cleanup_failed_total[1h]) > 0
+                    //   severity: warning
+                    //
+                    // # NOTICE: Approaching capacity limit, may need to scale or adjust retention
+                    // - alert: ICNEncryptionSequencePairsHigh
+                    //   expr: icn_network_encryption_sequence_pairs > 40000
+                    //   severity: info
+                    // ```
+                    let tracker_for_cleanup = encryption_sequence_tracker.clone();
+                    let shutdown_rx_for_cleanup = self.shutdown_tx.subscribe();
+                    let circuit_breaker_threshold = self
+                        .config
+                        .network
+                        .encryption_cleanup_circuit_breaker_threshold;
+                    background_tasks.spawn(async move {
+                        let mut interval =
+                            tokio::time::interval(std::time::Duration::from_secs(3600));
+                        let mut shutdown_rx = shutdown_rx_for_cleanup;
+                        let mut consecutive_failures: u32 = 0;
+
+                        loop {
+                            tokio::select! {
+                                _ = interval.tick() => {
+                                    match tracker_for_cleanup.cleanup_stale_entries(86400).await {
+                                        Ok(removed) => {
+                                            if removed > 0 {
+                                                debug!("Cleaned up {} stale encryption sequence entries", removed);
+                                            }
+                                            consecutive_failures = 0; // Reset on success
+
+                                            // Update gauge with current pair count for observability
+                                            let pair_count = tracker_for_cleanup.pair_count().await;
+                                            icn_obs::metrics::network::encryption_sequence_pairs_set(pair_count as u64);
+                                        }
+                                        Err(e) => {
+                                            consecutive_failures += 1;
+                                            icn_obs::metrics::network::encryption_sequence_cleanup_failed_inc();
+
+                                            if consecutive_failures >= circuit_breaker_threshold {
+                                                // Circuit breaker tripped - escalate to ERROR and alert via metric
+                                                error!(
+                                                    consecutive_failures = consecutive_failures,
+                                                    "Encryption sequence cleanup has failed {} consecutive times! \
+                                                     Storage may be degraded. Sequence tracker memory may grow unbounded. \
+                                                     Error: {}",
+                                                    consecutive_failures, e
+                                                );
+                                                // Critical alert metric - operators should alert on this
+                                                icn_obs::metrics::network::encryption_circuit_breaker_trips_inc();
+                                            } else {
+                                                warn!(
+                                                    consecutive_failures = consecutive_failures,
+                                                    threshold = circuit_breaker_threshold,
+                                                    "Encryption sequence cleanup failed ({}/{}): {}",
+                                                    consecutive_failures, circuit_breaker_threshold, e
+                                                );
+                                            }
+                                        }
+                                    }
+                                }
+                                _ = shutdown_rx.recv() => {
+                                    debug!("Running final encryption sequence cleanup before shutdown");
+                                    // Run final cleanup to remove any accumulated entries
+                                    if let Err(e) = tracker_for_cleanup.cleanup_stale_entries(86400).await {
+                                        warn!("Final encryption sequence cleanup failed: {}", e);
+                                    }
+                                    debug!("Encryption sequence cleanup task shutting down");
+                                    break;
+                                }
+                            }
+                        }
+                    });
+                }
+
+                let send_callback: icn_gossip::SendMessageCallback = Arc::new(
+                    move |recipient, gossip_msg| {
                         let net_handle = network_handle_clone.clone();
                         let from_did = own_did_clone.clone();
                         let keypair = keypair_clone.clone();
                         let sequence_ctr = sequence_counter.clone();
+                        let enc_seq_tracker = encryption_sequence_tracker.clone();
+                        let x25519_secret = x25519_dalek::StaticSecret::from(x25519_secret_bytes);
 
                         // Track metrics based on message type
                         use icn_gossip::GossipMessage;
@@ -445,12 +674,12 @@ impl Supervisor {
 
                         // Spawn async task to send message
                         tokio::spawn(async move {
-                            // Get next sequence number
+                            // Get next sequence number for signed envelope
                             let sequence =
                                 sequence_ctr.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
 
-                            // Create signed envelope
-                            let envelope = match icn_net::SignedEnvelope::from_payload(
+                            // Create inner signed envelope with gossip payload
+                            let inner_envelope = match icn_net::SignedEnvelope::from_payload(
                                 &from_did,
                                 &keypair,
                                 sequence,
@@ -464,17 +693,76 @@ impl Supervisor {
                                 }
                             };
 
-                            // Send signed message
+                            // Determine if we should encrypt (unicast + encryption enabled + peer supports it)
+                            let should_encrypt = if let Some(ref target_did) = recipient {
+                                encryption_enabled
+                                    && net_handle
+                                        .peer_has_capability(
+                                            target_did,
+                                            icn_net::CapabilityFlags::E2E_ENCRYPTION,
+                                        )
+                                        .await
+                            } else {
+                                false // Broadcast cannot be encrypted
+                            };
+
                             let result = if let Some(target_did) = recipient {
                                 // Unicast
-                                let net_msg = icn_net::NetworkMessage::signed(
-                                    Some(target_did.clone()),
-                                    envelope,
-                                );
-                                net_handle.send_message(target_did, net_msg).await
+                                if should_encrypt {
+                                    // Try to encrypt the message.
+                                    // Both inner and outer envelopes use the SAME signing sequence.
+                                    // This is safe because:
+                                    // 1. ChaCha20-Poly1305 AEAD provides ciphertext integrity
+                                    // 2. The inner envelope cannot be extracted without decryption
+                                    // 3. handle_signed_inner skips replay check (outer protects)
+                                    // See handlers/signed.rs::handle_signed_inner for full security analysis.
+                                    match try_encrypt_envelope(
+                                        &net_handle,
+                                        &from_did,
+                                        &target_did,
+                                        &inner_envelope,
+                                        &keypair,
+                                        &x25519_secret,
+                                        &enc_seq_tracker,
+                                        sequence, // Use same sequence as inner envelope
+                                    )
+                                    .await
+                                    {
+                                        Ok(outer_envelope) => {
+                                            debug!("Sending encrypted gossip to {}", target_did);
+                                            icn_obs::metrics::network::encrypted_messages_sent_inc(
+                                            );
+                                            let net_msg = icn_net::NetworkMessage::signed(
+                                                Some(target_did.clone()),
+                                                outer_envelope,
+                                            );
+                                            net_handle.send_message(target_did, net_msg).await
+                                        }
+                                        Err(e) => {
+                                            // Fail-closed: drop the message rather than transmit plaintext.
+                                            // This ensures we never leak confidential data unencrypted.
+                                            error!(
+                                                "Encryption failed for {}, dropping message (fail-closed): {}",
+                                                target_did, e
+                                            );
+                                            icn_obs::metrics::network::encryption_failed_inc(
+                                                "encryption_error",
+                                            );
+                                            // Return Ok to avoid triggering retry logic - this is intentional drop
+                                            Ok(())
+                                        }
+                                    }
+                                } else {
+                                    // Send unencrypted (peer doesn't support E2E or encryption disabled)
+                                    let net_msg = icn_net::NetworkMessage::signed(
+                                        Some(target_did.clone()),
+                                        inner_envelope,
+                                    );
+                                    net_handle.send_message(target_did, net_msg).await
+                                }
                             } else {
-                                // Broadcast
-                                let net_msg = icn_net::NetworkMessage::signed(None, envelope);
+                                // Broadcast (cannot be encrypted)
+                                let net_msg = icn_net::NetworkMessage::signed(None, inner_envelope);
                                 net_handle.broadcast(net_msg).await
                             };
 
@@ -482,7 +770,8 @@ impl Supervisor {
                                 warn!("Failed to send gossip message: {}", e);
                             }
                         });
-                    });
+                    },
+                );
 
                 gossip.set_send_callback(send_callback);
 

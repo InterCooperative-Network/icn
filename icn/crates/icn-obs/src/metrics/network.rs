@@ -90,6 +90,35 @@ pub fn init_descriptions() {
         "icn_network_replay_guard_peers",
         "Number of peers tracked in replay guard"
     );
+    // E2E Encryption metrics (Issue #404)
+    describe_counter!(
+        "icn_network_encrypted_messages_sent_total",
+        "Total number of E2E encrypted messages sent"
+    );
+    describe_counter!(
+        "icn_network_encrypted_messages_received_total",
+        "Total number of E2E encrypted messages successfully received and decrypted"
+    );
+    describe_counter!(
+        "icn_network_encryption_failed_total",
+        "Total number of messages dropped due to encryption failure (fail-closed)"
+    );
+    describe_counter!(
+        "icn_network_encryption_rejected_total",
+        "Total number of encrypted messages rejected by reason"
+    );
+    describe_counter!(
+        "icn_network_encryption_sequence_cleanup_failed_total",
+        "Total number of encryption sequence cleanup failures"
+    );
+    describe_gauge!(
+        "icn_network_encryption_sequence_pairs",
+        "Current number of active (sender, recipient) encryption sequence pairs being tracked"
+    );
+    describe_counter!(
+        "icn_network_encryption_circuit_breaker_trips_total",
+        "Total number of times the encryption cleanup circuit breaker has tripped"
+    );
 }
 
 // Simple counters
@@ -196,6 +225,64 @@ pub fn peer_capability_set(capability: &str, count: u64) {
 /// Set the number of peers tracked in replay guard
 pub fn replay_guard_peers_set(value: u64) {
     gauge!("icn_network_replay_guard_peers").set(value as f64);
+}
+
+// E2E Encryption metrics (Issue #404)
+
+/// Increment encrypted messages sent counter
+pub fn encrypted_messages_sent_inc() {
+    counter!("icn_network_encrypted_messages_sent_total").increment(1);
+}
+
+/// Increment encrypted messages received and successfully decrypted counter
+pub fn encrypted_messages_received_inc() {
+    counter!("icn_network_encrypted_messages_received_total").increment(1);
+}
+
+/// Increment encryption failed counter with reason (fail-closed: message dropped)
+///
+/// Reasons: "encryption_error", "peer_key_missing", "serialization_failed"
+pub fn encryption_failed_inc(reason: &str) {
+    counter!(
+        "icn_network_encryption_failed_total",
+        "reason" => reason.to_string()
+    )
+    .increment(1);
+}
+
+/// Increment encrypted message rejection counter with reason
+///
+/// Reasons: "missing_peer_key", "wrong_recipient", "decryption_failed", "invalid_inner_signature"
+pub fn encryption_rejected_inc(reason: &str) {
+    counter!(
+        "icn_network_encryption_rejected_total",
+        "reason" => reason.to_string()
+    )
+    .increment(1);
+}
+
+/// Increment encryption sequence cleanup failure counter
+///
+/// This metric helps operators detect storage issues before they cause problems.
+pub fn encryption_sequence_cleanup_failed_inc() {
+    counter!("icn_network_encryption_sequence_cleanup_failed_total").increment(1);
+}
+
+/// Set the current number of encryption sequence pairs being tracked
+///
+/// This gauge helps operators monitor memory usage in the sequence tracker.
+/// The value represents active (sender, recipient) pairs with sequence numbers.
+pub fn encryption_sequence_pairs_set(count: u64) {
+    gauge!("icn_network_encryption_sequence_pairs").set(count as f64);
+}
+
+/// Increment circuit breaker trip counter
+///
+/// This is a critical alert metric - any non-zero value indicates that
+/// encryption cleanup has failed repeatedly (5+ times) and storage may
+/// be degraded. Operators should investigate immediately.
+pub fn encryption_circuit_breaker_trips_inc() {
+    counter!("icn_network_encryption_circuit_breaker_trips_total").increment(1);
 }
 
 // Complex function with custom logic

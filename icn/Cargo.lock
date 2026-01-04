@@ -2828,6 +2828,7 @@ dependencies = [
  "toml 0.9.10+spec-1.1.0",
  "tracing",
  "tracing-subscriber",
+ "x25519-dalek",
 ]
 
 [[package]]
@@ -3101,6 +3102,7 @@ dependencies = [
  "icn-time",
  "icn-trust",
  "mdns-sd",
+ "portpicker",
  "quinn",
  "rand 0.8.5",
  "rand_core 0.6.4",

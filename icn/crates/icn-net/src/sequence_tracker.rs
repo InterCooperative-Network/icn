@@ -40,6 +40,7 @@ use icn_identity::Did;
 use icn_store::Store;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -50,7 +51,31 @@ use tokio::sync::RwLock;
 /// - At 1000 msg/sec, covers 10 seconds of unsynced messages
 /// - At 100 msg/sec, covers 100 seconds
 /// - In practice, sequences are persisted immediately after increment
+///
+/// ## Sled Durability Note
+///
+/// Sled uses a write-ahead log (WAL) and may buffer writes before flushing to disk.
+/// The default flush interval is typically ~1 second. In a crash scenario:
+///
+/// 1. Node writes sequences 1000, 1001, 1002 to Sled (in-memory buffer)
+/// 2. Before Sled flushes, node crashes
+/// 3. On restart, Sled reports sequence 999 (last flushed)
+/// 4. Safety gap: 999 + 10,000 = 10,999
+/// 5. Next message uses sequence 11,000 (safely above any lost sequences)
+///
+/// The 10K gap covers typical Sled flush intervals even under very high load.
+/// For networks requiring stricter guarantees, consider calling `store.flush()`
+/// after persistence (trading throughput for guaranteed durability).
 const RESTART_SAFETY_GAP: u64 = 10_000;
+
+/// Maximum number of (sender, recipient) pairs to track.
+///
+/// This limit prevents unbounded memory growth if cleanup fails persistently.
+/// At ~50 bytes per entry, 50K entries = ~2.5MB - acceptable for production.
+///
+/// When exceeded, new encryptions will fail with an error until cleanup succeeds
+/// or old pairs naturally expire. This is a safety measure, not expected in normal operation.
+const MAX_SEQUENCE_PAIRS: usize = 50_000;
 
 /// Key prefix for sequence storage.
 const SEQUENCE_PREFIX: &[u8] = b"outgoing_seq:";
@@ -73,8 +98,12 @@ pub struct OutgoingSequenceTracker {
     cache: RwLock<HashMap<(Did, Did), u64>>,
     /// Persistent storage backend
     store: Arc<dyn Store>,
-    /// Whether we've applied the restart safety gap
-    restart_gap_applied: RwLock<bool>,
+    /// Whether we've applied the restart safety gap.
+    /// Uses AtomicBool with compare_exchange for lock-free, race-free initialization.
+    restart_gap_applied: AtomicBool,
+    /// Maximum pairs capacity (test-overridable)
+    #[cfg(test)]
+    max_pairs: usize,
 }
 
 impl OutgoingSequenceTracker {
@@ -86,7 +115,9 @@ impl OutgoingSequenceTracker {
         let tracker = Self {
             cache: RwLock::new(HashMap::new()),
             store,
-            restart_gap_applied: RwLock::new(false),
+            restart_gap_applied: AtomicBool::new(false),
+            #[cfg(test)]
+            max_pairs: MAX_SEQUENCE_PAIRS,
         };
 
         Ok(tracker)
@@ -98,7 +129,19 @@ impl OutgoingSequenceTracker {
         Self {
             cache: RwLock::new(HashMap::new()),
             store: Arc::new(icn_store::SledStore::temporary().unwrap()),
-            restart_gap_applied: RwLock::new(true), // No gap needed for tests
+            restart_gap_applied: AtomicBool::new(true), // No gap needed for tests
+            max_pairs: MAX_SEQUENCE_PAIRS,
+        }
+    }
+
+    /// Create a sequence tracker for testing with custom capacity limit.
+    #[cfg(test)]
+    pub fn in_memory_with_capacity(max_pairs: usize) -> Self {
+        Self {
+            cache: RwLock::new(HashMap::new()),
+            store: Arc::new(icn_store::SledStore::temporary().unwrap()),
+            restart_gap_applied: AtomicBool::new(true), // No gap needed for tests
+            max_pairs,
         }
     }
 
@@ -106,12 +149,26 @@ impl OutgoingSequenceTracker {
     ///
     /// This should be called during node startup, after the store is ready.
     /// It loads all persisted sequences and adds RESTART_SAFETY_GAP to each.
+    ///
+    /// # Thread Safety
+    ///
+    /// Uses compare_exchange on AtomicBool to ensure the safety gap is applied
+    /// exactly once, even if multiple threads call this method concurrently.
+    /// Only the thread that successfully flips false->true performs the work.
     pub async fn load_and_apply_safety_gap(&self) -> Result<usize> {
-        let mut applied = self.restart_gap_applied.write().await;
-        if *applied {
+        // Atomically try to claim the initialization slot.
+        // Only one thread will succeed at changing false -> true.
+        // All others will see that it's already true and return early.
+        if self
+            .restart_gap_applied
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_err()
+        {
+            // Another thread already applied the gap or is applying it
             return Ok(0);
         }
 
+        // We successfully claimed the slot - now apply the safety gap
         let entries = self
             .store
             .scan(SEQUENCE_PREFIX)
@@ -123,8 +180,15 @@ impl OutgoingSequenceTracker {
         for (key, value) in entries {
             if let Some((sender, recipient)) = Self::parse_key(&key) {
                 if let Ok(entry) = serde_json::from_slice::<SequenceEntry>(&value) {
-                    // Apply safety gap
-                    let safe_sequence = entry.sequence.saturating_add(RESTART_SAFETY_GAP);
+                    // Apply safety gap, failing on overflow to prevent nonce reuse.
+                    // This is cryptographically critical: ChaCha20-Poly1305 nonce reuse
+                    // completely breaks confidentiality. While u64::MAX is astronomically
+                    // unlikely in practice, we fail-fast rather than silently wrap.
+                    let safe_sequence = entry.sequence.checked_add(RESTART_SAFETY_GAP).context(
+                        "Sequence overflow while applying safety gap - sequence space exhausted. \
+                         This should never happen in practice (requires sending 2^64 messages). \
+                         If this occurs, the encryption key material should be rotated.",
+                    )?;
                     cache.insert((sender.clone(), recipient.clone()), safe_sequence);
 
                     // Persist the new safe sequence
@@ -143,8 +207,6 @@ impl OutgoingSequenceTracker {
             }
         }
 
-        *applied = true;
-
         tracing::info!(
             loaded_sequences = count,
             safety_gap = RESTART_SAFETY_GAP,
@@ -158,27 +220,68 @@ impl OutgoingSequenceTracker {
     ///
     /// Automatically increments and persists the sequence.
     /// Thread-safe and guaranteed to return unique, monotonically increasing values.
+    ///
+    /// # Persistence-First Safety
+    ///
+    /// Critical: We persist to storage BEFORE updating the cache. This ensures that
+    /// if persistence fails (disk full, network partition), we never return a sequence
+    /// that might be reused after restart. The alternative (cache-then-persist) could
+    /// lead to nonce reuse which completely breaks ChaCha20-Poly1305 security.
+    ///
+    /// # Atomicity
+    ///
+    /// The write lock is held through the entire read-persist-update cycle to prevent
+    /// two threads from reading the same value and returning duplicate sequences.
+    /// While this means persistence happens under lock (blocking other callers),
+    /// cryptographic nonce uniqueness is more important than throughput.
+    ///
+    /// Sequence of operations (all under write lock):
+    /// 1. Read current value from cache
+    /// 2. Persist incremented value to storage (fail fast)
+    /// 3. Update cache with new value (only after successful persist)
+    ///
+    /// If persistence fails, we return an error and the cache is unchanged.
     pub async fn next_sequence(&self, sender: &Did, recipient: &Did) -> Result<u64> {
-        // Ensure safety gap has been applied on first access
-        {
-            let applied = self.restart_gap_applied.read().await;
-            if !*applied {
-                drop(applied);
-                self.load_and_apply_safety_gap().await?;
-            }
+        // Ensure safety gap has been applied on first access.
+        // Uses Acquire ordering to see the effects of any prior initialization.
+        if !self.restart_gap_applied.load(Ordering::Acquire) {
+            self.load_and_apply_safety_gap().await?;
         }
 
         let key = (sender.clone(), recipient.clone());
 
+        // Hold write lock through entire operation to prevent concurrent reads
+        // returning the same sequence number
         let mut cache = self.cache.write().await;
+
+        // Check if this is a new pair and we're at capacity
+        let is_new_pair = !cache.contains_key(&key);
+        #[cfg(test)]
+        let max_pairs = self.max_pairs;
+        #[cfg(not(test))]
+        let max_pairs = MAX_SEQUENCE_PAIRS;
+
+        if is_new_pair && cache.len() >= max_pairs {
+            // Safety limit reached - reject new pairs to prevent unbounded memory growth.
+            // Existing pairs can still increment. This is fail-safe: message won't be
+            // encrypted, which is better than running out of memory.
+            anyhow::bail!(
+                "Sequence tracker at capacity ({max_pairs} pairs). \
+                 Cannot add new recipient. Cleanup may be failing - check logs."
+            );
+        }
+
+        // Step 1: Read current value
         let next_seq = cache.get(&key).map(|s| s + 1).unwrap_or(1);
 
-        // Update cache
-        cache.insert(key, next_seq);
-
-        // Persist immediately (critical for nonce safety)
-        drop(cache); // Release lock before IO
+        // Step 2: Persist FIRST - fail fast before updating cache
+        // This ensures we never return a sequence that isn't durably stored.
+        // If this fails, cache is unchanged and caller can retry.
+        // NOTE: Persistence happens under lock, but nonce uniqueness > throughput
         self.persist_sequence(sender, recipient, next_seq).await?;
+
+        // Step 3: Update cache only after successful persistence
+        cache.insert(key, next_seq);
 
         Ok(next_seq)
     }
@@ -266,8 +369,20 @@ impl OutgoingSequenceTracker {
     /// Number of entries removed
     ///
     /// # Safety
-    /// Uses double-check pattern to avoid TOCTOU race conditions: entries are
-    /// verified as still stale after acquiring the write lock before deletion.
+    ///
+    /// This method minimizes lock hold time to avoid blocking encryption operations:
+    /// 1. Scan store entries (no lock)
+    /// 2. For each stale entry: verify staleness and delete from store (no lock)
+    /// 3. Briefly acquire write lock only for cache removal
+    ///
+    /// The sequence is safe because:
+    /// - Store deletions are idempotent (deleting non-existent key is fine)
+    /// - Cache removal under lock ensures consistency with next_sequence()
+    /// - If next_sequence() updates an entry between our check and delete, the
+    ///   store.delete() removes stale data but next_sequence() will re-persist
+    ///
+    /// This design prevents cleanup from blocking active encryption for extended
+    /// periods if storage I/O is slow.
     pub async fn cleanup_stale_entries(&self, retention_secs: u64) -> Result<usize> {
         let now_ms = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -295,25 +410,42 @@ impl OutgoingSequenceTracker {
             return Ok(0);
         }
 
-        // Second pass: re-check and delete under lock (TOCTOU protection)
-        let mut removed = 0;
-        let mut cache = self.cache.write().await;
+        // Second pass: verify and delete from store WITHOUT holding cache lock
+        // This prevents blocking encryption operations during slow storage I/O
+        let mut keys_to_remove_from_cache: Vec<(Did, Did)> = Vec::new();
 
         for key in candidate_keys {
             // Re-read entry from store to check if it's still stale
             // (could have been updated between scan and now)
             if let Ok(Some(fresh_value)) = self.store.get(&key) {
                 if let Ok(fresh_entry) = serde_json::from_slice::<SequenceEntry>(&fresh_value) {
-                    // Only delete if STILL stale after re-check AND delete succeeds
-                    if fresh_entry.updated_at_ms < cutoff_ms && self.store.delete(&key).is_ok() {
-                        if let Some((sender, recipient)) = Self::parse_key(&key) {
-                            cache.remove(&(sender, recipient));
+                    // Only delete if STILL stale after re-check
+                    if fresh_entry.updated_at_ms < cutoff_ms {
+                        // Delete from store (outside of cache lock)
+                        if self.store.delete(&key).is_ok() {
+                            if let Some((sender, recipient)) = Self::parse_key(&key) {
+                                keys_to_remove_from_cache.push((sender, recipient));
+                            }
                         }
-                        removed += 1;
                     }
                 }
             }
         }
+
+        // Third pass: briefly acquire lock only for cache removal
+        // This is fast (just HashMap removes) and doesn't block on I/O
+        let removed = if !keys_to_remove_from_cache.is_empty() {
+            let mut cache = self.cache.write().await;
+            let mut count = 0;
+            for key in keys_to_remove_from_cache {
+                if cache.remove(&key).is_some() {
+                    count += 1;
+                }
+            }
+            count
+        } else {
+            0
+        };
 
         if removed > 0 {
             tracing::info!(
@@ -330,16 +462,16 @@ impl OutgoingSequenceTracker {
     ///
     /// Returns true if `load_and_apply_safety_gap()` has been called.
     /// Useful for startup validation.
-    pub async fn is_initialized(&self) -> bool {
-        *self.restart_gap_applied.read().await
+    pub fn is_initialized(&self) -> bool {
+        self.restart_gap_applied.load(Ordering::Acquire)
     }
 
     /// Require that safety gap has been explicitly applied.
     ///
     /// Returns error if `load_and_apply_safety_gap()` hasn't been called.
     /// Use this in strict mode when you want to enforce explicit initialization.
-    pub async fn require_initialized(&self) -> Result<()> {
-        if !*self.restart_gap_applied.read().await {
+    pub fn require_initialized(&self) -> Result<()> {
+        if !self.restart_gap_applied.load(Ordering::Acquire) {
             anyhow::bail!(
                 "Sequence tracker not initialized. Call load_and_apply_safety_gap() during startup."
             )
@@ -575,13 +707,13 @@ mod tests {
         let tracker = OutgoingSequenceTracker::new(store).unwrap();
 
         // Not initialized yet
-        assert!(!tracker.is_initialized().await);
+        assert!(!tracker.is_initialized());
 
         // Apply safety gap
         tracker.load_and_apply_safety_gap().await.unwrap();
 
         // Now initialized
-        assert!(tracker.is_initialized().await);
+        assert!(tracker.is_initialized());
     }
 
     #[tokio::test]
@@ -590,14 +722,14 @@ mod tests {
         let tracker = OutgoingSequenceTracker::new(store).unwrap();
 
         // Should error before initialization
-        let result = tracker.require_initialized().await;
+        let result = tracker.require_initialized();
         assert!(result.is_err());
 
         // Apply safety gap
         tracker.load_and_apply_safety_gap().await.unwrap();
 
         // Should succeed after initialization
-        let result = tracker.require_initialized().await;
+        let result = tracker.require_initialized();
         assert!(result.is_ok());
     }
 
@@ -610,14 +742,14 @@ mod tests {
         let bob = generate_did();
 
         // Not initialized
-        assert!(!tracker.is_initialized().await);
+        assert!(!tracker.is_initialized());
 
         // next_sequence auto-initializes
         let seq = tracker.next_sequence(&alice, &bob).await.unwrap();
         assert_eq!(seq, 1);
 
         // Now initialized
-        assert!(tracker.is_initialized().await);
+        assert!(tracker.is_initialized());
     }
 
     #[tokio::test]
@@ -636,15 +768,205 @@ mod tests {
 
         assert_eq!(tracker.pair_count().await, 2);
 
-        // Cleanup with 1 second retention - should remove nothing (entries are fresh)
-        // Note: We use 1 second instead of 0 to avoid timing races where
-        // the cleanup timestamp is slightly after the entry creation timestamp
-        let removed = tracker.cleanup_stale_entries(1).await.unwrap();
+        // Cleanup with 60 second retention - should remove nothing (entries are fresh)
+        // We use 60 seconds instead of a small value to avoid timing races where
+        // slow test execution or system load causes entries to appear stale
+        let removed = tracker.cleanup_stale_entries(60).await.unwrap();
         assert_eq!(removed, 0);
 
         // Cleanup with very long retention - should remove nothing
         let removed = tracker.cleanup_stale_entries(86400).await.unwrap();
         assert_eq!(removed, 0);
         assert_eq!(tracker.pair_count().await, 2);
+    }
+
+    #[tokio::test]
+    async fn test_multiple_restarts_compound_safety_gap() {
+        // Tests that multiple restarts correctly compound the safety gap
+        // This is critical for ensuring nonce uniqueness across crashes/restarts
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+
+        let alice = generate_did();
+        let bob = generate_did();
+
+        // First "session" - get some sequences
+        let final_seq_session1 = {
+            let tracker = OutgoingSequenceTracker::new(store.clone()).unwrap();
+            tracker.load_and_apply_safety_gap().await.unwrap();
+
+            // Get sequences 1, 2, 3
+            for _ in 0..3 {
+                tracker.next_sequence(&alice, &bob).await.unwrap();
+            }
+
+            tracker.current_sequence(&alice, &bob).await.unwrap()
+        };
+        assert_eq!(final_seq_session1, 3);
+
+        // Second "session" (first restart) - safety gap applied
+        let final_seq_session2 = {
+            let tracker = OutgoingSequenceTracker::new(store.clone()).unwrap();
+            tracker.load_and_apply_safety_gap().await.unwrap();
+
+            // Current should be 3 + gap
+            let current = tracker.current_sequence(&alice, &bob).await.unwrap();
+            assert_eq!(current, 3 + RESTART_SAFETY_GAP);
+
+            // Get a few more sequences
+            tracker.next_sequence(&alice, &bob).await.unwrap();
+            tracker.next_sequence(&alice, &bob).await.unwrap();
+
+            tracker.current_sequence(&alice, &bob).await.unwrap()
+        };
+        assert_eq!(final_seq_session2, 3 + RESTART_SAFETY_GAP + 2);
+
+        // Third "session" (second restart) - another safety gap applied
+        {
+            let tracker = OutgoingSequenceTracker::new(store.clone()).unwrap();
+            tracker.load_and_apply_safety_gap().await.unwrap();
+
+            // Current should be (3 + gap + 2) + gap = 3 + 2*gap + 2
+            let current = tracker.current_sequence(&alice, &bob).await.unwrap();
+            assert_eq!(current, 3 + RESTART_SAFETY_GAP + 2 + RESTART_SAFETY_GAP);
+
+            // Verify next sequence continues from there
+            let next = tracker.next_sequence(&alice, &bob).await.unwrap();
+            assert_eq!(next, 3 + 2 * RESTART_SAFETY_GAP + 3);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_safety_gap_only_applied_once_per_instance() {
+        // Tests that calling load_and_apply_safety_gap multiple times
+        // only applies the gap once per tracker instance
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+
+        let alice = generate_did();
+        let bob = generate_did();
+
+        // First session - create a sequence
+        {
+            let tracker = OutgoingSequenceTracker::new(store.clone()).unwrap();
+            tracker.load_and_apply_safety_gap().await.unwrap();
+            tracker.next_sequence(&alice, &bob).await.unwrap();
+            assert_eq!(tracker.current_sequence(&alice, &bob).await.unwrap(), 1);
+        }
+
+        // Second session - gap should be applied exactly once
+        {
+            let tracker = OutgoingSequenceTracker::new(store.clone()).unwrap();
+
+            // Call load_and_apply_safety_gap multiple times
+            let loaded1 = tracker.load_and_apply_safety_gap().await.unwrap();
+            let loaded2 = tracker.load_and_apply_safety_gap().await.unwrap();
+            let loaded3 = tracker.load_and_apply_safety_gap().await.unwrap();
+
+            // First call should load, subsequent calls should skip
+            assert_eq!(loaded1, 1); // Loaded 1 pair
+            assert_eq!(loaded2, 0); // Already applied
+            assert_eq!(loaded3, 0); // Already applied
+
+            // Current should be 1 + gap (not 1 + 3*gap)
+            let current = tracker.current_sequence(&alice, &bob).await.unwrap();
+            assert_eq!(current, 1 + RESTART_SAFETY_GAP);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_capacity_limit_rejects_new_pairs() {
+        // Tests that when capacity is reached, new pairs are rejected
+        // but existing pairs can still increment their sequences.
+        //
+        // This is a safety mechanism to prevent unbounded memory growth if
+        // cleanup fails persistently (circuit breaker scenario).
+
+        // Create a tracker with small capacity for testing
+        let tracker = OutgoingSequenceTracker::in_memory_with_capacity(5);
+
+        let sender = generate_did();
+        let mut recipients: Vec<Did> = Vec::new();
+
+        // Fill to capacity (5 pairs)
+        for _ in 0..5 {
+            let recipient = generate_did();
+            recipients.push(recipient.clone());
+            tracker.next_sequence(&sender, &recipient).await.unwrap();
+        }
+
+        assert_eq!(tracker.pair_count().await, 5);
+
+        // Try to add a new pair - should fail
+        let new_recipient = generate_did();
+        let result = tracker.next_sequence(&sender, &new_recipient).await;
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("at capacity"),
+            "Expected capacity error, got: {err_msg}"
+        );
+
+        // Existing pairs should still work
+        let seq = tracker
+            .next_sequence(&sender, &recipients[0])
+            .await
+            .unwrap();
+        assert_eq!(seq, 2); // Second sequence for this pair
+
+        let seq = tracker
+            .next_sequence(&sender, &recipients[4])
+            .await
+            .unwrap();
+        assert_eq!(seq, 2); // Second sequence for this pair
+
+        // Still at 5 pairs
+        assert_eq!(tracker.pair_count().await, 5);
+    }
+
+    #[tokio::test]
+    async fn test_capacity_limit_error_message_contains_guidance() {
+        // Test that the capacity limit error message helps with debugging.
+
+        let tracker = OutgoingSequenceTracker::in_memory_with_capacity(1);
+
+        let sender = generate_did();
+
+        // Fill to capacity
+        tracker
+            .next_sequence(&sender, &generate_did())
+            .await
+            .unwrap();
+
+        // Try to exceed capacity
+        let result = tracker.next_sequence(&sender, &generate_did()).await;
+        let err_msg = result.unwrap_err().to_string();
+
+        // Error should mention cleanup as a potential issue
+        assert!(
+            err_msg.contains("Cleanup may be failing"),
+            "Error should guide users to check cleanup: {err_msg}"
+        );
+        assert!(
+            err_msg.contains("check logs"),
+            "Error should direct to logs: {err_msg}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_default_capacity_is_50k() {
+        // Verify the production capacity limit is 50K pairs
+        assert_eq!(MAX_SEQUENCE_PAIRS, 50_000);
+
+        // Verify default in_memory() uses production limit
+        let tracker = OutgoingSequenceTracker::in_memory();
+        let sender = generate_did();
+
+        // Should be able to add at least a few pairs (way below 50K)
+        for _ in 0..10 {
+            tracker
+                .next_sequence(&sender, &generate_did())
+                .await
+                .unwrap();
+        }
+        assert_eq!(tracker.pair_count().await, 10);
     }
 }

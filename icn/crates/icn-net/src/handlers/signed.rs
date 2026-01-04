@@ -7,9 +7,9 @@
 //! - Byzantine fault recording
 
 use super::ConnectionContext;
-use crate::envelope::SignedEnvelope;
+use crate::envelope::{PayloadType, SignedEnvelope};
 use crate::protocol::NetworkMessage;
-use tracing::{info, warn};
+use tracing::{debug, warn};
 
 impl ConnectionContext {
     /// Handle a Signed message envelope
@@ -50,12 +50,19 @@ impl ConnectionContext {
         // Signature valid, now check for replay attack
         match self.replay_guard.write().await.check(envelope) {
             Ok(()) => {
-                info!(
-                    "Verified signed message from {} (seq={})",
-                    envelope.from, envelope.sequence
+                debug!(
+                    "Verified signed message from {} (seq={}, type={:?})",
+                    envelope.from, envelope.sequence, envelope.payload_type
                 );
-                // Forward verified message to handler
-                self.forward_to_handler(message);
+
+                // Check if this is an encrypted payload that needs decryption
+                if envelope.payload_type == PayloadType::Encrypted {
+                    // Route to encrypted handler for decryption
+                    self.handle_encrypted_payload(message, envelope).await;
+                } else {
+                    // Forward verified message to handler
+                    self.forward_to_handler(message);
+                }
             }
             Err(e) => {
                 warn!("Replay attack detected from {}: {}", envelope.from, e);
@@ -78,6 +85,68 @@ impl ConnectionContext {
                 // Drop message (don't forward to handler)
             }
         }
+    }
+
+    /// Handle an inner signed envelope from an encrypted payload
+    ///
+    /// This is called after decrypting an EncryptedEnvelope. It verifies the
+    /// signature but SKIPS replay checking because:
+    /// 1. The outer envelope already passed replay protection
+    /// 2. The inner content is authenticated by ChaCha20-Poly1305
+    /// 3. The inner and outer envelopes share the same sequence number
+    ///
+    /// ## Security Trust Assumption
+    ///
+    /// Skipping inner replay protection is safe because ChaCha20-Poly1305 AEAD
+    /// provides **ciphertext integrity**. An attacker cannot:
+    /// - Extract the inner envelope from an encrypted message (no decryption key)
+    /// - Modify the ciphertext without detection (Poly1305 tag verification fails)
+    /// - Replay the outer encrypted message (outer envelope replay guard)
+    ///
+    /// The only way to obtain the inner envelope is through legitimate decryption,
+    /// which requires the recipient's X25519 private key. Therefore, any inner
+    /// envelope we process was necessarily inside a replay-protected outer envelope.
+    ///
+    /// Using the same sequence for both avoids consuming two sequence numbers
+    /// per encrypted message.
+    pub async fn handle_signed_inner(&self, message: NetworkMessage, envelope: &SignedEnvelope) {
+        // Verify signature and age first (same as handle_signed)
+        let sig_result = envelope.verify(300);
+
+        if let Err(e) = sig_result {
+            warn!(
+                "Inner envelope signature/age verification failed from {}: {}",
+                envelope.from, e
+            );
+
+            // Record InvalidSignature violation
+            if let Some(ref detector) = self.misbehavior_detector {
+                let message_hash = compute_message_hash(envelope);
+
+                let violation = icn_security::Violation::InvalidSignature {
+                    message_hash: message_hash.clone().try_into().unwrap_or([0u8; 32]),
+                };
+
+                detector
+                    .write()
+                    .await
+                    .record_violation(&envelope.from, violation, message_hash);
+            }
+            icn_obs::metrics::network::encryption_rejected_inc("invalid_inner_signature");
+            return;
+        }
+
+        debug!(
+            "Verified inner signed envelope from {} (seq={}, type={:?})",
+            envelope.from, envelope.sequence, envelope.payload_type
+        );
+
+        // Skip replay check - the outer envelope already provided replay protection.
+        // The inner content was inside authenticated encryption, so it couldn't have
+        // been extracted and replayed separately.
+
+        // Forward verified message to handler
+        self.forward_to_handler(message);
     }
 }
 
