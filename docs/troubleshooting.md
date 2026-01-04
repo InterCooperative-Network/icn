@@ -8,6 +8,9 @@ This document provides step-by-step procedures for diagnosing and resolving comm
 - [Incident Response Playbook](incident-response.md) - For security incidents and critical failures
 - [Production Hardening](production-hardening.md) - Security configuration reference
 
+> **Note**: Commands marked with "(future feature)" are planned but not yet implemented.
+> These are included for completeness and will be available in future ICN releases.
+
 ---
 
 ## Table of Contents
@@ -101,7 +104,7 @@ container_memory_working_set_bytes{namespace="icn", container="icnd"} / containe
 2. **Check for memory leaks** (sustained growth over time):
    - Review Grafana memory dashboard for trends
    - Check if memory grows without corresponding workload increase
-   - Look for goroutine/thread count growth
+   - Look for task/thread count growth
 
 3. **Identify workload patterns**:
    ```bash
@@ -145,13 +148,17 @@ sudo kubectl -n icn edit deployment icn-daemon
 ```
 
 **If suspected memory leak**:
-1. Collect heap profile (if enabled):
+1. Collect memory diagnostics from the host:
    ```bash
-   curl http://localhost:6060/debug/pprof/heap > heap.prof
+   # Capture memory map of the process
+   sudo kubectl -n icn exec deploy/icn-daemon -- cat /proc/1/smaps > smaps.txt
+
+   # Capture current metrics
+   curl -s http://10.8.10.40:30100/metrics > metrics-snapshot.txt
    ```
 2. Report to ICN developers with:
-   - Heap profile
-   - Memory growth timeline
+   - Memory diagnostics (smaps, metrics snapshot)
+   - Memory growth timeline from Grafana
    - Workload characteristics
    - ICN version
 
@@ -180,7 +187,7 @@ sudo kubectl -n icn edit deployment icn-daemon
 
 - Nodes have divergent views of the network
 - Messages not propagating to all nodes
-- `icn_gossip_sync_lag_seconds` increasing
+- Entry counts differ significantly between nodes
 - Dashboard shows uneven topic coverage
 - Inconsistent data across cooperative members
 
@@ -191,10 +198,11 @@ sudo kubectl -n icn edit deployment icn-daemon
 curl -s http://10.8.10.40:30100/metrics | grep icn_gossip
 
 # Key metrics to watch:
-# - icn_gossip_messages_received_total
-# - icn_gossip_messages_sent_total
-# - icn_gossip_sync_requests_total
-# - icn_gossip_entries_total{topic="..."}
+# - icn_gossip_entries_received_total (incoming entries)
+# - icn_gossip_entries_published_total (outgoing entries)
+# - icn_gossip_entries_total (total stored entries)
+# - icn_gossip_subscriptions_total (active subscriptions)
+# - icn_gossip_subscriptions_rejected_total (rejected subscriptions)
 ```
 
 ### Diagnosis Steps
@@ -216,9 +224,13 @@ curl -s http://10.8.10.40:30100/metrics | grep icn_gossip
    # Compare subscription counts across nodes (if multi-node)
    ```
 
-3. **Check vector clock drift**:
-   - Large clock differences indicate sync issues
-   - Look for: `icn_gossip_clock_drift_seconds`
+3. **Check message flow balance**:
+   - Compare sent vs received message counts
+   - Large imbalance indicates sync issues
+   ```bash
+   # Check message flow balance
+   curl -s http://10.8.10.40:30100/metrics | grep -E "icn_gossip_(entries_received|entries_published)_total"
+   ```
 
 4. **Check for rejected messages**:
    ```bash
@@ -233,7 +245,7 @@ curl -s http://10.8.10.40:30100/metrics | grep icn_gossip
    └── Yes → Messages flowing?
        ├── No → Check subscriptions, topic configuration
        └── Yes → Convergence slow?
-           ├── Yes → Check clock drift, anti-entropy
+           ├── Yes → Compare entry counts across nodes, check anti-entropy
            └── No → False alarm, verify with manual check
    ```
 
@@ -507,7 +519,7 @@ icnctl trust remove --from did:icn:<from> --to did:icn:<to>
 
 - Clients receiving 429 Too Many Requests
 - Legitimate operations being blocked
-- `icn_gateway_rate_limited_total` incrementing
+- `icn_gateway_rate_limit_exceeded_total` incrementing
 - User complaints about "too many requests" errors
 - API latency spikes due to queuing
 
@@ -744,10 +756,10 @@ sudo kubectl -n icn edit deployment icn-daemon
 | Issue | Key Metric | Alert Threshold |
 |-------|-----------|-----------------|
 | High Memory | `container_memory_working_set_bytes` | > 85% limit |
-| Gossip Lag | `icn_gossip_sync_lag_seconds` | > 60 seconds |
+| Gossip Issues | `icn_gossip_subscriptions_rejected_total` | increasing rate |
 | Ledger Lag | `icn_ledger_sync_lag_seconds` | > 300 seconds |
 | Trust Errors | `icn_trust_computation_errors_total` | > 10/minute |
-| Rate Limiting | `icn_gateway_rate_limited_total` | > 100/minute |
+| Rate Limiting | `icn_gateway_rate_limit_exceeded_total` | > 100/minute |
 | Restarts | `kube_pod_container_status_restarts_total` | > 3/hour |
 
 ### Quick Prometheus Queries
@@ -759,11 +771,14 @@ container_memory_working_set_bytes{namespace="icn"} / container_spec_memory_limi
 # Request error rate
 rate(icn_gateway_requests_total{status=~"5.."}[5m]) / rate(icn_gateway_requests_total[5m])
 
-# Gossip message rate
-rate(icn_gossip_messages_received_total[5m])
+# Gossip entry receive rate
+rate(icn_gossip_entries_received_total[5m])
 
-# Trust computation latency p99
-histogram_quantile(0.99, rate(icn_trust_computation_duration_seconds_bucket[5m]))
+# Rate limit events per minute
+rate(icn_gateway_rate_limit_exceeded_total[5m]) * 60
+
+# Gossip message latency p99
+histogram_quantile(0.99, rate(icn_gossip_message_latency_seconds_bucket[5m]))
 ```
 
 ---
