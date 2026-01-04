@@ -990,7 +990,18 @@ impl GovernanceActor {
                 };
                 self.close_scheduler.write().await.push(Reverse(scheduled));
 
-                // Broadcast to network
+                // Broadcast deliberation ended to network
+                // Note: comment_count and participant_count are 0 since
+                // comment tracking is not yet implemented in the actor
+                self.publish(GovernanceMessage::deliberation_ended(
+                    proposal_id.clone(),
+                    opened_at, // ended_at == opened_at (same moment)
+                    0,         // comment_count - not yet tracked
+                    0,         // participant_count - not yet tracked
+                ))
+                .await?;
+
+                // Broadcast proposal opened to network
                 self.publish(GovernanceMessage::proposal_opened(
                     proposal_id.clone(),
                     opened_at,
