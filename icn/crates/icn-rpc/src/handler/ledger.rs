@@ -438,7 +438,7 @@ pub async fn handle_quarantine_release(
             // Try to append the released entry back to the ledger
             // The intent of "release" is to retry the entry, so if reappend fails,
             // the operation has not fully succeeded and should return an error.
-            match ledger.append_entry(entry) {
+            match ledger.append_entry(entry).await {
                 Ok(_) => RpcResponse::success(
                     id,
                     serde_json::json!({

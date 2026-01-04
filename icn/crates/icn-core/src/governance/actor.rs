@@ -667,7 +667,7 @@ impl GovernanceActor {
         // Subscribe to governance topic
         {
             let mut g = gossip.write().await;
-            g.subscribe(GOVERNANCE_TOPIC, did.clone())?;
+            g.subscribe(GOVERNANCE_TOPIC, did.clone()).await?;
         }
 
         // Set up notification callback for incoming messages
@@ -1210,7 +1210,7 @@ impl GovernanceActor {
     async fn publish(&self, msg: GovernanceMessage) -> Result<[u8; 32]> {
         let bytes = msg.to_bytes()?;
         let mut g = self.gossip.write().await;
-        let hash = g.publish(GOVERNANCE_TOPIC, bytes)?;
+        let hash = g.publish(GOVERNANCE_TOPIC, bytes).await?;
         Ok(hash)
     }
 

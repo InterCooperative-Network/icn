@@ -200,13 +200,16 @@ pub async fn release_escrow(
             .parse()
             .map_err(|e| GatewayError::BadRequest(format!("Invalid to_account DID: {e}")))?;
 
-        let tx_hash = match ledger_mgr.create_payment(
-            &escrow.coop_id,
-            &to_did,   // Recipient (debited/gains credits in this mutual credit system)
-            &from_did, // Payer (credited/loses credits)
-            escrow.amount,
-            escrow.currency.clone(),
-        ) {
+        let tx_hash = match ledger_mgr
+            .create_payment(
+                &escrow.coop_id,
+                &to_did,   // Recipient (debited/gains credits in this mutual credit system)
+                &from_did, // Payer (credited/loses credits)
+                escrow.amount,
+                escrow.currency.clone(),
+            )
+            .await
+        {
             Ok(hash) => {
                 info!(
                     escrow_id = %escrow_id,

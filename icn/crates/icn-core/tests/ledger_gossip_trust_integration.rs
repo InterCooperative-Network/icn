@@ -109,7 +109,7 @@ impl TestNode {
     async fn publish_entry(&self, entry: &icn_ledger::JournalEntry) -> Result<()> {
         let data = serde_json::to_vec(entry)?;
         let mut gossip = self.gossip.write().await;
-        gossip.publish(LEDGER_SYNC_TOPIC, data)?;
+        gossip.publish(LEDGER_SYNC_TOPIC, data).await?;
         Ok(())
     }
 
@@ -122,7 +122,7 @@ impl TestNode {
     /// Add entry to local ledger
     async fn add_entry(&self, entry: icn_ledger::JournalEntry) -> Result<()> {
         let mut ledger = self.ledger.write().await;
-        ledger.append_entry(entry)?;
+        ledger.append_entry(entry).await?;
         Ok(())
     }
 }
@@ -471,7 +471,9 @@ async fn test_gossip_message_handling() -> Result<()> {
     // Publish on node1
     {
         let mut gossip = node1.gossip.write().await;
-        let hash = gossip.publish(LEDGER_SYNC_TOPIC, entry_data.clone())?;
+        let hash = gossip
+            .publish(LEDGER_SYNC_TOPIC, entry_data.clone())
+            .await?;
         info!("Published entry with hash: {:?}", hex::encode(hash));
     }
 

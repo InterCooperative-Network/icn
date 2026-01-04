@@ -66,11 +66,13 @@ pub async fn get_member_profile(
     // Get balance from ledger (using default currency "hours")
     let balance = ledger_manager
         .get_balance(&coop_id, &did_obj, "hours")
+        .await
         .unwrap_or(0) as f64;
 
     // Get transaction count from history
     let history = ledger_manager
         .get_history(&coop_id, Some(&did_obj), 0, 1000)
+        .await
         .unwrap_or_else(|_| Vec::new());
     let transaction_count = history.len();
 

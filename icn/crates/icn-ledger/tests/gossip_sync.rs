@@ -36,8 +36,8 @@ fn create_simple_ledger() -> (Ledger, TempDir) {
     (ledger, temp_dir)
 }
 
-#[test]
-fn test_direct_sync_message() {
+#[tokio::test]
+async fn test_direct_sync_message() {
     // Create two simple ledgers without gossip
     let (mut ledger1, _temp1) = create_simple_ledger();
     let (mut ledger2, _temp2) = create_simple_ledger();
@@ -53,7 +53,7 @@ fn test_direct_sync_message() {
         .unwrap();
 
     let hash = entry.id.clone().unwrap();
-    ledger1.append_entry(entry.clone()).unwrap();
+    ledger1.append_entry(entry.clone()).await.unwrap();
 
     // Verify ledger1 has it
     assert!(ledger1.get_entry(&hash).unwrap().is_some());
@@ -65,18 +65,18 @@ fn test_direct_sync_message() {
         entry,
     };
 
-    ledger2.handle_sync_message(sync_msg).unwrap();
+    ledger2.handle_sync_message(sync_msg).await.unwrap();
 
     // Verify ledger2 now has it
     assert!(ledger2.get_entry(&hash).unwrap().is_some());
     assert_eq!(ledger2.get_balance(&alice, "hours"), 10);
     assert_eq!(ledger2.get_balance(&bob, "hours"), -10);
 
-    println!("✓ Direct sync message handling successful");
+    println!("Direct sync message handling successful");
 }
 
-#[test]
-fn test_ledger_publishes_to_gossip() {
+#[tokio::test]
+async fn test_ledger_publishes_to_gossip() {
     // Create a node with gossip integration
     let (mut ledger, _temp, gossip) = create_test_node();
 
@@ -91,13 +91,13 @@ fn test_ledger_publishes_to_gossip() {
         .unwrap();
 
     let hash = entry.id.clone().unwrap();
-    ledger.append_entry(entry.clone()).unwrap();
+    ledger.append_entry(entry.clone()).await.unwrap();
 
     // Verify ledger has the entry
     assert!(ledger.get_entry(&hash).unwrap().is_some());
 
     // Verify the entry was published to gossip
-    let gossip_actor = gossip.blocking_read();
+    let gossip_actor = gossip.read().await;
     let entries = gossip_actor.get_entries("ledger:hours");
 
     assert_eq!(entries.len(), 1, "Expected 1 entry in gossip");
@@ -117,11 +117,11 @@ fn test_ledger_publishes_to_gossip() {
         _ => panic!("Expected NewEntry message"),
     }
 
-    println!("✓ Ledger publishes to gossip successfully");
+    println!("Ledger publishes to gossip successfully");
 }
 
-#[test]
-fn test_multiple_entries_to_gossip() {
+#[tokio::test]
+async fn test_multiple_entries_to_gossip() {
     // Create a node with gossip
     let (mut ledger, _temp, gossip) = create_test_node();
 
@@ -143,8 +143,8 @@ fn test_multiple_entries_to_gossip() {
         .unwrap();
 
     // Append both entries
-    ledger.append_entry(entry1).unwrap();
-    ledger.append_entry(entry2).unwrap();
+    ledger.append_entry(entry1).await.unwrap();
+    ledger.append_entry(entry2).await.unwrap();
 
     // Verify balances
     assert_eq!(ledger.get_balance(&alice, "hours"), 10);
@@ -152,16 +152,16 @@ fn test_multiple_entries_to_gossip() {
     assert_eq!(ledger.get_balance(&charlie, "hours"), -5);
 
     // Verify both entries were published to gossip
-    let gossip_actor = gossip.blocking_read();
+    let gossip_actor = gossip.read().await;
     let entries = gossip_actor.get_entries("ledger:hours");
 
     assert_eq!(entries.len(), 2, "Expected 2 entries in gossip");
 
-    println!("✓ Multiple entries published to gossip successfully");
+    println!("Multiple entries published to gossip successfully");
 }
 
-#[test]
-fn test_duplicate_entry_handling() {
+#[tokio::test]
+async fn test_duplicate_entry_handling() {
     // Create a simple ledger
     let (mut ledger, _temp) = create_simple_ledger();
 
@@ -176,7 +176,7 @@ fn test_duplicate_entry_handling() {
         .unwrap();
 
     let hash = entry.id.clone().unwrap();
-    ledger.append_entry(entry.clone()).unwrap();
+    ledger.append_entry(entry.clone()).await.unwrap();
 
     // Try to handle the same entry again via sync message
     let sync_msg = LedgerSyncMessage::NewEntry {
@@ -185,7 +185,7 @@ fn test_duplicate_entry_handling() {
     };
 
     // This should succeed but not duplicate the entry
-    ledger.handle_sync_message(sync_msg).unwrap();
+    ledger.handle_sync_message(sync_msg).await.unwrap();
 
     // Verify balance is still correct (not doubled)
     assert_eq!(ledger.get_balance(&alice, "hours"), 10);
@@ -195,5 +195,5 @@ fn test_duplicate_entry_handling() {
     let all_entries = ledger.get_all_entries().unwrap();
     assert_eq!(all_entries.len(), 1);
 
-    println!("✓ Duplicate entry handling successful");
+    println!("Duplicate entry handling successful");
 }

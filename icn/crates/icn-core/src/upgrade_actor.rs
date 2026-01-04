@@ -146,7 +146,7 @@ impl UpgradeActor {
             // Subscribe to upgrade gossip topic
             {
                 let mut gossip = gossip_handle.write().await;
-                if let Err(e) = gossip.subscribe(UPGRADE_TOPIC, own_did.clone()) {
+                if let Err(e) = gossip.subscribe(UPGRADE_TOPIC, own_did.clone()).await {
                     warn!("Failed to subscribe to upgrade topic: {}", e);
                 } else {
                     debug!("Subscribed to {} topic", UPGRADE_TOPIC);
@@ -217,6 +217,7 @@ impl UpgradeActor {
         let mut gossip = self.gossip_handle.write().await;
         gossip
             .publish(UPGRADE_TOPIC, payload)
+            .await
             .context("Failed to publish version announcement")?;
 
         debug!("Announced version: {}", self.current_version);
@@ -247,6 +248,7 @@ impl UpgradeActor {
         let mut gossip = self.gossip_handle.write().await;
         gossip
             .publish(UPGRADE_TOPIC, payload)
+            .await
             .context("Failed to publish upgrade proposal")?;
 
         Ok(())
@@ -293,6 +295,7 @@ impl UpgradeActor {
             let mut gossip = self.gossip_handle.write().await;
             gossip
                 .publish(UPGRADE_TOPIC, payload)
+                .await
                 .context("Failed to publish upgrade ready message")?;
 
             info!("Announced upgrade readiness for version {}", target);

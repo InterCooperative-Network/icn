@@ -333,6 +333,7 @@ pub async fn get_coop_stats(
     // Get transaction statistics from ledger
     let (transaction_count, total_hours_exchanged) = ledger_mgr
         .get_transaction_stats(&coop_id)
+        .await
         .unwrap_or((0, 0.0));
 
     let avg_transaction_size = if transaction_count > 0 {

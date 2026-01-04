@@ -346,7 +346,10 @@ async fn apply_recovery_finalization(
 
     // Update ledger
     let mut ledger_guard = ledger.write().await;
-    match ledger_guard.transfer_balances_for_recovery(old_did, new_did, id) {
+    match ledger_guard
+        .transfer_balances_for_recovery(old_did, new_did, id)
+        .await
+    {
         Ok(count) => {
             info!(
                 "Ledger: transferred {} currencies from {} to {}",
@@ -487,7 +490,10 @@ pub async fn handle_snapshot_coordination(
                         };
 
                         let mut gossip_guard = gossip_handle.write().await;
-                        match gossip_guard.publish("snapshot:coordinate", response_bytes) {
+                        match gossip_guard
+                            .publish("snapshot:coordinate", response_bytes)
+                            .await
+                        {
                             Ok(hash) => {
                                 debug!("Published snapshot response with hash: {:?}", hash);
                             }
@@ -616,8 +622,9 @@ pub async fn handle_node_profile(
             let response_msg = crate::node::ProfileMessage::Response(profile_opt.clone());
             if let Ok(response_data) = serde_json::to_vec(&response_msg) {
                 let mut gossip_write = gossip_handle.write().await;
-                if let Err(e) =
-                    gossip_write.publish(crate::node::TOPIC_NODE_PROFILES, response_data)
+                if let Err(e) = gossip_write
+                    .publish(crate::node::TOPIC_NODE_PROFILES, response_data)
+                    .await
                 {
                     warn!("Failed to publish profile response: {}", e);
                 } else {

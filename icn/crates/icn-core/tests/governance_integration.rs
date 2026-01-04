@@ -88,7 +88,7 @@ impl TestNode {
                 // Spawn async task to avoid blocking in callback
                 tokio::spawn(async move {
                     let mut gossip = gossip_clone.write().await;
-                    if let Err(e) = gossip.handle_message(&sender_did, gossip_msg) {
+                    if let Err(e) = gossip.handle_message(&sender_did, gossip_msg).await {
                         warn!("Failed to handle gossip message: {}", e);
                     }
                 });
@@ -266,7 +266,7 @@ impl TestNode {
         );
         gossip.create_topic(topic);
 
-        gossip.subscribe(GOVERNANCE_TOPIC, self.did.clone())?;
+        gossip.subscribe(GOVERNANCE_TOPIC, self.did.clone()).await?;
         Ok(())
     }
 
@@ -277,7 +277,7 @@ impl TestNode {
         // Publish to local gossip store
         let (hash, clock) = {
             let mut gossip = self.gossip_handle.write().await;
-            let hash = gossip.publish(GOVERNANCE_TOPIC, bytes)?;
+            let hash = gossip.publish(GOVERNANCE_TOPIC, bytes).await?;
             let entry = gossip
                 .get_entry(GOVERNANCE_TOPIC, &hash)
                 .expect("Entry should exist");

@@ -2,7 +2,8 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
 use icn_identity::Did;
 use icn_ledger::{
@@ -69,15 +70,12 @@ impl LedgerManager {
     }
 
     /// Get or create a ledger for a cooperative
-    pub fn get_ledger(&self, coop_id: &CoopId) -> Result<Arc<RwLock<Ledger>>> {
+    pub async fn get_ledger(&self, coop_id: &CoopId) -> Result<Arc<RwLock<Ledger>>> {
         // SECURITY: Validate coop_id BEFORE using in file path to prevent path traversal
         // This prevents attacks like coop_id = "../../etc/passwd" from accessing arbitrary files
         crate::validation::validate_coop_id(coop_id)?;
 
-        let ledgers = self
-            .ledgers
-            .read()
-            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
+        let ledgers = self.ledgers.read().await;
 
         if let Some(ledger) = ledgers.get(coop_id) {
             return Ok(ledger.clone());
@@ -86,10 +84,7 @@ impl LedgerManager {
         drop(ledgers); // Release read lock
 
         // Create new ledger
-        let mut ledgers = self
-            .ledgers
-            .write()
-            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
+        let mut ledgers = self.ledgers.write().await;
 
         // Double-check pattern (another thread might have created it)
         if let Some(ledger) = ledgers.get(coop_id) {
@@ -125,7 +120,7 @@ impl LedgerManager {
     }
 
     /// Create a payment transaction
-    pub fn create_payment(
+    pub async fn create_payment(
         &self,
         coop_id: &CoopId,
         from: &Did,
@@ -148,7 +143,7 @@ impl LedgerManager {
             }
         }
 
-        let ledger_arc = self.get_ledger(coop_id)?;
+        let ledger_arc = self.get_ledger(coop_id).await?;
 
         // Build the journal entry
         let entry = JournalEntryBuilder::new(from.clone())
@@ -158,12 +153,11 @@ impl LedgerManager {
             .map_err(GatewayError::SubstrateError)?;
 
         // Append to ledger
-        let mut ledger = ledger_arc
-            .write()
-            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
+        let mut ledger = ledger_arc.write().await;
 
         let hash = ledger
             .append_entry(entry)
+            .await
             .map_err(GatewayError::SubstrateError)?;
 
         let hash_str = hash.to_hex();
@@ -199,21 +193,21 @@ impl LedgerManager {
     }
 
     /// Get balance for an account
-    pub fn get_balance(&self, coop_id: &CoopId, did: &Did, currency: &str) -> Result<i64> {
-        let ledger_arc = self.get_ledger(coop_id)?;
-        let ledger = ledger_arc
-            .read()
-            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
+    pub async fn get_balance(&self, coop_id: &CoopId, did: &Did, currency: &str) -> Result<i64> {
+        let ledger_arc = self.get_ledger(coop_id).await?;
+        let ledger = ledger_arc.read().await;
 
         Ok(ledger.get_balance(did, currency))
     }
 
     /// Get all balances for an account
-    pub fn get_all_balances(&self, coop_id: &CoopId, did: &Did) -> Result<HashMap<String, i64>> {
-        let ledger_arc = self.get_ledger(coop_id)?;
-        let ledger = ledger_arc
-            .read()
-            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
+    pub async fn get_all_balances(
+        &self,
+        coop_id: &CoopId,
+        did: &Did,
+    ) -> Result<HashMap<String, i64>> {
+        let ledger_arc = self.get_ledger(coop_id).await?;
+        let ledger = ledger_arc.read().await;
 
         let account_balances = ledger.get_account_balances(did);
         Ok(account_balances.balances)
@@ -225,17 +219,15 @@ impl LedgerManager {
     /// - Uses efficient cursor-based pagination from ledger's timestamp index
     /// - When filtering by DID, loads all entries for filtering (still needed)
     /// - Returns up to `limit` entries starting from `offset`
-    pub fn get_history(
+    pub async fn get_history(
         &self,
         coop_id: &CoopId,
         filter_did: Option<&Did>,
         offset: usize,
         limit: usize,
     ) -> Result<Vec<icn_ledger::JournalEntry>> {
-        let ledger_arc = self.get_ledger(coop_id)?;
-        let ledger = ledger_arc
-            .read()
-            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
+        let ledger_arc = self.get_ledger(coop_id).await?;
+        let ledger = ledger_arc.read().await;
 
         // If no DID filter, use efficient cursor-based pagination
         if filter_did.is_none() {
@@ -281,7 +273,7 @@ impl LedgerManager {
     ///
     /// # Returns
     /// Tuple of (entries, next_cursor) where cursor is (timestamp, hash)
-    pub fn get_history_paginated(
+    pub async fn get_history_paginated(
         &self,
         coop_id: &CoopId,
         filter_did: Option<&Did>,
@@ -291,10 +283,8 @@ impl LedgerManager {
         Vec<icn_ledger::JournalEntry>,
         Option<icn_ledger::PaginationCursor>,
     )> {
-        let ledger_arc = self.get_ledger(coop_id)?;
-        let ledger = ledger_arc
-            .read()
-            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
+        let ledger_arc = self.get_ledger(coop_id).await?;
+        let ledger = ledger_arc.read().await;
 
         ledger
             .get_entries_filtered_paginated(filter_did, cursor, limit)
@@ -305,11 +295,9 @@ impl LedgerManager {
     ///
     /// Returns (transaction_count, total_hours_exchanged) for public stats display.
     /// This endpoint is safe to expose publicly as it only returns aggregate data.
-    pub fn get_transaction_stats(&self, coop_id: &CoopId) -> Result<(usize, f64)> {
-        let ledger_arc = self.get_ledger(coop_id)?;
-        let ledger = ledger_arc
-            .read()
-            .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
+    pub async fn get_transaction_stats(&self, coop_id: &CoopId) -> Result<(usize, f64)> {
+        let ledger_arc = self.get_ledger(coop_id).await?;
+        let ledger = ledger_arc.read().await;
 
         // Get all entries
         let entries = ledger
@@ -372,13 +360,11 @@ impl LedgerManager {
             }
         }
 
-        let ledger_arc = self.get_ledger(coop_id)?;
+        let ledger_arc = self.get_ledger(coop_id).await?;
 
         // Step 1: Get FX prerequisites (short read lock)
         let oracle = {
-            let ledger = ledger_arc
-                .read()
-                .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
+            let ledger = ledger_arc.read().await;
 
             let (_fx_config, oracle) = ledger.fx_prerequisites()?;
             oracle
@@ -396,9 +382,7 @@ impl LedgerManager {
 
         // Step 3: Prepare the transfer with the fetched rate (read lock, sync)
         let prepared = {
-            let ledger = ledger_arc
-                .read()
-                .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
+            let ledger = ledger_arc.read().await;
 
             ledger.prepare_cross_currency_transfer_with_rate(
                 from,
@@ -413,11 +397,9 @@ impl LedgerManager {
 
         // Execute the transfer (writes to ledger) - needs write lock
         let (hash, details, clearing_balances) = {
-            let mut ledger = ledger_arc
-                .write()
-                .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
+            let mut ledger = ledger_arc.write().await;
 
-            let (hash, details) = ledger.execute_cross_currency_transfer(prepared)?;
+            let (hash, details) = ledger.execute_cross_currency_transfer(prepared).await?;
 
             // Query clearing account balances for metrics
             let clearing_balances = if let Some(fx_config) = ledger.fx_config() {
@@ -503,13 +485,11 @@ impl LedgerManager {
         from_currency: &str,
         to_currency: &str,
     ) -> Result<CrossPaymentQuote> {
-        let ledger_arc = self.get_ledger(coop_id)?;
+        let ledger_arc = self.get_ledger(coop_id).await?;
 
         // Get FX config and oracle under lock, then release before await
         let (fx_config, oracle) = {
-            let ledger = ledger_arc
-                .read()
-                .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
+            let ledger = ledger_arc.read().await;
 
             let fx_config = ledger
                 .fx_config()
@@ -607,8 +587,8 @@ mod tests {
     use super::*;
     use icn_identity::IdentityBundle;
 
-    #[test]
-    fn test_create_payment() {
+    #[tokio::test]
+    async fn test_create_payment() {
         let mgr = LedgerManager::new();
         let alice = IdentityBundle::generate().unwrap();
         let bob = IdentityBundle::generate().unwrap();
@@ -621,6 +601,7 @@ mod tests {
                 10,
                 "hours".to_string(),
             )
+            .await
             .unwrap();
 
         assert!(!hash.is_empty());
@@ -628,17 +609,19 @@ mod tests {
         // Check balances
         let alice_balance = mgr
             .get_balance(&"test-coop".to_string(), alice.did(), "hours")
+            .await
             .unwrap();
         let bob_balance = mgr
             .get_balance(&"test-coop".to_string(), bob.did(), "hours")
+            .await
             .unwrap();
 
         assert_eq!(alice_balance, 10); // Alice is owed 10 hours
         assert_eq!(bob_balance, -10); // Bob owes 10 hours
     }
 
-    #[test]
-    fn test_get_all_balances() {
+    #[tokio::test]
+    async fn test_get_all_balances() {
         let mgr = LedgerManager::new();
         let alice = IdentityBundle::generate().unwrap();
         let bob = IdentityBundle::generate().unwrap();
@@ -650,16 +633,18 @@ mod tests {
             10,
             "hours".to_string(),
         )
+        .await
         .unwrap();
 
         let balances = mgr
             .get_all_balances(&"test-coop".to_string(), alice.did())
+            .await
             .unwrap();
         assert_eq!(balances.get("hours"), Some(&10));
     }
 
-    #[test]
-    fn test_get_history() {
+    #[tokio::test]
+    async fn test_get_history() {
         let mgr = LedgerManager::new();
         let alice = IdentityBundle::generate().unwrap();
         let bob = IdentityBundle::generate().unwrap();
@@ -671,17 +656,20 @@ mod tests {
             10,
             "hours".to_string(),
         )
+        .await
         .unwrap();
 
         // Get all history with pagination
         let history = mgr
             .get_history(&"test-coop".to_string(), None, 0, 100)
+            .await
             .unwrap();
         assert_eq!(history.len(), 1);
 
         // Filter by Alice
         let alice_history = mgr
             .get_history(&"test-coop".to_string(), Some(alice.did()), 0, 100)
+            .await
             .unwrap();
         assert_eq!(alice_history.len(), 1);
 
@@ -689,12 +677,14 @@ mod tests {
         let other = IdentityBundle::generate().unwrap();
         let other_history = mgr
             .get_history(&"test-coop".to_string(), Some(other.did()), 0, 100)
+            .await
             .unwrap();
         assert_eq!(other_history.len(), 0);
 
         // Test pagination
         let empty_page = mgr
             .get_history(&"test-coop".to_string(), None, 10, 100)
+            .await
             .unwrap();
         assert_eq!(empty_page.len(), 0); // Offset beyond available entries
     }

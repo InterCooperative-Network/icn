@@ -19,8 +19,8 @@ use tracing::info;
 /// Using realistic timestamps catches edge cases that small integers might miss.
 const TEST_BASE_TIME: u64 = 1704067200;
 
-#[test]
-fn test_credit_limit_enforcement_rejects_excessive_spending() -> Result<()> {
+#[tokio::test]
+async fn test_credit_limit_enforcement_rejects_excessive_spending() -> Result<()> {
     let _ = tracing_subscriber::fmt()
         .with_env_filter("info")
         .with_test_writer()
@@ -58,7 +58,7 @@ fn test_credit_limit_enforcement_rejects_excessive_spending() -> Result<()> {
             .credit(bob.clone(), "hours".to_string(), 5_000)
             .build()?;
 
-        let result = ledger.append_entry(entry);
+        let result = ledger.append_entry(entry).await;
         assert!(
             result.is_ok(),
             "Valid transaction should be accepted: {result:?}"
@@ -77,7 +77,7 @@ fn test_credit_limit_enforcement_rejects_excessive_spending() -> Result<()> {
             .credit(bob.clone(), "hours".to_string(), 6_000)
             .build()?;
 
-        let result = ledger.append_entry(entry);
+        let result = ledger.append_entry(entry).await;
         assert!(
             result.is_err(),
             "Transaction exceeding limit should be rejected"
@@ -99,7 +99,7 @@ fn test_credit_limit_enforcement_rejects_excessive_spending() -> Result<()> {
             .credit(bob.clone(), "hours".to_string(), 4_750)
             .build()?;
 
-        let result = ledger.append_entry(entry);
+        let result = ledger.append_entry(entry).await;
         assert!(
             result.is_ok(),
             "Transaction near limit should be accepted: {result:?}"
@@ -118,7 +118,7 @@ fn test_credit_limit_enforcement_rejects_excessive_spending() -> Result<()> {
             .credit(bob.clone(), "hours".to_string(), 5_000)
             .build()?;
 
-        let result = ledger.append_entry(entry);
+        let result = ledger.append_entry(entry).await;
         assert!(
             result.is_err(),
             "Transaction beyond limit should be rejected"
@@ -228,8 +228,8 @@ fn test_new_member_policy_values() -> Result<()> {
     Ok(())
 }
 
-#[test]
-fn test_new_member_ramping_enforced() -> Result<()> {
+#[tokio::test]
+async fn test_new_member_ramping_enforced() -> Result<()> {
     let _ = tracing_subscriber::fmt()
         .with_env_filter("info")
         .with_test_writer()
@@ -272,7 +272,7 @@ fn test_new_member_ramping_enforced() -> Result<()> {
             .credit(established.clone(), "hours".to_string(), 800)
             .build()?;
 
-        let result = ledger.append_entry(entry);
+        let result = ledger.append_entry(entry).await;
         assert!(
             result.is_ok(),
             "New member should be able to spend within initial limit: {result:?}"
@@ -290,7 +290,7 @@ fn test_new_member_ramping_enforced() -> Result<()> {
             .credit(established.clone(), "hours".to_string(), 500)
             .build()?;
 
-        let result = ledger.append_entry(entry);
+        let result = ledger.append_entry(entry).await;
         assert!(
             result.is_err(),
             "New member should NOT be able to exceed initial limit"
@@ -311,7 +311,7 @@ fn test_new_member_ramping_enforced() -> Result<()> {
             .credit(established.clone(), "hours".to_string(), 150)
             .build()?;
 
-        let result = ledger.append_entry(entry);
+        let result = ledger.append_entry(entry).await;
         assert!(
             result.is_ok(),
             "Small transaction within limit should succeed: {result:?}"

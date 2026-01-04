@@ -104,6 +104,7 @@ impl TestNode {
             // Subscribe to trust attestations topic
             gossip
                 .subscribe(icn_core::TRUST_ATTESTATIONS_TOPIC, did.clone())
+                .await
                 .expect("Failed to subscribe to trust attestations");
 
             info!("Subscribed to trust:attestations topic");
@@ -117,7 +118,7 @@ impl TestNode {
                 let gossip_clone = gossip_handle_clone.clone();
                 tokio::spawn(async move {
                     let mut gossip = gossip_clone.write().await;
-                    if let Err(e) = gossip.handle_message(&sender, gossip_msg) {
+                    if let Err(e) = gossip.handle_message(&sender, gossip_msg).await {
                         warn!("Failed to handle gossip message: {}", e);
                     }
                 });

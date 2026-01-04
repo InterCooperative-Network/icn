@@ -140,7 +140,7 @@ async fn test_unauthorized_subscription_violation() -> Result<()> {
     // Node2 attempts to subscribe - should fail and record violation
     {
         let mut gossip = node1.gossip.write().await;
-        let result = gossip.subscribe("protected:data", node2.did.clone());
+        let result = gossip.subscribe("protected:data", node2.did.clone()).await;
         assert!(result.is_err(), "Subscription should be rejected");
     }
 
@@ -189,7 +189,7 @@ async fn test_acl_violation_rate_limit_quarantine() -> Result<()> {
     // Node2 repeatedly violates ACL (trigger rate limit)
     for i in 0..12 {
         let mut gossip = node1.gossip.write().await;
-        let result = gossip.subscribe("private:data", node2.did.clone());
+        let result = gossip.subscribe("private:data", node2.did.clone()).await;
         assert!(result.is_err(), "Iteration {i}: Subscription should fail");
 
         // Small delay to simulate realistic attack

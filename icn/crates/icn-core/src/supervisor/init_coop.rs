@@ -57,7 +57,7 @@ pub async fn init_coop_services(
     // This allows coops created on one node to sync to others
     {
         let mut gossip = gossip_handle.write().await;
-        if let Err(e) = gossip.subscribe(COOP_UPDATES_TOPIC, node_did) {
+        if let Err(e) = gossip.subscribe(COOP_UPDATES_TOPIC, node_did).await {
             warn!("Failed to subscribe to coop:updates topic: {}", e);
         } else {
             info!("Subscribed to coop:updates topic");

@@ -843,7 +843,7 @@ impl Ledger {
     ///
     /// # Returns
     /// The content hash of the committed entry and conversion details.
-    pub fn execute_cross_currency_transfer(
+    pub async fn execute_cross_currency_transfer(
         &mut self,
         prepared: crate::fx::PreparedFxTransfer,
     ) -> std::result::Result<(ContentHash, crate::fx::FxConversionDetails), crate::fx::FxError>
@@ -858,6 +858,7 @@ impl Ledger {
         // Append the entry to the ledger
         let hash = self
             .append_entry(prepared.entry)
+            .await
             .map_err(|e| FxError::InvalidAmount(format!("Failed to append entry: {e}")))?;
 
         // Emit cross-currency transfer event
@@ -926,19 +927,19 @@ impl Ledger {
             )
             .await?;
 
-        self.execute_cross_currency_transfer(prepared)
+        self.execute_cross_currency_transfer(prepared).await
     }
 
     /// Append a journal entry to the ledger
     #[instrument(skip(self, entry), fields(entry_hash = entry.id.as_ref().map(|h| h.to_hex()).unwrap_or_else(|| "none".to_string()), account_count = entry.accounts.len()))]
-    pub fn append_entry(&mut self, entry: JournalEntry) -> Result<ContentHash> {
-        self.append_entry_internal(entry, true)
+    pub async fn append_entry(&mut self, entry: JournalEntry) -> Result<ContentHash> {
+        self.append_entry_internal(entry, true).await
     }
 
     /// Append a journal entry without publishing to gossip
     /// Used when receiving entries from gossip to avoid re-broadcasting
-    pub fn append_entry_from_sync(&mut self, entry: JournalEntry) -> Result<ContentHash> {
-        self.append_entry_internal(entry, false)
+    pub async fn append_entry_from_sync(&mut self, entry: JournalEntry) -> Result<ContentHash> {
+        self.append_entry_internal(entry, false).await
     }
 
     /// Internal append method with control over gossip publishing
@@ -946,7 +947,7 @@ impl Ledger {
     /// # Arguments
     /// * `entry` - The journal entry to append
     /// * `broadcast` - Whether to publish to gossip (false when receiving from gossip)
-    fn append_entry_internal(
+    async fn append_entry_internal(
         &mut self,
         entry: JournalEntry,
         broadcast: bool,
@@ -1331,7 +1332,7 @@ impl Ledger {
         // (broadcast is false when receiving from gossip to avoid re-broadcasting)
         if broadcast {
             if let Some(gossip) = &self.gossip {
-                self.publish_to_gossip(gossip, &entry)?;
+                self.publish_to_gossip(gossip, &entry).await?;
             }
         }
 
@@ -1340,7 +1341,7 @@ impl Ledger {
 
     /// Publish a journal entry to gossip for distributed synchronization
     #[instrument(skip(self, gossip, entry), fields(entry_hash = entry.id.as_ref().map(|h| h.to_hex()).unwrap_or_else(|| "none".to_string())))]
-    fn publish_to_gossip(&self, gossip: &GossipHandle, entry: &JournalEntry) -> Result<()> {
+    async fn publish_to_gossip(&self, gossip: &GossipHandle, entry: &JournalEntry) -> Result<()> {
         use crate::sync::ledger_topic;
 
         let hash = entry.id.as_ref().context("Entry must have hash")?.clone();
@@ -1361,9 +1362,9 @@ impl Ledger {
 
             let data = serialize_sync_message(&msg)?;
 
-            // Publish via gossip (blocking lock)
-            let mut gossip_actor = gossip.blocking_write();
-            gossip_actor.publish(&topic, data)?;
+            // Publish via gossip
+            let mut gossip_actor = gossip.write().await;
+            gossip_actor.publish(&topic, data).await?;
 
             debug!(
                 entry_hash = %hash,
@@ -1384,7 +1385,7 @@ impl Ledger {
         LedgerSyncMessage::EntryResponse { .. } => "EntryResponse",
         LedgerSyncMessage::RollbackNotification { .. } => "RollbackNotification",
     }))]
-    pub fn handle_sync_message(&mut self, msg: LedgerSyncMessage) -> Result<()> {
+    pub async fn handle_sync_message(&mut self, msg: LedgerSyncMessage) -> Result<()> {
         // Issue #181: Track sync lag (time since entry was created)
         let observe_sync_lag = |entry_timestamp: u64| {
             let now_ms = icn_time::current_timestamp_millis();
@@ -1409,7 +1410,7 @@ impl Ledger {
                 entry.id = Some(hash.clone());
 
                 // Use append_entry_from_sync to avoid re-broadcasting entries we received
-                let result = self.append_entry_from_sync(entry);
+                let result = self.append_entry_from_sync(entry).await;
 
                 match result {
                     Ok(h) => {
@@ -1454,8 +1455,8 @@ impl Ledger {
                             };
                             let data = serialize_sync_message(&response)?;
 
-                            let mut gossip_actor = gossip.blocking_write();
-                            gossip_actor.publish(&topic, data)?;
+                            let mut gossip_actor = gossip.write().await;
+                            gossip_actor.publish(&topic, data).await?;
 
                             debug!("Sent entry {} response", hash);
                         }
@@ -1473,7 +1474,7 @@ impl Ledger {
                     observe_sync_lag(e.timestamp);
                     debug!("Received entry {} response", hash);
                     // Use append_entry_from_sync to avoid re-broadcasting entries we received
-                    let result = self.append_entry_from_sync(e);
+                    let result = self.append_entry_from_sync(e).await;
 
                     if let Err(e) = result {
                         warn!("Failed to store entry from response: {}", e);
@@ -1511,7 +1512,7 @@ impl Ledger {
                 }
 
                 // Execute the rollback locally (don't broadcast again)
-                match self.rollback_to_entry(&target_hash, &reason, false) {
+                match self.rollback_to_entry(&target_hash, &reason, false).await {
                     Ok(local_archived) => {
                         // Verify our archived entries match
                         if local_archived.len() != archived_entries.len() {
@@ -2545,7 +2546,7 @@ impl Ledger {
     /// a social recovery is finalized.
     ///
     /// Returns the number of currencies transferred.
-    pub fn transfer_balances_for_recovery(
+    pub async fn transfer_balances_for_recovery(
         &mut self,
         old_did: &Did,
         new_did: &Did,
@@ -2593,7 +2594,7 @@ impl Ledger {
             };
 
             // Append the entry
-            self.append_entry(entry)?;
+            self.append_entry(entry).await?;
             transferred_count += 1;
         }
 
@@ -2613,7 +2614,7 @@ impl Ledger {
     /// - Quarantine: Violates invariants or limits
     ///
     /// Returns a MergeDecision capturing all outcomes for observability.
-    pub fn merge_batch(&mut self, entries: Vec<JournalEntry>) -> Result<MergeDecision> {
+    pub async fn merge_batch(&mut self, entries: Vec<JournalEntry>) -> Result<MergeDecision> {
         // Get current tip (last entry hash)
         let all_entries = self.get_all_entries()?;
         let tip_hash = all_entries
@@ -2660,7 +2661,7 @@ impl Ledger {
             }
 
             // Accept the entry
-            match self.append_entry(entry) {
+            match self.append_entry(entry).await {
                 Ok(hash) => {
                     debug!("Accepted entry {}", hash);
                     decision.increment_accepted();
@@ -2734,7 +2735,7 @@ impl Ledger {
     /// This is a destructive operation. Entries are moved to archive storage
     /// but not deleted, allowing potential recovery if needed.
     #[instrument(skip(self), fields(target_hash = %target_hash))]
-    pub fn rollback_to_entry(
+    pub async fn rollback_to_entry(
         &mut self,
         target_hash: &ContentHash,
         reason: &str,
@@ -2844,7 +2845,7 @@ impl Ledger {
 
                 let data = serialize_sync_message(&notification)?;
                 // Use "ledger:system" topic for system-wide notifications
-                if let Err(e) = gossip.blocking_write().publish("ledger:system", data) {
+                if let Err(e) = gossip.write().await.publish("ledger:system", data).await {
                     warn!("Failed to broadcast rollback notification: {}", e);
                 } else {
                     info!("Broadcast rollback notification to network");
@@ -3201,8 +3202,8 @@ mod tests {
         (ledger, temp_dir)
     }
 
-    #[test]
-    fn test_append_and_retrieve_entry() {
+    #[tokio::test]
+    async fn test_append_and_retrieve_entry() {
         let (mut ledger, _temp) = create_test_ledger();
 
         let keypair = KeyPair::generate().unwrap();
@@ -3216,7 +3217,7 @@ mod tests {
             .unwrap();
 
         let hash = entry.id.clone().unwrap();
-        ledger.append_entry(entry).unwrap();
+        ledger.append_entry(entry).await.unwrap();
 
         let retrieved = ledger.get_entry(&hash).unwrap();
         assert!(retrieved.is_some());
@@ -3225,8 +3226,8 @@ mod tests {
         assert_eq!(retrieved.accounts.len(), 2);
     }
 
-    #[test]
-    fn test_balance_computation() {
+    #[tokio::test]
+    async fn test_balance_computation() {
         let (mut ledger, _temp) = create_test_ledger();
 
         let keypair = KeyPair::generate().unwrap();
@@ -3245,15 +3246,15 @@ mod tests {
             .build()
             .unwrap();
 
-        ledger.append_entry(entry1).unwrap();
-        ledger.append_entry(entry2).unwrap();
+        ledger.append_entry(entry1).await.unwrap();
+        ledger.append_entry(entry2).await.unwrap();
 
         assert_eq!(ledger.get_balance(&alice, "hours"), 15);
         assert_eq!(ledger.get_balance(&bob, "hours"), -15);
     }
 
-    #[test]
-    fn test_verify_integrity() {
+    #[tokio::test]
+    async fn test_verify_integrity() {
         let (mut ledger, _temp) = create_test_ledger();
 
         let keypair = KeyPair::generate().unwrap();
@@ -3266,13 +3267,13 @@ mod tests {
             .build()
             .unwrap();
 
-        ledger.append_entry(entry).unwrap();
+        ledger.append_entry(entry).await.unwrap();
 
         assert!(ledger.verify_integrity().is_ok());
     }
 
-    #[test]
-    fn test_recompute_balances() {
+    #[tokio::test]
+    async fn test_recompute_balances() {
         let (mut ledger, _temp) = create_test_ledger();
 
         let keypair = KeyPair::generate().unwrap();
@@ -3285,7 +3286,7 @@ mod tests {
             .build()
             .unwrap();
 
-        ledger.append_entry(entry).unwrap();
+        ledger.append_entry(entry).await.unwrap();
 
         // Manually corrupt balances
         ledger.cached_balances.clear();
@@ -3297,8 +3298,8 @@ mod tests {
         assert_eq!(ledger.get_balance(&bob, "hours"), -10);
     }
 
-    #[test]
-    fn test_merge_batch_accepts_valid_entries() {
+    #[tokio::test]
+    async fn test_merge_batch_accepts_valid_entries() {
         let (mut ledger, _temp) = create_test_ledger();
 
         let keypair = KeyPair::generate().unwrap();
@@ -3321,7 +3322,7 @@ mod tests {
         let entries = vec![entry1, entry2];
 
         // Merge batch
-        let decision = ledger.merge_batch(entries).unwrap();
+        let decision = ledger.merge_batch(entries).await.unwrap();
 
         // Both should be accepted
         assert_eq!(decision.accepted_count, 2);
@@ -3333,8 +3334,8 @@ mod tests {
         assert_eq!(ledger.get_balance(&bob, "hours"), -15);
     }
 
-    #[test]
-    fn test_merge_batch_discards_duplicates() {
+    #[tokio::test]
+    async fn test_merge_batch_discards_duplicates() {
         let (mut ledger, _temp) = create_test_ledger();
 
         let keypair = KeyPair::generate().unwrap();
@@ -3351,11 +3352,11 @@ mod tests {
         let entry_id = entry.id.clone().unwrap();
 
         // Append once directly
-        ledger.append_entry(entry.clone()).unwrap();
+        ledger.append_entry(entry.clone()).await.unwrap();
 
         // Try to merge same entry again
         let entries = vec![entry];
-        let decision = ledger.merge_batch(entries).unwrap();
+        let decision = ledger.merge_batch(entries).await.unwrap();
 
         // Should be discarded as duplicate
         assert_eq!(decision.accepted_count, 0);
@@ -3363,8 +3364,8 @@ mod tests {
         assert_eq!(decision.discarded[0], entry_id);
     }
 
-    #[test]
-    fn test_merge_batch_quarantines_invalid_entries() {
+    #[tokio::test]
+    async fn test_merge_batch_quarantines_invalid_entries() {
         let (mut ledger, _temp) = create_test_ledger();
 
         let keypair = KeyPair::generate().unwrap();
@@ -3385,7 +3386,7 @@ mod tests {
 
         // Merge the invalid entry
         let entries = vec![entry];
-        let decision = ledger.merge_batch(entries).unwrap();
+        let decision = ledger.merge_batch(entries).await.unwrap();
 
         // Should be quarantined
         assert_eq!(decision.accepted_count, 0);
@@ -3397,8 +3398,8 @@ mod tests {
         assert_eq!(quarantine_items.len(), 1);
     }
 
-    #[test]
-    fn test_merge_decision_stored() {
+    #[tokio::test]
+    async fn test_merge_decision_stored() {
         let (mut ledger, _temp) = create_test_ledger();
 
         let keypair = KeyPair::generate().unwrap();
@@ -3412,7 +3413,7 @@ mod tests {
             .unwrap();
 
         // Merge
-        ledger.merge_batch(vec![entry]).unwrap();
+        ledger.merge_batch(vec![entry]).await.unwrap();
 
         // Last merge decision should be available
         let last_decision = ledger.last_merge_decision();
@@ -3424,8 +3425,8 @@ mod tests {
 
     // === Emergency Flow Tests (Issue #25) ===
 
-    #[test]
-    fn test_freeze_member_blocks_transactions_as_author() {
+    #[tokio::test]
+    async fn test_freeze_member_blocks_transactions_as_author() {
         let (mut ledger, _temp) = create_test_ledger();
 
         let keypair = KeyPair::generate().unwrap();
@@ -3439,7 +3440,7 @@ mod tests {
             .build()
             .unwrap();
 
-        let decision1 = ledger.merge_batch(vec![entry1]).unwrap();
+        let decision1 = ledger.merge_batch(vec![entry1]).await.unwrap();
         assert_eq!(decision1.accepted_count, 1);
 
         // Freeze Alice
@@ -3453,7 +3454,7 @@ mod tests {
             .build()
             .unwrap();
 
-        let decision2 = ledger.merge_batch(vec![entry2]).unwrap();
+        let decision2 = ledger.merge_batch(vec![entry2]).await.unwrap();
         assert_eq!(decision2.accepted_count, 0);
         assert_eq!(decision2.quarantined.len(), 1);
 
@@ -3461,8 +3462,8 @@ mod tests {
         assert_eq!(ledger.get_balance(&alice, "hours"), 10);
     }
 
-    #[test]
-    fn test_freeze_member_blocks_transactions_as_participant() {
+    #[tokio::test]
+    async fn test_freeze_member_blocks_transactions_as_participant() {
         let (mut ledger, _temp) = create_test_ledger();
 
         let keypair = KeyPair::generate().unwrap();
@@ -3477,7 +3478,7 @@ mod tests {
             .build()
             .unwrap();
 
-        ledger.merge_batch(vec![entry1]).unwrap();
+        ledger.merge_batch(vec![entry1]).await.unwrap();
 
         // Freeze Bob (not the author, but a participant)
         ledger.freeze_member(bob.clone(), "Account compromised".to_string(), None);
@@ -3490,7 +3491,7 @@ mod tests {
             .build()
             .unwrap();
 
-        let decision = ledger.merge_batch(vec![entry2]).unwrap();
+        let decision = ledger.merge_batch(vec![entry2]).await.unwrap();
         assert_eq!(decision.accepted_count, 0);
         assert_eq!(decision.quarantined.len(), 1);
 
@@ -3498,8 +3499,8 @@ mod tests {
         assert_eq!(ledger.get_balance(&bob, "hours"), -10);
     }
 
-    #[test]
-    fn test_unfreeze_member_allows_transactions() {
+    #[tokio::test]
+    async fn test_unfreeze_member_allows_transactions() {
         let (mut ledger, _temp) = create_test_ledger();
 
         let keypair = KeyPair::generate().unwrap();
@@ -3517,7 +3518,7 @@ mod tests {
             .build()
             .unwrap();
 
-        let decision1 = ledger.merge_batch(vec![entry1]).unwrap();
+        let decision1 = ledger.merge_batch(vec![entry1]).await.unwrap();
         assert_eq!(decision1.quarantined.len(), 1);
 
         // Unfreeze Alice
@@ -3532,7 +3533,7 @@ mod tests {
             .build()
             .unwrap();
 
-        let decision2 = ledger.merge_batch(vec![entry2]).unwrap();
+        let decision2 = ledger.merge_batch(vec![entry2]).await.unwrap();
         assert_eq!(decision2.accepted_count, 1);
         assert_eq!(ledger.get_balance(&alice, "hours"), 10);
     }
@@ -3587,8 +3588,8 @@ mod tests {
         assert_eq!(ledger.frozen_member_count(), 1);
     }
 
-    #[test]
-    fn test_freeze_preserves_balance() {
+    #[tokio::test]
+    async fn test_freeze_preserves_balance() {
         let (mut ledger, _temp) = create_test_ledger();
 
         let keypair = KeyPair::generate().unwrap();
@@ -3602,7 +3603,7 @@ mod tests {
             .build()
             .unwrap();
 
-        ledger.merge_batch(vec![entry]).unwrap();
+        ledger.merge_batch(vec![entry]).await.unwrap();
         assert_eq!(ledger.get_balance(&alice, "hours"), 50);
         assert_eq!(ledger.get_balance(&bob, "hours"), -50);
 
@@ -3645,8 +3646,8 @@ mod tests {
         (ledger, temp_dir)
     }
 
-    #[test]
-    fn test_progressive_balance_limit_blocks_excessive_accumulation() {
+    #[tokio::test]
+    async fn test_progressive_balance_limit_blocks_excessive_accumulation() {
         let (mut ledger, _temp) = create_test_ledger_with_progressive_limits();
 
         let keypair = KeyPair::generate().unwrap();
@@ -3661,7 +3662,7 @@ mod tests {
             .build()
             .unwrap();
 
-        let result = ledger.append_entry(entry);
+        let result = ledger.append_entry(entry).await;
         assert!(result.is_err());
         assert!(result
             .unwrap_err()
@@ -3669,8 +3670,8 @@ mod tests {
             .contains("Balance limit exceeded"));
     }
 
-    #[test]
-    fn test_progressive_balance_limit_allows_within_limit() {
+    #[tokio::test]
+    async fn test_progressive_balance_limit_allows_within_limit() {
         let (mut ledger, _temp) = create_test_ledger_with_progressive_limits();
 
         let keypair = KeyPair::generate().unwrap();
@@ -3685,14 +3686,14 @@ mod tests {
             .build()
             .unwrap();
 
-        let result = ledger.append_entry(entry);
+        let result = ledger.append_entry(entry).await;
         assert!(result.is_ok(), "Expected Ok but got: {:?}", result.err());
         assert_eq!(ledger.get_balance(&alice, "hours"), 40);
         assert_eq!(ledger.get_balance(&bob, "hours"), -40);
     }
 
-    #[test]
-    fn test_progressive_velocity_limit_blocks_rapid_accumulation() {
+    #[tokio::test]
+    async fn test_progressive_velocity_limit_blocks_rapid_accumulation() {
         // Use Strong POPLevel for Alice to test velocity independently of balance
         // Strong: max_balance=5000, max_credit=500, daily_velocity=500
         // This lets us test velocity limit (500) without hitting balance limit (5000)
@@ -3735,7 +3736,7 @@ mod tests {
                 .build()
                 .unwrap();
 
-            let result = ledger.append_entry(entry);
+            let result = ledger.append_entry(entry).await;
             assert!(
                 result.is_ok(),
                 "Receive {} failed: {:?}",
@@ -3754,7 +3755,7 @@ mod tests {
             .build()
             .unwrap();
 
-        let result = ledger.append_entry(entry_over);
+        let result = ledger.append_entry(entry_over).await;
         assert!(result.is_err(), "Expected error but got Ok");
         let err_str = result.unwrap_err().to_string();
         assert!(
@@ -3763,8 +3764,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_progressive_velocity_allows_spending() {
+    #[tokio::test]
+    async fn test_progressive_velocity_allows_spending() {
         let (mut ledger, _temp) = create_test_ledger_with_progressive_limits();
 
         let keypair = KeyPair::generate().unwrap();
@@ -3779,7 +3780,7 @@ mod tests {
             .build()
             .unwrap();
 
-        let result = ledger.append_entry(entry1);
+        let result = ledger.append_entry(entry1).await;
         assert!(result.is_ok(), "Entry1 failed: {:?}", result.err());
         assert_eq!(ledger.get_balance(&alice, "hours"), 40);
 
@@ -3793,7 +3794,7 @@ mod tests {
             .unwrap();
 
         // This should succeed because spending (credit to alice = negative net_change) is allowed
-        let result = ledger.append_entry(entry2);
+        let result = ledger.append_entry(entry2).await;
         assert!(
             result.is_ok(),
             "Entry2 (spending) failed: {:?}",
@@ -3803,8 +3804,8 @@ mod tests {
         assert_eq!(ledger.get_balance(&charlie, "hours"), 30);
     }
 
-    #[test]
-    fn test_progressive_credit_limit() {
+    #[tokio::test]
+    async fn test_progressive_credit_limit() {
         let (mut ledger, _temp) = create_test_ledger_with_progressive_limits();
 
         let keypair = KeyPair::generate().unwrap();
@@ -3819,7 +3820,7 @@ mod tests {
             .build()
             .unwrap();
 
-        let result = ledger.append_entry(entry);
+        let result = ledger.append_entry(entry).await;
         assert!(result.is_err());
         assert!(result
             .unwrap_err()
@@ -3833,7 +3834,7 @@ mod tests {
 
     /// Helper to create a ledger with N entries for pagination testing.
     /// Returns the ledger, temp dir, and all participant DIDs.
-    fn create_ledger_with_entries(count: usize) -> (Ledger, TempDir, Vec<Did>) {
+    async fn create_ledger_with_entries(count: usize) -> (Ledger, TempDir, Vec<Did>) {
         let (mut ledger, temp_dir) = create_test_ledger();
         let mut dids = Vec::new();
 
@@ -3850,7 +3851,7 @@ mod tests {
                 .build()
                 .unwrap();
 
-            ledger.append_entry(entry).unwrap();
+            ledger.append_entry(entry).await.unwrap();
             // Small delay to ensure distinct timestamps
             std::thread::sleep(std::time::Duration::from_millis(1));
         }
@@ -3858,9 +3859,9 @@ mod tests {
         (ledger, temp_dir, dids)
     }
 
-    #[test]
-    fn test_pagination_basic() {
-        let (ledger, _temp, _dids) = create_ledger_with_entries(10);
+    #[tokio::test]
+    async fn test_pagination_basic() {
+        let (ledger, _temp, _dids) = create_ledger_with_entries(10).await;
 
         // Get first page of 3
         let (entries, total) = ledger.get_entries_paginated(0, 3).unwrap();
@@ -3875,9 +3876,9 @@ mod tests {
         assert_ne!(entries[0].timestamp, entries2[0].timestamp);
     }
 
-    #[test]
-    fn test_pagination_last_page() {
-        let (ledger, _temp, _dids) = create_ledger_with_entries(10);
+    #[tokio::test]
+    async fn test_pagination_last_page() {
+        let (ledger, _temp, _dids) = create_ledger_with_entries(10).await;
 
         // Get last partial page (offset 8, limit 5 -> should only get 2)
         let (entries, total) = ledger.get_entries_paginated(8, 5).unwrap();
@@ -3894,9 +3895,9 @@ mod tests {
         assert_eq!(total, 0);
     }
 
-    #[test]
-    fn test_pagination_exact_boundary() {
-        let (ledger, _temp, _dids) = create_ledger_with_entries(10);
+    #[tokio::test]
+    async fn test_pagination_exact_boundary() {
+        let (ledger, _temp, _dids) = create_ledger_with_entries(10).await;
 
         // Get exactly all entries
         let (entries, total) = ledger.get_entries_paginated(0, 10).unwrap();
@@ -3908,9 +3909,9 @@ mod tests {
         assert!(entries.is_empty());
     }
 
-    #[test]
-    fn test_filtered_pagination_no_filter() {
-        let (ledger, _temp, _dids) = create_ledger_with_entries(10);
+    #[tokio::test]
+    async fn test_filtered_pagination_no_filter() {
+        let (ledger, _temp, _dids) = create_ledger_with_entries(10).await;
 
         // No filter, no cursor - fast path
         let (entries, next_cursor) = ledger
@@ -3928,8 +3929,8 @@ mod tests {
         assert!(next_cursor2.is_none()); // No more pages
     }
 
-    #[test]
-    fn test_filtered_pagination_with_did_filter() {
+    #[tokio::test]
+    async fn test_filtered_pagination_with_did_filter() {
         let (mut ledger, temp_dir) = create_test_ledger();
 
         // Create specific test scenario with known DID
@@ -3944,7 +3945,7 @@ mod tests {
                 .credit(bob.clone(), "hours".to_string(), (i + 1) as i64)
                 .build()
                 .unwrap();
-            ledger.append_entry(entry).unwrap();
+            ledger.append_entry(entry).await.unwrap();
             std::thread::sleep(std::time::Duration::from_millis(1));
         }
 
@@ -3955,7 +3956,7 @@ mod tests {
                 .credit(bob.clone(), "hours".to_string(), (i + 1) as i64)
                 .build()
                 .unwrap();
-            ledger.append_entry(entry).unwrap();
+            ledger.append_entry(entry).await.unwrap();
             std::thread::sleep(std::time::Duration::from_millis(1));
         }
 
@@ -3990,9 +3991,9 @@ mod tests {
         drop(temp_dir);
     }
 
-    #[test]
-    fn test_filtered_pagination_cursor_continuity() {
-        let (ledger, _temp, _dids) = create_ledger_with_entries(15);
+    #[tokio::test]
+    async fn test_filtered_pagination_cursor_continuity() {
+        let (ledger, _temp, _dids) = create_ledger_with_entries(15).await;
 
         let mut all_entries = Vec::new();
         let mut cursor: Option<(u64, Option<String>)> = None;
@@ -4029,9 +4030,9 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_pagination_asc_order() {
-        let (ledger, _temp, _dids) = create_ledger_with_entries(5);
+    #[tokio::test]
+    async fn test_pagination_asc_order() {
+        let (ledger, _temp, _dids) = create_ledger_with_entries(5).await;
 
         let (entries, _) = ledger.get_entries_paginated_asc(0, 10).unwrap();
 
@@ -4044,9 +4045,9 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_pagination_desc_order() {
-        let (ledger, _temp, _dids) = create_ledger_with_entries(5);
+    #[tokio::test]
+    async fn test_pagination_desc_order() {
+        let (ledger, _temp, _dids) = create_ledger_with_entries(5).await;
 
         let (entries, _) = ledger.get_entries_paginated(0, 10).unwrap();
 

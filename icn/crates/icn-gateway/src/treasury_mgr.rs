@@ -438,7 +438,7 @@ impl GatewayTreasuryManager {
         // between the ledger state and the audit trail.
         let new_balance = {
             let mut ledger = ledger_handle.write().await;
-            ledger.append_entry(entry)?;
+            ledger.append_entry(entry).await?;
             ledger.get_balance(treasury_did, &currency)
         };
 

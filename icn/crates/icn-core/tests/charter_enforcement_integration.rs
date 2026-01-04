@@ -48,7 +48,7 @@ async fn test_charter_validator_allows_valid_transaction() -> Result<()> {
         .build()?;
 
     // Should be accepted (passes charter validation)
-    let result = ledger.write().await.append_entry(entry);
+    let result = ledger.write().await.append_entry(entry).await;
     assert!(result.is_ok(), "Valid transaction should be accepted");
 
     println!("✅ Valid transaction passed charter validation");
@@ -100,7 +100,7 @@ async fn test_charter_validator_hook_integration() -> Result<()> {
         .build()?;
 
     // Should be rejected by validation hook
-    let result = ledger.append_entry(entry);
+    let result = ledger.append_entry(entry).await;
     assert!(result.is_err(), "Should be rejected by validation hook");
     assert!(result.unwrap_err().to_string().contains("Test rejection"));
 
@@ -131,7 +131,7 @@ async fn test_charter_validator_quarantines_violations() -> Result<()> {
         .build()?;
 
     // Should be rejected and quarantined
-    let result = ledger.append_entry(entry);
+    let result = ledger.append_entry(entry).await;
     assert!(result.is_err());
 
     // Check quarantine store

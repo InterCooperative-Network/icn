@@ -98,7 +98,9 @@ impl RecoveryTestNode {
                 icn_gossip::AccessControl::Public,
             );
             gossip.create_topic(topic);
-            gossip.subscribe(IDENTITY_RECOVERY_TOPIC, did.clone())?;
+            gossip
+                .subscribe(IDENTITY_RECOVERY_TOPIC, did.clone())
+                .await?;
         }
 
         info!("Gossip actor spawned and subscribed to recovery topic");
@@ -118,7 +120,7 @@ impl RecoveryTestNode {
                 if let MessagePayload::Gossip(gossip_msg) = net_msg.payload {
                     let sender = net_msg.from.clone();
                     let mut gossip = gossip_handle.write().await;
-                    if let Err(e) = gossip.handle_message(&sender, gossip_msg) {
+                    if let Err(e) = gossip.handle_message(&sender, gossip_msg).await {
                         warn!("Failed to handle gossip message: {}", e);
                     }
                 }
@@ -285,6 +287,7 @@ impl RecoveryTestNode {
                                         let mut ledger_guard = ledger.write().await;
                                         match ledger_guard
                                             .transfer_balances_for_recovery(old_did, new_did, id)
+                                            .await
                                         {
                                             Ok(count) => {
                                                 info!(
@@ -472,7 +475,7 @@ async fn test_full_recovery_flow() -> Result<()> {
             .debit(alice_did.clone(), "hours".to_string(), 100) // Alice receives 100 hours
             .credit(bob_did.clone(), "hours".to_string(), 100) // Bob gives 100 hours
             .build()?;
-        ledger.append_entry(entry)?;
+        ledger.append_entry(entry).await?;
     }
 
     // Verify Alice's initial state
@@ -504,7 +507,9 @@ async fn test_full_recovery_flow() -> Result<()> {
     let recovery_bytes = recovery_msg.to_bytes()?;
     {
         let mut gossip = alice.gossip_handle.write().await;
-        gossip.publish(IDENTITY_RECOVERY_TOPIC, recovery_bytes)?;
+        gossip
+            .publish(IDENTITY_RECOVERY_TOPIC, recovery_bytes)
+            .await?;
     }
 
     tokio::time::sleep(Duration::from_secs(1)).await;
@@ -524,7 +529,9 @@ async fn test_full_recovery_flow() -> Result<()> {
     let attestation_bytes = attestation_msg.to_bytes()?;
     {
         let mut gossip = bob.gossip_handle.write().await;
-        gossip.publish(IDENTITY_RECOVERY_TOPIC, attestation_bytes)?;
+        gossip
+            .publish(IDENTITY_RECOVERY_TOPIC, attestation_bytes)
+            .await?;
     }
 
     tokio::time::sleep(Duration::from_secs(1)).await;
@@ -543,7 +550,9 @@ async fn test_full_recovery_flow() -> Result<()> {
     let attestation_bytes = attestation_msg.to_bytes()?;
     {
         let mut gossip = carol.gossip_handle.write().await;
-        gossip.publish(IDENTITY_RECOVERY_TOPIC, attestation_bytes)?;
+        gossip
+            .publish(IDENTITY_RECOVERY_TOPIC, attestation_bytes)
+            .await?;
     }
 
     tokio::time::sleep(Duration::from_secs(1)).await;
@@ -574,7 +583,9 @@ async fn test_full_recovery_flow() -> Result<()> {
         let finalized_msg = RecoveryMessage::finalized(&recovery)?;
         let finalized_bytes = finalized_msg.to_bytes()?;
         let mut gossip = alice.gossip_handle.write().await;
-        gossip.publish(IDENTITY_RECOVERY_TOPIC, finalized_bytes)?;
+        gossip
+            .publish(IDENTITY_RECOVERY_TOPIC, finalized_bytes)
+            .await?;
     }
 
     // Manually trigger trust graph and ledger migration on Alice's node
@@ -590,7 +601,9 @@ async fn test_full_recovery_flow() -> Result<()> {
     }
     {
         let mut ledger = alice.ledger.write().await;
-        let count = ledger.transfer_balances_for_recovery(&alice_did, &alice2_did, &recovery_id)?;
+        let count = ledger
+            .transfer_balances_for_recovery(&alice_did, &alice2_did, &recovery_id)
+            .await?;
         info!(
             "Ledger: transferred {} currencies from {} to {}",
             count, alice_did, alice2_did

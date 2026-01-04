@@ -505,7 +505,7 @@ impl CommunityActor {
             match bincode::serde::encode_to_vec(community, bincode::config::legacy()) {
                 Ok(data) => {
                     let mut gossip_actor = gossip.write().await;
-                    match gossip_actor.publish(COMMUNITY_TOPIC, data) {
+                    match gossip_actor.publish(COMMUNITY_TOPIC, data).await {
                         Ok(hash) => {
                             debug!(
                                 community_id = %community.id,

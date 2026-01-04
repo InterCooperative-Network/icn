@@ -66,26 +66,20 @@ impl TrustScoreCache {
         }
     }
 
-    /// Get cached trust score if valid, or compute and cache it
-    fn get_or_compute<F>(&self, did: &Did, compute: F) -> f64
-    where
-        F: FnOnce() -> f64,
-    {
-        // Try to get from cache first
-        {
-            if let Ok(cache) = self.scores.lock() {
-                if let Some((score, cached_at)) = cache.get(did) {
-                    if cached_at.elapsed() < self.ttl {
-                        return *score;
-                    }
+    /// Get cached trust score if still valid
+    fn get(&self, did: &Did) -> Option<f64> {
+        if let Ok(cache) = self.scores.lock() {
+            if let Some((score, cached_at)) = cache.get(did) {
+                if cached_at.elapsed() < self.ttl {
+                    return Some(*score);
                 }
             }
         }
+        None
+    }
 
-        // Compute new score
-        let score = compute();
-
-        // Cache it
+    /// Insert a trust score into the cache
+    fn insert(&self, did: &Did, score: f64) {
         if let Ok(mut cache) = self.scores.lock() {
             cache.insert(did.clone(), (score, Instant::now()));
             // Limit cache size to prevent unbounded growth
@@ -95,6 +89,24 @@ impl TrustScoreCache {
                 cache.retain(|_, (_, cached_at)| now.duration_since(*cached_at) < self.ttl);
             }
         }
+    }
+
+    /// Get cached trust score if valid, or compute and cache it (sync version)
+    #[allow(dead_code)]
+    fn get_or_compute<F>(&self, did: &Did, compute: F) -> f64
+    where
+        F: FnOnce() -> f64,
+    {
+        // Try to get from cache first
+        if let Some(score) = self.get(did) {
+            return score;
+        }
+
+        // Compute new score
+        let score = compute();
+
+        // Cache it
+        self.insert(did, score);
 
         score
     }
@@ -466,7 +478,7 @@ impl GossipActor {
 
     /// Publish an entry to a topic
     #[instrument(skip(self, data), fields(topic = %topic, data_size = data.len()))]
-    pub fn publish(&mut self, topic: &str, data: Vec<u8>) -> Result<ContentHash> {
+    pub async fn publish(&mut self, topic: &str, data: Vec<u8>) -> Result<ContentHash> {
         // Auto-create topic if it doesn't exist (as public topic)
         if !self.topics.contains_key(topic) {
             debug!("Auto-creating public topic: {}", topic);
@@ -515,7 +527,7 @@ impl GossipActor {
         }
 
         // Store entry
-        self.store_entry(entry)?;
+        self.store_entry(entry).await?;
 
         // Track metrics
         icn_obs::metrics::gossip::entries_published_inc();
@@ -532,7 +544,9 @@ impl GossipActor {
     }
 
     /// Store an entry (from publish or receive)
-    pub(crate) fn store_entry(&mut self, entry: GossipEntry) -> Result<()> {
+    ///
+    /// This method is async to allow non-blocking access to the storage quota manager.
+    pub(crate) async fn store_entry(&mut self, entry: GossipEntry) -> Result<()> {
         let topic = &entry.topic;
         let hash = entry.hash;
         let entry_size = entry.data.len() as u64;
@@ -547,11 +561,8 @@ impl GossipActor {
         }
 
         // Phase 18 Week 6: Check storage quota for author
-        // Use block_in_place to safely call blocking_read from async context
         if let Some(quota_manager) = &self.storage_quota_manager {
-            let can_store = tokio::task::block_in_place(|| {
-                quota_manager.blocking_read().can_store(&author, entry_size)
-            });
+            let can_store = quota_manager.read().await.can_store(&author, entry_size);
 
             if let Err(e) = can_store {
                 warn!(
@@ -584,15 +595,12 @@ impl GossipActor {
                     topic_entries.remove(&oldest_hash);
 
                     // Phase 18 Week 6: Release quota for evicted entry
-                    // Use block_in_place to safely call blocking_write from async context
                     if let Some(quota_manager) = &self.storage_quota_manager {
-                        tokio::task::block_in_place(|| {
-                            let _ = quota_manager.blocking_write().release_usage(
-                                &oldest_author,
-                                &oldest_hash,
-                                oldest_size,
-                            );
-                        });
+                        let _ = quota_manager.write().await.release_usage(
+                            &oldest_author,
+                            &oldest_hash,
+                            oldest_size,
+                        );
                     }
                 }
             }
@@ -607,31 +615,28 @@ impl GossipActor {
         topic_entries.insert(hash, entry.clone());
 
         // Phase 18 Week 6: Record quota usage for new entry
-        // Use block_in_place to safely call blocking_write from async context
         if let Some(quota_manager) = &self.storage_quota_manager {
-            tokio::task::block_in_place(|| {
-                let mut manager = quota_manager.blocking_write();
-                // Use Normal priority for gossip entries (evicted before ledger/contracts)
-                let _ = manager.record_usage(
-                    &author,
-                    hash.to_vec(),
-                    entry_size,
-                    icn_store::QuotaPriority::Normal,
-                );
+            let mut manager = quota_manager.write().await;
+            // Use Normal priority for gossip entries (evicted before ledger/contracts)
+            let _ = manager.record_usage(
+                &author,
+                hash.to_vec(),
+                entry_size,
+                icn_store::QuotaPriority::Normal,
+            );
 
-                // Check if eviction is needed
-                if manager.needs_eviction() {
-                    if let Ok(evicted) = manager.evict_if_needed() {
-                        if !evicted.is_empty() {
-                            info!(
-                                evicted_count = evicted.len(),
-                                "Storage quota eviction triggered"
-                            );
-                            icn_obs::metrics::storage_quotas::evicted_inc(evicted.len() as u64);
-                        }
+            // Check if eviction is needed
+            if manager.needs_eviction() {
+                if let Ok(evicted) = manager.evict_if_needed() {
+                    if !evicted.is_empty() {
+                        info!(
+                            evicted_count = evicted.len(),
+                            "Storage quota eviction triggered"
+                        );
+                        icn_obs::metrics::storage_quotas::evicted_inc(evicted.len() as u64);
                     }
                 }
-            });
+            }
         }
 
         // Merge vector clock
@@ -670,32 +675,22 @@ impl GossipActor {
 
     /// Subscribe to a topic
     #[instrument(skip(self), fields(topic = %topic, subscriber = %subscriber))]
-    pub fn subscribe(&mut self, topic: &str, subscriber: Did) -> Result<Subscription> {
+    pub async fn subscribe(&mut self, topic: &str, subscriber: Did) -> Result<Subscription> {
         let topic_obj = self.topics.get(topic).context("Topic not found")?;
 
         // Priority 1: Check fine-grained trust threshold (if configured)
         if let Some(threshold) = topic_obj.min_trust_threshold {
             if let Some(trust_graph) = &self.trust_graph {
-                // Get trust score from cache or compute it
-                // Cache avoids blocking async operations on every subscription check
-                let trust_graph_clone = Arc::clone(trust_graph);
-                let subscriber_clone = subscriber.clone();
-                let trust_score = self.trust_cache.get_or_compute(&subscriber, || {
-                    // Compute score - only blocks if cache miss
-                    tokio::task::block_in_place(|| {
-                        match tokio::runtime::Handle::try_current() {
-                            Ok(rt) => rt.block_on(async {
-                                let graph = trust_graph_clone.read().await;
-                                graph.compute_trust_score(&subscriber_clone).unwrap_or(0.0)
-                            }),
-                            Err(_) => {
-                                warn!("No Tokio runtime available for trust score lookup");
-                                icn_obs::metrics::gossip::runtime_unavailable_inc();
-                                0.0 // Fallback: untrusted
-                            }
-                        }
-                    })
-                });
+                // Get trust score from cache or compute it async
+                let trust_score = if let Some(cached) = self.trust_cache.get(&subscriber) {
+                    cached
+                } else {
+                    // Compute async and cache
+                    let graph = trust_graph.read().await;
+                    let score = graph.compute_trust_score(&subscriber).unwrap_or(0.0);
+                    self.trust_cache.insert(&subscriber, score);
+                    score
+                };
 
                 // Enforce trust threshold
                 if trust_score < threshold {
@@ -989,17 +984,17 @@ impl GossipActor {
 
     /// Handle incoming gossip message from network
     #[instrument(skip(self, message), fields(peer_did = %sender, message_type = message.variant_name()))]
-    pub fn handle_message(&mut self, sender: &Did, message: GossipMessage) -> Result<()> {
+    pub async fn handle_message(&mut self, sender: &Did, message: GossipMessage) -> Result<()> {
         // Issue #181: Track message processing latency
         let start = std::time::Instant::now();
-        let result = self.handle_message_inner(sender, message);
+        let result = self.handle_message_inner(sender, message).await;
         let elapsed = start.elapsed().as_secs_f64();
         icn_obs::metrics::gossip::message_latency_record(elapsed);
         result
     }
 
     /// Inner implementation of handle_message (for latency tracking)
-    fn handle_message_inner(&mut self, sender: &Did, message: GossipMessage) -> Result<()> {
+    async fn handle_message_inner(&mut self, sender: &Did, message: GossipMessage) -> Result<()> {
         // H7 fix: Trust-gated message handling
         // Check sender's trust score before processing messages
         const MIN_TRUST_FOR_MESSAGE: f64 = 0.1; // Known trust class minimum
@@ -1056,7 +1051,7 @@ impl GossipActor {
 
             GossipMessage::Request { hash } => self.handle_request(sender, hash),
 
-            GossipMessage::Response { entry } => self.handle_response(sender, entry),
+            GossipMessage::Response { entry } => self.handle_response(sender, entry).await,
 
             GossipMessage::RequestBloomFilter { topic } => {
                 self.handle_request_bloom_filter(sender, topic)
@@ -1090,7 +1085,10 @@ impl GossipActor {
                 truncated,
                 nonce,
                 next_cursor,
-            } => self.handle_pull_response(sender, topic, entries, truncated, nonce, next_cursor),
+            } => {
+                self.handle_pull_response(sender, topic, entries, truncated, nonce, next_cursor)
+                    .await
+            }
 
             GossipMessage::BlobAnnounce {
                 blob_hash,
@@ -1660,8 +1658,8 @@ mod tests {
         Some(TrustClass::Partner)
     }
 
-    #[test]
-    fn test_create_and_publish() {
+    #[tokio::test]
+    async fn test_create_and_publish() {
         let keypair = KeyPair::generate().unwrap();
         let did = keypair.did().clone();
 
@@ -1669,7 +1667,10 @@ mod tests {
 
         // Publish to default topic
         let data = b"Hello, world!".to_vec();
-        let hash = gossip.publish("global:identity", data.clone()).unwrap();
+        let hash = gossip
+            .publish("global:identity", data.clone())
+            .await
+            .unwrap();
 
         // Retrieve entry
         let entry = gossip.get_entry("global:identity", &hash).unwrap();
@@ -1677,19 +1678,22 @@ mod tests {
         assert_eq!(entry.author, did);
     }
 
-    #[test]
-    fn test_subscribe() {
+    #[tokio::test]
+    async fn test_subscribe() {
         let keypair = KeyPair::generate().unwrap();
         let did = keypair.did().clone();
 
         let mut gossip = GossipActor::new(did.clone(), Arc::new(mock_trust_lookup));
 
-        let subscription = gossip.subscribe("global:identity", did.clone()).unwrap();
+        let subscription = gossip
+            .subscribe("global:identity", did.clone())
+            .await
+            .unwrap();
         assert_eq!(subscription.topic, "global:identity");
     }
 
-    #[test]
-    fn test_bloom_filter_sync() {
+    #[tokio::test]
+    async fn test_bloom_filter_sync() {
         let keypair1 = KeyPair::generate().unwrap();
         let did1 = keypair1.did().clone();
 
@@ -1702,14 +1706,17 @@ mod tests {
         // Node 1 publishes entries
         gossip1
             .publish("global:identity", b"Entry 1".to_vec())
+            .await
             .unwrap();
         gossip1
             .publish("global:identity", b"Entry 2".to_vec())
+            .await
             .unwrap();
 
         // Node 2 publishes different entry
         gossip2
             .publish("global:identity", b"Entry 3".to_vec())
+            .await
             .unwrap();
 
         // Get bloom filter from node 2
@@ -1722,8 +1729,8 @@ mod tests {
         assert_eq!(missing.len(), 2);
     }
 
-    #[test]
-    fn test_vector_clock_merge() {
+    #[tokio::test]
+    async fn test_vector_clock_merge() {
         let keypair1 = KeyPair::generate().unwrap();
         let did1 = keypair1.did().clone();
 
@@ -1733,14 +1740,17 @@ mod tests {
         let initial_count = gossip.clock.get(&did1);
 
         // Publish entry (increments clock)
-        gossip.publish("global:identity", b"Test".to_vec()).unwrap();
+        gossip
+            .publish("global:identity", b"Test".to_vec())
+            .await
+            .unwrap();
 
         // Clock should have incremented
         assert_eq!(gossip.clock.get(&did1), initial_count + 1);
     }
 
-    #[test]
-    fn test_pull_protocol_request_response() {
+    #[tokio::test]
+    async fn test_pull_protocol_request_response() {
         // Test that the pull protocol works: Announce -> Request -> Response
         let keypair1 = KeyPair::generate().unwrap();
         let did1 = keypair1.did().clone();
@@ -1762,7 +1772,10 @@ mod tests {
 
         // Gossip1 publishes an entry
         let data = b"Test entry".to_vec();
-        let hash = gossip1.publish("global:identity", data.clone()).unwrap();
+        let hash = gossip1
+            .publish("global:identity", data.clone())
+            .await
+            .unwrap();
 
         // Get the entry from gossip1
         let entry = gossip1.get_entry("global:identity", &hash).unwrap();
@@ -1775,7 +1788,7 @@ mod tests {
             topic: "global:identity".to_string(),
         };
 
-        gossip2.handle_message(&did1, announce).unwrap();
+        gossip2.handle_message(&did1, announce).await.unwrap();
 
         // Gossip2 should have sent a Request message
         let messages = sent_messages.lock().unwrap();
@@ -1799,7 +1812,7 @@ mod tests {
         }));
 
         let request = GossipMessage::Request { hash };
-        gossip1.handle_message(&did2, request).unwrap();
+        gossip1.handle_message(&did2, request).await.unwrap();
 
         // Gossip1 should have sent a Response message directly to gossip2 (not broadcast)
         let messages1 = sent_messages1.lock().unwrap();
@@ -1817,8 +1830,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_request_missing_handler() {
+    #[tokio::test]
+    async fn test_request_missing_handler() {
         // Test RequestMissing message handling
         let keypair = KeyPair::generate().unwrap();
         let did = keypair.did().clone();
@@ -1828,12 +1841,15 @@ mod tests {
         // Publish some entries
         let hash1 = gossip
             .publish("global:identity", b"Entry 1".to_vec())
+            .await
             .unwrap();
         let hash2 = gossip
             .publish("global:identity", b"Entry 2".to_vec())
+            .await
             .unwrap();
         let _hash3 = gossip
             .publish("global:identity", b"Entry 3".to_vec())
+            .await
             .unwrap();
 
         // Track messages sent via callback
@@ -1849,7 +1865,7 @@ mod tests {
             hashes: vec![hash1, hash2],
         };
 
-        gossip.handle_message(&did, request_missing).unwrap();
+        gossip.handle_message(&did, request_missing).await.unwrap();
 
         // Should have sent 2 Response messages
         let messages = sent_messages.lock().unwrap();
@@ -1865,15 +1881,18 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_unsubscribe() {
+    #[tokio::test]
+    async fn test_unsubscribe() {
         let keypair = KeyPair::generate().unwrap();
         let did = keypair.did().clone();
 
         let mut gossip = GossipActor::new(did.clone(), Arc::new(mock_trust_lookup));
 
         // Subscribe first
-        gossip.subscribe("global:identity", did.clone()).unwrap();
+        gossip
+            .subscribe("global:identity", did.clone())
+            .await
+            .unwrap();
         assert!(gossip.is_subscribed("global:identity", &did));
 
         // Unsubscribe
@@ -1881,8 +1900,8 @@ mod tests {
         assert!(!gossip.is_subscribed("global:identity", &did));
     }
 
-    #[test]
-    fn test_get_subscribers() {
+    #[tokio::test]
+    async fn test_get_subscribers() {
         let keypair1 = KeyPair::generate().unwrap();
         let did1 = keypair1.did().clone();
 
@@ -1892,8 +1911,14 @@ mod tests {
         let mut gossip = GossipActor::new(did1.clone(), Arc::new(mock_trust_lookup));
 
         // Subscribe both DIDs
-        gossip.subscribe("global:identity", did1.clone()).unwrap();
-        gossip.subscribe("global:identity", did2.clone()).unwrap();
+        gossip
+            .subscribe("global:identity", did1.clone())
+            .await
+            .unwrap();
+        gossip
+            .subscribe("global:identity", did2.clone())
+            .await
+            .unwrap();
 
         // Get subscribers
         let subscribers = gossip.get_subscribers("global:identity");
@@ -1902,16 +1927,22 @@ mod tests {
         assert!(subscribers.contains(&did2));
     }
 
-    #[test]
-    fn test_get_subscriptions() {
+    #[tokio::test]
+    async fn test_get_subscriptions() {
         let keypair = KeyPair::generate().unwrap();
         let did = keypair.did().clone();
 
         let mut gossip = GossipActor::new(did.clone(), Arc::new(mock_trust_lookup));
 
         // Subscribe to multiple topics
-        gossip.subscribe("global:identity", did.clone()).unwrap();
-        gossip.subscribe("global:rendezvous", did.clone()).unwrap();
+        gossip
+            .subscribe("global:identity", did.clone())
+            .await
+            .unwrap();
+        gossip
+            .subscribe("global:rendezvous", did.clone())
+            .await
+            .unwrap();
 
         // Get all subscriptions for this DID
         let subscriptions = gossip.get_subscriptions(&did);
@@ -1920,8 +1951,8 @@ mod tests {
         assert!(subscriptions.contains(&"global:rendezvous".to_string()));
     }
 
-    #[test]
-    fn test_is_subscribed() {
+    #[tokio::test]
+    async fn test_is_subscribed() {
         let keypair = KeyPair::generate().unwrap();
         let did = keypair.did().clone();
 
@@ -1931,20 +1962,29 @@ mod tests {
         assert!(!gossip.is_subscribed("global:identity", &did));
 
         // Subscribe
-        gossip.subscribe("global:identity", did.clone()).unwrap();
+        gossip
+            .subscribe("global:identity", did.clone())
+            .await
+            .unwrap();
         assert!(gossip.is_subscribed("global:identity", &did));
     }
 
-    #[test]
-    fn test_subscribe_duplicate_prevention() {
+    #[tokio::test]
+    async fn test_subscribe_duplicate_prevention() {
         let keypair = KeyPair::generate().unwrap();
         let did = keypair.did().clone();
 
         let mut gossip = GossipActor::new(did.clone(), Arc::new(mock_trust_lookup));
 
         // Subscribe twice
-        gossip.subscribe("global:identity", did.clone()).unwrap();
-        gossip.subscribe("global:identity", did.clone()).unwrap();
+        gossip
+            .subscribe("global:identity", did.clone())
+            .await
+            .unwrap();
+        gossip
+            .subscribe("global:identity", did.clone())
+            .await
+            .unwrap();
 
         // Should only be subscribed once
         let subscribers = gossip.get_subscribers("global:identity");
@@ -1963,8 +2003,8 @@ mod tests {
         assert!(result.is_err());
     }
 
-    #[test]
-    fn test_subscribe_acl_denied() {
+    #[tokio::test]
+    async fn test_subscribe_acl_denied() {
         let keypair = KeyPair::generate().unwrap();
         let did = keypair.did().clone();
 
@@ -1980,13 +2020,13 @@ mod tests {
         gossip.create_topic(topic);
 
         // Try to subscribe with no trust - should fail
-        let result = gossip.subscribe("partner:only", did.clone());
+        let result = gossip.subscribe("partner:only", did.clone()).await;
         assert!(result.is_err());
     }
 
-    #[test]
+    #[tokio::test]
     #[ignore] // Slow test - fills 10,000 slots
-    fn test_subscribe_limit_enforcement_full() {
+    async fn test_subscribe_limit_enforcement_full() {
         let owner = KeyPair::generate().unwrap().did().clone();
         let mut gossip = GossipActor::new(owner.clone(), Arc::new(mock_trust_lookup));
 
@@ -2005,13 +2045,13 @@ mod tests {
 
         // Try to add another - should fail
         let did = KeyPair::generate().unwrap().did().clone();
-        let result = gossip.subscribe("test:limited", did);
+        let result = gossip.subscribe("test:limited", did).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("limit reached"));
     }
 
-    #[test]
-    fn test_subscribe_limit_enforcement_logic() {
+    #[tokio::test]
+    async fn test_subscribe_limit_enforcement_logic() {
         // Test the limit checking logic with a small number
         let owner = KeyPair::generate().unwrap().did().clone();
         let mut gossip = GossipActor::new(owner.clone(), Arc::new(mock_trust_lookup));
@@ -2022,7 +2062,7 @@ mod tests {
         // Add 100 subscribers to verify normal operation
         for i in 0..100 {
             let did = KeyPair::generate().unwrap().did().clone();
-            let result = gossip.subscribe("test:limited", did);
+            let result = gossip.subscribe("test:limited", did).await;
             assert!(result.is_ok(), "Subscribe {i} should succeed");
         }
 
@@ -2034,8 +2074,8 @@ mod tests {
         // This test just confirms normal operation works
     }
 
-    #[test]
-    fn test_per_peer_subscription_limit() {
+    #[tokio::test]
+    async fn test_per_peer_subscription_limit() {
         // Test that a single peer cannot subscribe to too many topics
         let owner = KeyPair::generate().unwrap().did().clone();
 
@@ -2051,7 +2091,7 @@ mod tests {
         for i in 0..50 {
             let topic_name = format!("test:topic_{i}");
             gossip.create_topic(Topic::new(topic_name.clone(), AccessControl::Public));
-            let result = gossip.subscribe(&topic_name, peer.clone());
+            let result = gossip.subscribe(&topic_name, peer.clone()).await;
             assert!(result.is_ok(), "Subscribe to topic {i} should succeed");
         }
 
@@ -2064,7 +2104,7 @@ mod tests {
             "test:topic_50".to_string(),
             AccessControl::Public,
         ));
-        let result = gossip.subscribe("test:topic_50", peer.clone());
+        let result = gossip.subscribe("test:topic_50", peer.clone()).await;
         assert!(result.is_err(), "51st subscription should fail");
         assert!(
             result
@@ -2075,8 +2115,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_per_peer_subscription_limit_trust_weighted() {
+    #[tokio::test]
+    async fn test_per_peer_subscription_limit_trust_weighted() {
         // Test that higher trust classes get higher limits
         let owner = KeyPair::generate().unwrap().did().clone();
 
@@ -2098,7 +2138,7 @@ mod tests {
         for i in 0..100 {
             let topic_name = format!("test:fed_topic_{i}");
             gossip.create_topic(Topic::new(topic_name.clone(), AccessControl::Public));
-            let result = gossip.subscribe(&topic_name, peer.clone());
+            let result = gossip.subscribe(&topic_name, peer.clone()).await;
             assert!(
                 result.is_ok(),
                 "Federated peer subscribe to topic {i} should succeed"
@@ -2114,8 +2154,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_entry_limit_enforcement() {
+    #[tokio::test]
+    async fn test_entry_limit_enforcement() {
         let owner = KeyPair::generate().unwrap().did().clone();
         let mut gossip = GossipActor::new(owner.clone(), Arc::new(mock_trust_lookup));
 
@@ -2127,11 +2167,11 @@ mod tests {
         // Publish more entries than the limit
         for i in 0..10 {
             let data = format!("entry_{i}").into_bytes();
-            let result = gossip.publish("test:entries", data);
+            let result = gossip.publish("test:entries", data).await;
             assert!(result.is_ok(), "Publish {i} failed: {result:?}");
 
             // Sleep briefly to ensure distinct timestamps for proper ordering
-            std::thread::sleep(std::time::Duration::from_millis(2));
+            tokio::time::sleep(std::time::Duration::from_millis(2)).await;
         }
 
         // Should have exactly max_entries (5) entries
@@ -2182,8 +2222,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_subscription_notifications() {
+    #[tokio::test]
+    async fn test_subscription_notifications() {
         use std::sync::Mutex;
 
         let owner = KeyPair::generate().unwrap().did().clone();
@@ -2212,14 +2252,16 @@ mod tests {
         // Subscribe both users to the topic
         gossip
             .subscribe("test:notifications", subscriber1.clone())
+            .await
             .unwrap();
         gossip
             .subscribe("test:notifications", subscriber2.clone())
+            .await
             .unwrap();
 
         // Publish an entry
         let data = b"Test notification".to_vec();
-        let hash = gossip.publish("test:notifications", data).unwrap();
+        let hash = gossip.publish("test:notifications", data).await.unwrap();
 
         // Verify both subscribers were notified
         let notifs = notifications.lock().unwrap();
@@ -2247,8 +2289,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_no_notification_without_callback() {
+    #[tokio::test]
+    async fn test_no_notification_without_callback() {
         let owner = KeyPair::generate().unwrap().did().clone();
         let subscriber = KeyPair::generate().unwrap().did().clone();
 
@@ -2263,18 +2305,19 @@ mod tests {
         // Subscribe without setting callback
         gossip
             .subscribe("test:no-callback", subscriber.clone())
+            .await
             .unwrap();
 
         // This should not panic even without a callback set
-        let result = gossip.publish("test:no-callback", b"Test".to_vec());
+        let result = gossip.publish("test:no-callback", b"Test".to_vec()).await;
         assert!(
             result.is_ok(),
             "Publishing should succeed even without notification callback"
         );
     }
 
-    #[test]
-    fn test_no_notification_without_subscribers() {
+    #[tokio::test]
+    async fn test_no_notification_without_subscribers() {
         use std::sync::Mutex;
 
         let owner = KeyPair::generate().unwrap().did().clone();
@@ -2291,7 +2334,10 @@ mod tests {
         gossip.set_notification_callback(callback);
 
         // Publish without any subscribers
-        gossip.publish("test:no-subs", b"Test".to_vec()).unwrap();
+        gossip
+            .publish("test:no-subs", b"Test".to_vec())
+            .await
+            .unwrap();
 
         // Verify no notifications were sent
         let count = notification_count.lock().unwrap();
@@ -2301,8 +2347,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_response_handler_triggers_notifications() {
+    #[tokio::test]
+    async fn test_response_handler_triggers_notifications() {
         use sha2::{Digest, Sha256};
         use std::sync::Mutex;
 
@@ -2319,6 +2365,7 @@ mod tests {
         ));
         gossip
             .subscribe("test:response", subscriber.clone())
+            .await
             .unwrap();
 
         // Track notifications
@@ -2354,12 +2401,14 @@ mod tests {
         };
 
         // Simulate receiving a Response message from the author
-        let result = gossip.handle_message(
-            &author,
-            GossipMessage::Response {
-                entry: entry.clone(),
-            },
-        );
+        let result = gossip
+            .handle_message(
+                &author,
+                GossipMessage::Response {
+                    entry: entry.clone(),
+                },
+            )
+            .await;
         assert!(result.is_ok(), "Response handler should succeed");
 
         // Verify notification was sent to subscriber
@@ -2374,8 +2423,8 @@ mod tests {
         assert_eq!(notifs[0].2, subscriber);
     }
 
-    #[test]
-    fn test_response_handler_enforces_max_entries() {
+    #[tokio::test]
+    async fn test_response_handler_enforces_max_entries() {
         use sha2::{Digest, Sha256};
 
         let owner = KeyPair::generate().unwrap().did().clone();
@@ -2412,10 +2461,11 @@ mod tests {
             };
 
             // Small delay to ensure distinct timestamps
-            std::thread::sleep(std::time::Duration::from_millis(2));
+            tokio::time::sleep(std::time::Duration::from_millis(2)).await;
 
             gossip
                 .handle_message(&author, GossipMessage::Response { entry })
+                .await
                 .unwrap();
         }
 
@@ -2460,7 +2510,7 @@ mod tests {
         gossip.create_topic(topic);
 
         // Alice attempts to subscribe - should be rejected (score 0.05 < 0.1)
-        let result = gossip.subscribe("test:trust-gated", alice.clone());
+        let result = gossip.subscribe("test:trust-gated", alice.clone()).await;
         assert!(
             result.is_err(),
             "Subscription should be rejected due to low trust"
@@ -2471,7 +2521,7 @@ mod tests {
             .contains("Insufficient trust"));
 
         // Bob (unknown, score 0.0) attempts to subscribe - should also be rejected
-        let result = gossip.subscribe("test:trust-gated", bob.clone());
+        let result = gossip.subscribe("test:trust-gated", bob.clone()).await;
         assert!(
             result.is_err(),
             "Subscription should be rejected for unknown peer"
@@ -2509,7 +2559,7 @@ mod tests {
         gossip.create_topic(topic);
 
         // Alice attempts to subscribe - should succeed (final score ~0.42 >= 0.4)
-        let result = gossip.subscribe("test:trust-gated", alice.clone());
+        let result = gossip.subscribe("test:trust-gated", alice.clone()).await;
         assert!(
             result.is_ok(),
             "Subscription should be accepted with sufficient trust"
@@ -2548,7 +2598,7 @@ mod tests {
         gossip.create_topic(topic);
 
         // Alice attempts to subscribe - should succeed (score 0.4 >= 0.4)
-        let result = gossip.subscribe("test:trust-gated", alice.clone());
+        let result = gossip.subscribe("test:trust-gated", alice.clone()).await;
         assert!(
             result.is_ok(),
             "Subscription should be accepted at exact threshold"
@@ -2571,7 +2621,7 @@ mod tests {
         gossip.create_topic(topic);
 
         // Alice attempts to subscribe - should succeed via fallback to Public ACL
-        let result = gossip.subscribe("test:fallback", alice.clone());
+        let result = gossip.subscribe("test:fallback", alice.clone()).await;
         assert!(
             result.is_ok(),
             "Subscription should succeed via ACL fallback"
@@ -2613,7 +2663,7 @@ mod tests {
         gossip.create_topic(topic);
 
         // Alice attempts to subscribe - should succeed (has score 0.8 >= 0.7)
-        let result = gossip.subscribe("test:mixed", alice.clone());
+        let result = gossip.subscribe("test:mixed", alice.clone()).await;
         assert!(
             result.is_ok(),
             "Trust score check should pass before ACL check"
@@ -2712,8 +2762,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_subscription_restore_creates_missing_entries() {
+    #[tokio::test]
+    async fn test_subscription_restore_creates_missing_entries() {
         // Test that restoring subscriptions doesn't silently drop them if the subscription
         // list doesn't exist yet
         let keypair = KeyPair::generate().unwrap();
@@ -2725,11 +2775,14 @@ mod tests {
         // Create topic and subscribe
         let topic = Topic::new("test:sub".to_string(), AccessControl::Public);
         gossip.create_topic(topic);
-        gossip.subscribe("test:sub", did.clone()).unwrap();
+        gossip.subscribe("test:sub", did.clone()).await.unwrap();
 
         // Create another subscriber
         let subscriber2 = KeyPair::generate().unwrap().did().clone();
-        gossip.subscribe("test:sub", subscriber2.clone()).unwrap();
+        gossip
+            .subscribe("test:sub", subscriber2.clone())
+            .await
+            .unwrap();
 
         // Export state
         let state = gossip.export_state();
@@ -2793,8 +2846,8 @@ mod tests {
         assert!(subs.contains(&did));
     }
 
-    #[test]
-    fn test_replica_message_types() {
+    #[tokio::test]
+    async fn test_replica_message_types() {
         // Phase 17: Test that replica coordination messages can be created and handled
         use crate::types::{GossipMessage, ReplicaHealth};
 
@@ -2812,7 +2865,7 @@ mod tests {
             content_hash,
             requesting_peer: did.clone(),
         };
-        let result = gossip.handle_message(&did, request);
+        let result = gossip.handle_message(&did, request).await;
         assert!(
             result.is_ok(),
             "ReplicaRequest should be handled successfully"
@@ -2824,7 +2877,7 @@ mod tests {
             offering_peer: did.clone(),
             health: ReplicaHealth::Healthy,
         };
-        let result = gossip.handle_message(&did, offer);
+        let result = gossip.handle_message(&did, offer).await;
         assert!(
             result.is_ok(),
             "ReplicaOffer should be handled successfully"
@@ -2839,7 +2892,7 @@ mod tests {
                 (peer2, ReplicaHealth::Stale),
             ],
         };
-        let result = gossip.handle_message(&did, status);
+        let result = gossip.handle_message(&did, status).await;
         assert!(
             result.is_ok(),
             "ReplicaStatus should be handled successfully"
@@ -2866,8 +2919,8 @@ mod tests {
         assert_eq!(status2.variant_name(), "ReplicaStatus");
     }
 
-    #[test]
-    fn test_replica_coordination_with_store() -> Result<()> {
+    #[tokio::test]
+    async fn test_replica_coordination_with_store() -> Result<()> {
         // Phase 17: Test full replica coordination flow with storage
         use crate::types::{GossipMessage, ReplicaHealth};
         use icn_store::SledStore;
@@ -2937,7 +2990,7 @@ mod tests {
         }));
 
         // Handle the request
-        gossip1.handle_message(&did2, request)?;
+        gossip1.handle_message(&did2, request).await?;
 
         // Verify gossip1 responded with ReplicaOffer
         let messages = sent_messages.lock().unwrap();
@@ -2974,7 +3027,7 @@ mod tests {
             health: ReplicaHealth::Healthy,
         };
 
-        gossip2.handle_message(&did1, offer)?;
+        gossip2.handle_message(&did1, offer).await?;
 
         // Verify gossip2 recorded gossip1 as a replica
         let replica_count = store2.get_replica_count(&content_hash)?;
@@ -3002,7 +3055,7 @@ mod tests {
             ],
         };
 
-        gossip2.handle_message(&did1, status)?;
+        gossip2.handle_message(&did1, status).await?;
 
         // Verify all replicas were recorded
         let replica_count = store2.get_replica_count(&content_hash)?;
@@ -3044,17 +3097,17 @@ mod tests {
 
         // First publish should succeed (100 bytes < 500 byte quota)
         let data1 = vec![1u8; 100];
-        let result = gossip.publish("test:quota", data1);
+        let result = gossip.publish("test:quota", data1).await;
         assert!(result.is_ok(), "First publish should succeed within quota");
 
         // Second publish should also succeed (100 + 100 = 200 < 500)
         let data2 = vec![2u8; 100];
-        let result = gossip.publish("test:quota", data2);
+        let result = gossip.publish("test:quota", data2).await;
         assert!(result.is_ok(), "Second publish should succeed within quota");
 
         // Third publish should also succeed (200 + 100 = 300 < 500)
         let data3 = vec![3u8; 100];
-        let result = gossip.publish("test:quota", data3);
+        let result = gossip.publish("test:quota", data3).await;
         assert!(result.is_ok(), "Third publish should succeed within quota");
 
         // Verify quota usage is being tracked
@@ -3090,12 +3143,12 @@ mod tests {
 
         // First publish should succeed (150 bytes < 200 byte quota)
         let data1 = vec![1u8; 150];
-        let result = gossip.publish("test:quota", data1);
+        let result = gossip.publish("test:quota", data1).await;
         assert!(result.is_ok(), "First publish should succeed within quota");
 
         // Second publish should fail (150 + 100 = 250 > 200 byte quota)
         let data2 = vec![2u8; 100];
-        let result = gossip.publish("test:quota", data2);
+        let result = gossip.publish("test:quota", data2).await;
         assert!(
             result.is_err(),
             "Second publish should fail - quota exceeded"

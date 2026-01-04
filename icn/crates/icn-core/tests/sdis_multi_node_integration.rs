@@ -66,7 +66,7 @@ impl SdisTestNode {
             ] {
                 let topic = Topic::new(topic_name.to_string(), AccessControl::Public);
                 gossip.create_topic(topic);
-                gossip.subscribe(topic_name, did.clone())?;
+                gossip.subscribe(topic_name, did.clone()).await?;
             }
         }
 

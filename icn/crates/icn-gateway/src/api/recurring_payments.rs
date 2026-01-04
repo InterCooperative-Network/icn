@@ -321,13 +321,16 @@ pub async fn execute_due_payments(
         };
 
         // Execute payment via ledger
-        match ledger_mgr.create_payment(
-            &payment.coop_id,
-            &to_did,
-            &from_did,
-            payment.amount,
-            payment.currency.clone(),
-        ) {
+        match ledger_mgr
+            .create_payment(
+                &payment.coop_id,
+                &to_did,
+                &from_did,
+                payment.amount,
+                payment.currency.clone(),
+            )
+            .await
+        {
             Ok(tx_hash) => {
                 info!(
                     payment_id = %payment_id,

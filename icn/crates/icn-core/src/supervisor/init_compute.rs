@@ -83,7 +83,7 @@ pub fn create_send_callback(gossip_handle: GossipHandle) -> icn_compute::SendCal
             match data {
                 Ok(bytes) => {
                     let mut gossip = gossip.write().await;
-                    if let Err(e) = gossip.publish(topic, bytes) {
+                    if let Err(e) = gossip.publish(topic, bytes).await {
                         warn!("Failed to publish compute message to {}: {}", topic, e);
                     }
                 }
@@ -203,7 +203,7 @@ pub fn create_payment_callback(ledger: LedgerHandle) -> icn_compute::PaymentCall
 
             // Append to ledger
             let mut ledger = ledger.write().await;
-            match ledger.append_entry(entry) {
+            match ledger.append_entry(entry).await {
                 Ok(_) => {
                     info!(
                         "Compute payment settled: {} {} from {} to {} for task {}",
@@ -288,7 +288,7 @@ pub async fn subscribe_compute_topics(gossip: &mut icn_gossip::GossipActor, did:
         icn_compute::TOPIC_RESULT,
         icn_compute::TOPIC_CANCEL,
     ] {
-        if let Err(e) = gossip.subscribe(topic, did.clone()) {
+        if let Err(e) = gossip.subscribe(topic, did.clone()).await {
             warn!("Failed to subscribe to compute topic {}: {}", topic, e);
         } else {
             info!("Subscribed to compute topic: {}", topic);
@@ -296,7 +296,10 @@ pub async fn subscribe_compute_topics(gossip: &mut icn_gossip::GossipActor, did:
     }
 
     // Subscribe to disputes topic
-    if let Err(e) = gossip.subscribe(icn_ccl::TOPIC_DISPUTES_FILE, did.clone()) {
+    if let Err(e) = gossip
+        .subscribe(icn_ccl::TOPIC_DISPUTES_FILE, did.clone())
+        .await
+    {
         warn!("Failed to subscribe to disputes topic: {}", e);
     } else {
         info!("Subscribed to disputes topic");

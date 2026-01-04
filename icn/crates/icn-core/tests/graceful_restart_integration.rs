@@ -61,10 +61,13 @@ impl TestNode {
         let incoming_handler: IncomingMessageHandler = Arc::new(move |net_msg| {
             if let MessagePayload::Gossip(gossip_msg) = net_msg.payload {
                 let sender = net_msg.from.clone();
-                let mut gossip = gossip_handle_clone.blocking_write();
-                if let Err(e) = gossip.handle_message(&sender, gossip_msg) {
-                    warn!("Failed to handle gossip message: {}", e);
-                }
+                let gossip_handle = gossip_handle_clone.clone();
+                tokio::spawn(async move {
+                    let mut gossip = gossip_handle.write().await;
+                    if let Err(e) = gossip.handle_message(&sender, gossip_msg).await {
+                        warn!("Failed to handle gossip message: {}", e);
+                    }
+                });
             }
         });
 
@@ -192,7 +195,7 @@ async fn test_graceful_restart_preserves_state() -> Result<()> {
         let mut gossip = node1.gossip_handle.write().await;
         let topic = Topic::new(topic_name.to_string(), AccessControl::Public);
         gossip.create_topic(topic);
-        gossip.subscribe(topic_name, did1.clone())?;
+        gossip.subscribe(topic_name, did1.clone()).await?;
         info!("✅ Created topic '{}' and subscribed", topic_name);
     }
 
@@ -201,7 +204,7 @@ async fn test_graceful_restart_preserves_state() -> Result<()> {
     for i in 0..num_messages {
         let mut gossip = node1.gossip_handle.write().await;
         let msg = format!("message {i}");
-        let entry_id = gossip.publish(topic_name, msg.as_bytes().to_vec())?;
+        let entry_id = gossip.publish(topic_name, msg.as_bytes().to_vec()).await?;
         info!("✅ Published entry {}: {:?}", i, entry_id);
     }
 
@@ -244,10 +247,13 @@ async fn test_graceful_restart_preserves_state() -> Result<()> {
     let incoming_handler2: IncomingMessageHandler = Arc::new(move |net_msg| {
         if let MessagePayload::Gossip(gossip_msg) = net_msg.payload {
             let sender = net_msg.from.clone();
-            let mut gossip = gossip_handle2_clone.blocking_write();
-            if let Err(e) = gossip.handle_message(&sender, gossip_msg) {
-                warn!("Failed to handle gossip message: {}", e);
-            }
+            let gossip_handle = gossip_handle2_clone.clone();
+            tokio::spawn(async move {
+                let mut gossip = gossip_handle.write().await;
+                if let Err(e) = gossip.handle_message(&sender, gossip_msg).await {
+                    warn!("Failed to handle gossip message: {}", e);
+                }
+            });
         }
     });
 
@@ -323,7 +329,9 @@ async fn test_graceful_restart_preserves_state() -> Result<()> {
     // Publish another message to verify state continuity
     {
         let mut gossip = node2.gossip_handle.write().await;
-        let entry_id = gossip.publish(topic_name, b"post-restart message".to_vec())?;
+        let entry_id = gossip
+            .publish(topic_name, b"post-restart message".to_vec())
+            .await?;
         info!("✅ Published post-restart entry: {:?}", entry_id);
     }
 
@@ -450,10 +458,13 @@ async fn test_x25519_keys_persist_across_restart() -> Result<()> {
     let incoming_handler: IncomingMessageHandler = Arc::new(move |net_msg| {
         if let MessagePayload::Gossip(gossip_msg) = net_msg.payload {
             let sender = net_msg.from.clone();
-            let mut gossip = gossip_clone.blocking_write();
-            if let Err(e) = gossip.handle_message(&sender, gossip_msg) {
-                warn!("Failed to handle gossip message: {}", e);
-            }
+            let gossip_handle = gossip_clone.clone();
+            tokio::spawn(async move {
+                let mut gossip = gossip_handle.write().await;
+                if let Err(e) = gossip.handle_message(&sender, gossip_msg).await {
+                    warn!("Failed to handle gossip message: {}", e);
+                }
+            });
         }
     });
 

@@ -135,7 +135,7 @@ async fn test_ledger_balance_migration_on_rotation() -> Result<()> {
             .credit(alice_old_did.clone(), "hours".to_string(), 100)
             .debit(bank.did.clone(), "hours".to_string(), 100)
             .build()?;
-        ledger.append_entry(entry)?;
+        ledger.append_entry(entry).await?;
     }
 
     // Verify initial balance
@@ -153,7 +153,7 @@ async fn test_ledger_balance_migration_on_rotation() -> Result<()> {
             .debit(alice_old_did.clone(), "hours".to_string(), 100)
             .credit(alice_new_did.clone(), "hours".to_string(), 100)
             .build()?;
-        ledger.append_entry(entry)?;
+        ledger.append_entry(entry).await?;
     }
 
     // Verify balance migrated
@@ -189,7 +189,7 @@ async fn test_complete_rotation_flow() -> Result<()> {
             .credit(alice_old_did.clone(), "credits".to_string(), 50)
             .debit(bob.did.clone(), "credits".to_string(), 50)
             .build()?;
-        ledger.append_entry(entry)?;
+        ledger.append_entry(entry).await?;
     }
 
     // Alice rotates
@@ -213,7 +213,7 @@ async fn test_complete_rotation_flow() -> Result<()> {
             .debit(alice_old_did.clone(), "credits".to_string(), 50)
             .credit(alice_new_did.clone(), "credits".to_string(), 50)
             .build()?;
-        ledger.append_entry(entry)?;
+        ledger.append_entry(entry).await?;
     }
 
     // Verify final state - trust edges exist

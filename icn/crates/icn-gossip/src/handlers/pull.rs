@@ -293,7 +293,7 @@ impl GossipActor {
     ///
     /// Stores all received entries, updates peer sync state, and automatically
     /// continues pagination if a cursor is provided.
-    pub(crate) fn handle_pull_response(
+    pub(crate) async fn handle_pull_response(
         &mut self,
         sender: &Did,
         topic: String,
@@ -327,7 +327,7 @@ impl GossipActor {
 
         // Store all entries
         for entry in entries {
-            self.store_entry(entry)?;
+            self.store_entry(entry).await?;
         }
 
         // Update peer sync state if we can identify the peer
