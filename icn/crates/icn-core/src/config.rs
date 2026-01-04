@@ -189,6 +189,26 @@ pub struct NetworkConfig {
     /// Default: true (recommended for pilot and production)
     #[serde(default = "default_true")]
     pub e2e_encryption_enabled: bool,
+
+    /// Number of consecutive encryption sequence cleanup failures before escalating
+    /// to ERROR level and tripping the circuit breaker.
+    ///
+    /// The cleanup task runs hourly to remove stale sequence entries. If cleanup
+    /// fails repeatedly (e.g., storage issues), the circuit breaker trips to:
+    /// - Escalate logging from WARN to ERROR
+    /// - Increment `icn_network_encryption_circuit_breaker_trips_total` metric
+    ///
+    /// Lower values detect issues faster but may cause false alarms during
+    /// transient storage hiccups. Higher values are more tolerant but delay
+    /// detection of persistent issues.
+    ///
+    /// Default: 3 (failures detected within 3 hours)
+    #[serde(default = "default_circuit_breaker_threshold")]
+    pub encryption_cleanup_circuit_breaker_threshold: u32,
+}
+
+fn default_circuit_breaker_threshold() -> u32 {
+    3
 }
 
 impl NetworkConfig {
@@ -748,6 +768,7 @@ impl Default for Config {
                 turn_username: None,
                 turn_password: None,
                 e2e_encryption_enabled: true,
+                encryption_cleanup_circuit_breaker_threshold: 3,
             },
             observability: ObservabilityConfig {
                 metrics_port: 9100,

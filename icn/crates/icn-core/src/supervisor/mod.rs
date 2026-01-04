@@ -542,19 +542,20 @@ impl Supervisor {
                     // - Cleanup runs hourly with 24h retention, so active pairs are retained
                     // - For larger networks, increase MAX_SEQUENCE_PAIRS or reduce retention
                     //
-                    // Circuit breaker: After 3 consecutive failures (3 hours), escalate to ERROR.
+                    // Circuit breaker: After N consecutive failures, escalate to ERROR.
                     // This helps operators detect persistent storage issues before they cause
                     // unbounded memory growth.
                     let tracker_for_cleanup = encryption_sequence_tracker.clone();
                     let shutdown_rx_for_cleanup = self.shutdown_tx.subscribe();
+                    let circuit_breaker_threshold = self
+                        .config
+                        .network
+                        .encryption_cleanup_circuit_breaker_threshold;
                     background_tasks.spawn(async move {
                         let mut interval =
                             tokio::time::interval(std::time::Duration::from_secs(3600));
                         let mut shutdown_rx = shutdown_rx_for_cleanup;
                         let mut consecutive_failures: u32 = 0;
-                        // Trip after 3 consecutive failures (3 hours) to catch persistent storage issues faster.
-                        // With hourly cleanup, 3 failures = 3 hours of potential unbounded memory growth.
-                        const CIRCUIT_BREAKER_THRESHOLD: u32 = 3;
 
                         loop {
                             tokio::select! {
@@ -574,7 +575,7 @@ impl Supervisor {
                                             consecutive_failures += 1;
                                             icn_obs::metrics::network::encryption_sequence_cleanup_failed_inc();
 
-                                            if consecutive_failures >= CIRCUIT_BREAKER_THRESHOLD {
+                                            if consecutive_failures >= circuit_breaker_threshold {
                                                 // Circuit breaker tripped - escalate to ERROR and alert via metric
                                                 error!(
                                                     consecutive_failures = consecutive_failures,
@@ -588,9 +589,9 @@ impl Supervisor {
                                             } else {
                                                 warn!(
                                                     consecutive_failures = consecutive_failures,
-                                                    threshold = CIRCUIT_BREAKER_THRESHOLD,
+                                                    threshold = circuit_breaker_threshold,
                                                     "Encryption sequence cleanup failed ({}/{}): {}",
-                                                    consecutive_failures, CIRCUIT_BREAKER_THRESHOLD, e
+                                                    consecutive_failures, circuit_breaker_threshold, e
                                                 );
                                             }
                                         }

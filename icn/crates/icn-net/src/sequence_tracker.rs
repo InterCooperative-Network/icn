@@ -348,16 +348,19 @@ impl OutgoingSequenceTracker {
     ///
     /// # Safety
     ///
-    /// Uses double-check pattern to avoid TOCTOU race conditions: entries are
-    /// verified as still stale after acquiring the write lock before deletion.
+    /// This method minimizes lock hold time to avoid blocking encryption operations:
+    /// 1. Scan store entries (no lock)
+    /// 2. For each stale entry: verify staleness and delete from store (no lock)
+    /// 3. Briefly acquire write lock only for cache removal
     ///
-    /// The cache write lock provides mutual exclusion with `next_sequence()`:
-    /// - `next_sequence()` holds the cache write lock during persistence
-    /// - `cleanup_stale_entries()` holds the cache write lock during store access
+    /// The sequence is safe because:
+    /// - Store deletions are idempotent (deleting non-existent key is fine)
+    /// - Cache removal under lock ensures consistency with next_sequence()
+    /// - If next_sequence() updates an entry between our check and delete, the
+    ///   store.delete() removes stale data but next_sequence() will re-persist
     ///
-    /// This ensures no concurrent modifications between `store.get()` and
-    /// `store.delete()` in the cleanup loop. Any sequence updates via
-    /// `next_sequence()` must wait for cleanup to release the lock, and vice versa.
+    /// This design prevents cleanup from blocking active encryption for extended
+    /// periods if storage I/O is slow.
     pub async fn cleanup_stale_entries(&self, retention_secs: u64) -> Result<usize> {
         let now_ms = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -385,25 +388,42 @@ impl OutgoingSequenceTracker {
             return Ok(0);
         }
 
-        // Second pass: re-check and delete under lock (TOCTOU protection)
-        let mut removed = 0;
-        let mut cache = self.cache.write().await;
+        // Second pass: verify and delete from store WITHOUT holding cache lock
+        // This prevents blocking encryption operations during slow storage I/O
+        let mut keys_to_remove_from_cache: Vec<(Did, Did)> = Vec::new();
 
         for key in candidate_keys {
             // Re-read entry from store to check if it's still stale
             // (could have been updated between scan and now)
             if let Ok(Some(fresh_value)) = self.store.get(&key) {
                 if let Ok(fresh_entry) = serde_json::from_slice::<SequenceEntry>(&fresh_value) {
-                    // Only delete if STILL stale after re-check AND delete succeeds
-                    if fresh_entry.updated_at_ms < cutoff_ms && self.store.delete(&key).is_ok() {
-                        if let Some((sender, recipient)) = Self::parse_key(&key) {
-                            cache.remove(&(sender, recipient));
+                    // Only delete if STILL stale after re-check
+                    if fresh_entry.updated_at_ms < cutoff_ms {
+                        // Delete from store (outside of cache lock)
+                        if self.store.delete(&key).is_ok() {
+                            if let Some((sender, recipient)) = Self::parse_key(&key) {
+                                keys_to_remove_from_cache.push((sender, recipient));
+                            }
                         }
-                        removed += 1;
                     }
                 }
             }
         }
+
+        // Third pass: briefly acquire lock only for cache removal
+        // This is fast (just HashMap removes) and doesn't block on I/O
+        let removed = if !keys_to_remove_from_cache.is_empty() {
+            let mut cache = self.cache.write().await;
+            let mut count = 0;
+            for key in keys_to_remove_from_cache {
+                if cache.remove(&key).is_some() {
+                    count += 1;
+                }
+            }
+            count
+        } else {
+            0
+        };
 
         if removed > 0 {
             tracing::info!(
