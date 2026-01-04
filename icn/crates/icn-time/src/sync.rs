@@ -19,9 +19,9 @@ pub const MAX_CLOCK_SKEW: Duration = Duration::from_secs(300);
 /// Minimum servers required for median calculation
 pub const MIN_SERVERS: usize = 3;
 
-/// Maximum reasonable timestamp in milliseconds for safe i64 conversion
-/// i64::MAX is ~292 billion years in milliseconds, but we use a more
-/// conservative limit (~292 million years) to catch clearly malicious values
+/// Maximum reasonable timestamp in milliseconds for safe i64 conversion.
+/// i64::MAX milliseconds is approximately 292 million years; we use this
+/// maximum safe value to catch clearly malicious timestamp values.
 const MAX_REASONABLE_TIMESTAMP_MS: u64 = i64::MAX as u64;
 
 /// Timeout for individual time server queries
@@ -508,5 +508,30 @@ mod tests {
         // Applying offset: network = local - offset = 4800 - (-200) = 5000
         let network = (local_time as i64 - offset) as u64;
         assert_eq!(network, median_time);
+    }
+
+    #[test]
+    fn test_max_reasonable_timestamp_constant() {
+        // Verify the constant is set correctly for safe i64 conversion
+        assert_eq!(MAX_REASONABLE_TIMESTAMP_MS, i64::MAX as u64);
+
+        // Any value at or below this is safe to cast to i64
+        let safe_value = MAX_REASONABLE_TIMESTAMP_MS;
+        let as_i64 = safe_value as i64;
+        assert_eq!(as_i64, i64::MAX);
+
+        // Verify values above would wrap (demonstrating the need for validation)
+        let unsafe_value = MAX_REASONABLE_TIMESTAMP_MS + 1;
+        let wrapped = unsafe_value as i64;
+        assert!(wrapped < 0, "Values above MAX should wrap to negative");
+    }
+
+    #[test]
+    fn test_invalid_timestamp_error() {
+        // Test that InvalidTimestamp error can be created and displays correctly
+        let err = TimeError::InvalidTimestamp(u64::MAX);
+        let msg = format!("{}", err);
+        assert!(msg.contains("exceeds safe range"));
+        assert!(msg.contains(&u64::MAX.to_string()));
     }
 }
