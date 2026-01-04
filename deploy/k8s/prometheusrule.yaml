@@ -120,6 +120,51 @@ spec:
         summary: "ICN backup job failed"
         description: "ICN backup job {{ $labels.job_name }} has failed."
 
+    - alert: ICNBackupVerificationFailed
+      expr: |
+        kube_job_status_failed{namespace="icn", job_name=~"icn-backup-verify.*"} > 0
+      for: 1m
+      labels:
+        severity: warning
+        service: icn
+      annotations:
+        summary: "ICN backup verification failed"
+        description: "Backup verification job {{ $labels.job_name }} has failed. Manual verification required."
+
+    - alert: ICNBackupMissing
+      expr: |
+        time() - kube_job_status_completion_time{namespace="icn", job_name=~"icn-backup-.*"} > 93600
+      for: 5m
+      labels:
+        severity: critical
+        service: icn
+      annotations:
+        summary: "ICN backup is overdue"
+        description: "No successful backup in the last 26 hours. Check backup CronJob status."
+
+    - alert: ICNNoRecentBackupJobs
+      expr: |
+        absent(kube_job_status_completion_time{namespace="icn", job_name=~"icn-backup-.*"})
+      for: 30m
+      labels:
+        severity: warning
+        service: icn
+      annotations:
+        summary: "No ICN backup jobs found"
+        description: "No backup job completion records found. CronJob may not be configured."
+
+    - alert: ICNBackupStorageAlmostFull
+      expr: |
+        kubelet_volume_stats_used_bytes{namespace="icn", persistentvolumeclaim="icn-backups"}
+        / kubelet_volume_stats_capacity_bytes{namespace="icn", persistentvolumeclaim="icn-backups"} > 0.8
+      for: 5m
+      labels:
+        severity: warning
+        service: icn
+      annotations:
+        summary: "ICN backup storage almost full"
+        description: "Backup storage is {{ $value | humanizePercentage }} full. Consider increasing retention cleanup."
+
   - name: icn.application.rules
     interval: 30s
     rules:

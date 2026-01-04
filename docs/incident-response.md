@@ -20,8 +20,9 @@ This document provides operational procedures for responding to common incidents
 8. [Incident: Gossip Storm](#incident-gossip-storm)
 9. [Incident: Quarantine Growth](#incident-quarantine-growth)
 10. [Incident: Storage Issues (K3s)](#incident-storage-issues-k3s)
-11. [Monitoring and Detection](#monitoring-and-detection)
-12. [Communication Templates](#communication-templates)
+11. [Incident: Backup Verification Failure](#incident-backup-verification-failure)
+12. [Monitoring and Detection](#monitoring-and-detection)
+13. [Communication Templates](#communication-templates)
 
 ---
 
@@ -993,6 +994,183 @@ journalctl -u icnd --since "1 week ago" | grep upgrade
 
 ---
 
+## Incident: Backup Verification Failure
+
+**Severity**: P2 - Medium (can escalate to P1 if no valid backups exist)
+
+### Symptoms
+
+- `ICNBackupVerificationFailed` alert firing
+- Backup verification CronJob failing
+- No recent backup completion records
+- `ICNBackupMissing` critical alert (no backup in 26+ hours)
+
+### Diagnosis
+
+1. **Check backup job status**:
+   ```bash
+   ssh ubuntu@10.8.10.40
+   sudo kubectl -n icn get jobs -l component=backup
+   sudo kubectl -n icn get jobs -l component=backup-verify
+   ```
+
+2. **View backup job logs**:
+   ```bash
+   # Get latest backup job
+   sudo kubectl -n icn logs job/$(sudo kubectl -n icn get jobs -l component=backup-job --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1].metadata.name}')
+
+   # Get latest verification job
+   sudo kubectl -n icn logs job/$(sudo kubectl -n icn get jobs -l component=backup-verify-job --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1].metadata.name}')
+   ```
+
+3. **Check backup files directly**:
+   ```bash
+   ssh atlas "ls -la /mnt/storage/k8s/icn-backups/"
+   ```
+
+4. **Check backup PVC**:
+   ```bash
+   sudo kubectl -n icn get pvc icn-backups
+   sudo kubectl -n icn describe pvc icn-backups
+   ```
+
+### Recovery
+
+#### Scenario 1: Verification Failing but Backups Exist
+
+1. **Run manual verification**:
+   ```bash
+   # SSH to a node with backup access
+   ssh atlas
+
+   # Test newest backup
+   cd /mnt/storage/k8s/icn-backups
+   NEWEST=$(ls -t icn-backup-*.tar.gz | head -1)
+
+   # Verify archive integrity
+   tar -tzf "$NEWEST" > /dev/null && echo "Archive OK"
+
+   # Extract and check contents
+   mkdir -p /tmp/verify && tar -xzf "$NEWEST" -C /tmp/verify
+   ls -la /tmp/verify
+   rm -rf /tmp/verify
+   ```
+
+2. **If backup is valid, check verification script**:
+   ```bash
+   sudo kubectl -n icn get configmap backup-scripts -o yaml
+   ```
+
+#### Scenario 2: No Recent Backups
+
+1. **Check CronJob schedule**:
+   ```bash
+   sudo kubectl -n icn get cronjob icn-backup -o yaml | grep schedule
+   ```
+
+2. **Run backup manually**:
+   ```bash
+   sudo kubectl -n icn create job --from=cronjob/icn-backup manual-backup-$(date +%Y%m%d-%H%M%S)
+
+   # Watch job progress
+   sudo kubectl -n icn get jobs -w
+   ```
+
+3. **Check for resource issues**:
+   ```bash
+   # Check if backup PVC has space
+   ssh atlas "df -h /mnt/storage/k8s/icn-backups"
+
+   # Check if data PVC is accessible
+   sudo kubectl -n icn exec deploy/icn-daemon -- ls -la /data
+   ```
+
+#### Scenario 3: Backup Storage Full
+
+1. **Check usage**:
+   ```bash
+   ssh atlas "du -sh /mnt/storage/k8s/icn-backups/*"
+   ```
+
+2. **Clean old backups** (keep at least 3):
+   ```bash
+   ssh atlas "cd /mnt/storage/k8s/icn-backups && ls -t icn-backup-*.tar.gz | tail -n +4 | xargs rm -v"
+   ```
+
+3. **Adjust retention** (if needed, edit CronJob):
+   ```bash
+   sudo kubectl -n icn edit cronjob icn-backup
+   # Change: -mtime +7 to -mtime +3 for 3-day retention
+   ```
+
+### Backup Restoration Procedure
+
+**⚠️ Full restoration should be coordinated with cooperative - this affects service availability**
+
+1. **Stop ICN daemon**:
+   ```bash
+   sudo kubectl -n icn scale deployment icn-daemon --replicas=0
+   ```
+
+2. **Identify backup to restore**:
+   ```bash
+   ssh atlas "ls -la /mnt/storage/k8s/icn-backups/"
+   # Select backup by date - prefer newest verified backup
+   ```
+
+3. **Backup current state** (even if corrupted):
+   ```bash
+   ssh atlas "cp -r /mnt/storage/k8s/icn-data /mnt/storage/k8s/icn-data-pre-restore-$(date +%Y%m%d-%H%M%S)"
+   ```
+
+4. **Clear current data and restore**:
+   ```bash
+   ssh atlas
+   cd /mnt/storage/k8s
+
+   # Clear current data
+   rm -rf icn-data/*
+
+   # Extract backup
+   tar -xzf icn-backups/icn-backup-YYYYMMDD-HHMMSS.tar.gz -C icn-data
+
+   # Verify extraction
+   ls -la icn-data/
+   ```
+
+5. **Restart ICN daemon**:
+   ```bash
+   sudo kubectl -n icn scale deployment icn-daemon --replicas=1
+   sudo kubectl -n icn rollout status deployment/icn-daemon
+   ```
+
+6. **Verify restoration**:
+   ```bash
+   # Check health
+   curl http://10.8.10.40:30080/v1/health
+
+   # Check identity
+   sudo kubectl -n icn exec deploy/icn-daemon -- /usr/local/bin/icnctl id show
+
+   # Monitor logs for errors
+   sudo kubectl -n icn logs -f deployment/icn-daemon
+   ```
+
+7. **Monitor gossip resync**:
+   - Watch for entries being replayed from network
+   - Check quarantine for conflicts
+   - Verify ledger balances
+
+### Prevention
+
+- **Automated verification**: Daily verification CronJob at 6am (4 hours after backup)
+- **Multiple retention periods**: Keep daily (7), weekly (4), monthly (3)
+- **Off-site backups**: Consider replicating to cloud storage
+- **Alert on age**: Critical alert if newest backup > 26 hours old
+- **Test restores**: Monthly restoration drill to verify procedure
+
+---
+
 ## Monitoring and Detection
 
 ### Key Metrics to Monitor
@@ -1211,5 +1389,6 @@ After resolving an incident, document:
 
 ## Version History
 
+- **2026-01-04**: Added backup verification incident procedures, restoration guide (#320)
 - **2026-01-04**: Added K3s-specific procedures, communication templates (#324)
 - **2025-01-14**: Initial version (Track B1)

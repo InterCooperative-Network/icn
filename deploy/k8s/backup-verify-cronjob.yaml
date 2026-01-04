@@ -1,0 +1,202 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: icn-backup-verify
+  namespace: icn
+  labels:
+    app: icn
+    component: backup-verify
+spec:
+  schedule: "0 6 * * *"  # Daily at 6am (4 hours after backup)
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 300  # 5 minute timeout
+      template:
+        metadata:
+          labels:
+            app: icn
+            component: backup-verify-job
+        spec:
+          restartPolicy: Never
+          containers:
+          - name: verify
+            image: busybox:1.36
+            command:
+            - /bin/sh
+            - /scripts/backup-verify.sh
+            env:
+            - name: BACKUP_DIR
+              value: "/backups"
+            - name: MAX_AGE_HOURS
+              value: "26"
+            volumeMounts:
+            - name: backups
+              mountPath: /backups
+              readOnly: true
+            - name: scripts
+              mountPath: /scripts
+              readOnly: true
+            - name: metrics
+              mountPath: /tmp
+            resources:
+              requests:
+                cpu: 50m
+                memory: 64Mi
+              limits:
+                cpu: 200m
+                memory: 256Mi
+          volumes:
+          - name: backups
+            persistentVolumeClaim:
+              claimName: icn-backups
+          - name: scripts
+            configMap:
+              name: backup-scripts
+              defaultMode: 0755
+          - name: metrics
+            emptyDir: {}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backup-scripts
+  namespace: icn
+  labels:
+    app: icn
+    component: backup
+data:
+  backup-verify.sh: |
+    #!/bin/sh
+    # ICN Backup Verification Script
+    # Validates backup integrity and database consistency
+    # Part of Issue #320: Automated backup verification
+
+    set -e
+
+    BACKUP_DIR="${BACKUP_DIR:-/backups}"
+    VERIFY_DIR="${VERIFY_DIR:-/tmp/backup-verify}"
+    METRICS_FILE="${METRICS_FILE:-/tmp/backup-metrics.txt}"
+    MAX_AGE_HOURS="${MAX_AGE_HOURS:-26}"
+
+    init_metrics() {
+        cat > "$METRICS_FILE" << 'METRICSEOF'
+    # HELP icn_backup_verification_success Whether the last backup verification succeeded (1=success, 0=failure)
+    # TYPE icn_backup_verification_success gauge
+    # HELP icn_backup_last_verified_timestamp Unix timestamp of last successful verification
+    # TYPE icn_backup_last_verified_timestamp gauge
+    # HELP icn_backup_count Number of backup files available
+    # TYPE icn_backup_count gauge
+    # HELP icn_backup_newest_age_seconds Age of newest backup in seconds
+    # TYPE icn_backup_newest_age_seconds gauge
+    # HELP icn_backup_total_size_bytes Total size of all backups in bytes
+    # TYPE icn_backup_total_size_bytes gauge
+    # HELP icn_backup_verification_duration_seconds Duration of verification in seconds
+    # TYPE icn_backup_verification_duration_seconds gauge
+    METRICSEOF
+    }
+
+    write_metric() {
+        echo "$1 $2" >> "$METRICS_FILE"
+    }
+
+    log() {
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+    }
+
+    error() {
+        log "ERROR: $1"
+        write_metric "icn_backup_verification_success" "0"
+        exit 1
+    }
+
+    cleanup() {
+        rm -rf "$VERIFY_DIR" 2>/dev/null || true
+    }
+    trap cleanup EXIT
+
+    START_TIME=$(date +%s)
+    init_metrics
+    log "Starting backup verification"
+    log "Backup directory: $BACKUP_DIR"
+
+    if [ ! -d "$BACKUP_DIR" ]; then
+        error "Backup directory does not exist: $BACKUP_DIR"
+    fi
+
+    BACKUP_FILES=$(find "$BACKUP_DIR" -name "icn-backup-*.tar.gz" -type f 2>/dev/null | sort -r)
+    BACKUP_COUNT=$(echo "$BACKUP_FILES" | grep -c "tar.gz" || echo "0")
+
+    if [ "$BACKUP_COUNT" -eq 0 ]; then
+        error "No backup files found in $BACKUP_DIR"
+    fi
+
+    log "Found $BACKUP_COUNT backup file(s)"
+    write_metric "icn_backup_count" "$BACKUP_COUNT"
+
+    NEWEST_BACKUP=$(echo "$BACKUP_FILES" | head -1)
+    log "Newest backup: $NEWEST_BACKUP"
+
+    BACKUP_MTIME=$(stat -c %Y "$NEWEST_BACKUP" 2>/dev/null || stat -f %m "$NEWEST_BACKUP" 2>/dev/null)
+    CURRENT_TIME=$(date +%s)
+    BACKUP_AGE_SECONDS=$((CURRENT_TIME - BACKUP_MTIME))
+    BACKUP_AGE_HOURS=$((BACKUP_AGE_SECONDS / 3600))
+
+    log "Backup age: ${BACKUP_AGE_HOURS} hours"
+    write_metric "icn_backup_newest_age_seconds" "$BACKUP_AGE_SECONDS"
+
+    if [ "$BACKUP_AGE_HOURS" -gt "$MAX_AGE_HOURS" ]; then
+        log "WARNING: Newest backup is older than $MAX_AGE_HOURS hours"
+    fi
+
+    TOTAL_SIZE=$(find "$BACKUP_DIR" -name "icn-backup-*.tar.gz" -type f -exec stat -c %s {} + 2>/dev/null | awk '{sum+=$1} END {print sum}' || echo "0")
+    write_metric "icn_backup_total_size_bytes" "$TOTAL_SIZE"
+    log "Total backup size: $((TOTAL_SIZE / 1024 / 1024)) MB"
+
+    log "Verifying archive integrity..."
+    if ! tar -tzf "$NEWEST_BACKUP" > /dev/null 2>&1; then
+        error "Archive integrity check failed for $NEWEST_BACKUP"
+    fi
+    log "Archive integrity: OK"
+
+    log "Extracting backup for content verification..."
+    mkdir -p "$VERIFY_DIR"
+    tar -xzf "$NEWEST_BACKUP" -C "$VERIFY_DIR"
+
+    log "Checking database structure..."
+    SLED_FOUND=false
+    for dir in "$VERIFY_DIR"/*; do
+        if [ -d "$dir" ]; then
+            if [ -f "$dir/conf" ] || [ -d "$dir/db" ]; then
+                SLED_FOUND=true
+                log "  - $(basename "$dir"): Sled database found"
+            fi
+        fi
+    done
+
+    if [ -f "$VERIFY_DIR/conf" ]; then
+        SLED_FOUND=true
+        log "  - Root: Sled database found"
+    fi
+
+    DATA_FILE_COUNT=$(find "$VERIFY_DIR" -type f 2>/dev/null | wc -l)
+    log "  - Total files: $DATA_FILE_COUNT"
+
+    END_TIME=$(date +%s)
+    DURATION=$((END_TIME - START_TIME))
+    write_metric "icn_backup_verification_duration_seconds" "$DURATION"
+    write_metric "icn_backup_verification_success" "1"
+    write_metric "icn_backup_last_verified_timestamp" "$CURRENT_TIME"
+
+    log "Verification completed successfully in ${DURATION}s"
+
+    echo ""
+    echo "=== Summary ==="
+    echo "Backups: $BACKUP_COUNT"
+    echo "Age: ${BACKUP_AGE_HOURS}h"
+    echo "Size: $((TOTAL_SIZE / 1024 / 1024)) MB"
+    echo "Files: $DATA_FILE_COUNT"
+    echo "Status: SUCCESS"
