@@ -300,6 +300,24 @@ pub struct GovernanceParams {
     /// Cannot set deliberation longer than this
     /// Default: 2592000 (30 days)
     pub max_deliberation_seconds: u64,
+
+    /// Maximum execution delay for proposals (in seconds)
+    /// Limits how far into the future a proposal's effective_at can be set
+    /// Default: 31536000 (1 year = 365 days)
+    ///
+    /// Example values for different cooperative needs:
+    /// - 86400 (1 day): Fast-moving tech cooperatives
+    /// - 2592000 (30 days): Standard governance changes
+    /// - 31536000 (1 year, default): Major protocol changes
+    /// - 63072000 (2 years): Constitutional amendments
+    #[serde(default = "default_max_execution_delay")]
+    pub max_execution_delay_seconds: u64,
+}
+
+/// Default max execution delay: 1 year (31536000 seconds)
+/// Public so icn-core can use the same default for fallback
+pub fn default_max_execution_delay() -> u64 {
+    365 * 24 * 60 * 60 // 31536000 seconds
 }
 
 impl Default for GovernanceParams {
@@ -312,6 +330,7 @@ impl Default for GovernanceParams {
             require_deliberation: true,
             min_deliberation_seconds: 24 * 60 * 60, // 1 day
             max_deliberation_seconds: 30 * 24 * 60 * 60, // 30 days
+            max_execution_delay_seconds: default_max_execution_delay(),
         }
     }
 }
@@ -404,6 +423,15 @@ impl GovernanceParams {
                 "Minimum deliberation ({}) exceeds maximum ({})",
                 self.min_deliberation_seconds,
                 self.max_deliberation_seconds
+            );
+        }
+
+        // Execution delay validation: minimum 1 hour to prevent misconfiguration
+        const MIN_EXECUTION_DELAY_SECONDS: u64 = 3600; // 1 hour
+        if self.max_execution_delay_seconds < MIN_EXECUTION_DELAY_SECONDS {
+            anyhow::bail!(
+                "Max execution delay ({} seconds) must be at least 1 hour (3600 seconds)",
+                self.max_execution_delay_seconds
             );
         }
 
@@ -640,5 +668,49 @@ mod tests {
         assert_eq!(config.emergency.freeze_quorum_percentage, 80);
         assert_eq!(config.emergency.freeze_approval_percentage, 90);
         assert_eq!(config.emergency.rollback_approval_percentage, 95);
+    }
+
+    #[test]
+    fn test_max_execution_delay_default() {
+        let params = GovernanceParams::default();
+        // Default should be 1 year
+        assert_eq!(params.max_execution_delay_seconds, 365 * 24 * 60 * 60);
+        assert_eq!(
+            params.max_execution_delay_seconds,
+            default_max_execution_delay()
+        );
+    }
+
+    #[test]
+    fn test_max_execution_delay_validation_minimum() {
+        // Valid: exactly 1 hour
+        let valid_params = GovernanceParams {
+            max_execution_delay_seconds: 3600,
+            ..Default::default()
+        };
+        assert!(valid_params.validate().is_ok());
+
+        // Invalid: less than 1 hour
+        let invalid_params = GovernanceParams {
+            max_execution_delay_seconds: 3599,
+            ..Default::default()
+        };
+        let result = invalid_params.validate();
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("must be at least 1 hour"));
+    }
+
+    #[test]
+    fn test_max_execution_delay_custom_value() {
+        // Custom: 30 days
+        let params = GovernanceParams {
+            max_execution_delay_seconds: 30 * 24 * 60 * 60,
+            ..Default::default()
+        };
+        assert!(params.validate().is_ok());
+        assert_eq!(params.max_execution_delay_seconds, 2592000);
     }
 }

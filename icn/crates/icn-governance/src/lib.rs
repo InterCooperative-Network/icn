@@ -89,7 +89,9 @@ pub use charter::{
     OrgType,
 };
 pub use charter_store::{CharterStore, CharterStoreBackend, InMemoryCharterStore};
-pub use config::{EmergencyThresholds, GovernanceConfig, GovernanceParams};
+pub use config::{
+    default_max_execution_delay, EmergencyThresholds, GovernanceConfig, GovernanceParams,
+};
 pub use delegation::{
     scopes_overlap, Delegation, DelegationError, DelegationId, DelegationManager, DelegationScope,
     ProposalDomainLookup, DEFAULT_MAX_DELEGATION_DEPTH,
