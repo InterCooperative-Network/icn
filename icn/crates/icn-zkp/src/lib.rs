@@ -92,6 +92,8 @@
 pub mod accumulator;
 pub mod circuit;
 pub mod prover;
+#[cfg(feature = "stark")]
+pub mod stark;
 pub mod types;
 pub mod verifier;
 
