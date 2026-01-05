@@ -37,7 +37,7 @@ repository = "https://github.com/yourusername/icn"
 
 [workspace.dependencies]
 # Async runtime
-tokio = { version = "1.35", features = ["rt-multi-thread", "macros", "io-util", "fs", "signal", "sync", "time"] }
+tokio = { version = "1.49", features = ["rt-multi-thread", "macros", "io-util", "fs", "signal", "sync", "time"] }
 tokio-util = { version = "0.7", features = ["codec"] }
 
 # Networking & Transport
