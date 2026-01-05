@@ -218,6 +218,7 @@ impl ZkVerifier {
             accumulator_epoch: accumulator.epoch(),
             issuer_pk,
             nonce: context.nonce,
+            accumulator_type: crate::circuit::non_revocation::AccumulatorType::Rsa,
         };
 
         let valid = NonRevocationCircuit::verify(&public, proof)?;
@@ -291,6 +292,7 @@ impl ZkVerifier {
                 accumulator_epoch: accumulator.epoch(),
                 issuer_pk,
                 nonce: proof.context.nonce,
+                accumulator_type: crate::circuit::non_revocation::AccumulatorType::Rsa,
             };
 
             let nr_valid = NonRevocationCircuit::verify(&public, nr_proof)?;

@@ -13,7 +13,7 @@
 //! - **Attribute proofs**: Prove properties without revealing data (age, citizenship, membership)
 //! - **Non-revocation proofs**: Prove credential has not been revoked
 //! - **Compound proofs**: Combine attribute + non-revocation
-//! - **RSA accumulator**: For efficient revocation checking
+//! - **Accumulators**: RSA (legacy) and Merkle (PQ-safe) for revocation checking
 //!
 //! # Architecture
 //!
@@ -91,6 +91,7 @@
 
 pub mod accumulator;
 pub mod circuit;
+pub mod merkle_accumulator;
 pub mod prover;
 #[cfg(feature = "stark")]
 pub mod stark;
@@ -99,6 +100,9 @@ pub mod verifier;
 
 // Re-exports for convenience
 pub use accumulator::{AccumulatorError, MembershipWitness, NonMembershipWitness, RsaAccumulator};
+pub use merkle_accumulator::{
+    MerkleAccumulator, MerkleAccumulatorError, MerkleMembershipProof, MerkleNonMembershipProof,
+};
 pub use circuit::{
     AgeProofCircuit, AgeProofPrivate, AgeProofPublic, Circuit, CircuitError,
     CitizenshipProofCircuit, CitizenshipProofPrivate, CitizenshipProofPublic,

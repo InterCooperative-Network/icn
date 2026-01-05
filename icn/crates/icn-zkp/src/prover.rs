@@ -167,6 +167,7 @@ impl ZkProver {
             accumulator_epoch: accumulator.epoch(),
             issuer_pk,
             nonce: context.nonce,
+            accumulator_type: crate::circuit::non_revocation::AccumulatorType::Rsa,
         };
 
         let private = NonRevocationPrivate {
@@ -177,6 +178,7 @@ impl ZkProver {
                 b: bincode::serde::encode_to_vec(&witness.d, bincode::config::legacy())
                     .unwrap_or_default(),
                 aux: credential_id,
+                merkle_proof: None,
             },
             blinding: rand::random(),
         };
