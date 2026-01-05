@@ -51,11 +51,13 @@ pub fn u64_to_felt(value: u64) -> Felt {
 }
 
 /// Convert a byte array to field elements (each byte becomes one element)
+#[allow(dead_code)]
 pub fn bytes_to_felts(bytes: &[u8]) -> Vec<Felt> {
     bytes.iter().map(|&b| Felt::from(b as u32)).collect()
 }
 
 /// Convert field elements back to u32 (assumes values fit in u32)
+#[allow(dead_code)]
 pub fn felt_to_u32(felt: Felt) -> u32 {
     // BaseElement's inner value can be extracted via as_int()
     felt.as_int() as u32
@@ -65,7 +67,9 @@ pub fn felt_to_u32(felt: Felt) -> u32 {
 pub fn hash_to_felt(data: &[u8]) -> Felt {
     use sha3::{Digest, Sha3_256};
     let hash = Sha3_256::digest(data);
-    // Take first 8 bytes as u64 for field element
+    // Take first 8 bytes as u64 for field element.
+    // SAFETY: Sha3_256 always returns a 32-byte digest, so this slice is always valid.
+    // The unwrap_or fallback is defensive and should never be reached.
     let bytes: [u8; 8] = hash[..8].try_into().unwrap_or([0u8; 8]);
     Felt::from(u64::from_le_bytes(bytes))
 }
