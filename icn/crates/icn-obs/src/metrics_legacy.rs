@@ -3780,6 +3780,33 @@ pub mod supervisor {
         )
         .increment(1);
     }
+
+    /// Increment actor restart counter by actor type (Issue #479)
+    pub fn actor_restarted_inc(actor: &str) {
+        counter!(
+            "icn_supervisor_actor_restarts_total",
+            "actor" => actor.to_string()
+        )
+        .increment(1);
+    }
+
+    /// Set current restart backoff delay for an actor in seconds (Issue #479)
+    pub fn restart_backoff_set(actor: &str, delay_secs: f64) {
+        gauge!(
+            "icn_supervisor_actor_restart_backoff_seconds",
+            "actor" => actor.to_string()
+        )
+        .set(delay_secs);
+    }
+
+    /// Increment counter when an actor exceeds max restart attempts (Issue #479)
+    pub fn restart_limit_exceeded_inc(actor: &str) {
+        counter!(
+            "icn_supervisor_actor_restart_limit_exceeded_total",
+            "actor" => actor.to_string()
+        )
+        .increment(1);
+    }
 }
 
 /// Commons Evolution metrics (PersonhoodAnchor, CommonsHolder, Charter, etc.)

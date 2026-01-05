@@ -17,6 +17,7 @@ pub mod identity;
 pub mod node;
 pub mod policy;
 pub mod replication;
+pub mod restart;
 pub mod runtime;
 pub mod supervisor;
 pub mod trust_propagation;
