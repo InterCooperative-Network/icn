@@ -598,3 +598,287 @@ fn test_binding_serialization() {
     assert_eq!(deserialized.ephemeral_pk, binding.ephemeral_pk);
     assert_eq!(deserialized.expires, binding.expires);
 }
+
+// ============================================================================
+// Level 3 STARK Verification Tests
+// ============================================================================
+
+#[test]
+fn test_verification_level3_with_stark_proof() {
+    use icn_zkp::{
+        proof_capability, AgeAttestation, ProofCapability, ProofContext, RsaAccumulator, ZkProver,
+    };
+
+    // Skip if no proof capability
+    let capability = proof_capability();
+    if !capability.can_prove() {
+        eprintln!(
+            "Skipping STARK test: no proof capability ({:?})",
+            capability.description()
+        );
+        return;
+    }
+
+    let keybundle = test_keybundle();
+    let issuer_pk = [1u8; 32];
+
+    // Generate ephemeral proof and binding
+    let (proof, binding) = generate_proof_and_binding(
+        &keybundle,
+        ProofType::AgeAtLeast { threshold: 21 },
+        Duration::from_secs(3600),
+        vec![Channel::Nfc],
+    );
+
+    // Generate STARK proof for age verification
+    let prover = ZkProver::new();
+    let context = ProofContext::new(None);
+
+    // Create attestation for someone 25 years old
+    let current_days = (context.timestamp / 86400) as u32;
+    let birthdate_days = current_days - (25 * 365);
+
+    let attestation = AgeAttestation {
+        birthdate_days,
+        signature: vec![0u8; 64],
+    };
+
+    let stark_proof = prover
+        .prove_age(21, &attestation, issuer_pk, &context)
+        .expect("STARK proof generation should succeed");
+
+    // Create accumulator (empty - no revoked credentials)
+    let accumulator = RsaAccumulator::new_test();
+
+    // Verify at Level 3
+    let verifier = EphemeralVerifier::new();
+    verifier.add_trusted_issuer(issuer_pk);
+
+    let result = verifier.verify_level3(&proof, &binding, &stark_proof, &accumulator, issuer_pk);
+
+    assert!(
+        result.valid,
+        "Level 3 verification should pass. Warnings: {:?}",
+        result.warnings
+    );
+    assert_eq!(result.level, 3, "Should report Level 3 verification");
+
+    // Check proof capability is reported correctly
+    if matches!(capability, ProofCapability::Stark) {
+        println!("Using production STARK proofs");
+    } else {
+        println!("WARNING: Using simulated proofs for testing");
+    }
+}
+
+#[test]
+fn test_verification_level3_empty_stark_proof_fails() {
+    use icn_zkp::{RsaAccumulator, StarkProof};
+
+    let keybundle = test_keybundle();
+    let issuer_pk = [1u8; 32];
+
+    // Generate ephemeral proof and binding
+    let (proof, binding) = generate_proof_and_binding(
+        &keybundle,
+        ProofType::AgeAtLeast { threshold: 18 },
+        Duration::from_secs(3600),
+        vec![],
+    );
+
+    // Create an empty/invalid STARK proof
+    let empty_stark = StarkProof {
+        proof_bytes: vec![], // Empty!
+        public_inputs_hash: [0u8; 32],
+        version: 1,
+        simulated: false,
+    };
+
+    let accumulator = RsaAccumulator::new_test();
+
+    // Verify at Level 3 - should fail due to empty proof
+    let verifier = EphemeralVerifier::new();
+    let result = verifier.verify_level3(&proof, &binding, &empty_stark, &accumulator, issuer_pk);
+
+    assert!(
+        !result.valid,
+        "Empty STARK proof should fail Level 3 verification"
+    );
+    assert!(
+        result.warnings.iter().any(|w| w.contains("STARK")),
+        "Should mention STARK in failure reason"
+    );
+}
+
+#[test]
+fn test_verification_level3_invalid_public_inputs_fails() {
+    use icn_zkp::{RsaAccumulator, StarkProof};
+
+    let keybundle = test_keybundle();
+    let issuer_pk = [1u8; 32];
+
+    // Generate ephemeral proof and binding
+    let (proof, binding) = generate_proof_and_binding(
+        &keybundle,
+        ProofType::Citizenship {
+            country_code: [b'U', b'S'],
+        },
+        Duration::from_secs(3600),
+        vec![Channel::Ble],
+    );
+
+    // Create STARK proof with all-zero public inputs (invalid)
+    let invalid_stark = StarkProof {
+        proof_bytes: vec![0u8; 100],   // Non-empty but garbage
+        public_inputs_hash: [0u8; 32], // All zeros = invalid
+        version: 1,
+        simulated: false,
+    };
+
+    let accumulator = RsaAccumulator::new_test();
+
+    // Verify at Level 3 - should fail due to invalid public inputs
+    let verifier = EphemeralVerifier::new();
+    let result = verifier.verify_level3(&proof, &binding, &invalid_stark, &accumulator, issuer_pk);
+
+    assert!(
+        !result.valid,
+        "Invalid public inputs should fail Level 3 verification"
+    );
+    assert!(
+        result.warnings.iter().any(|w| w.contains("public inputs")),
+        "Should mention public inputs in failure reason"
+    );
+}
+
+#[test]
+fn test_stark_proof_capability_check() {
+    use icn_zkp::{proof_capability, ProofCapability};
+
+    let capability = proof_capability();
+
+    // icn-gateway depends on icn-zkp with stark feature enabled,
+    // so we should always have STARK capability
+    assert_eq!(
+        capability,
+        ProofCapability::Stark,
+        "icn-gateway should have STARK capability via icn-zkp dependency"
+    );
+    assert!(capability.is_secure(), "STARK should be secure");
+    assert!(capability.can_prove(), "Should be able to prove with STARK");
+
+    println!(
+        "Proof capability: {:?} - {}",
+        capability,
+        capability.description()
+    );
+}
+
+#[test]
+fn test_full_sdis_l3_flow_with_stark() {
+    use icn_zkp::{
+        proof_capability, AgeAttestation, ProofContext, RsaAccumulator, ZkProver, ZkVerifier,
+    };
+
+    // Skip if no proof capability
+    if !proof_capability().can_prove() {
+        eprintln!("Skipping full L3 flow test: no proof capability");
+        return;
+    }
+
+    // === SETUP ===
+    let keybundle = test_keybundle();
+    let issuer_pk = [1u8; 32];
+
+    // === PROVER SIDE ===
+
+    // 1. Generate ephemeral proof for presentation
+    let (ephemeral_proof, _binding) = generate_proof_and_binding(
+        &keybundle,
+        ProofType::AgeAtLeast { threshold: 21 },
+        Duration::from_secs(3600),
+        vec![Channel::Nfc, Channel::Ble],
+    );
+
+    // 2. Generate STARK proof of age attribute
+    let prover = ZkProver::new();
+    let context = ProofContext::new(None);
+
+    let current_days = (context.timestamp / 86400) as u32;
+    let attestation = AgeAttestation {
+        birthdate_days: current_days - (30 * 365), // 30 years old
+        signature: vec![0u8; 64],
+    };
+
+    let stark_proof = prover
+        .prove_age(21, &attestation, issuer_pk, &context)
+        .expect("Age proof should succeed for 30 year old");
+
+    // 3. Setup accumulator (simulating revocation registry)
+    let mut accumulator = RsaAccumulator::new_test();
+    // Add some revoked credentials (not ours)
+    accumulator.add(&[0xDE, 0xAD].repeat(16).try_into().unwrap());
+
+    // === VERIFIER SIDE ===
+
+    // 1. Receive the QR code, decode it
+    let qr_bytes = encode_for_qr(&ephemeral_proof).expect("QR encoding should work");
+    let decoded_proof = decode_from_qr(&qr_bytes).expect("QR decoding should work");
+
+    // 2. Setup verifier
+    let verifier = EphemeralVerifier::new();
+    verifier.add_trusted_issuer(issuer_pk);
+
+    // 3. Level 1: QR scan verification
+    let l1_result = verifier.verify_level1(&decoded_proof);
+    assert!(l1_result.valid, "L1 should pass");
+    assert_eq!(l1_result.level, 1);
+
+    // 4. Level 2: With binding (received via NFC/BLE)
+    // Note: We need a fresh proof since L1 consumed the nonce
+    let (ephemeral_proof2, binding2) = generate_proof_and_binding(
+        &keybundle,
+        ProofType::AgeAtLeast { threshold: 21 },
+        Duration::from_secs(3600),
+        vec![Channel::Nfc],
+    );
+    let l2_result = verifier.verify_level2(&ephemeral_proof2, &binding2);
+    assert!(l2_result.valid, "L2 should pass");
+    assert_eq!(l2_result.level, 2);
+
+    // 5. Level 3: Full STARK verification
+    // Note: Need fresh proof again
+    let (ephemeral_proof3, binding3) = generate_proof_and_binding(
+        &keybundle,
+        ProofType::AgeAtLeast { threshold: 21 },
+        Duration::from_secs(3600),
+        vec![Channel::Http],
+    );
+    let l3_result = verifier.verify_level3(
+        &ephemeral_proof3,
+        &binding3,
+        &stark_proof,
+        &accumulator,
+        issuer_pk,
+    );
+    assert!(l3_result.valid, "L3 should pass: {:?}", l3_result.warnings);
+    assert_eq!(l3_result.level, 3);
+
+    // === VERIFY STARK PROOF DIRECTLY ===
+    let mut zk_verifier = ZkVerifier::new();
+    let verification = zk_verifier
+        .verify_age(21, &stark_proof, issuer_pk, &context)
+        .expect("Direct STARK verification should not error");
+
+    assert!(
+        verification.valid,
+        "Direct STARK verification should pass: {:?}",
+        verification.warnings
+    );
+
+    println!("Full SDIS L3 flow completed successfully!");
+    println!("  - L1 (QR): PASS");
+    println!("  - L2 (Binding): PASS");
+    println!("  - L3 (STARK): PASS");
+    println!("  - Proof capability: {}", proof_capability().description());
+}

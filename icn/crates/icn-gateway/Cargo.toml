@@ -71,7 +71,7 @@ icn-compute = { path = "../icn-compute" }
 icn-federation = { path = "../icn-federation" }
 icn-trust = { path = "../icn-trust" }
 icn-ccl = { path = "../icn-ccl" }
-icn-zkp = { path = "../icn-zkp" }
+icn-zkp = { path = "../icn-zkp", features = ["stark"] }
 icn-steward = { path = "../icn-steward" }
 icn-crypto-pq = { path = "../icn-crypto-pq" }
 icn-coop = { path = "../icn-coop" }

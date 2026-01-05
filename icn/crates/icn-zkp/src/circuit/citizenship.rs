@@ -93,6 +93,7 @@ impl Circuit for CitizenshipProofCircuit {
         "citizenship_proof_v1"
     }
 
+    #[allow(clippy::needless_return)]
     fn prove(public: &Self::Public, private: &Self::Private) -> Result<StarkProof, CircuitError> {
         public.validate()?;
         private.validate()?;
@@ -118,9 +119,9 @@ impl Circuit for CitizenshipProofCircuit {
 
         #[cfg(feature = "stark")]
         {
-            // TODO: Actual STARK proof generation with winterfell
+            // Use the winterfell STARK prover
             let _ = public_hash;
-            unimplemented!("Full STARK proofs require 'stark' feature implementation");
+            return crate::stark::citizenship::prove_citizenship(public, private);
         }
 
         #[cfg(all(not(feature = "stark"), feature = "simulated"))]
@@ -159,6 +160,7 @@ impl Circuit for CitizenshipProofCircuit {
         }
     }
 
+    #[allow(clippy::needless_return)]
     fn verify(public: &Self::Public, proof: &StarkProof) -> Result<bool, CircuitError> {
         public.validate()?;
 
@@ -169,8 +171,8 @@ impl Circuit for CitizenshipProofCircuit {
 
         #[cfg(feature = "stark")]
         {
-            // TODO: Actual STARK verification with winterfell
-            unimplemented!("Full STARK verification requires 'stark' feature implementation");
+            // Use the winterfell STARK verifier
+            return crate::stark::citizenship::verify_citizenship(public, proof);
         }
 
         #[cfg(all(not(feature = "stark"), feature = "simulated"))]

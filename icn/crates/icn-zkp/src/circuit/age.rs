@@ -126,6 +126,7 @@ impl Circuit for AgeProofCircuit {
     /// The circuit verifies:
     /// 1. issuer_signature is valid for (issuer_pk, birthdate_days)
     /// 2. (current_date - birthdate_days) >= threshold * 365
+    #[allow(clippy::needless_return)]
     fn prove(public: &Self::Public, private: &Self::Private) -> Result<StarkProof, CircuitError> {
         // Validate inputs
         public.validate()?;
@@ -157,9 +158,9 @@ impl Circuit for AgeProofCircuit {
 
         #[cfg(feature = "stark")]
         {
-            // TODO: Actual STARK proof generation with winterfell
+            // Use the winterfell STARK prover
             let _ = public_hash;
-            unimplemented!("Full STARK proofs require 'stark' feature implementation");
+            return crate::stark::age::prove_age(public, private);
         }
 
         #[cfg(all(not(feature = "stark"), feature = "simulated"))]
@@ -198,6 +199,7 @@ impl Circuit for AgeProofCircuit {
     }
 
     /// Verify an age proof
+    #[allow(clippy::needless_return)]
     fn verify(public: &Self::Public, proof: &StarkProof) -> Result<bool, CircuitError> {
         // Validate public inputs
         public.validate()?;
@@ -210,8 +212,8 @@ impl Circuit for AgeProofCircuit {
 
         #[cfg(feature = "stark")]
         {
-            // TODO: Actual STARK verification with winterfell
-            unimplemented!("Full STARK verification requires 'stark' feature implementation");
+            // Use the winterfell STARK verifier
+            return crate::stark::age::verify_age(public, proof);
         }
 
         #[cfg(all(not(feature = "stark"), feature = "simulated"))]

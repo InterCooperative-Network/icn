@@ -3361,9 +3361,9 @@ dependencies = [
  "thiserror 2.0.17",
  "tokio",
  "tracing",
- "winter-air 0.9.0",
- "winter-math 0.9.3",
- "winter-utils 0.9.3",
+ "winter-air",
+ "winter-math",
+ "winter-utils",
  "winterfell",
  "zeroize",
 ]
@@ -7731,40 +7731,15 @@ dependencies = [
 
 [[package]]
 name = "winter-air"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b72f12b88ebb060b52c0e9aece9bb64a9fc38daf7ba689dd5ce63271b456c883"
-dependencies = [
- "libm",
- "winter-crypto 0.9.0",
- "winter-fri 0.9.0",
- "winter-math 0.9.3",
- "winter-utils 0.9.3",
-]
-
-[[package]]
-name = "winter-air"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ef01227f23c7c331710f43b877a8333f5f8d539631eea763600f1a74bf018c7c"
 dependencies = [
  "libm",
- "winter-crypto 0.13.1",
- "winter-fri 0.13.1",
- "winter-math 0.13.1",
- "winter-utils 0.13.1",
-]
-
-[[package]]
-name = "winter-crypto"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "00fbb724d2d9fbfd3aa16ea27f5e461d4fe1d74b0c9e0ed1bf79e9e2a955f4d5"
-dependencies = [
- "blake3",
- "sha3",
- "winter-math 0.9.3",
- "winter-utils 0.9.3",
+ "winter-crypto",
+ "winter-fri",
+ "winter-math",
+ "winter-utils",
 ]
 
 [[package]]
@@ -7775,19 +7750,8 @@ checksum = "1cdb247bc142438798edb04067ab72a22cf815f57abbd7b78a6fa986fc101db8"
 dependencies = [
  "blake3",
  "sha3",
- "winter-math 0.13.1",
- "winter-utils 0.13.1",
-]
-
-[[package]]
-name = "winter-fri"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ab6077cf4c23c0411f591f4ba29378e27f26acb8cef3c51cadd93daaf6080b3"
-dependencies = [
- "winter-crypto 0.9.0",
- "winter-math 0.9.3",
- "winter-utils 0.9.3",
+ "winter-math",
+ "winter-utils",
 ]
 
 [[package]]
@@ -7796,18 +7760,9 @@ version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fd592b943f9d65545683868aaf1b601eb66e52bfd67175347362efff09101d3a"
 dependencies = [
- "winter-crypto 0.13.1",
- "winter-math 0.13.1",
- "winter-utils 0.13.1",
-]
-
-[[package]]
-name = "winter-math"
-version = "0.9.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b0e685b3b872d82e58a86519294a814b7bc7a4d3cd2c93570a7d80c0c5a1aba"
-dependencies = [
- "winter-utils 0.9.3",
+ "winter-crypto",
+ "winter-math",
+ "winter-utils",
 ]
 
 [[package]]
@@ -7816,7 +7771,7 @@ version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7aecfb48ee6a8b4746392c8ff31e33e62df8528a3b5628c5af27b92b14aef1ea"
 dependencies = [
- "winter-utils 0.13.1",
+ "winter-utils",
 ]
 
 [[package]]
@@ -7836,19 +7791,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "84cc631ed56cd39b78ef932c1ec4060cc6a44d114474291216c32f56655b3048"
 dependencies = [
  "tracing",
- "winter-air 0.13.1",
- "winter-crypto 0.13.1",
- "winter-fri 0.13.1",
- "winter-math 0.13.1",
+ "winter-air",
+ "winter-crypto",
+ "winter-fri",
+ "winter-math",
  "winter-maybe-async",
- "winter-utils 0.13.1",
+ "winter-utils",
 ]
-
-[[package]]
-name = "winter-utils"
-version = "0.9.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "961e81e9388877a25db1c034ba38253de2055f569633ae6a665d857a0556391b"
 
 [[package]]
 name = "winter-utils"
@@ -7862,11 +7811,11 @@ version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0425ea81f8f703a1021810216da12003175c7974a584660856224df04b2e2fdb"
 dependencies = [
- "winter-air 0.13.1",
- "winter-crypto 0.13.1",
- "winter-fri 0.13.1",
- "winter-math 0.13.1",
- "winter-utils 0.13.1",
+ "winter-air",
+ "winter-crypto",
+ "winter-fri",
+ "winter-math",
+ "winter-utils",
 ]
 
 [[package]]
@@ -7875,7 +7824,7 @@ version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "43f824ddd5aec8ca6a54307f20c115485a8a919ea94dd26d496d856ca6185f4f"
 dependencies = [
- "winter-air 0.13.1",
+ "winter-air",
  "winter-prover",
  "winter-verifier",
 ]
