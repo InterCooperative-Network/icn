@@ -23,6 +23,7 @@ use crate::{
     topology::{NeighborSets, TopologyConfig, TopologyInfo},
     CapabilityFlags, Discovery, PeerInfo, SessionManager,
 };
+use icn_store::Store;
 
 /// Max age for rate limiter buckets before cleanup (5 minutes)
 const RATE_LIMITER_BUCKET_MAX_AGE_SECS: u64 = 300;
@@ -801,6 +802,7 @@ impl NetworkActor {
         stun_servers: Option<Vec<SocketAddr>>,
         turn_config: Option<crate::TurnConfig>,
         misbehavior_detector: Option<Arc<RwLock<icn_security::MisbehaviorDetector>>>,
+        store: Option<Arc<dyn Store>>,
     ) -> Result<NetworkHandle> {
         let did = identity_bundle.did().clone();
 
@@ -862,8 +864,19 @@ impl NetworkActor {
 
         // Create replay guard for signed message verification
         // 300 second clock skew tolerance, 3600 second peer age limit
-        let replay_guard = Arc::new(RwLock::new(ReplayGuard::new(300, 3600)));
-        info!("Replay protection enabled (300s clock skew, 3600s peer age limit)");
+        // Use persistent mode if store is provided (critical for replay protection across restarts)
+        let replay_guard = if let Some(ref store) = store {
+            let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+            // Load persisted state and apply safety gap
+            if let Err(e) = guard.load_and_apply_safety_gap() {
+                warn!("Failed to load replay guard state: {}. Starting fresh.", e);
+            }
+            info!("Replay protection enabled with persistence (300s clock skew, 3600s peer age limit)");
+            Arc::new(RwLock::new(guard))
+        } else {
+            warn!("Replay protection enabled WITHOUT persistence - replay attacks possible after restart!");
+            Arc::new(RwLock::new(ReplayGuard::new(300, 3600)))
+        };
 
         // Create peer connection info store (version, capabilities, X25519 keys)
         let peer_connections = Arc::new(RwLock::new(std::collections::HashMap::new()));
@@ -1789,6 +1802,7 @@ mod tests {
             None, // stun_servers
             None, // turn_config
             None, // misbehavior_detector
+            None, // store (tests don't need persistence)
         )
         .await
         .unwrap();

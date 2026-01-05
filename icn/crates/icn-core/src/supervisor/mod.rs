@@ -454,6 +454,15 @@ impl Supervisor {
             // Get TURN config for NAT traversal fallback (Phase 4 M1)
             let turn_config = self.config.network.turn_config();
 
+            // Create store for replay protection persistence (security critical)
+            let network_store_path = self.config.store_path().join("network");
+            let network_store: Arc<dyn icn_store::Store> =
+                Arc::new(SledStore::open(&network_store_path)?);
+            info!(
+                "Network store opened at {} for replay protection persistence",
+                network_store_path.display()
+            );
+
             let network_handle = icn_net::NetworkActor::spawn(
                 identity_bundle.clone(),
                 listen_addr,
@@ -466,6 +475,7 @@ impl Supervisor {
                 stun_servers,
                 turn_config,
                 Some(misbehavior_detector.clone()), // Shared Byzantine fault detector
+                Some(network_store),                // Persistent store for replay protection
             )
             .await?;
 

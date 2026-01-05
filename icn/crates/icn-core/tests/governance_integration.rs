@@ -202,6 +202,7 @@ impl TestNode {
             None, // No STUN servers
             None, // No TURN config
             None, // No misbehavior detector for tests
+            None, // No store for tests
         )
         .await?;
 

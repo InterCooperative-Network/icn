@@ -86,6 +86,7 @@ impl TestNode {
             None, // No STUN servers
             None, // No TURN config
             None, // No misbehavior detector for tests
+            None, // No store for tests
         )
         .await?;
 
@@ -272,6 +273,7 @@ async fn test_graceful_restart_preserves_state() -> Result<()> {
         None, // No STUN servers
         None, // No TURN config
         None, // No misbehavior detector for tests
+        None, // No store for tests
     )
     .await?;
 
@@ -484,6 +486,7 @@ async fn test_x25519_keys_persist_across_restart() -> Result<()> {
         None, // No STUN servers
         None, // No TURN config
         None, // No misbehavior detector for tests
+        None, // No store for tests
     )
     .await?;
 
