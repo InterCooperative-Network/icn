@@ -3311,6 +3311,12 @@ pub mod misbehavior {
         )
         .increment(1);
     }
+
+    /// Increment counter when evidence is truncated due to size limits.
+    /// This helps operators detect storage exhaustion attack attempts.
+    pub fn evidence_truncated_inc() {
+        counter!("icn_misbehavior_evidence_truncated_total").increment(1);
+    }
 }
 
 /// Partition detection and healing metrics (Phase 18 Week 3)
