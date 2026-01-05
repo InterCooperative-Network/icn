@@ -20,6 +20,12 @@ use blake3::Hasher;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+/// Maximum number of elements in accumulator (DoS protection)
+///
+/// This limits memory usage and ensures proof sizes remain reasonable.
+/// With 2^20 elements, the tree has ~2 million nodes (64MB memory).
+pub const MAX_ACCUMULATOR_SIZE: usize = 1 << 20; // 1,048,576 elements
+
 /// Errors from Merkle accumulator operations
 #[derive(Debug, Error)]
 pub enum MerkleAccumulatorError {
@@ -37,6 +43,9 @@ pub enum MerkleAccumulatorError {
 
     #[error("Proof verification failed: {0}")]
     VerificationFailed(String),
+
+    #[error("Accumulator capacity exceeded (max {MAX_ACCUMULATOR_SIZE} elements)")]
+    CapacityExceeded,
 }
 
 /// Hash type used throughout the accumulator (32 bytes)
@@ -113,6 +122,11 @@ impl MerkleAccumulator {
 
     /// Add an element to the accumulator
     pub fn add(&mut self, element: &[u8; 32]) -> Result<(), MerkleAccumulatorError> {
+        // DoS protection: limit accumulator size
+        if self.elements.len() >= MAX_ACCUMULATOR_SIZE {
+            return Err(MerkleAccumulatorError::CapacityExceeded);
+        }
+
         let hash = hash_element(element);
 
         // Binary search for insertion point
@@ -214,24 +228,26 @@ impl MerkleAccumulator {
                 element_hash: hash,
                 left_neighbor: None,
                 right_neighbor: None,
+                left_index: None,
+                right_index: None,
                 left_proof: None,
                 right_proof: None,
                 root,
             });
         }
 
-        // Get left neighbor (if exists)
-        let left_neighbor = if insert_pos > 0 {
-            Some(self.elements[insert_pos - 1])
+        // Get left neighbor and index (if exists)
+        let (left_neighbor, left_index) = if insert_pos > 0 {
+            (Some(self.elements[insert_pos - 1]), Some(insert_pos - 1))
         } else {
-            None
+            (None, None)
         };
 
-        // Get right neighbor (if exists)
-        let right_neighbor = if insert_pos < self.elements.len() {
-            Some(self.elements[insert_pos])
+        // Get right neighbor and index (if exists)
+        let (right_neighbor, right_index) = if insert_pos < self.elements.len() {
+            (Some(self.elements[insert_pos]), Some(insert_pos))
         } else {
-            None
+            (None, None)
         };
 
         // Generate proofs for neighbors
@@ -251,6 +267,8 @@ impl MerkleAccumulator {
             element_hash: hash,
             left_neighbor,
             right_neighbor,
+            left_index,
+            right_index,
             left_proof,
             right_proof,
             root,
@@ -258,6 +276,8 @@ impl MerkleAccumulator {
     }
 
     /// Verify a non-membership proof
+    ///
+    /// This runs in O(log n) time using the provided indices.
     pub fn verify_non_membership(root: &Hash, proof: &MerkleNonMembershipProof) -> bool {
         if proof.root != *root {
             return false;
@@ -282,17 +302,26 @@ impl MerkleAccumulator {
             }
         }
 
-        // Verify neighbor proofs
-        if let (Some(left), Some(left_siblings)) = (&proof.left_neighbor, &proof.left_proof) {
-            // For non-membership, we need to verify the sibling path
-            // but the index might not match - we verify the hash chain
-            if !verify_sibling_path(left, left_siblings, &proof.root) {
+        // Verify adjacency: right_index should be left_index + 1 (if both exist)
+        if let (Some(left_idx), Some(right_idx)) = (proof.left_index, proof.right_index) {
+            if right_idx != left_idx + 1 {
+                return false; // Neighbors must be adjacent
+            }
+        }
+
+        // Verify neighbor proofs using indices for O(log n) verification
+        if let (Some(left), Some(left_siblings), Some(left_idx)) =
+            (&proof.left_neighbor, &proof.left_proof, proof.left_index)
+        {
+            if !verify_sibling_path_with_index(left, left_siblings, left_idx, &proof.root) {
                 return false;
             }
         }
 
-        if let (Some(right), Some(right_siblings)) = (&proof.right_neighbor, &proof.right_proof) {
-            if !verify_sibling_path(right, right_siblings, &proof.root) {
+        if let (Some(right), Some(right_siblings), Some(right_idx)) =
+            (&proof.right_neighbor, &proof.right_proof, proof.right_index)
+        {
+            if !verify_sibling_path_with_index(right, right_siblings, right_idx, &proof.root) {
                 return false;
             }
         }
@@ -380,6 +409,10 @@ pub struct MerkleNonMembershipProof {
     pub left_neighbor: Option<Hash>,
     /// Right neighbor in sorted order (None if element would be last)
     pub right_neighbor: Option<Hash>,
+    /// Index of left neighbor (for O(log n) verification)
+    pub left_index: Option<usize>,
+    /// Index of right neighbor (for O(log n) verification)
+    pub right_index: Option<usize>,
     /// Merkle proof for left neighbor
     pub left_proof: Option<Vec<Hash>>,
     /// Merkle proof for right neighbor
@@ -428,33 +461,33 @@ fn hash_pair(left: &Hash, right: &Hash) -> Hash {
     *hasher.finalize().as_bytes()
 }
 
-/// Verify a sibling path leads to the given root
-fn verify_sibling_path(leaf: &Hash, siblings: &[Hash], root: &Hash) -> bool {
+/// Verify a sibling path leads to the given root using provided index
+///
+/// This runs in O(log n) time - linear in the tree depth.
+fn verify_sibling_path_with_index(
+    leaf: &Hash,
+    siblings: &[Hash],
+    leaf_index: usize,
+    root: &Hash,
+) -> bool {
     if siblings.is_empty() {
         return *leaf == *root;
     }
 
-    // Try both left and right positions for each level
-    // This is needed because we don't store the index in the non-membership proof
-    fn try_path(current: Hash, siblings: &[Hash], depth: usize, root: &Hash) -> bool {
-        if depth == siblings.len() {
-            return current == *root;
-        }
+    let mut current = *leaf;
+    let mut index = leaf_index;
 
-        let sibling = &siblings[depth];
-
-        // Try as left child
-        let as_left = hash_pair(&current, sibling);
-        if try_path(as_left, siblings, depth + 1, root) {
-            return true;
-        }
-
-        // Try as right child
-        let as_right = hash_pair(sibling, &current);
-        try_path(as_right, siblings, depth + 1, root)
+    for sibling in siblings {
+        // Use the index to determine left/right position
+        current = if index.is_multiple_of(2) {
+            hash_pair(&current, sibling)
+        } else {
+            hash_pair(sibling, &current)
+        };
+        index /= 2;
     }
 
-    try_path(*leaf, siblings, 0, root)
+    current == *root
 }
 
 #[cfg(test)]

@@ -8,6 +8,7 @@ use crate::circuit::{
     CitizenshipProofPublic, MembershipProofCircuit, MembershipProofPublic, NonRevocationCircuit,
     NonRevocationPublic,
 };
+use crate::merkle_accumulator::MerkleAccumulator;
 use crate::types::{CompoundProof, ProofContext, ProofType, StarkProof, VerificationResult};
 use icn_identity::Did;
 use thiserror::Error;
@@ -220,6 +221,36 @@ impl ZkVerifier {
             nonce: context.nonce,
             accumulator_type: crate::circuit::non_revocation::AccumulatorType::Rsa,
         };
+
+        let valid = NonRevocationCircuit::verify(&public, proof)?;
+
+        Ok(if valid {
+            VerificationResult::success(ProofType::NonRevocation)
+        } else {
+            VerificationResult::failure(ProofType::NonRevocation)
+        })
+    }
+
+    /// Verify a non-revocation proof using Merkle accumulator (post-quantum safe)
+    pub fn verify_non_revocation_merkle(
+        &mut self,
+        proof: &StarkProof,
+        accumulator: &mut MerkleAccumulator,
+        issuer_pk: [u8; 32],
+        context: &ProofContext,
+    ) -> Result<VerificationResult, VerifierError> {
+        if !context.is_valid(self.max_proof_age) {
+            return Err(VerifierError::ProofExpired);
+        }
+
+        if !self.is_trusted_issuer(&issuer_pk) {
+            return Err(VerifierError::UntrustedIssuer);
+        }
+
+        self.check_nonce(&context.nonce)?;
+
+        let public =
+            NonRevocationPublic::new_merkle(accumulator.root(), accumulator.epoch(), issuer_pk);
 
         let valid = NonRevocationCircuit::verify(&public, proof)?;
 

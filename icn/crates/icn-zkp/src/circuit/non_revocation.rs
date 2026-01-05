@@ -58,19 +58,20 @@ pub struct NonRevocationPublic {
 }
 
 impl NonRevocationPublic {
-    /// Create new public inputs (defaults to Merkle accumulator)
+    /// Create new public inputs (defaults to RSA for backward compatibility)
+    ///
+    /// For post-quantum safe proofs, use [`new_merkle()`] instead.
     pub fn new(accumulator_value: [u8; 32], accumulator_epoch: u64, issuer_pk: [u8; 32]) -> Self {
         Self::with_type(
             accumulator_value,
             accumulator_epoch,
             issuer_pk,
-            AccumulatorType::Merkle,
+            AccumulatorType::Rsa,
         )
     }
 
-    /// Create new public inputs for RSA accumulator (legacy)
-    #[deprecated(since = "0.2.0", note = "RSA accumulator is not post-quantum safe")]
-    pub fn new_rsa(
+    /// Create new public inputs for Merkle accumulator (post-quantum safe, RECOMMENDED)
+    pub fn new_merkle(
         accumulator_value: [u8; 32],
         accumulator_epoch: u64,
         issuer_pk: [u8; 32],
@@ -79,7 +80,7 @@ impl NonRevocationPublic {
             accumulator_value,
             accumulator_epoch,
             issuer_pk,
-            AccumulatorType::Rsa,
+            AccumulatorType::Merkle,
         )
     }
 
@@ -150,6 +151,12 @@ pub struct MerkleNonMembershipProofData {
     pub left_neighbor: Option<[u8; 32]>,
     /// Right neighbor hash (None if element would be last)
     pub right_neighbor: Option<[u8; 32]>,
+    /// Index of left neighbor (for O(log n) verification)
+    #[serde(default)]
+    pub left_index: Option<usize>,
+    /// Index of right neighbor (for O(log n) verification)
+    #[serde(default)]
+    pub right_index: Option<usize>,
     /// Merkle proof for left neighbor (sibling hashes)
     pub left_proof: Option<Vec<[u8; 32]>>,
     /// Merkle proof for right neighbor
@@ -161,6 +168,8 @@ impl From<MerkleNonMembershipProof> for MerkleNonMembershipProofData {
         Self {
             left_neighbor: proof.left_neighbor,
             right_neighbor: proof.right_neighbor,
+            left_index: proof.left_index,
+            right_index: proof.right_index,
             left_proof: proof.left_proof,
             right_proof: proof.right_proof,
         }
@@ -246,6 +255,18 @@ impl Circuit for NonRevocationCircuit {
     fn prove(public: &Self::Public, private: &Self::Private) -> Result<StarkProof, CircuitError> {
         public.validate()?;
         private.validate()?;
+
+        // Security: Ensure witness type matches accumulator type
+        // This prevents downgrade attacks where Merkle type is declared but RSA witness is used
+        let witness_is_merkle = private.witness.is_merkle();
+        let acc_is_merkle = public.accumulator_type == AccumulatorType::Merkle;
+        if witness_is_merkle != acc_is_merkle {
+            return Err(CircuitError::InvalidPrivateInput(format!(
+                "Witness type mismatch: witness is {}, but accumulator type is {}",
+                if witness_is_merkle { "Merkle" } else { "RSA" },
+                public.accumulator_type.description()
+            )));
+        }
 
         // In a real implementation, we would verify:
         // 1. The Bezout coefficients prove non-membership

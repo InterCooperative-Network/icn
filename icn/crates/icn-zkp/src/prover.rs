@@ -9,6 +9,7 @@ use crate::circuit::{
     MembershipProofCircuit, MembershipProofPrivate, MembershipProofPublic, NonRevocationCircuit,
     NonRevocationPrivate, NonRevocationPublic,
 };
+use crate::merkle_accumulator::MerkleAccumulator;
 use crate::types::{
     AgeAttestation, Attestation, CitizenshipAttestation, CompoundProof, MembershipAttestation,
     ProofContext, ProofType, StarkProof,
@@ -182,6 +183,28 @@ impl ZkProver {
             },
             blinding: rand::random(),
         };
+
+        Ok(NonRevocationCircuit::prove(&public, &private)?)
+    }
+
+    /// Generate a non-revocation proof using Merkle accumulator (post-quantum safe)
+    pub fn prove_non_revocation_merkle(
+        &self,
+        credential_id: [u8; 32],
+        accumulator: &mut MerkleAccumulator,
+        issuer_pk: [u8; 32],
+        _context: &ProofContext,
+    ) -> Result<StarkProof, ProverError> {
+        // Get non-membership proof from Merkle accumulator
+        let merkle_proof = accumulator
+            .non_membership_proof(&credential_id)
+            .map_err(|e| ProverError::InvalidAttestation(e.to_string()))?;
+
+        let public =
+            NonRevocationPublic::new_merkle(accumulator.root(), accumulator.epoch(), issuer_pk);
+
+        let private =
+            NonRevocationPrivate::from_merkle(credential_id, merkle_proof, rand::random());
 
         Ok(NonRevocationCircuit::prove(&public, &private)?)
     }
