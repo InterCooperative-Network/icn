@@ -44,7 +44,7 @@ zstd = "0.13"
 icn-store.workspace = true
 tracing-subscriber.workspace = true
 rand_core.workspace = true
-criterion = "0.5"
+criterion = "0.8"
 tempfile = "3.24"
 portpicker.workspace = true
 
