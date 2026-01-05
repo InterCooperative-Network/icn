@@ -11,7 +11,10 @@ pub mod non_revocation;
 pub use age::{AgeProofCircuit, AgeProofPrivate, AgeProofPublic};
 pub use citizenship::{CitizenshipProofCircuit, CitizenshipProofPrivate, CitizenshipProofPublic};
 pub use membership::{MembershipProofCircuit, MembershipProofPrivate, MembershipProofPublic};
-pub use non_revocation::{NonRevocationCircuit, NonRevocationPrivate, NonRevocationPublic};
+pub use non_revocation::{
+    AccumulatorType, MerkleNonMembershipProofData, NonMembershipWitness, NonRevocationCircuit,
+    NonRevocationPrivate, NonRevocationPublic,
+};
 
 use crate::types::StarkProof;
 use thiserror::Error;

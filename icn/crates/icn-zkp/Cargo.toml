@@ -24,6 +24,7 @@ num-integer = "0.1"
 # Hashing
 sha3 = "0.10"
 sha2 = "0.10"
+blake3 = "1.5"
 
 # Encoding
 hex = "0.4"
