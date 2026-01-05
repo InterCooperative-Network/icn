@@ -223,7 +223,7 @@ mod tests {
         let delay2 = tracker.should_restart("test_actor").unwrap();
         assert_eq!(delay2.as_millis(), 200);
 
-        // Third restart should have quadrupled delay
+        // Third restart should have doubled again (200ms * 2 = 400ms)
         let delay3 = tracker.should_restart("test_actor").unwrap();
         assert_eq!(delay3.as_millis(), 400);
 
