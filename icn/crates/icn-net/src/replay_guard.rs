@@ -538,7 +538,9 @@ impl ReplayGuard {
         };
         let value = serde_json::to_vec(&entry).context("Failed to serialize max_seq entry")?;
 
-        store.put(&key, &value).context("Failed to persist max_seq")?;
+        store
+            .put(&key, &value)
+            .context("Failed to persist max_seq")?;
 
         Ok(())
     }
