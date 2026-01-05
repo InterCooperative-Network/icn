@@ -260,11 +260,13 @@ impl ReplayGuard {
                 if let Ok(entry) = serde_json::from_slice::<FinalizedEntry>(&value) {
                     // Only load finalized sequences less than 24h old
                     if entry.finalized_at_ms >= cutoff_ms {
-                        let window = self
-                            .sequences
-                            .entry(did)
-                            .or_insert_with(SequenceWindow::new);
-                        window.finalized.insert(seq, now);
+                        // Only attach finalized entries to windows that were already
+                        // initialized from max_seq (with safety gap and floor applied).
+                        // This avoids creating new windows with floor_seq=0 based solely
+                        // on finalized state, which could allow replay of older sequences.
+                        if let Some(window) = self.sequences.get_mut(&did) {
+                            window.finalized.insert(seq, now);
+                        }
                     }
                 }
             }
@@ -353,7 +355,7 @@ impl ReplayGuard {
         window.insert_sequence(&seq_hash);
         window.last_update = Instant::now();
 
-        // 7. Persist max_seq if changed (fail-safe: persist before returning success)
+        // 7. Persist max_seq if changed (best-effort: safety gap handles missed writes)
         if max_seq_changed {
             if let Err(e) = self.persist_max_seq(&envelope.from, envelope.sequence) {
                 tracing::warn!(
