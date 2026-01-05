@@ -43,7 +43,7 @@ anyhow = "1"
 thiserror = "2"
 
 # JWT tokens
-jsonwebtoken = "9"
+jsonwebtoken = "10"
 
 # UUID generation
 uuid = { version = "1", features = ["v4"] }
