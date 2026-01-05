@@ -176,7 +176,7 @@ impl MerkleAccumulator {
         let mut index = proof.index;
 
         for sibling in &proof.siblings {
-            current = if index % 2 == 0 {
+            current = if index.is_multiple_of(2) {
                 hash_pair(&current, sibling)
             } else {
                 hash_pair(sibling, &current)
@@ -341,7 +341,7 @@ impl MerkleAccumulator {
         let mut index = leaf_offset + leaf_index;
 
         while index > 0 {
-            let sibling_index = if index % 2 == 0 { index - 1 } else { index + 1 };
+            let sibling_index = if index.is_multiple_of(2) { index - 1 } else { index + 1 };
             if sibling_index < self.tree.len() {
                 siblings.push(self.tree[sibling_index]);
             } else {
