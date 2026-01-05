@@ -11,7 +11,7 @@ icn-identity = { path = "../icn-identity" }
 icn-crypto-pq = { path = "../icn-crypto-pq" }
 
 # STARK proving system (pure Rust)
-winterfell = { version = "0.9", optional = true }
+winterfell = { version = "0.13", optional = true }
 winter-air = { version = "0.9", optional = true }
 winter-math = { version = "0.9", optional = true }
 winter-utils = { version = "0.9", optional = true }
