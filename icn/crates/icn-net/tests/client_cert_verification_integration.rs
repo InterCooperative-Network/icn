@@ -75,6 +75,7 @@ impl SecureTestNode {
             None,
             None,
             None,
+            None, // store
         )
         .await?;
 
@@ -129,6 +130,7 @@ impl SecureTestNode {
             None,
             None,
             None,
+            None, // store
         )
         .await?;
 
@@ -238,6 +240,7 @@ async fn test_client_cert_verification_allows_trusted_peer() -> Result<()> {
         None,
         None,
         None,
+        None, // store
     )
     .await?;
 
@@ -260,6 +263,7 @@ async fn test_client_cert_verification_allows_trusted_peer() -> Result<()> {
         None,
         None,
         None,
+        None, // store
     )
     .await?;
 
@@ -337,6 +341,7 @@ async fn test_client_cert_verification_rejects_untrusted_peer() -> Result<()> {
         None,
         None,
         None,
+        None, // store
     )
     .await?;
 
@@ -359,6 +364,7 @@ async fn test_client_cert_verification_rejects_untrusted_peer() -> Result<()> {
         None,
         None,
         None,
+        None, // store
     )
     .await?;
 
@@ -480,6 +486,7 @@ async fn test_did_tls_binding_verified_on_hello() -> Result<()> {
         None,
         None,
         None,
+        None, // store
     )
     .await?;
 
@@ -506,6 +513,7 @@ async fn test_did_tls_binding_verified_on_hello() -> Result<()> {
         None,
         None,
         None,
+        None, // store
     )
     .await?;
 

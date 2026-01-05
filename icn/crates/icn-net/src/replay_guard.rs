@@ -1,21 +1,91 @@
-//! Replay protection through sequence number tracking
+//! Replay protection through persistent sequence number tracking
 //!
 //! Prevents replay attacks by maintaining per-sender sequence windows
 //! and rejecting duplicate or out-of-order messages.
+//!
+//! # Persistence (Security Critical)
+//!
+//! This module now supports persistent storage of replay protection state.
+//! Without persistence, replay attacks would be possible after node restart:
+//!
+//! 1. Attacker records a signed message
+//! 2. Target node restarts (crash, update, etc.)
+//! 3. Attacker replays the message
+//! 4. Node accepts it (no memory of prior sequences) ← VULNERABILITY
+//!
+//! With persistence:
+//! - `max_seq` per peer is persisted to storage
+//! - `finalized` sequences (processed transactions) are persisted
+//! - On restart, a safety gap is applied to prevent any edge cases
+//!
+//! # Architecture
+//!
+//! ```text
+//! ReplayGuard (Persistent)
+//!   ├── In-memory cache (HashMap<Did, SequenceWindow>)
+//!   ├── Persistent store (Sled via icn-store)
+//!   │   ├── replay_max_seq:<did> → max sequence number
+//!   │   └── replay_finalized:<did>:<seq> → finalization timestamp
+//!   └── Safety gap on restart (+1000)
+//! ```
 
 use crate::envelope::SignedEnvelope;
 use anyhow::{bail, Context, Result};
 use icn_gossip::BloomFilter;
 use icn_identity::Did;
+use icn_store::Store;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
-use std::time::{Duration, Instant};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 /// Hash a sequence number to a 32-byte hash for Bloom filter
 fn hash_sequence(sequence: u64) -> [u8; 32] {
     let mut hasher = Sha256::new();
     hasher.update(sequence.to_be_bytes());
     hasher.finalize().into()
+}
+
+/// Safety gap added to all max_seq values on startup.
+///
+/// This ensures that even if persistence was delayed or crashed before saving,
+/// we won't accept replayed messages. 1,000 provides safety margin:
+/// - At 100 msg/sec from a peer, covers 10 seconds of unsynced state
+/// - In practice, max_seq is persisted on every update
+///
+/// Note: This is smaller than OutgoingSequenceTracker's gap (10,000) because:
+/// - Outgoing uses sequences for nonces (reuse breaks encryption)
+/// - Incoming uses sequences for replay detection (gap only causes temporary rejection)
+const RESTART_SAFETY_GAP: u64 = 1_000;
+
+/// Maximum entries before Bloom filter rotation (80% of capacity)
+const BLOOM_ROTATION_THRESHOLD: u64 = 8_000;
+
+/// Bloom filter capacity
+const BLOOM_CAPACITY: usize = 10_000;
+
+/// Key prefix for max sequence storage
+const MAX_SEQ_PREFIX: &[u8] = b"replay_max_seq:";
+
+/// Key prefix for finalized sequence storage
+const FINALIZED_PREFIX: &[u8] = b"replay_finalized:";
+
+/// Persisted max sequence entry
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct MaxSeqEntry {
+    /// Maximum sequence seen from this peer
+    max_seq: u64,
+    /// Timestamp of last update (for debugging/audit)
+    updated_at_ms: u64,
+}
+
+/// Persisted finalized sequence entry
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct FinalizedEntry {
+    /// When the sequence was finalized
+    finalized_at_ms: u64,
 }
 
 /// Per-peer sequence tracking for replay protection
@@ -25,8 +95,14 @@ fn hash_sequence(sequence: u64) -> [u8; 32] {
 /// - **Out-of-order delivery**: Sequences within acceptance window
 /// - **Stale connections**: Cleanup old peer state
 /// - **Finalized sequences**: Permanently prevent replay after processing
+///
+/// # Persistence
+///
+/// When created with `new_persistent()`, this guard persists:
+/// - `max_seq` per peer (prevents replays after restart)
+/// - `finalized` sequences (prevents replay of processed transactions)
 pub struct ReplayGuard {
-    /// Last seen sequence per peer
+    /// Last seen sequence per peer (in-memory cache)
     sequences: HashMap<Did, SequenceWindow>,
 
     /// Maximum allowed clock skew (seconds)
@@ -34,18 +110,23 @@ pub struct ReplayGuard {
 
     /// Maximum age before peer state is evicted (seconds)
     max_peer_age_secs: u64,
+
+    /// Persistent storage backend (None for in-memory only)
+    store: Option<Arc<dyn Store>>,
+
+    /// Whether we've loaded persisted state and applied safety gap
+    initialized: AtomicBool,
 }
-
-/// Maximum entries before Bloom filter rotation (80% of capacity)
-const BLOOM_ROTATION_THRESHOLD: u64 = 8_000;
-
-/// Bloom filter capacity
-const BLOOM_CAPACITY: usize = 10_000;
 
 /// Sequence window for a single peer
 struct SequenceWindow {
     /// Highest sequence number seen from this peer
     max_seq: u64,
+
+    /// Floor sequence number (reject all sequences <= this value)
+    /// Set after restart with safety gap to reject all pre-restart sequences
+    /// without relying on the bloom filter (which is lost on restart)
+    floor_seq: u64,
 
     /// Bloom filter of recent sequences (for out-of-order detection)
     /// Size: ~10KB for 10,000 sequences with 0.1% false positive rate
@@ -65,7 +146,9 @@ struct SequenceWindow {
 }
 
 impl ReplayGuard {
-    /// Create a new replay guard
+    /// Create a new in-memory replay guard (no persistence)
+    ///
+    /// **WARNING**: State is lost on restart. Use `new_persistent()` for production.
     ///
     /// # Arguments
     /// * `max_clock_skew` - Maximum allowed clock skew in seconds (default: 300)
@@ -75,7 +158,127 @@ impl ReplayGuard {
             sequences: HashMap::new(),
             max_clock_skew,
             max_peer_age_secs,
+            store: None,
+            initialized: AtomicBool::new(true), // No initialization needed for in-memory
         }
+    }
+
+    /// Create a new persistent replay guard
+    ///
+    /// Persists replay protection state to storage for survival across restarts.
+    /// Call `load_and_apply_safety_gap()` after creation to initialize.
+    ///
+    /// # Arguments
+    /// * `max_clock_skew` - Maximum allowed clock skew in seconds (default: 300)
+    /// * `max_peer_age_secs` - Evict peer state after this many seconds of inactivity (default: 3600)
+    /// * `store` - Persistent storage backend
+    pub fn new_persistent(
+        max_clock_skew: u64,
+        max_peer_age_secs: u64,
+        store: Arc<dyn Store>,
+    ) -> Self {
+        ReplayGuard {
+            sequences: HashMap::new(),
+            max_clock_skew,
+            max_peer_age_secs,
+            store: Some(store),
+            initialized: AtomicBool::new(false),
+        }
+    }
+
+    /// Load persisted state and apply restart safety gap
+    ///
+    /// Must be called during node startup for persistent guards.
+    /// Safe to call multiple times (idempotent via atomic flag).
+    ///
+    /// # Returns
+    /// Number of peers loaded from storage
+    pub fn load_and_apply_safety_gap(&mut self) -> Result<usize> {
+        // Only initialize once
+        if self
+            .initialized
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_err()
+        {
+            return Ok(0);
+        }
+
+        let store = match &self.store {
+            Some(s) => s,
+            None => return Ok(0), // In-memory mode, nothing to load
+        };
+
+        let mut count = 0;
+
+        // Load max sequences
+        let entries = store
+            .scan(MAX_SEQ_PREFIX)
+            .context("Failed to scan replay max_seq entries")?;
+
+        for (key, value) in entries {
+            if let Some(did) = Self::parse_max_seq_key(&key) {
+                if let Ok(entry) = serde_json::from_slice::<MaxSeqEntry>(&value) {
+                    // Apply safety gap
+                    let safe_max_seq = entry.max_seq.saturating_add(RESTART_SAFETY_GAP);
+
+                    let window = self
+                        .sequences
+                        .entry(did.clone())
+                        .or_insert_with(SequenceWindow::new);
+                    window.max_seq = safe_max_seq;
+                    // Set floor to reject ALL sequences at or below this value
+                    // This is critical because the bloom filter is empty after restart,
+                    // so we can't rely on it to detect replays of pre-restart sequences
+                    window.floor_seq = safe_max_seq;
+
+                    tracing::debug!(
+                        peer = %did,
+                        old_max_seq = entry.max_seq,
+                        new_max_seq = safe_max_seq,
+                        floor_seq = safe_max_seq,
+                        "Loaded replay guard state with safety gap and floor"
+                    );
+
+                    // Persist the safe value
+                    self.persist_max_seq_inner(&did, safe_max_seq)?;
+
+                    count += 1;
+                }
+            }
+        }
+
+        // Load finalized sequences
+        let finalized_entries = store
+            .scan(FINALIZED_PREFIX)
+            .context("Failed to scan finalized entries")?;
+
+        let now = Instant::now();
+        let cutoff_ms = Self::current_time_ms().saturating_sub(24 * 60 * 60 * 1000); // 24h ago
+
+        for (key, value) in finalized_entries {
+            if let Some((did, seq)) = Self::parse_finalized_key(&key) {
+                if let Ok(entry) = serde_json::from_slice::<FinalizedEntry>(&value) {
+                    // Only load finalized sequences less than 24h old
+                    if entry.finalized_at_ms >= cutoff_ms {
+                        // Only attach finalized entries to windows that were already
+                        // initialized from max_seq (with safety gap and floor applied).
+                        // This avoids creating new windows with floor_seq=0 based solely
+                        // on finalized state, which could allow replay of older sequences.
+                        if let Some(window) = self.sequences.get_mut(&did) {
+                            window.finalized.insert(seq, now);
+                        }
+                    }
+                }
+            }
+        }
+
+        tracing::info!(
+            loaded_peers = count,
+            safety_gap = RESTART_SAFETY_GAP,
+            "Loaded replay guard state with restart safety gap"
+        );
+
+        Ok(count)
     }
 
     /// Check if message is fresh (not replayed)
@@ -94,6 +297,11 @@ impl ReplayGuard {
     ///
     /// This allows some out-of-order delivery while preventing replays.
     pub fn check(&mut self, envelope: &SignedEnvelope) -> Result<()> {
+        // Ensure initialized for persistent mode
+        if !self.initialized.load(Ordering::Acquire) {
+            self.load_and_apply_safety_gap()?;
+        }
+
         // 1. Verify signature and age
         envelope.verify(self.max_clock_skew)?;
 
@@ -112,7 +320,19 @@ impl ReplayGuard {
             );
         }
 
-        // 4. Check sequence number against Bloom filter
+        // 4. Check against floor_seq (CRITICAL: prevents replay after restart)
+        // After restart, floor_seq is set to max_seq + RESTART_SAFETY_GAP
+        // All sequences at or below this are rejected (bloom filter is lost on restart)
+        if envelope.sequence <= window.floor_seq {
+            bail!(
+                "Replay detected from {}: sequence {} already seen (floor: {})",
+                envelope.from.as_str(),
+                envelope.sequence,
+                window.floor_seq
+            );
+        }
+
+        // 5. Check sequence number against Bloom filter
         let seq_hash = hash_sequence(envelope.sequence);
         if envelope.sequence <= window.max_seq {
             // Potentially out-of-order or replay
@@ -127,12 +347,29 @@ impl ReplayGuard {
             // Not in filter: accept as out-of-order
         }
 
-        // 5. Update window
-        if envelope.sequence > window.max_seq {
+        // 6. Update window
+        let max_seq_changed = envelope.sequence > window.max_seq;
+        if max_seq_changed {
             window.max_seq = envelope.sequence;
         }
         window.insert_sequence(&seq_hash);
         window.last_update = Instant::now();
+
+        // 7. Persist max_seq if changed (best-effort: safety gap handles missed writes)
+        if max_seq_changed {
+            if let Err(e) = self.persist_max_seq(&envelope.from, envelope.sequence) {
+                tracing::warn!(
+                    peer = %envelope.from,
+                    seq = envelope.sequence,
+                    error = %e,
+                    "Failed to persist max_seq (continuing anyway)"
+                );
+                // Note: We continue despite persistence failure because:
+                // - The message has been validated and should be processed
+                // - The safety gap on restart handles missed persistence
+                // - Better to process valid messages than fail on storage issues
+            }
+        }
 
         Ok(())
     }
@@ -161,6 +398,16 @@ impl ReplayGuard {
 
         window.finalized.insert(sequence, Instant::now());
 
+        // Persist finalized sequence
+        if let Err(e) = self.persist_finalized(sender, sequence) {
+            tracing::warn!(
+                peer = %sender,
+                seq = sequence,
+                error = %e,
+                "Failed to persist finalized sequence"
+            );
+        }
+
         Ok(())
     }
 
@@ -179,31 +426,76 @@ impl ReplayGuard {
     /// - Inactive peer windows (no messages in max_peer_age_secs)
     /// - Old finalized sequences (>24 hours old)
     ///
-    /// # Note on Bloom Filter Saturation
-    ///
-    /// For long-lived, high-volume peers, Bloom filters may saturate over time,
-    /// leading to increased false positive rates. This is acceptable because:
-    /// - False positives only cause temporary reordering issues
-    /// - The finalized set provides definitive replay protection for critical sequences
-    /// - Peer inactivity timeout eventually clears saturated filters
-    ///
-    /// For extremely high-volume scenarios (>10k messages/peer), consider:
-    /// - Lowering max_peer_age_secs to rotate Bloom filters more frequently
-    /// - Implementing periodic Bloom filter reset (not currently implemented)
+    /// Also cleans up corresponding persistent storage.
     pub fn cleanup(&mut self) {
         let max_age = Duration::from_secs(self.max_peer_age_secs);
         let finalized_max_age = Duration::from_secs(24 * 60 * 60); // 24 hours
         let now = Instant::now();
 
+        // Collect DIDs to remove from storage
+        let mut dids_to_remove: Vec<Did> = Vec::new();
+
         // Remove inactive peer windows
-        self.sequences
-            .retain(|_, window| now.duration_since(window.last_update) < max_age);
+        self.sequences.retain(|did, window| {
+            let keep = now.duration_since(window.last_update) < max_age;
+            if !keep {
+                dids_to_remove.push(did.clone());
+            }
+            keep
+        });
+
+        // Delete from storage
+        if let Some(ref store) = self.store {
+            for did in &dids_to_remove {
+                let key = Self::make_max_seq_key(did);
+                if let Err(e) = store.delete(&key) {
+                    tracing::warn!(peer = %did, error = %e, "Failed to delete max_seq from storage");
+                }
+            }
+        }
 
         // Prune old finalized sequences from remaining windows
-        for window in self.sequences.values_mut() {
-            window.finalized.retain(|_, &mut finalized_at| {
-                now.duration_since(finalized_at) < finalized_max_age
-            });
+        let cutoff_ms = Self::current_time_ms().saturating_sub(24 * 60 * 60 * 1000);
+
+        for (did, window) in self.sequences.iter_mut() {
+            let old_finalized: Vec<u64> = window
+                .finalized
+                .iter()
+                .filter(|(_, &finalized_at)| now.duration_since(finalized_at) >= finalized_max_age)
+                .map(|(&seq, _)| seq)
+                .collect();
+
+            for seq in &old_finalized {
+                window.finalized.remove(seq);
+
+                // Delete from storage
+                if let Some(ref store) = self.store {
+                    let key = Self::make_finalized_key(did, *seq);
+                    if let Err(e) = store.delete(&key) {
+                        tracing::warn!(
+                            peer = %did,
+                            seq = seq,
+                            error = %e,
+                            "Failed to delete finalized sequence from storage"
+                        );
+                    }
+                }
+            }
+        }
+
+        // Also clean up old finalized entries from storage that may not be in memory
+        if let Some(ref store) = self.store {
+            if let Ok(entries) = store.scan(FINALIZED_PREFIX) {
+                for (key, value) in entries {
+                    if let Ok(entry) = serde_json::from_slice::<FinalizedEntry>(&value) {
+                        if entry.finalized_at_ms < cutoff_ms {
+                            if let Err(e) = store.delete(&key) {
+                                tracing::warn!(error = %e, "Failed to delete old finalized entry");
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -215,6 +507,113 @@ impl ReplayGuard {
     /// Get the max sequence seen for a specific peer
     pub fn get_max_seq(&self, did: &Did) -> Option<u64> {
         self.sequences.get(did).map(|w| w.max_seq)
+    }
+
+    /// Check if the guard is using persistent storage
+    pub fn is_persistent(&self) -> bool {
+        self.store.is_some()
+    }
+
+    /// Check if the guard has been initialized (loaded from storage)
+    pub fn is_initialized(&self) -> bool {
+        self.initialized.load(Ordering::Acquire)
+    }
+
+    // -------------------------------------------------------------------------
+    // Persistence helpers
+    // -------------------------------------------------------------------------
+
+    fn persist_max_seq(&self, did: &Did, max_seq: u64) -> Result<()> {
+        self.persist_max_seq_inner(did, max_seq)
+    }
+
+    fn persist_max_seq_inner(&self, did: &Did, max_seq: u64) -> Result<()> {
+        let store = match &self.store {
+            Some(s) => s,
+            None => return Ok(()), // In-memory mode
+        };
+
+        let key = Self::make_max_seq_key(did);
+        let entry = MaxSeqEntry {
+            max_seq,
+            updated_at_ms: Self::current_time_ms(),
+        };
+        let value = serde_json::to_vec(&entry).context("Failed to serialize max_seq entry")?;
+
+        store
+            .put(&key, &value)
+            .context("Failed to persist max_seq")?;
+
+        Ok(())
+    }
+
+    fn persist_finalized(&self, did: &Did, sequence: u64) -> Result<()> {
+        let store = match &self.store {
+            Some(s) => s,
+            None => return Ok(()), // In-memory mode
+        };
+
+        let key = Self::make_finalized_key(did, sequence);
+        let entry = FinalizedEntry {
+            finalized_at_ms: Self::current_time_ms(),
+        };
+        let value = serde_json::to_vec(&entry).context("Failed to serialize finalized entry")?;
+
+        store
+            .put(&key, &value)
+            .context("Failed to persist finalized sequence")?;
+
+        Ok(())
+    }
+
+    fn make_max_seq_key(did: &Did) -> Vec<u8> {
+        let mut key = Vec::with_capacity(MAX_SEQ_PREFIX.len() + 100);
+        key.extend_from_slice(MAX_SEQ_PREFIX);
+        key.extend_from_slice(did.as_str().as_bytes());
+        key
+    }
+
+    fn parse_max_seq_key(key: &[u8]) -> Option<Did> {
+        if !key.starts_with(MAX_SEQ_PREFIX) {
+            return None;
+        }
+        let rest = &key[MAX_SEQ_PREFIX.len()..];
+        let did_str = std::str::from_utf8(rest).ok()?;
+        Did::from_str(did_str).ok()
+    }
+
+    fn make_finalized_key(did: &Did, sequence: u64) -> Vec<u8> {
+        let mut key = Vec::with_capacity(FINALIZED_PREFIX.len() + 120);
+        key.extend_from_slice(FINALIZED_PREFIX);
+        key.extend_from_slice(did.as_str().as_bytes());
+        key.push(b':');
+        key.extend_from_slice(sequence.to_string().as_bytes());
+        key
+    }
+
+    fn parse_finalized_key(key: &[u8]) -> Option<(Did, u64)> {
+        if !key.starts_with(FINALIZED_PREFIX) {
+            return None;
+        }
+        let rest = &key[FINALIZED_PREFIX.len()..];
+        let rest_str = std::str::from_utf8(rest).ok()?;
+
+        // Find the last colon (sequence is after it)
+        let colon_pos = rest_str.rfind(':')?;
+        let did_str = &rest_str[..colon_pos];
+        let seq_str = &rest_str[colon_pos + 1..];
+
+        let did = Did::from_str(did_str).ok()?;
+        let seq = seq_str.parse().ok()?;
+
+        Some((did, seq))
+    }
+
+    fn current_time_ms() -> u64 {
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0)
     }
 }
 
@@ -228,6 +627,7 @@ impl SequenceWindow {
     fn new() -> Self {
         SequenceWindow {
             max_seq: 0,
+            floor_seq: 0,
             recent: BloomFilter::new(BLOOM_CAPACITY, 0.001),
             insertion_count: 0,
             finalized: HashMap::new(),
@@ -649,5 +1049,207 @@ mod tests {
         let result = guard.check(&old_envelope);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("finalized"));
+    }
+
+    // -------------------------------------------------------------------------
+    // Persistence tests
+    // -------------------------------------------------------------------------
+
+    #[test]
+    fn test_persistent_guard_creation() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let guard = ReplayGuard::new_persistent(300, 3600, store);
+
+        assert!(guard.is_persistent());
+        assert!(!guard.is_initialized());
+    }
+
+    #[test]
+    fn test_persistence_and_restart_safety_gap() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let keypair = KeyPair::generate().unwrap();
+
+        // Session 1: Create guard, check some messages
+        {
+            let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+            guard.load_and_apply_safety_gap().unwrap();
+
+            for seq in 1..=5 {
+                let envelope = SignedEnvelope::new(
+                    keypair.did(),
+                    &keypair,
+                    seq,
+                    PayloadType::Gossip,
+                    format!("msg{seq}").as_bytes().to_vec(),
+                )
+                .unwrap();
+                assert!(guard.check(&envelope).is_ok());
+            }
+
+            assert_eq!(guard.get_max_seq(keypair.did()), Some(5));
+        }
+
+        // Session 2: Simulate restart - create new guard from same store
+        {
+            let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+            let loaded = guard.load_and_apply_safety_gap().unwrap();
+
+            assert_eq!(loaded, 1); // One peer loaded
+
+            // max_seq should be 5 + RESTART_SAFETY_GAP
+            let expected_max_seq = 5 + RESTART_SAFETY_GAP;
+            assert_eq!(guard.get_max_seq(keypair.did()), Some(expected_max_seq));
+
+            // Replays of old sequences should be rejected
+            let old_envelope = SignedEnvelope::new(
+                keypair.did(),
+                &keypair,
+                5,
+                PayloadType::Gossip,
+                b"replay_attempt".to_vec(),
+            )
+            .unwrap();
+            let result = guard.check(&old_envelope);
+            assert!(result.is_err());
+            assert!(result.unwrap_err().to_string().contains("already seen"));
+
+            // New sequences above the gap should work
+            let new_envelope = SignedEnvelope::new(
+                keypair.did(),
+                &keypair,
+                expected_max_seq + 1,
+                PayloadType::Gossip,
+                b"new_msg".to_vec(),
+            )
+            .unwrap();
+            assert!(guard.check(&new_envelope).is_ok());
+        }
+    }
+
+    #[test]
+    fn test_finalized_persistence_across_restart() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let keypair = KeyPair::generate().unwrap();
+
+        // Session 1: Finalize a sequence
+        {
+            let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+            guard.load_and_apply_safety_gap().unwrap();
+
+            let envelope = SignedEnvelope::new(
+                keypair.did(),
+                &keypair,
+                100,
+                PayloadType::Ledger,
+                b"critical_tx".to_vec(),
+            )
+            .unwrap();
+
+            assert!(guard.check(&envelope).is_ok());
+            assert!(guard.finalize(keypair.did(), 100).is_ok());
+        }
+
+        // Session 2: Verify finalized sequence is still protected
+        {
+            let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+            guard.load_and_apply_safety_gap().unwrap();
+
+            assert!(guard.is_finalized(keypair.did(), 100));
+
+            // Attempting to replay finalized sequence should fail
+            let replay_envelope = SignedEnvelope::new(
+                keypair.did(),
+                &keypair,
+                100,
+                PayloadType::Ledger,
+                b"replay_critical_tx".to_vec(),
+            )
+            .unwrap();
+            let result = guard.check(&replay_envelope);
+            assert!(result.is_err());
+            assert!(result.unwrap_err().to_string().contains("finalized"));
+        }
+    }
+
+    #[test]
+    fn test_multiple_restart_compounds_safety_gap() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let keypair = KeyPair::generate().unwrap();
+
+        // Session 1
+        let session1_max = {
+            let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+            guard.load_and_apply_safety_gap().unwrap();
+
+            let envelope = SignedEnvelope::new(
+                keypair.did(),
+                &keypair,
+                10,
+                PayloadType::Gossip,
+                b"msg".to_vec(),
+            )
+            .unwrap();
+            assert!(guard.check(&envelope).is_ok());
+
+            guard.get_max_seq(keypair.did()).unwrap()
+        };
+        assert_eq!(session1_max, 10);
+
+        // Session 2 (first restart)
+        let session2_max = {
+            let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+            guard.load_and_apply_safety_gap().unwrap();
+            guard.get_max_seq(keypair.did()).unwrap()
+        };
+        assert_eq!(session2_max, 10 + RESTART_SAFETY_GAP);
+
+        // Session 3 (second restart)
+        let session3_max = {
+            let mut guard = ReplayGuard::new_persistent(300, 3600, store.clone());
+            guard.load_and_apply_safety_gap().unwrap();
+            guard.get_max_seq(keypair.did()).unwrap()
+        };
+        assert_eq!(session3_max, 10 + 2 * RESTART_SAFETY_GAP);
+    }
+
+    #[test]
+    fn test_key_parsing() {
+        let did = KeyPair::generate().unwrap().did().clone();
+
+        // Max seq key
+        let key = ReplayGuard::make_max_seq_key(&did);
+        let parsed = ReplayGuard::parse_max_seq_key(&key).unwrap();
+        assert_eq!(parsed.as_str(), did.as_str());
+
+        // Finalized key
+        let seq = 12345u64;
+        let fkey = ReplayGuard::make_finalized_key(&did, seq);
+        let (parsed_did, parsed_seq) = ReplayGuard::parse_finalized_key(&fkey).unwrap();
+        assert_eq!(parsed_did.as_str(), did.as_str());
+        assert_eq!(parsed_seq, seq);
+    }
+
+    #[test]
+    fn test_auto_initialization() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let keypair = KeyPair::generate().unwrap();
+
+        let mut guard = ReplayGuard::new_persistent(300, 3600, store);
+
+        // Not initialized yet
+        assert!(!guard.is_initialized());
+
+        // First check auto-initializes
+        let envelope = SignedEnvelope::new(
+            keypair.did(),
+            &keypair,
+            1,
+            PayloadType::Gossip,
+            b"test".to_vec(),
+        )
+        .unwrap();
+
+        assert!(guard.check(&envelope).is_ok());
+        assert!(guard.is_initialized());
     }
 }

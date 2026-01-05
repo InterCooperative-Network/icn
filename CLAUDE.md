@@ -276,6 +276,16 @@ The Claude Code agent **must**:
 - Always work on feature branches and open PRs
 - Run required checks before requesting review
 - Explain any skipped checks in the PR description
+- **When working on an existing PR**: Always check for new/updated comments and CI status before making changes
+  ```bash
+  gh pr view <PR_NUMBER> --comments  # Check for review comments
+  gh pr checks <PR_NUMBER>           # Check CI status
+  gh pr diff <PR_NUMBER>             # Review current changes
+  ```
+- **When CI fails**: Fetch and review the CI logs to understand the failure
+  ```bash
+  gh run view <RUN_ID> --log-failed  # Get failed job logs
+  ```
 
 ## Issue Management
 
