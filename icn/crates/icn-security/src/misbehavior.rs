@@ -326,14 +326,15 @@ impl MisbehaviorDetector {
         sanitized
     }
 
-    /// Prune old violations for a peer if they exceed the per-peer limit.
+    /// Prune oldest violations for a peer if they exceed the per-peer limit.
     ///
     /// Keeps the most recent MAX_VIOLATIONS_PER_PEER violations.
+    /// Violations are stored newest-first (inserted at front), so pruning
+    /// simply truncates from the back in O(1) amortized time.
     fn prune_violations_for_peer(&mut self, did: &Did) {
         if let Some(violations) = self.violations.get_mut(did) {
             if violations.len() > MAX_VIOLATIONS_PER_PEER {
-                // Sort by timestamp and keep only the most recent
-                violations.sort_by(|a, b| b.detected_at.cmp(&a.detected_at));
+                // Violations are stored newest-first, so truncate from back (oldest)
                 violations.truncate(MAX_VIOLATIONS_PER_PEER);
 
                 debug!(
@@ -362,10 +363,13 @@ impl MisbehaviorDetector {
             evidence: sanitized_evidence,
         };
 
-        // Add to violation history
-        self.violations.entry(did.clone()).or_default().push(record);
+        // Add to violation history (newest-first for O(1) pruning)
+        self.violations
+            .entry(did.clone())
+            .or_default()
+            .insert(0, record);
 
-        // Prune old violations to prevent unbounded growth
+        // Prune old violations to prevent unbounded growth (O(1) truncation from back)
         self.prune_violations_for_peer(did);
 
         // Update reputation score and capture thresholds for later checks
@@ -402,8 +406,8 @@ impl MisbehaviorDetector {
             self.quarantine_peer(did);
         }
 
-        // Cleanup old violations
-        self.cleanup_old_violations();
+        // Note: cleanup_old_violations() is called periodically via check_quarantine_releases()
+        // rather than on every violation for better performance
     }
 
     /// Get violations for a DID
@@ -1053,8 +1057,10 @@ mod tests {
         let mut detector = MisbehaviorDetector::new(MisbehaviorThresholds::default());
         let did = test_did();
 
+        let total_violations = MAX_VIOLATIONS_PER_PEER + 50;
+
         // Record more than MAX_VIOLATIONS_PER_PEER violations
-        for i in 0..(MAX_VIOLATIONS_PER_PEER + 50) {
+        for i in 0..total_violations {
             let violation = Violation::ExcessiveResourceUse {
                 metric: format!("test_{i}"),
                 observed: 10,
@@ -1071,6 +1077,31 @@ mod tests {
             MAX_VIOLATIONS_PER_PEER,
             violations.len()
         );
+
+        // Verify that the MOST RECENT violations are kept (newest-first order)
+        // The first violation in the list should be the most recent (test_{total-1})
+        // The last violation should be the oldest kept (test_{total-MAX})
+        if let Violation::ExcessiveResourceUse { metric, .. } = &violations[0].violation {
+            let expected_newest = format!("test_{}", total_violations - 1);
+            assert_eq!(
+                metric, &expected_newest,
+                "First violation should be the most recent"
+            );
+        } else {
+            panic!("Expected ExcessiveResourceUse violation");
+        }
+
+        if let Violation::ExcessiveResourceUse { metric, .. } =
+            &violations[violations.len() - 1].violation
+        {
+            let expected_oldest_kept = format!("test_{}", total_violations - MAX_VIOLATIONS_PER_PEER);
+            assert_eq!(
+                metric, &expected_oldest_kept,
+                "Last violation should be the oldest kept"
+            );
+        } else {
+            panic!("Expected ExcessiveResourceUse violation");
+        }
     }
 
     #[test]
