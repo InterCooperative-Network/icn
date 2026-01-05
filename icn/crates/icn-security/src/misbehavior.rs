@@ -9,9 +9,18 @@ use icn_identity::Did;
 use icn_obs::metrics::misbehavior as metrics;
 use icn_store::ContentHash;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
 use tracing::{debug, info, warn};
+
+/// Maximum size of evidence in bytes (64KB).
+/// Evidence larger than this will be truncated and hashed.
+pub const MAX_EVIDENCE_SIZE: usize = 64 * 1024;
+
+/// Maximum stored violations per peer before pruning oldest.
+/// This prevents unbounded memory growth from malicious peers.
+pub const MAX_VIOLATIONS_PER_PEER: usize = 100;
 
 /// Types of misbehavior that can be detected
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -285,6 +294,56 @@ impl MisbehaviorDetector {
         self.trust_penalty_callback = Some(callback);
     }
 
+    /// Sanitize evidence to prevent storage exhaustion attacks.
+    ///
+    /// If evidence exceeds MAX_EVIDENCE_SIZE, it is truncated and a SHA-256 hash
+    /// of the full evidence is appended, preserving a summary while bounding storage.
+    fn sanitize_evidence(evidence: Vec<u8>) -> Vec<u8> {
+        if evidence.len() <= MAX_EVIDENCE_SIZE {
+            return evidence;
+        }
+
+        // Marker format: "\n[TRUNCATED:sha256=<64 hex chars>]"
+        // Total marker length: 1 + 19 + 64 + 1 = 85 bytes
+        const MARKER_LEN: usize = 85;
+        let truncate_at = MAX_EVIDENCE_SIZE.saturating_sub(MARKER_LEN);
+        let mut sanitized = evidence[..truncate_at].to_vec();
+
+        // Compute hash of full evidence for forensic reference
+        let hash = Sha256::digest(&evidence);
+
+        // Append marker and hash
+        sanitized.extend_from_slice(b"\n[TRUNCATED:sha256=");
+        sanitized.extend_from_slice(hex::encode(hash).as_bytes());
+        sanitized.extend_from_slice(b"]");
+
+        debug!(
+            "Evidence truncated from {} to {} bytes",
+            evidence.len(),
+            sanitized.len()
+        );
+
+        sanitized
+    }
+
+    /// Prune old violations for a peer if they exceed the per-peer limit.
+    ///
+    /// Keeps the most recent MAX_VIOLATIONS_PER_PEER violations.
+    fn prune_violations_for_peer(&mut self, did: &Did) {
+        if let Some(violations) = self.violations.get_mut(did) {
+            if violations.len() > MAX_VIOLATIONS_PER_PEER {
+                // Sort by timestamp and keep only the most recent
+                violations.sort_by(|a, b| b.detected_at.cmp(&a.detected_at));
+                violations.truncate(MAX_VIOLATIONS_PER_PEER);
+
+                debug!(
+                    "Pruned violations for {} to {} entries",
+                    did, MAX_VIOLATIONS_PER_PEER
+                );
+            }
+        }
+    }
+
     /// Record a violation for a DID
     pub fn record_violation(&mut self, did: &Did, violation: Violation, evidence: Vec<u8>) {
         info!(
@@ -293,15 +352,21 @@ impl MisbehaviorDetector {
             violation.description()
         );
 
+        // Sanitize evidence to prevent storage exhaustion
+        let sanitized_evidence = Self::sanitize_evidence(evidence);
+
         // Create violation record
         let record = ViolationRecord {
             violation: violation.clone(),
             detected_at: SystemTime::now(),
-            evidence,
+            evidence: sanitized_evidence,
         };
 
         // Add to violation history
         self.violations.entry(did.clone()).or_default().push(record);
+
+        // Prune old violations to prevent unbounded growth
+        self.prune_violations_for_peer(did);
 
         // Update reputation score and capture thresholds for later checks
         let (is_auto_ban, should_ban, should_quarantine) = {
@@ -927,6 +992,109 @@ mod tests {
             call_count.load(Ordering::SeqCst),
             1,
             "Callback should be called on quarantine release"
+        );
+    }
+
+    #[test]
+    fn test_evidence_under_size_limit_unchanged() {
+        let small_evidence = vec![1u8; 1000]; // 1KB, well under 64KB limit
+        let sanitized = MisbehaviorDetector::sanitize_evidence(small_evidence.clone());
+
+        assert_eq!(
+            sanitized, small_evidence,
+            "Evidence under size limit should be unchanged"
+        );
+    }
+
+    #[test]
+    fn test_evidence_over_size_limit_truncated() {
+        let large_evidence = vec![42u8; 128 * 1024]; // 128KB, over 64KB limit
+        let sanitized = MisbehaviorDetector::sanitize_evidence(large_evidence.clone());
+
+        // Should be truncated to approximately MAX_EVIDENCE_SIZE
+        assert!(
+            sanitized.len() <= MAX_EVIDENCE_SIZE,
+            "Sanitized evidence should be at most {} bytes, got {}",
+            MAX_EVIDENCE_SIZE,
+            sanitized.len()
+        );
+
+        // Should contain truncation marker
+        let sanitized_str = String::from_utf8_lossy(&sanitized);
+        assert!(
+            sanitized_str.contains("[TRUNCATED:sha256="),
+            "Truncated evidence should contain hash marker"
+        );
+
+        // Hash should be a valid hex string (64 chars for SHA-256)
+        let hash_start = sanitized_str.find("sha256=").unwrap() + 7;
+        let hash_end = sanitized_str.find(']').unwrap();
+        let hash_hex = &sanitized_str[hash_start..hash_end];
+        assert_eq!(hash_hex.len(), 64, "SHA-256 hash should be 64 hex chars");
+        assert!(
+            hash_hex.chars().all(|c| c.is_ascii_hexdigit()),
+            "Hash should be valid hex"
+        );
+    }
+
+    #[test]
+    fn test_evidence_at_exact_limit() {
+        let exact_evidence = vec![99u8; MAX_EVIDENCE_SIZE];
+        let sanitized = MisbehaviorDetector::sanitize_evidence(exact_evidence.clone());
+
+        assert_eq!(
+            sanitized, exact_evidence,
+            "Evidence at exact limit should be unchanged"
+        );
+    }
+
+    #[test]
+    fn test_per_peer_violation_pruning() {
+        let mut detector = MisbehaviorDetector::new(MisbehaviorThresholds::default());
+        let did = test_did();
+
+        // Record more than MAX_VIOLATIONS_PER_PEER violations
+        for i in 0..(MAX_VIOLATIONS_PER_PEER + 50) {
+            let violation = Violation::ExcessiveResourceUse {
+                metric: format!("test_{i}"),
+                observed: 10,
+                limit: 5,
+            };
+            detector.record_violation(&did, violation, vec![]);
+        }
+
+        // Should have at most MAX_VIOLATIONS_PER_PEER violations
+        let violations = detector.get_violations(&did);
+        assert!(
+            violations.len() <= MAX_VIOLATIONS_PER_PEER,
+            "Should have at most {} violations, got {}",
+            MAX_VIOLATIONS_PER_PEER,
+            violations.len()
+        );
+    }
+
+    #[test]
+    fn test_oversized_evidence_recorded_correctly() {
+        let mut detector = MisbehaviorDetector::new(MisbehaviorThresholds::default());
+        let did = test_did();
+
+        // Create oversized evidence
+        let large_evidence = vec![0xAB; 100 * 1024]; // 100KB
+        let violation = Violation::InvalidSignature {
+            message_hash: [0u8; 32],
+        };
+
+        detector.record_violation(&did, violation, large_evidence);
+
+        // Verify violation was recorded
+        let violations = detector.get_violations(&did);
+        assert_eq!(violations.len(), 1);
+
+        // Verify evidence was sanitized
+        let stored_evidence = &violations[0].evidence;
+        assert!(
+            stored_evidence.len() <= MAX_EVIDENCE_SIZE,
+            "Stored evidence should be sanitized"
         );
     }
 }
