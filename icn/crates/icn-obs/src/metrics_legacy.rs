@@ -1674,6 +1674,20 @@ pub fn init_descriptions() {
         "icn_ledger_dynamic_limit_recalculations_total",
         "Total times a limit was recalculated due to trust changes"
     );
+
+    // Causal ordering metrics (Issue #499)
+    describe_counter!(
+        "icn_ledger_orphan_entries_total",
+        "Total entries accepted without all parent entries present"
+    );
+    describe_counter!(
+        "icn_ledger_missing_parents_total",
+        "Total missing parent entries encountered"
+    );
+    describe_counter!(
+        "icn_ledger_entries_rejected_missing_parents_total",
+        "Total local entries rejected due to missing parents"
+    );
 }
 
 /// Network metrics
@@ -2228,6 +2242,21 @@ pub mod ledger {
     /// Increment counter when a limit is recalculated (trust change, etc.)
     pub fn dynamic_limit_recalculations_inc() {
         counter!("icn_ledger_dynamic_limit_recalculations_total").increment(1);
+    }
+
+    /// Issue #499: Increment counter when an entry is accepted without all parents present
+    pub fn orphan_entries_inc() {
+        counter!("icn_ledger_orphan_entries_total").increment(1);
+    }
+
+    /// Issue #499: Increment counter for each missing parent entry encountered
+    pub fn missing_parents_add(count: u64) {
+        counter!("icn_ledger_missing_parents_total").increment(count);
+    }
+
+    /// Issue #499: Increment counter when a local entry is rejected due to missing parents
+    pub fn entries_rejected_missing_parents_inc() {
+        counter!("icn_ledger_entries_rejected_missing_parents_total").increment(1);
     }
 }
 
