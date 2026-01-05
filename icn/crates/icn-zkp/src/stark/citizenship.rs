@@ -120,7 +120,7 @@ impl Air for CitizenshipProofAir {
         //    a citizenship status that matches country and meets minimum status.
         //
         // The status >= minimum check is performed during trace construction.
-        // See GitHub issue #505 for future algebraic constraint improvements.
+        // See GitHub issue #506 for future algebraic constraint improvements.
 
         result[0] = E::ZERO;
         result[1] = E::ZERO;
@@ -222,9 +222,11 @@ pub fn prove_citizenship(
     let pub_inputs = CitizenshipPublicInputs::from_circuit(public);
 
     let prover = CitizenshipProofProver::new(default_proof_options(), pub_inputs);
-    let proof = prover
-        .prove(trace)
-        .map_err(|e| CircuitError::ProofGenerationFailed(e.to_string()))?;
+    let proof = prover.prove(trace).map_err(|e| {
+        CircuitError::ProofGenerationFailed(format!(
+            "STARK citizenship proof generation failed: {e}"
+        ))
+    })?;
 
     let proof_bytes = proof.to_bytes();
     let public_hash = crate::circuit::compute_public_inputs_hash(public);
@@ -242,8 +244,9 @@ pub fn verify_citizenship(
         return Ok(false);
     }
 
-    let stark_proof = Proof::from_bytes(&proof.proof_bytes)
-        .map_err(|e| CircuitError::VerificationFailed(e.to_string()))?;
+    let stark_proof = Proof::from_bytes(&proof.proof_bytes).map_err(|e| {
+        CircuitError::VerificationFailed(format!("STARK proof deserialization failed: {e}"))
+    })?;
 
     let pub_inputs = CitizenshipPublicInputs::from_circuit(public);
 

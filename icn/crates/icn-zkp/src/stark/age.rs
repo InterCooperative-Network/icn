@@ -18,7 +18,7 @@ use winterfell::{
 /// Public inputs for age proof AIR
 #[derive(Debug, Clone)]
 pub struct AgePublicInputs {
-    /// Age threshold in days (threshold_years * 365)
+    /// Age threshold in days (accounting for leap years)
     pub threshold_days: Felt,
     /// Current date as days since epoch
     pub current_date: Felt,
@@ -31,7 +31,7 @@ pub struct AgePublicInputs {
 impl AgePublicInputs {
     /// Create from circuit public inputs
     pub fn from_circuit(public: &AgeProofPublic) -> Self {
-        let threshold_days = (public.threshold as u32) * 365;
+        let threshold_days = years_to_days(public.threshold as u32);
         Self {
             threshold_days: u32_to_felt(threshold_days),
             current_date: u32_to_felt(public.current_date),
@@ -130,7 +130,7 @@ impl Air for AgeProofAir {
         //
         // FUTURE IMPROVEMENT: Full algebraic verification via range proof constraints
         // would encode age >= threshold directly in the AIR, eliminating reliance on
-        // trace construction for soundness. See GitHub issue #505.
+        // trace construction for soundness. See GitHub issue #506.
 
         result[0] = E::ZERO;
         result[1] = E::ZERO;
@@ -229,7 +229,7 @@ pub fn prove_age(
     public: &AgeProofPublic,
     private: &AgeProofPrivate,
 ) -> Result<StarkProof, CircuitError> {
-    let threshold_days = (public.threshold as u32) * 365;
+    let threshold_days = years_to_days(public.threshold as u32);
 
     // Build trace
     let trace = build_trace(
@@ -244,9 +244,9 @@ pub fn prove_age(
 
     // Create prover and generate proof
     let prover = AgeProofProver::new(default_proof_options(), pub_inputs);
-    let proof = prover
-        .prove(trace)
-        .map_err(|e| CircuitError::ProofGenerationFailed(e.to_string()))?;
+    let proof = prover.prove(trace).map_err(|e| {
+        CircuitError::ProofGenerationFailed(format!("STARK age proof generation failed: {e}"))
+    })?;
 
     // Serialize proof
     let proof_bytes = proof.to_bytes();
@@ -264,8 +264,9 @@ pub fn verify_age(public: &AgeProofPublic, proof: &StarkProof) -> Result<bool, C
     }
 
     // Deserialize proof
-    let stark_proof = Proof::from_bytes(&proof.proof_bytes)
-        .map_err(|e| CircuitError::VerificationFailed(e.to_string()))?;
+    let stark_proof = Proof::from_bytes(&proof.proof_bytes).map_err(|e| {
+        CircuitError::VerificationFailed(format!("STARK proof deserialization failed: {e}"))
+    })?;
 
     // Create public inputs
     let pub_inputs = AgePublicInputs::from_circuit(public);
@@ -354,8 +355,8 @@ mod tests {
         let issuer_pk = [1u8; 32];
         let public = AgeProofPublic::new(21, issuer_pk);
 
-        // Someone born exactly 21 years ago (edge case)
-        let birthdate = public.current_date - (21 * 365);
+        // Someone born exactly 21 years ago (accounting for leap years)
+        let birthdate = public.current_date - years_to_days(21);
         let private = AgeProofPrivate {
             birthdate_days: birthdate,
             issuer_signature: vec![0u8; 64],

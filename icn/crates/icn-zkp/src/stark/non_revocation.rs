@@ -117,7 +117,7 @@ impl Air for NonRevocationProofAir {
         //    a valid non-membership witness for the credential.
         //
         // The non-membership witness validation is performed during trace construction.
-        // See GitHub issue #505 for post-quantum accumulator improvements.
+        // See GitHub issue #505 for post-quantum accumulator and #506 for algebraic constraints.
 
         result[0] = E::ZERO;
         result[1] = E::ZERO;
@@ -200,9 +200,11 @@ pub fn prove_non_revocation(
     let pub_inputs = NonRevocationPublicInputs::from_circuit(public);
 
     let prover = NonRevocationProofProver::new(default_proof_options(), pub_inputs);
-    let proof = prover
-        .prove(trace)
-        .map_err(|e| CircuitError::ProofGenerationFailed(e.to_string()))?;
+    let proof = prover.prove(trace).map_err(|e| {
+        CircuitError::ProofGenerationFailed(format!(
+            "STARK non-revocation proof generation failed: {e}"
+        ))
+    })?;
 
     let proof_bytes = proof.to_bytes();
     let public_hash = crate::circuit::compute_public_inputs_hash(public);
@@ -220,8 +222,9 @@ pub fn verify_non_revocation(
         return Ok(false);
     }
 
-    let stark_proof = Proof::from_bytes(&proof.proof_bytes)
-        .map_err(|e| CircuitError::VerificationFailed(e.to_string()))?;
+    let stark_proof = Proof::from_bytes(&proof.proof_bytes).map_err(|e| {
+        CircuitError::VerificationFailed(format!("STARK proof deserialization failed: {e}"))
+    })?;
 
     let pub_inputs = NonRevocationPublicInputs::from_circuit(public);
 

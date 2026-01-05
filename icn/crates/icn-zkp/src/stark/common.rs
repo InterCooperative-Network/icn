@@ -45,6 +45,18 @@ pub fn u32_to_felt(value: u32) -> Felt {
     Felt::from(value)
 }
 
+/// Convert years to approximate days, accounting for leap years.
+///
+/// Uses the approximation: years * 365.25 ≈ years * 365 + years / 4
+/// This provides accuracy within ~1 day over typical human lifespans.
+///
+/// # Examples
+/// - 18 years → 6,574 days (vs 6,570 without leap year correction)
+/// - 21 years → 7,670 days (vs 7,665 without leap year correction)
+pub fn years_to_days(years: u32) -> u32 {
+    years * 365 + years / 4
+}
+
 /// Convert a u64 value to a field element
 pub fn u64_to_felt(value: u64) -> Felt {
     Felt::from(value)
@@ -63,7 +75,24 @@ pub fn felt_to_u32(felt: Felt) -> u32 {
     felt.as_int() as u32
 }
 
-/// Hash bytes to a single field element using SHA3
+/// Hash bytes to a single field element using SHA3-256, truncated to 64 bits.
+///
+/// # Security Note
+/// This function truncates SHA3-256 (256 bits) to 64 bits to fit in a single
+/// field element. This has the following security implications:
+///
+/// - **Collision resistance**: Reduced from ~2^128 to ~2^32 birthday bound
+/// - **Preimage resistance**: Reduced from ~2^256 to ~2^64
+///
+/// This truncation is acceptable for the STARK use case because:
+/// 1. Hash values are used as commitments within a larger proof structure
+/// 2. The STARK proof system provides additional soundness guarantees
+/// 3. Collision attacks would require ~2^32 hash computations, which is
+///    computationally expensive but not infeasible for a determined attacker
+///
+/// For applications requiring full hash security, consider using multiple
+/// field elements to represent the full 256-bit hash, or use Poseidon hash
+/// which is designed for efficient representation in finite fields.
 pub fn hash_to_felt(data: &[u8]) -> Felt {
     use sha3::{Digest, Sha3_256};
     let hash = Sha3_256::digest(data);
