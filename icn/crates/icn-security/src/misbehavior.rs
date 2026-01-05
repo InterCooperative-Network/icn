@@ -294,6 +294,14 @@ impl MisbehaviorDetector {
         self.trust_penalty_callback = Some(callback);
     }
 
+    /// Truncation marker components for self-documenting length calculation
+    const TRUNCATION_MARKER_PREFIX: &'static [u8] = b"\n[TRUNCATED:sha256=";
+    const TRUNCATION_MARKER_SUFFIX: &'static [u8] = b"]";
+    /// SHA-256 produces 32 bytes = 64 hex characters
+    const SHA256_HEX_LEN: usize = 64;
+    /// Total marker length: prefix (20) + 64 hex chars + suffix (1) = 85 bytes
+    const TRUNCATION_MARKER_LEN: usize = 20 + Self::SHA256_HEX_LEN + 1; // Can't use .len() in const context
+
     /// Sanitize evidence to prevent storage exhaustion attacks.
     ///
     /// If evidence exceeds MAX_EVIDENCE_SIZE, it is truncated and a SHA-256 hash
@@ -303,25 +311,25 @@ impl MisbehaviorDetector {
             return evidence;
         }
 
-        // Marker format: "\n[TRUNCATED:sha256=<64 hex chars>]"
-        // Total marker length: 1 + 19 + 64 + 1 = 85 bytes
-        const MARKER_LEN: usize = 85;
-        let truncate_at = MAX_EVIDENCE_SIZE.saturating_sub(MARKER_LEN);
+        let truncate_at = MAX_EVIDENCE_SIZE.saturating_sub(Self::TRUNCATION_MARKER_LEN);
         let mut sanitized = evidence[..truncate_at].to_vec();
 
         // Compute hash of full evidence for forensic reference
         let hash = Sha256::digest(&evidence);
 
         // Append marker and hash
-        sanitized.extend_from_slice(b"\n[TRUNCATED:sha256=");
+        sanitized.extend_from_slice(Self::TRUNCATION_MARKER_PREFIX);
         sanitized.extend_from_slice(hex::encode(hash).as_bytes());
-        sanitized.extend_from_slice(b"]");
+        sanitized.extend_from_slice(Self::TRUNCATION_MARKER_SUFFIX);
 
         debug!(
             "Evidence truncated from {} to {} bytes",
             evidence.len(),
             sanitized.len()
         );
+
+        // Emit metric for monitoring truncation attempts
+        metrics::evidence_truncated_inc();
 
         sanitized
     }
@@ -1094,7 +1102,8 @@ mod tests {
         if let Violation::ExcessiveResourceUse { metric, .. } =
             &violations[violations.len() - 1].violation
         {
-            let expected_oldest_kept = format!("test_{}", total_violations - MAX_VIOLATIONS_PER_PEER);
+            let expected_oldest_kept =
+                format!("test_{}", total_violations - MAX_VIOLATIONS_PER_PEER);
             assert_eq!(
                 metric, &expected_oldest_kept,
                 "Last violation should be the oldest kept"
@@ -1126,6 +1135,47 @@ mod tests {
         assert!(
             stored_evidence.len() <= MAX_EVIDENCE_SIZE,
             "Stored evidence should be sanitized"
+        );
+    }
+
+    #[test]
+    fn test_evidence_one_byte_over_limit() {
+        // Test boundary case: exactly one byte over the limit
+        let evidence = vec![42u8; MAX_EVIDENCE_SIZE + 1];
+        let sanitized = MisbehaviorDetector::sanitize_evidence(evidence);
+
+        assert!(
+            sanitized.len() <= MAX_EVIDENCE_SIZE,
+            "Evidence one byte over limit should be truncated"
+        );
+        assert!(
+            String::from_utf8_lossy(&sanitized).contains("[TRUNCATED:sha256="),
+            "Should contain truncation marker"
+        );
+    }
+
+    #[test]
+    fn test_truncation_hash_is_correct() {
+        // Verify that the hash in the truncation marker matches the original evidence
+        let large_evidence = vec![0xDE; 128 * 1024]; // 128KB
+        let expected_hash = hex::encode(Sha256::digest(&large_evidence));
+
+        let sanitized = MisbehaviorDetector::sanitize_evidence(large_evidence);
+        let sanitized_str = String::from_utf8_lossy(&sanitized);
+
+        // Extract hash from marker
+        let hash_start = sanitized_str
+            .find("sha256=")
+            .expect("should have sha256 marker")
+            + 7;
+        let hash_end = sanitized_str
+            .find(']')
+            .expect("should have closing bracket");
+        let actual_hash = &sanitized_str[hash_start..hash_end];
+
+        assert_eq!(
+            actual_hash, expected_hash,
+            "Hash in truncation marker should match SHA-256 of original evidence"
         );
     }
 }
