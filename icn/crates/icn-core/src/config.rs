@@ -1028,6 +1028,70 @@ pub struct SupervisorConfig {
     /// Clock synchronization interval in seconds (default: 600 = 10 minutes)
     #[serde(default = "default_clock_sync_interval_secs")]
     pub clock_sync_interval_secs: u64,
+
+    /// Actor restart policy configuration
+    #[serde(default)]
+    pub restart_policy: RestartPolicyConfig,
+}
+
+/// Configuration for actor restart with exponential backoff.
+///
+/// When an actor task fails, the supervisor can restart it with configurable
+/// backoff to prevent rapid restart loops that exhaust resources.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RestartPolicyConfig {
+    /// Initial delay before first restart attempt in milliseconds (default: 100)
+    #[serde(default = "default_restart_initial_delay_ms")]
+    pub initial_delay_ms: u64,
+
+    /// Maximum delay between restart attempts in milliseconds (default: 30000 = 30s)
+    #[serde(default = "default_restart_max_delay_ms")]
+    pub max_delay_ms: u64,
+
+    /// Backoff multiplier applied to delay after each failure (default: 2.0)
+    #[serde(default = "default_restart_backoff_multiplier")]
+    pub backoff_multiplier: f64,
+
+    /// Maximum restart attempts within the restart window (default: 5)
+    #[serde(default = "default_restart_max_attempts")]
+    pub max_attempts: u32,
+
+    /// Time window for counting restart attempts in seconds (default: 60)
+    /// If max_attempts is exceeded within this window, the actor is not restarted.
+    #[serde(default = "default_restart_window_secs")]
+    pub restart_window_secs: u64,
+}
+
+fn default_restart_initial_delay_ms() -> u64 {
+    100
+}
+
+fn default_restart_max_delay_ms() -> u64 {
+    30_000 // 30 seconds
+}
+
+fn default_restart_backoff_multiplier() -> f64 {
+    2.0
+}
+
+fn default_restart_max_attempts() -> u32 {
+    5
+}
+
+fn default_restart_window_secs() -> u64 {
+    60
+}
+
+impl Default for RestartPolicyConfig {
+    fn default() -> Self {
+        Self {
+            initial_delay_ms: default_restart_initial_delay_ms(),
+            max_delay_ms: default_restart_max_delay_ms(),
+            backoff_multiplier: default_restart_backoff_multiplier(),
+            max_attempts: default_restart_max_attempts(),
+            restart_window_secs: default_restart_window_secs(),
+        }
+    }
 }
 
 fn default_candidate_cleanup_interval_secs() -> u64 {
@@ -1063,6 +1127,7 @@ impl Default for SupervisorConfig {
             metrics_update_interval_secs: default_metrics_update_interval_secs(),
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
             clock_sync_interval_secs: default_clock_sync_interval_secs(),
+            restart_policy: RestartPolicyConfig::default(),
         }
     }
 }
