@@ -100,14 +100,14 @@ pub mod verifier;
 
 // Re-exports for convenience
 pub use accumulator::{AccumulatorError, MembershipWitness, NonMembershipWitness, RsaAccumulator};
-pub use merkle_accumulator::{
-    MerkleAccumulator, MerkleAccumulatorError, MerkleMembershipProof, MerkleNonMembershipProof,
-};
 pub use circuit::{
     AgeProofCircuit, AgeProofPrivate, AgeProofPublic, Circuit, CircuitError,
     CitizenshipProofCircuit, CitizenshipProofPrivate, CitizenshipProofPublic,
     MembershipProofCircuit, MembershipProofPrivate, MembershipProofPublic, NonRevocationCircuit,
     NonRevocationPrivate, NonRevocationPublic,
+};
+pub use merkle_accumulator::{
+    MerkleAccumulator, MerkleAccumulatorError, MerkleMembershipProof, MerkleNonMembershipProof,
 };
 pub use prover::{ProverError, ZkProver};
 pub use types::{

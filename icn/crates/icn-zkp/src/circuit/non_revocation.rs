@@ -103,10 +103,11 @@ impl NonRevocationPublic {
 
     /// Validate public inputs
     pub fn validate(&self) -> Result<(), CircuitError> {
-        // Accumulator value should not be all zeros
-        if self.accumulator_value == [0u8; 32] {
+        // RSA accumulator value should not be all zeros (indicates uninitialized)
+        // Merkle accumulator CAN have zero root (empty revocation list is valid)
+        if self.accumulator_type == AccumulatorType::Rsa && self.accumulator_value == [0u8; 32] {
             return Err(CircuitError::InvalidPublicInput(
-                "accumulator value cannot be zero".into(),
+                "RSA accumulator value cannot be zero".into(),
             ));
         }
         Ok(())
@@ -368,12 +369,56 @@ mod tests {
     }
 
     #[test]
-    fn test_zero_accumulator_invalid() {
+    fn test_zero_rsa_accumulator_invalid() {
         let issuer_pk = [1u8; 32];
-        let accumulator = [0u8; 32]; // Invalid
+        let accumulator = [0u8; 32]; // Invalid for RSA
 
-        let public = NonRevocationPublic::new(accumulator, 1, issuer_pk);
+        // RSA accumulator with zero value should be invalid
+        let public =
+            NonRevocationPublic::with_type(accumulator, 1, issuer_pk, AccumulatorType::Rsa);
         assert!(public.validate().is_err());
+    }
+
+    #[test]
+    fn test_zero_merkle_accumulator_valid() {
+        let issuer_pk = [1u8; 32];
+        let accumulator = [0u8; 32]; // Valid for empty Merkle tree
+
+        // Merkle accumulator with zero root (empty) should be valid
+        let public =
+            NonRevocationPublic::with_type(accumulator, 0, issuer_pk, AccumulatorType::Merkle);
+        assert!(public.validate().is_ok());
+    }
+
+    #[test]
+    #[cfg(feature = "simulated")]
+    fn test_empty_merkle_accumulator_proof() {
+        use crate::merkle_accumulator::MerkleAccumulator;
+
+        let issuer_pk = [1u8; 32];
+        let credential_id = [5u8; 32];
+
+        // Empty Merkle accumulator (no revoked credentials)
+        let mut acc = MerkleAccumulator::new();
+        let merkle_proof = acc.non_membership_proof(&credential_id).unwrap();
+        let root = acc.root();
+
+        // Root should be zero for empty accumulator
+        assert_eq!(root, [0u8; 32]);
+
+        // Create public inputs
+        let public =
+            NonRevocationPublic::with_type(root, acc.epoch(), issuer_pk, AccumulatorType::Merkle);
+
+        // Validation should pass
+        assert!(public.validate().is_ok());
+
+        // Create private inputs
+        let private = NonRevocationPrivate::from_merkle(credential_id, merkle_proof, [0u8; 32]);
+
+        // Generate and verify proof
+        let proof = NonRevocationCircuit::prove(&public, &private).unwrap();
+        assert!(NonRevocationCircuit::verify(&public, &proof).unwrap());
     }
 
     #[test]
@@ -426,12 +471,8 @@ mod tests {
         let root = acc.root();
 
         // Create public inputs with Merkle accumulator type
-        let public = NonRevocationPublic::with_type(
-            root,
-            acc.epoch(),
-            issuer_pk,
-            AccumulatorType::Merkle,
-        );
+        let public =
+            NonRevocationPublic::with_type(root, acc.epoch(), issuer_pk, AccumulatorType::Merkle);
 
         // Create private inputs from Merkle proof
         let private = NonRevocationPrivate::from_merkle(credential_id, merkle_proof, [0u8; 32]);
