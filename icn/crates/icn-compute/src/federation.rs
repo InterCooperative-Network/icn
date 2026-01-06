@@ -179,7 +179,7 @@ pub struct FederatedExecutorRegistry {
     /// Own cooperative ID
     own_coop_id: String,
 
-    /// Trust attenuation factor (default 0.5)
+    /// Trust attenuation factor (default 0.9)
     trust_attenuation: f64,
 
     /// Cache TTL in seconds
@@ -191,7 +191,7 @@ pub struct FederatedExecutorRegistry {
 
 impl FederatedExecutorRegistry {
     /// Default trust attenuation factor
-    pub const DEFAULT_ATTENUATION: f64 = 0.5;
+    pub const DEFAULT_ATTENUATION: f64 = 0.9;
 
     /// Default cache TTL (5 minutes)
     pub const DEFAULT_CACHE_TTL_SECS: u64 = 300;
@@ -285,7 +285,8 @@ impl FederatedExecutorRegistry {
         );
 
         let mut all_executors = Vec::new();
-        let cache = self.federated_cache.write().await;
+        // Use read lock since we only read from cache here
+        let cache = self.federated_cache.read().await;
 
         for coop in compute_coops {
             // For now, we don't have a way to query executors directly from cooperatives.
@@ -339,7 +340,7 @@ impl FederatedExecutorRegistry {
             federated_trust_score: federated_trust,
             last_seen: now,
             capacity: attestation.capacity,
-            gateway_endpoint: None, // Would be set from CooperativeInfo
+            gateway_endpoint: attestation.gateway_endpoint,
         };
 
         // Update cache

@@ -165,145 +165,147 @@ impl ComputeActor {
         };
 
         // Check placement constraints from policy (Phase 16E)
-        // Look up task to get its placement_constraints
-        let mgr = self.task_manager.lock().await;
-        if let Some(task) = mgr.get(&task_hash) {
-            if let Some(ref constraints) = task.placement_constraints {
-                // Check required region
-                if let Some(ref required_region) = constraints.required_region {
-                    if let Some(ref own_region) = self.own_region {
-                        if own_region != required_region {
-                            tracing::debug!(
-                                task_hash = %task_hash_str,
-                                required_region = %required_region,
-                                own_region = %own_region,
-                                "Task requires different region, skipping claim"
-                            );
-                            drop(mgr);
-                            return Ok(());
-                        }
-                    } else {
-                        // No region configured, cannot claim region-specific tasks
+        // Extract constraints from task manager first, then drop the lock to avoid
+        // nested lock acquisition with executor_registry (potential deadlock fix)
+        let (placement_constraints, federation_constraints, task_coop_id) = {
+            let mgr = self.task_manager.lock().await;
+            if let Some(task) = mgr.get(&task_hash) {
+                (
+                    task.placement_constraints.clone(),
+                    task.federation_constraints.clone(),
+                    task.coop_id.clone(),
+                )
+            } else {
+                (None, None, None)
+            }
+            // mgr lock is dropped here
+        };
+
+        // Check placement constraints (no longer holding task_manager lock)
+        if let Some(ref constraints) = placement_constraints {
+            // Check required region
+            if let Some(ref required_region) = constraints.required_region {
+                if let Some(ref own_region) = self.own_region {
+                    if own_region != required_region {
                         tracing::debug!(
                             task_hash = %task_hash_str,
                             required_region = %required_region,
-                            "Task requires region but node has no region configured, skipping claim"
+                            own_region = %own_region,
+                            "Task requires different region, skipping claim"
                         );
-                        drop(mgr);
                         return Ok(());
                     }
-                }
-
-                // Check executor whitelist
-                if !constraints.allowed_executors.is_empty()
-                    && !constraints.allowed_executors.contains(&self.own_did)
-                {
-                    tracing::info!(
+                } else {
+                    // No region configured, cannot claim region-specific tasks
+                    tracing::debug!(
                         task_hash = %task_hash_str,
-                        executor = %self.own_did,
-                        "Executor not in whitelist, skipping placement"
+                        required_region = %required_region,
+                        "Task requires region but node has no region configured, skipping claim"
                     );
-                    icn_obs::metrics::compute::placement_constraints_enforced_inc("whitelist");
-                    drop(mgr);
                     return Ok(());
-                }
-
-                // Check executor blacklist
-                if constraints.forbidden_executors.contains(&self.own_did) {
-                    tracing::info!(
-                        task_hash = %task_hash_str,
-                        executor = %self.own_did,
-                        "Executor in blacklist, skipping placement"
-                    );
-                    icn_obs::metrics::compute::placement_constraints_enforced_inc("blacklist");
-                    drop(mgr);
-                    return Ok(());
-                }
-
-                // Check required capabilities
-                if !constraints.required_capabilities.is_empty() {
-                    // Get our capabilities from registry
-                    let registry = self.executor_registry.lock().await;
-                    if let Some(info) = registry.get(&self.own_did) {
-                        let our_caps = &info.capabilities;
-                        for required in &constraints.required_capabilities {
-                            // Convert string to capability and check
-                            let has_cap = our_caps.iter().any(|cap| match cap {
-                                crate::types::ExecutorCapability::Ccl => required == "Ccl",
-                                crate::types::ExecutorCapability::Wasm => required == "Wasm",
-                                crate::types::ExecutorCapability::Custom(name) => name == required,
-                            });
-                            if !has_cap {
-                                tracing::info!(
-                                    task_hash = %task_hash_str,
-                                    executor = %self.own_did,
-                                    missing_capability = %required,
-                                    "Missing required capability, skipping placement"
-                                );
-                                icn_obs::metrics::compute::placement_constraints_enforced_inc(
-                                    "capability",
-                                );
-                                drop(registry);
-                                drop(mgr);
-                                return Ok(());
-                            }
-                        }
-                    }
                 }
             }
 
-            // Phase 21: Check federation placement constraints
-            if let Some(ref fed_constraints) = task.federation_constraints {
-                // Determine if we're a federated executor (from another cooperative)
-                let is_local = self.own_cooperative_id.is_none()
-                    || task.coop_id.as_ref() == self.own_cooperative_id.as_ref();
+            // Check executor whitelist
+            if !constraints.allowed_executors.is_empty()
+                && !constraints.allowed_executors.contains(&self.own_did)
+            {
+                tracing::info!(
+                    task_hash = %task_hash_str,
+                    executor = %self.own_did,
+                    "Executor not in whitelist, skipping placement"
+                );
+                icn_obs::metrics::compute::placement_constraints_enforced_inc("whitelist");
+                return Ok(());
+            }
 
-                // Check federation policy
-                if !fed_constraints.allows_cooperative(self.own_cooperative_id.as_deref(), is_local)
-                {
-                    tracing::info!(
-                        task_hash = %task_hash_str,
-                        executor = %self.own_did,
-                        our_coop = ?self.own_cooperative_id,
-                        task_coop = ?task.coop_id,
-                        policy = ?fed_constraints.federation_policy,
-                        "Federation policy rejects this executor, skipping placement"
-                    );
-                    icn_obs::metrics::compute::placement_constraints_enforced_inc(
-                        "federation_policy",
-                    );
-                    drop(mgr);
-                    return Ok(());
-                }
+            // Check executor blacklist
+            if constraints.forbidden_executors.contains(&self.own_did) {
+                tracing::info!(
+                    task_hash = %task_hash_str,
+                    executor = %self.own_did,
+                    "Executor in blacklist, skipping placement"
+                );
+                icn_obs::metrics::compute::placement_constraints_enforced_inc("blacklist");
+                return Ok(());
+            }
 
-                // Check federated trust threshold if we're a federated executor
-                if !is_local {
-                    let min_trust = fed_constraints.effective_min_trust();
-                    // Look up our federated trust score from registry
-                    let registry = self.executor_registry.lock().await;
-                    if let Some(info) = registry.get(&self.own_did) {
-                        if let Some(fed_trust) = info.federated_trust_score {
-                            if fed_trust < min_trust {
-                                tracing::info!(
-                                    task_hash = %task_hash_str,
-                                    executor = %self.own_did,
-                                    federated_trust = fed_trust,
-                                    min_required = min_trust,
-                                    "Federated trust below threshold, skipping placement"
-                                );
-                                icn_obs::metrics::compute::placement_constraints_enforced_inc(
-                                    "federation_trust",
-                                );
-                                drop(registry);
-                                drop(mgr);
-                                return Ok(());
-                            }
+            // Check required capabilities
+            if !constraints.required_capabilities.is_empty() {
+                // Get our capabilities from registry (safe - not holding task_manager)
+                let registry = self.executor_registry.lock().await;
+                if let Some(info) = registry.get(&self.own_did) {
+                    let our_caps = &info.capabilities;
+                    for required in &constraints.required_capabilities {
+                        // Convert string to capability and check
+                        let has_cap = our_caps.iter().any(|cap| match cap {
+                            crate::types::ExecutorCapability::Ccl => required == "Ccl",
+                            crate::types::ExecutorCapability::Wasm => required == "Wasm",
+                            crate::types::ExecutorCapability::Custom(name) => name == required,
+                        });
+                        if !has_cap {
+                            tracing::info!(
+                                task_hash = %task_hash_str,
+                                executor = %self.own_did,
+                                missing_capability = %required,
+                                "Missing required capability, skipping placement"
+                            );
+                            icn_obs::metrics::compute::placement_constraints_enforced_inc(
+                                "capability",
+                            );
+                            return Ok(());
                         }
                     }
                 }
+                // registry lock dropped here
             }
         }
-        drop(mgr);
+
+        // Phase 21: Check federation placement constraints
+        if let Some(ref fed_constraints) = federation_constraints {
+            // Determine if we're a federated executor (from another cooperative)
+            let is_local = self.own_cooperative_id.is_none()
+                || task_coop_id.as_ref() == self.own_cooperative_id.as_ref();
+
+            // Check federation policy
+            if !fed_constraints.allows_cooperative(self.own_cooperative_id.as_deref(), is_local) {
+                tracing::info!(
+                    task_hash = %task_hash_str,
+                    executor = %self.own_did,
+                    our_coop = ?self.own_cooperative_id,
+                    task_coop = ?task_coop_id,
+                    policy = ?fed_constraints.federation_policy,
+                    "Federation policy rejects this executor, skipping placement"
+                );
+                icn_obs::metrics::compute::placement_constraints_enforced_inc("federation_policy");
+                return Ok(());
+            }
+
+            // Check federated trust threshold if we're a federated executor
+            if !is_local {
+                let min_trust = fed_constraints.effective_min_trust();
+                // Look up our federated trust score from registry (safe - not holding task_manager)
+                let registry = self.executor_registry.lock().await;
+                if let Some(info) = registry.get(&self.own_did) {
+                    if let Some(fed_trust) = info.federated_trust_score {
+                        if fed_trust < min_trust {
+                            tracing::info!(
+                                task_hash = %task_hash_str,
+                                executor = %self.own_did,
+                                federated_trust = fed_trust,
+                                min_required = min_trust,
+                                "Federated trust below threshold, skipping placement"
+                            );
+                            icn_obs::metrics::compute::placement_constraints_enforced_inc(
+                                "federation_trust",
+                            );
+                            return Ok(());
+                        }
+                    }
+                }
+                // registry lock dropped here
+            }
+        }
 
         // Score the task
         let offer = match policy.score_task(
