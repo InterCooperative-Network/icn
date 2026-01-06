@@ -2540,7 +2540,13 @@ impl GovernanceEventHandler {
                 partner_coop_id,
                 reason,
             } => {
-                self.execute_terminate_clearing(&proposal_id, &clearing, &partner_coop_id, &reason);
+                self.execute_terminate_clearing(
+                    &proposal_id,
+                    &registry,
+                    &clearing,
+                    &partner_coop_id,
+                    &reason,
+                );
             }
             FederationProposal::VouchForCooperative {
                 target_coop_id,
@@ -2637,7 +2643,11 @@ impl GovernanceEventHandler {
         }
 
         // Record audit entry for the join
-        let audit_key = format!("federation:join:{}:{}", own_info.coop_id, federation_id);
+        // Include proposal_id in key to preserve history across multiple join/leave cycles
+        let audit_key = format!(
+            "federation:join:{}:{}:{}",
+            own_info.coop_id, federation_id, proposal_id.0
+        );
         if let Err(e) = self.audit_store.put(
             audit_key.as_bytes(),
             serde_json::json!({
@@ -2685,7 +2695,11 @@ impl GovernanceEventHandler {
         );
 
         // Record audit entry for the leave
-        let audit_key = format!("federation:leave:{}:{}", own_info.coop_id, federation_id);
+        // Include proposal_id in key to preserve history across multiple join/leave cycles
+        let audit_key = format!(
+            "federation:leave:{}:{}:{}",
+            own_info.coop_id, federation_id, proposal_id.0
+        );
         if let Err(e) = self.audit_store.put(
             audit_key.as_bytes(),
             serde_json::json!({
@@ -2773,7 +2787,11 @@ impl GovernanceEventHandler {
         );
         agreement.max_imbalance = max_imbalance;
         agreement.settlement_interval = settlement_interval;
-        // Set a 1:1 exchange rate for the currency
+        // NOTE: Clearing agreements are currently same-currency only.
+        // We encode this as a 1:1 exchange rate keyed by `{currency}:{currency}`,
+        // i.e. the same currency on both sides. Cross-currency clearing and
+        // non-1:1 exchange rates are not yet supported and would require
+        // extending the clearing model and agreement schema.
         agreement
             .exchange_rates
             .insert(format!("{currency}:{currency}"), 1.0);
@@ -2783,9 +2801,10 @@ impl GovernanceEventHandler {
                 info!("   ✓ Clearing agreement created: {}", id);
 
                 // Record audit entry
+                // Include proposal_id in key to preserve history across multiple agreements
                 let audit_key = format!(
-                    "federation:clearing:{}:{}",
-                    own_info.coop_id, partner_coop_id
+                    "federation:clearing:{}:{}:{}",
+                    own_info.coop_id, partner_coop_id, proposal_id.0
                 );
                 if let Err(e) = self.audit_store.put(
                     audit_key.as_bytes(),
@@ -2820,6 +2839,7 @@ impl GovernanceEventHandler {
     fn execute_terminate_clearing(
         &self,
         proposal_id: &ProposalId,
+        registry: &CooperativeRegistryHandle,
         clearing: &ClearingManagerHandle,
         partner_coop_id: &str,
         reason: &str,
@@ -2830,11 +2850,7 @@ impl GovernanceEventHandler {
         // Find the agreement between us and this partner
         // We need to verify we're actually a party to this agreement
         let agreements = clearing.list_agreements();
-        let own_coop_id = self
-            .federation_registry
-            .as_ref()
-            .map(|r| r.own_coop_id().to_string())
-            .unwrap_or_default();
+        let own_coop_id = registry.own_coop_id().to_string();
         let matching_agreement = agreements.iter().find(|a| {
             (a.coop_a == partner_coop_id && a.coop_b == own_coop_id)
                 || (a.coop_b == partner_coop_id && a.coop_a == own_coop_id)
@@ -3006,7 +3022,11 @@ impl GovernanceEventHandler {
                 }
 
                 // Record audit entry
-                let audit_key = format!("federation:vouch:{}:{}", own_info.coop_id, target_coop_id);
+                // Include proposal_id in key to preserve history across multiple vouches
+                let audit_key = format!(
+                    "federation:vouch:{}:{}:{}",
+                    own_info.coop_id, target_coop_id, proposal_id.0
+                );
                 if let Err(e) = self.audit_store.put(
                     audit_key.as_bytes(),
                     serde_json::json!({
