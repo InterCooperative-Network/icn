@@ -118,6 +118,9 @@ pub const TOPIC_MIGRATION: &str = "compute:migration";
 /// Gossip topic for dispute resolution (Phase 20)
 pub const TOPIC_DISPUTE: &str = "compute:dispute";
 
+/// Gossip topic for cross-cooperative federation (Phase 21)
+pub const TOPIC_FEDERATION: &str = "compute:federation";
+
 /// Minimum trust score to submit tasks (0.0 - 1.0)
 pub const MIN_TRUST_SUBMIT: f64 = 0.1;
 

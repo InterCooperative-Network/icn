@@ -85,6 +85,7 @@ async fn test_compute_events_to_websocket() {
         resource_profile: None,
         actor_mode: None,
         placement_constraints: None,
+        federation_constraints: None,
         estimated_value: None,
         verification: None,
     };
@@ -195,6 +196,7 @@ async fn test_multiple_subscribers_receive_events() {
         resource_profile: None,
         actor_mode: None,
         placement_constraints: None,
+        federation_constraints: None,
         estimated_value: None,
         verification: None,
     };
@@ -309,6 +311,7 @@ async fn test_events_have_sequence_numbers() {
         resource_profile: None,
         actor_mode: None,
         placement_constraints: None,
+        federation_constraints: None,
         estimated_value: None,
         verification: None,
     };
