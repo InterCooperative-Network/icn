@@ -918,6 +918,15 @@ impl GatewayServer {
                                 .service(api::governance::get_votes)
                                 .service(api::governance::open_proposal)
                                 .service(api::governance::close_proposal)
+                                // Federation proposal endpoints
+                                .service(api::governance::create_join_federation_proposal)
+                                .service(api::governance::create_leave_federation_proposal)
+                                .service(api::governance::create_establish_clearing_proposal)
+                                .service(api::governance::create_terminate_clearing_proposal)
+                                .service(api::governance::create_vouch_proposal)
+                                .service(api::governance::create_revoke_vouch_proposal)
+                                .service(api::governance::create_update_federation_policy_proposal)
+                                // Vote endpoints
                                 .service(api::governance::cast_vote)
                                 // Delegation endpoints
                                 .service(api::governance::create_delegation)

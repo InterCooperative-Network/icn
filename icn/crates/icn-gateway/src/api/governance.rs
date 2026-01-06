@@ -11,13 +11,18 @@ use crate::governance_mgr::GovernanceManager;
 use crate::middleware::{get_claims, require_scope};
 use crate::models::{
     CastVoteRequest, CreateDelegationRequest, CreateDomainRequest, CreateProposalRequest,
-    DelegationListResponse, DelegationResponse, OpenProposalRequest, ProposalPayloadRequest,
+    DelegationListResponse, DelegationResponse, EstablishClearingProposalRequest,
+    JoinFederationProposalRequest, LeaveFederationProposalRequest, OpenProposalRequest,
+    ProposalPayloadRequest, RevokeVouchProposalRequest, TerminateClearingProposalRequest,
+    UpdateFederationPolicyProposalRequest, VouchProposalRequest,
 };
 use crate::pagination::{ListPagination, ListQuery, ListResponse};
 use crate::validation;
+use icn_federation::SettlementInterval;
 use icn_governance::{
-    Delegation, DelegationScope, GovernanceDomainId, GovernanceParams, MembershipConfig,
-    ProposalId, ProposalPayload, VoteChoice,
+    DataSharingLevel, Delegation, DelegationScope, DisputeResolutionMethod, FederationProposal,
+    FederationTerms, GovernanceDomainId, GovernanceParams, MembershipConfig, ProposalId,
+    ProposalPayload, VoteChoice,
 };
 use icn_identity::Did;
 use icn_obs::metrics::gateway;
@@ -851,6 +856,379 @@ pub async fn close_proposal(
     }
 
     Ok(HttpResponse::Ok().json(proposal))
+}
+
+// ============================================================================
+// Federation Proposal Endpoints
+// ============================================================================
+
+// ============================================================================
+// Federation Proposal Helpers
+// ============================================================================
+
+/// Common fields for federation proposals
+struct FederationProposalCommon {
+    domain_id: String,
+    title: String,
+    description: String,
+    proposer_did: Did,
+}
+
+/// Extract common authorization and validation for federation proposals
+fn extract_federation_common(
+    http_req: &HttpRequest,
+    domain_id: &str,
+    title: &str,
+    description: &str,
+) -> Result<FederationProposalCommon> {
+    // Check authorization
+    require_scope(http_req, "gov:write")?;
+
+    // Extract authenticated DID from JWT claims
+    let claims = get_claims(http_req).ok_or_else(|| {
+        crate::error::GatewayError::AuthenticationFailed("No claims found".to_string())
+    })?;
+
+    let proposer_did: Did = claims.sub.parse().map_err(|e| {
+        crate::error::GatewayError::BadRequest(format!("Invalid DID in token: {e}"))
+    })?;
+
+    // Validate common fields
+    validation::validate_domain_id(domain_id)?;
+    validation::validate_proposal_title(title)?;
+    validation::validate_proposal_description(description)?;
+
+    Ok(FederationProposalCommon {
+        domain_id: domain_id.to_string(),
+        title: title.to_string(),
+        description: description.to_string(),
+        proposer_did,
+    })
+}
+
+/// Create a federation proposal with the common workflow
+async fn create_federation_proposal_impl(
+    gov_mgr: &GovernanceManager,
+    event_broadcaster: &EventBroadcaster,
+    common: FederationProposalCommon,
+    fed_proposal: FederationProposal,
+) -> Result<HttpResponse> {
+    // Validate the federation proposal itself
+    fed_proposal
+        .validate()
+        .map_err(crate::error::GatewayError::BadRequest)?;
+
+    // Wrap in ProposalPayload
+    let payload = ProposalPayload::Federation(fed_proposal);
+
+    // Create proposal via governance manager
+    let domain_id = GovernanceDomainId(common.domain_id.clone());
+    let suggested_id = ProposalId(format!("prop-{}", uuid::Uuid::new_v4()));
+
+    let proposal_id = gov_mgr
+        .create_proposal(
+            suggested_id,
+            domain_id,
+            common.proposer_did.clone(),
+            common.title.clone(),
+            common.description.clone(),
+            payload,
+        )
+        .await?;
+
+    // Track proposal creation
+    gateway::governance_proposals_created_inc();
+
+    // Broadcast event to WebSocket subscribers
+    event_broadcaster
+        .broadcast(
+            &common.domain_id,
+            GatewayEvent::GovernanceProposalCreated {
+                proposal_id: proposal_id.0.clone(),
+                domain_id: common.domain_id.clone(),
+                proposer: common.proposer_did.to_string(),
+                title: common.title.clone(),
+                payload_type: "federation".to_string(),
+            },
+        )
+        .await;
+
+    // Return created proposal
+    let proposal = gov_mgr.get_proposal(&proposal_id).await?.ok_or_else(|| {
+        crate::error::GatewayError::InternalError(
+            "Proposal creation succeeded but proposal not found".to_string(),
+        )
+    })?;
+
+    Ok(HttpResponse::Created().json(proposal))
+}
+
+/// Parse data sharing level string to enum
+fn parse_data_sharing_level(s: &str) -> Result<DataSharingLevel> {
+    match s {
+        "none" => Ok(DataSharingLevel::None),
+        "metadata_only" => Ok(DataSharingLevel::MetadataOnly),
+        "full" => Ok(DataSharingLevel::Full),
+        _ => Err(crate::error::GatewayError::InternalError(format!(
+            "Invalid data_sharing_level after validation: '{s}'"
+        ))),
+    }
+}
+
+/// Parse dispute resolution string to enum
+fn parse_dispute_resolution(s: &str) -> Result<DisputeResolutionMethod> {
+    if s.starts_with("arbitrator:") {
+        let arbitrator_id = s.strip_prefix("arbitrator:").unwrap_or("").to_string();
+        Ok(DisputeResolutionMethod::ArbitratorCooperative { arbitrator_id })
+    } else {
+        match s {
+            "federation_mediation" => Ok(DisputeResolutionMethod::FederationMediation),
+            "federation_vote" => Ok(DisputeResolutionMethod::FederationVote),
+            _ => Err(crate::error::GatewayError::InternalError(format!(
+                "Invalid dispute_resolution after validation: '{s}'"
+            ))),
+        }
+    }
+}
+
+/// Parse settlement interval string to enum
+fn parse_settlement_interval(s: &str) -> Result<SettlementInterval> {
+    match s {
+        "daily" => Ok(SettlementInterval::Daily),
+        "weekly" => Ok(SettlementInterval::Weekly),
+        "monthly" => Ok(SettlementInterval::Monthly),
+        "manual" => Ok(SettlementInterval::Manual),
+        _ => Err(crate::error::GatewayError::InternalError(format!(
+            "Invalid settlement_interval after validation: '{s}'"
+        ))),
+    }
+}
+
+// ============================================================================
+// Federation Proposal Endpoints
+// ============================================================================
+
+/// POST /gov/proposals/federation/join - Create a "join federation" proposal
+#[post("/proposals/federation/join")]
+pub async fn create_join_federation_proposal(
+    http_req: HttpRequest,
+    gov_mgr: web::Data<Arc<GovernanceManager>>,
+    event_broadcaster: web::Data<Arc<EventBroadcaster>>,
+    req: web::Json<JoinFederationProposalRequest>,
+) -> Result<HttpResponse> {
+    let common =
+        extract_federation_common(&http_req, &req.domain_id, &req.title, &req.description)?;
+
+    // Validate federation-specific fields
+    validation::validate_federation_id(&req.federation_id)?;
+    validation::validate_trust_score(req.terms.min_trust_threshold)?;
+    let data_sharing_level_str =
+        validation::validate_data_sharing_level(&req.terms.data_sharing_level)?;
+    let dispute_resolution_str =
+        validation::validate_dispute_resolution(&req.terms.dispute_resolution)?;
+
+    // Convert string types to enums
+    let data_sharing_level = parse_data_sharing_level(&data_sharing_level_str)?;
+    let dispute_resolution = parse_dispute_resolution(&dispute_resolution_str)?;
+
+    // Build FederationTerms
+    let terms = FederationTerms {
+        min_trust_threshold: req.terms.min_trust_threshold,
+        governance_binding: req.terms.governance_binding,
+        data_sharing_level,
+        dispute_resolution,
+    };
+
+    // Build FederationProposal
+    let fed_proposal = FederationProposal::JoinFederation {
+        federation_id: req.federation_id.clone(),
+        terms,
+        sponsor_coop_id: req.sponsor_coop_id.clone(),
+    };
+
+    create_federation_proposal_impl(&gov_mgr, &event_broadcaster, common, fed_proposal).await
+}
+
+/// POST /gov/proposals/federation/leave - Create a "leave federation" proposal
+#[post("/proposals/federation/leave")]
+pub async fn create_leave_federation_proposal(
+    http_req: HttpRequest,
+    gov_mgr: web::Data<Arc<GovernanceManager>>,
+    event_broadcaster: web::Data<Arc<EventBroadcaster>>,
+    req: web::Json<LeaveFederationProposalRequest>,
+) -> Result<HttpResponse> {
+    let common =
+        extract_federation_common(&http_req, &req.domain_id, &req.title, &req.description)?;
+
+    // Validate federation-specific fields
+    validation::validate_federation_id(&req.federation_id)?;
+    validation::validate_reason(&req.reason)?;
+    validation::validate_grace_period_days(req.grace_period_days)?;
+
+    // Build FederationProposal
+    let fed_proposal = FederationProposal::LeaveFederation {
+        federation_id: req.federation_id.clone(),
+        reason: req.reason.clone(),
+        grace_period_days: req.grace_period_days,
+    };
+
+    create_federation_proposal_impl(&gov_mgr, &event_broadcaster, common, fed_proposal).await
+}
+
+/// POST /gov/proposals/federation/clearing - Create an "establish clearing" proposal
+#[post("/proposals/federation/clearing")]
+pub async fn create_establish_clearing_proposal(
+    http_req: HttpRequest,
+    gov_mgr: web::Data<Arc<GovernanceManager>>,
+    event_broadcaster: web::Data<Arc<EventBroadcaster>>,
+    req: web::Json<EstablishClearingProposalRequest>,
+) -> Result<HttpResponse> {
+    let common =
+        extract_federation_common(&http_req, &req.domain_id, &req.title, &req.description)?;
+
+    // Validate federation-specific fields
+    validation::validate_federation_id(&req.partner_coop_id)?;
+    validation::validate_max_imbalance(req.max_imbalance)?;
+    validation::validate_currency(&req.currency)?;
+    let settlement_interval_str =
+        validation::validate_settlement_interval(&req.settlement_interval)?;
+
+    // Parse partner DID
+    let partner_coop_did: Did = req.partner_coop_did.parse().map_err(|e| {
+        crate::error::GatewayError::BadRequest(format!("Invalid partner_coop_did: {e}"))
+    })?;
+
+    // Convert settlement interval string to enum
+    let settlement_interval = parse_settlement_interval(&settlement_interval_str)?;
+
+    // Build FederationProposal
+    let fed_proposal = FederationProposal::EstablishClearing {
+        partner_coop_id: req.partner_coop_id.clone(),
+        partner_coop_did,
+        max_imbalance: req.max_imbalance,
+        settlement_interval,
+        currency: req.currency.clone(),
+    };
+
+    create_federation_proposal_impl(&gov_mgr, &event_broadcaster, common, fed_proposal).await
+}
+
+/// POST /gov/proposals/federation/clearing/terminate - Create a "terminate clearing" proposal
+#[post("/proposals/federation/clearing/terminate")]
+pub async fn create_terminate_clearing_proposal(
+    http_req: HttpRequest,
+    gov_mgr: web::Data<Arc<GovernanceManager>>,
+    event_broadcaster: web::Data<Arc<EventBroadcaster>>,
+    req: web::Json<TerminateClearingProposalRequest>,
+) -> Result<HttpResponse> {
+    let common =
+        extract_federation_common(&http_req, &req.domain_id, &req.title, &req.description)?;
+
+    // Validate federation-specific fields
+    validation::validate_federation_id(&req.partner_coop_id)?;
+    validation::validate_reason(&req.reason)?;
+
+    // Build FederationProposal
+    let fed_proposal = FederationProposal::TerminateClearing {
+        partner_coop_id: req.partner_coop_id.clone(),
+        reason: req.reason.clone(),
+    };
+
+    create_federation_proposal_impl(&gov_mgr, &event_broadcaster, common, fed_proposal).await
+}
+
+/// POST /gov/proposals/federation/vouch - Create a "vouch for cooperative" proposal
+#[post("/proposals/federation/vouch")]
+pub async fn create_vouch_proposal(
+    http_req: HttpRequest,
+    gov_mgr: web::Data<Arc<GovernanceManager>>,
+    event_broadcaster: web::Data<Arc<EventBroadcaster>>,
+    req: web::Json<VouchProposalRequest>,
+) -> Result<HttpResponse> {
+    let common =
+        extract_federation_common(&http_req, &req.domain_id, &req.title, &req.description)?;
+
+    // Validate federation-specific fields
+    validation::validate_federation_id(&req.target_coop_id)?;
+    validation::validate_trust_score(req.trust_score)?;
+    validation::validate_context(&req.context)?;
+    validation::validate_evidence(&req.evidence)?;
+
+    // Parse target DID
+    let target_coop_did: Did = req.target_coop_did.parse().map_err(|e| {
+        crate::error::GatewayError::BadRequest(format!("Invalid target_coop_did: {e}"))
+    })?;
+
+    // Build FederationProposal
+    let fed_proposal = FederationProposal::VouchForCooperative {
+        target_coop_id: req.target_coop_id.clone(),
+        target_coop_did,
+        trust_score: req.trust_score,
+        context: req.context.clone(),
+        evidence: req.evidence.clone(),
+    };
+
+    create_federation_proposal_impl(&gov_mgr, &event_broadcaster, common, fed_proposal).await
+}
+
+/// POST /gov/proposals/federation/vouch/revoke - Create a "revoke vouch" proposal
+#[post("/proposals/federation/vouch/revoke")]
+pub async fn create_revoke_vouch_proposal(
+    http_req: HttpRequest,
+    gov_mgr: web::Data<Arc<GovernanceManager>>,
+    event_broadcaster: web::Data<Arc<EventBroadcaster>>,
+    req: web::Json<RevokeVouchProposalRequest>,
+) -> Result<HttpResponse> {
+    let common =
+        extract_federation_common(&http_req, &req.domain_id, &req.title, &req.description)?;
+
+    // Validate federation-specific fields
+    validation::validate_federation_id(&req.target_coop_id)?;
+    validation::validate_reason(&req.reason)?;
+
+    // Build FederationProposal
+    let fed_proposal = FederationProposal::RevokeVouch {
+        target_coop_id: req.target_coop_id.clone(),
+        reason: req.reason.clone(),
+    };
+
+    create_federation_proposal_impl(&gov_mgr, &event_broadcaster, common, fed_proposal).await
+}
+
+/// POST /gov/proposals/federation/policy - Create an "update federation policy" proposal
+#[post("/proposals/federation/policy")]
+pub async fn create_update_federation_policy_proposal(
+    http_req: HttpRequest,
+    gov_mgr: web::Data<Arc<GovernanceManager>>,
+    event_broadcaster: web::Data<Arc<EventBroadcaster>>,
+    req: web::Json<UpdateFederationPolicyProposalRequest>,
+) -> Result<HttpResponse> {
+    let common =
+        extract_federation_common(&http_req, &req.domain_id, &req.title, &req.description)?;
+
+    // Validate federation-specific fields
+    validation::validate_auto_accept_threshold(req.auto_accept_vouch_threshold)?;
+    validation::validate_trust_decay_factor(req.trust_decay_factor)?;
+    validation::validate_max_attestations_per_minute(req.max_attestations_per_minute)?;
+
+    // Ensure at least one policy field is provided
+    if req.auto_accept_vouch_threshold.is_none()
+        && req.trust_decay_factor.is_none()
+        && req.max_attestations_per_minute.is_none()
+    {
+        return Err(crate::error::GatewayError::BadRequest(
+            "At least one policy field must be provided".to_string(),
+        ));
+    }
+
+    // Build FederationProposal
+    let fed_proposal = FederationProposal::UpdateFederationPolicy {
+        auto_accept_vouch_threshold: req.auto_accept_vouch_threshold,
+        trust_decay_factor: req.trust_decay_factor,
+        max_attestations_per_minute: req.max_attestations_per_minute,
+    };
+
+    create_federation_proposal_impl(&gov_mgr, &event_broadcaster, common, fed_proposal).await
 }
 
 // ============================================================================
@@ -2932,5 +3310,721 @@ mod tests {
 
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), 200); // Success
+    }
+
+    // ============================================================================
+    // Federation Proposal Tests
+    // ============================================================================
+
+    #[actix_web::test]
+    async fn test_create_join_federation_proposal() {
+        let gov_mgr = Arc::new(GovernanceManager::new());
+        let event_broadcaster = Arc::new(EventBroadcaster::new());
+        let alice = IdentityBundle::generate().unwrap();
+
+        // Create domain first
+        gov_mgr
+            .create_domain(
+                GovernanceDomainId("coop:food".to_string()),
+                "Food Coop".to_string(),
+                "cooperative".to_string(),
+                GovernanceParams::new(50, 66, 7 * 86400),
+                MembershipConfig::static_list(vec![alice.did().clone()]),
+            )
+            .await
+            .unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(gov_mgr.clone()))
+                .app_data(web::Data::new(event_broadcaster.clone()))
+                .service(web::scope("/gov").service(create_join_federation_proposal)),
+        )
+        .await;
+
+        // Create join federation proposal
+        let req_body = JoinFederationProposalRequest {
+            domain_id: "coop:food".to_string(),
+            title: "Join Regional Food Federation".to_string(),
+            description: "Proposal to join the regional food cooperative federation".to_string(),
+            federation_id: "regional-food-fed".to_string(),
+            terms: crate::models::FederationTermsRequest {
+                min_trust_threshold: 0.6,
+                governance_binding: true,
+                data_sharing_level: "metadata_only".to_string(),
+                dispute_resolution: "federation_mediation".to_string(),
+            },
+            sponsor_coop_id: Some("organic-farms-coop".to_string()),
+        };
+
+        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let req = test::TestRequest::post()
+            .uri("/gov/proposals/federation/join")
+            .set_json(&req_body)
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp: Proposal = test::call_and_read_body_json(&app, req).await;
+        assert_eq!(resp.title, "Join Regional Food Federation");
+        assert!(matches!(resp.state, ProposalState::Draft));
+        assert!(matches!(
+            resp.payload,
+            icn_governance::ProposalPayload::Federation(
+                icn_governance::FederationProposal::JoinFederation { .. }
+            )
+        ));
+    }
+
+    #[actix_web::test]
+    async fn test_create_leave_federation_proposal() {
+        let gov_mgr = Arc::new(GovernanceManager::new());
+        let event_broadcaster = Arc::new(EventBroadcaster::new());
+        let alice = IdentityBundle::generate().unwrap();
+
+        gov_mgr
+            .create_domain(
+                GovernanceDomainId("coop:food".to_string()),
+                "Food Coop".to_string(),
+                "cooperative".to_string(),
+                GovernanceParams::new(50, 66, 7 * 86400),
+                MembershipConfig::static_list(vec![alice.did().clone()]),
+            )
+            .await
+            .unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(gov_mgr.clone()))
+                .app_data(web::Data::new(event_broadcaster.clone()))
+                .service(web::scope("/gov").service(create_leave_federation_proposal)),
+        )
+        .await;
+
+        let req_body = LeaveFederationProposalRequest {
+            domain_id: "coop:food".to_string(),
+            title: "Leave Regional Federation".to_string(),
+            description: "Strategic realignment requires leaving federation".to_string(),
+            federation_id: "regional-food-fed".to_string(),
+            reason: "Strategic realignment".to_string(),
+            grace_period_days: 30,
+        };
+
+        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let req = test::TestRequest::post()
+            .uri("/gov/proposals/federation/leave")
+            .set_json(&req_body)
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp: Proposal = test::call_and_read_body_json(&app, req).await;
+        assert_eq!(resp.title, "Leave Regional Federation");
+        assert!(matches!(
+            resp.payload,
+            icn_governance::ProposalPayload::Federation(
+                icn_governance::FederationProposal::LeaveFederation { .. }
+            )
+        ));
+    }
+
+    #[actix_web::test]
+    async fn test_create_establish_clearing_proposal() {
+        let gov_mgr = Arc::new(GovernanceManager::new());
+        let event_broadcaster = Arc::new(EventBroadcaster::new());
+        let alice = IdentityBundle::generate().unwrap();
+        let partner = IdentityBundle::generate().unwrap();
+
+        gov_mgr
+            .create_domain(
+                GovernanceDomainId("coop:food".to_string()),
+                "Food Coop".to_string(),
+                "cooperative".to_string(),
+                GovernanceParams::new(50, 66, 7 * 86400),
+                MembershipConfig::static_list(vec![alice.did().clone()]),
+            )
+            .await
+            .unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(gov_mgr.clone()))
+                .app_data(web::Data::new(event_broadcaster.clone()))
+                .service(web::scope("/gov").service(create_establish_clearing_proposal)),
+        )
+        .await;
+
+        let req_body = EstablishClearingProposalRequest {
+            domain_id: "coop:food".to_string(),
+            title: "Establish Clearing with Partner Coop".to_string(),
+            description: "Setup bilateral clearing for cross-coop transactions".to_string(),
+            partner_coop_id: "partner-coop".to_string(),
+            partner_coop_did: partner.did().to_string(),
+            max_imbalance: 10000,
+            settlement_interval: "weekly".to_string(),
+            currency: "HOURS".to_string(),
+        };
+
+        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let req = test::TestRequest::post()
+            .uri("/gov/proposals/federation/clearing")
+            .set_json(&req_body)
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp: Proposal = test::call_and_read_body_json(&app, req).await;
+        assert_eq!(resp.title, "Establish Clearing with Partner Coop");
+        assert!(matches!(
+            resp.payload,
+            icn_governance::ProposalPayload::Federation(
+                icn_governance::FederationProposal::EstablishClearing { .. }
+            )
+        ));
+    }
+
+    #[actix_web::test]
+    async fn test_create_terminate_clearing_proposal() {
+        let gov_mgr = Arc::new(GovernanceManager::new());
+        let event_broadcaster = Arc::new(EventBroadcaster::new());
+        let alice = IdentityBundle::generate().unwrap();
+
+        gov_mgr
+            .create_domain(
+                GovernanceDomainId("coop:food".to_string()),
+                "Food Coop".to_string(),
+                "cooperative".to_string(),
+                GovernanceParams::new(50, 66, 7 * 86400),
+                MembershipConfig::static_list(vec![alice.did().clone()]),
+            )
+            .await
+            .unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(gov_mgr.clone()))
+                .app_data(web::Data::new(event_broadcaster.clone()))
+                .service(web::scope("/gov").service(create_terminate_clearing_proposal)),
+        )
+        .await;
+
+        let req_body = TerminateClearingProposalRequest {
+            domain_id: "coop:food".to_string(),
+            title: "Terminate Clearing Agreement".to_string(),
+            description: "End the clearing agreement with partner coop".to_string(),
+            partner_coop_id: "partner-coop".to_string(),
+            reason: "Partnership no longer beneficial".to_string(),
+        };
+
+        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let req = test::TestRequest::post()
+            .uri("/gov/proposals/federation/clearing/terminate")
+            .set_json(&req_body)
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp: Proposal = test::call_and_read_body_json(&app, req).await;
+        assert_eq!(resp.title, "Terminate Clearing Agreement");
+        assert!(matches!(
+            resp.payload,
+            icn_governance::ProposalPayload::Federation(
+                icn_governance::FederationProposal::TerminateClearing { .. }
+            )
+        ));
+    }
+
+    #[actix_web::test]
+    async fn test_create_vouch_proposal() {
+        let gov_mgr = Arc::new(GovernanceManager::new());
+        let event_broadcaster = Arc::new(EventBroadcaster::new());
+        let alice = IdentityBundle::generate().unwrap();
+        let target = IdentityBundle::generate().unwrap();
+
+        gov_mgr
+            .create_domain(
+                GovernanceDomainId("coop:food".to_string()),
+                "Food Coop".to_string(),
+                "cooperative".to_string(),
+                GovernanceParams::new(50, 66, 7 * 86400),
+                MembershipConfig::static_list(vec![alice.did().clone()]),
+            )
+            .await
+            .unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(gov_mgr.clone()))
+                .app_data(web::Data::new(event_broadcaster.clone()))
+                .service(web::scope("/gov").service(create_vouch_proposal)),
+        )
+        .await;
+
+        let req_body = VouchProposalRequest {
+            domain_id: "coop:food".to_string(),
+            title: "Vouch for New Worker Coop".to_string(),
+            description: "Recommend this cooperative for federation membership".to_string(),
+            target_coop_id: "new-worker-coop".to_string(),
+            target_coop_did: target.did().to_string(),
+            trust_score: 0.75,
+            context: "trade".to_string(),
+            evidence: Some("Six months of successful trading".to_string()),
+        };
+
+        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let req = test::TestRequest::post()
+            .uri("/gov/proposals/federation/vouch")
+            .set_json(&req_body)
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp: Proposal = test::call_and_read_body_json(&app, req).await;
+        assert_eq!(resp.title, "Vouch for New Worker Coop");
+        assert!(matches!(
+            resp.payload,
+            icn_governance::ProposalPayload::Federation(
+                icn_governance::FederationProposal::VouchForCooperative { .. }
+            )
+        ));
+    }
+
+    #[actix_web::test]
+    async fn test_create_revoke_vouch_proposal() {
+        let gov_mgr = Arc::new(GovernanceManager::new());
+        let event_broadcaster = Arc::new(EventBroadcaster::new());
+        let alice = IdentityBundle::generate().unwrap();
+
+        gov_mgr
+            .create_domain(
+                GovernanceDomainId("coop:food".to_string()),
+                "Food Coop".to_string(),
+                "cooperative".to_string(),
+                GovernanceParams::new(50, 66, 7 * 86400),
+                MembershipConfig::static_list(vec![alice.did().clone()]),
+            )
+            .await
+            .unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(gov_mgr.clone()))
+                .app_data(web::Data::new(event_broadcaster.clone()))
+                .service(web::scope("/gov").service(create_revoke_vouch_proposal)),
+        )
+        .await;
+
+        let req_body = RevokeVouchProposalRequest {
+            domain_id: "coop:food".to_string(),
+            title: "Revoke Vouch for Problem Coop".to_string(),
+            description: "Remove our endorsement due to trust violations".to_string(),
+            target_coop_id: "problem-coop".to_string(),
+            reason: "Repeated contract violations".to_string(),
+        };
+
+        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let req = test::TestRequest::post()
+            .uri("/gov/proposals/federation/vouch/revoke")
+            .set_json(&req_body)
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp: Proposal = test::call_and_read_body_json(&app, req).await;
+        assert_eq!(resp.title, "Revoke Vouch for Problem Coop");
+        assert!(matches!(
+            resp.payload,
+            icn_governance::ProposalPayload::Federation(
+                icn_governance::FederationProposal::RevokeVouch { .. }
+            )
+        ));
+    }
+
+    #[actix_web::test]
+    async fn test_create_update_federation_policy_proposal() {
+        let gov_mgr = Arc::new(GovernanceManager::new());
+        let event_broadcaster = Arc::new(EventBroadcaster::new());
+        let alice = IdentityBundle::generate().unwrap();
+
+        gov_mgr
+            .create_domain(
+                GovernanceDomainId("coop:food".to_string()),
+                "Food Coop".to_string(),
+                "cooperative".to_string(),
+                GovernanceParams::new(50, 66, 7 * 86400),
+                MembershipConfig::static_list(vec![alice.did().clone()]),
+            )
+            .await
+            .unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(gov_mgr.clone()))
+                .app_data(web::Data::new(event_broadcaster.clone()))
+                .service(web::scope("/gov").service(create_update_federation_policy_proposal)),
+        )
+        .await;
+
+        let req_body = UpdateFederationPolicyProposalRequest {
+            domain_id: "coop:food".to_string(),
+            title: "Update Federation Policy".to_string(),
+            description: "Adjust auto-accept threshold and rate limits".to_string(),
+            auto_accept_vouch_threshold: Some(0.7),
+            trust_decay_factor: Some(0.05),
+            max_attestations_per_minute: Some(30),
+        };
+
+        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let req = test::TestRequest::post()
+            .uri("/gov/proposals/federation/policy")
+            .set_json(&req_body)
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp: Proposal = test::call_and_read_body_json(&app, req).await;
+        assert_eq!(resp.title, "Update Federation Policy");
+        assert!(matches!(
+            resp.payload,
+            icn_governance::ProposalPayload::Federation(
+                icn_governance::FederationProposal::UpdateFederationPolicy { .. }
+            )
+        ));
+    }
+
+    #[actix_web::test]
+    async fn test_federation_proposal_invalid_trust_score() {
+        let gov_mgr = Arc::new(GovernanceManager::new());
+        let event_broadcaster = Arc::new(EventBroadcaster::new());
+        let alice = IdentityBundle::generate().unwrap();
+
+        gov_mgr
+            .create_domain(
+                GovernanceDomainId("coop:food".to_string()),
+                "Food Coop".to_string(),
+                "cooperative".to_string(),
+                GovernanceParams::new(50, 66, 7 * 86400),
+                MembershipConfig::static_list(vec![alice.did().clone()]),
+            )
+            .await
+            .unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(gov_mgr.clone()))
+                .app_data(web::Data::new(event_broadcaster.clone()))
+                .service(web::scope("/gov").service(create_join_federation_proposal)),
+        )
+        .await;
+
+        // Trust score too high (> 1.0)
+        let req_body = JoinFederationProposalRequest {
+            domain_id: "coop:food".to_string(),
+            title: "Join Federation".to_string(),
+            description: "Test proposal".to_string(),
+            federation_id: "test-fed".to_string(),
+            terms: crate::models::FederationTermsRequest {
+                min_trust_threshold: 1.5, // Invalid - too high
+                governance_binding: true,
+                data_sharing_level: "metadata_only".to_string(),
+                dispute_resolution: "federation_mediation".to_string(),
+            },
+            sponsor_coop_id: None,
+        };
+
+        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let req = test::TestRequest::post()
+            .uri("/gov/proposals/federation/join")
+            .set_json(&req_body)
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 400); // Bad Request
+    }
+
+    #[actix_web::test]
+    async fn test_federation_proposal_invalid_grace_period() {
+        let gov_mgr = Arc::new(GovernanceManager::new());
+        let event_broadcaster = Arc::new(EventBroadcaster::new());
+        let alice = IdentityBundle::generate().unwrap();
+
+        gov_mgr
+            .create_domain(
+                GovernanceDomainId("coop:food".to_string()),
+                "Food Coop".to_string(),
+                "cooperative".to_string(),
+                GovernanceParams::new(50, 66, 7 * 86400),
+                MembershipConfig::static_list(vec![alice.did().clone()]),
+            )
+            .await
+            .unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(gov_mgr.clone()))
+                .app_data(web::Data::new(event_broadcaster.clone()))
+                .service(web::scope("/gov").service(create_leave_federation_proposal)),
+        )
+        .await;
+
+        // Grace period too long (> 365)
+        let req_body = LeaveFederationProposalRequest {
+            domain_id: "coop:food".to_string(),
+            title: "Leave Federation".to_string(),
+            description: "Test proposal".to_string(),
+            federation_id: "test-fed".to_string(),
+            reason: "Test reason".to_string(),
+            grace_period_days: 500, // Invalid - too long
+        };
+
+        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let req = test::TestRequest::post()
+            .uri("/gov/proposals/federation/leave")
+            .set_json(&req_body)
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 400); // Bad Request
+    }
+
+    #[actix_web::test]
+    async fn test_federation_proposal_invalid_settlement_interval() {
+        let gov_mgr = Arc::new(GovernanceManager::new());
+        let event_broadcaster = Arc::new(EventBroadcaster::new());
+        let alice = IdentityBundle::generate().unwrap();
+        let partner = IdentityBundle::generate().unwrap();
+
+        gov_mgr
+            .create_domain(
+                GovernanceDomainId("coop:food".to_string()),
+                "Food Coop".to_string(),
+                "cooperative".to_string(),
+                GovernanceParams::new(50, 66, 7 * 86400),
+                MembershipConfig::static_list(vec![alice.did().clone()]),
+            )
+            .await
+            .unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(gov_mgr.clone()))
+                .app_data(web::Data::new(event_broadcaster.clone()))
+                .service(web::scope("/gov").service(create_establish_clearing_proposal)),
+        )
+        .await;
+
+        let req_body = EstablishClearingProposalRequest {
+            domain_id: "coop:food".to_string(),
+            title: "Establish Clearing".to_string(),
+            description: "Test proposal".to_string(),
+            partner_coop_id: "partner-coop".to_string(),
+            partner_coop_did: partner.did().to_string(),
+            max_imbalance: 10000,
+            settlement_interval: "yearly".to_string(), // Invalid
+            currency: "HOURS".to_string(),
+        };
+
+        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let req = test::TestRequest::post()
+            .uri("/gov/proposals/federation/clearing")
+            .set_json(&req_body)
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 400); // Bad Request
+    }
+
+    #[actix_web::test]
+    async fn test_federation_proposal_requires_auth() {
+        let gov_mgr = Arc::new(GovernanceManager::new());
+        let event_broadcaster = Arc::new(EventBroadcaster::new());
+        let alice = IdentityBundle::generate().unwrap();
+
+        gov_mgr
+            .create_domain(
+                GovernanceDomainId("coop:food".to_string()),
+                "Food Coop".to_string(),
+                "cooperative".to_string(),
+                GovernanceParams::new(50, 66, 7 * 86400),
+                MembershipConfig::static_list(vec![alice.did().clone()]),
+            )
+            .await
+            .unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(gov_mgr.clone()))
+                .app_data(web::Data::new(event_broadcaster.clone()))
+                .service(web::scope("/gov").service(create_join_federation_proposal)),
+        )
+        .await;
+
+        let req_body = JoinFederationProposalRequest {
+            domain_id: "coop:food".to_string(),
+            title: "Join Federation".to_string(),
+            description: "Test proposal".to_string(),
+            federation_id: "test-fed".to_string(),
+            terms: crate::models::FederationTermsRequest {
+                min_trust_threshold: 0.5,
+                governance_binding: true,
+                data_sharing_level: "metadata_only".to_string(),
+                dispute_resolution: "federation_mediation".to_string(),
+            },
+            sponsor_coop_id: None,
+        };
+
+        // Request without claims (no auth)
+        let req = test::TestRequest::post()
+            .uri("/gov/proposals/federation/join")
+            .set_json(&req_body)
+            .to_request();
+        // Note: no claims inserted
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 401); // Unauthorized - no auth token
+    }
+
+    #[actix_web::test]
+    async fn test_federation_proposal_requires_write_scope() {
+        let gov_mgr = Arc::new(GovernanceManager::new());
+        let event_broadcaster = Arc::new(EventBroadcaster::new());
+        let alice = IdentityBundle::generate().unwrap();
+
+        gov_mgr
+            .create_domain(
+                GovernanceDomainId("coop:food".to_string()),
+                "Food Coop".to_string(),
+                "cooperative".to_string(),
+                GovernanceParams::new(50, 66, 7 * 86400),
+                MembershipConfig::static_list(vec![alice.did().clone()]),
+            )
+            .await
+            .unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(gov_mgr.clone()))
+                .app_data(web::Data::new(event_broadcaster.clone()))
+                .service(web::scope("/gov").service(create_join_federation_proposal)),
+        )
+        .await;
+
+        let req_body = JoinFederationProposalRequest {
+            domain_id: "coop:food".to_string(),
+            title: "Join Federation".to_string(),
+            description: "Test proposal".to_string(),
+            federation_id: "test-fed".to_string(),
+            terms: crate::models::FederationTermsRequest {
+                min_trust_threshold: 0.5,
+                governance_binding: true,
+                data_sharing_level: "metadata_only".to_string(),
+                dispute_resolution: "federation_mediation".to_string(),
+            },
+            sponsor_coop_id: None,
+        };
+
+        // Request with only read scope (not write)
+        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:read"]);
+        let req = test::TestRequest::post()
+            .uri("/gov/proposals/federation/join")
+            .set_json(&req_body)
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 403); // Forbidden - wrong scope
+    }
+
+    #[actix_web::test]
+    async fn test_update_policy_requires_at_least_one_field() {
+        let gov_mgr = Arc::new(GovernanceManager::new());
+        let event_broadcaster = Arc::new(EventBroadcaster::new());
+        let alice = IdentityBundle::generate().unwrap();
+
+        gov_mgr
+            .create_domain(
+                GovernanceDomainId("coop:food".to_string()),
+                "Food Coop".to_string(),
+                "cooperative".to_string(),
+                GovernanceParams::new(50, 66, 7 * 86400),
+                MembershipConfig::static_list(vec![alice.did().clone()]),
+            )
+            .await
+            .unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(gov_mgr.clone()))
+                .app_data(web::Data::new(event_broadcaster.clone()))
+                .service(web::scope("/gov").service(create_update_federation_policy_proposal)),
+        )
+        .await;
+
+        // No policy fields provided
+        let req_body = UpdateFederationPolicyProposalRequest {
+            domain_id: "coop:food".to_string(),
+            title: "Update Policy".to_string(),
+            description: "Test proposal".to_string(),
+            auto_accept_vouch_threshold: None,
+            trust_decay_factor: None,
+            max_attestations_per_minute: None,
+        };
+
+        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let req = test::TestRequest::post()
+            .uri("/gov/proposals/federation/policy")
+            .set_json(&req_body)
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), 400); // Bad Request - no fields provided
+    }
+
+    #[actix_web::test]
+    async fn test_federation_proposal_arbitrator_dispute_resolution() {
+        let gov_mgr = Arc::new(GovernanceManager::new());
+        let event_broadcaster = Arc::new(EventBroadcaster::new());
+        let alice = IdentityBundle::generate().unwrap();
+
+        gov_mgr
+            .create_domain(
+                GovernanceDomainId("coop:food".to_string()),
+                "Food Coop".to_string(),
+                "cooperative".to_string(),
+                GovernanceParams::new(50, 66, 7 * 86400),
+                MembershipConfig::static_list(vec![alice.did().clone()]),
+            )
+            .await
+            .unwrap();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(gov_mgr.clone()))
+                .app_data(web::Data::new(event_broadcaster.clone()))
+                .service(web::scope("/gov").service(create_join_federation_proposal)),
+        )
+        .await;
+
+        // Test arbitrator dispute resolution format
+        let req_body = JoinFederationProposalRequest {
+            domain_id: "coop:food".to_string(),
+            title: "Join Federation with Arbitrator".to_string(),
+            description: "Using arbitrator for dispute resolution".to_string(),
+            federation_id: "test-fed".to_string(),
+            terms: crate::models::FederationTermsRequest {
+                min_trust_threshold: 0.5,
+                governance_binding: true,
+                data_sharing_level: "full".to_string(),
+                dispute_resolution: "arbitrator:neutral-coop".to_string(),
+            },
+            sponsor_coop_id: None,
+        };
+
+        let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
+        let req = test::TestRequest::post()
+            .uri("/gov/proposals/federation/join")
+            .set_json(&req_body)
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp: Proposal = test::call_and_read_body_json(&app, req).await;
+        assert_eq!(resp.title, "Join Federation with Arbitrator");
     }
 }
