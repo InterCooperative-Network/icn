@@ -276,6 +276,12 @@ impl ResultAggregator {
     }
 
     /// Add a result from an executor
+    ///
+    /// This method verifies:
+    /// 1. Task hash matches the expected task
+    /// 2. Ed25519 signature is valid for the claimed executor DID
+    /// 3. No duplicate results from the same executor
+    /// 4. Collection window has not expired
     pub fn add_result(&mut self, result: ComputeResult) -> Result<()> {
         // Verify task hash matches
         if result.task_hash != self.task_hash {
@@ -287,6 +293,14 @@ impl ResultAggregator {
         }
 
         let executor = result.executor.clone();
+
+        // CRITICAL: Verify Ed25519 signature before accepting result
+        // This prevents malicious nodes from forging results claiming to be from other executors
+        let executor_did = Did::from_str(&executor).map_err(|e| {
+            ComputeError::InvalidResult(format!("Invalid executor DID '{executor}': {e}"))
+        })?;
+        result.verify_signature(&executor_did)?;
+
         let now = icn_time::current_timestamp_millis();
 
         // Check if we already have a result from this executor
@@ -586,16 +600,35 @@ mod tests {
     use super::*;
     use crate::types::ExecutionOutcome;
 
-    fn test_result(task_hash: TaskHash, executor: &str, output: &[u8]) -> ComputeResult {
-        ComputeResult {
-            task_hash,
-            task_id: "test-task".into(),
-            executor: executor.into(),
-            outcome: ExecutionOutcome::Success(output.to_vec()),
-            fuel_used: 1000,
-            duration_ms: 100,
-            completed_at: icn_time::current_timestamp_millis(),
-            signature: vec![],
+    /// Test executor with keypair for signing results
+    struct TestExecutor {
+        keypair: icn_identity::KeyPair,
+        did: String,
+    }
+
+    impl TestExecutor {
+        fn new() -> Self {
+            let keypair = icn_identity::KeyPair::generate().unwrap();
+            let did = keypair.did().to_string();
+            Self { keypair, did }
+        }
+
+        fn signed_result(&self, task_hash: TaskHash, output: &[u8]) -> ComputeResult {
+            let mut result = ComputeResult {
+                task_hash,
+                task_id: "test-task".into(),
+                executor: self.did.clone(),
+                outcome: ExecutionOutcome::Success(output.to_vec()),
+                fuel_used: 1000,
+                duration_ms: 100,
+                completed_at: icn_time::current_timestamp_millis(),
+                signature: vec![],
+            };
+            // Sign with the executor's keypair
+            let payload = result.signing_payload();
+            let signature = self.keypair.sign(&payload);
+            result.signature = signature.to_bytes().to_vec();
+            result
         }
     }
 
@@ -633,8 +666,10 @@ mod tests {
             icn_time::current_timestamp_millis(),
         );
 
-        let result = test_result(task_hash, "did:icn:executor1", b"output");
-        aggregator.add_result(result).unwrap();
+        let exec1 = TestExecutor::new();
+        aggregator
+            .add_result(exec1.signed_result(task_hash, b"output"))
+            .unwrap();
 
         assert!(matches!(
             aggregator.status(),
@@ -658,15 +693,19 @@ mod tests {
             icn_time::current_timestamp_millis(),
         );
 
+        let exec1 = TestExecutor::new();
+        let exec2 = TestExecutor::new();
+        let exec3 = TestExecutor::new();
+
         // Add 3 agreeing results
         aggregator
-            .add_result(test_result(task_hash, "did:icn:exec1", b"same"))
+            .add_result(exec1.signed_result(task_hash, b"same"))
             .unwrap();
         aggregator
-            .add_result(test_result(task_hash, "did:icn:exec2", b"same"))
+            .add_result(exec2.signed_result(task_hash, b"same"))
             .unwrap();
         aggregator
-            .add_result(test_result(task_hash, "did:icn:exec3", b"same"))
+            .add_result(exec3.signed_result(task_hash, b"same"))
             .unwrap();
 
         let status = aggregator.status();
@@ -699,15 +738,19 @@ mod tests {
             icn_time::current_timestamp_millis(),
         );
 
+        let exec1 = TestExecutor::new();
+        let exec2 = TestExecutor::new();
+        let exec3 = TestExecutor::new();
+
         // Add 3 different results - no consensus possible
         aggregator
-            .add_result(test_result(task_hash, "did:icn:exec1", b"output1"))
+            .add_result(exec1.signed_result(task_hash, b"output1"))
             .unwrap();
         aggregator
-            .add_result(test_result(task_hash, "did:icn:exec2", b"output2"))
+            .add_result(exec2.signed_result(task_hash, b"output2"))
             .unwrap();
         aggregator
-            .add_result(test_result(task_hash, "did:icn:exec3", b"output3"))
+            .add_result(exec3.signed_result(task_hash, b"output3"))
             .unwrap();
 
         let status = aggregator.status();
@@ -739,15 +782,19 @@ mod tests {
             icn_time::current_timestamp_millis(),
         );
 
+        let exec1 = TestExecutor::new();
+        let exec2 = TestExecutor::new();
+        let exec3 = TestExecutor::new();
+
         // 2 agree, 1 differs - 2/3 = 66.7% meets 50% threshold
         aggregator
-            .add_result(test_result(task_hash, "did:icn:exec1", b"correct"))
+            .add_result(exec1.signed_result(task_hash, b"correct"))
             .unwrap();
         aggregator
-            .add_result(test_result(task_hash, "did:icn:exec2", b"correct"))
+            .add_result(exec2.signed_result(task_hash, b"correct"))
             .unwrap();
         aggregator
-            .add_result(test_result(task_hash, "did:icn:exec3", b"wrong"))
+            .add_result(exec3.signed_result(task_hash, b"wrong"))
             .unwrap();
 
         let status = aggregator.status();
@@ -767,7 +814,12 @@ mod tests {
     #[test]
     fn test_duplicate_executor_rejected() {
         let task_hash = [5u8; 32];
-        let verification = TaskVerification::default();
+        let verification = TaskVerification {
+            value: TaskValue::Medium,
+            required_executors: 2,
+            consensus_threshold: 0.67,
+            assigned_executors: vec![],
+        };
 
         let mut aggregator = ResultAggregator::with_default_window(
             task_hash,
@@ -775,10 +827,15 @@ mod tests {
             icn_time::current_timestamp_millis(),
         );
 
-        let result1 = test_result(task_hash, "did:icn:exec1", b"output");
-        aggregator.add_result(result1).unwrap();
+        let exec1 = TestExecutor::new();
 
-        let result2 = test_result(task_hash, "did:icn:exec1", b"different");
+        // First submission succeeds
+        aggregator
+            .add_result(exec1.signed_result(task_hash, b"output"))
+            .unwrap();
+
+        // Second submission from same executor is rejected
+        let result2 = exec1.signed_result(task_hash, b"different");
         assert!(aggregator.add_result(result2).is_err());
     }
 
@@ -794,8 +851,48 @@ mod tests {
             icn_time::current_timestamp_millis(),
         );
 
-        let result = test_result(wrong_hash, "did:icn:exec1", b"output");
+        let exec1 = TestExecutor::new();
+        // Result signed for wrong task hash
+        let result = exec1.signed_result(wrong_hash, b"output");
         assert!(aggregator.add_result(result).is_err());
+    }
+
+    #[test]
+    fn test_invalid_signature_rejected() {
+        let task_hash = [10u8; 32];
+        let verification = TaskVerification::default();
+
+        let mut aggregator = ResultAggregator::with_default_window(
+            task_hash,
+            verification,
+            icn_time::current_timestamp_millis(),
+        );
+
+        let exec1 = TestExecutor::new();
+        let exec2 = TestExecutor::new();
+
+        // Create result claiming to be from exec1 but signed by exec2
+        let mut forged_result = ComputeResult {
+            task_hash,
+            task_id: "test-task".into(),
+            executor: exec1.did.clone(), // Claims to be exec1
+            outcome: ExecutionOutcome::Success(b"output".to_vec()),
+            fuel_used: 1000,
+            duration_ms: 100,
+            completed_at: icn_time::current_timestamp_millis(),
+            signature: vec![],
+        };
+        // Sign with exec2's key (wrong key)
+        let payload = forged_result.signing_payload();
+        let signature = exec2.keypair.sign(&payload);
+        forged_result.signature = signature.to_bytes().to_vec();
+
+        // Should be rejected due to signature verification failure
+        let err = aggregator.add_result(forged_result).unwrap_err();
+        assert!(
+            err.to_string().contains("Signature verification failed"),
+            "Expected signature verification error, got: {err}"
+        );
     }
 
     #[test]
@@ -813,8 +910,11 @@ mod tests {
         // Register task
         manager.register_task(task_hash, verification).unwrap();
 
+        let exec1 = TestExecutor::new();
+        let exec2 = TestExecutor::new();
+
         // Submit first result
-        let result1 = test_result(task_hash, "did:icn:exec1", b"output");
+        let result1 = exec1.signed_result(task_hash, b"output");
         let status = manager.submit_result(result1).unwrap();
         assert!(matches!(
             status,
@@ -825,7 +925,7 @@ mod tests {
         ));
 
         // Submit second result (same output)
-        let result2 = test_result(task_hash, "did:icn:exec2", b"output");
+        let result2 = exec2.signed_result(task_hash, b"output");
         let status = manager.submit_result(result2).unwrap();
         assert!(matches!(
             status,
@@ -857,18 +957,23 @@ mod tests {
             icn_time::current_timestamp_millis(),
         );
 
+        let exec1 = TestExecutor::new();
+        let exec2 = TestExecutor::new();
+        let exec3 = TestExecutor::new();
+        let exec4 = TestExecutor::new();
+
         // 2 groups: 3 correct, 1 wrong
         aggregator
-            .add_result(test_result(task_hash, "did:icn:exec1", b"correct"))
+            .add_result(exec1.signed_result(task_hash, b"correct"))
             .unwrap();
         aggregator
-            .add_result(test_result(task_hash, "did:icn:exec2", b"correct"))
+            .add_result(exec2.signed_result(task_hash, b"correct"))
             .unwrap();
         aggregator
-            .add_result(test_result(task_hash, "did:icn:exec3", b"correct"))
+            .add_result(exec3.signed_result(task_hash, b"correct"))
             .unwrap();
         aggregator
-            .add_result(test_result(task_hash, "did:icn:exec4", b"wrong"))
+            .add_result(exec4.signed_result(task_hash, b"wrong"))
             .unwrap();
 
         let groups = aggregator.executor_groups();
