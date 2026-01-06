@@ -2675,8 +2675,9 @@ impl GovernanceEventHandler {
         info!("   Reason: {}", reason);
 
         let own_info = registry.own_coop_info();
-        let departure_timestamp =
-            icn_time::current_timestamp_secs() + (grace_period_days as u64 * 86400);
+        // Use saturating arithmetic to prevent overflow on very large grace periods
+        let grace_seconds = u64::from(grace_period_days).saturating_mul(86400);
+        let departure_timestamp = icn_time::current_timestamp_secs().saturating_add(grace_seconds);
 
         info!(
             "   Coop '{}' scheduled to leave federation '{}' at timestamp {}",
@@ -2826,11 +2827,18 @@ impl GovernanceEventHandler {
         info!("   Action: Terminate clearing with '{}'", partner_coop_id);
         info!("   Reason: {}", reason);
 
-        // Find the agreement with this partner
+        // Find the agreement between us and this partner
+        // We need to verify we're actually a party to this agreement
         let agreements = clearing.list_agreements();
-        let matching_agreement = agreements
-            .iter()
-            .find(|a| a.coop_a == partner_coop_id || a.coop_b == partner_coop_id);
+        let own_coop_id = self
+            .federation_registry
+            .as_ref()
+            .map(|r| r.own_coop_id().to_string())
+            .unwrap_or_default();
+        let matching_agreement = agreements.iter().find(|a| {
+            (a.coop_a == partner_coop_id && a.coop_b == own_coop_id)
+                || (a.coop_b == partner_coop_id && a.coop_a == own_coop_id)
+        });
 
         match matching_agreement {
             Some(agreement) => {
@@ -2866,8 +2874,13 @@ impl GovernanceEventHandler {
                     warn!("   Failed to record termination audit entry: {}", e);
                 }
 
+                // NOTE: ClearingManager currently lacks a delete_agreement method.
+                // The agreement remains in the store but is marked as terminated
+                // via the audit entry. A future enhancement should add proper
+                // agreement deletion to ClearingManager.
+                // See: https://github.com/InterCooperative-Network/icn/issues/517#termination
                 info!(
-                    "   ✓ Clearing agreement '{}' terminated",
+                    "   ✓ Clearing agreement '{}' terminated (settlement complete, audit recorded)",
                     agreement.agreement_id
                 );
                 icn_obs::metrics::governance::proposals_executed_inc(
@@ -2934,11 +2947,19 @@ impl GovernanceEventHandler {
         let own_info = registry.own_coop_info();
 
         // Map context string to TrustContext enum
-        let trust_context = match context.to_lowercase().as_str() {
+        let context_lower = context.to_lowercase();
+        let trust_context = match context_lower.as_str() {
             "economic" | "trade" => TrustContext::Economic,
             "social" | "community" => TrustContext::Social,
             "governance" | "voting" => TrustContext::Governance,
-            _ => TrustContext::General,
+            "general" => TrustContext::General,
+            other => {
+                warn!(
+                    "   Unrecognized trust context '{}', defaulting to General",
+                    other
+                );
+                TrustContext::General
+            }
         };
 
         // Build evidence summary
@@ -3025,34 +3046,23 @@ impl GovernanceEventHandler {
 
         let own_info = registry.own_coop_info();
 
-        // Look up the target's DID to remove the attestation
+        // Look up the target's DID to remove the attestation.
+        // We require the target to be in the registry to know which DID to revoke.
+        // Without the DID, we cannot safely identify which attestation to remove
+        // (the attestation store indexes by DID, not coop_id).
         let target_did = match registry.get(target_coop_id) {
             Ok(Some(info)) => info.public_did,
             Ok(None) => {
-                // Try to find via existing attestations
-                match attestations.get_attestations_from(&own_info.coop_id) {
-                    Ok(atts) => {
-                        // This is a simplification; in practice we'd have better indexing
-                        // to find attestations by target_coop_id. For now, take the first one.
-                        match atts.first() {
-                            Some(att) => att.member_did.clone(),
-                            None => {
-                                warn!("   No existing attestation found for '{}'", target_coop_id);
-                                icn_obs::metrics::governance::execution_failures_inc(
-                                    "federation_revoke_vouch",
-                                );
-                                return;
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        error!("   Failed to lookup existing attestations: {}", e);
-                        icn_obs::metrics::governance::execution_failures_inc(
-                            "federation_revoke_vouch",
-                        );
-                        return;
-                    }
-                }
+                // Target not in registry - we cannot safely revoke without knowing the DID.
+                // This could happen if the target coop was removed from the registry before
+                // the revoke proposal was executed. In production, consider adding coop_id
+                // indexing to the attestation store to handle this case.
+                error!(
+                    "   Cannot revoke vouch: target '{}' not found in registry (DID unknown)",
+                    target_coop_id
+                );
+                icn_obs::metrics::governance::execution_failures_inc("federation_revoke_vouch");
+                return;
             }
             Err(e) => {
                 error!("   Failed to lookup target in registry: {}", e);
