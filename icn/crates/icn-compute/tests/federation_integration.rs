@@ -253,3 +253,129 @@ fn test_local_preference_weight() {
     };
     assert!((constraints.effective_local_preference() - 1.5).abs() < 0.001);
 }
+
+/// Test FederatedExecutorAttestation signing and verification
+#[test]
+fn test_federated_executor_attestation_signing() {
+    use ed25519_dalek::SigningKey;
+    use rand::rngs::OsRng;
+
+    let now_secs = icn_time::current_timestamp_millis() / 1000;
+
+    // Generate keypair for cooperative
+    let coop_keypair = icn_identity::KeyPair::generate().unwrap();
+    let coop_did = coop_keypair.did();
+    let exec_keypair = icn_identity::KeyPair::generate().unwrap();
+    let exec_did = exec_keypair.did();
+
+    // Create attestation
+    let mut attestation = FederatedExecutorAttestation {
+        source_coop_id: "coop-a".to_string(),
+        executor_did: exec_did.to_string(),
+        trust_attestation: FederatedTrustAttestation::new(
+            "coop-a".to_string(),
+            coop_did.clone(),
+            exec_did.clone(),
+            0.8,
+            TrustContext::General,
+            3600,
+        ),
+        capabilities: vec![icn_compute::ExecutorCapability::Ccl],
+        capacity: None,
+        gateway_endpoint: Some("https://coop-a.example.com".to_string()),
+        issued_at: now_secs,
+        expires_at: now_secs + 3600,
+        signature: vec![],
+    };
+
+    // Initially unsigned
+    assert!(!attestation.is_signed());
+
+    // Sign with a random key (simulating wrong key)
+    let wrong_key = SigningKey::generate(&mut OsRng);
+    attestation.sign(&wrong_key);
+    assert!(attestation.is_signed());
+
+    // Verify should fail with cooperative's actual key
+    let coop_verifying_key = coop_did.to_verifying_key().unwrap();
+    let result = attestation.verify(&coop_verifying_key).unwrap();
+    assert!(!result, "Signature should not verify with wrong key");
+
+    // Now sign with correct key (from DID's private key equivalent)
+    // For test purposes, we need to use the cooperative's actual signing key
+    // Since we can't easily extract it from KeyPair, we create a new test scenario
+
+    // Create a fresh attestation and sign with a key we control
+    let signing_key = SigningKey::generate(&mut OsRng);
+    let verifying_key = signing_key.verifying_key();
+
+    // Create a DID from this verifying key for consistency
+    let test_did = icn_identity::Did::from_public_key(&verifying_key);
+
+    let mut attestation2 = FederatedExecutorAttestation {
+        source_coop_id: "coop-b".to_string(),
+        executor_did: exec_did.to_string(),
+        trust_attestation: FederatedTrustAttestation::new(
+            "coop-b".to_string(),
+            test_did.clone(),
+            exec_did.clone(),
+            0.9,
+            TrustContext::General,
+            3600,
+        ),
+        capabilities: vec![icn_compute::ExecutorCapability::Ccl],
+        capacity: None,
+        gateway_endpoint: None,
+        issued_at: now_secs,
+        expires_at: now_secs + 3600,
+        signature: vec![],
+    };
+
+    attestation2.sign(&signing_key);
+    assert!(attestation2.is_signed());
+
+    // Now verify with the matching key
+    let result = attestation2.verify(&verifying_key).unwrap();
+    assert!(result, "Signature should verify with correct key");
+}
+
+/// Test unsigned attestation is rejected
+#[test]
+fn test_unsigned_attestation_rejected() {
+    let now_secs = icn_time::current_timestamp_millis() / 1000;
+
+    let coop_keypair = icn_identity::KeyPair::generate().unwrap();
+    let coop_did = coop_keypair.did();
+    let exec_keypair = icn_identity::KeyPair::generate().unwrap();
+    let exec_did = exec_keypair.did();
+
+    let attestation = FederatedExecutorAttestation {
+        source_coop_id: "coop-a".to_string(),
+        executor_did: exec_did.to_string(),
+        trust_attestation: FederatedTrustAttestation::new(
+            "coop-a".to_string(),
+            coop_did.clone(),
+            exec_did.clone(),
+            0.8,
+            TrustContext::General,
+            3600,
+        ),
+        capabilities: vec![],
+        capacity: None,
+        gateway_endpoint: None,
+        issued_at: now_secs,
+        expires_at: now_secs + 3600,
+        signature: vec![], // Unsigned!
+    };
+
+    // Should not be signed
+    assert!(!attestation.is_signed());
+
+    // Attempting to verify an unsigned attestation should fail
+    let verifying_key = coop_did.to_verifying_key().unwrap();
+    let result = attestation.verify(&verifying_key);
+    assert!(
+        result.is_err(),
+        "Verifying unsigned attestation should error"
+    );
+}

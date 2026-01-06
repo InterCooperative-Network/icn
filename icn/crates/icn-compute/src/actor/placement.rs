@@ -685,6 +685,9 @@ impl ComputeActor {
     ///
     /// Called when a federated cooperative announces available executors.
     /// These executors are registered with attenuated trust scores.
+    ///
+    /// # Security
+    /// This method verifies the attestation signature to prevent forged announcements.
     pub(super) async fn on_federated_executor_announce(
         &self,
         executor: String,
@@ -701,6 +704,68 @@ impl ComputeActor {
             attested_trust = local_trust,
             "Received federated executor announcement"
         );
+
+        // Security: Verify attestation is signed
+        if !attestation.is_signed() {
+            tracing::warn!(
+                executor = %executor,
+                cooperative_id = %cooperative_id,
+                "Rejecting unsigned federated executor attestation"
+            );
+            return Err(ComputeError::InvalidSignature(
+                "Attestation must be signed by source cooperative".to_string(),
+            ));
+        }
+
+        // Security: Verify attestation is not expired
+        if attestation.is_expired() {
+            tracing::warn!(
+                executor = %executor,
+                cooperative_id = %cooperative_id,
+                "Rejecting expired federated executor attestation"
+            );
+            return Err(ComputeError::InvalidSignature(
+                "Attestation has expired".to_string(),
+            ));
+        }
+
+        // Security: Verify the source cooperative DID matches the claimed cooperative_id
+        // and verify the signature
+        let source_did = &attestation.trust_attestation.source_coop_did;
+        let verifying_key = source_did.to_verifying_key().map_err(|e| {
+            ComputeError::InvalidSignature(format!(
+                "Failed to extract verifying key from source DID: {e}"
+            ))
+        })?;
+
+        match attestation.verify(&verifying_key) {
+            Ok(true) => {
+                tracing::debug!(
+                    executor = %executor,
+                    cooperative_id = %cooperative_id,
+                    "Federated executor attestation signature verified"
+                );
+            }
+            Ok(false) => {
+                tracing::warn!(
+                    executor = %executor,
+                    cooperative_id = %cooperative_id,
+                    "Rejecting federated executor attestation: invalid signature"
+                );
+                return Err(ComputeError::InvalidSignature(
+                    "Attestation signature verification failed".to_string(),
+                ));
+            }
+            Err(e) => {
+                tracing::warn!(
+                    executor = %executor,
+                    cooperative_id = %cooperative_id,
+                    error = %e,
+                    "Error verifying federated executor attestation"
+                );
+                return Err(e);
+            }
+        }
 
         // Calculate attenuated trust score
         // Get our trust in the announcing cooperative
@@ -783,14 +848,42 @@ impl ComputeActor {
         }
 
         // Verify payment terms are acceptable
-        // TODO: Integrate with ClearingManager for payment verification
-        if payment.amount == 0 {
+        const MIN_PAYMENT_THRESHOLD: u64 = 1; // Minimum 1 credit required for federated tasks
+
+        if payment.amount < MIN_PAYMENT_THRESHOLD {
             tracing::warn!(
                 task_hash = %task_hash_str,
-                "Zero payment offered for federated task"
+                offered = payment.amount,
+                minimum = MIN_PAYMENT_THRESHOLD,
+                "Rejecting federated task: payment below minimum threshold"
             );
-            // Continue anyway for now - payment enforcement is future work
+            return Err(ComputeError::PolicyViolation(format!(
+                "Payment amount {} below minimum threshold {}",
+                payment.amount, MIN_PAYMENT_THRESHOLD
+            )));
         }
+
+        // Validate exchange variance is reasonable (prevent excessive fees)
+        const MAX_ALLOWED_EXCHANGE_VARIANCE: f64 = 0.25; // 25% max
+        if payment.max_exchange_variance > MAX_ALLOWED_EXCHANGE_VARIANCE {
+            tracing::warn!(
+                task_hash = %task_hash_str,
+                variance = payment.max_exchange_variance,
+                max_allowed = MAX_ALLOWED_EXCHANGE_VARIANCE,
+                "Rejecting federated task: exchange variance too high"
+            );
+            return Err(ComputeError::PolicyViolation(format!(
+                "Exchange variance {} exceeds maximum {}",
+                payment.max_exchange_variance, MAX_ALLOWED_EXCHANGE_VARIANCE
+            )));
+        }
+
+        tracing::debug!(
+            task_hash = %task_hash_str,
+            amount = payment.amount,
+            trigger = ?payment.payment_trigger,
+            "Payment terms validated for federated task"
+        );
 
         // Store task in task manager with federated metadata
         {

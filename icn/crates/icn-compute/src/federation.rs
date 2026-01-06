@@ -107,6 +107,56 @@ impl FederatedExecutorAttestation {
         let now = icn_time::current_timestamp_millis() / 1000;
         self.expires_at.saturating_sub(now)
     }
+
+    /// Get the bytes to sign (attestation without signature)
+    pub fn signing_bytes(&self) -> Vec<u8> {
+        let mut att = self.clone();
+        att.signature = Vec::new();
+        // Clear nested signature too for consistent hashing
+        att.trust_attestation.signature = Vec::new();
+        serde_json::to_vec(&att).unwrap_or_default()
+    }
+
+    /// Sign the attestation with the source cooperative's key
+    pub fn sign(&mut self, signing_key: &ed25519_dalek::SigningKey) {
+        use ed25519_dalek::Signer;
+        let bytes = self.signing_bytes();
+        let signature = signing_key.sign(&bytes);
+        self.signature = signature.to_bytes().to_vec();
+    }
+
+    /// Verify the attestation signature against the source cooperative's public key
+    ///
+    /// Returns Ok(true) if signature is valid, Ok(false) if invalid,
+    /// Err if signature format is wrong
+    pub fn verify(
+        &self,
+        verifying_key: &ed25519_dalek::VerifyingKey,
+    ) -> Result<bool, ComputeError> {
+        use ed25519_dalek::{Signature, Verifier};
+
+        if self.signature.len() != 64 {
+            return Err(ComputeError::InvalidSignature(
+                "Invalid signature length".to_string(),
+            ));
+        }
+
+        let bytes = self.signing_bytes();
+        let sig_bytes: [u8; 64] = self.signature[..64]
+            .try_into()
+            .map_err(|_| ComputeError::InvalidSignature("Invalid signature format".to_string()))?;
+
+        let signature = Signature::from_bytes(&sig_bytes);
+        match verifying_key.verify(&bytes, &signature) {
+            Ok(()) => Ok(true),
+            Err(_) => Ok(false),
+        }
+    }
+
+    /// Check if attestation has a signature
+    pub fn is_signed(&self) -> bool {
+        !self.signature.is_empty()
+    }
 }
 
 /// When payment for federated task execution is triggered.
