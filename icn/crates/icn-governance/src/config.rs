@@ -2,6 +2,7 @@
 
 use crate::membership::MembershipConfig;
 use crate::profile::GovernanceProfileId;
+use crate::proposal::{ProposalPayload, TreasuryProposalOperation};
 use serde::{Deserialize, Serialize};
 
 /// Complete governance configuration for a domain
@@ -65,6 +66,82 @@ impl GovernanceConfig {
             membership: MembershipConfig::trust_threshold(0.3),
             params: GovernanceParams::default(),
             emergency: EmergencyThresholds::default(),
+        }
+    }
+
+    /// Get the quorum and approval thresholds for a specific proposal type
+    ///
+    /// Different proposal types have different threshold requirements:
+    /// - Normal proposals use `params.quorum_percentage` and `params.approval_threshold_percentage`
+    /// - Emergency proposals (freeze, veto, rollback) use higher thresholds from `emergency`
+    /// - Treasury proposals use specialized thresholds based on operation type
+    ///
+    /// This ensures that high-impact actions require broader consensus to prevent
+    /// low-turnout manipulation attacks.
+    pub fn thresholds_for_proposal(&self, payload: &ProposalPayload) -> ProposalThresholds {
+        match payload {
+            // Emergency proposals - require super-majority
+            ProposalPayload::FreezeMember { .. } | ProposalPayload::UnfreezeMember { .. } => {
+                ProposalThresholds::new(
+                    self.emergency.freeze_quorum_percentage,
+                    self.emergency.freeze_approval_percentage,
+                )
+            }
+
+            ProposalPayload::VetoProposal { .. } => ProposalThresholds::new(
+                self.emergency.veto_quorum_percentage,
+                self.emergency.veto_approval_percentage,
+            ),
+
+            ProposalPayload::ForceCloseProposal { .. } => ProposalThresholds::new(
+                self.emergency.force_close_quorum_percentage,
+                self.emergency.force_close_approval_percentage,
+            ),
+
+            ProposalPayload::RollbackLedger { .. } => ProposalThresholds::new(
+                self.emergency.rollback_quorum_percentage,
+                self.emergency.rollback_approval_percentage,
+            ),
+
+            // Treasury proposals - specialized thresholds based on operation type
+            ProposalPayload::Treasury { operation } => match operation {
+                TreasuryProposalOperation::CreateBudget { .. }
+                | TreasuryProposalOperation::CancelBudget { .. }
+                | TreasuryProposalOperation::ReclaimBudget { .. } => ProposalThresholds::new(
+                    self.emergency.treasury_budget_quorum_percentage,
+                    self.emergency.treasury_budget_approval_percentage,
+                ),
+
+                TreasuryProposalOperation::Withdraw { .. }
+                | TreasuryProposalOperation::TransferBetweenBudgets { .. } => {
+                    ProposalThresholds::new(
+                        self.emergency.treasury_withdrawal_quorum_percentage,
+                        self.emergency.treasury_withdrawal_approval_percentage,
+                    )
+                }
+
+                TreasuryProposalOperation::ModifySpendingRule { .. } => ProposalThresholds::new(
+                    self.emergency.treasury_rule_quorum_percentage,
+                    self.emergency.treasury_rule_approval_percentage,
+                ),
+            },
+
+            // Normal proposals - use default thresholds
+            ProposalPayload::Text { .. }
+            | ProposalPayload::Budget { .. }
+            | ProposalPayload::Membership { .. }
+            | ProposalPayload::ConfigChange { .. }
+            | ProposalPayload::SchedulingPolicy { .. }
+            | ProposalPayload::DisputeResolution { .. }
+            | ProposalPayload::Sdis { .. }
+            | ProposalPayload::ProtocolUpgrade { .. }
+            | ProposalPayload::ProtocolChange { .. }
+            | ProposalPayload::SurplusAllocation { .. }
+            | ProposalPayload::ShareRedemption { .. }
+            | ProposalPayload::BondIssuance { .. } => ProposalThresholds::new(
+                self.params.quorum_percentage,
+                self.params.approval_threshold_percentage,
+            ),
         }
     }
 }
@@ -266,6 +343,25 @@ impl EmergencyThresholds {
             && self.veto_approval_percentage > 50
             && self.force_close_approval_percentage > 50
             && self.rollback_approval_percentage > 50
+    }
+}
+
+/// Quorum and approval thresholds for a specific proposal
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ProposalThresholds {
+    /// Minimum percentage of eligible voters that must vote (0-100)
+    pub quorum_percentage: u8,
+    /// Percentage of votes needed to pass (0-100)
+    pub approval_percentage: u8,
+}
+
+impl ProposalThresholds {
+    /// Create new thresholds
+    pub fn new(quorum_percentage: u8, approval_percentage: u8) -> Self {
+        Self {
+            quorum_percentage,
+            approval_percentage,
+        }
     }
 }
 
@@ -712,5 +808,126 @@ mod tests {
         };
         assert!(params.validate().is_ok());
         assert_eq!(params.max_execution_delay_seconds, 2592000);
+    }
+
+    // ========== Proposal-Type-Specific Threshold Tests (Issue #477) ==========
+
+    #[test]
+    fn test_thresholds_for_normal_proposal() {
+        let config = GovernanceConfig::cooperative_default();
+
+        // Text proposal should use default thresholds
+        let payload = ProposalPayload::Text {
+            body: "Test proposal".to_string(),
+        };
+        let thresholds = config.thresholds_for_proposal(&payload);
+
+        assert_eq!(thresholds.quorum_percentage, 50); // Default
+        assert_eq!(thresholds.approval_percentage, 50); // Default
+    }
+
+    #[test]
+    fn test_thresholds_for_freeze_member_proposal() {
+        let config = GovernanceConfig::cooperative_default();
+
+        // FreezeMember should use emergency freeze thresholds (67% quorum, 75% approval)
+        let payload = ProposalPayload::FreezeMember {
+            member: icn_identity::Did::from_anchor_id(&[1; 32]),
+            reason: "Security concern".to_string(),
+            duration_seconds: Some(86400),
+        };
+        let thresholds = config.thresholds_for_proposal(&payload);
+
+        assert_eq!(thresholds.quorum_percentage, 67);
+        assert_eq!(thresholds.approval_percentage, 75);
+    }
+
+    #[test]
+    fn test_thresholds_for_veto_proposal() {
+        let config = GovernanceConfig::cooperative_default();
+
+        // VetoProposal should use emergency veto thresholds
+        let payload = ProposalPayload::VetoProposal {
+            target_proposal_id: "test-proposal".to_string(),
+            reason: "Emergency veto".to_string(),
+        };
+        let thresholds = config.thresholds_for_proposal(&payload);
+
+        assert_eq!(thresholds.quorum_percentage, 67);
+        assert_eq!(thresholds.approval_percentage, 75);
+    }
+
+    #[test]
+    fn test_thresholds_for_rollback_proposal() {
+        let config = GovernanceConfig::cooperative_default();
+
+        // RollbackLedger should use highest thresholds (75% quorum, 80% approval)
+        let payload = ProposalPayload::RollbackLedger {
+            target_hash: "abc123".to_string(),
+            reason: "Fraud detected".to_string(),
+            affected_accounts: vec![],
+        };
+        let thresholds = config.thresholds_for_proposal(&payload);
+
+        assert_eq!(thresholds.quorum_percentage, 75);
+        assert_eq!(thresholds.approval_percentage, 80);
+    }
+
+    #[test]
+    fn test_thresholds_for_treasury_withdrawal() {
+        let config = GovernanceConfig::cooperative_default();
+
+        // Treasury withdrawal should use treasury withdrawal thresholds
+        let payload = ProposalPayload::Treasury {
+            operation: TreasuryProposalOperation::Withdraw {
+                treasury_did: icn_identity::Did::from_anchor_id(&[2; 32]),
+                recipient: icn_identity::Did::from_anchor_id(&[3; 32]),
+                amount: 10000,
+                currency: "COOP".to_string(),
+                purpose: "Equipment purchase".to_string(),
+                budget_id: None,
+            },
+        };
+        let thresholds = config.thresholds_for_proposal(&payload);
+
+        assert_eq!(thresholds.quorum_percentage, 60);
+        assert_eq!(thresholds.approval_percentage, 67);
+    }
+
+    #[test]
+    fn test_thresholds_custom_emergency_config() {
+        // Test with custom emergency thresholds
+        let emergency = EmergencyThresholds::new(
+            80, 90, // freeze
+            80, 90, // veto
+            80, 90, // force close
+            90, 95, // rollback
+            86400,
+        );
+
+        let config = GovernanceConfig::with_emergency(
+            GovernanceProfileId::builtin("test"),
+            MembershipConfig::trust_threshold(0.5),
+            GovernanceParams::new(50, 50, 3600),
+            emergency,
+        );
+
+        // FreezeMember should use custom thresholds
+        let payload = ProposalPayload::FreezeMember {
+            member: icn_identity::Did::from_anchor_id(&[1; 32]),
+            reason: "Test".to_string(),
+            duration_seconds: None,
+        };
+        let thresholds = config.thresholds_for_proposal(&payload);
+
+        assert_eq!(thresholds.quorum_percentage, 80);
+        assert_eq!(thresholds.approval_percentage, 90);
+    }
+
+    #[test]
+    fn test_proposal_thresholds_struct() {
+        let thresholds = ProposalThresholds::new(67, 75);
+        assert_eq!(thresholds.quorum_percentage, 67);
+        assert_eq!(thresholds.approval_percentage, 75);
     }
 }

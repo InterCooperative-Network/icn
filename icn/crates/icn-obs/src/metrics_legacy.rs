@@ -2422,6 +2422,60 @@ pub mod governance {
     pub fn scope_overlap_storage_errors_inc() {
         counter!("icn_governance_scope_overlap_storage_errors_total").increment(1);
     }
+
+    // Issue #477: Low-turnout monitoring metrics
+
+    /// Record when a proposal fails to meet quorum
+    ///
+    /// Tracks proposals that don't meet the required participation threshold.
+    /// Labels by proposal_type to identify which types of proposals commonly fail quorum.
+    pub fn quorum_not_met_inc(proposal_type: &str) {
+        counter!(
+            "icn_governance_quorum_not_met_total",
+            "proposal_type" => proposal_type.to_string()
+        )
+        .increment(1);
+    }
+
+    /// Record when an emergency proposal fails to meet quorum
+    ///
+    /// Emergency proposals (freeze, veto, rollback) have higher quorum requirements.
+    /// This metric specifically tracks failures for these high-impact proposals,
+    /// which may indicate either healthy resistance to emergency actions or
+    /// concerning low participation during critical votes.
+    pub fn emergency_quorum_not_met_inc(emergency_type: &str) {
+        counter!(
+            "icn_governance_emergency_quorum_not_met_total",
+            "emergency_type" => emergency_type.to_string()
+        )
+        .increment(1);
+    }
+
+    /// Record the participation percentage for a closed proposal
+    ///
+    /// Histogram of actual participation (votes_cast / eligible_voters * 100).
+    /// Useful for understanding typical engagement levels and identifying
+    /// trends in voter participation over time.
+    pub fn participation_percentage_observe(proposal_type: &str, percentage: f64) {
+        histogram!(
+            "icn_governance_participation_percentage",
+            "proposal_type" => proposal_type.to_string()
+        )
+        .record(percentage);
+    }
+
+    /// Record the quorum margin for a proposal
+    ///
+    /// Tracks how close proposals came to meeting/failing quorum.
+    /// Positive values indicate above quorum, negative indicates below.
+    /// Helps identify patterns where proposals just barely pass or fail quorum.
+    pub fn quorum_margin_observe(proposal_type: &str, margin_percentage: f64) {
+        histogram!(
+            "icn_governance_quorum_margin_percentage",
+            "proposal_type" => proposal_type.to_string()
+        )
+        .record(margin_percentage);
+    }
 }
 
 /// Protocol parameter metrics (delayed execution)

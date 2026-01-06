@@ -21,10 +21,10 @@ use icn_entity::EntityId;
 use icn_governance::{
     DecisionOutcome, Delegation, DelegationId, GovernanceConfig, GovernanceDomain,
     GovernanceDomainId, GovernanceMessage, GovernanceParams, GovernanceProfile,
-    GovernanceProfileId, GovernanceRule, MembershipAction, MembershipConfig, MembershipResolver,
-    MembershipSource, PaginatedResult, ParameterChange, Proposal, ProposalId, ProposalOutcome,
-    ProposalPayload, ProposalState, ProtocolParameter, ProtocolParameterStore, TallySnapshot,
-    Timestamp, Vote, VoteChoice, VoteTally,
+    GovernanceProfileId, MembershipAction, MembershipConfig, MembershipResolver, MembershipSource,
+    PaginatedResult, ParameterChange, Proposal, ProposalId, ProposalOutcome, ProposalPayload,
+    ProposalState, ProtocolParameter, ProtocolParameterStore, TallySnapshot, Timestamp, Vote,
+    VoteChoice, VoteTally,
 };
 
 use crate::events::{EventBus, SystemEvent};
@@ -1216,10 +1216,42 @@ impl GovernanceActor {
                 // Resolve eligible membership
                 let eligible_count = self.resolver.member_count(&domain)?;
 
-                // Evaluate outcome
+                // Get proposal-type-specific thresholds (Issue #477)
+                // Emergency proposals (freeze, veto, rollback) require higher quorum/approval
+                // to prevent low-turnout manipulation attacks
+                let thresholds = domain.config.thresholds_for_proposal(&proposal.payload);
+
+                // Evaluate outcome with proposal-type-specific thresholds
                 let outcome_result =
                     self.profile
-                        .evaluate(&tally, &domain.config.params, eligible_count)?;
+                        .evaluate_with_thresholds(&tally, thresholds, eligible_count)?;
+
+                // Record participation metrics (Issue #477)
+                let proposal_type = proposal.payload.type_name();
+                let total_votes = tally.total_votes();
+                let participation_pct = if eligible_count > 0 {
+                    (total_votes as f64 / eligible_count as f64) * 100.0
+                } else {
+                    0.0
+                };
+                let quorum_required_pct = thresholds.quorum_percentage as f64;
+                let quorum_margin = participation_pct - quorum_required_pct;
+
+                icn_obs::metrics::governance::participation_percentage_observe(
+                    proposal_type,
+                    participation_pct,
+                );
+                icn_obs::metrics::governance::quorum_margin_observe(proposal_type, quorum_margin);
+
+                // Track quorum failures
+                if matches!(outcome_result, DecisionOutcome::NoQuorum) {
+                    icn_obs::metrics::governance::quorum_not_met_inc(proposal_type);
+
+                    // Track emergency proposal quorum failures specifically
+                    if let Some(emergency_type) = proposal.payload.emergency_type() {
+                        icn_obs::metrics::governance::emergency_quorum_not_met_inc(emergency_type);
+                    }
+                }
 
                 // Map to proposal state
                 let now = now_seconds();
