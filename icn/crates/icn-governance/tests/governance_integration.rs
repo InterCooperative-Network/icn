@@ -885,3 +885,251 @@ fn test_config_change_proposal() {
         panic!("Expected ConfigChange payload");
     }
 }
+
+// =============================================================================
+// Emergency Quorum Threshold Tests (Issue #477)
+// =============================================================================
+
+#[test]
+fn test_emergency_freeze_proposal_requires_higher_quorum() {
+    use icn_governance::{GovernanceProfile, ProposalThresholds};
+
+    let profile = GovernanceProfile::cooperative_default();
+    let proposal_id = ProposalId::generate();
+
+    // Create votes: 5 out of 10 eligible voters (50% turnout)
+    // All votes are "For"
+    // Note: integer division rounds down: (10 * 67) / 100 = 6 required for 67% quorum
+    let mut votes = Vec::new();
+    for _ in 0..5 {
+        let kp = KeyPair::generate().unwrap();
+        votes.push(Vote::new(
+            proposal_id.clone(),
+            kp.did().clone(),
+            VoteChoice::For,
+        ));
+    }
+
+    let tally = VoteTally::from(votes);
+    let eligible_count = 10;
+
+    // Normal proposal (50% quorum): should pass with exactly 5 votes
+    // (10 * 50) / 100 = 5 required, we have 5 → quorum met
+    let normal_thresholds = ProposalThresholds::new(50, 50);
+    let result = profile
+        .evaluate_with_thresholds(&tally, normal_thresholds, eligible_count)
+        .unwrap();
+    assert!(
+        matches!(result, icn_governance::DecisionOutcome::Accepted),
+        "Normal proposal with 50% turnout should pass 50% quorum"
+    );
+
+    // Emergency freeze proposal (67% quorum): should fail quorum
+    // (10 * 67) / 100 = 6 required, we only have 5 → NoQuorum
+    let freeze_thresholds = ProposalThresholds::new(67, 75);
+    let result = profile
+        .evaluate_with_thresholds(&tally, freeze_thresholds, eligible_count)
+        .unwrap();
+    assert!(
+        matches!(result, icn_governance::DecisionOutcome::NoQuorum),
+        "Freeze proposal with 50% turnout should fail 67% quorum (need 6, got 5)"
+    );
+}
+
+#[test]
+fn test_emergency_rollback_requires_supermajority_approval() {
+    use icn_governance::{GovernanceProfile, ProposalThresholds};
+
+    let profile = GovernanceProfile::cooperative_default();
+    let proposal_id = ProposalId::generate();
+
+    // Create votes: 8 out of 10 eligible (80% turnout - meets 75% quorum)
+    // 6 For, 2 Against (75% approval)
+    let mut votes = Vec::new();
+    for _ in 0..6 {
+        let kp = KeyPair::generate().unwrap();
+        votes.push(Vote::new(
+            proposal_id.clone(),
+            kp.did().clone(),
+            VoteChoice::For,
+        ));
+    }
+    for _ in 0..2 {
+        let kp = KeyPair::generate().unwrap();
+        votes.push(Vote::new(
+            proposal_id.clone(),
+            kp.did().clone(),
+            VoteChoice::Against,
+        ));
+    }
+
+    let tally = VoteTally::from(votes);
+    let eligible_count = 10;
+
+    // Rollback requires 80% approval
+    let rollback_thresholds = ProposalThresholds::new(75, 80);
+    let result = profile
+        .evaluate_with_thresholds(&tally, rollback_thresholds, eligible_count)
+        .unwrap();
+    // 6/8 = 75% approval, but 80% required - should be rejected
+    assert!(
+        matches!(result, icn_governance::DecisionOutcome::Rejected),
+        "Rollback with 75% approval should fail 80% approval threshold"
+    );
+}
+
+#[test]
+fn test_emergency_veto_passes_with_supermajority() {
+    use icn_governance::{GovernanceProfile, ProposalThresholds};
+
+    let profile = GovernanceProfile::cooperative_default();
+    let proposal_id = ProposalId::generate();
+
+    // Create votes: 7 out of 10 eligible (70% turnout - meets 67% quorum)
+    // All 7 vote For (100% approval - exceeds 75% threshold)
+    let mut votes = Vec::new();
+    for _ in 0..7 {
+        let kp = KeyPair::generate().unwrap();
+        votes.push(Vote::new(
+            proposal_id.clone(),
+            kp.did().clone(),
+            VoteChoice::For,
+        ));
+    }
+
+    let tally = VoteTally::from(votes);
+    let eligible_count = 10;
+
+    // Veto requires 67% quorum and 75% approval
+    let veto_thresholds = ProposalThresholds::new(67, 75);
+    let result = profile
+        .evaluate_with_thresholds(&tally, veto_thresholds, eligible_count)
+        .unwrap();
+    assert!(
+        matches!(result, icn_governance::DecisionOutcome::Accepted),
+        "Veto with 70% turnout and 100% approval should pass"
+    );
+}
+
+#[test]
+fn test_thresholds_for_proposal_returns_correct_values() {
+    use icn_governance::GovernanceConfig;
+
+    let config = GovernanceConfig::cooperative_default();
+
+    // Normal text proposal: 50/50
+    let text_payload = ProposalPayload::Text {
+        body: "test".to_string(),
+    };
+    let thresholds = config.thresholds_for_proposal(&text_payload);
+    assert_eq!(thresholds.quorum_percentage, 50);
+    assert_eq!(thresholds.approval_percentage, 50);
+
+    // Freeze member: 67/75
+    let freeze_payload = ProposalPayload::FreezeMember {
+        member: icn_identity::KeyPair::generate().unwrap().did().clone(),
+        reason: "test".to_string(),
+        duration_seconds: None,
+    };
+    let thresholds = config.thresholds_for_proposal(&freeze_payload);
+    assert_eq!(thresholds.quorum_percentage, 67);
+    assert_eq!(thresholds.approval_percentage, 75);
+
+    // Rollback ledger: 75/80 (highest thresholds)
+    let rollback_payload = ProposalPayload::RollbackLedger {
+        target_hash: "checkpoint-1".to_string(),
+        reason: "emergency".to_string(),
+        affected_accounts: vec![],
+    };
+    let thresholds = config.thresholds_for_proposal(&rollback_payload);
+    assert_eq!(thresholds.quorum_percentage, 75);
+    assert_eq!(thresholds.approval_percentage, 80);
+}
+
+#[test]
+fn test_proposal_type_name_all_variants() {
+    // Ensure type_name returns expected strings for metrics
+    let test_cases = [
+        (
+            ProposalPayload::Text {
+                body: "".to_string(),
+            },
+            "text",
+        ),
+        (
+            ProposalPayload::FreezeMember {
+                member: icn_identity::KeyPair::generate().unwrap().did().clone(),
+                reason: "".to_string(),
+                duration_seconds: None,
+            },
+            "freeze_member",
+        ),
+        (
+            ProposalPayload::VetoProposal {
+                target_proposal_id: ProposalId::generate().0,
+                reason: "".to_string(),
+            },
+            "veto_proposal",
+        ),
+        (
+            ProposalPayload::RollbackLedger {
+                target_hash: "".to_string(),
+                reason: "".to_string(),
+                affected_accounts: vec![],
+            },
+            "rollback_ledger",
+        ),
+    ];
+
+    for (payload, expected_name) in test_cases {
+        assert_eq!(
+            payload.type_name(),
+            expected_name,
+            "type_name for {:?} should be {expected_name}",
+            std::mem::discriminant(&payload)
+        );
+    }
+}
+
+#[test]
+fn test_proposal_emergency_type_identification() {
+    // Emergency proposals
+    let freeze = ProposalPayload::FreezeMember {
+        member: icn_identity::KeyPair::generate().unwrap().did().clone(),
+        reason: "".to_string(),
+        duration_seconds: None,
+    };
+    assert_eq!(freeze.emergency_type(), Some("freeze"));
+    assert!(freeze.is_emergency());
+
+    let veto = ProposalPayload::VetoProposal {
+        target_proposal_id: ProposalId::generate().0,
+        reason: "".to_string(),
+    };
+    assert_eq!(veto.emergency_type(), Some("veto"));
+    assert!(veto.is_emergency());
+
+    let rollback = ProposalPayload::RollbackLedger {
+        target_hash: "".to_string(),
+        reason: "".to_string(),
+        affected_accounts: vec![],
+    };
+    assert_eq!(rollback.emergency_type(), Some("rollback"));
+    assert!(rollback.is_emergency());
+
+    // Non-emergency proposals
+    let text = ProposalPayload::Text {
+        body: "".to_string(),
+    };
+    assert_eq!(text.emergency_type(), None);
+    assert!(!text.is_emergency());
+
+    let budget = ProposalPayload::Budget {
+        amount: 100,
+        currency: "USD".to_string(),
+        recipient: icn_identity::KeyPair::generate().unwrap().did().clone(),
+        purpose: "".to_string(),
+    };
+    assert_eq!(budget.emergency_type(), None);
+    assert!(!budget.is_emergency());
+}

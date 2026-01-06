@@ -388,6 +388,53 @@ pub enum ProposalPayload {
     },
 }
 
+impl ProposalPayload {
+    /// Get a string name for the proposal type (for metrics labeling)
+    pub fn type_name(&self) -> &'static str {
+        match self {
+            ProposalPayload::Text { .. } => "text",
+            ProposalPayload::Budget { .. } => "budget",
+            ProposalPayload::Membership { .. } => "membership",
+            ProposalPayload::ConfigChange { .. } => "config_change",
+            ProposalPayload::SchedulingPolicy { .. } => "scheduling_policy",
+            ProposalPayload::FreezeMember { .. } => "freeze_member",
+            ProposalPayload::UnfreezeMember { .. } => "unfreeze_member",
+            ProposalPayload::VetoProposal { .. } => "veto_proposal",
+            ProposalPayload::ForceCloseProposal { .. } => "force_close_proposal",
+            ProposalPayload::RollbackLedger { .. } => "rollback_ledger",
+            ProposalPayload::DisputeResolution { .. } => "dispute_resolution",
+            ProposalPayload::Sdis { .. } => "sdis",
+            ProposalPayload::ProtocolUpgrade { .. } => "protocol_upgrade",
+            ProposalPayload::ProtocolChange { .. } => "protocol_change",
+            ProposalPayload::Treasury { .. } => "treasury",
+            ProposalPayload::SurplusAllocation { .. } => "surplus_allocation",
+            ProposalPayload::ShareRedemption { .. } => "share_redemption",
+            ProposalPayload::BondIssuance { .. } => "bond_issuance",
+        }
+    }
+
+    /// Get the emergency type if this is an emergency proposal
+    ///
+    /// Returns Some(emergency_type) for freeze, veto, force_close, and rollback proposals.
+    /// Returns None for normal proposals.
+    pub fn emergency_type(&self) -> Option<&'static str> {
+        match self {
+            ProposalPayload::FreezeMember { .. } | ProposalPayload::UnfreezeMember { .. } => {
+                Some("freeze")
+            }
+            ProposalPayload::VetoProposal { .. } => Some("veto"),
+            ProposalPayload::ForceCloseProposal { .. } => Some("force_close"),
+            ProposalPayload::RollbackLedger { .. } => Some("rollback"),
+            _ => None,
+        }
+    }
+
+    /// Check if this is an emergency proposal (requires higher quorum)
+    pub fn is_emergency(&self) -> bool {
+        self.emergency_type().is_some()
+    }
+}
+
 /// Treasury operations that require governance approval
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum TreasuryProposalOperation {

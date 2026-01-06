@@ -11,9 +11,9 @@ use anyhow::{bail, Result};
 use icn_gossip::GossipActor;
 use icn_governance::{
     GovernanceConfig, GovernanceDomain, GovernanceDomainId, GovernanceMessage, GovernanceParams,
-    GovernanceProfile, GovernanceProfileId, GovernanceRule, MembershipConfig, MembershipResolver,
-    Proposal, ProposalId, ProposalOutcome, ProposalPayload, ProposalState,
-    StaticMembershipResolver, TallySnapshot, Vote, VoteChoice, VoteTally,
+    GovernanceProfile, GovernanceProfileId, MembershipConfig, MembershipResolver, Proposal,
+    ProposalId, ProposalOutcome, ProposalPayload, ProposalState, StaticMembershipResolver,
+    TallySnapshot, Vote, VoteChoice, VoteTally,
 };
 use icn_identity::{Did, IdentityBundle, KeyPair};
 use icn_net::{IncomingMessageHandler, MessagePayload, NetworkActor};
@@ -426,9 +426,11 @@ impl TestNode {
         let resolver = StaticMembershipResolver::new();
         let eligible_count = resolver.member_count(&domain)?;
 
-        // Evaluate outcome
+        // Evaluate outcome using proposal-type-specific thresholds (Issue #477)
         let profile = GovernanceProfile::cooperative_default();
-        let outcome_result = profile.evaluate(&tally, &domain.config.params, eligible_count)?;
+        let thresholds = domain.config.thresholds_for_proposal(&proposal.payload);
+        let outcome_result =
+            profile.evaluate_with_thresholds(&tally, thresholds, eligible_count)?;
 
         let outcome = match outcome_result {
             icn_governance::DecisionOutcome::Accepted => ProposalOutcome::Accepted,
@@ -740,5 +742,163 @@ async fn test_governance_proposal_lifecycle() -> Result<()> {
     node2.shutdown().await;
     node3.shutdown().await;
 
+    Ok(())
+}
+
+/// Test that emergency proposals require higher quorum thresholds (Issue #477)
+///
+/// This is an end-to-end test that verifies emergency proposals (freeze, veto, rollback)
+/// require 67%+ quorum vs the standard 50% for normal proposals.
+#[tokio::test]
+async fn test_emergency_proposal_requires_supermajority_quorum() -> Result<()> {
+    // Initialize test environment
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter("warn")
+        .with_test_writer()
+        .try_init();
+
+    info!("=== Starting emergency quorum enforcement test ===");
+
+    // Setup: Create a governance domain with 10 members
+    // We'll use static membership with 10 DIDs
+    let mut members = Vec::new();
+    for _ in 0..10 {
+        let kp = KeyPair::generate()?;
+        members.push(kp.did().clone());
+    }
+
+    // Create domain with default cooperative config (50% quorum for normal, 67% for freeze)
+    let config = GovernanceConfig::new(
+        GovernanceProfileId::builtin("cooperative"),
+        MembershipConfig::static_list(members.clone()),
+        GovernanceParams::new(50, 50, 604800),
+    );
+    let domain = GovernanceDomain::new("Test Cooperative".to_string(), config);
+    let domain_id = domain.id.clone();
+
+    // Verify the thresholds for freeze vs normal proposals
+    let normal_payload = ProposalPayload::Text {
+        body: "Normal proposal".to_string(),
+    };
+    let freeze_payload = ProposalPayload::FreezeMember {
+        member: members[0].clone(),
+        reason: "Security concern".to_string(),
+        duration_seconds: Some(86400),
+    };
+
+    let normal_thresholds = domain.config.thresholds_for_proposal(&normal_payload);
+    let freeze_thresholds = domain.config.thresholds_for_proposal(&freeze_payload);
+
+    info!(
+        "Normal proposal thresholds: {}% quorum, {}% approval",
+        normal_thresholds.quorum_percentage, normal_thresholds.approval_percentage
+    );
+    info!(
+        "Freeze proposal thresholds: {}% quorum, {}% approval",
+        freeze_thresholds.quorum_percentage, freeze_thresholds.approval_percentage
+    );
+
+    // Verify emergency thresholds are higher
+    assert!(
+        freeze_thresholds.quorum_percentage > normal_thresholds.quorum_percentage,
+        "Freeze proposal should require higher quorum than normal"
+    );
+
+    // Create test proposals
+    let proposer_did = members[1].clone();
+
+    let normal_proposal = Proposal::new(
+        domain_id.clone(),
+        proposer_did.clone(),
+        "Normal Text Proposal".to_string(),
+        "A routine proposal".to_string(),
+        normal_payload,
+    );
+
+    let freeze_proposal = Proposal::new(
+        domain_id.clone(),
+        proposer_did,
+        "Freeze Member".to_string(),
+        "Emergency action".to_string(),
+        freeze_payload,
+    );
+
+    // Scenario: 5 out of 10 members vote (50% turnout)
+    // For integer division: (10 * 50) / 100 = 5 required for normal
+    //                       (10 * 67) / 100 = 6 required for freeze
+    let mut normal_votes = Vec::new();
+    let mut freeze_votes = Vec::new();
+    for member in members.iter().take(5) {
+        normal_votes.push(Vote::new(
+            normal_proposal.id.clone(),
+            member.clone(),
+            VoteChoice::For,
+        ));
+        freeze_votes.push(Vote::new(
+            freeze_proposal.id.clone(),
+            member.clone(),
+            VoteChoice::For,
+        ));
+    }
+
+    let normal_tally = VoteTally::from(normal_votes);
+    let freeze_tally = VoteTally::from(freeze_votes);
+
+    // Evaluate outcomes
+    let profile = GovernanceProfile::cooperative_default();
+    let resolver = StaticMembershipResolver::new();
+    let eligible_count = resolver.member_count(&domain)?;
+
+    let normal_outcome =
+        profile.evaluate_with_thresholds(&normal_tally, normal_thresholds, eligible_count)?;
+    let freeze_outcome =
+        profile.evaluate_with_thresholds(&freeze_tally, freeze_thresholds, eligible_count)?;
+
+    info!(
+        "Normal proposal outcome with 50% turnout: {:?}",
+        normal_outcome
+    );
+    info!(
+        "Freeze proposal outcome with 50% turnout: {:?}",
+        freeze_outcome
+    );
+
+    // Assert: Normal proposal passes (50% turnout meets 50% quorum)
+    assert!(
+        matches!(normal_outcome, icn_governance::DecisionOutcome::Accepted),
+        "Normal proposal with 50% turnout should pass 50% quorum"
+    );
+
+    // Assert: Freeze proposal fails quorum (50% turnout < 67% required)
+    assert!(
+        matches!(freeze_outcome, icn_governance::DecisionOutcome::NoQuorum),
+        "Freeze proposal with 50% turnout should fail 67% quorum (need 6 votes, got 5)"
+    );
+
+    // Scenario 2: 7 out of 10 members vote (70% turnout) - should pass for freeze
+    let mut freeze_votes_7 = Vec::new();
+    for member in members.iter().take(7) {
+        freeze_votes_7.push(Vote::new(
+            freeze_proposal.id.clone(),
+            member.clone(),
+            VoteChoice::For,
+        ));
+    }
+    let freeze_tally_7 = VoteTally::from(freeze_votes_7);
+    let freeze_outcome_7 =
+        profile.evaluate_with_thresholds(&freeze_tally_7, freeze_thresholds, eligible_count)?;
+
+    info!(
+        "Freeze proposal outcome with 70% turnout: {:?}",
+        freeze_outcome_7
+    );
+
+    // Assert: Freeze proposal passes with 70% turnout (> 67% required)
+    assert!(
+        matches!(freeze_outcome_7, icn_governance::DecisionOutcome::Accepted),
+        "Freeze proposal with 70% turnout should pass 67% quorum"
+    );
+
+    info!("=== Emergency quorum enforcement test completed successfully ===");
     Ok(())
 }

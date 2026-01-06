@@ -1,5 +1,6 @@
 //! Governance profiles - rules for evaluating votes
 
+use crate::config::ProposalThresholds;
 use crate::tally::VoteTally;
 use crate::GovernanceParams;
 use anyhow::Result;
@@ -85,6 +86,45 @@ impl GovernanceProfile {
     }
 }
 
+impl GovernanceProfile {
+    /// Evaluate a vote tally with explicit thresholds
+    ///
+    /// This method allows specifying custom quorum and approval thresholds
+    /// instead of using the default params. This is used to enforce
+    /// higher thresholds for emergency proposals (freeze, veto, rollback).
+    ///
+    /// # Arguments
+    /// * `tally` - The vote tally to evaluate
+    /// * `thresholds` - Custom quorum and approval thresholds
+    /// * `eligible_voter_count` - Total number of eligible voters
+    ///
+    /// # Returns
+    /// The decision outcome (Accepted, Rejected, or NoQuorum)
+    pub fn evaluate_with_thresholds(
+        &self,
+        tally: &VoteTally,
+        thresholds: ProposalThresholds,
+        eligible_voter_count: usize,
+    ) -> Result<DecisionOutcome> {
+        // Check quorum: did enough people vote?
+        let total_votes = tally.total_votes();
+        let quorum_required = (eligible_voter_count * thresholds.quorum_percentage as usize) / 100;
+
+        if total_votes < quorum_required {
+            return Ok(DecisionOutcome::NoQuorum);
+        }
+
+        // Check approval: did enough vote "for"?
+        let approval_required = (total_votes * thresholds.approval_percentage as usize) / 100;
+
+        if tally.for_votes > approval_required {
+            Ok(DecisionOutcome::Accepted)
+        } else {
+            Ok(DecisionOutcome::Rejected)
+        }
+    }
+}
+
 impl GovernanceRule for GovernanceProfile {
     fn evaluate(
         &self,
@@ -92,22 +132,15 @@ impl GovernanceRule for GovernanceProfile {
         params: &GovernanceParams,
         eligible_voter_count: usize,
     ) -> Result<DecisionOutcome> {
-        // Check quorum: did enough people vote?
-        let total_votes = tally.total_votes();
-        let quorum_required = (eligible_voter_count * params.quorum_percentage as usize) / 100;
-
-        if total_votes < quorum_required {
-            return Ok(DecisionOutcome::NoQuorum);
-        }
-
-        // Check approval: did enough vote "for"?
-        let approval_required = (total_votes * params.approval_threshold_percentage as usize) / 100;
-
-        if tally.for_votes > approval_required {
-            Ok(DecisionOutcome::Accepted)
-        } else {
-            Ok(DecisionOutcome::Rejected)
-        }
+        // Delegate to evaluate_with_thresholds with params converted to thresholds
+        self.evaluate_with_thresholds(
+            tally,
+            ProposalThresholds::new(
+                params.quorum_percentage,
+                params.approval_threshold_percentage,
+            ),
+            eligible_voter_count,
+        )
     }
 
     fn profile_id(&self) -> &GovernanceProfileId {
