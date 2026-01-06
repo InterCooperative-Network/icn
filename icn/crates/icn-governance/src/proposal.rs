@@ -832,6 +832,12 @@ impl FederationProposal {
     /// Validate the federation proposal
     ///
     /// Returns an error message if validation fails.
+    ///
+    /// Note: This performs structural validation only. Full validation
+    /// (e.g., verifying that a DID corresponds to a cooperative ID, or
+    /// checking for existing memberships/agreements) requires federation
+    /// registry lookup and should be done at proposal creation time by
+    /// the gateway or at execution time by the handler.
     pub fn validate(&self) -> Result<(), String> {
         match self {
             FederationProposal::JoinFederation {
@@ -847,13 +853,19 @@ impl FederationProposal {
             FederationProposal::LeaveFederation {
                 federation_id,
                 reason,
-                ..
+                grace_period_days,
             } => {
                 if federation_id.is_empty() {
                     return Err("federation_id cannot be empty".to_string());
                 }
                 if reason.is_empty() {
                     return Err("reason cannot be empty".to_string());
+                }
+                if *grace_period_days == 0 {
+                    return Err("grace_period_days must be at least 1".to_string());
+                }
+                if *grace_period_days > 365 {
+                    return Err("grace_period_days cannot exceed 365".to_string());
                 }
             }
             FederationProposal::EstablishClearing {
@@ -1795,6 +1807,41 @@ mod tests {
             max_attestations_per_minute: None,
         };
         assert!(invalid_policy.validate().is_err());
+
+        // Invalid grace_period_days (zero)
+        let zero_grace = FederationProposal::LeaveFederation {
+            federation_id: "test-fed".to_string(),
+            reason: "Leaving".to_string(),
+            grace_period_days: 0,
+        };
+        assert!(zero_grace.validate().is_err());
+        assert!(zero_grace
+            .validate()
+            .unwrap_err()
+            .contains("grace_period_days"));
+
+        // Invalid grace_period_days (too long)
+        let long_grace = FederationProposal::LeaveFederation {
+            federation_id: "test-fed".to_string(),
+            reason: "Leaving".to_string(),
+            grace_period_days: 500,
+        };
+        assert!(long_grace.validate().is_err());
+
+        // Valid grace_period_days (edge cases)
+        let min_grace = FederationProposal::LeaveFederation {
+            federation_id: "test-fed".to_string(),
+            reason: "Leaving".to_string(),
+            grace_period_days: 1,
+        };
+        assert!(min_grace.validate().is_ok());
+
+        let max_grace = FederationProposal::LeaveFederation {
+            federation_id: "test-fed".to_string(),
+            reason: "Leaving".to_string(),
+            grace_period_days: 365,
+        };
+        assert!(max_grace.validate().is_ok());
     }
 
     #[test]
