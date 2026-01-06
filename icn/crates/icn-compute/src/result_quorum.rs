@@ -227,10 +227,24 @@ pub struct ResultAggregator {
     deadline: u64,
 }
 
+/// Default collection window in milliseconds (30 seconds)
+pub const DEFAULT_COLLECTION_WINDOW_MS: u64 = 30_000;
+
 impl ResultAggregator {
     /// Create a new result aggregator for a task
-    pub fn new(task_hash: TaskHash, verification: TaskVerification, started_at: u64) -> Self {
-        let deadline = started_at + 30_000; // Default 30s collection window
+    ///
+    /// # Arguments
+    /// * `task_hash` - Hash of the task being verified
+    /// * `verification` - Verification requirements for this task
+    /// * `started_at` - Timestamp when collection started (milliseconds)
+    /// * `collection_window_ms` - Time window to collect results (milliseconds)
+    pub fn new(
+        task_hash: TaskHash,
+        verification: TaskVerification,
+        started_at: u64,
+        collection_window_ms: u64,
+    ) -> Self {
+        let deadline = started_at + collection_window_ms;
 
         Self {
             task_hash,
@@ -239,6 +253,20 @@ impl ResultAggregator {
             started_at,
             deadline,
         }
+    }
+
+    /// Create a new result aggregator with default collection window (30s)
+    pub fn with_default_window(
+        task_hash: TaskHash,
+        verification: TaskVerification,
+        started_at: u64,
+    ) -> Self {
+        Self::new(
+            task_hash,
+            verification,
+            started_at,
+            DEFAULT_COLLECTION_WINDOW_MS,
+        )
     }
 
     /// Set custom collection deadline
@@ -333,18 +361,33 @@ impl ResultAggregator {
     }
 
     /// Get the canonical result (if consensus reached)
+    ///
+    /// This method evaluates consensus and returns the canonical result in one pass,
+    /// avoiding redundant computation compared to calling status() then looking up the result.
     pub fn canonical_result(&self) -> Option<&ComputeResult> {
-        if let QuorumStatus::Consensus { result_hash, .. } = self.status() {
-            self.results.values().find_map(|r| {
-                if r.output_hash == result_hash {
-                    Some(&r.result)
-                } else {
-                    None
-                }
-            })
-        } else {
-            None
+        let received = self.results.len();
+        let required = self.verification.required_executors;
+
+        // Not enough results yet
+        if received < required {
+            return None;
         }
+
+        // Find majority group directly
+        let mut groups: HashMap<[u8; 32], Vec<&CollectedResult>> = HashMap::new();
+        for result in self.results.values() {
+            groups.entry(result.output_hash).or_default().push(result);
+        }
+
+        let total = self.results.len();
+        let threshold = (total as f64 * self.verification.consensus_threshold).ceil() as usize;
+
+        // Find and return canonical result if consensus met
+        groups
+            .iter()
+            .find(|(_, group)| group.len() >= threshold)
+            .and_then(|(_, group)| group.first())
+            .map(|r| &r.result)
     }
 
     /// Get all collected results
@@ -385,10 +428,13 @@ impl ResultQuorumManager {
     /// Register a task for multi-executor verification
     pub fn register_task(&self, task_hash: TaskHash, verification: TaskVerification) -> Result<()> {
         let now = icn_time::current_timestamp_millis();
-        let deadline = now + self.config.collection_window_ms;
 
-        let aggregator =
-            ResultAggregator::new(task_hash, verification, now).with_deadline(deadline);
+        let aggregator = ResultAggregator::new(
+            task_hash,
+            verification,
+            now,
+            self.config.collection_window_ms,
+        );
 
         let mut aggregators = self
             .aggregators
@@ -581,7 +627,7 @@ mod tests {
             assigned_executors: vec![],
         };
 
-        let mut aggregator = ResultAggregator::new(
+        let mut aggregator = ResultAggregator::with_default_window(
             task_hash,
             verification,
             icn_time::current_timestamp_millis(),
@@ -606,7 +652,7 @@ mod tests {
             assigned_executors: vec![],
         };
 
-        let mut aggregator = ResultAggregator::new(
+        let mut aggregator = ResultAggregator::with_default_window(
             task_hash,
             verification,
             icn_time::current_timestamp_millis(),
@@ -647,7 +693,7 @@ mod tests {
             assigned_executors: vec![],
         };
 
-        let mut aggregator = ResultAggregator::new(
+        let mut aggregator = ResultAggregator::with_default_window(
             task_hash,
             verification,
             icn_time::current_timestamp_millis(),
@@ -687,7 +733,7 @@ mod tests {
             assigned_executors: vec![],
         };
 
-        let mut aggregator = ResultAggregator::new(
+        let mut aggregator = ResultAggregator::with_default_window(
             task_hash,
             verification,
             icn_time::current_timestamp_millis(),
@@ -723,7 +769,7 @@ mod tests {
         let task_hash = [5u8; 32];
         let verification = TaskVerification::default();
 
-        let mut aggregator = ResultAggregator::new(
+        let mut aggregator = ResultAggregator::with_default_window(
             task_hash,
             verification,
             icn_time::current_timestamp_millis(),
@@ -742,7 +788,7 @@ mod tests {
         let wrong_hash = [7u8; 32];
         let verification = TaskVerification::default();
 
-        let mut aggregator = ResultAggregator::new(
+        let mut aggregator = ResultAggregator::with_default_window(
             task_hash,
             verification,
             icn_time::current_timestamp_millis(),
@@ -805,7 +851,7 @@ mod tests {
             assigned_executors: vec![],
         };
 
-        let mut aggregator = ResultAggregator::new(
+        let mut aggregator = ResultAggregator::with_default_window(
             task_hash,
             verification,
             icn_time::current_timestamp_millis(),
