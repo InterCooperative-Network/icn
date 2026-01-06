@@ -693,6 +693,44 @@ pub fn init_descriptions() {
     describe_gauge!("icn_system_uptime_seconds", "System uptime in seconds");
     describe_gauge!("icn_system_actors_active", "Number of active actors");
 
+    // Supervisor metrics (Issue #493)
+    describe_counter!(
+        "icn_supervisor_errors_total",
+        "Total supervisor errors by operation type"
+    );
+    describe_counter!(
+        "icn_supervisor_startup_phases_total",
+        "Startup phase completions by phase name"
+    );
+    describe_gauge!(
+        "icn_supervisor_state",
+        "Supervisor state: 0=stopped, 1=starting, 2=running, 3=stopping"
+    );
+    describe_counter!(
+        "icn_supervisor_actors_spawned_total",
+        "Total actors spawned by actor type"
+    );
+    describe_counter!(
+        "icn_supervisor_actor_spawn_failures_total",
+        "Actor spawn failures by actor type"
+    );
+    describe_counter!(
+        "icn_supervisor_actor_restarts_total",
+        "Actor restart count by actor type"
+    );
+    describe_gauge!(
+        "icn_supervisor_actor_restart_backoff_seconds",
+        "Current restart backoff delay by actor"
+    );
+    describe_counter!(
+        "icn_supervisor_actor_restart_limit_exceeded_total",
+        "Times an actor exceeded max restart attempts"
+    );
+    describe_gauge!(
+        "icn_supervisor_actor_active",
+        "Whether actor is currently active (1=active, 0=inactive)"
+    );
+
     // Core infrastructure metrics (dead-letter queue)
     describe_counter!(
         "icn_core_dead_letter_enqueued_total",
@@ -3877,6 +3915,15 @@ pub mod supervisor {
             "actor" => actor.to_string()
         )
         .increment(1);
+    }
+
+    /// Issue #493: Set actor active state (1=active, 0=inactive)
+    pub fn actor_active_set(actor: &str, active: bool) {
+        gauge!(
+            "icn_supervisor_actor_active",
+            "actor" => actor.to_string()
+        )
+        .set(if active { 1.0 } else { 0.0 });
     }
 }
 
