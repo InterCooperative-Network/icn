@@ -854,8 +854,14 @@ async fn test_emergency_proposal_requires_supermajority_quorum() -> Result<()> {
     let freeze_outcome =
         profile.evaluate_with_thresholds(&freeze_tally, freeze_thresholds, eligible_count)?;
 
-    info!("Normal proposal outcome with 50% turnout: {:?}", normal_outcome);
-    info!("Freeze proposal outcome with 50% turnout: {:?}", freeze_outcome);
+    info!(
+        "Normal proposal outcome with 50% turnout: {:?}",
+        normal_outcome
+    );
+    info!(
+        "Freeze proposal outcome with 50% turnout: {:?}",
+        freeze_outcome
+    );
 
     // Assert: Normal proposal passes (50% turnout meets 50% quorum)
     assert!(
