@@ -666,6 +666,11 @@ pub fn validate_context(context: &str) -> Result<()> {
 /// Validate optional evidence string
 pub fn validate_evidence(evidence: &Option<String>) -> Result<()> {
     if let Some(ev) = evidence {
+        if ev.is_empty() || ev.trim().is_empty() {
+            return Err(GatewayError::BadRequest(
+                "Evidence cannot be empty if provided".to_string(),
+            ));
+        }
         if ev.len() > MAX_EVIDENCE_LEN {
             return Err(GatewayError::BadRequest(format!(
                 "Evidence exceeds maximum length of {MAX_EVIDENCE_LEN} characters"
@@ -953,5 +958,198 @@ mod tests {
 
         // Invalid voting period (too long)
         assert!(validate_governance_params(50, 66, MAX_VOTING_PERIOD_SECONDS + 1).is_err());
+    }
+
+    // ============================================================================
+    // Federation Validation Tests
+    // ============================================================================
+
+    #[test]
+    fn test_validate_federation_id() {
+        // Valid IDs
+        assert!(validate_federation_id("test-federation").is_ok());
+        assert!(validate_federation_id("regional-food-fed").is_ok());
+        assert!(validate_federation_id("coop123").is_ok());
+
+        // Invalid IDs
+        assert!(validate_federation_id("").is_err()); // Empty
+        assert!(validate_federation_id("   ").is_err()); // Whitespace-only
+        assert!(validate_federation_id(&"a".repeat(MAX_FEDERATION_ID_LEN + 1)).is_err()); // Too long
+        assert!(validate_federation_id("test federation").is_err()); // Space
+        assert!(validate_federation_id("test@federation").is_err()); // Special char
+    }
+
+    #[test]
+    fn test_validate_trust_score() {
+        // Valid scores
+        assert!(validate_trust_score(0.0).is_ok());
+        assert!(validate_trust_score(0.5).is_ok());
+        assert!(validate_trust_score(1.0).is_ok());
+
+        // Invalid scores
+        assert!(validate_trust_score(-0.1).is_err()); // Negative
+        assert!(validate_trust_score(1.1).is_err()); // Too high
+        assert!(validate_trust_score(f64::NAN).is_err()); // NaN
+        assert!(validate_trust_score(f64::INFINITY).is_err()); // Infinity
+        assert!(validate_trust_score(f64::NEG_INFINITY).is_err()); // Negative infinity
+    }
+
+    #[test]
+    fn test_validate_grace_period_days() {
+        // Valid periods
+        assert!(validate_grace_period_days(1).is_ok());
+        assert!(validate_grace_period_days(30).is_ok());
+        assert!(validate_grace_period_days(365).is_ok());
+
+        // Invalid periods
+        assert!(validate_grace_period_days(0).is_err()); // Zero
+        assert!(validate_grace_period_days(366).is_err()); // > 365
+        assert!(validate_grace_period_days(1000).is_err()); // Way too long
+    }
+
+    #[test]
+    fn test_validate_settlement_interval() {
+        // Valid intervals
+        assert!(validate_settlement_interval("daily").is_ok());
+        assert!(validate_settlement_interval("DAILY").is_ok()); // Case insensitive
+        assert!(validate_settlement_interval("weekly").is_ok());
+        assert!(validate_settlement_interval("monthly").is_ok());
+        assert!(validate_settlement_interval("manual").is_ok());
+
+        // Returns normalized lowercase
+        assert_eq!(
+            validate_settlement_interval("WEEKLY").unwrap(),
+            "weekly".to_string()
+        );
+
+        // Invalid intervals
+        assert!(validate_settlement_interval("yearly").is_err());
+        assert!(validate_settlement_interval("hourly").is_err());
+        assert!(validate_settlement_interval("").is_err());
+    }
+
+    #[test]
+    fn test_validate_data_sharing_level() {
+        // Valid levels
+        assert!(validate_data_sharing_level("none").is_ok());
+        assert!(validate_data_sharing_level("NONE").is_ok()); // Case insensitive
+        assert!(validate_data_sharing_level("metadata_only").is_ok());
+        assert!(validate_data_sharing_level("full").is_ok());
+
+        // Returns normalized lowercase
+        assert_eq!(
+            validate_data_sharing_level("FULL").unwrap(),
+            "full".to_string()
+        );
+
+        // Invalid levels
+        assert!(validate_data_sharing_level("partial").is_err());
+        assert!(validate_data_sharing_level("").is_err());
+    }
+
+    #[test]
+    fn test_validate_dispute_resolution() {
+        // Valid methods
+        assert!(validate_dispute_resolution("federation_mediation").is_ok());
+        assert!(validate_dispute_resolution("FEDERATION_MEDIATION").is_ok()); // Case insensitive
+        assert!(validate_dispute_resolution("federation_vote").is_ok());
+        assert!(validate_dispute_resolution("arbitrator:neutral-coop").is_ok());
+
+        // Arbitrator with empty ID
+        assert!(validate_dispute_resolution("arbitrator:").is_err());
+        assert!(validate_dispute_resolution("arbitrator:   ").is_err());
+
+        // Invalid methods
+        assert!(validate_dispute_resolution("court").is_err());
+        assert!(validate_dispute_resolution("").is_err());
+    }
+
+    #[test]
+    fn test_validate_reason() {
+        // Valid reasons
+        assert!(validate_reason("Strategic realignment").is_ok());
+        assert!(validate_reason("a").is_ok()); // Single char
+
+        // Invalid reasons
+        assert!(validate_reason("").is_err()); // Empty
+        assert!(validate_reason("   ").is_err()); // Whitespace-only
+        assert!(validate_reason(&"a".repeat(MAX_REASON_LEN + 1)).is_err()); // Too long
+    }
+
+    #[test]
+    fn test_validate_context() {
+        // Valid contexts
+        assert!(validate_context("trade").is_ok());
+        assert!(validate_context("governance").is_ok());
+
+        // Invalid contexts
+        assert!(validate_context("").is_err()); // Empty
+        assert!(validate_context("   ").is_err()); // Whitespace-only
+        assert!(validate_context(&"a".repeat(MAX_CONTEXT_LEN + 1)).is_err()); // Too long
+    }
+
+    #[test]
+    fn test_validate_evidence() {
+        // Valid evidence
+        assert!(validate_evidence(&None).is_ok());
+        assert!(validate_evidence(&Some("Supporting documentation".to_string())).is_ok());
+
+        // Invalid evidence
+        assert!(validate_evidence(&Some("".to_string())).is_err()); // Empty string
+        assert!(validate_evidence(&Some("   ".to_string())).is_err()); // Whitespace-only
+        assert!(validate_evidence(&Some("a".repeat(MAX_EVIDENCE_LEN + 1))).is_err());
+        // Too long
+    }
+
+    #[test]
+    fn test_validate_max_imbalance() {
+        // Valid imbalances
+        assert!(validate_max_imbalance(1).is_ok());
+        assert!(validate_max_imbalance(1000).is_ok());
+        assert!(validate_max_imbalance(1_000_000).is_ok());
+
+        // Invalid imbalances
+        assert!(validate_max_imbalance(0).is_err()); // Zero
+        assert!(validate_max_imbalance(-100).is_err()); // Negative
+    }
+
+    #[test]
+    fn test_validate_auto_accept_threshold() {
+        // Valid thresholds
+        assert!(validate_auto_accept_threshold(None).is_ok());
+        assert!(validate_auto_accept_threshold(Some(0.0)).is_ok());
+        assert!(validate_auto_accept_threshold(Some(0.5)).is_ok());
+        assert!(validate_auto_accept_threshold(Some(1.0)).is_ok());
+        assert!(validate_auto_accept_threshold(Some(-1.0)).is_ok()); // Disabled
+
+        // Invalid thresholds
+        assert!(validate_auto_accept_threshold(Some(-0.5)).is_err()); // Not -1.0 and negative
+        assert!(validate_auto_accept_threshold(Some(1.1)).is_err()); // Too high
+        assert!(validate_auto_accept_threshold(Some(f64::NAN)).is_err()); // NaN
+    }
+
+    #[test]
+    fn test_validate_trust_decay_factor() {
+        // Valid factors
+        assert!(validate_trust_decay_factor(None).is_ok());
+        assert!(validate_trust_decay_factor(Some(0.0)).is_ok());
+        assert!(validate_trust_decay_factor(Some(0.05)).is_ok());
+        assert!(validate_trust_decay_factor(Some(1.0)).is_ok());
+
+        // Invalid factors
+        assert!(validate_trust_decay_factor(Some(-0.1)).is_err()); // Negative
+        assert!(validate_trust_decay_factor(Some(1.1)).is_err()); // Too high
+        assert!(validate_trust_decay_factor(Some(f64::NAN)).is_err()); // NaN
+    }
+
+    #[test]
+    fn test_validate_max_attestations_per_minute() {
+        // Valid rates
+        assert!(validate_max_attestations_per_minute(None).is_ok());
+        assert!(validate_max_attestations_per_minute(Some(1)).is_ok());
+        assert!(validate_max_attestations_per_minute(Some(100)).is_ok());
+
+        // Invalid rates
+        assert!(validate_max_attestations_per_minute(Some(0)).is_err()); // Zero
     }
 }
