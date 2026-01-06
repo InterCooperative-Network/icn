@@ -211,6 +211,8 @@ pub async fn broadcast_trust_attestation(
     keypair: &KeyPair,
     gossip: &GossipHandle,
 ) -> Result<()> {
+    let start = Instant::now();
+
     // Sign the attestation
     attestation.sign(keypair)?;
 
@@ -221,9 +223,13 @@ pub async fn broadcast_trust_attestation(
     let mut gossip_actor = gossip.write().await;
     let hash = gossip_actor.publish(TRUST_ATTESTATIONS_TOPIC, data).await?;
 
+    // Issue #498: Record local propagation latency
+    let propagation_duration = start.elapsed();
+    icn_obs::metrics::trust::propagation_local_record(propagation_duration.as_secs_f64());
+
     debug!(
-        "Broadcasted trust attestation: {} -> {} (hash: {:?})",
-        attestation.issuer, attestation.subject, hash
+        "Broadcasted trust attestation: {} -> {} (hash: {:?}, latency: {:?})",
+        attestation.issuer, attestation.subject, hash, propagation_duration
     );
 
     // Record metric
@@ -248,6 +254,9 @@ pub async fn handle_trust_attestation_entry(
     own_did: &Did,
     rate_limiter: Option<&AttestationRateLimiter>,
 ) -> Result<()> {
+    // Issue #498: Track processing start time for propagation metrics
+    let process_start = Instant::now();
+
     // Decompress if needed
     let data = entry.get_data()?;
 
@@ -343,9 +352,21 @@ pub async fn handle_trust_attestation_entry(
 
     graph.add_edge(edge.clone())?;
 
+    // Issue #498: Record propagation metrics
+    let process_duration = process_start.elapsed();
+    icn_obs::metrics::trust::propagation_remote_record(process_duration.as_secs_f64());
+
+    // Calculate sync lag (how old was the attestation when we processed it)
+    let now_secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let sync_lag = now_secs.saturating_sub(attestation.created_at) as f64;
+    icn_obs::metrics::trust::sync_lag_set(sync_lag);
+
     info!(
-        "Applied remote trust attestation: {} -> {} (score: {})",
-        edge.source, edge.target, edge.score
+        "Applied remote trust attestation: {} -> {} (score: {}, latency: {:?}, sync_lag: {}s)",
+        edge.source, edge.target, edge.score, process_duration, sync_lag
     );
 
     // Record metrics

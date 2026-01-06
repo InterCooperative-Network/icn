@@ -559,6 +559,24 @@ pub fn init_descriptions() {
         "Trust score distribution by graph type"
     );
 
+    // Trust propagation metrics (Issue #498)
+    describe_histogram!(
+        "icn_trust_propagation_local_seconds",
+        "Time from trust attestation creation to gossip publish (local node)"
+    );
+    describe_histogram!(
+        "icn_trust_propagation_remote_seconds",
+        "Time from gossip receive to trust graph update (remote attestation)"
+    );
+    describe_gauge!(
+        "icn_trust_sync_lag_seconds",
+        "Trust sync lag based on attestation timestamp vs receive time"
+    );
+    describe_gauge!(
+        "icn_trust_updates_pending",
+        "Number of trust updates pending processing"
+    );
+
     // Contract metrics
     describe_gauge!(
         "icn_contract_installed_total",
@@ -2492,6 +2510,30 @@ pub mod trust {
     /// Issue #181: Increment trust computation errors counter
     pub fn computation_errors_inc() {
         counter!("icn_trust_computation_errors_total").increment(1);
+    }
+
+    // ========================================
+    // Propagation metrics (Issue #498)
+    // ========================================
+
+    /// Record time from attestation creation to gossip publish (local node)
+    pub fn propagation_local_record(duration_secs: f64) {
+        histogram!("icn_trust_propagation_local_seconds").record(duration_secs);
+    }
+
+    /// Record time from gossip receive to trust graph update (remote attestation)
+    pub fn propagation_remote_record(duration_secs: f64) {
+        histogram!("icn_trust_propagation_remote_seconds").record(duration_secs);
+    }
+
+    /// Set the trust sync lag based on attestation timestamp vs receive time
+    pub fn sync_lag_set(lag_secs: f64) {
+        gauge!("icn_trust_sync_lag_seconds").set(lag_secs);
+    }
+
+    /// Set the number of pending trust updates
+    pub fn updates_pending_set(count: u64) {
+        gauge!("icn_trust_updates_pending").set(count as f64);
     }
 }
 
