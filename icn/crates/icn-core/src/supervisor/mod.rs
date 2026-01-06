@@ -520,8 +520,10 @@ impl Supervisor {
                 tokio::sync::RwLock<Option<icn_ccl::ContractRegistryHandle>>,
             > = Arc::new(tokio::sync::RwLock::new(None));
 
-            // Keep a reference to federation registry for RPC server (declared here to be in scope for later use)
+            // Keep references to federation components for RPC server and governance handlers
             let federation_registry_for_rpc: Option<Arc<icn_federation::CooperativeRegistry>>;
+            let clearing_manager_for_governance: Option<Arc<icn_federation::ClearingManager>>;
+            let attestation_store_for_governance: Option<Arc<icn_federation::AttestationStore>>;
 
             // Set send callback on gossip actor to enable request/response
             {
@@ -868,6 +870,35 @@ impl Supervisor {
                     // Keep reference for RPC server
                     federation_registry_for_rpc = Some(federation_registry.clone());
 
+                    // Create clearing manager for bilateral clearing agreements (Issue #517)
+                    let clearing_store_path = self.config.store_path().join("clearing");
+                    let clearing_store: Arc<dyn icn_store::Store> =
+                        Arc::new(SledStore::open(&clearing_store_path)?);
+                    let clearing_manager = Arc::new(
+                        icn_federation::ClearingManager::new(clearing_store, coop_id.clone())
+                            .map_err(|e| {
+                                anyhow::anyhow!("Failed to create clearing manager: {e}")
+                            })?,
+                    );
+                    clearing_manager_for_governance = Some(clearing_manager);
+                    info!(
+                        "✓ Clearing manager initialized: store={}",
+                        clearing_store_path.display()
+                    );
+
+                    // Create attestation store for trust attestations (Issue #517)
+                    let attestation_store_path = self.config.store_path().join("attestations");
+                    let attestation_store_backend: Arc<dyn icn_store::Store> =
+                        Arc::new(SledStore::open(&attestation_store_path)?);
+                    let attestation_store = Arc::new(icn_federation::AttestationStore::new(
+                        attestation_store_backend,
+                    ));
+                    attestation_store_for_governance = Some(attestation_store);
+                    info!(
+                        "✓ Attestation store initialized: store={}",
+                        attestation_store_path.display()
+                    );
+
                     // Create federation gossip handler
                     let federation_handler = Arc::new(
                         icn_federation::FederationGossipHandler::new(federation_registry),
@@ -910,6 +941,8 @@ impl Supervisor {
                     Some(federation_handler)
                 } else {
                     federation_registry_for_rpc = None;
+                    clearing_manager_for_governance = None;
+                    attestation_store_for_governance = None;
                     None
                 };
 
@@ -1231,7 +1264,7 @@ impl Supervisor {
                         did.clone()
                     });
 
-                let handler = governance_handlers::GovernanceEventHandler::new(
+                let mut handler = governance_handlers::GovernanceEventHandler::new(
                     ledger_handle.clone(),
                     gov_store.clone(),
                     dead_letter_queue.clone(),
@@ -1240,6 +1273,16 @@ impl Supervisor {
                     treasury_manager_handle.clone(),
                     treasury_did,
                 );
+
+                // Add federation components if federation is enabled (Issue #517)
+                if let (Some(registry), Some(clearing), Some(attestations)) = (
+                    federation_registry_for_rpc.clone(),
+                    clearing_manager_for_governance.clone(),
+                    attestation_store_for_governance.clone(),
+                ) {
+                    handler = handler.with_federation(registry, clearing, attestations);
+                    info!("✓ Federation components wired to governance event handler");
+                }
 
                 event_bus
                     .subscribe(governance_handlers::create_governance_subscription(handler))

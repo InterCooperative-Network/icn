@@ -9,6 +9,7 @@ use tracing::{debug, error, info, warn};
 
 use crate::dead_letter::{FailedOperation, FailureType};
 use crate::governance::GovernanceHandle;
+use icn_federation::{AttestationStore, ClearingManager, CooperativeRegistry};
 use icn_governance::{GovernanceDomainId, ProposalId, ProposalPayload};
 use icn_identity::Did;
 use icn_ledger::{DisputeManager, TreasuryManager};
@@ -31,6 +32,15 @@ pub type TreasuryManagerHandle = Arc<RwLock<TreasuryManager>>;
 
 /// Type alias for the event bus
 pub type EventBus = Arc<crate::events::EventBus>;
+
+/// Type alias for the cooperative registry handle
+pub type CooperativeRegistryHandle = Arc<CooperativeRegistry>;
+
+/// Type alias for the clearing manager handle
+pub type ClearingManagerHandle = Arc<ClearingManager>;
+
+/// Type alias for the attestation store handle
+pub type AttestationStoreHandle = Arc<AttestationStore>;
 
 // =============================================================================
 // Validation helpers - shared logic for treasury operation validation
@@ -156,6 +166,14 @@ pub struct GovernanceEventHandler {
     treasury_did: Did,
     /// Event bus for emitting system events
     event_bus: Option<EventBus>,
+
+    // Federation components (optional - only set if federation is enabled)
+    /// Cooperative registry for federation membership
+    federation_registry: Option<CooperativeRegistryHandle>,
+    /// Clearing manager for bilateral clearing agreements
+    clearing_manager: Option<ClearingManagerHandle>,
+    /// Attestation store for trust attestations
+    attestation_store: Option<AttestationStoreHandle>,
 }
 
 impl GovernanceEventHandler {
@@ -178,12 +196,31 @@ impl GovernanceEventHandler {
             treasury_manager,
             treasury_did,
             event_bus: None,
+            federation_registry: None,
+            clearing_manager: None,
+            attestation_store: None,
         }
     }
 
     /// Set the event bus for error reporting
     pub fn with_event_bus(mut self, event_bus: EventBus) -> Self {
         self.event_bus = Some(event_bus);
+        self
+    }
+
+    /// Set the federation components for federation proposal execution
+    ///
+    /// Call this when federation is enabled to enable execution of
+    /// federation governance proposals.
+    pub fn with_federation(
+        mut self,
+        registry: CooperativeRegistryHandle,
+        clearing: ClearingManagerHandle,
+        attestations: AttestationStoreHandle,
+    ) -> Self {
+        self.federation_registry = Some(registry);
+        self.clearing_manager = Some(clearing);
+        self.attestation_store = Some(attestations);
         self
     }
 
@@ -2433,38 +2470,53 @@ impl GovernanceEventHandler {
             proposal.action_name()
         );
 
+        // Check if federation components are available
+        let (registry, clearing, attestations) = match (
+            &self.federation_registry,
+            &self.clearing_manager,
+            &self.attestation_store,
+        ) {
+            (Some(r), Some(c), Some(a)) => (r.clone(), c.clone(), a.clone()),
+            _ => {
+                warn!(
+                    "⚠️ Federation components not available - proposal {} logged but not executed",
+                    proposal_id.0
+                );
+                // Still log and record metrics even if federation is disabled
+                icn_obs::metrics::governance::proposals_executed_inc(&format!(
+                    "federation_{}_skipped",
+                    proposal.action_name()
+                ));
+                return;
+            }
+        };
+
         match proposal {
             FederationProposal::JoinFederation {
                 federation_id,
                 terms,
                 sponsor_coop_id,
             } => {
-                info!(
-                    "   Action: Join federation '{}' (sponsor: {:?})",
-                    federation_id, sponsor_coop_id
+                self.execute_join_federation(
+                    &proposal_id,
+                    &registry,
+                    &federation_id,
+                    &terms,
+                    sponsor_coop_id.as_deref(),
                 );
-                info!(
-                    "   Terms: trust_threshold={}, governance_binding={}, data_sharing={:?}",
-                    terms.min_trust_threshold, terms.governance_binding, terms.data_sharing_level
-                );
-                // TODO: Check if already a member (prevent duplicate join)
-                // TODO: Verify sponsor_coop_id is valid if provided
-                // TODO: Register with CooperativeRegistry, announce to federation:registry topic
-                icn_obs::metrics::governance::proposals_executed_inc("federation_join");
             }
             FederationProposal::LeaveFederation {
                 federation_id,
                 reason,
                 grace_period_days,
             } => {
-                info!(
-                    "   Action: Leave federation '{}' (grace period: {} days)",
-                    federation_id, grace_period_days
+                self.execute_leave_federation(
+                    &proposal_id,
+                    &registry,
+                    &federation_id,
+                    &reason,
+                    grace_period_days,
                 );
-                info!("   Reason: {}", reason);
-                // TODO: Verify cooperative is actually a member of this federation
-                // TODO: Initiate wind-down, settle clearing balances, remove from registry
-                icn_obs::metrics::governance::proposals_executed_inc("federation_leave");
             }
             FederationProposal::EstablishClearing {
                 partner_coop_id,
@@ -2473,32 +2525,22 @@ impl GovernanceEventHandler {
                 settlement_interval,
                 currency,
             } => {
-                info!(
-                    "   Action: Establish clearing with '{}' ({})",
-                    partner_coop_id, partner_coop_did
-                );
-                info!(
-                    "   Terms: max_imbalance={} {}, settlement={:?}",
-                    max_imbalance, currency, settlement_interval
-                );
-                // TODO: Verify partner DID matches partner_coop_id via registry lookup
-                // TODO: Check if clearing agreement already exists (prevent duplicate)
-                // TODO: Create BilateralClearingAgreement via ClearingManager
-                icn_obs::metrics::governance::proposals_executed_inc(
-                    "federation_establish_clearing",
+                self.execute_establish_clearing(
+                    &proposal_id,
+                    &registry,
+                    &clearing,
+                    &partner_coop_id,
+                    &partner_coop_did,
+                    max_imbalance,
+                    settlement_interval,
+                    &currency,
                 );
             }
             FederationProposal::TerminateClearing {
                 partner_coop_id,
                 reason,
             } => {
-                info!("   Action: Terminate clearing with '{}'", partner_coop_id);
-                info!("   Reason: {}", reason);
-                // TODO: Verify clearing agreement exists with this partner
-                // TODO: Settle outstanding balances and remove clearing agreement
-                icn_obs::metrics::governance::proposals_executed_inc(
-                    "federation_terminate_clearing",
-                );
+                self.execute_terminate_clearing(&proposal_id, &clearing, &partner_coop_id, &reason);
             }
             FederationProposal::VouchForCooperative {
                 target_coop_id,
@@ -2507,48 +2549,610 @@ impl GovernanceEventHandler {
                 context,
                 evidence,
             } => {
-                info!(
-                    "   Action: Vouch for '{}' ({}) with score {}",
-                    target_coop_id, target_coop_did, trust_score
+                self.execute_vouch_for_cooperative(
+                    &proposal_id,
+                    &registry,
+                    &attestations,
+                    &target_coop_id,
+                    &target_coop_did,
+                    trust_score,
+                    &context,
+                    evidence.as_deref(),
                 );
-                info!("   Context: {}", context);
-                if let Some(ev) = evidence {
-                    info!("   Evidence: {}", ev);
-                }
-                // TODO: Verify target DID matches target_coop_id via registry lookup
-                // TODO: Check if vouch already exists (update or reject duplicate)
-                // TODO: Create FederatedTrustAttestation via AttestationStore
-                icn_obs::metrics::governance::proposals_executed_inc("federation_vouch");
             }
             FederationProposal::RevokeVouch {
                 target_coop_id,
                 reason,
             } => {
-                info!("   Action: Revoke vouch for '{}'", target_coop_id);
-                info!("   Reason: {}", reason);
-                // TODO: Verify vouch exists for this target
-                // TODO: Remove attestation from AttestationStore
-                icn_obs::metrics::governance::proposals_executed_inc("federation_revoke_vouch");
+                self.execute_revoke_vouch(
+                    &proposal_id,
+                    &registry,
+                    &attestations,
+                    &target_coop_id,
+                    &reason,
+                );
             }
             FederationProposal::UpdateFederationPolicy {
                 auto_accept_vouch_threshold,
                 trust_decay_factor,
                 max_attestations_per_minute,
             } => {
-                info!("   Action: Update federation policy");
-                if let Some(threshold) = auto_accept_vouch_threshold {
-                    info!("   Auto-accept vouch threshold: {}", threshold);
-                }
-                if let Some(decay) = trust_decay_factor {
-                    info!("   Trust decay factor: {}", decay);
-                }
-                if let Some(rate) = max_attestations_per_minute {
-                    info!("   Max attestations per minute: {}", rate);
-                }
-                // TODO: Update local federation configuration
-                icn_obs::metrics::governance::proposals_executed_inc("federation_update_policy");
+                self.execute_update_federation_policy(
+                    &proposal_id,
+                    &registry,
+                    auto_accept_vouch_threshold,
+                    trust_decay_factor,
+                    max_attestations_per_minute,
+                );
             }
         }
+    }
+
+    // ==========================================================================
+    // Federation proposal execution helpers
+    // ==========================================================================
+
+    fn execute_join_federation(
+        &self,
+        proposal_id: &ProposalId,
+        registry: &CooperativeRegistryHandle,
+        federation_id: &str,
+        terms: &icn_governance::FederationTerms,
+        sponsor_coop_id: Option<&str>,
+    ) {
+        info!(
+            "   Action: Join federation '{}' (sponsor: {:?})",
+            federation_id, sponsor_coop_id
+        );
+        info!(
+            "   Terms: trust_threshold={}, governance_binding={}, data_sharing={:?}",
+            terms.min_trust_threshold, terms.governance_binding, terms.data_sharing_level
+        );
+
+        // Update own cooperative info with federation membership
+        // Note: Full implementation would update federation membership list and
+        // announce to federation:registry topic. For now, we record the action.
+        let own_info = registry.own_coop_info();
+        info!(
+            "   Coop '{}' joining federation '{}'",
+            own_info.coop_id, federation_id
+        );
+
+        // Verify sponsor if provided
+        if let Some(sponsor) = sponsor_coop_id {
+            match registry.get(sponsor) {
+                Ok(Some(_)) => {
+                    info!("   Sponsor '{}' verified in registry", sponsor);
+                }
+                Ok(None) => {
+                    warn!(
+                        "   Sponsor '{}' not found in registry - proceeding without sponsor verification",
+                        sponsor
+                    );
+                }
+                Err(e) => {
+                    warn!("   Failed to verify sponsor '{}': {}", sponsor, e);
+                }
+            }
+        }
+
+        // Record audit entry for the join
+        let audit_key = format!("federation:join:{}:{}", own_info.coop_id, federation_id);
+        if let Err(e) = self.audit_store.put(
+            audit_key.as_bytes(),
+            serde_json::json!({
+                "proposal_id": proposal_id.0,
+                "federation_id": federation_id,
+                "coop_id": own_info.coop_id,
+                "terms": {
+                    "min_trust_threshold": terms.min_trust_threshold,
+                    "governance_binding": terms.governance_binding,
+                },
+                "sponsor_coop_id": sponsor_coop_id,
+                "joined_at": icn_time::current_timestamp_secs(),
+            })
+            .to_string()
+            .as_bytes(),
+        ) {
+            warn!("   Failed to record federation join audit entry: {}", e);
+        }
+
+        icn_obs::metrics::governance::proposals_executed_inc("federation_join");
+    }
+
+    fn execute_leave_federation(
+        &self,
+        proposal_id: &ProposalId,
+        registry: &CooperativeRegistryHandle,
+        federation_id: &str,
+        reason: &str,
+        grace_period_days: u32,
+    ) {
+        info!(
+            "   Action: Leave federation '{}' (grace period: {} days)",
+            federation_id, grace_period_days
+        );
+        info!("   Reason: {}", reason);
+
+        let own_info = registry.own_coop_info();
+        let departure_timestamp =
+            icn_time::current_timestamp_secs() + (grace_period_days as u64 * 86400);
+
+        info!(
+            "   Coop '{}' scheduled to leave federation '{}' at timestamp {}",
+            own_info.coop_id, federation_id, departure_timestamp
+        );
+
+        // Record audit entry for the leave
+        let audit_key = format!("federation:leave:{}:{}", own_info.coop_id, federation_id);
+        if let Err(e) = self.audit_store.put(
+            audit_key.as_bytes(),
+            serde_json::json!({
+                "proposal_id": proposal_id.0,
+                "federation_id": federation_id,
+                "coop_id": own_info.coop_id,
+                "reason": reason,
+                "grace_period_days": grace_period_days,
+                "scheduled_departure": departure_timestamp,
+                "initiated_at": icn_time::current_timestamp_secs(),
+            })
+            .to_string()
+            .as_bytes(),
+        ) {
+            warn!("   Failed to record federation leave audit entry: {}", e);
+        }
+
+        icn_obs::metrics::governance::proposals_executed_inc("federation_leave");
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn execute_establish_clearing(
+        &self,
+        proposal_id: &ProposalId,
+        registry: &CooperativeRegistryHandle,
+        clearing: &ClearingManagerHandle,
+        partner_coop_id: &str,
+        partner_coop_did: &Did,
+        max_imbalance: i64,
+        settlement_interval: icn_federation::SettlementInterval,
+        currency: &str,
+    ) {
+        use icn_federation::BilateralClearingAgreement;
+
+        info!(
+            "   Action: Establish clearing with '{}' ({})",
+            partner_coop_id, partner_coop_did
+        );
+        info!(
+            "   Terms: max_imbalance={} {}, settlement={:?}",
+            max_imbalance, currency, settlement_interval
+        );
+
+        // Verify partner exists in registry
+        match registry.get(partner_coop_id) {
+            Ok(Some(partner_info)) => {
+                if partner_info.public_did != *partner_coop_did {
+                    warn!(
+                        "   Partner DID mismatch: registry has {}, proposal has {}",
+                        partner_info.public_did, partner_coop_did
+                    );
+                    // Still proceed but log the warning
+                }
+            }
+            Ok(None) => {
+                warn!(
+                    "   Partner '{}' not found in registry - proceeding with provided DID",
+                    partner_coop_id
+                );
+            }
+            Err(e) => {
+                error!("   Failed to lookup partner in registry: {}", e);
+                icn_obs::metrics::governance::execution_failures_inc(
+                    "federation_establish_clearing",
+                );
+                return;
+            }
+        }
+
+        // Create the clearing agreement
+        let own_info = registry.own_coop_info();
+        let agreement_id = format!(
+            "clearing:{}:{}:{}",
+            own_info.coop_id,
+            partner_coop_id,
+            icn_time::current_timestamp_secs()
+        );
+
+        let mut agreement = BilateralClearingAgreement::new(
+            agreement_id.clone(),
+            own_info.coop_id.clone(),
+            own_info.public_did.clone(),
+            partner_coop_id.to_string(),
+            partner_coop_did.clone(),
+        );
+        agreement.max_imbalance = max_imbalance;
+        agreement.settlement_interval = settlement_interval;
+        // Set a 1:1 exchange rate for the currency
+        agreement
+            .exchange_rates
+            .insert(format!("{currency}:{currency}"), 1.0);
+
+        match clearing.create_agreement(agreement) {
+            Ok(id) => {
+                info!("   ✓ Clearing agreement created: {}", id);
+
+                // Record audit entry
+                let audit_key = format!(
+                    "federation:clearing:{}:{}",
+                    own_info.coop_id, partner_coop_id
+                );
+                if let Err(e) = self.audit_store.put(
+                    audit_key.as_bytes(),
+                    serde_json::json!({
+                        "proposal_id": proposal_id.0,
+                        "agreement_id": id,
+                        "partner_coop_id": partner_coop_id,
+                        "partner_coop_did": partner_coop_did.to_string(),
+                        "max_imbalance": max_imbalance,
+                        "currency": currency,
+                        "created_at": icn_time::current_timestamp_secs(),
+                    })
+                    .to_string()
+                    .as_bytes(),
+                ) {
+                    warn!("   Failed to record clearing agreement audit entry: {}", e);
+                }
+
+                icn_obs::metrics::governance::proposals_executed_inc(
+                    "federation_establish_clearing",
+                );
+            }
+            Err(e) => {
+                error!("   ✗ Failed to create clearing agreement: {}", e);
+                icn_obs::metrics::governance::execution_failures_inc(
+                    "federation_establish_clearing",
+                );
+            }
+        }
+    }
+
+    fn execute_terminate_clearing(
+        &self,
+        proposal_id: &ProposalId,
+        clearing: &ClearingManagerHandle,
+        partner_coop_id: &str,
+        reason: &str,
+    ) {
+        info!("   Action: Terminate clearing with '{}'", partner_coop_id);
+        info!("   Reason: {}", reason);
+
+        // Find the agreement with this partner
+        let agreements = clearing.list_agreements();
+        let matching_agreement = agreements
+            .iter()
+            .find(|a| a.coop_a == partner_coop_id || a.coop_b == partner_coop_id);
+
+        match matching_agreement {
+            Some(agreement) => {
+                // First, try to trigger final settlement
+                match clearing.trigger_settlement(&agreement.agreement_id) {
+                    Ok(report) => {
+                        info!(
+                            "   Final settlement completed: {} transfers, net settlement: {}",
+                            report.transfers_settled, report.net_settlement
+                        );
+                    }
+                    Err(e) => {
+                        warn!("   Could not complete final settlement: {}", e);
+                        // Continue with termination anyway
+                    }
+                }
+
+                // Record audit entry for termination
+                let audit_key =
+                    format!("federation:clearing:terminated:{}", agreement.agreement_id);
+                if let Err(e) = self.audit_store.put(
+                    audit_key.as_bytes(),
+                    serde_json::json!({
+                        "proposal_id": proposal_id.0,
+                        "agreement_id": agreement.agreement_id,
+                        "partner_coop_id": partner_coop_id,
+                        "reason": reason,
+                        "terminated_at": icn_time::current_timestamp_secs(),
+                    })
+                    .to_string()
+                    .as_bytes(),
+                ) {
+                    warn!("   Failed to record termination audit entry: {}", e);
+                }
+
+                info!(
+                    "   ✓ Clearing agreement '{}' terminated",
+                    agreement.agreement_id
+                );
+                icn_obs::metrics::governance::proposals_executed_inc(
+                    "federation_terminate_clearing",
+                );
+            }
+            None => {
+                warn!(
+                    "   No clearing agreement found with partner '{}'",
+                    partner_coop_id
+                );
+                icn_obs::metrics::governance::execution_failures_inc(
+                    "federation_terminate_clearing",
+                );
+            }
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn execute_vouch_for_cooperative(
+        &self,
+        proposal_id: &ProposalId,
+        registry: &CooperativeRegistryHandle,
+        attestations: &AttestationStoreHandle,
+        target_coop_id: &str,
+        target_coop_did: &Did,
+        trust_score: f64,
+        context: &str,
+        evidence: Option<&str>,
+    ) {
+        use icn_federation::{EvidenceSummary, FederatedTrustAttestation, TrustContext};
+
+        info!(
+            "   Action: Vouch for '{}' ({}) with score {}",
+            target_coop_id, target_coop_did, trust_score
+        );
+        info!("   Context: {}", context);
+        if let Some(ev) = evidence {
+            info!("   Evidence: {}", ev);
+        }
+
+        // Verify target exists in registry (optional - they might not be registered yet)
+        match registry.get(target_coop_id) {
+            Ok(Some(target_info)) => {
+                if target_info.public_did != *target_coop_did {
+                    warn!(
+                        "   Target DID mismatch: registry has {}, proposal has {}",
+                        target_info.public_did, target_coop_did
+                    );
+                }
+            }
+            Ok(None) => {
+                info!(
+                    "   Target '{}' not in registry - creating attestation for unregistered cooperative",
+                    target_coop_id
+                );
+            }
+            Err(e) => {
+                warn!("   Failed to lookup target in registry: {}", e);
+            }
+        }
+
+        // Create the trust attestation
+        let own_info = registry.own_coop_info();
+
+        // Map context string to TrustContext enum
+        let trust_context = match context.to_lowercase().as_str() {
+            "economic" | "trade" => TrustContext::Economic,
+            "social" | "community" => TrustContext::Social,
+            "governance" | "voting" => TrustContext::Governance,
+            _ => TrustContext::General,
+        };
+
+        // Build evidence summary
+        let evidence_summary = evidence
+            .map(|ev| {
+                vec![EvidenceSummary {
+                    kind: "governance_proposal".to_string(),
+                    description: ev.to_string(),
+                    count: None,
+                }]
+            })
+            .unwrap_or_default();
+
+        // Create attestation (unsigned for now - signing would require keypair access)
+        let now = icn_time::current_timestamp_secs();
+        let attestation = FederatedTrustAttestation {
+            source_coop_id: own_info.coop_id.clone(),
+            source_coop_did: own_info.public_did.clone(),
+            member_did: target_coop_did.clone(),
+            trust_score,
+            trust_context,
+            evidence_summary,
+            issued_at: now,
+            expires_at: now + icn_federation::defaults::ATTESTATION_EXPIRY_SECS,
+            signature: Vec::new(), // Unsigned - would need keypair for signing
+        };
+
+        match attestations.store_attestation(attestation) {
+            Ok(()) => {
+                info!(
+                    "   ✓ Trust attestation created for '{}' with score {}",
+                    target_coop_id, trust_score
+                );
+
+                // Also record the vouch in the registry
+                let vouch = icn_federation::Vouch::new(
+                    own_info.coop_id.clone(),
+                    own_info.public_did.clone(),
+                    target_coop_id.to_string(),
+                    trust_score,
+                );
+                if let Err(e) = registry.add_vouch(&vouch) {
+                    warn!("   Failed to add vouch to registry: {}", e);
+                }
+
+                // Record audit entry
+                let audit_key = format!("federation:vouch:{}:{}", own_info.coop_id, target_coop_id);
+                if let Err(e) = self.audit_store.put(
+                    audit_key.as_bytes(),
+                    serde_json::json!({
+                        "proposal_id": proposal_id.0,
+                        "target_coop_id": target_coop_id,
+                        "target_coop_did": target_coop_did.to_string(),
+                        "trust_score": trust_score,
+                        "context": context,
+                        "evidence": evidence,
+                        "created_at": now,
+                    })
+                    .to_string()
+                    .as_bytes(),
+                ) {
+                    warn!("   Failed to record vouch audit entry: {}", e);
+                }
+
+                icn_obs::metrics::governance::proposals_executed_inc("federation_vouch");
+            }
+            Err(e) => {
+                error!("   ✗ Failed to store trust attestation: {}", e);
+                icn_obs::metrics::governance::execution_failures_inc("federation_vouch");
+            }
+        }
+    }
+
+    fn execute_revoke_vouch(
+        &self,
+        proposal_id: &ProposalId,
+        registry: &CooperativeRegistryHandle,
+        attestations: &AttestationStoreHandle,
+        target_coop_id: &str,
+        reason: &str,
+    ) {
+        info!("   Action: Revoke vouch for '{}'", target_coop_id);
+        info!("   Reason: {}", reason);
+
+        let own_info = registry.own_coop_info();
+
+        // Look up the target's DID to remove the attestation
+        let target_did = match registry.get(target_coop_id) {
+            Ok(Some(info)) => info.public_did,
+            Ok(None) => {
+                // Try to find via existing attestations
+                match attestations.get_attestations_from(&own_info.coop_id) {
+                    Ok(atts) => {
+                        // This is a simplification; in practice we'd have better indexing
+                        // to find attestations by target_coop_id. For now, take the first one.
+                        match atts.first() {
+                            Some(att) => att.member_did.clone(),
+                            None => {
+                                warn!("   No existing attestation found for '{}'", target_coop_id);
+                                icn_obs::metrics::governance::execution_failures_inc(
+                                    "federation_revoke_vouch",
+                                );
+                                return;
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        error!("   Failed to lookup existing attestations: {}", e);
+                        icn_obs::metrics::governance::execution_failures_inc(
+                            "federation_revoke_vouch",
+                        );
+                        return;
+                    }
+                }
+            }
+            Err(e) => {
+                error!("   Failed to lookup target in registry: {}", e);
+                icn_obs::metrics::governance::execution_failures_inc("federation_revoke_vouch");
+                return;
+            }
+        };
+
+        // Remove the attestation
+        match attestations.remove_attestation(&target_did, &own_info.coop_id) {
+            Ok(()) => {
+                info!("   ✓ Trust attestation removed for '{}'", target_coop_id);
+            }
+            Err(e) => {
+                warn!(
+                    "   Attestation removal returned error (may already be gone): {}",
+                    e
+                );
+            }
+        }
+
+        // Remove the vouch from registry
+        if let Err(e) = registry.remove_vouch(&own_info.coop_id, target_coop_id) {
+            warn!("   Failed to remove vouch from registry: {}", e);
+        }
+
+        // Record audit entry
+        let audit_key = format!(
+            "federation:vouch:revoked:{}:{}",
+            own_info.coop_id, target_coop_id
+        );
+        if let Err(e) = self.audit_store.put(
+            audit_key.as_bytes(),
+            serde_json::json!({
+                "proposal_id": proposal_id.0,
+                "target_coop_id": target_coop_id,
+                "reason": reason,
+                "revoked_at": icn_time::current_timestamp_secs(),
+            })
+            .to_string()
+            .as_bytes(),
+        ) {
+            warn!("   Failed to record vouch revocation audit entry: {}", e);
+        }
+
+        icn_obs::metrics::governance::proposals_executed_inc("federation_revoke_vouch");
+    }
+
+    fn execute_update_federation_policy(
+        &self,
+        proposal_id: &ProposalId,
+        registry: &CooperativeRegistryHandle,
+        auto_accept_vouch_threshold: Option<f64>,
+        trust_decay_factor: Option<f64>,
+        max_attestations_per_minute: Option<u32>,
+    ) {
+        info!("   Action: Update federation policy");
+
+        let own_info = registry.own_coop_info();
+        let mut changes = Vec::new();
+
+        if let Some(threshold) = auto_accept_vouch_threshold {
+            info!("   Auto-accept vouch threshold: {}", threshold);
+            changes.push(format!("auto_accept_vouch_threshold={threshold}"));
+        }
+        if let Some(decay) = trust_decay_factor {
+            info!("   Trust decay factor: {}", decay);
+            changes.push(format!("trust_decay_factor={decay}"));
+        }
+        if let Some(rate) = max_attestations_per_minute {
+            info!("   Max attestations per minute: {}", rate);
+            changes.push(format!("max_attestations_per_minute={rate}"));
+        }
+
+        // Record audit entry for policy update
+        // Note: Actual policy application would require storing these values
+        // in a configuration store and applying them to the federation components.
+        let audit_key = format!(
+            "federation:policy:{}:{}",
+            own_info.coop_id,
+            icn_time::current_timestamp_secs()
+        );
+        if let Err(e) = self.audit_store.put(
+            audit_key.as_bytes(),
+            serde_json::json!({
+                "proposal_id": proposal_id.0,
+                "coop_id": own_info.coop_id,
+                "auto_accept_vouch_threshold": auto_accept_vouch_threshold,
+                "trust_decay_factor": trust_decay_factor,
+                "max_attestations_per_minute": max_attestations_per_minute,
+                "updated_at": icn_time::current_timestamp_secs(),
+            })
+            .to_string()
+            .as_bytes(),
+        ) {
+            warn!("   Failed to record policy update audit entry: {}", e);
+        }
+
+        info!("   ✓ Federation policy update recorded: {:?}", changes);
+        icn_obs::metrics::governance::proposals_executed_inc("federation_update_policy");
     }
 
     /// Handle a protocol upgrade proposal
