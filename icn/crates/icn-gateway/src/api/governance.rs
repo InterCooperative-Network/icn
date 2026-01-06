@@ -862,19 +862,30 @@ pub async fn close_proposal(
 // Federation Proposal Endpoints
 // ============================================================================
 
-/// POST /gov/proposals/federation/join - Create a "join federation" proposal
-#[post("/proposals/federation/join")]
-pub async fn create_join_federation_proposal(
-    http_req: HttpRequest,
-    gov_mgr: web::Data<Arc<GovernanceManager>>,
-    event_broadcaster: web::Data<Arc<EventBroadcaster>>,
-    req: web::Json<JoinFederationProposalRequest>,
-) -> Result<HttpResponse> {
+// ============================================================================
+// Federation Proposal Helpers
+// ============================================================================
+
+/// Common fields for federation proposals
+struct FederationProposalCommon {
+    domain_id: String,
+    title: String,
+    description: String,
+    proposer_did: Did,
+}
+
+/// Extract common authorization and validation for federation proposals
+fn extract_federation_common(
+    http_req: &HttpRequest,
+    domain_id: &str,
+    title: &str,
+    description: &str,
+) -> Result<FederationProposalCommon> {
     // Check authorization
-    require_scope(&http_req, "gov:write")?;
+    require_scope(http_req, "gov:write")?;
 
     // Extract authenticated DID from JWT claims
-    let claims = get_claims(&http_req).ok_or_else(|| {
+    let claims = get_claims(http_req).ok_or_else(|| {
         crate::error::GatewayError::AuthenticationFailed("No claims found".to_string())
     })?;
 
@@ -883,9 +894,130 @@ pub async fn create_join_federation_proposal(
     })?;
 
     // Validate common fields
-    validation::validate_domain_id(&req.domain_id)?;
-    validation::validate_proposal_title(&req.title)?;
-    validation::validate_proposal_description(&req.description)?;
+    validation::validate_domain_id(domain_id)?;
+    validation::validate_proposal_title(title)?;
+    validation::validate_proposal_description(description)?;
+
+    Ok(FederationProposalCommon {
+        domain_id: domain_id.to_string(),
+        title: title.to_string(),
+        description: description.to_string(),
+        proposer_did,
+    })
+}
+
+/// Create a federation proposal with the common workflow
+async fn create_federation_proposal_impl(
+    gov_mgr: &GovernanceManager,
+    event_broadcaster: &EventBroadcaster,
+    common: FederationProposalCommon,
+    fed_proposal: FederationProposal,
+) -> Result<HttpResponse> {
+    // Validate the federation proposal itself
+    fed_proposal
+        .validate()
+        .map_err(crate::error::GatewayError::BadRequest)?;
+
+    // Wrap in ProposalPayload
+    let payload = ProposalPayload::Federation(fed_proposal);
+
+    // Create proposal via governance manager
+    let domain_id = GovernanceDomainId(common.domain_id.clone());
+    let suggested_id = ProposalId(format!("prop-{}", uuid::Uuid::new_v4()));
+
+    let proposal_id = gov_mgr
+        .create_proposal(
+            suggested_id,
+            domain_id,
+            common.proposer_did.clone(),
+            common.title.clone(),
+            common.description.clone(),
+            payload,
+        )
+        .await?;
+
+    // Track proposal creation
+    gateway::governance_proposals_created_inc();
+
+    // Broadcast event to WebSocket subscribers
+    event_broadcaster
+        .broadcast(
+            &common.domain_id,
+            GatewayEvent::GovernanceProposalCreated {
+                proposal_id: proposal_id.0.clone(),
+                domain_id: common.domain_id.clone(),
+                proposer: common.proposer_did.to_string(),
+                title: common.title.clone(),
+                payload_type: "federation".to_string(),
+            },
+        )
+        .await;
+
+    // Return created proposal
+    let proposal = gov_mgr.get_proposal(&proposal_id).await?.ok_or_else(|| {
+        crate::error::GatewayError::InternalError(
+            "Proposal creation succeeded but proposal not found".to_string(),
+        )
+    })?;
+
+    Ok(HttpResponse::Created().json(proposal))
+}
+
+/// Parse data sharing level string to enum
+fn parse_data_sharing_level(s: &str) -> Result<DataSharingLevel> {
+    match s {
+        "none" => Ok(DataSharingLevel::None),
+        "metadata_only" => Ok(DataSharingLevel::MetadataOnly),
+        "full" => Ok(DataSharingLevel::Full),
+        _ => Err(crate::error::GatewayError::InternalError(format!(
+            "Invalid data_sharing_level after validation: '{s}'"
+        ))),
+    }
+}
+
+/// Parse dispute resolution string to enum
+fn parse_dispute_resolution(s: &str) -> Result<DisputeResolutionMethod> {
+    if s.starts_with("arbitrator:") {
+        let arbitrator_id = s.strip_prefix("arbitrator:").unwrap_or("").to_string();
+        Ok(DisputeResolutionMethod::ArbitratorCooperative { arbitrator_id })
+    } else {
+        match s {
+            "federation_mediation" => Ok(DisputeResolutionMethod::FederationMediation),
+            "federation_vote" => Ok(DisputeResolutionMethod::FederationVote),
+            _ => Err(crate::error::GatewayError::InternalError(format!(
+                "Invalid dispute_resolution after validation: '{s}'"
+            ))),
+        }
+    }
+}
+
+/// Parse settlement interval string to enum
+fn parse_settlement_interval(s: &str) -> Result<SettlementInterval> {
+    match s {
+        "daily" => Ok(SettlementInterval::Daily),
+        "weekly" => Ok(SettlementInterval::Weekly),
+        "monthly" => Ok(SettlementInterval::Monthly),
+        "manual" => Ok(SettlementInterval::Manual),
+        _ => Err(crate::error::GatewayError::InternalError(format!(
+            "Invalid settlement_interval after validation: '{s}'"
+        ))),
+    }
+}
+
+// ============================================================================
+// Federation Proposal Endpoints
+// ============================================================================
+
+/// POST /gov/proposals/federation/join - Create a "join federation" proposal
+#[post("/proposals/federation/join")]
+pub async fn create_join_federation_proposal(
+    http_req: HttpRequest,
+    gov_mgr: web::Data<Arc<GovernanceManager>>,
+    event_broadcaster: web::Data<Arc<EventBroadcaster>>,
+    req: web::Json<JoinFederationProposalRequest>,
+) -> Result<HttpResponse> {
+    let common =
+        extract_federation_common(&http_req, &req.domain_id, &req.title, &req.description)?;
 
     // Validate federation-specific fields
     validation::validate_federation_id(&req.federation_id)?;
@@ -896,26 +1028,8 @@ pub async fn create_join_federation_proposal(
         validation::validate_dispute_resolution(&req.terms.dispute_resolution)?;
 
     // Convert string types to enums
-    let data_sharing_level = match data_sharing_level_str.as_str() {
-        "none" => DataSharingLevel::None,
-        "metadata_only" => DataSharingLevel::MetadataOnly,
-        "full" => DataSharingLevel::Full,
-        _ => unreachable!(), // validation ensures valid value
-    };
-
-    let dispute_resolution = if dispute_resolution_str.starts_with("arbitrator:") {
-        let arbitrator_id = dispute_resolution_str
-            .strip_prefix("arbitrator:")
-            .unwrap_or("")
-            .to_string();
-        DisputeResolutionMethod::ArbitratorCooperative { arbitrator_id }
-    } else {
-        match dispute_resolution_str.as_str() {
-            "federation_mediation" => DisputeResolutionMethod::FederationMediation,
-            "federation_vote" => DisputeResolutionMethod::FederationVote,
-            _ => unreachable!(), // validation ensures valid value
-        }
-    };
+    let data_sharing_level = parse_data_sharing_level(&data_sharing_level_str)?;
+    let dispute_resolution = parse_dispute_resolution(&dispute_resolution_str)?;
 
     // Build FederationTerms
     let terms = FederationTerms {
@@ -932,54 +1046,7 @@ pub async fn create_join_federation_proposal(
         sponsor_coop_id: req.sponsor_coop_id.clone(),
     };
 
-    // Validate the federation proposal itself
-    fed_proposal
-        .validate()
-        .map_err(crate::error::GatewayError::BadRequest)?;
-
-    // Wrap in ProposalPayload
-    let payload = ProposalPayload::Federation(fed_proposal);
-
-    // Create proposal via governance manager
-    let domain_id = GovernanceDomainId(req.domain_id.clone());
-    let suggested_id = ProposalId(format!("prop-{}", uuid::Uuid::new_v4()));
-
-    let proposal_id = gov_mgr
-        .create_proposal(
-            suggested_id,
-            domain_id,
-            proposer_did.clone(),
-            req.title.clone(),
-            req.description.clone(),
-            payload,
-        )
-        .await?;
-
-    // Track proposal creation
-    gateway::governance_proposals_created_inc();
-
-    // Broadcast event to WebSocket subscribers
-    event_broadcaster
-        .broadcast(
-            &req.domain_id,
-            GatewayEvent::GovernanceProposalCreated {
-                proposal_id: proposal_id.0.clone(),
-                domain_id: req.domain_id.clone(),
-                proposer: proposer_did.to_string(),
-                title: req.title.clone(),
-                payload_type: "federation".to_string(),
-            },
-        )
-        .await;
-
-    // Return created proposal
-    let proposal = gov_mgr.get_proposal(&proposal_id).await?.ok_or_else(|| {
-        crate::error::GatewayError::InternalError(
-            "Proposal creation succeeded but proposal not found".to_string(),
-        )
-    })?;
-
-    Ok(HttpResponse::Created().json(proposal))
+    create_federation_proposal_impl(&gov_mgr, &event_broadcaster, common, fed_proposal).await
 }
 
 /// POST /gov/proposals/federation/leave - Create a "leave federation" proposal
@@ -990,22 +1057,8 @@ pub async fn create_leave_federation_proposal(
     event_broadcaster: web::Data<Arc<EventBroadcaster>>,
     req: web::Json<LeaveFederationProposalRequest>,
 ) -> Result<HttpResponse> {
-    // Check authorization
-    require_scope(&http_req, "gov:write")?;
-
-    // Extract authenticated DID from JWT claims
-    let claims = get_claims(&http_req).ok_or_else(|| {
-        crate::error::GatewayError::AuthenticationFailed("No claims found".to_string())
-    })?;
-
-    let proposer_did: Did = claims.sub.parse().map_err(|e| {
-        crate::error::GatewayError::BadRequest(format!("Invalid DID in token: {e}"))
-    })?;
-
-    // Validate common fields
-    validation::validate_domain_id(&req.domain_id)?;
-    validation::validate_proposal_title(&req.title)?;
-    validation::validate_proposal_description(&req.description)?;
+    let common =
+        extract_federation_common(&http_req, &req.domain_id, &req.title, &req.description)?;
 
     // Validate federation-specific fields
     validation::validate_federation_id(&req.federation_id)?;
@@ -1019,54 +1072,7 @@ pub async fn create_leave_federation_proposal(
         grace_period_days: req.grace_period_days,
     };
 
-    // Validate the federation proposal itself
-    fed_proposal
-        .validate()
-        .map_err(crate::error::GatewayError::BadRequest)?;
-
-    // Wrap in ProposalPayload
-    let payload = ProposalPayload::Federation(fed_proposal);
-
-    // Create proposal via governance manager
-    let domain_id = GovernanceDomainId(req.domain_id.clone());
-    let suggested_id = ProposalId(format!("prop-{}", uuid::Uuid::new_v4()));
-
-    let proposal_id = gov_mgr
-        .create_proposal(
-            suggested_id,
-            domain_id,
-            proposer_did.clone(),
-            req.title.clone(),
-            req.description.clone(),
-            payload,
-        )
-        .await?;
-
-    // Track proposal creation
-    gateway::governance_proposals_created_inc();
-
-    // Broadcast event to WebSocket subscribers
-    event_broadcaster
-        .broadcast(
-            &req.domain_id,
-            GatewayEvent::GovernanceProposalCreated {
-                proposal_id: proposal_id.0.clone(),
-                domain_id: req.domain_id.clone(),
-                proposer: proposer_did.to_string(),
-                title: req.title.clone(),
-                payload_type: "federation".to_string(),
-            },
-        )
-        .await;
-
-    // Return created proposal
-    let proposal = gov_mgr.get_proposal(&proposal_id).await?.ok_or_else(|| {
-        crate::error::GatewayError::InternalError(
-            "Proposal creation succeeded but proposal not found".to_string(),
-        )
-    })?;
-
-    Ok(HttpResponse::Created().json(proposal))
+    create_federation_proposal_impl(&gov_mgr, &event_broadcaster, common, fed_proposal).await
 }
 
 /// POST /gov/proposals/federation/clearing - Create an "establish clearing" proposal
@@ -1077,22 +1083,8 @@ pub async fn create_establish_clearing_proposal(
     event_broadcaster: web::Data<Arc<EventBroadcaster>>,
     req: web::Json<EstablishClearingProposalRequest>,
 ) -> Result<HttpResponse> {
-    // Check authorization
-    require_scope(&http_req, "gov:write")?;
-
-    // Extract authenticated DID from JWT claims
-    let claims = get_claims(&http_req).ok_or_else(|| {
-        crate::error::GatewayError::AuthenticationFailed("No claims found".to_string())
-    })?;
-
-    let proposer_did: Did = claims.sub.parse().map_err(|e| {
-        crate::error::GatewayError::BadRequest(format!("Invalid DID in token: {e}"))
-    })?;
-
-    // Validate common fields
-    validation::validate_domain_id(&req.domain_id)?;
-    validation::validate_proposal_title(&req.title)?;
-    validation::validate_proposal_description(&req.description)?;
+    let common =
+        extract_federation_common(&http_req, &req.domain_id, &req.title, &req.description)?;
 
     // Validate federation-specific fields
     validation::validate_federation_id(&req.partner_coop_id)?;
@@ -1107,13 +1099,7 @@ pub async fn create_establish_clearing_proposal(
     })?;
 
     // Convert settlement interval string to enum
-    let settlement_interval = match settlement_interval_str.as_str() {
-        "daily" => SettlementInterval::Daily,
-        "weekly" => SettlementInterval::Weekly,
-        "monthly" => SettlementInterval::Monthly,
-        "manual" => SettlementInterval::Manual,
-        _ => unreachable!(), // validation ensures valid value
-    };
+    let settlement_interval = parse_settlement_interval(&settlement_interval_str)?;
 
     // Build FederationProposal
     let fed_proposal = FederationProposal::EstablishClearing {
@@ -1124,54 +1110,7 @@ pub async fn create_establish_clearing_proposal(
         currency: req.currency.clone(),
     };
 
-    // Validate the federation proposal itself
-    fed_proposal
-        .validate()
-        .map_err(crate::error::GatewayError::BadRequest)?;
-
-    // Wrap in ProposalPayload
-    let payload = ProposalPayload::Federation(fed_proposal);
-
-    // Create proposal via governance manager
-    let domain_id = GovernanceDomainId(req.domain_id.clone());
-    let suggested_id = ProposalId(format!("prop-{}", uuid::Uuid::new_v4()));
-
-    let proposal_id = gov_mgr
-        .create_proposal(
-            suggested_id,
-            domain_id,
-            proposer_did.clone(),
-            req.title.clone(),
-            req.description.clone(),
-            payload,
-        )
-        .await?;
-
-    // Track proposal creation
-    gateway::governance_proposals_created_inc();
-
-    // Broadcast event to WebSocket subscribers
-    event_broadcaster
-        .broadcast(
-            &req.domain_id,
-            GatewayEvent::GovernanceProposalCreated {
-                proposal_id: proposal_id.0.clone(),
-                domain_id: req.domain_id.clone(),
-                proposer: proposer_did.to_string(),
-                title: req.title.clone(),
-                payload_type: "federation".to_string(),
-            },
-        )
-        .await;
-
-    // Return created proposal
-    let proposal = gov_mgr.get_proposal(&proposal_id).await?.ok_or_else(|| {
-        crate::error::GatewayError::InternalError(
-            "Proposal creation succeeded but proposal not found".to_string(),
-        )
-    })?;
-
-    Ok(HttpResponse::Created().json(proposal))
+    create_federation_proposal_impl(&gov_mgr, &event_broadcaster, common, fed_proposal).await
 }
 
 /// POST /gov/proposals/federation/clearing/terminate - Create a "terminate clearing" proposal
@@ -1182,22 +1121,8 @@ pub async fn create_terminate_clearing_proposal(
     event_broadcaster: web::Data<Arc<EventBroadcaster>>,
     req: web::Json<TerminateClearingProposalRequest>,
 ) -> Result<HttpResponse> {
-    // Check authorization
-    require_scope(&http_req, "gov:write")?;
-
-    // Extract authenticated DID from JWT claims
-    let claims = get_claims(&http_req).ok_or_else(|| {
-        crate::error::GatewayError::AuthenticationFailed("No claims found".to_string())
-    })?;
-
-    let proposer_did: Did = claims.sub.parse().map_err(|e| {
-        crate::error::GatewayError::BadRequest(format!("Invalid DID in token: {e}"))
-    })?;
-
-    // Validate common fields
-    validation::validate_domain_id(&req.domain_id)?;
-    validation::validate_proposal_title(&req.title)?;
-    validation::validate_proposal_description(&req.description)?;
+    let common =
+        extract_federation_common(&http_req, &req.domain_id, &req.title, &req.description)?;
 
     // Validate federation-specific fields
     validation::validate_federation_id(&req.partner_coop_id)?;
@@ -1209,54 +1134,7 @@ pub async fn create_terminate_clearing_proposal(
         reason: req.reason.clone(),
     };
 
-    // Validate the federation proposal itself
-    fed_proposal
-        .validate()
-        .map_err(crate::error::GatewayError::BadRequest)?;
-
-    // Wrap in ProposalPayload
-    let payload = ProposalPayload::Federation(fed_proposal);
-
-    // Create proposal via governance manager
-    let domain_id = GovernanceDomainId(req.domain_id.clone());
-    let suggested_id = ProposalId(format!("prop-{}", uuid::Uuid::new_v4()));
-
-    let proposal_id = gov_mgr
-        .create_proposal(
-            suggested_id,
-            domain_id,
-            proposer_did.clone(),
-            req.title.clone(),
-            req.description.clone(),
-            payload,
-        )
-        .await?;
-
-    // Track proposal creation
-    gateway::governance_proposals_created_inc();
-
-    // Broadcast event to WebSocket subscribers
-    event_broadcaster
-        .broadcast(
-            &req.domain_id,
-            GatewayEvent::GovernanceProposalCreated {
-                proposal_id: proposal_id.0.clone(),
-                domain_id: req.domain_id.clone(),
-                proposer: proposer_did.to_string(),
-                title: req.title.clone(),
-                payload_type: "federation".to_string(),
-            },
-        )
-        .await;
-
-    // Return created proposal
-    let proposal = gov_mgr.get_proposal(&proposal_id).await?.ok_or_else(|| {
-        crate::error::GatewayError::InternalError(
-            "Proposal creation succeeded but proposal not found".to_string(),
-        )
-    })?;
-
-    Ok(HttpResponse::Created().json(proposal))
+    create_federation_proposal_impl(&gov_mgr, &event_broadcaster, common, fed_proposal).await
 }
 
 /// POST /gov/proposals/federation/vouch - Create a "vouch for cooperative" proposal
@@ -1267,22 +1145,8 @@ pub async fn create_vouch_proposal(
     event_broadcaster: web::Data<Arc<EventBroadcaster>>,
     req: web::Json<VouchProposalRequest>,
 ) -> Result<HttpResponse> {
-    // Check authorization
-    require_scope(&http_req, "gov:write")?;
-
-    // Extract authenticated DID from JWT claims
-    let claims = get_claims(&http_req).ok_or_else(|| {
-        crate::error::GatewayError::AuthenticationFailed("No claims found".to_string())
-    })?;
-
-    let proposer_did: Did = claims.sub.parse().map_err(|e| {
-        crate::error::GatewayError::BadRequest(format!("Invalid DID in token: {e}"))
-    })?;
-
-    // Validate common fields
-    validation::validate_domain_id(&req.domain_id)?;
-    validation::validate_proposal_title(&req.title)?;
-    validation::validate_proposal_description(&req.description)?;
+    let common =
+        extract_federation_common(&http_req, &req.domain_id, &req.title, &req.description)?;
 
     // Validate federation-specific fields
     validation::validate_federation_id(&req.target_coop_id)?;
@@ -1304,54 +1168,7 @@ pub async fn create_vouch_proposal(
         evidence: req.evidence.clone(),
     };
 
-    // Validate the federation proposal itself
-    fed_proposal
-        .validate()
-        .map_err(crate::error::GatewayError::BadRequest)?;
-
-    // Wrap in ProposalPayload
-    let payload = ProposalPayload::Federation(fed_proposal);
-
-    // Create proposal via governance manager
-    let domain_id = GovernanceDomainId(req.domain_id.clone());
-    let suggested_id = ProposalId(format!("prop-{}", uuid::Uuid::new_v4()));
-
-    let proposal_id = gov_mgr
-        .create_proposal(
-            suggested_id,
-            domain_id,
-            proposer_did.clone(),
-            req.title.clone(),
-            req.description.clone(),
-            payload,
-        )
-        .await?;
-
-    // Track proposal creation
-    gateway::governance_proposals_created_inc();
-
-    // Broadcast event to WebSocket subscribers
-    event_broadcaster
-        .broadcast(
-            &req.domain_id,
-            GatewayEvent::GovernanceProposalCreated {
-                proposal_id: proposal_id.0.clone(),
-                domain_id: req.domain_id.clone(),
-                proposer: proposer_did.to_string(),
-                title: req.title.clone(),
-                payload_type: "federation".to_string(),
-            },
-        )
-        .await;
-
-    // Return created proposal
-    let proposal = gov_mgr.get_proposal(&proposal_id).await?.ok_or_else(|| {
-        crate::error::GatewayError::InternalError(
-            "Proposal creation succeeded but proposal not found".to_string(),
-        )
-    })?;
-
-    Ok(HttpResponse::Created().json(proposal))
+    create_federation_proposal_impl(&gov_mgr, &event_broadcaster, common, fed_proposal).await
 }
 
 /// POST /gov/proposals/federation/vouch/revoke - Create a "revoke vouch" proposal
@@ -1362,22 +1179,8 @@ pub async fn create_revoke_vouch_proposal(
     event_broadcaster: web::Data<Arc<EventBroadcaster>>,
     req: web::Json<RevokeVouchProposalRequest>,
 ) -> Result<HttpResponse> {
-    // Check authorization
-    require_scope(&http_req, "gov:write")?;
-
-    // Extract authenticated DID from JWT claims
-    let claims = get_claims(&http_req).ok_or_else(|| {
-        crate::error::GatewayError::AuthenticationFailed("No claims found".to_string())
-    })?;
-
-    let proposer_did: Did = claims.sub.parse().map_err(|e| {
-        crate::error::GatewayError::BadRequest(format!("Invalid DID in token: {e}"))
-    })?;
-
-    // Validate common fields
-    validation::validate_domain_id(&req.domain_id)?;
-    validation::validate_proposal_title(&req.title)?;
-    validation::validate_proposal_description(&req.description)?;
+    let common =
+        extract_federation_common(&http_req, &req.domain_id, &req.title, &req.description)?;
 
     // Validate federation-specific fields
     validation::validate_federation_id(&req.target_coop_id)?;
@@ -1389,54 +1192,7 @@ pub async fn create_revoke_vouch_proposal(
         reason: req.reason.clone(),
     };
 
-    // Validate the federation proposal itself
-    fed_proposal
-        .validate()
-        .map_err(crate::error::GatewayError::BadRequest)?;
-
-    // Wrap in ProposalPayload
-    let payload = ProposalPayload::Federation(fed_proposal);
-
-    // Create proposal via governance manager
-    let domain_id = GovernanceDomainId(req.domain_id.clone());
-    let suggested_id = ProposalId(format!("prop-{}", uuid::Uuid::new_v4()));
-
-    let proposal_id = gov_mgr
-        .create_proposal(
-            suggested_id,
-            domain_id,
-            proposer_did.clone(),
-            req.title.clone(),
-            req.description.clone(),
-            payload,
-        )
-        .await?;
-
-    // Track proposal creation
-    gateway::governance_proposals_created_inc();
-
-    // Broadcast event to WebSocket subscribers
-    event_broadcaster
-        .broadcast(
-            &req.domain_id,
-            GatewayEvent::GovernanceProposalCreated {
-                proposal_id: proposal_id.0.clone(),
-                domain_id: req.domain_id.clone(),
-                proposer: proposer_did.to_string(),
-                title: req.title.clone(),
-                payload_type: "federation".to_string(),
-            },
-        )
-        .await;
-
-    // Return created proposal
-    let proposal = gov_mgr.get_proposal(&proposal_id).await?.ok_or_else(|| {
-        crate::error::GatewayError::InternalError(
-            "Proposal creation succeeded but proposal not found".to_string(),
-        )
-    })?;
-
-    Ok(HttpResponse::Created().json(proposal))
+    create_federation_proposal_impl(&gov_mgr, &event_broadcaster, common, fed_proposal).await
 }
 
 /// POST /gov/proposals/federation/policy - Create an "update federation policy" proposal
@@ -1447,22 +1203,8 @@ pub async fn create_update_federation_policy_proposal(
     event_broadcaster: web::Data<Arc<EventBroadcaster>>,
     req: web::Json<UpdateFederationPolicyProposalRequest>,
 ) -> Result<HttpResponse> {
-    // Check authorization
-    require_scope(&http_req, "gov:write")?;
-
-    // Extract authenticated DID from JWT claims
-    let claims = get_claims(&http_req).ok_or_else(|| {
-        crate::error::GatewayError::AuthenticationFailed("No claims found".to_string())
-    })?;
-
-    let proposer_did: Did = claims.sub.parse().map_err(|e| {
-        crate::error::GatewayError::BadRequest(format!("Invalid DID in token: {e}"))
-    })?;
-
-    // Validate common fields
-    validation::validate_domain_id(&req.domain_id)?;
-    validation::validate_proposal_title(&req.title)?;
-    validation::validate_proposal_description(&req.description)?;
+    let common =
+        extract_federation_common(&http_req, &req.domain_id, &req.title, &req.description)?;
 
     // Validate federation-specific fields
     validation::validate_auto_accept_threshold(req.auto_accept_vouch_threshold)?;
@@ -1486,54 +1228,7 @@ pub async fn create_update_federation_policy_proposal(
         max_attestations_per_minute: req.max_attestations_per_minute,
     };
 
-    // Validate the federation proposal itself
-    fed_proposal
-        .validate()
-        .map_err(crate::error::GatewayError::BadRequest)?;
-
-    // Wrap in ProposalPayload
-    let payload = ProposalPayload::Federation(fed_proposal);
-
-    // Create proposal via governance manager
-    let domain_id = GovernanceDomainId(req.domain_id.clone());
-    let suggested_id = ProposalId(format!("prop-{}", uuid::Uuid::new_v4()));
-
-    let proposal_id = gov_mgr
-        .create_proposal(
-            suggested_id,
-            domain_id,
-            proposer_did.clone(),
-            req.title.clone(),
-            req.description.clone(),
-            payload,
-        )
-        .await?;
-
-    // Track proposal creation
-    gateway::governance_proposals_created_inc();
-
-    // Broadcast event to WebSocket subscribers
-    event_broadcaster
-        .broadcast(
-            &req.domain_id,
-            GatewayEvent::GovernanceProposalCreated {
-                proposal_id: proposal_id.0.clone(),
-                domain_id: req.domain_id.clone(),
-                proposer: proposer_did.to_string(),
-                title: req.title.clone(),
-                payload_type: "federation".to_string(),
-            },
-        )
-        .await;
-
-    // Return created proposal
-    let proposal = gov_mgr.get_proposal(&proposal_id).await?.ok_or_else(|| {
-        crate::error::GatewayError::InternalError(
-            "Proposal creation succeeded but proposal not found".to_string(),
-        )
-    })?;
-
-    Ok(HttpResponse::Created().json(proposal))
+    create_federation_proposal_impl(&gov_mgr, &event_broadcaster, common, fed_proposal).await
 }
 
 // ============================================================================
