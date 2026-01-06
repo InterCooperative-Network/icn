@@ -1,4 +1,27 @@
 //! Security middleware and configurations for production deployment
+//!
+//! # CORS Configuration
+//!
+//! CORS (Cross-Origin Resource Sharing) controls which websites can make requests to this API.
+//!
+//! ## Production Deployment
+//!
+//! For production, choose one of these approaches:
+//!
+//! 1. **Reverse Proxy (Recommended)**: Use `CorsMode::Disabled` and configure CORS at the
+//!    reverse proxy level (nginx, Cloudflare, etc.). This is the most secure approach.
+//!
+//! 2. **Explicit Origins**: Use `CorsMode::AllowedOrigins` with a list of trusted domains.
+//!    Example: `["https://app.icn.coop", "https://admin.icn.coop"]`
+//!
+//! 3. **Permissive (NOT RECOMMENDED)**: Use `CorsMode::Permissive` only for development or
+//!    when you truly need to allow any origin (public read-only APIs).
+//!
+//! ## Security Considerations
+//!
+//! - Never use `Permissive` mode in production with authenticated endpoints
+//! - `allow_any_origin()` with `supports_credentials()` is blocked by browsers
+//! - Always prefer explicit origin allowlists over wildcards
 
 use actix_cors::Cors;
 use actix_web::{
@@ -10,13 +33,28 @@ use futures_util::Future;
 use std::future::{ready, Ready};
 use std::pin::Pin;
 
+/// CORS handling mode
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub enum CorsMode {
+    /// Disable CORS handling entirely - let reverse proxy handle it
+    /// This is the most secure option when behind nginx/Cloudflare
+    #[default]
+    Disabled,
+
+    /// Allow only specific origins (recommended for production)
+    /// Origins must be exact matches (e.g., "https://app.icn.coop")
+    AllowedOrigins(Vec<String>),
+
+    /// Allow any origin (dangerous - use only for development)
+    /// WARNING: This allows any website to make requests to this API
+    Permissive,
+}
+
 /// Security configuration for the gateway
 #[derive(Debug, Clone)]
 pub struct SecurityConfig {
-    /// Enable CORS (only for development - use reverse proxy in production)
-    pub enable_cors: bool,
-    /// Allowed CORS origins (if enable_cors is true)
-    pub cors_origins: Vec<String>,
+    /// CORS handling mode
+    pub cors_mode: CorsMode,
     /// Enable security headers
     pub enable_security_headers: bool,
     /// Content Security Policy directive
@@ -26,8 +64,7 @@ pub struct SecurityConfig {
 impl Default for SecurityConfig {
     fn default() -> Self {
         Self {
-            enable_cors: false, // Disabled by default - use reverse proxy
-            cors_origins: vec![],
+            cors_mode: CorsMode::Disabled, // Secure by default
             enable_security_headers: true,
             csp_directive: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws: wss:".to_string(),
         }
@@ -38,48 +75,99 @@ impl SecurityConfig {
     /// Development configuration (permissive CORS for local development)
     pub fn development() -> Self {
         Self {
-            enable_cors: true,
-            cors_origins: vec!["http://localhost:3000".to_string(), "http://localhost:8080".to_string()],
+            cors_mode: CorsMode::AllowedOrigins(vec![
+                "http://localhost:3000".to_string(),
+                "http://localhost:8080".to_string(),
+                "http://localhost:5173".to_string(), // Vite default
+                "http://127.0.0.1:3000".to_string(),
+                "http://127.0.0.1:8080".to_string(),
+            ]),
             enable_security_headers: true,
             csp_directive: "default-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' ws: wss: http://localhost:* ws://localhost:*".to_string(),
         }
     }
 
-    /// Production configuration (strict security, no CORS - use reverse proxy)
+    /// Production configuration (strict security - use reverse proxy for CORS)
     pub fn production() -> Self {
         Self::default()
     }
+
+    /// Production configuration with explicit allowed origins
+    pub fn production_with_origins(origins: Vec<String>) -> Self {
+        Self {
+            cors_mode: CorsMode::AllowedOrigins(origins),
+            enable_security_headers: true,
+            csp_directive: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws: wss:".to_string(),
+        }
+    }
 }
 
-/// Configure CORS middleware
+/// Configure CORS middleware based on security configuration
+///
+/// # Security
+///
+/// - `Disabled`: Returns restrictive CORS (no cross-origin allowed)
+/// - `AllowedOrigins`: Only specified origins can make cross-origin requests
+/// - `Permissive`: Any origin allowed (DANGEROUS - development only)
 pub fn configure_cors(config: &SecurityConfig) -> Cors {
-    if config.enable_cors {
-        let mut cors = Cors::default()
-            .allow_any_method()
-            .allowed_headers(vec![
-                header::AUTHORIZATION,
-                header::ACCEPT,
-                header::CONTENT_TYPE,
-            ])
-            .supports_credentials()
-            .max_age(3600);
-
-        // Add allowed origins
-        for origin in &config.cors_origins {
-            cors = cors.allowed_origin(origin);
+    match &config.cors_mode {
+        CorsMode::Disabled => {
+            // Restrictive CORS - only same-origin requests allowed
+            // Cross-origin requests will be blocked by the browser
+            tracing::info!("CORS disabled - only same-origin requests allowed");
+            Cors::default()
         }
 
-        cors
-    } else {
-        // Production mode: permissive CORS
-        // allow_any_origin() accepts any origin (echoes it back)
-        // Cloudflare Transform Rules also add headers - browser should handle duplicates
-        Cors::default()
-            .allow_any_origin()
-            .allow_any_method()
-            .allow_any_header()
-            .expose_any_header()
-            .max_age(3600)
+        CorsMode::AllowedOrigins(origins) => {
+            if origins.is_empty() {
+                tracing::warn!("CORS configured with empty origins list - same as disabled");
+                return Cors::default();
+            }
+
+            tracing::info!(
+                origins = ?origins,
+                "CORS configured with allowed origins"
+            );
+
+            let mut cors = Cors::default()
+                .allowed_methods(vec!["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+                .allowed_headers(vec![
+                    header::AUTHORIZATION,
+                    header::ACCEPT,
+                    header::CONTENT_TYPE,
+                ])
+                .expose_headers(vec![
+                    header::CONTENT_TYPE,
+                    HeaderName::from_static("x-request-id"),
+                ])
+                .supports_credentials()
+                .max_age(3600); // 1 hour preflight cache
+
+            // Add each allowed origin
+            for origin in origins {
+                cors = cors.allowed_origin(origin);
+            }
+
+            cors
+        }
+
+        CorsMode::Permissive => {
+            // WARNING: This is dangerous and should only be used for development
+            tracing::warn!("⚠️  CORS PERMISSIVE MODE ENABLED - This is insecure for production!");
+
+            // Note: allow_any_origin() cannot be combined with supports_credentials()
+            // Browsers will reject this combination for security reasons
+            Cors::default()
+                .allow_any_origin()
+                .allowed_methods(vec!["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+                .allowed_headers(vec![
+                    header::AUTHORIZATION,
+                    header::ACCEPT,
+                    header::CONTENT_TYPE,
+                ])
+                .expose_headers(vec![header::CONTENT_TYPE])
+                .max_age(3600)
+        }
     }
 }
 
@@ -238,7 +326,7 @@ mod tests {
     #[test]
     fn test_security_config_default() {
         let config = SecurityConfig::default();
-        assert!(!config.enable_cors);
+        assert_eq!(config.cors_mode, CorsMode::Disabled);
         assert!(config.enable_security_headers);
         assert!(config.csp_directive.contains("default-src 'self'"));
     }
@@ -246,15 +334,48 @@ mod tests {
     #[test]
     fn test_security_config_development() {
         let config = SecurityConfig::development();
-        assert!(config.enable_cors);
-        assert_eq!(config.cors_origins.len(), 2);
+        match &config.cors_mode {
+            CorsMode::AllowedOrigins(origins) => {
+                assert!(origins.len() >= 2);
+                assert!(origins.iter().any(|o| o.contains("localhost")));
+            }
+            _ => panic!("Development config should use AllowedOrigins"),
+        }
         assert!(config.enable_security_headers);
     }
 
     #[test]
     fn test_security_config_production() {
         let config = SecurityConfig::production();
-        assert!(!config.enable_cors);
+        assert_eq!(config.cors_mode, CorsMode::Disabled);
         assert!(config.enable_security_headers);
+    }
+
+    #[test]
+    fn test_security_config_production_with_origins() {
+        let origins = vec![
+            "https://app.icn.coop".to_string(),
+            "https://admin.icn.coop".to_string(),
+        ];
+        let config = SecurityConfig::production_with_origins(origins.clone());
+        assert_eq!(config.cors_mode, CorsMode::AllowedOrigins(origins));
+        assert!(config.enable_security_headers);
+    }
+
+    #[test]
+    fn test_cors_mode_default() {
+        let mode = CorsMode::default();
+        assert_eq!(mode, CorsMode::Disabled);
+    }
+
+    #[test]
+    fn test_cors_mode_equality() {
+        assert_eq!(CorsMode::Disabled, CorsMode::Disabled);
+        assert_eq!(CorsMode::Permissive, CorsMode::Permissive);
+        assert_eq!(
+            CorsMode::AllowedOrigins(vec!["https://example.com".to_string()]),
+            CorsMode::AllowedOrigins(vec!["https://example.com".to_string()])
+        );
+        assert_ne!(CorsMode::Disabled, CorsMode::Permissive);
     }
 }
