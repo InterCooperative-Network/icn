@@ -677,6 +677,21 @@ impl Default for FederationTerms {
     }
 }
 
+impl FederationTerms {
+    /// Validate the federation terms
+    ///
+    /// Returns an error message if validation fails.
+    pub fn validate(&self) -> Result<(), String> {
+        if !(0.0..=1.0).contains(&self.min_trust_threshold) {
+            let threshold = self.min_trust_threshold;
+            return Err(format!(
+                "min_trust_threshold must be between 0.0 and 1.0, got {threshold}"
+            ));
+        }
+        Ok(())
+    }
+}
+
 /// Level of data sharing agreed to in federation terms
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum DataSharingLevel {
@@ -812,6 +827,116 @@ impl FederationProposal {
             FederationProposal::RevokeVouch { .. } => "revoke_vouch",
             FederationProposal::UpdateFederationPolicy { .. } => "update_federation_policy",
         }
+    }
+
+    /// Validate the federation proposal
+    ///
+    /// Returns an error message if validation fails.
+    pub fn validate(&self) -> Result<(), String> {
+        match self {
+            FederationProposal::JoinFederation {
+                federation_id,
+                terms,
+                ..
+            } => {
+                if federation_id.is_empty() {
+                    return Err("federation_id cannot be empty".to_string());
+                }
+                terms.validate()?;
+            }
+            FederationProposal::LeaveFederation {
+                federation_id,
+                reason,
+                ..
+            } => {
+                if federation_id.is_empty() {
+                    return Err("federation_id cannot be empty".to_string());
+                }
+                if reason.is_empty() {
+                    return Err("reason cannot be empty".to_string());
+                }
+            }
+            FederationProposal::EstablishClearing {
+                partner_coop_id,
+                max_imbalance,
+                currency,
+                ..
+            } => {
+                if partner_coop_id.is_empty() {
+                    return Err("partner_coop_id cannot be empty".to_string());
+                }
+                if *max_imbalance <= 0 {
+                    return Err(format!(
+                        "max_imbalance must be positive, got {max_imbalance}"
+                    ));
+                }
+                if currency.is_empty() {
+                    return Err("currency cannot be empty".to_string());
+                }
+            }
+            FederationProposal::TerminateClearing {
+                partner_coop_id,
+                reason,
+            } => {
+                if partner_coop_id.is_empty() {
+                    return Err("partner_coop_id cannot be empty".to_string());
+                }
+                if reason.is_empty() {
+                    return Err("reason cannot be empty".to_string());
+                }
+            }
+            FederationProposal::VouchForCooperative {
+                target_coop_id,
+                trust_score,
+                context,
+                ..
+            } => {
+                if target_coop_id.is_empty() {
+                    return Err("target_coop_id cannot be empty".to_string());
+                }
+                if !(0.0..=1.0).contains(trust_score) {
+                    return Err(format!(
+                        "trust_score must be between 0.0 and 1.0, got {trust_score}"
+                    ));
+                }
+                if context.is_empty() {
+                    return Err("context cannot be empty".to_string());
+                }
+            }
+            FederationProposal::RevokeVouch {
+                target_coop_id,
+                reason,
+            } => {
+                if target_coop_id.is_empty() {
+                    return Err("target_coop_id cannot be empty".to_string());
+                }
+                if reason.is_empty() {
+                    return Err("reason cannot be empty".to_string());
+                }
+            }
+            FederationProposal::UpdateFederationPolicy {
+                auto_accept_vouch_threshold,
+                trust_decay_factor,
+                ..
+            } => {
+                if let Some(threshold) = auto_accept_vouch_threshold {
+                    // -1.0 is valid (means disabled), otherwise must be in [0.0, 1.0]
+                    if *threshold != -1.0 && !(0.0..=1.0).contains(threshold) {
+                        return Err(format!(
+                            "auto_accept_vouch_threshold must be -1.0 (disabled) or between 0.0 and 1.0, got {threshold}"
+                        ));
+                    }
+                }
+                if let Some(decay) = trust_decay_factor {
+                    if !(0.0..=1.0).contains(decay) {
+                        return Err(format!(
+                            "trust_decay_factor must be between 0.0 and 1.0, got {decay}"
+                        ));
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 }
 
@@ -1552,5 +1677,209 @@ mod tests {
             terms.dispute_resolution,
             DisputeResolutionMethod::FederationMediation
         );
+    }
+
+    #[test]
+    fn test_federation_terms_validation() {
+        // Valid terms
+        let valid_terms = FederationTerms::default();
+        assert!(valid_terms.validate().is_ok());
+
+        // Invalid trust threshold (too high)
+        let invalid_high = FederationTerms {
+            min_trust_threshold: 1.5,
+            ..Default::default()
+        };
+        assert!(invalid_high.validate().is_err());
+        assert!(invalid_high
+            .validate()
+            .unwrap_err()
+            .contains("min_trust_threshold"));
+
+        // Invalid trust threshold (negative)
+        let invalid_negative = FederationTerms {
+            min_trust_threshold: -0.1,
+            ..Default::default()
+        };
+        assert!(invalid_negative.validate().is_err());
+
+        // Edge cases that should be valid
+        let edge_zero = FederationTerms {
+            min_trust_threshold: 0.0,
+            ..Default::default()
+        };
+        assert!(edge_zero.validate().is_ok());
+
+        let edge_one = FederationTerms {
+            min_trust_threshold: 1.0,
+            ..Default::default()
+        };
+        assert!(edge_one.validate().is_ok());
+    }
+
+    #[test]
+    fn test_federation_proposal_validation() {
+        let target_did = KeyPair::generate().unwrap().did().clone();
+
+        // Valid vouch
+        let valid_vouch = FederationProposal::VouchForCooperative {
+            target_coop_id: "test-coop".to_string(),
+            target_coop_did: target_did.clone(),
+            trust_score: 0.8,
+            context: "trade".to_string(),
+            evidence: None,
+        };
+        assert!(valid_vouch.validate().is_ok());
+
+        // Invalid trust score (too high)
+        let invalid_score = FederationProposal::VouchForCooperative {
+            target_coop_id: "test-coop".to_string(),
+            target_coop_did: target_did.clone(),
+            trust_score: 1.5,
+            context: "trade".to_string(),
+            evidence: None,
+        };
+        assert!(invalid_score.validate().is_err());
+        assert!(invalid_score
+            .validate()
+            .unwrap_err()
+            .contains("trust_score"));
+
+        // Empty target_coop_id
+        let empty_id = FederationProposal::VouchForCooperative {
+            target_coop_id: "".to_string(),
+            target_coop_did: target_did.clone(),
+            trust_score: 0.5,
+            context: "trade".to_string(),
+            evidence: None,
+        };
+        assert!(empty_id.validate().is_err());
+        assert!(empty_id.validate().unwrap_err().contains("target_coop_id"));
+
+        // Empty context
+        let empty_context = FederationProposal::VouchForCooperative {
+            target_coop_id: "test-coop".to_string(),
+            target_coop_did: target_did.clone(),
+            trust_score: 0.5,
+            context: "".to_string(),
+            evidence: None,
+        };
+        assert!(empty_context.validate().is_err());
+
+        // Invalid max_imbalance (zero)
+        let zero_imbalance = FederationProposal::EstablishClearing {
+            partner_coop_id: "test-coop".to_string(),
+            partner_coop_did: target_did.clone(),
+            max_imbalance: 0,
+            settlement_interval: SettlementInterval::Weekly,
+            currency: "HOURS".to_string(),
+        };
+        assert!(zero_imbalance.validate().is_err());
+        assert!(zero_imbalance
+            .validate()
+            .unwrap_err()
+            .contains("max_imbalance"));
+
+        // Valid policy update with -1.0 (disabled)
+        let valid_policy = FederationProposal::UpdateFederationPolicy {
+            auto_accept_vouch_threshold: Some(-1.0),
+            trust_decay_factor: Some(0.5),
+            max_attestations_per_minute: Some(10),
+        };
+        assert!(valid_policy.validate().is_ok());
+
+        // Invalid policy update
+        let invalid_policy = FederationProposal::UpdateFederationPolicy {
+            auto_accept_vouch_threshold: Some(-0.5), // not -1.0 and not in [0,1]
+            trust_decay_factor: None,
+            max_attestations_per_minute: None,
+        };
+        assert!(invalid_policy.validate().is_err());
+    }
+
+    #[test]
+    fn test_federation_proposal_serialization_roundtrip() {
+        let target_did = KeyPair::generate().unwrap().did().clone();
+
+        let proposals = vec![
+            FederationProposal::JoinFederation {
+                federation_id: "test-fed".to_string(),
+                terms: FederationTerms::default(),
+                sponsor_coop_id: Some("sponsor".to_string()),
+            },
+            FederationProposal::LeaveFederation {
+                federation_id: "test-fed".to_string(),
+                reason: "Strategic change".to_string(),
+                grace_period_days: 30,
+            },
+            FederationProposal::EstablishClearing {
+                partner_coop_id: "partner".to_string(),
+                partner_coop_did: target_did.clone(),
+                max_imbalance: 50000,
+                settlement_interval: SettlementInterval::Weekly,
+                currency: "HOURS".to_string(),
+            },
+            FederationProposal::VouchForCooperative {
+                target_coop_id: "target".to_string(),
+                target_coop_did: target_did,
+                trust_score: 0.75,
+                context: "trade".to_string(),
+                evidence: Some("Good history".to_string()),
+            },
+        ];
+
+        for proposal in proposals {
+            let json = serde_json::to_string(&proposal).unwrap();
+            let deserialized: FederationProposal = serde_json::from_str(&json).unwrap();
+            assert_eq!(proposal.action_name(), deserialized.action_name());
+        }
+    }
+
+    #[test]
+    fn test_federation_terms_serialization_roundtrip() {
+        let terms = FederationTerms {
+            min_trust_threshold: 0.7,
+            governance_binding: true,
+            data_sharing_level: DataSharingLevel::Full,
+            dispute_resolution: DisputeResolutionMethod::FederationVote,
+        };
+
+        let json = serde_json::to_string(&terms).unwrap();
+        let deserialized: FederationTerms = serde_json::from_str(&json).unwrap();
+
+        assert!((terms.min_trust_threshold - deserialized.min_trust_threshold).abs() < 0.001);
+        assert_eq!(terms.governance_binding, deserialized.governance_binding);
+        assert_eq!(terms.data_sharing_level, deserialized.data_sharing_level);
+        assert_eq!(terms.dispute_resolution, deserialized.dispute_resolution);
+    }
+
+    #[test]
+    fn test_data_sharing_level_serialization() {
+        for level in [
+            DataSharingLevel::None,
+            DataSharingLevel::MetadataOnly,
+            DataSharingLevel::Full,
+        ] {
+            let json = serde_json::to_string(&level).unwrap();
+            let deserialized: DataSharingLevel = serde_json::from_str(&json).unwrap();
+            assert_eq!(level, deserialized);
+        }
+    }
+
+    #[test]
+    fn test_dispute_resolution_method_serialization() {
+        let methods = vec![
+            DisputeResolutionMethod::FederationMediation,
+            DisputeResolutionMethod::ArbitratorCooperative {
+                arbitrator_id: "arbitrator-coop".to_string(),
+            },
+            DisputeResolutionMethod::FederationVote,
+        ];
+
+        for method in methods {
+            let json = serde_json::to_string(&method).unwrap();
+            let deserialized: DisputeResolutionMethod = serde_json::from_str(&json).unwrap();
+            assert_eq!(method, deserialized);
+        }
     }
 }
