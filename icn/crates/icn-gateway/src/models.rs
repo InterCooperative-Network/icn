@@ -495,3 +495,157 @@ pub struct CrossPaymentQuote {
     /// Whether the rate is considered stale
     pub is_stale: bool,
 }
+
+// === Federation Proposal Requests (Issue #518) ===
+
+/// Common fields for federation proposal requests
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct FederationProposalCommon {
+    /// Governance domain to create proposal in
+    pub domain_id: String,
+    /// Short title for the proposal
+    pub title: String,
+    /// Rationale/explanation for the proposal
+    pub description: String,
+}
+
+/// Federation terms for join proposals
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct FederationTermsRequest {
+    /// Minimum trust score required for federation members (0.0-1.0)
+    pub min_trust_threshold: f64,
+    /// Whether federation governance decisions are binding
+    pub governance_binding: bool,
+    /// Data sharing level: "none", "metadata_only", "full"
+    pub data_sharing_level: String,
+    /// Dispute resolution: "federation_mediation", "federation_vote", or "arbitrator:<coop_id>"
+    pub dispute_resolution: String,
+}
+
+/// Request to create a "join federation" proposal
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct JoinFederationProposalRequest {
+    /// Governance domain to create proposal in
+    pub domain_id: String,
+    /// Short title for the proposal
+    pub title: String,
+    /// Rationale/explanation for the proposal
+    pub description: String,
+    /// ID of the federation to join
+    pub federation_id: String,
+    /// Terms for joining the federation
+    pub terms: FederationTermsRequest,
+    /// Optional sponsor cooperative ID
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sponsor_coop_id: Option<String>,
+}
+
+/// Request to create a "leave federation" proposal
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct LeaveFederationProposalRequest {
+    /// Governance domain to create proposal in
+    pub domain_id: String,
+    /// Short title for the proposal
+    pub title: String,
+    /// Rationale/explanation for the proposal
+    pub description: String,
+    /// ID of the federation to leave
+    pub federation_id: String,
+    /// Reason for leaving
+    pub reason: String,
+    /// Grace period in days (1-365)
+    pub grace_period_days: u32,
+}
+
+/// Request to create an "establish clearing" proposal
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct EstablishClearingProposalRequest {
+    /// Governance domain to create proposal in
+    pub domain_id: String,
+    /// Short title for the proposal
+    pub title: String,
+    /// Rationale/explanation for the proposal
+    pub description: String,
+    /// Partner cooperative ID
+    pub partner_coop_id: String,
+    /// Partner cooperative DID
+    pub partner_coop_did: String,
+    /// Maximum allowed imbalance (must be positive)
+    pub max_imbalance: i64,
+    /// Settlement interval: "daily", "weekly", "monthly", "manual"
+    pub settlement_interval: String,
+    /// Currency for the clearing agreement
+    pub currency: String,
+}
+
+/// Request to create a "terminate clearing" proposal
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct TerminateClearingProposalRequest {
+    /// Governance domain to create proposal in
+    pub domain_id: String,
+    /// Short title for the proposal
+    pub title: String,
+    /// Rationale/explanation for the proposal
+    pub description: String,
+    /// Partner cooperative ID
+    pub partner_coop_id: String,
+    /// Reason for termination
+    pub reason: String,
+}
+
+/// Request to create a "vouch for cooperative" proposal
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct VouchProposalRequest {
+    /// Governance domain to create proposal in
+    pub domain_id: String,
+    /// Short title for the proposal
+    pub title: String,
+    /// Rationale/explanation for the proposal
+    pub description: String,
+    /// Target cooperative ID to vouch for
+    pub target_coop_id: String,
+    /// Target cooperative DID
+    pub target_coop_did: String,
+    /// Trust score (0.0-1.0)
+    pub trust_score: f64,
+    /// Context for the vouch (e.g., "trade", "governance", "technical")
+    pub context: String,
+    /// Optional evidence/documentation
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub evidence: Option<String>,
+}
+
+/// Request to create a "revoke vouch" proposal
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct RevokeVouchProposalRequest {
+    /// Governance domain to create proposal in
+    pub domain_id: String,
+    /// Short title for the proposal
+    pub title: String,
+    /// Rationale/explanation for the proposal
+    pub description: String,
+    /// Target cooperative ID to revoke vouch from
+    pub target_coop_id: String,
+    /// Reason for revoking the vouch
+    pub reason: String,
+}
+
+/// Request to create an "update federation policy" proposal
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct UpdateFederationPolicyProposalRequest {
+    /// Governance domain to create proposal in
+    pub domain_id: String,
+    /// Short title for the proposal
+    pub title: String,
+    /// Rationale/explanation for the proposal
+    pub description: String,
+    /// Auto-accept vouch threshold (-1.0 to disable, or 0.0-1.0)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub auto_accept_vouch_threshold: Option<f64>,
+    /// Trust decay factor (0.0-1.0)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub trust_decay_factor: Option<f64>,
+    /// Maximum attestations per minute (must be > 0)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_attestations_per_minute: Option<u32>,
+}

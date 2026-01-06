@@ -510,6 +510,233 @@ pub fn validate_governance_params(
     Ok(())
 }
 
+// === Federation Proposal Validation (Issue #518) ===
+
+/// Maximum length for federation ID
+pub const MAX_FEDERATION_ID_LEN: usize = 128;
+
+/// Maximum length for reason strings (leave, terminate, revoke)
+pub const MAX_REASON_LEN: usize = 2000;
+
+/// Maximum length for evidence string
+pub const MAX_EVIDENCE_LEN: usize = 5000;
+
+/// Maximum length for context string
+pub const MAX_CONTEXT_LEN: usize = 256;
+
+/// Maximum grace period in days
+pub const MAX_GRACE_PERIOD_DAYS: u32 = 365;
+
+/// Validate federation ID
+pub fn validate_federation_id(id: &str) -> Result<()> {
+    if id.is_empty() || id.trim().is_empty() {
+        return Err(GatewayError::BadRequest(
+            "Federation ID cannot be empty".to_string(),
+        ));
+    }
+
+    if id.len() > MAX_FEDERATION_ID_LEN {
+        return Err(GatewayError::BadRequest(format!(
+            "Federation ID exceeds maximum length of {MAX_FEDERATION_ID_LEN} characters"
+        )));
+    }
+
+    // Validate characters (alphanumeric, hyphens, underscores, colons)
+    if !id
+        .chars()
+        .all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c == ':')
+    {
+        return Err(GatewayError::BadRequest(
+            "Federation ID must contain only alphanumeric characters, hyphens, underscores, and colons"
+                .to_string(),
+        ));
+    }
+
+    Ok(())
+}
+
+/// Validate trust score (must be in [0.0, 1.0])
+pub fn validate_trust_score(score: f64) -> Result<()> {
+    if !score.is_finite() {
+        return Err(GatewayError::BadRequest(
+            "Trust score must be a finite number".to_string(),
+        ));
+    }
+
+    if !(0.0..=1.0).contains(&score) {
+        return Err(GatewayError::BadRequest(
+            "Trust score must be between 0.0 and 1.0".to_string(),
+        ));
+    }
+
+    Ok(())
+}
+
+/// Validate grace period in days (must be 1-365)
+pub fn validate_grace_period_days(days: u32) -> Result<()> {
+    if days == 0 {
+        return Err(GatewayError::BadRequest(
+            "Grace period must be at least 1 day".to_string(),
+        ));
+    }
+
+    if days > MAX_GRACE_PERIOD_DAYS {
+        return Err(GatewayError::BadRequest(format!(
+            "Grace period cannot exceed {MAX_GRACE_PERIOD_DAYS} days"
+        )));
+    }
+
+    Ok(())
+}
+
+/// Validate settlement interval string and return parsed enum
+pub fn validate_settlement_interval(interval: &str) -> Result<String> {
+    match interval.to_lowercase().as_str() {
+        "daily" | "weekly" | "monthly" | "manual" => Ok(interval.to_lowercase()),
+        _ => Err(GatewayError::BadRequest(format!(
+            "Invalid settlement interval: '{interval}'. Valid values: daily, weekly, monthly, manual"
+        ))),
+    }
+}
+
+/// Validate data sharing level string and return parsed enum
+pub fn validate_data_sharing_level(level: &str) -> Result<String> {
+    match level.to_lowercase().as_str() {
+        "none" | "metadata_only" | "full" => Ok(level.to_lowercase()),
+        _ => Err(GatewayError::BadRequest(format!(
+            "Invalid data sharing level: '{level}'. Valid values: none, metadata_only, full"
+        ))),
+    }
+}
+
+/// Validate dispute resolution string and return normalized version
+pub fn validate_dispute_resolution(method: &str) -> Result<String> {
+    let lower = method.to_lowercase();
+    match lower.as_str() {
+        "federation_mediation" | "federation_vote" => Ok(lower),
+        s if s.starts_with("arbitrator:") => {
+            let arbitrator_id = s.strip_prefix("arbitrator:").unwrap_or("");
+            if arbitrator_id.is_empty() || arbitrator_id.trim().is_empty() {
+                return Err(GatewayError::BadRequest(
+                    "Arbitrator ID cannot be empty in dispute resolution".to_string(),
+                ));
+            }
+            Ok(method.to_string())
+        }
+        _ => Err(GatewayError::BadRequest(format!(
+            "Invalid dispute resolution: '{method}'. Valid values: federation_mediation, federation_vote, arbitrator:<coop_id>"
+        ))),
+    }
+}
+
+/// Validate reason string (for leave, terminate, revoke)
+pub fn validate_reason(reason: &str) -> Result<()> {
+    if reason.is_empty() || reason.trim().is_empty() {
+        return Err(GatewayError::BadRequest(
+            "Reason cannot be empty".to_string(),
+        ));
+    }
+
+    if reason.len() > MAX_REASON_LEN {
+        return Err(GatewayError::BadRequest(format!(
+            "Reason exceeds maximum length of {MAX_REASON_LEN} characters"
+        )));
+    }
+
+    Ok(())
+}
+
+/// Validate context string (for vouch)
+pub fn validate_context(context: &str) -> Result<()> {
+    if context.is_empty() || context.trim().is_empty() {
+        return Err(GatewayError::BadRequest(
+            "Context cannot be empty".to_string(),
+        ));
+    }
+
+    if context.len() > MAX_CONTEXT_LEN {
+        return Err(GatewayError::BadRequest(format!(
+            "Context exceeds maximum length of {MAX_CONTEXT_LEN} characters"
+        )));
+    }
+
+    Ok(())
+}
+
+/// Validate optional evidence string
+pub fn validate_evidence(evidence: &Option<String>) -> Result<()> {
+    if let Some(ev) = evidence {
+        if ev.len() > MAX_EVIDENCE_LEN {
+            return Err(GatewayError::BadRequest(format!(
+                "Evidence exceeds maximum length of {MAX_EVIDENCE_LEN} characters"
+            )));
+        }
+    }
+
+    Ok(())
+}
+
+/// Validate max imbalance (must be positive)
+pub fn validate_max_imbalance(max_imbalance: i64) -> Result<()> {
+    if max_imbalance <= 0 {
+        return Err(GatewayError::BadRequest(
+            "Max imbalance must be positive".to_string(),
+        ));
+    }
+
+    Ok(())
+}
+
+/// Validate auto-accept vouch threshold (-1.0 to disable, or 0.0-1.0)
+pub fn validate_auto_accept_threshold(threshold: Option<f64>) -> Result<()> {
+    if let Some(t) = threshold {
+        if !t.is_finite() {
+            return Err(GatewayError::BadRequest(
+                "Auto-accept threshold must be a finite number".to_string(),
+            ));
+        }
+        // -1.0 means disabled, otherwise must be in [0.0, 1.0]
+        if t != -1.0 && !(0.0..=1.0).contains(&t) {
+            return Err(GatewayError::BadRequest(
+                "Auto-accept threshold must be -1.0 (disabled) or between 0.0 and 1.0".to_string(),
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+/// Validate trust decay factor (0.0-1.0)
+pub fn validate_trust_decay_factor(factor: Option<f64>) -> Result<()> {
+    if let Some(f) = factor {
+        if !f.is_finite() {
+            return Err(GatewayError::BadRequest(
+                "Trust decay factor must be a finite number".to_string(),
+            ));
+        }
+        if !(0.0..=1.0).contains(&f) {
+            return Err(GatewayError::BadRequest(
+                "Trust decay factor must be between 0.0 and 1.0".to_string(),
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+/// Validate max attestations per minute (must be > 0)
+pub fn validate_max_attestations_per_minute(rate: Option<u32>) -> Result<()> {
+    if let Some(r) = rate {
+        if r == 0 {
+            return Err(GatewayError::BadRequest(
+                "Max attestations per minute must be greater than 0".to_string(),
+            ));
+        }
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
