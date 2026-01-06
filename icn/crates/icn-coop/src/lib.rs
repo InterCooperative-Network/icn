@@ -23,9 +23,13 @@ pub use lifecycle::{LifecycleEvent, LifecycleManager};
 pub use membership::{MembershipChange, MembershipManager};
 pub use store::CoopStore;
 pub use types::{
-    CoopStatus, CoopType, Cooperative, CooperativeId, Member, MemberRole, MemberStatus,
-    MembershipApplication, MembershipTier,
+    AssetDistributionPlan, BalanceAction, CapitalReturnMethod, CoopStatus, CoopType, Cooperative,
+    CooperativeId, DebtAction, DissolutionRequest, FormationRequest, Member, MemberRole,
+    MemberStatus, MembershipApplication, MembershipTier, StoredFounderSignature,
 };
+
+// Re-export governance charter types for convenience
+pub use icn_governance::charter::{CharterId, FounderSignature};
 
 use thiserror::Error;
 
