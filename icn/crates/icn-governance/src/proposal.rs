@@ -688,6 +688,19 @@ impl FederationTerms {
                 "min_trust_threshold must be between 0.0 and 1.0, got {threshold}"
             ));
         }
+
+        // Validate dispute resolution-specific fields
+        if let DisputeResolutionMethod::ArbitratorCooperative { arbitrator_id } =
+            &self.dispute_resolution
+        {
+            if arbitrator_id.is_empty() {
+                return Err(
+                    "arbitrator_id must be non-empty when using ArbitratorCooperative dispute resolution"
+                        .to_string(),
+                );
+            }
+        }
+
         Ok(())
     }
 }
@@ -929,7 +942,7 @@ impl FederationProposal {
             FederationProposal::UpdateFederationPolicy {
                 auto_accept_vouch_threshold,
                 trust_decay_factor,
-                ..
+                max_attestations_per_minute,
             } => {
                 if let Some(threshold) = auto_accept_vouch_threshold {
                     // -1.0 is valid (means disabled), otherwise must be in [0.0, 1.0]
@@ -944,6 +957,13 @@ impl FederationProposal {
                         return Err(format!(
                             "trust_decay_factor must be between 0.0 and 1.0, got {decay}"
                         ));
+                    }
+                }
+                if let Some(rate) = max_attestations_per_minute {
+                    if *rate == 0 {
+                        return Err(
+                            "max_attestations_per_minute must be greater than 0".to_string()
+                        );
                     }
                 }
             }
@@ -1677,6 +1697,34 @@ mod tests {
             .action_name(),
             "vouch_for_cooperative"
         );
+
+        assert_eq!(
+            FederationProposal::TerminateClearing {
+                partner_coop_id: "test".to_string(),
+                reason: "ending partnership".to_string(),
+            }
+            .action_name(),
+            "terminate_clearing"
+        );
+
+        assert_eq!(
+            FederationProposal::RevokeVouch {
+                target_coop_id: "test".to_string(),
+                reason: "trust violation".to_string(),
+            }
+            .action_name(),
+            "revoke_vouch"
+        );
+
+        assert_eq!(
+            FederationProposal::UpdateFederationPolicy {
+                auto_accept_vouch_threshold: Some(0.5),
+                trust_decay_factor: None,
+                max_attestations_per_minute: None,
+            }
+            .action_name(),
+            "update_federation_policy"
+        );
     }
 
     #[test]
@@ -1727,6 +1775,28 @@ mod tests {
             ..Default::default()
         };
         assert!(edge_one.validate().is_ok());
+
+        // ArbitratorCooperative with empty arbitrator_id
+        let empty_arbitrator = FederationTerms {
+            dispute_resolution: DisputeResolutionMethod::ArbitratorCooperative {
+                arbitrator_id: "".to_string(),
+            },
+            ..Default::default()
+        };
+        assert!(empty_arbitrator.validate().is_err());
+        assert!(empty_arbitrator
+            .validate()
+            .unwrap_err()
+            .contains("arbitrator_id"));
+
+        // ArbitratorCooperative with valid arbitrator_id
+        let valid_arbitrator = FederationTerms {
+            dispute_resolution: DisputeResolutionMethod::ArbitratorCooperative {
+                arbitrator_id: "arbitrator-coop".to_string(),
+            },
+            ..Default::default()
+        };
+        assert!(valid_arbitrator.validate().is_ok());
     }
 
     #[test]
@@ -1842,6 +1912,85 @@ mod tests {
             grace_period_days: 365,
         };
         assert!(max_grace.validate().is_ok());
+
+        // JoinFederation validation - empty federation_id
+        let empty_fed_id = FederationProposal::JoinFederation {
+            federation_id: "".to_string(),
+            terms: FederationTerms::default(),
+            sponsor_coop_id: None,
+        };
+        assert!(empty_fed_id.validate().is_err());
+        assert!(empty_fed_id
+            .validate()
+            .unwrap_err()
+            .contains("federation_id"));
+
+        // JoinFederation validation - invalid terms
+        let invalid_terms_join = FederationProposal::JoinFederation {
+            federation_id: "test-fed".to_string(),
+            terms: FederationTerms {
+                min_trust_threshold: 1.5, // invalid
+                ..Default::default()
+            },
+            sponsor_coop_id: None,
+        };
+        assert!(invalid_terms_join.validate().is_err());
+
+        // TerminateClearing validation - empty partner_coop_id
+        let empty_partner_terminate = FederationProposal::TerminateClearing {
+            partner_coop_id: "".to_string(),
+            reason: "Ending partnership".to_string(),
+        };
+        assert!(empty_partner_terminate.validate().is_err());
+        assert!(empty_partner_terminate
+            .validate()
+            .unwrap_err()
+            .contains("partner_coop_id"));
+
+        // TerminateClearing validation - empty reason
+        let empty_reason_terminate = FederationProposal::TerminateClearing {
+            partner_coop_id: "partner-coop".to_string(),
+            reason: "".to_string(),
+        };
+        assert!(empty_reason_terminate.validate().is_err());
+        assert!(empty_reason_terminate
+            .validate()
+            .unwrap_err()
+            .contains("reason"));
+
+        // RevokeVouch validation - empty target_coop_id
+        let empty_target_revoke = FederationProposal::RevokeVouch {
+            target_coop_id: "".to_string(),
+            reason: "Trust violation".to_string(),
+        };
+        assert!(empty_target_revoke.validate().is_err());
+        assert!(empty_target_revoke
+            .validate()
+            .unwrap_err()
+            .contains("target_coop_id"));
+
+        // RevokeVouch validation - empty reason
+        let empty_reason_revoke = FederationProposal::RevokeVouch {
+            target_coop_id: "target-coop".to_string(),
+            reason: "".to_string(),
+        };
+        assert!(empty_reason_revoke.validate().is_err());
+        assert!(empty_reason_revoke
+            .validate()
+            .unwrap_err()
+            .contains("reason"));
+
+        // UpdateFederationPolicy - max_attestations_per_minute = 0
+        let zero_attestations = FederationProposal::UpdateFederationPolicy {
+            auto_accept_vouch_threshold: None,
+            trust_decay_factor: None,
+            max_attestations_per_minute: Some(0),
+        };
+        assert!(zero_attestations.validate().is_err());
+        assert!(zero_attestations
+            .validate()
+            .unwrap_err()
+            .contains("max_attestations_per_minute"));
     }
 
     #[test]
@@ -1872,6 +2021,19 @@ mod tests {
                 trust_score: 0.75,
                 context: "trade".to_string(),
                 evidence: Some("Good history".to_string()),
+            },
+            FederationProposal::TerminateClearing {
+                partner_coop_id: "partner".to_string(),
+                reason: "Partnership ended".to_string(),
+            },
+            FederationProposal::RevokeVouch {
+                target_coop_id: "target".to_string(),
+                reason: "Trust violation".to_string(),
+            },
+            FederationProposal::UpdateFederationPolicy {
+                auto_accept_vouch_threshold: Some(0.7),
+                trust_decay_factor: Some(0.05),
+                max_attestations_per_minute: Some(30),
             },
         ];
 
