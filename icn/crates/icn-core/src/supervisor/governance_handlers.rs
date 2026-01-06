@@ -2606,6 +2606,42 @@ impl GovernanceEventHandler {
         terms: &icn_governance::FederationTerms,
         sponsor_coop_id: Option<&str>,
     ) {
+        use crate::dead_letter::{FailedOperation, FailureType};
+
+        // Idempotency check - prevent duplicate execution
+        let idem_key = format!("federation:join:idem:{}", proposal_id.0);
+        match self.audit_store.get(idem_key.as_bytes()) {
+            Ok(Some(_)) => {
+                debug!(
+                    "Federation join proposal {} already executed, skipping",
+                    proposal_id.0
+                );
+                icn_obs::metrics::governance::idempotent_skips_inc();
+                return;
+            }
+            Ok(None) => {}
+            Err(e) => {
+                error!(
+                    "🚨 Failed to check idempotency for federation join {}: {}",
+                    proposal_id.0, e
+                );
+                let failed_op = FailedOperation::new(
+                    format!("federation:join:idem:{}", proposal_id.0),
+                    FailureType::IdempotencyCheckFailed,
+                    serde_json::json!({
+                        "proposal_id": proposal_id.0,
+                        "error": "idempotency_check_failed",
+                    }),
+                    format!("Failed to check idempotency: {e}"),
+                );
+                if let Err(dlq_err) = self.dlq.enqueue(failed_op) {
+                    error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                }
+                icn_obs::metrics::governance::execution_failures_inc("federation_join");
+                return;
+            }
+        }
+
         info!(
             "   Action: Join federation '{}' (sponsor: {:?})",
             federation_id, sponsor_coop_id
@@ -2678,6 +2714,42 @@ impl GovernanceEventHandler {
         reason: &str,
         grace_period_days: u32,
     ) {
+        use crate::dead_letter::{FailedOperation, FailureType};
+
+        // Idempotency check
+        let idem_key = format!("federation:leave:idem:{}", proposal_id.0);
+        match self.audit_store.get(idem_key.as_bytes()) {
+            Ok(Some(_)) => {
+                debug!(
+                    "Federation leave proposal {} already executed, skipping",
+                    proposal_id.0
+                );
+                icn_obs::metrics::governance::idempotent_skips_inc();
+                return;
+            }
+            Ok(None) => {}
+            Err(e) => {
+                error!(
+                    "🚨 Failed to check idempotency for federation leave {}: {}",
+                    proposal_id.0, e
+                );
+                let failed_op = FailedOperation::new(
+                    format!("federation:leave:idem:{}", proposal_id.0),
+                    FailureType::IdempotencyCheckFailed,
+                    serde_json::json!({
+                        "proposal_id": proposal_id.0,
+                        "error": "idempotency_check_failed",
+                    }),
+                    format!("Failed to check idempotency: {e}"),
+                );
+                if let Err(dlq_err) = self.dlq.enqueue(failed_op) {
+                    error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                }
+                icn_obs::metrics::governance::execution_failures_inc("federation_leave");
+                return;
+            }
+        }
+
         info!(
             "   Action: Leave federation '{}' (grace period: {} days)",
             federation_id, grace_period_days
@@ -2732,7 +2804,67 @@ impl GovernanceEventHandler {
         settlement_interval: icn_federation::SettlementInterval,
         currency: &str,
     ) {
+        use crate::dead_letter::{FailedOperation, FailureType};
         use icn_federation::BilateralClearingAgreement;
+
+        // Idempotency check
+        let idem_key = format!("federation:clearing:idem:{}", proposal_id.0);
+        match self.audit_store.get(idem_key.as_bytes()) {
+            Ok(Some(_)) => {
+                debug!(
+                    "Federation establish clearing proposal {} already executed, skipping",
+                    proposal_id.0
+                );
+                icn_obs::metrics::governance::idempotent_skips_inc();
+                return;
+            }
+            Ok(None) => {}
+            Err(e) => {
+                error!(
+                    "🚨 Failed to check idempotency for establish clearing {}: {}",
+                    proposal_id.0, e
+                );
+                let failed_op = FailedOperation::new(
+                    format!("federation:clearing:idem:{}", proposal_id.0),
+                    FailureType::IdempotencyCheckFailed,
+                    serde_json::json!({
+                        "proposal_id": proposal_id.0,
+                        "error": "idempotency_check_failed",
+                    }),
+                    format!("Failed to check idempotency: {e}"),
+                );
+                if let Err(dlq_err) = self.dlq.enqueue(failed_op) {
+                    error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                }
+                icn_obs::metrics::governance::execution_failures_inc(
+                    "federation_establish_clearing",
+                );
+                return;
+            }
+        }
+
+        // Validate max_imbalance is positive
+        if max_imbalance <= 0 {
+            error!(
+                "   Invalid max_imbalance for proposal {}: {} (must be positive)",
+                proposal_id.0, max_imbalance
+            );
+            let failed_op = FailedOperation::new(
+                format!("federation:clearing:{}", proposal_id.0),
+                FailureType::FederationOperationFailed,
+                serde_json::json!({
+                    "proposal_id": proposal_id.0,
+                    "error": "invalid_max_imbalance",
+                    "max_imbalance": max_imbalance,
+                }),
+                format!("max_imbalance must be positive, got: {max_imbalance}"),
+            );
+            if let Err(dlq_err) = self.dlq.enqueue(failed_op) {
+                error!("   Failed to write to dead-letter queue: {}", dlq_err);
+            }
+            icn_obs::metrics::governance::execution_failures_inc("federation_establish_clearing");
+            return;
+        }
 
         info!(
             "   Action: Establish clearing with '{}' ({})",
@@ -2762,6 +2894,19 @@ impl GovernanceEventHandler {
             }
             Err(e) => {
                 error!("   Failed to lookup partner in registry: {}", e);
+                let failed_op = FailedOperation::new(
+                    format!("federation:clearing:{}", proposal_id.0),
+                    FailureType::FederationOperationFailed,
+                    serde_json::json!({
+                        "proposal_id": proposal_id.0,
+                        "error": "partner_lookup_failed",
+                        "partner_coop_id": partner_coop_id,
+                    }),
+                    format!("Failed to lookup partner: {e}"),
+                );
+                if let Err(dlq_err) = self.dlq.enqueue(failed_op) {
+                    error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                }
                 icn_obs::metrics::governance::execution_failures_inc(
                     "federation_establish_clearing",
                 );
@@ -2844,6 +2989,44 @@ impl GovernanceEventHandler {
         partner_coop_id: &str,
         reason: &str,
     ) {
+        use crate::dead_letter::{FailedOperation, FailureType};
+
+        // Idempotency check
+        let idem_key = format!("federation:terminate:idem:{}", proposal_id.0);
+        match self.audit_store.get(idem_key.as_bytes()) {
+            Ok(Some(_)) => {
+                debug!(
+                    "Federation terminate clearing proposal {} already executed, skipping",
+                    proposal_id.0
+                );
+                icn_obs::metrics::governance::idempotent_skips_inc();
+                return;
+            }
+            Ok(None) => {}
+            Err(e) => {
+                error!(
+                    "🚨 Failed to check idempotency for terminate clearing {}: {}",
+                    proposal_id.0, e
+                );
+                let failed_op = FailedOperation::new(
+                    format!("federation:terminate:idem:{}", proposal_id.0),
+                    FailureType::IdempotencyCheckFailed,
+                    serde_json::json!({
+                        "proposal_id": proposal_id.0,
+                        "error": "idempotency_check_failed",
+                    }),
+                    format!("Failed to check idempotency: {e}"),
+                );
+                if let Err(dlq_err) = self.dlq.enqueue(failed_op) {
+                    error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                }
+                icn_obs::metrics::governance::execution_failures_inc(
+                    "federation_terminate_clearing",
+                );
+                return;
+            }
+        }
+
         info!("   Action: Terminate clearing with '{}'", partner_coop_id);
         info!("   Reason: {}", reason);
 
@@ -2927,7 +3110,65 @@ impl GovernanceEventHandler {
         context: &str,
         evidence: Option<&str>,
     ) {
+        use crate::dead_letter::{FailedOperation, FailureType};
         use icn_federation::{EvidenceSummary, FederatedTrustAttestation, TrustContext};
+
+        // Idempotency check
+        let idem_key = format!("federation:vouch:idem:{}", proposal_id.0);
+        match self.audit_store.get(idem_key.as_bytes()) {
+            Ok(Some(_)) => {
+                debug!(
+                    "Federation vouch proposal {} already executed, skipping",
+                    proposal_id.0
+                );
+                icn_obs::metrics::governance::idempotent_skips_inc();
+                return;
+            }
+            Ok(None) => {}
+            Err(e) => {
+                error!(
+                    "🚨 Failed to check idempotency for vouch {}: {}",
+                    proposal_id.0, e
+                );
+                let failed_op = FailedOperation::new(
+                    format!("federation:vouch:idem:{}", proposal_id.0),
+                    FailureType::IdempotencyCheckFailed,
+                    serde_json::json!({
+                        "proposal_id": proposal_id.0,
+                        "error": "idempotency_check_failed",
+                    }),
+                    format!("Failed to check idempotency: {e}"),
+                );
+                if let Err(dlq_err) = self.dlq.enqueue(failed_op) {
+                    error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                }
+                icn_obs::metrics::governance::execution_failures_inc("federation_vouch");
+                return;
+            }
+        }
+
+        // Validate trust_score is in valid range [0.0, 1.0]
+        if !trust_score.is_finite() || !(0.0..=1.0).contains(&trust_score) {
+            error!(
+                "   Invalid trust_score for proposal {}: {} (must be in [0.0, 1.0])",
+                proposal_id.0, trust_score
+            );
+            let failed_op = FailedOperation::new(
+                format!("federation:vouch:{}", proposal_id.0),
+                FailureType::FederationOperationFailed,
+                serde_json::json!({
+                    "proposal_id": proposal_id.0,
+                    "error": "invalid_trust_score",
+                    "trust_score": trust_score,
+                }),
+                format!("trust_score must be in [0.0, 1.0], got: {trust_score}"),
+            );
+            if let Err(dlq_err) = self.dlq.enqueue(failed_op) {
+                error!("   Failed to write to dead-letter queue: {}", dlq_err);
+            }
+            icn_obs::metrics::governance::execution_failures_inc("federation_vouch");
+            return;
+        }
 
         info!(
             "   Action: Vouch for '{}' ({}) with score {}",
@@ -3061,6 +3302,42 @@ impl GovernanceEventHandler {
         target_coop_id: &str,
         reason: &str,
     ) {
+        use crate::dead_letter::{FailedOperation, FailureType};
+
+        // Idempotency check
+        let idem_key = format!("federation:revoke:idem:{}", proposal_id.0);
+        match self.audit_store.get(idem_key.as_bytes()) {
+            Ok(Some(_)) => {
+                debug!(
+                    "Federation revoke vouch proposal {} already executed, skipping",
+                    proposal_id.0
+                );
+                icn_obs::metrics::governance::idempotent_skips_inc();
+                return;
+            }
+            Ok(None) => {}
+            Err(e) => {
+                error!(
+                    "🚨 Failed to check idempotency for revoke vouch {}: {}",
+                    proposal_id.0, e
+                );
+                let failed_op = FailedOperation::new(
+                    format!("federation:revoke:idem:{}", proposal_id.0),
+                    FailureType::IdempotencyCheckFailed,
+                    serde_json::json!({
+                        "proposal_id": proposal_id.0,
+                        "error": "idempotency_check_failed",
+                    }),
+                    format!("Failed to check idempotency: {e}"),
+                );
+                if let Err(dlq_err) = self.dlq.enqueue(failed_op) {
+                    error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                }
+                icn_obs::metrics::governance::execution_failures_inc("federation_revoke_vouch");
+                return;
+            }
+        }
+
         info!("   Action: Revoke vouch for '{}'", target_coop_id);
         info!("   Reason: {}", reason);
 
@@ -3081,6 +3358,19 @@ impl GovernanceEventHandler {
                     "   Cannot revoke vouch: target '{}' not found in registry (DID unknown)",
                     target_coop_id
                 );
+                let failed_op = FailedOperation::new(
+                    format!("federation:revoke:{}", proposal_id.0),
+                    FailureType::FederationOperationFailed,
+                    serde_json::json!({
+                        "proposal_id": proposal_id.0,
+                        "error": "target_not_found",
+                        "target_coop_id": target_coop_id,
+                    }),
+                    format!("Target '{target_coop_id}' not found in registry"),
+                );
+                if let Err(dlq_err) = self.dlq.enqueue(failed_op) {
+                    error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                }
                 icn_obs::metrics::governance::execution_failures_inc("federation_revoke_vouch");
                 return;
             }
@@ -3139,6 +3429,42 @@ impl GovernanceEventHandler {
         trust_decay_factor: Option<f64>,
         max_attestations_per_minute: Option<u32>,
     ) {
+        use crate::dead_letter::{FailedOperation, FailureType};
+
+        // Idempotency check
+        let idem_key = format!("federation:policy:idem:{}", proposal_id.0);
+        match self.audit_store.get(idem_key.as_bytes()) {
+            Ok(Some(_)) => {
+                debug!(
+                    "Federation policy update proposal {} already executed, skipping",
+                    proposal_id.0
+                );
+                icn_obs::metrics::governance::idempotent_skips_inc();
+                return;
+            }
+            Ok(None) => {}
+            Err(e) => {
+                error!(
+                    "🚨 Failed to check idempotency for policy update {}: {}",
+                    proposal_id.0, e
+                );
+                let failed_op = FailedOperation::new(
+                    format!("federation:policy:idem:{}", proposal_id.0),
+                    FailureType::IdempotencyCheckFailed,
+                    serde_json::json!({
+                        "proposal_id": proposal_id.0,
+                        "error": "idempotency_check_failed",
+                    }),
+                    format!("Failed to check idempotency: {e}"),
+                );
+                if let Err(dlq_err) = self.dlq.enqueue(failed_op) {
+                    error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                }
+                icn_obs::metrics::governance::execution_failures_inc("federation_update_policy");
+                return;
+            }
+        }
+
         info!("   Action: Update federation policy");
 
         let own_info = registry.own_coop_info();

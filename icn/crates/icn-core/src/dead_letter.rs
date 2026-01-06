@@ -52,6 +52,8 @@ pub enum FailureType {
     StorageFailure,
     /// Treasury operation failed
     TreasuryOperationFailed,
+    /// Federation operation failed
+    FederationOperationFailed,
     /// Other failure type
     Other(String),
 }
@@ -67,6 +69,7 @@ impl std::fmt::Display for FailureType {
             FailureType::GossipPublishFailed => write!(f, "gossip_publish_failed"),
             FailureType::StorageFailure => write!(f, "storage_failure"),
             FailureType::TreasuryOperationFailed => write!(f, "treasury_operation_failed"),
+            FailureType::FederationOperationFailed => write!(f, "federation_operation_failed"),
             FailureType::Other(s) => write!(f, "other:{s}"),
         }
     }
