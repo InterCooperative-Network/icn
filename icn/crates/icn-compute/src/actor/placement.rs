@@ -391,6 +391,7 @@ impl ComputeActor {
             let task_hash_copy = task_hash;
             let pending_offers = self.pending_offers.clone();
             let pending_timestamps = self.pending_request_timestamps.clone();
+            let pending_requirements = self.pending_executor_requirements.clone();
             let task_manager = self.task_manager.clone();
             let send_callback = self.send_callback.clone();
 
@@ -400,13 +401,17 @@ impl ComputeActor {
 
                 // Get all offers
                 let mut offers_map = pending_offers.lock().await;
-                let offers = offers_map.remove(&task_hash_copy).unwrap_or_default();
+                let mut offers = offers_map.remove(&task_hash_copy).unwrap_or_default();
                 drop(offers_map);
 
-                // Always cleanup timestamp (prevent memory leak)
+                // Always cleanup timestamp and requirements (prevent memory leak)
                 let mut timestamps = pending_timestamps.lock().await;
                 let requested_at = timestamps.remove(&task_hash_copy);
                 drop(timestamps);
+
+                let mut requirements = pending_requirements.lock().await;
+                let required_executors = requirements.remove(&task_hash_copy).unwrap_or(1);
+                drop(requirements);
 
                 if offers.is_empty() {
                     tracing::warn!(
@@ -416,82 +421,148 @@ impl ComputeActor {
                     return;
                 }
 
-                // Select highest score with deterministic tie-breaking
-                // When scores are equal (within epsilon), use lexicographic DID comparison
-                // This ensures consistent selection across different platforms
-                // SAFETY: We checked !offers.is_empty() above, so max_by always returns Some
-                #[allow(clippy::unwrap_used)]
-                let winner = offers
-                    .iter()
-                    .max_by(|a, b| {
-                        const EPSILON: f64 = 1e-9;
-                        let score_diff = a.score - b.score;
-                        if score_diff.abs() < EPSILON {
-                            // Scores are effectively equal, use DID as tie-breaker
-                            a.executor.cmp(&b.executor)
-                        } else if score_diff > 0.0 {
-                            std::cmp::Ordering::Greater
-                        } else {
-                            std::cmp::Ordering::Less
-                        }
-                    })
-                    .unwrap();
+                // Sort offers by score (descending) with deterministic tie-breaking
+                offers.sort_by(|a, b| {
+                    const EPSILON: f64 = 1e-9;
+                    let score_diff = b.score - a.score; // Descending order
+                    if score_diff.abs() < EPSILON {
+                        // Scores are effectively equal, use DID as tie-breaker
+                        a.executor.cmp(&b.executor)
+                    } else if score_diff > 0.0 {
+                        std::cmp::Ordering::Greater
+                    } else {
+                        std::cmp::Ordering::Less
+                    }
+                });
+
+                // Select top N executors for multi-executor verification (Issue #511)
+                let selected_count = required_executors.min(offers.len());
+                let selected_executors: Vec<_> = offers.iter().take(selected_count).collect();
+
+                // Defensive check: ensure we have at least one executor selected
+                if selected_executors.is_empty() {
+                    tracing::warn!(
+                        task_hash = %hex::encode(task_hash_copy),
+                        required_executors = required_executors,
+                        offer_count = offers.len(),
+                        "No executors selected for task (unexpected state)"
+                    );
+                    return;
+                }
 
                 // Compute placement duration from original request time
-
                 if let Some(requested_at) = requested_at {
                     let now = icn_time::current_timestamp_millis();
                     let duration_ms = now.saturating_sub(requested_at);
                     let duration_secs = duration_ms as f64 / 1000.0;
 
-                    tracing::info!(
-                        task_hash = %hex::encode(task_hash_copy),
-                        winner = %winner.executor,
-                        score = winner.score,
-                        offer_count = offers.len(),
-                        duration_secs = duration_secs,
-                        "Selected executor for task"
-                    );
+                    if selected_count > 1 {
+                        tracing::info!(
+                            task_hash = %hex::encode(task_hash_copy),
+                            selected_count = selected_count,
+                            required_executors = required_executors,
+                            offer_count = offers.len(),
+                            duration_secs = duration_secs,
+                            executors = ?selected_executors.iter().map(|e| &e.executor).collect::<Vec<_>>(),
+                            "Selected multiple executors for multi-executor verification"
+                        );
+                    } else {
+                        tracing::info!(
+                            task_hash = %hex::encode(task_hash_copy),
+                            winner = %selected_executors[0].executor,
+                            score = selected_executors[0].score,
+                            offer_count = offers.len(),
+                            duration_secs = duration_secs,
+                            "Selected executor for task"
+                        );
+                    }
 
                     // Track placement duration (true end-to-end latency)
                     icn_obs::metrics::compute::placement_duration_observe(duration_secs);
+                } else if selected_count > 1 {
+                    tracing::info!(
+                        task_hash = %hex::encode(task_hash_copy),
+                        selected_count = selected_count,
+                        required_executors = required_executors,
+                        offer_count = offers.len(),
+                        "Selected multiple executors for multi-executor verification (no duration tracking)"
+                    );
                 } else {
                     tracing::info!(
                         task_hash = %hex::encode(task_hash_copy),
-                        winner = %winner.executor,
-                        score = winner.score,
+                        winner = %selected_executors[0].executor,
+                        score = selected_executors[0].score,
                         offer_count = offers.len(),
                         "Selected executor for task (no duration tracking)"
                     );
                 }
 
                 // Track placement wins and losses
-                // Winner gets 1 win, all other offers are losses
-                icn_obs::metrics::compute::placement_wins_inc();
-                if offers.len() > 1 {
-                    for _ in 0..(offers.len() - 1) {
+                // Selected executors get wins, all others are losses
+                for _ in 0..selected_count {
+                    icn_obs::metrics::compute::placement_wins_inc();
+                }
+                if offers.len() > selected_count {
+                    for _ in 0..(offers.len() - selected_count) {
                         icn_obs::metrics::compute::placement_losses_inc();
                     }
                 }
 
-                // Claim task with winner
-                let mut mgr = task_manager.lock().await;
-                if let Err(e) = mgr.claim(&task_hash_copy, winner.executor.clone()) {
-                    tracing::warn!(
-                        task_hash = %hex::encode(task_hash_copy),
-                        error = %e,
-                        "Failed to claim task with winner"
-                    );
-                    return;
-                }
-                drop(mgr);
+                // For single executor, claim the task as before
+                // For multi-executor, we don't claim - all selected executors will execute
+                // and their results will be collected by the quorum manager
+                if selected_count == 1 {
+                    // Single executor: claim the task
+                    let mut mgr = task_manager.lock().await;
+                    if let Err(e) =
+                        mgr.claim(&task_hash_copy, selected_executors[0].executor.clone())
+                    {
+                        tracing::warn!(
+                            task_hash = %hex::encode(task_hash_copy),
+                            error = %e,
+                            "Failed to claim task with winner"
+                        );
+                        return;
+                    }
+                    drop(mgr);
 
-                // Broadcast claim
-                if let Some(cb) = send_callback {
-                    cb(ComputeMessage::TaskClaimed {
-                        task_hash: task_hash_copy,
-                        executor: winner.executor.clone(),
-                    });
+                    // Broadcast claim
+                    if let Some(cb) = send_callback {
+                        cb(ComputeMessage::TaskClaimed {
+                            task_hash: task_hash_copy,
+                            executor: selected_executors[0].executor.clone(),
+                        });
+                    }
+                } else {
+                    // Multi-executor verification mode (Issue #511):
+                    // - All selected executors receive TaskClaimed and execute independently
+                    // - Results are collected by ResultQuorumManager for consensus verification
+                    // - Only the first executor is recorded in TaskManager as the "primary"
+                    //   for tracking purposes; all executors' results are equally valid
+                    // - TaskManager.claim() doesn't affect execution - it's just bookkeeping
+                    if let Some(cb) = send_callback {
+                        for selected in &selected_executors {
+                            cb(ComputeMessage::TaskClaimed {
+                                task_hash: task_hash_copy,
+                                executor: selected.executor.clone(),
+                            });
+                        }
+                    }
+
+                    // Record first executor as "primary" in TaskManager for tracking.
+                    // Note: This is purely for bookkeeping - all executors execute and
+                    // their results are verified by the quorum manager regardless.
+                    if let Some(primary) = selected_executors.first() {
+                        let mut mgr = task_manager.lock().await;
+                        if let Err(e) = mgr.claim(&task_hash_copy, primary.executor.clone()) {
+                            tracing::warn!(
+                                task_hash = %hex::encode(task_hash_copy),
+                                error = %e,
+                                "Failed to claim task with primary executor"
+                            );
+                        }
+                        drop(mgr);
+                    }
                 }
             });
         }

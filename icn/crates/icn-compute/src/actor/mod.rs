@@ -30,6 +30,7 @@ use crate::checkpoint_store::CheckpointStore;
 use crate::error::ComputeError;
 use crate::executor::LocalExecutor;
 use crate::migration_manager::ActorMigrationManager;
+use crate::result_quorum::{ResultQuorumManager, VerificationConfig};
 use crate::task::TaskManager;
 use crate::types::{ComputeMessage, TaskHash};
 
@@ -60,6 +61,8 @@ pub struct ComputeActor {
     pending_offers: Arc<Mutex<HashMap<TaskHash, Vec<crate::scheduler::PlacementOffer>>>>,
     /// Track when placement requests were sent (for duration metrics)
     pending_request_timestamps: Arc<Mutex<HashMap<TaskHash, u64>>>,
+    /// Track required executor count for multi-executor verification (Issue #511)
+    pending_executor_requirements: Arc<Mutex<HashMap<TaskHash, usize>>>,
     /// Maximum concurrent tasks this executor will claim
     max_concurrent_tasks: usize,
     /// Checkpoint store for actor state persistence (Phase 16D)
@@ -78,6 +81,8 @@ pub struct ComputeActor {
     own_region: Option<String>,
     /// Contract registry handle for CclRef resolution
     contract_registry: Option<icn_ccl::ContractRegistryHandle>,
+    /// Result quorum manager for multi-executor verification (Issue #511)
+    quorum_manager: Arc<ResultQuorumManager>,
 }
 
 impl ComputeActor {
@@ -96,6 +101,7 @@ impl ComputeActor {
             pending_consensus: Arc::new(Mutex::new(HashMap::new())),
             pending_offers: Arc::new(Mutex::new(HashMap::new())),
             pending_request_timestamps: Arc::new(Mutex::new(HashMap::new())),
+            pending_executor_requirements: Arc::new(Mutex::new(HashMap::new())),
             max_concurrent_tasks: 10, // Default: 10 concurrent tasks
             checkpoint_store: None,
             migration_manager: None,
@@ -105,6 +111,7 @@ impl ComputeActor {
             locality_callback: None,    // Phase 16C M5: Set via set_locality_callback()
             own_region: None,           // Set via set_region() or from config
             contract_registry: None,    // Set via set_contract_registry()
+            quorum_manager: Arc::new(ResultQuorumManager::new(VerificationConfig::default())),
         }
     }
 
@@ -196,6 +203,21 @@ impl ComputeActor {
         self.max_concurrent_tasks = max;
     }
 
+    /// Set verification configuration for result quorum
+    ///
+    /// This configures thresholds for multi-executor verification:
+    /// - Tasks below `low_value_threshold` use single executor
+    /// - Tasks above `medium_value_threshold` require 3+ executors
+    /// - Critical tasks above `high_value_threshold` require 5 executors
+    pub fn set_verification_config(&mut self, config: VerificationConfig) {
+        self.quorum_manager = Arc::new(ResultQuorumManager::new(config));
+    }
+
+    /// Get a reference to the quorum manager for result verification
+    pub fn quorum_manager(&self) -> &Arc<ResultQuorumManager> {
+        &self.quorum_manager
+    }
+
     /// Check if we're at capacity for claiming new tasks
     async fn at_capacity(&self) -> bool {
         let registry = self.executor_registry.lock().await;
@@ -267,6 +289,35 @@ impl ComputeActor {
 
                     // Cleanup old migration records (keep for 5 minutes)
                     let _removed = manager_clone.cleanup_migrations(300).await;
+                }
+            });
+        }
+
+        // Spawn quorum aggregator cleanup task (Issue #511)
+        {
+            let quorum_manager_clone = Arc::clone(&self.quorum_manager);
+            tokio::spawn(async move {
+                // Run cleanup every 30 seconds (collection window is 30s by default)
+                let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(30));
+                loop {
+                    interval.tick().await;
+
+                    match quorum_manager_clone.cleanup_expired() {
+                        Ok(expired) => {
+                            if !expired.is_empty() {
+                                tracing::debug!(
+                                    expired_count = expired.len(),
+                                    "Cleaned up expired quorum aggregators"
+                                );
+                            }
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                error = %e,
+                                "Failed to cleanup expired quorum aggregators"
+                            );
+                        }
+                    }
                 }
             });
         }

@@ -11,11 +11,32 @@ use super::types::{ComputeEvent, ExecutorInfo, PaymentRequest, ResultConsensus, 
 use super::ComputeActor;
 use crate::error::ComputeError;
 use crate::executor::Executor;
+use crate::result_quorum::{QuorumStatus, TaskVerification};
 use crate::task::{TaskManager, TaskStatus};
 use crate::types::{ComputeMessage, ComputeResult, ComputeTask, TaskHash};
 use crate::{MIN_TRUST_EXECUTE, MIN_TRUST_SUBMIT};
 
 impl ComputeActor {
+    /// Determine verification requirements for a task based on its estimated value
+    /// or explicit verification configuration.
+    ///
+    /// Returns the verification requirements and whether multi-executor verification is needed.
+    fn determine_verification(&self, task: &ComputeTask) -> (TaskVerification, bool) {
+        // Use explicit verification if provided
+        if let Some(ref verification) = task.verification {
+            let requires_multi = verification.required_executors > 1;
+            return (verification.clone(), requires_multi);
+        }
+
+        // Otherwise, classify based on estimated value
+        let estimated_credits = task.estimated_value.unwrap_or(0);
+        let value = self.quorum_manager.classify_value(estimated_credits);
+        let verification = self.quorum_manager.create_verification(value);
+        let requires_multi = !verification.is_single_executor();
+
+        (verification, requires_multi)
+    }
+
     /// Handle task result with consensus checking
     pub(super) async fn on_task_result(&self, result: ComputeResult) -> Result<(), ComputeError> {
         let task_hash_str = hex::encode(result.task_hash);
@@ -86,8 +107,112 @@ impl ComputeActor {
         );
         icn_obs::metrics::compute::signatures_verified_inc();
 
-        // Consensus checking: For now, we require just 1 result (single-executor mode)
-        // In the future, this can be extended to require multiple matching results
+        // Check if this task is registered for multi-executor verification (Issue #511)
+        let quorum_result = self.quorum_manager.submit_result(result.clone());
+
+        // Handle quorum-based verification if task is registered
+        if let Ok(status) = quorum_result {
+            match status {
+                QuorumStatus::Collecting { received, required } => {
+                    tracing::debug!(
+                        task_hash = %task_hash_str,
+                        received = received,
+                        required = required,
+                        "Multi-executor task: collecting results"
+                    );
+                    return Ok(()); // Wait for more results
+                }
+                QuorumStatus::Consensus {
+                    result_hash,
+                    agreeing,
+                    total,
+                } => {
+                    tracing::info!(
+                        task_hash = %task_hash_str,
+                        agreeing = agreeing,
+                        total = total,
+                        result_hash = %hex::encode(result_hash),
+                        "Multi-executor task: consensus reached"
+                    );
+
+                    // Record quorum metrics
+                    icn_obs::metrics::compute::quorum_consensus_inc("multi_executor");
+
+                    // Get canonical result and proceed to completion
+                    if let Ok(Some(canonical)) =
+                        self.quorum_manager.get_canonical_result(&result.task_hash)
+                    {
+                        // Clean up quorum tracking
+                        let _ = self.quorum_manager.remove_task(&result.task_hash);
+                        return self.complete_task_result(canonical).await;
+                    }
+                }
+                QuorumStatus::Divergent {
+                    result_groups,
+                    total,
+                } => {
+                    tracing::warn!(
+                        task_hash = %task_hash_str,
+                        result_groups = result_groups,
+                        total = total,
+                        "Multi-executor task: results diverge, escalating to dispute"
+                    );
+
+                    // Record quorum metrics
+                    icn_obs::metrics::compute::quorum_divergent_inc(
+                        "multi_executor",
+                        result_groups,
+                    );
+
+                    // Get executor groups for dispute evidence
+                    if let Ok(groups) = self.quorum_manager.get_executor_groups(&result.task_hash) {
+                        // File disputes for divergent results
+                        self.handle_divergent_results(&result.task_hash, groups)
+                            .await;
+                    }
+
+                    // Accept majority result if available (before cleanup)
+                    let canonical = self.quorum_manager.get_canonical_result(&result.task_hash);
+
+                    // Clean up quorum tracking
+                    let _ = self.quorum_manager.remove_task(&result.task_hash);
+
+                    if let Ok(Some(canonical)) = canonical {
+                        return self.complete_task_result(canonical).await;
+                    }
+                    return Ok(()); // No canonical result
+                }
+                QuorumStatus::Timeout { received, required } => {
+                    tracing::warn!(
+                        task_hash = %task_hash_str,
+                        received = received,
+                        required = required,
+                        "Multi-executor task: collection timed out"
+                    );
+
+                    // Record quorum metrics
+                    icn_obs::metrics::compute::quorum_timeout_inc(
+                        "multi_executor",
+                        received,
+                        required,
+                    );
+
+                    // Proceed with available results if any (before cleanup)
+                    let canonical = self.quorum_manager.get_canonical_result(&result.task_hash);
+
+                    // Clean up quorum tracking
+                    let _ = self.quorum_manager.remove_task(&result.task_hash);
+
+                    if let Ok(Some(canonical)) = canonical {
+                        return self.complete_task_result(canonical).await;
+                    }
+                    return Ok(());
+                }
+            }
+        }
+
+        // Fallback: Single-executor consensus (legacy path)
+        // This handles tasks not registered with quorum manager
         let required_confirmations = 1;
 
         let mut consensus_map = self.pending_consensus.lock().await;
@@ -250,6 +375,142 @@ impl ComputeActor {
         Ok(())
     }
 
+    /// Complete a task with the given result (used by both quorum and legacy paths)
+    async fn complete_task_result(&self, result: ComputeResult) -> Result<(), ComputeError> {
+        let executor_did = result.executor.clone();
+        let task_hash = result.task_hash;
+        let outcome = result.outcome.clone();
+        let fuel_used = result.fuel_used;
+        let duration_ms = result.duration_ms;
+
+        let mut mgr = self.task_manager.lock().await;
+        if mgr.get(&task_hash).is_some() {
+            mgr.complete(result)?;
+        }
+        drop(mgr);
+
+        // Decrement executor load
+        let mut registry = self.executor_registry.lock().await;
+        if let Some(info) = registry.get_mut(&executor_did) {
+            if info.tasks_executing > 0 {
+                info.tasks_executing -= 1;
+                icn_obs::metrics::compute::executor_load_set(
+                    &executor_did,
+                    info.tasks_executing as f64,
+                );
+            }
+        }
+        drop(registry);
+
+        // Broadcast event for external listeners (e.g., WebSocket clients)
+        if let Some(ref cb) = self.event_callback {
+            let outcome_str = match &outcome {
+                crate::types::ExecutionOutcome::Success(_) => "success",
+                crate::types::ExecutionOutcome::Failed(_) => "failed",
+                crate::types::ExecutionOutcome::OutOfFuel => "out_of_fuel",
+                crate::types::ExecutionOutcome::Timeout => "timeout",
+            };
+            cb(ComputeEvent::TaskCompleted {
+                task_hash: hex::encode(task_hash),
+                executor: executor_did.clone(),
+                outcome: outcome_str.to_string(),
+                fuel_used,
+                duration_ms,
+            });
+        }
+
+        Ok(())
+    }
+
+    /// Handle divergent results from multi-executor verification (Issue #511)
+    async fn handle_divergent_results(
+        &self,
+        task_hash: &TaskHash,
+        executor_groups: std::collections::HashMap<[u8; 32], Vec<String>>,
+    ) {
+        let task_hash_str = hex::encode(task_hash);
+
+        // Record conflict metric
+        icn_obs::metrics::compute::result_conflicts_inc(&task_hash_str);
+
+        // Find the majority group (largest)
+        let majority_group = executor_groups
+            .iter()
+            .max_by_key(|(_, executors)| executors.len())
+            .map(|(hash, executors)| (hash, executors.clone()));
+
+        // Auto-file disputes against minority groups
+        if let Some(ref dispute_system) = self.dispute_resolution {
+            if let Some((majority_hash, majority_executors)) = majority_group {
+                // Use first executor in majority as the "correct" reference
+                if let Some(majority_executor_str) = majority_executors.first() {
+                    let majority_executor: icn_identity::Did = match majority_executor_str.parse() {
+                        Ok(did) => did,
+                        Err(_) => return,
+                    };
+
+                    // File disputes against each minority group
+                    for (result_hash, executors) in &executor_groups {
+                        if result_hash == majority_hash {
+                            continue; // Skip majority group
+                        }
+
+                        for executor_str in executors {
+                            let minority_executor: icn_identity::Did = match executor_str.parse() {
+                                Ok(did) => did,
+                                Err(_) => continue,
+                            };
+
+                            let evidence = icn_ccl::DisputeEvidence {
+                                task_hash: *task_hash,
+                                claimed_result: icn_ccl::Value::String(hex::encode(result_hash)),
+                                reason: icn_ccl::DisputeReason::IncorrectResult {
+                                    expected: icn_ccl::Value::String(hex::encode(majority_hash)),
+                                    actual: icn_ccl::Value::String(hex::encode(result_hash)),
+                                },
+                                additional_data: vec![],
+                                filed_at: std::time::SystemTime::now(),
+                            };
+
+                            let dispute_system_clone = dispute_system.clone();
+                            let minority_executor_clone = minority_executor.clone();
+                            let majority_executor_clone = majority_executor.clone();
+                            let task_hash_for_dispute = *task_hash;
+
+                            tokio::spawn(async move {
+                                let mut system = dispute_system_clone.write().await;
+                                match system
+                                    .file_dispute(
+                                        task_hash_for_dispute,
+                                        minority_executor_clone,
+                                        majority_executor_clone,
+                                        evidence,
+                                    )
+                                    .await
+                                {
+                                    Ok(dispute_id) => {
+                                        icn_obs::metrics::compute::result_conflict_disputes_filed_inc(
+                                        );
+                                        tracing::info!(
+                                            dispute_id = hex::encode(dispute_id),
+                                            "Auto-filed dispute for multi-executor result divergence"
+                                        );
+                                    }
+                                    Err(e) => {
+                                        tracing::warn!(
+                                            error = %e,
+                                            "Failed to auto-file dispute for result divergence"
+                                        );
+                                    }
+                                }
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     /// Handle task cancellation
     pub(super) async fn on_task_cancelled(
         &self,
@@ -298,6 +559,23 @@ impl ComputeActor {
                 }
             }
         }
+
+        // Clean up pending placement state (Issue #511 - prevent memory leak)
+        {
+            let mut requirements = self.pending_executor_requirements.lock().await;
+            requirements.remove(&task_hash);
+        }
+        {
+            let mut offers = self.pending_offers.lock().await;
+            offers.remove(&task_hash);
+        }
+        {
+            let mut timestamps = self.pending_request_timestamps.lock().await;
+            timestamps.remove(&task_hash);
+        }
+
+        // Clean up quorum tracking if task was registered
+        let _ = self.quorum_manager.remove_task(&task_hash);
 
         tracing::info!(
             task_hash = %task_hash_str,
@@ -817,13 +1095,39 @@ impl ComputeActor {
             .submit(adjusted_task.clone())?;
         icn_obs::metrics::compute::tasks_submitted_inc();
 
+        // Determine verification requirements (Issue #511)
+        let (verification, requires_multi_executor) = self.determine_verification(&adjusted_task);
+
         tracing::info!(
             task_id = %task.id,
             task_hash = %hex::encode(hash),
             submitter = %task.submitter,
             fuel_limit = task.fuel_limit.0,
+            verification_value = ?verification.value,
+            required_executors = verification.required_executors,
             "Task submitted successfully"
         );
+
+        // Register high-value tasks with quorum manager for multi-executor verification
+        if requires_multi_executor {
+            if let Err(e) = self
+                .quorum_manager
+                .register_task(hash, verification.clone())
+            {
+                tracing::warn!(
+                    task_hash = %hex::encode(hash),
+                    error = %e,
+                    "Failed to register task for quorum verification"
+                );
+                // Continue anyway - task can still be executed with single-executor fallback
+            } else {
+                tracing::debug!(
+                    task_hash = %hex::encode(hash),
+                    required_executors = verification.required_executors,
+                    "Task registered for multi-executor verification"
+                );
+            }
+        }
 
         // Broadcast to network - use placement negotiation if resource profile provided
         if let Some(ref cb) = self.send_callback {
@@ -833,6 +1137,7 @@ impl ComputeActor {
 
                 tracing::debug!(
                     task_hash = %hex::encode(hash),
+                    required_executors = verification.required_executors,
                     "Using placement negotiation (resource profile provided)"
                 );
 
@@ -841,6 +1146,14 @@ impl ComputeActor {
                     .lock()
                     .await
                     .insert(hash, now);
+
+                // Store required executor count for multi-executor selection (Issue #511)
+                if requires_multi_executor {
+                    self.pending_executor_requirements
+                        .lock()
+                        .await
+                        .insert(hash, verification.required_executors);
+                }
 
                 cb(ComputeMessage::PlacementRequest {
                     task_hash: hash,
