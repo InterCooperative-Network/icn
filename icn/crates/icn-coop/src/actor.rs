@@ -1,8 +1,9 @@
 use crate::{
-    CoopStore, CoopType, Cooperative, LifecycleManager, Member, MemberRole, MembershipManager,
-    Result,
+    AssetDistributionPlan, CoopStore, CoopType, Cooperative, FormationRequest, LifecycleEvent,
+    LifecycleManager, Member, MemberRole, MembershipManager, Result,
 };
 use icn_gossip::GossipActor;
+use icn_governance::charter::FounderSignature;
 use icn_identity::Did;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot, RwLock};
@@ -30,6 +31,13 @@ pub enum CoopMessage {
         founder: Did,
         reply: oneshot::Sender<Result<Cooperative>>,
     },
+    /// Create cooperative from a formation request (Issue #290)
+    CreateFromRequest {
+        request: FormationRequest,
+        id: String,
+        first_founder: Did,
+        reply: oneshot::Sender<Result<(Cooperative, LifecycleEvent)>>,
+    },
     GetCooperative {
         coop_id: String,
         reply: oneshot::Sender<Result<Cooperative>>,
@@ -45,6 +53,12 @@ pub enum CoopMessage {
         coop_id: String,
         charter_hash: String,
         reply: oneshot::Sender<Result<Cooperative>>,
+    },
+    /// Sign charter as a founder (Issue #290)
+    SignCharter {
+        coop_id: String,
+        signature: FounderSignature,
+        reply: oneshot::Sender<Result<(Cooperative, Vec<LifecycleEvent>)>>,
     },
     AddMember {
         coop_id: String,
@@ -81,6 +95,19 @@ pub enum CoopMessage {
         name: Option<String>,
         metadata: Option<std::collections::HashMap<String, String>>,
         reply: oneshot::Sender<Result<Cooperative>>,
+    },
+    /// Start dissolution process with asset distribution plan (Issue #290)
+    StartDissolution {
+        coop_id: String,
+        initiator: Did,
+        plan: AssetDistributionPlan,
+        proposal_id: Option<String>,
+        reply: oneshot::Sender<Result<(Cooperative, LifecycleEvent)>>,
+    },
+    /// Complete dissolution after assets distributed (Issue #290)
+    CompleteDissolution {
+        coop_id: String,
+        reply: oneshot::Sender<Result<(Cooperative, Vec<LifecycleEvent>)>>,
     },
 }
 
@@ -121,6 +148,41 @@ impl CoopActor {
                     let result = self
                         .handle_create_cooperative(id, name, coop_type, founder)
                         .await;
+                    let _ = reply.send(result);
+                }
+                CoopMessage::CreateFromRequest {
+                    request,
+                    id,
+                    first_founder,
+                    reply,
+                } => {
+                    let result = self
+                        .handle_create_from_request(request, id, first_founder)
+                        .await;
+                    let _ = reply.send(result);
+                }
+                CoopMessage::SignCharter {
+                    coop_id,
+                    signature,
+                    reply,
+                } => {
+                    let result = self.handle_sign_charter(coop_id, signature).await;
+                    let _ = reply.send(result);
+                }
+                CoopMessage::StartDissolution {
+                    coop_id,
+                    initiator,
+                    plan,
+                    proposal_id,
+                    reply,
+                } => {
+                    let result = self
+                        .handle_start_dissolution(coop_id, initiator, plan, proposal_id)
+                        .await;
+                    let _ = reply.send(result);
+                }
+                CoopMessage::CompleteDissolution { coop_id, reply } => {
+                    let result = self.handle_complete_dissolution(coop_id).await;
                     let _ = reply.send(result);
                 }
                 CoopMessage::GetCooperative { coop_id, reply } => {
@@ -378,5 +440,77 @@ impl CoopActor {
                 }
             }
         }
+    }
+
+    // === Issue #290: Charter signing and dissolution handlers ===
+
+    async fn handle_create_from_request(
+        &mut self,
+        request: FormationRequest,
+        id: String,
+        first_founder: Did,
+    ) -> Result<(Cooperative, LifecycleEvent)> {
+        let (coop, event) = self
+            .lifecycle
+            .create_from_request(request, id, first_founder.clone())
+            .await?;
+
+        self.store.save_cooperative(&coop)?;
+
+        // Add first founder as member
+        let member = Member::new(first_founder, coop.id.clone(), MemberRole::Founder);
+        let member = self.membership.add_member(member, 0.0).await?;
+        let member = self.membership.approve_member(member).await?;
+        self.store.save_member(&member)?;
+
+        self.announce_coop_update(&coop).await;
+
+        Ok((coop, event))
+    }
+
+    async fn handle_sign_charter(
+        &mut self,
+        coop_id: String,
+        signature: FounderSignature,
+    ) -> Result<(Cooperative, Vec<LifecycleEvent>)> {
+        let coop = self.store.get_cooperative(&coop_id)?;
+        let (coop, events) = self.lifecycle.sign_charter(coop, signature).await?;
+
+        self.store.save_cooperative(&coop)?;
+        self.announce_coop_update(&coop).await;
+
+        Ok((coop, events))
+    }
+
+    async fn handle_start_dissolution(
+        &mut self,
+        coop_id: String,
+        initiator: Did,
+        plan: AssetDistributionPlan,
+        proposal_id: Option<String>,
+    ) -> Result<(Cooperative, LifecycleEvent)> {
+        let coop = self.store.get_cooperative(&coop_id)?;
+        let (coop, event) = self
+            .lifecycle
+            .start_dissolution_with_plan(coop, initiator, plan, proposal_id)
+            .await?;
+
+        self.store.save_cooperative(&coop)?;
+        self.announce_coop_update(&coop).await;
+
+        Ok((coop, event))
+    }
+
+    async fn handle_complete_dissolution(
+        &mut self,
+        coop_id: String,
+    ) -> Result<(Cooperative, Vec<LifecycleEvent>)> {
+        let coop = self.store.get_cooperative(&coop_id)?;
+        let (coop, events) = self.lifecycle.complete_dissolution_with_plan(coop).await?;
+
+        self.store.save_cooperative(&coop)?;
+        self.announce_coop_update(&coop).await;
+
+        Ok((coop, events))
     }
 }
