@@ -87,6 +87,9 @@ pub struct ComputeActor {
     federation_registry: Option<Arc<crate::federation::FederatedExecutorRegistry>>,
     /// Our cooperative ID for federation purposes
     own_cooperative_id: Option<String>,
+    /// Rate limiter for federated announcements (per cooperative)
+    /// Maps cooperative_id -> (last_announce_time, count_in_window)
+    federated_announce_rate_limiter: Arc<Mutex<HashMap<String, (u64, u32)>>>,
 }
 
 impl ComputeActor {
@@ -118,6 +121,7 @@ impl ComputeActor {
             quorum_manager: Arc::new(ResultQuorumManager::new(VerificationConfig::default())),
             federation_registry: None, // Phase 21: Set via set_federation_registry()
             own_cooperative_id: None,  // Phase 21: Set via set_cooperative_id()
+            federated_announce_rate_limiter: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 

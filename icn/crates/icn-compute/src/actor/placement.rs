@@ -767,6 +767,37 @@ impl ComputeActor {
             }
         }
 
+        // Rate limiting: prevent announcement flooding from any cooperative
+        const MAX_ANNOUNCES_PER_WINDOW: u32 = 10; // Max 10 announcements per window
+        const RATE_LIMIT_WINDOW_MS: u64 = 60_000; // 1 minute window
+
+        let now = icn_time::current_timestamp_millis();
+        {
+            let mut rate_limiter = self.federated_announce_rate_limiter.lock().await;
+            let entry = rate_limiter.entry(cooperative_id.clone()).or_insert((0, 0));
+
+            // Check if we're in a new window
+            if now - entry.0 > RATE_LIMIT_WINDOW_MS {
+                // Reset window
+                entry.0 = now;
+                entry.1 = 1;
+            } else {
+                // Same window, check limit
+                if entry.1 >= MAX_ANNOUNCES_PER_WINDOW {
+                    tracing::warn!(
+                        executor = %executor,
+                        cooperative_id = %cooperative_id,
+                        count = entry.1,
+                        "Rate limiting federated executor announcement"
+                    );
+                    return Err(ComputeError::PolicyViolation(format!(
+                        "Rate limit exceeded: max {MAX_ANNOUNCES_PER_WINDOW} announcements per minute from {cooperative_id}"
+                    )));
+                }
+                entry.1 += 1;
+            }
+        }
+
         // Calculate attenuated trust score
         // Get our trust in the announcing cooperative
         let coop_trust = (self.trust_callback)(&cooperative_id);
