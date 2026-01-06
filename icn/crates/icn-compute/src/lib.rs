@@ -73,7 +73,8 @@ pub use policy::{
 };
 pub use result_quorum::{
     CollectedResult, QuorumStatus, ResultAggregator, ResultQuorumManager, TaskValue,
-    TaskVerification, VerificationConfig, DEFAULT_COLLECTION_WINDOW_MS,
+    TaskVerification, VerificationConfig, CLOCK_SKEW_TOLERANCE_MS, DEFAULT_COLLECTION_WINDOW_MS,
+    MAX_CONCURRENT_VERIFICATIONS,
 };
 pub use scheduler::{
     DefaultPlacementPolicy, GpuDevice, GpuSpec, LocalityContext, LocalityHint, NodeCapacity,

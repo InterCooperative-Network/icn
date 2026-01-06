@@ -1188,6 +1188,28 @@ pub fn init_descriptions() {
         "Total number of disputes auto-filed due to compute result conflicts"
     );
 
+    // Result quorum verification metrics (Issue #478)
+    describe_counter!(
+        "icn_compute_quorum_consensus_total",
+        "Total number of tasks where multi-executor quorum reached consensus"
+    );
+    describe_counter!(
+        "icn_compute_quorum_divergent_total",
+        "Total number of tasks where multi-executor results diverged (no consensus)"
+    );
+    describe_counter!(
+        "icn_compute_quorum_timeout_total",
+        "Total number of tasks where quorum verification timed out"
+    );
+    describe_histogram!(
+        "icn_compute_quorum_collection_seconds",
+        "Time taken to collect all executor results for quorum verification"
+    );
+    describe_gauge!(
+        "icn_compute_quorum_active_verifications",
+        "Number of tasks currently undergoing multi-executor verification"
+    );
+
     // Misbehavior detection metrics (Phase 18)
     describe_counter!(
         "icn_misbehavior_violations_total",
@@ -3444,6 +3466,48 @@ pub mod compute {
 
     pub fn disputes_investigating_set(count: u64) {
         gauge!("icn_compute_disputes_investigating").set(count as f64);
+    }
+
+    // === Result Quorum Verification Metrics (Issue #478) ===
+
+    /// Record when multi-executor quorum reaches consensus
+    pub fn quorum_consensus_inc(task_value: &str) {
+        counter!(
+            "icn_compute_quorum_consensus_total",
+            "task_value" => task_value.to_string()
+        )
+        .increment(1);
+    }
+
+    /// Record when multi-executor results diverge (no consensus)
+    pub fn quorum_divergent_inc(task_value: &str, result_groups: usize) {
+        counter!(
+            "icn_compute_quorum_divergent_total",
+            "task_value" => task_value.to_string(),
+            "result_groups" => result_groups.to_string()
+        )
+        .increment(1);
+    }
+
+    /// Record when quorum verification times out
+    pub fn quorum_timeout_inc(task_value: &str, received: usize, required: usize) {
+        counter!(
+            "icn_compute_quorum_timeout_total",
+            "task_value" => task_value.to_string(),
+            "received" => received.to_string(),
+            "required" => required.to_string()
+        )
+        .increment(1);
+    }
+
+    /// Record time taken to collect all executor results
+    pub fn quorum_collection_duration_record(duration_secs: f64) {
+        histogram!("icn_compute_quorum_collection_seconds").record(duration_secs);
+    }
+
+    /// Set the number of active quorum verifications
+    pub fn quorum_active_verifications_set(count: usize) {
+        gauge!("icn_compute_quorum_active_verifications").set(count as f64);
     }
 }
 

@@ -230,6 +230,15 @@ pub struct ResultAggregator {
 /// Default collection window in milliseconds (30 seconds)
 pub const DEFAULT_COLLECTION_WINDOW_MS: u64 = 30_000;
 
+/// Clock skew tolerance in milliseconds (1 second)
+/// Results received within this tolerance after the deadline are still accepted
+/// to account for NTP drift between nodes (typically 100-500ms)
+pub const CLOCK_SKEW_TOLERANCE_MS: u64 = 1_000;
+
+/// Maximum concurrent verifications to prevent memory exhaustion
+/// If more tasks need verification, older ones should be cleaned up first
+pub const MAX_CONCURRENT_VERIFICATIONS: usize = 1_000;
+
 impl ResultAggregator {
     /// Create a new result aggregator for a task
     ///
@@ -310,8 +319,10 @@ impl ResultAggregator {
             )));
         }
 
-        // Check if collection window has passed
-        if now > self.deadline {
+        // Check if collection window has passed (with clock skew tolerance)
+        // We allow results up to CLOCK_SKEW_TOLERANCE_MS after the deadline
+        // to account for NTP drift between nodes
+        if now > self.deadline + CLOCK_SKEW_TOLERANCE_MS {
             return Err(ComputeError::InvalidResult(
                 "Result collection window has closed".into(),
             ));
@@ -440,6 +451,10 @@ impl ResultQuorumManager {
     }
 
     /// Register a task for multi-executor verification
+    ///
+    /// # Errors
+    /// - Returns error if task is already registered
+    /// - Returns error if MAX_CONCURRENT_VERIFICATIONS limit reached (DoS protection)
     pub fn register_task(&self, task_hash: TaskHash, verification: TaskVerification) -> Result<()> {
         let now = icn_time::current_timestamp_millis();
 
@@ -454,6 +469,13 @@ impl ResultQuorumManager {
             .aggregators
             .write()
             .map_err(|_| ComputeError::LockError)?;
+
+        // DoS protection: limit concurrent verifications
+        if aggregators.len() >= MAX_CONCURRENT_VERIFICATIONS {
+            return Err(ComputeError::InvalidResult(format!(
+                "Maximum concurrent verifications reached ({MAX_CONCURRENT_VERIFICATIONS}). Clean up expired tasks first."
+            )));
+        }
 
         if aggregators.contains_key(&task_hash) {
             return Err(ComputeError::InvalidResult(format!(
