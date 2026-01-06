@@ -83,6 +83,14 @@ pub struct ComputeTask {
     /// Placement constraints from policy (Phase 16E Week 2)
     #[serde(default)]
     pub placement_constraints: Option<crate::policy::PlacementConstraints>,
+    /// Estimated task value in credits (Issue #478 - for verification requirements)
+    /// Used to determine how many executors should verify the result
+    #[serde(default)]
+    pub estimated_value: Option<u64>,
+    /// Verification requirements for multi-executor result quorum (Issue #478)
+    /// If None, determined automatically from estimated_value
+    #[serde(default)]
+    pub verification: Option<crate::result_quorum::TaskVerification>,
 }
 
 impl ComputeTask {
@@ -463,6 +471,8 @@ mod tests {
             resource_profile: None,
             actor_mode: None,
             placement_constraints: None,
+            estimated_value: None,
+            verification: None,
         };
 
         let hash1 = task.hash();
@@ -620,6 +630,8 @@ mod tests {
             resource_profile: None,
             actor_mode: None,
             placement_constraints: None,
+            estimated_value: None,
+            verification: None,
         }
     }
 

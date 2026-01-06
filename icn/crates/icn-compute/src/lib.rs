@@ -35,6 +35,7 @@ mod executor;
 mod migration_manager;
 mod migration_policy;
 mod policy;
+mod result_quorum;
 mod scheduler;
 mod task;
 mod types;
@@ -69,6 +70,10 @@ pub use migration_policy::{
 pub use policy::{
     CoopSchedulingPolicy, EnforcementMode, MemberQuota, PlacementConstraints, PolicyDecision,
     PolicyManager, SchedulingRule, UsageRecord, UsageTracker,
+};
+pub use result_quorum::{
+    CollectedResult, QuorumStatus, ResultAggregator, ResultQuorumManager, TaskValue,
+    TaskVerification, VerificationConfig,
 };
 pub use scheduler::{
     DefaultPlacementPolicy, GpuDevice, GpuSpec, LocalityContext, LocalityHint, NodeCapacity,
