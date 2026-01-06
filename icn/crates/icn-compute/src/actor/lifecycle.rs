@@ -161,13 +161,13 @@ impl ComputeActor {
                             .await;
                     }
 
+                    // Accept majority result if available (before cleanup)
+                    let canonical = self.quorum_manager.get_canonical_result(&result.task_hash);
+
                     // Clean up quorum tracking
                     let _ = self.quorum_manager.remove_task(&result.task_hash);
 
-                    // Accept majority result if available
-                    if let Ok(Some(canonical)) =
-                        self.quorum_manager.get_canonical_result(&result.task_hash)
-                    {
+                    if let Ok(Some(canonical)) = canonical {
                         return self.complete_task_result(canonical).await;
                     }
                     return Ok(()); // No canonical result
@@ -179,12 +179,13 @@ impl ComputeActor {
                         required = required,
                         "Multi-executor task: collection timed out"
                     );
+                    // Proceed with available results if any (before cleanup)
+                    let canonical = self.quorum_manager.get_canonical_result(&result.task_hash);
+
                     // Clean up quorum tracking
                     let _ = self.quorum_manager.remove_task(&result.task_hash);
-                    // Proceed with available results if any
-                    if let Ok(Some(canonical)) =
-                        self.quorum_manager.get_canonical_result(&result.task_hash)
-                    {
+
+                    if let Ok(Some(canonical)) = canonical {
                         return self.complete_task_result(canonical).await;
                     }
                     return Ok(());

@@ -439,6 +439,17 @@ impl ComputeActor {
                 let selected_count = required_executors.min(offers.len());
                 let selected_executors: Vec<_> = offers.iter().take(selected_count).collect();
 
+                // Defensive check: ensure we have at least one executor selected
+                if selected_executors.is_empty() {
+                    tracing::warn!(
+                        task_hash = %hex::encode(task_hash_copy),
+                        required_executors = required_executors,
+                        offer_count = offers.len(),
+                        "No executors selected for task (unexpected state)"
+                    );
+                    return;
+                }
+
                 // Compute placement duration from original request time
                 if let Some(requested_at) = requested_at {
                     let now = icn_time::current_timestamp_millis();
