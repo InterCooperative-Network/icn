@@ -10,7 +10,7 @@ pub type CooperativeId = String;
 /// Stored founder signature (serialization-friendly version)
 ///
 /// This is a local type that stores DID as String for better bincode compatibility.
-/// Use `from_governance_signature` and `to_governance_signature` for conversion.
+/// Use `from_governance` and `to_governance` for conversion.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StoredFounderSignature {
     /// Founder's DID (stored as string for serialization)
@@ -105,13 +105,19 @@ impl FormationRequest {
 }
 
 /// Dissolution request for dissolving a cooperative
+///
+/// This type is intended for use in Gateway API endpoints and external
+/// integrations. Internal dissolution uses the `start_dissolution` handle
+/// method with individual parameters.
+///
+/// The `reason` field is stored in the cooperative's metadata for audit purposes.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DissolutionRequest {
     /// Cooperative to dissolve
     pub coop_id: String,
     /// DID of the member initiating dissolution
     pub initiator: Did,
-    /// Reason for dissolution
+    /// Reason for dissolution (stored in metadata for audit trail)
     pub reason: String,
     /// Asset distribution plan
     pub asset_distribution: AssetDistributionPlan,
@@ -266,9 +272,22 @@ pub struct Cooperative {
     #[serde(default = "default_min_founders")]
     pub min_founders: usize,
 
+    /// List of DIDs authorized to sign the charter as founders
+    /// Only DIDs in this list can add founding signatures
+    #[serde(default)]
+    pub authorized_founders: Vec<String>,
+
     /// Whether all required founders have signed
     #[serde(default)]
     pub charter_ratified: bool,
+
+    /// Optional description of the cooperative
+    #[serde(default)]
+    pub description: Option<String>,
+
+    /// Currency for economic transactions (e.g., "hours", "credits")
+    #[serde(default)]
+    pub currency: Option<String>,
 
     /// Governance domain ID for proposals (e.g., "coop:my-coop")
     #[serde(default)]
@@ -416,7 +435,10 @@ impl Cooperative {
             charter_id: None,
             founding_signatures: Vec::new(),
             min_founders: 3,
+            authorized_founders: Vec::new(),
             charter_ratified: false,
+            description: None,
+            currency: None,
             governance_domain: None,
             dissolution_plan: None,
             dissolution_proposal_id: None,
@@ -457,7 +479,10 @@ impl Cooperative {
             charter_id: None,
             founding_signatures: Vec::new(),
             min_founders: 3,
+            authorized_founders: Vec::new(),
             charter_ratified: false,
+            description: None,
+            currency: None,
             governance_domain,
             dissolution_plan: None,
             dissolution_proposal_id: None,
@@ -465,11 +490,22 @@ impl Cooperative {
     }
 
     /// Create a cooperative from a formation request
+    ///
+    /// Stores the founding members as authorized signers - only these DIDs
+    /// can sign the charter during formation.
     pub fn from_formation_request(request: &FormationRequest, id: String) -> Self {
         let mut coop = Self::new_with_id(id.clone(), request.name.clone(), request.coop_type);
         coop.min_members = request.min_members;
         coop.min_founders = request.founding_members.len().max(3);
+        // Store authorized founders for signature validation
+        coop.authorized_founders = request
+            .founding_members
+            .iter()
+            .map(|d| d.to_string())
+            .collect();
         coop.governance_domain = Some(format!("coop:{id}"));
+        coop.description = request.description.clone();
+        coop.currency = request.currency.clone();
         if let Some(hash) = &request.charter_document_hash {
             coop.charter_hash = Some(hex::encode(hash));
         }
@@ -477,14 +513,26 @@ impl Cooperative {
     }
 
     /// Add a founder signature from governance type
+    ///
+    /// Returns `Ok(true)` if signature was added successfully.
+    /// Returns `Err` if the signer is not an authorized founder.
+    /// Returns `Ok(false)` if the founder has already signed.
     pub fn add_founder_signature(
         &mut self,
         signature: &icn_governance::charter::FounderSignature,
-    ) -> bool {
+    ) -> Result<bool, String> {
         let did_str = signature.did.to_string();
+
+        // Validate signer is an authorized founder (if list is non-empty)
+        if !self.authorized_founders.is_empty() && !self.authorized_founders.contains(&did_str) {
+            return Err(format!(
+                "DID {did_str} is not an authorized founder for this cooperative"
+            ));
+        }
+
         // Check if this founder has already signed
         if self.founding_signatures.iter().any(|s| s.did == did_str) {
-            return false;
+            return Ok(false);
         }
         self.founding_signatures
             .push(StoredFounderSignature::from_governance(signature));
@@ -494,27 +542,7 @@ impl Cooperative {
         if self.founding_signatures.len() >= self.min_founders {
             self.charter_ratified = true;
         }
-        true
-    }
-
-    /// Add a founder signature from stored format
-    pub fn add_stored_signature(&mut self, signature: StoredFounderSignature) -> bool {
-        // Check if this founder has already signed
-        if self
-            .founding_signatures
-            .iter()
-            .any(|s| s.did == signature.did)
-        {
-            return false;
-        }
-        self.founding_signatures.push(signature);
-        self.updated_at = Utc::now();
-
-        // Check if we have enough signatures to ratify
-        if self.founding_signatures.len() >= self.min_founders {
-            self.charter_ratified = true;
-        }
-        true
+        Ok(true)
     }
 
     /// Check if the charter has been ratified (all required founders have signed)

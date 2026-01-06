@@ -189,10 +189,16 @@ impl LifecycleManager {
         let signer = signature.did.clone();
         let was_ratified = coop.charter_ratified;
 
-        if !coop.add_founder_signature(&signature) {
-            return Err(CoopError::DuplicateMember(format!(
-                "Founder {signer} has already signed the charter"
-            )));
+        match coop.add_founder_signature(&signature) {
+            Ok(true) => {} // Signature added successfully
+            Ok(false) => {
+                return Err(CoopError::DuplicateMember(format!(
+                    "Founder {signer} has already signed the charter"
+                )));
+            }
+            Err(e) => {
+                return Err(CoopError::PermissionDenied(e));
+            }
         }
 
         let mut events = vec![LifecycleEvent::CharterSigned {
@@ -557,5 +563,76 @@ mod tests {
             result.unwrap_err(),
             CoopError::InvalidStateTransition(_)
         ));
+    }
+
+    #[tokio::test]
+    async fn test_unauthorized_founder_rejected() {
+        let manager = LifecycleManager::new();
+        let authorized_founder = create_test_did();
+        let unauthorized_founder = create_test_did();
+
+        // Create coop with only authorized_founder in the founding members list
+        let request = FormationRequest::new(
+            "Test Coop".to_string(),
+            CoopType::Worker,
+            vec![authorized_founder.clone()],
+        )
+        .with_min_members(1);
+
+        let (coop, _) = manager
+            .create_from_request(
+                request,
+                "test-coop-auth".to_string(),
+                authorized_founder.clone(),
+            )
+            .await
+            .unwrap();
+
+        // Verify authorized_founders list was populated
+        assert_eq!(coop.authorized_founders.len(), 1);
+        assert!(coop
+            .authorized_founders
+            .contains(&authorized_founder.to_string()));
+
+        // Try to sign with unauthorized founder
+        let unauthorized_sig = FounderSignature {
+            did: unauthorized_founder.clone(),
+            signature: vec![1, 2, 3],
+            timestamp: 1000,
+            role: None,
+        };
+        let result = manager.sign_charter(coop, unauthorized_sig).await;
+
+        // Should fail with PermissionDenied
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            CoopError::PermissionDenied(_)
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_description_and_currency_transferred() {
+        let manager = LifecycleManager::new();
+        let founder = create_test_did();
+
+        let request = FormationRequest::new(
+            "My Coop".to_string(),
+            CoopType::Worker,
+            vec![founder.clone()],
+        )
+        .with_description("A worker cooperative for software development".to_string())
+        .with_currency("hours".to_string());
+
+        let (coop, _) = manager
+            .create_from_request(request, "test-coop-desc".to_string(), founder)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            coop.description,
+            Some("A worker cooperative for software development".to_string())
+        );
+        assert_eq!(coop.currency, Some("hours".to_string()));
     }
 }
