@@ -1340,6 +1340,7 @@ impl Supervisor {
             });
 
             icn_obs::metrics::supervisor::actor_spawned_inc("rpc_server");
+            icn_obs::metrics::supervisor::actor_active_set("rpc_server", true);
             info!("RPC server spawned on {}", rpc_addr);
 
             // Spawn anti-entropy task
