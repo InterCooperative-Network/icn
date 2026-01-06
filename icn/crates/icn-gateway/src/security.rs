@@ -81,6 +81,7 @@ impl SecurityConfig {
                 "http://localhost:5173".to_string(), // Vite default
                 "http://127.0.0.1:3000".to_string(),
                 "http://127.0.0.1:8080".to_string(),
+                "http://127.0.0.1:5173".to_string(), // Vite on 127.0.0.1
             ]),
             enable_security_headers: true,
             csp_directive: "default-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' ws: wss: http://localhost:* ws://localhost:*".to_string(),
@@ -377,5 +378,69 @@ mod tests {
             CorsMode::AllowedOrigins(vec!["https://example.com".to_string()])
         );
         assert_ne!(CorsMode::Disabled, CorsMode::Permissive);
+    }
+
+    #[test]
+    fn test_configure_cors_disabled_mode() {
+        let config = SecurityConfig {
+            cors_mode: CorsMode::Disabled,
+            enable_security_headers: true,
+            csp_directive: String::new(),
+        };
+        // Should not panic and return a valid Cors instance
+        let _cors = configure_cors(&config);
+    }
+
+    #[test]
+    fn test_configure_cors_allowed_origins_mode() {
+        let config = SecurityConfig {
+            cors_mode: CorsMode::AllowedOrigins(vec![
+                "https://app.icn.coop".to_string(),
+                "https://admin.icn.coop".to_string(),
+            ]),
+            enable_security_headers: true,
+            csp_directive: String::new(),
+        };
+        // Should not panic and return a valid Cors instance
+        let _cors = configure_cors(&config);
+    }
+
+    #[test]
+    fn test_configure_cors_empty_origins_falls_back_to_disabled() {
+        let config = SecurityConfig {
+            cors_mode: CorsMode::AllowedOrigins(vec![]),
+            enable_security_headers: true,
+            csp_directive: String::new(),
+        };
+        // Should not panic - empty origins falls back to disabled behavior
+        let _cors = configure_cors(&config);
+    }
+
+    #[test]
+    fn test_configure_cors_permissive_mode() {
+        let config = SecurityConfig {
+            cors_mode: CorsMode::Permissive,
+            enable_security_headers: true,
+            csp_directive: String::new(),
+        };
+        // Should not panic and return a valid Cors instance
+        let _cors = configure_cors(&config);
+    }
+
+    #[test]
+    fn test_development_config_includes_all_localhost_variants() {
+        let config = SecurityConfig::development();
+        if let CorsMode::AllowedOrigins(origins) = &config.cors_mode {
+            // Check localhost variants
+            assert!(origins.iter().any(|o| o == "http://localhost:3000"));
+            assert!(origins.iter().any(|o| o == "http://localhost:8080"));
+            assert!(origins.iter().any(|o| o == "http://localhost:5173"));
+            // Check 127.0.0.1 variants
+            assert!(origins.iter().any(|o| o == "http://127.0.0.1:3000"));
+            assert!(origins.iter().any(|o| o == "http://127.0.0.1:8080"));
+            assert!(origins.iter().any(|o| o == "http://127.0.0.1:5173"));
+        } else {
+            panic!("Development config should use AllowedOrigins");
+        }
     }
 }
