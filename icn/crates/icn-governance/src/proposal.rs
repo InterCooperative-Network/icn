@@ -2,6 +2,7 @@
 
 use crate::domain::GovernanceDomainId;
 use crate::Timestamp;
+use icn_federation::SettlementInterval;
 use icn_identity::Did;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -386,6 +387,17 @@ pub enum ProposalPayload {
         /// The bond offering details
         bond_offering: icn_ledger::BondOffering,
     },
+
+    // === Federation Governance (Issue #514) ===
+    /// Federation relationship management
+    ///
+    /// Enables governance-controlled management of federation relationships
+    /// including joining/leaving federations, establishing clearing agreements,
+    /// and vouching for other cooperatives.
+    ///
+    /// Federation actions require member approval to ensure democratic control
+    /// over inter-cooperative relationships.
+    Federation(FederationProposal),
 }
 
 impl ProposalPayload {
@@ -410,6 +422,7 @@ impl ProposalPayload {
             ProposalPayload::SurplusAllocation { .. } => "surplus_allocation",
             ProposalPayload::ShareRedemption { .. } => "share_redemption",
             ProposalPayload::BondIssuance { .. } => "bond_issuance",
+            ProposalPayload::Federation(_) => "federation",
         }
     }
 
@@ -634,6 +647,172 @@ pub enum ForcedOutcome {
 pub enum MembershipAction {
     Add,
     Remove,
+}
+
+// === Federation Governance (Issue #514) ===
+
+/// Terms for joining a federation
+///
+/// Specifies the obligations and expectations when a cooperative joins a federation.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FederationTerms {
+    /// Required trust threshold for federation membership
+    pub min_trust_threshold: f64,
+    /// Whether the cooperative agrees to follow federation governance
+    pub governance_binding: bool,
+    /// Data sharing level (none, metadata_only, full)
+    pub data_sharing_level: DataSharingLevel,
+    /// Dispute resolution method
+    pub dispute_resolution: DisputeResolutionMethod,
+}
+
+impl Default for FederationTerms {
+    fn default() -> Self {
+        Self {
+            min_trust_threshold: 0.5,
+            governance_binding: true,
+            data_sharing_level: DataSharingLevel::MetadataOnly,
+            dispute_resolution: DisputeResolutionMethod::FederationMediation,
+        }
+    }
+}
+
+/// Level of data sharing agreed to in federation terms
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum DataSharingLevel {
+    /// No automatic data sharing
+    None,
+    /// Share metadata only (activity summaries, not individual transactions)
+    #[default]
+    MetadataOnly,
+    /// Full transparency (all ledger data visible to federation)
+    Full,
+}
+
+/// Method for resolving disputes within a federation
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum DisputeResolutionMethod {
+    /// Disputes escalate to federation mediators
+    #[default]
+    FederationMediation,
+    /// Disputes resolved by designated arbitrator cooperative
+    ArbitratorCooperative { arbitrator_id: String },
+    /// Disputes resolved by member vote across federation
+    FederationVote,
+}
+
+/// Federation-related governance proposals
+///
+/// These proposals enable governance-controlled management of federation relationships.
+/// All federation actions require member approval through the proposal system.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum FederationProposal {
+    /// Join an existing federation network
+    ///
+    /// Requires member approval as it commits the cooperative to federation rules.
+    /// The cooperative will be announced to the federation registry upon approval.
+    JoinFederation {
+        /// Federation network identifier
+        federation_id: String,
+        /// Terms agreed to for joining
+        terms: FederationTerms,
+        /// Optional sponsor cooperative that vouches for the joining coop
+        sponsor_coop_id: Option<String>,
+    },
+
+    /// Leave a federation network
+    ///
+    /// Triggers wind-down process including settlement of pending clearing balances.
+    /// The cooperative will be removed from the federation registry.
+    LeaveFederation {
+        /// Federation network identifier
+        federation_id: String,
+        /// Reason for leaving
+        reason: String,
+        /// Grace period in days before full departure (for settlement)
+        grace_period_days: u32,
+    },
+
+    /// Establish bilateral clearing agreement with another cooperative
+    ///
+    /// Sets up the ability to transact across cooperative boundaries with
+    /// periodic settlement of balances.
+    EstablishClearing {
+        /// Partner cooperative's identifier
+        partner_coop_id: String,
+        /// Partner cooperative's DID
+        partner_coop_did: Did,
+        /// Maximum credit imbalance before requiring settlement
+        max_imbalance: i64,
+        /// How often to settle balances
+        settlement_interval: SettlementInterval,
+        /// Currency for the clearing arrangement
+        currency: String,
+    },
+
+    /// Terminate an existing clearing agreement
+    ///
+    /// Requires settling all outstanding balances before termination.
+    TerminateClearing {
+        /// Partner cooperative's identifier
+        partner_coop_id: String,
+        /// Reason for termination
+        reason: String,
+    },
+
+    /// Vouch for another cooperative's trustworthiness
+    ///
+    /// Creates a federated trust attestation that other cooperatives can use
+    /// when evaluating the target cooperative.
+    VouchForCooperative {
+        /// Cooperative being vouched for
+        target_coop_id: String,
+        /// Target cooperative's DID
+        target_coop_did: Did,
+        /// Trust score (0.0 to 1.0) being attested
+        trust_score: f64,
+        /// Context for the vouch (e.g., "trade", "governance", "technical")
+        context: String,
+        /// Optional evidence/justification
+        evidence: Option<String>,
+    },
+
+    /// Revoke a previous vouch for a cooperative
+    ///
+    /// Removes the trust attestation, affecting the target's federated trust score.
+    RevokeVouch {
+        /// Cooperative whose vouch is being revoked
+        target_coop_id: String,
+        /// Reason for revocation
+        reason: String,
+    },
+
+    /// Update federation policy for the cooperative
+    ///
+    /// Modifies how the cooperative participates in federation activities.
+    UpdateFederationPolicy {
+        /// New auto-accept threshold for incoming vouches (-1.0 to disable)
+        auto_accept_vouch_threshold: Option<f64>,
+        /// New default trust decay factor for attestations
+        trust_decay_factor: Option<f64>,
+        /// New maximum attestations per minute (rate limiting)
+        max_attestations_per_minute: Option<u32>,
+    },
+}
+
+impl FederationProposal {
+    /// Get a descriptive name for the federation action
+    pub fn action_name(&self) -> &'static str {
+        match self {
+            FederationProposal::JoinFederation { .. } => "join_federation",
+            FederationProposal::LeaveFederation { .. } => "leave_federation",
+            FederationProposal::EstablishClearing { .. } => "establish_clearing",
+            FederationProposal::TerminateClearing { .. } => "terminate_clearing",
+            FederationProposal::VouchForCooperative { .. } => "vouch_for_cooperative",
+            FederationProposal::RevokeVouch { .. } => "revoke_vouch",
+            FederationProposal::UpdateFederationPolicy { .. } => "update_federation_policy",
+        }
+    }
 }
 
 /// A proposal for a decision
@@ -1187,5 +1366,191 @@ mod tests {
             ProposalPayload::BondIssuance { ref bond_offering }
             if bond_offering.principal_requested == 500_000 && bond_offering.interest_rate_bps == 300
         ));
+    }
+
+    // ========== Federation Proposal Tests (Issue #514) ==========
+
+    #[test]
+    fn test_federation_join_proposal() {
+        let kp = KeyPair::generate().unwrap();
+        let did = kp.did().clone();
+        let domain_id = GovernanceDomainId::new("test-coop");
+
+        let terms = FederationTerms {
+            min_trust_threshold: 0.6,
+            governance_binding: true,
+            data_sharing_level: DataSharingLevel::MetadataOnly,
+            dispute_resolution: DisputeResolutionMethod::FederationMediation,
+        };
+
+        let proposal = Proposal::new(
+            domain_id,
+            did,
+            "Join Regional Food Federation".to_string(),
+            "Proposal to join the regional food cooperative federation".to_string(),
+            ProposalPayload::Federation(FederationProposal::JoinFederation {
+                federation_id: "regional-food-fed".to_string(),
+                terms: terms.clone(),
+                sponsor_coop_id: Some("organic-farms-coop".to_string()),
+            }),
+        );
+
+        assert_eq!(proposal.title, "Join Regional Food Federation");
+        assert!(matches!(
+            proposal.payload,
+            ProposalPayload::Federation(FederationProposal::JoinFederation { ref federation_id, .. })
+            if federation_id == "regional-food-fed"
+        ));
+    }
+
+    #[test]
+    fn test_federation_establish_clearing_proposal() {
+        let kp = KeyPair::generate().unwrap();
+        let did = kp.did().clone();
+        let domain_id = GovernanceDomainId::new("test-coop");
+
+        let partner_kp = KeyPair::generate().unwrap();
+        let partner_did = partner_kp.did().clone();
+
+        let proposal = Proposal::new(
+            domain_id,
+            did,
+            "Establish Clearing with Farm Coop".to_string(),
+            "Set up bilateral clearing for cross-coop transactions".to_string(),
+            ProposalPayload::Federation(FederationProposal::EstablishClearing {
+                partner_coop_id: "farm-coop".to_string(),
+                partner_coop_did: partner_did.clone(),
+                max_imbalance: 50_000,
+                settlement_interval: SettlementInterval::Weekly,
+                currency: "HOURS".to_string(),
+            }),
+        );
+
+        assert!(matches!(
+            proposal.payload,
+            ProposalPayload::Federation(FederationProposal::EstablishClearing {
+                ref partner_coop_id,
+                max_imbalance,
+                ..
+            })
+            if partner_coop_id == "farm-coop" && max_imbalance == 50_000
+        ));
+    }
+
+    #[test]
+    fn test_federation_vouch_proposal() {
+        let kp = KeyPair::generate().unwrap();
+        let did = kp.did().clone();
+        let domain_id = GovernanceDomainId::new("test-coop");
+
+        let target_kp = KeyPair::generate().unwrap();
+        let target_did = target_kp.did().clone();
+
+        let proposal = Proposal::new(
+            domain_id,
+            did,
+            "Vouch for New Coop".to_string(),
+            "Vouch for the newly formed worker cooperative".to_string(),
+            ProposalPayload::Federation(FederationProposal::VouchForCooperative {
+                target_coop_id: "new-worker-coop".to_string(),
+                target_coop_did: target_did.clone(),
+                trust_score: 0.75,
+                context: "trade".to_string(),
+                evidence: Some(
+                    "We have been trading with them successfully for 6 months".to_string(),
+                ),
+            }),
+        );
+
+        assert!(matches!(
+            proposal.payload,
+            ProposalPayload::Federation(FederationProposal::VouchForCooperative {
+                trust_score,
+                ref context,
+                ..
+            })
+            if (trust_score - 0.75).abs() < 0.001 && context == "trade"
+        ));
+    }
+
+    #[test]
+    fn test_federation_proposal_type_name() {
+        let kp = KeyPair::generate().unwrap();
+        let did = kp.did().clone();
+        let domain_id = GovernanceDomainId::new("test-coop");
+
+        let proposal = Proposal::new(
+            domain_id,
+            did,
+            "Federation Test".to_string(),
+            "Test proposal".to_string(),
+            ProposalPayload::Federation(FederationProposal::LeaveFederation {
+                federation_id: "test-fed".to_string(),
+                reason: "Strategic realignment".to_string(),
+                grace_period_days: 30,
+            }),
+        );
+
+        assert_eq!(proposal.payload.type_name(), "federation");
+    }
+
+    #[test]
+    fn test_federation_proposal_action_names() {
+        assert_eq!(
+            FederationProposal::JoinFederation {
+                federation_id: "test".to_string(),
+                terms: FederationTerms::default(),
+                sponsor_coop_id: None,
+            }
+            .action_name(),
+            "join_federation"
+        );
+
+        assert_eq!(
+            FederationProposal::LeaveFederation {
+                federation_id: "test".to_string(),
+                reason: "test".to_string(),
+                grace_period_days: 30,
+            }
+            .action_name(),
+            "leave_federation"
+        );
+
+        let target_did = KeyPair::generate().unwrap().did().clone();
+        assert_eq!(
+            FederationProposal::EstablishClearing {
+                partner_coop_id: "test".to_string(),
+                partner_coop_did: target_did.clone(),
+                max_imbalance: 1000,
+                settlement_interval: SettlementInterval::Daily,
+                currency: "HOURS".to_string(),
+            }
+            .action_name(),
+            "establish_clearing"
+        );
+
+        assert_eq!(
+            FederationProposal::VouchForCooperative {
+                target_coop_id: "test".to_string(),
+                target_coop_did: target_did,
+                trust_score: 0.8,
+                context: "trade".to_string(),
+                evidence: None,
+            }
+            .action_name(),
+            "vouch_for_cooperative"
+        );
+    }
+
+    #[test]
+    fn test_federation_terms_default() {
+        let terms = FederationTerms::default();
+        assert!((terms.min_trust_threshold - 0.5).abs() < 0.001);
+        assert!(terms.governance_binding);
+        assert_eq!(terms.data_sharing_level, DataSharingLevel::MetadataOnly);
+        assert_eq!(
+            terms.dispute_resolution,
+            DisputeResolutionMethod::FederationMediation
+        );
     }
 }

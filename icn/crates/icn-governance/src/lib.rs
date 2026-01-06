@@ -107,8 +107,9 @@ pub use membership::{MembershipConfig, MembershipSource};
 pub use message::{GovernanceMessage, ProposalOutcome, TallySnapshot};
 pub use profile::{DecisionOutcome, GovernanceProfile, GovernanceProfileId, GovernanceRule};
 pub use proposal::{
-    DisputeResolutionOutcome, ForcedOutcome, MembershipAction, Proposal, ProposalId,
-    ProposalPayload, ProposalState, TreasuryApprovalType, TreasuryProposalOperation,
+    DataSharingLevel, DisputeResolutionMethod, DisputeResolutionOutcome, FederationProposal,
+    FederationTerms, ForcedOutcome, MembershipAction, Proposal, ProposalId, ProposalPayload,
+    ProposalState, TreasuryApprovalType, TreasuryProposalOperation,
 };
 pub use resolver::{MembershipResolver, StaticMembershipResolver};
 pub use sdis::{
