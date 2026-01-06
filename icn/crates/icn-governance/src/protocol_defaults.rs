@@ -232,6 +232,197 @@ pub fn default_parameters() -> Vec<ProtocolParameter> {
                 allow_override: true,
             },
         ),
+        // === Proposal-Type-Specific Thresholds (Issue #477) ===
+        // These enable runtime configurability of quorum/approval thresholds via governance.
+        // Cooperatives can override these to customize their decision-making rules.
+        //
+        // Emergency proposals (freeze, veto, rollback) have higher default thresholds
+        // to prevent low-turnout manipulation attacks.
+        //
+        // Quorum: Minimum voter participation (% of eligible voters)
+        param(
+            "governance.quorum.freeze",
+            "Freeze Member Quorum",
+            "Quorum percentage required for freeze/unfreeze member proposals.",
+            ParameterValue::Percentage(67.0),
+            ParameterConstraints {
+                min: Some(ParameterValue::Percentage(50.0)), // At least majority
+                max: Some(ParameterValue::Percentage(100.0)),
+                allowed_values: None,
+                requires_restart: false,
+                allow_override: true,
+            },
+        ),
+        param(
+            "governance.quorum.veto",
+            "Veto Proposal Quorum",
+            "Quorum percentage required for veto proposals.",
+            ParameterValue::Percentage(67.0),
+            ParameterConstraints {
+                min: Some(ParameterValue::Percentage(50.0)),
+                max: Some(ParameterValue::Percentage(100.0)),
+                allowed_values: None,
+                requires_restart: false,
+                allow_override: true,
+            },
+        ),
+        param(
+            "governance.quorum.force_close",
+            "Force Close Quorum",
+            "Quorum percentage required for force close proposals.",
+            ParameterValue::Percentage(67.0),
+            ParameterConstraints {
+                min: Some(ParameterValue::Percentage(50.0)),
+                max: Some(ParameterValue::Percentage(100.0)),
+                allowed_values: None,
+                requires_restart: false,
+                allow_override: true,
+            },
+        ),
+        param(
+            "governance.quorum.rollback",
+            "Ledger Rollback Quorum",
+            "Quorum percentage required for ledger rollback proposals (highest threshold).",
+            ParameterValue::Percentage(75.0),
+            ParameterConstraints {
+                min: Some(ParameterValue::Percentage(60.0)), // Higher minimum for rollback
+                max: Some(ParameterValue::Percentage(100.0)),
+                allowed_values: None,
+                requires_restart: false,
+                allow_override: true,
+            },
+        ),
+        param(
+            "governance.quorum.treasury_budget",
+            "Treasury Budget Quorum",
+            "Quorum percentage required for treasury budget proposals.",
+            ParameterValue::Percentage(50.0),
+            ParameterConstraints {
+                min: Some(ParameterValue::Percentage(25.0)),
+                max: Some(ParameterValue::Percentage(100.0)),
+                allowed_values: None,
+                requires_restart: false,
+                allow_override: true,
+            },
+        ),
+        param(
+            "governance.quorum.treasury_withdrawal",
+            "Treasury Withdrawal Quorum",
+            "Quorum percentage required for treasury withdrawal proposals.",
+            ParameterValue::Percentage(60.0),
+            ParameterConstraints {
+                min: Some(ParameterValue::Percentage(40.0)),
+                max: Some(ParameterValue::Percentage(100.0)),
+                allowed_values: None,
+                requires_restart: false,
+                allow_override: true,
+            },
+        ),
+        param(
+            "governance.quorum.treasury_rule",
+            "Treasury Rule Quorum",
+            "Quorum percentage required for treasury spending rule modifications.",
+            ParameterValue::Percentage(60.0),
+            ParameterConstraints {
+                min: Some(ParameterValue::Percentage(40.0)),
+                max: Some(ParameterValue::Percentage(100.0)),
+                allowed_values: None,
+                requires_restart: false,
+                allow_override: true,
+            },
+        ),
+        // Approval: Minimum yes votes as % of votes cast
+        param(
+            "governance.approval.freeze",
+            "Freeze Member Approval",
+            "Approval percentage required for freeze/unfreeze member proposals.",
+            ParameterValue::Percentage(75.0),
+            ParameterConstraints {
+                min: Some(ParameterValue::Percentage(50.0)),
+                max: Some(ParameterValue::Percentage(100.0)),
+                allowed_values: None,
+                requires_restart: false,
+                allow_override: true,
+            },
+        ),
+        param(
+            "governance.approval.veto",
+            "Veto Proposal Approval",
+            "Approval percentage required for veto proposals.",
+            ParameterValue::Percentage(75.0),
+            ParameterConstraints {
+                min: Some(ParameterValue::Percentage(50.0)),
+                max: Some(ParameterValue::Percentage(100.0)),
+                allowed_values: None,
+                requires_restart: false,
+                allow_override: true,
+            },
+        ),
+        param(
+            "governance.approval.force_close",
+            "Force Close Approval",
+            "Approval percentage required for force close proposals.",
+            ParameterValue::Percentage(75.0),
+            ParameterConstraints {
+                min: Some(ParameterValue::Percentage(50.0)),
+                max: Some(ParameterValue::Percentage(100.0)),
+                allowed_values: None,
+                requires_restart: false,
+                allow_override: true,
+            },
+        ),
+        param(
+            "governance.approval.rollback",
+            "Ledger Rollback Approval",
+            "Approval percentage required for ledger rollback proposals (highest threshold).",
+            ParameterValue::Percentage(80.0),
+            ParameterConstraints {
+                min: Some(ParameterValue::Percentage(66.0)), // Higher minimum for rollback
+                max: Some(ParameterValue::Percentage(100.0)),
+                allowed_values: None,
+                requires_restart: false,
+                allow_override: true,
+            },
+        ),
+        param(
+            "governance.approval.treasury_budget",
+            "Treasury Budget Approval",
+            "Approval percentage required for treasury budget proposals.",
+            ParameterValue::Percentage(50.0),
+            ParameterConstraints {
+                min: Some(ParameterValue::Percentage(50.0)),
+                max: Some(ParameterValue::Percentage(100.0)),
+                allowed_values: None,
+                requires_restart: false,
+                allow_override: true,
+            },
+        ),
+        param(
+            "governance.approval.treasury_withdrawal",
+            "Treasury Withdrawal Approval",
+            "Approval percentage required for treasury withdrawal proposals.",
+            ParameterValue::Percentage(67.0),
+            ParameterConstraints {
+                min: Some(ParameterValue::Percentage(50.0)),
+                max: Some(ParameterValue::Percentage(100.0)),
+                allowed_values: None,
+                requires_restart: false,
+                allow_override: true,
+            },
+        ),
+        param(
+            "governance.approval.treasury_rule",
+            "Treasury Rule Approval",
+            "Approval percentage required for treasury spending rule modifications.",
+            ParameterValue::Percentage(67.0),
+            ParameterConstraints {
+                min: Some(ParameterValue::Percentage(50.0)),
+                max: Some(ParameterValue::Percentage(100.0)),
+                allowed_values: None,
+                requires_restart: false,
+                allow_override: true,
+            },
+        ),
         // === Trust Parameters ===
         param(
             "trust.min_endorsements",
@@ -547,6 +738,117 @@ mod tests {
                 seen.insert(param.id.clone()),
                 "Duplicate parameter ID found: {}",
                 param.id
+            );
+        }
+    }
+
+    #[test]
+    fn test_governance_threshold_parameters_exist() {
+        // Emergency operation thresholds (Issue #477)
+        let threshold_params = [
+            "governance.quorum.freeze",
+            "governance.quorum.veto",
+            "governance.quorum.force_close",
+            "governance.quorum.rollback",
+            "governance.quorum.treasury_budget",
+            "governance.quorum.treasury_withdrawal",
+            "governance.quorum.treasury_rule",
+            "governance.approval.freeze",
+            "governance.approval.veto",
+            "governance.approval.force_close",
+            "governance.approval.rollback",
+            "governance.approval.treasury_budget",
+            "governance.approval.treasury_withdrawal",
+            "governance.approval.treasury_rule",
+        ];
+
+        for param_id in threshold_params {
+            let param = get_default_parameter(param_id);
+            assert!(
+                param.is_some(),
+                "Missing governance threshold parameter: {param_id}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_emergency_thresholds_higher_than_standard() {
+        // Emergency operations should require higher quorum than standard (50%)
+        let standard_quorum = match get_default_parameter("governance.min_quorum") {
+            Some(p) => match p.value {
+                ParameterValue::Percentage(v) => v,
+                _ => panic!("min_quorum should be Percentage"),
+            },
+            None => panic!("min_quorum not found"),
+        };
+
+        let emergency_quorum_params = [
+            "governance.quorum.freeze",
+            "governance.quorum.veto",
+            "governance.quorum.force_close",
+            "governance.quorum.rollback",
+        ];
+
+        for param_id in emergency_quorum_params {
+            let param = get_default_parameter(param_id).expect("param exists");
+            if let ParameterValue::Percentage(quorum) = param.value {
+                assert!(
+                    quorum > standard_quorum,
+                    "{param_id} ({quorum}) should be higher than standard quorum ({standard_quorum})"
+                );
+            } else {
+                panic!("{param_id} should be Percentage type");
+            }
+        }
+    }
+
+    #[test]
+    fn test_threshold_constraints_valid() {
+        let threshold_params = [
+            "governance.quorum.freeze",
+            "governance.approval.freeze",
+            "governance.quorum.rollback",
+            "governance.approval.rollback",
+        ];
+
+        for param_id in threshold_params {
+            let param = get_default_parameter(param_id).expect("param exists");
+
+            // All threshold params should have min >= 50% for security
+            if let Some(ParameterValue::Percentage(min)) = param.constraints.min {
+                assert!(
+                    min >= 50.0,
+                    "{param_id} min constraint ({min}) should be >= 50%"
+                );
+            } else {
+                panic!("{param_id} should have min percentage constraint");
+            }
+
+            // All should have max <= 100%
+            if let Some(ParameterValue::Percentage(max)) = param.constraints.max {
+                assert!(
+                    max <= 100.0,
+                    "{param_id} max constraint ({max}) should be <= 100%"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_treasury_threshold_values() {
+        // Budget creation requires different thresholds than withdrawal
+        let budget_quorum =
+            get_default_parameter("governance.quorum.treasury_budget").expect("param exists");
+        let withdrawal_quorum =
+            get_default_parameter("governance.quorum.treasury_withdrawal").expect("param exists");
+
+        if let (ParameterValue::Percentage(budget), ParameterValue::Percentage(withdrawal)) =
+            (&budget_quorum.value, &withdrawal_quorum.value)
+        {
+            // Withdrawal should require at least as much quorum as budget creation
+            assert!(
+                withdrawal >= budget,
+                "treasury_withdrawal quorum ({withdrawal}) should be >= treasury_budget quorum ({budget})"
             );
         }
     }

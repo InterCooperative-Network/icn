@@ -335,7 +335,12 @@ impl GovernanceHandle {
     /// before calling this method will NOT have the protocol parameter store configured.
     /// Always call this before cloning the handle.
     pub fn with_protocol_params(mut self, store: Arc<dyn ProtocolParameterStore>) -> Self {
-        self.protocol_params = Some(store);
+        self.protocol_params = Some(store.clone());
+        // Also set on inner actor for use in handle() method
+        // SAFETY: Called during initialization before handle is shared
+        if let Ok(mut actor) = self.inner.try_write() {
+            actor.protocol_params = Some(store);
+        }
         self
     }
 
@@ -427,6 +432,112 @@ impl GovernanceHandle {
             Some(store) => store.count_pending_changes(),
             None => Ok(0),
         }
+    }
+
+    /// Get thresholds for a proposal from protocol parameters
+    ///
+    /// Looks up quorum and approval thresholds from protocol parameters based on
+    /// the proposal type. Falls back to None if parameters not found or store
+    /// not configured.
+    ///
+    /// Parameter IDs follow the pattern:
+    /// - `governance.quorum.<type>` for quorum percentage
+    /// - `governance.approval.<type>` for approval percentage
+    ///
+    /// Where `<type>` is: freeze, veto, force_close, rollback, treasury_budget,
+    /// treasury_withdrawal, treasury_rule
+    pub fn get_thresholds_from_params(
+        &self,
+        payload: &ProposalPayload,
+        coop_id: Option<&EntityId>,
+    ) -> Option<icn_governance::ProposalThresholds> {
+        use icn_governance::protocol::ParameterValue;
+
+        let store = self.protocol_params.as_ref()?;
+
+        // Determine parameter suffix based on proposal type
+        let param_suffix = match payload {
+            ProposalPayload::FreezeMember { .. } | ProposalPayload::UnfreezeMember { .. } => {
+                Some("freeze")
+            }
+            ProposalPayload::VetoProposal { .. } => Some("veto"),
+            ProposalPayload::ForceCloseProposal { .. } => Some("force_close"),
+            ProposalPayload::RollbackLedger { .. } => Some("rollback"),
+            ProposalPayload::Treasury { operation } => {
+                use icn_governance::TreasuryProposalOperation;
+                match operation {
+                    TreasuryProposalOperation::CreateBudget { .. }
+                    | TreasuryProposalOperation::CancelBudget { .. }
+                    | TreasuryProposalOperation::ReclaimBudget { .. } => Some("treasury_budget"),
+                    TreasuryProposalOperation::Withdraw { .. }
+                    | TreasuryProposalOperation::TransferBetweenBudgets { .. } => {
+                        Some("treasury_withdrawal")
+                    }
+                    TreasuryProposalOperation::ModifySpendingRule { .. } => Some("treasury_rule"),
+                }
+            }
+            // Normal proposals use default min_quorum and min_approval
+            _ => None,
+        };
+
+        // For normal proposals, try to get default thresholds
+        if param_suffix.is_none() {
+            let quorum = store
+                .get_effective("governance.min_quorum", coop_id, None)
+                .ok()
+                .flatten()
+                .and_then(|p| {
+                    if let ParameterValue::Percentage(v) = p.value {
+                        Some(v as u8)
+                    } else {
+                        None
+                    }
+                })?;
+
+            let approval = store
+                .get_effective("governance.min_approval", coop_id, None)
+                .ok()
+                .flatten()
+                .and_then(|p| {
+                    if let ParameterValue::Percentage(v) = p.value {
+                        Some(v as u8)
+                    } else {
+                        None
+                    }
+                })?;
+
+            return Some(icn_governance::ProposalThresholds::new(quorum, approval));
+        }
+
+        let suffix = param_suffix?;
+        let quorum_id = format!("governance.quorum.{suffix}");
+        let approval_id = format!("governance.approval.{suffix}");
+
+        let quorum = store
+            .get_effective(&quorum_id, coop_id, None)
+            .ok()
+            .flatten()
+            .and_then(|p| {
+                if let ParameterValue::Percentage(v) = p.value {
+                    Some(v as u8)
+                } else {
+                    None
+                }
+            })?;
+
+        let approval = store
+            .get_effective(&approval_id, coop_id, None)
+            .ok()
+            .flatten()
+            .and_then(|p| {
+                if let ParameterValue::Percentage(v) = p.value {
+                    Some(v as u8)
+                } else {
+                    None
+                }
+            })?;
+
+        Some(icn_governance::ProposalThresholds::new(quorum, approval))
     }
 
     /// Check if an entity exists (for scope validation at execution time)
@@ -781,6 +892,8 @@ pub struct GovernanceActor {
     event_scheduler: Arc<RwLock<BinaryHeap<Reverse<ScheduledGovernanceEvent>>>>,
     cancel_tx: mpsc::UnboundedSender<ProposalId>,
     event_bus: Option<Arc<EventBus>>,
+    /// Protocol parameter store for governable parameters (Phase 20)
+    protocol_params: Option<Arc<dyn ProtocolParameterStore>>,
 }
 
 impl GovernanceActor {
@@ -842,6 +955,7 @@ impl GovernanceActor {
             event_scheduler: event_scheduler.clone(),
             cancel_tx,
             event_bus,
+            protocol_params: None,
         };
 
         let handle = GovernanceHandle {
@@ -919,6 +1033,106 @@ impl GovernanceActor {
         );
 
         Ok(handle)
+    }
+
+    /// Get proposal-type-specific thresholds from protocol parameters
+    ///
+    /// Returns `Some(thresholds)` if protocol parameters are configured and contain
+    /// the relevant threshold parameters, `None` otherwise (fallback to domain config).
+    fn get_thresholds_from_params(
+        &self,
+        payload: &ProposalPayload,
+        coop_id: Option<&icn_entity::EntityId>,
+    ) -> Option<icn_governance::ProposalThresholds> {
+        use icn_governance::protocol::ParameterValue;
+
+        let store = self.protocol_params.as_ref()?;
+
+        // Determine parameter suffix based on proposal type
+        let param_suffix = match payload {
+            ProposalPayload::FreezeMember { .. } | ProposalPayload::UnfreezeMember { .. } => {
+                Some("freeze")
+            }
+            ProposalPayload::VetoProposal { .. } => Some("veto"),
+            ProposalPayload::ForceCloseProposal { .. } => Some("force_close"),
+            ProposalPayload::RollbackLedger { .. } => Some("rollback"),
+            ProposalPayload::Treasury { operation } => {
+                use icn_governance::TreasuryProposalOperation;
+                match operation {
+                    TreasuryProposalOperation::CreateBudget { .. }
+                    | TreasuryProposalOperation::CancelBudget { .. }
+                    | TreasuryProposalOperation::ReclaimBudget { .. } => Some("treasury_budget"),
+                    TreasuryProposalOperation::Withdraw { .. }
+                    | TreasuryProposalOperation::TransferBetweenBudgets { .. } => {
+                        Some("treasury_withdrawal")
+                    }
+                    TreasuryProposalOperation::ModifySpendingRule { .. } => Some("treasury_rule"),
+                }
+            }
+            // Normal proposals use default min_quorum and min_approval
+            _ => None,
+        };
+
+        // For normal proposals, try to get default thresholds
+        if param_suffix.is_none() {
+            let quorum = store
+                .get_effective("governance.min_quorum", coop_id, None)
+                .ok()
+                .flatten()
+                .and_then(|p| {
+                    if let ParameterValue::Percentage(v) = p.value {
+                        Some(v as u8)
+                    } else {
+                        None
+                    }
+                })?;
+
+            let approval = store
+                .get_effective("governance.min_approval", coop_id, None)
+                .ok()
+                .flatten()
+                .and_then(|p| {
+                    if let ParameterValue::Percentage(v) = p.value {
+                        Some(v as u8)
+                    } else {
+                        None
+                    }
+                })?;
+
+            return Some(icn_governance::ProposalThresholds::new(quorum, approval));
+        }
+
+        // For special proposal types, look up specific thresholds
+        let suffix = param_suffix?;
+
+        let quorum_key = format!("governance.quorum.{suffix}");
+        let approval_key = format!("governance.approval.{suffix}");
+
+        let quorum = store
+            .get_effective(&quorum_key, coop_id, None)
+            .ok()
+            .flatten()
+            .and_then(|p| {
+                if let ParameterValue::Percentage(v) = p.value {
+                    Some(v as u8)
+                } else {
+                    None
+                }
+            })?;
+
+        let approval = store
+            .get_effective(&approval_key, coop_id, None)
+            .ok()
+            .flatten()
+            .and_then(|p| {
+                if let ParameterValue::Percentage(v) = p.value {
+                    Some(v as u8)
+                } else {
+                    None
+                }
+            })?;
+
+        Some(icn_governance::ProposalThresholds::new(quorum, approval))
     }
 
     /// Handle a governance command
@@ -1218,8 +1432,13 @@ impl GovernanceActor {
 
                 // Get proposal-type-specific thresholds (Issue #477)
                 // Emergency proposals (freeze, veto, rollback) require higher quorum/approval
-                // to prevent low-turnout manipulation attacks
-                let thresholds = domain.config.thresholds_for_proposal(&proposal.payload);
+                // to prevent low-turnout manipulation attacks.
+                // First try protocol parameters (runtime programmable via ProtocolChange proposals),
+                // fall back to domain config. Currently uses global scope; cooperative-specific
+                // overrides come from domain config until domain<->entity mapping is established.
+                let thresholds = self
+                    .get_thresholds_from_params(&proposal.payload, None)
+                    .unwrap_or_else(|| domain.config.thresholds_for_proposal(&proposal.payload));
 
                 // Evaluate outcome with proposal-type-specific thresholds
                 let outcome_result =
