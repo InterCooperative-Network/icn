@@ -138,7 +138,8 @@ impl GovernanceConfig {
             | ProposalPayload::ProtocolChange { .. }
             | ProposalPayload::SurplusAllocation { .. }
             | ProposalPayload::ShareRedemption { .. }
-            | ProposalPayload::BondIssuance { .. } => ProposalThresholds::new(
+            | ProposalPayload::BondIssuance { .. }
+            | ProposalPayload::Federation(_) => ProposalThresholds::new(
                 self.params.quorum_percentage,
                 self.params.approval_threshold_percentage,
             ),

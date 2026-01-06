@@ -381,6 +381,10 @@ impl GovernanceEventHandler {
                 );
                 // TODO: Open bond for subscription
             }
+            // Federation governance (Issue #514)
+            ProposalPayload::Federation(federation_proposal) => {
+                self.handle_federation_proposal(proposal_id, federation_proposal);
+            }
         }
     }
 
@@ -2407,6 +2411,142 @@ impl GovernanceEventHandler {
             _ => {
                 info!("   Action: Other SDIS operation");
                 icn_obs::metrics::governance::proposals_executed_inc("sdis_other");
+            }
+        }
+    }
+
+    /// Handle a federation governance proposal (Issue #514)
+    ///
+    /// Federation proposals enable governance-controlled management of inter-cooperative
+    /// relationships including joining/leaving federations, establishing clearing agreements,
+    /// and managing trust attestations.
+    fn handle_federation_proposal(
+        &self,
+        proposal_id: ProposalId,
+        proposal: icn_governance::FederationProposal,
+    ) {
+        use icn_governance::FederationProposal;
+
+        info!(
+            "🌐 Federation proposal {} accepted: {}",
+            proposal_id.0,
+            proposal.action_name()
+        );
+
+        match proposal {
+            FederationProposal::JoinFederation {
+                federation_id,
+                terms,
+                sponsor_coop_id,
+            } => {
+                info!(
+                    "   Action: Join federation '{}' (sponsor: {:?})",
+                    federation_id, sponsor_coop_id
+                );
+                info!(
+                    "   Terms: trust_threshold={}, governance_binding={}, data_sharing={:?}",
+                    terms.min_trust_threshold, terms.governance_binding, terms.data_sharing_level
+                );
+                // TODO: Check if already a member (prevent duplicate join)
+                // TODO: Verify sponsor_coop_id is valid if provided
+                // TODO: Register with CooperativeRegistry, announce to federation:registry topic
+                icn_obs::metrics::governance::proposals_executed_inc("federation_join");
+            }
+            FederationProposal::LeaveFederation {
+                federation_id,
+                reason,
+                grace_period_days,
+            } => {
+                info!(
+                    "   Action: Leave federation '{}' (grace period: {} days)",
+                    federation_id, grace_period_days
+                );
+                info!("   Reason: {}", reason);
+                // TODO: Verify cooperative is actually a member of this federation
+                // TODO: Initiate wind-down, settle clearing balances, remove from registry
+                icn_obs::metrics::governance::proposals_executed_inc("federation_leave");
+            }
+            FederationProposal::EstablishClearing {
+                partner_coop_id,
+                partner_coop_did,
+                max_imbalance,
+                settlement_interval,
+                currency,
+            } => {
+                info!(
+                    "   Action: Establish clearing with '{}' ({})",
+                    partner_coop_id, partner_coop_did
+                );
+                info!(
+                    "   Terms: max_imbalance={} {}, settlement={:?}",
+                    max_imbalance, currency, settlement_interval
+                );
+                // TODO: Verify partner DID matches partner_coop_id via registry lookup
+                // TODO: Check if clearing agreement already exists (prevent duplicate)
+                // TODO: Create BilateralClearingAgreement via ClearingManager
+                icn_obs::metrics::governance::proposals_executed_inc(
+                    "federation_establish_clearing",
+                );
+            }
+            FederationProposal::TerminateClearing {
+                partner_coop_id,
+                reason,
+            } => {
+                info!("   Action: Terminate clearing with '{}'", partner_coop_id);
+                info!("   Reason: {}", reason);
+                // TODO: Verify clearing agreement exists with this partner
+                // TODO: Settle outstanding balances and remove clearing agreement
+                icn_obs::metrics::governance::proposals_executed_inc(
+                    "federation_terminate_clearing",
+                );
+            }
+            FederationProposal::VouchForCooperative {
+                target_coop_id,
+                target_coop_did,
+                trust_score,
+                context,
+                evidence,
+            } => {
+                info!(
+                    "   Action: Vouch for '{}' ({}) with score {}",
+                    target_coop_id, target_coop_did, trust_score
+                );
+                info!("   Context: {}", context);
+                if let Some(ev) = evidence {
+                    info!("   Evidence: {}", ev);
+                }
+                // TODO: Verify target DID matches target_coop_id via registry lookup
+                // TODO: Check if vouch already exists (update or reject duplicate)
+                // TODO: Create FederatedTrustAttestation via AttestationStore
+                icn_obs::metrics::governance::proposals_executed_inc("federation_vouch");
+            }
+            FederationProposal::RevokeVouch {
+                target_coop_id,
+                reason,
+            } => {
+                info!("   Action: Revoke vouch for '{}'", target_coop_id);
+                info!("   Reason: {}", reason);
+                // TODO: Verify vouch exists for this target
+                // TODO: Remove attestation from AttestationStore
+                icn_obs::metrics::governance::proposals_executed_inc("federation_revoke_vouch");
+            }
+            FederationProposal::UpdateFederationPolicy {
+                auto_accept_vouch_threshold,
+                trust_decay_factor,
+                max_attestations_per_minute,
+            } => {
+                info!("   Action: Update federation policy");
+                if let Some(threshold) = auto_accept_vouch_threshold {
+                    info!("   Auto-accept vouch threshold: {}", threshold);
+                }
+                if let Some(decay) = trust_decay_factor {
+                    info!("   Trust decay factor: {}", decay);
+                }
+                if let Some(rate) = max_attestations_per_minute {
+                    info!("   Max attestations per minute: {}", rate);
+                }
+                // TODO: Update local federation configuration
+                icn_obs::metrics::governance::proposals_executed_inc("federation_update_policy");
             }
         }
     }
