@@ -1,4 +1,8 @@
-use crate::{CoopMessage, CoopType, Cooperative, Member, MemberRole, Result};
+use crate::{
+    AssetDistributionPlan, CoopMessage, CoopType, Cooperative, FormationRequest, LifecycleEvent,
+    Member, MemberRole, Result,
+};
+use icn_governance::charter::FounderSignature;
 use icn_identity::Did;
 use tokio::sync::{mpsc, oneshot};
 
@@ -179,6 +183,100 @@ impl CoopHandle {
                 metadata,
                 reply,
             })
+            .await
+            .map_err(|_| crate::CoopError::Governance("Actor disconnected".into()))?;
+        rx.await
+            .map_err(|_| crate::CoopError::Governance("Reply failed".into()))?
+    }
+
+    // === Issue #290: Charter signing and dissolution methods ===
+
+    /// Create a cooperative from a formation request
+    ///
+    /// This creates a cooperative in Forming state with the specified
+    /// founding members. The cooperative must be activated after all
+    /// required founders have signed the charter.
+    pub async fn create_from_request(
+        &self,
+        request: FormationRequest,
+        id: String,
+        first_founder: Did,
+    ) -> Result<(Cooperative, LifecycleEvent)> {
+        let (reply, rx) = oneshot::channel();
+        self.tx
+            .send(CoopMessage::CreateFromRequest {
+                request,
+                id,
+                first_founder,
+                reply,
+            })
+            .await
+            .map_err(|_| crate::CoopError::Governance("Actor disconnected".into()))?;
+        rx.await
+            .map_err(|_| crate::CoopError::Governance("Reply failed".into()))?
+    }
+
+    /// Sign the cooperative's charter as a founder
+    ///
+    /// Each founder must sign the charter before the cooperative can be
+    /// activated. Returns lifecycle events including CharterSigned and
+    /// potentially CharterRatified if this was the final required signature.
+    pub async fn sign_charter(
+        &self,
+        coop_id: String,
+        signature: FounderSignature,
+    ) -> Result<(Cooperative, Vec<LifecycleEvent>)> {
+        let (reply, rx) = oneshot::channel();
+        self.tx
+            .send(CoopMessage::SignCharter {
+                coop_id,
+                signature,
+                reply,
+            })
+            .await
+            .map_err(|_| crate::CoopError::Governance("Actor disconnected".into()))?;
+        rx.await
+            .map_err(|_| crate::CoopError::Governance("Reply failed".into()))?
+    }
+
+    /// Start dissolution process with an asset distribution plan
+    ///
+    /// This transitions the cooperative to Dissolving state. The plan
+    /// specifies how balances, debts, and capital should be handled.
+    /// Optionally includes a governance proposal ID that approved this.
+    pub async fn start_dissolution(
+        &self,
+        coop_id: String,
+        initiator: Did,
+        plan: AssetDistributionPlan,
+        proposal_id: Option<String>,
+    ) -> Result<(Cooperative, LifecycleEvent)> {
+        let (reply, rx) = oneshot::channel();
+        self.tx
+            .send(CoopMessage::StartDissolution {
+                coop_id,
+                initiator,
+                plan,
+                proposal_id,
+                reply,
+            })
+            .await
+            .map_err(|_| crate::CoopError::Governance("Actor disconnected".into()))?;
+        rx.await
+            .map_err(|_| crate::CoopError::Governance("Reply failed".into()))?
+    }
+
+    /// Complete the dissolution process
+    ///
+    /// This should be called after assets have been distributed according
+    /// to the plan. Transitions the cooperative to Dissolved state.
+    pub async fn complete_dissolution(
+        &self,
+        coop_id: String,
+    ) -> Result<(Cooperative, Vec<LifecycleEvent>)> {
+        let (reply, rx) = oneshot::channel();
+        self.tx
+            .send(CoopMessage::CompleteDissolution { coop_id, reply })
             .await
             .map_err(|_| crate::CoopError::Governance("Actor disconnected".into()))?;
         rx.await

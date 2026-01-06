@@ -1,10 +1,178 @@
 use chrono::{DateTime, Utc};
+use icn_governance::charter::CharterId;
 use icn_identity::Did;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Unique identifier for a cooperative
 pub type CooperativeId = String;
+
+/// Stored founder signature (serialization-friendly version)
+///
+/// This is a local type that stores DID as String for better bincode compatibility.
+/// Use `from_governance_signature` and `to_governance_signature` for conversion.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StoredFounderSignature {
+    /// Founder's DID (stored as string for serialization)
+    pub did: String,
+    /// Ed25519 signature over charter content
+    pub signature: Vec<u8>,
+    /// When signature was made (Unix timestamp)
+    pub timestamp: u64,
+    /// Optional role in founding (e.g., "initiator", "steward")
+    pub role: Option<String>,
+}
+
+impl StoredFounderSignature {
+    /// Create from icn_governance FounderSignature
+    pub fn from_governance(sig: &icn_governance::charter::FounderSignature) -> Self {
+        Self {
+            did: sig.did.to_string(),
+            signature: sig.signature.clone(),
+            timestamp: sig.timestamp,
+            role: sig.role.clone(),
+        }
+    }
+
+    /// Convert to icn_governance FounderSignature
+    pub fn to_governance(&self) -> Result<icn_governance::charter::FounderSignature, String> {
+        let did: Did = self.did.parse().map_err(|e| format!("Invalid DID: {e}"))?;
+        Ok(icn_governance::charter::FounderSignature {
+            did,
+            signature: self.signature.clone(),
+            timestamp: self.timestamp,
+            role: self.role.clone(),
+        })
+    }
+
+    /// Get the DID (parsing from string)
+    pub fn did(&self) -> Result<Did, String> {
+        self.did.parse().map_err(|e| format!("Invalid DID: {e}"))
+    }
+}
+
+/// Formation request for creating a new cooperative
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FormationRequest {
+    /// Proposed cooperative name
+    pub name: String,
+    /// Type of cooperative
+    pub coop_type: CoopType,
+    /// Minimum members required (defaults to 3)
+    pub min_members: usize,
+    /// Founding members who must sign the charter
+    pub founding_members: Vec<Did>,
+    /// Optional charter document hash (off-chain document)
+    pub charter_document_hash: Option<[u8; 32]>,
+    /// Optional description
+    pub description: Option<String>,
+    /// Currency for economic transactions (defaults to "hours")
+    pub currency: Option<String>,
+}
+
+impl FormationRequest {
+    pub fn new(name: String, coop_type: CoopType, founding_members: Vec<Did>) -> Self {
+        Self {
+            name,
+            coop_type,
+            min_members: 3,
+            founding_members,
+            charter_document_hash: None,
+            description: None,
+            currency: None,
+        }
+    }
+
+    pub fn with_min_members(mut self, min: usize) -> Self {
+        self.min_members = min;
+        self
+    }
+
+    pub fn with_charter_hash(mut self, hash: [u8; 32]) -> Self {
+        self.charter_document_hash = Some(hash);
+        self
+    }
+
+    pub fn with_description(mut self, desc: String) -> Self {
+        self.description = Some(desc);
+        self
+    }
+
+    pub fn with_currency(mut self, currency: String) -> Self {
+        self.currency = Some(currency);
+        self
+    }
+}
+
+/// Dissolution request for dissolving a cooperative
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DissolutionRequest {
+    /// Cooperative to dissolve
+    pub coop_id: String,
+    /// DID of the member initiating dissolution
+    pub initiator: Did,
+    /// Reason for dissolution
+    pub reason: String,
+    /// Asset distribution plan
+    pub asset_distribution: AssetDistributionPlan,
+}
+
+/// Plan for distributing assets during dissolution
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AssetDistributionPlan {
+    /// How to handle positive balances
+    pub positive_balance_action: BalanceAction,
+    /// How to handle negative balances (debts)
+    pub negative_balance_action: DebtAction,
+    /// Capital return method
+    pub capital_return: CapitalReturnMethod,
+    /// Target entity for remaining assets (e.g., federation treasury)
+    pub residual_recipient: Option<String>,
+}
+
+impl Default for AssetDistributionPlan {
+    fn default() -> Self {
+        Self {
+            positive_balance_action: BalanceAction::ReturnToMember,
+            negative_balance_action: DebtAction::WriteOff,
+            capital_return: CapitalReturnMethod::ProRata,
+            residual_recipient: None,
+        }
+    }
+}
+
+/// Action for positive balances during dissolution
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum BalanceAction {
+    /// Return balance to member
+    ReturnToMember,
+    /// Transfer to federation
+    TransferToFederation,
+    /// Donate to commons
+    DonateToCommons,
+}
+
+/// Action for debts (negative balances) during dissolution
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum DebtAction {
+    /// Write off all debts
+    WriteOff,
+    /// Require settlement before dissolution
+    RequireSettlement,
+    /// Transfer debt to federation
+    TransferToFederation,
+}
+
+/// Method for returning capital contributions
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum CapitalReturnMethod {
+    /// Return proportional to contribution
+    ProRata,
+    /// Equal distribution regardless of contribution
+    Equal,
+    /// No capital return (donated to residual recipient)
+    NoReturn,
+}
 
 /// Membership tier with associated rights and responsibilities
 ///
@@ -83,6 +251,40 @@ pub struct Cooperative {
     /// Bylaws and governing documents (CCL contract IDs or hashes)
     #[serde(default)]
     pub bylaws: Vec<String>,
+
+    // === Charter and governance fields (Issue #290) ===
+    /// Charter ID linking to icn-governance Charter
+    #[serde(default)]
+    pub charter_id: Option<CharterId>,
+
+    /// Founding signatures collected during formation
+    /// Uses StoredFounderSignature for bincode compatibility
+    #[serde(default)]
+    pub founding_signatures: Vec<StoredFounderSignature>,
+
+    /// Required number of founder signatures for activation
+    #[serde(default = "default_min_founders")]
+    pub min_founders: usize,
+
+    /// Whether all required founders have signed
+    #[serde(default)]
+    pub charter_ratified: bool,
+
+    /// Governance domain ID for proposals (e.g., "coop:my-coop")
+    #[serde(default)]
+    pub governance_domain: Option<String>,
+
+    /// Asset distribution plan (set during dissolution)
+    #[serde(default)]
+    pub dissolution_plan: Option<AssetDistributionPlan>,
+
+    /// Governance proposal ID that approved dissolution (if applicable)
+    #[serde(default)]
+    pub dissolution_proposal_id: Option<String>,
+}
+
+fn default_min_founders() -> usize {
+    3
 }
 
 fn default_min_members() -> usize {
@@ -210,6 +412,14 @@ impl Cooperative {
             tiers: Vec::new(),
             capital_pool: 0,
             bylaws: Vec::new(),
+            // Charter and governance fields
+            charter_id: None,
+            founding_signatures: Vec::new(),
+            min_founders: 3,
+            charter_ratified: false,
+            governance_domain: None,
+            dissolution_plan: None,
+            dissolution_proposal_id: None,
         }
     }
 
@@ -228,6 +438,7 @@ impl Cooperative {
         min_members: usize,
     ) -> Self {
         let now = Utc::now();
+        let governance_domain = Some(format!("coop:{id}"));
         Self {
             id,
             name,
@@ -242,7 +453,93 @@ impl Cooperative {
             tiers: Vec::new(),
             capital_pool: 0,
             bylaws: Vec::new(),
+            // Charter and governance fields
+            charter_id: None,
+            founding_signatures: Vec::new(),
+            min_founders: 3,
+            charter_ratified: false,
+            governance_domain,
+            dissolution_plan: None,
+            dissolution_proposal_id: None,
         }
+    }
+
+    /// Create a cooperative from a formation request
+    pub fn from_formation_request(request: &FormationRequest, id: String) -> Self {
+        let mut coop = Self::new_with_id(id.clone(), request.name.clone(), request.coop_type);
+        coop.min_members = request.min_members;
+        coop.min_founders = request.founding_members.len().max(3);
+        coop.governance_domain = Some(format!("coop:{id}"));
+        if let Some(hash) = &request.charter_document_hash {
+            coop.charter_hash = Some(hex::encode(hash));
+        }
+        coop
+    }
+
+    /// Add a founder signature from governance type
+    pub fn add_founder_signature(
+        &mut self,
+        signature: &icn_governance::charter::FounderSignature,
+    ) -> bool {
+        let did_str = signature.did.to_string();
+        // Check if this founder has already signed
+        if self.founding_signatures.iter().any(|s| s.did == did_str) {
+            return false;
+        }
+        self.founding_signatures
+            .push(StoredFounderSignature::from_governance(signature));
+        self.updated_at = Utc::now();
+
+        // Check if we have enough signatures to ratify
+        if self.founding_signatures.len() >= self.min_founders {
+            self.charter_ratified = true;
+        }
+        true
+    }
+
+    /// Add a founder signature from stored format
+    pub fn add_stored_signature(&mut self, signature: StoredFounderSignature) -> bool {
+        // Check if this founder has already signed
+        if self
+            .founding_signatures
+            .iter()
+            .any(|s| s.did == signature.did)
+        {
+            return false;
+        }
+        self.founding_signatures.push(signature);
+        self.updated_at = Utc::now();
+
+        // Check if we have enough signatures to ratify
+        if self.founding_signatures.len() >= self.min_founders {
+            self.charter_ratified = true;
+        }
+        true
+    }
+
+    /// Check if the charter has been ratified (all required founders have signed)
+    pub fn is_charter_ratified(&self) -> bool {
+        self.charter_ratified && self.founding_signatures.len() >= self.min_founders
+    }
+
+    /// Get the number of pending founder signatures
+    pub fn pending_signatures(&self) -> usize {
+        if self.founding_signatures.len() >= self.min_founders {
+            0
+        } else {
+            self.min_founders - self.founding_signatures.len()
+        }
+    }
+
+    /// Set dissolution plan
+    pub fn set_dissolution_plan(
+        &mut self,
+        plan: AssetDistributionPlan,
+        proposal_id: Option<String>,
+    ) {
+        self.dissolution_plan = Some(plan);
+        self.dissolution_proposal_id = proposal_id;
+        self.updated_at = Utc::now();
     }
 
     pub fn can_transition_to(&self, new_status: &CoopStatus) -> bool {
