@@ -2703,6 +2703,11 @@ impl GovernanceEventHandler {
             warn!("   Failed to record federation join audit entry: {}", e);
         }
 
+        // Mark idempotency key to prevent re-execution
+        if let Err(e) = self.audit_store.put(idem_key.as_bytes(), b"completed") {
+            warn!("   Failed to record idempotency marker: {}", e);
+        }
+
         icn_obs::metrics::governance::proposals_executed_inc("federation_join");
     }
 
@@ -2787,6 +2792,11 @@ impl GovernanceEventHandler {
             .as_bytes(),
         ) {
             warn!("   Failed to record federation leave audit entry: {}", e);
+        }
+
+        // Mark idempotency key to prevent re-execution
+        if let Err(e) = self.audit_store.put(idem_key.as_bytes(), b"completed") {
+            warn!("   Failed to record idempotency marker: {}", e);
         }
 
         icn_obs::metrics::governance::proposals_executed_inc("federation_leave");
@@ -2968,6 +2978,11 @@ impl GovernanceEventHandler {
                     warn!("   Failed to record clearing agreement audit entry: {}", e);
                 }
 
+                // Mark idempotency key to prevent re-execution
+                if let Err(e) = self.audit_store.put(idem_key.as_bytes(), b"completed") {
+                    warn!("   Failed to record idempotency marker: {}", e);
+                }
+
                 icn_obs::metrics::governance::proposals_executed_inc(
                     "federation_establish_clearing",
                 );
@@ -3082,6 +3097,12 @@ impl GovernanceEventHandler {
                     "   ✓ Clearing agreement '{}' terminated (settlement complete, audit recorded)",
                     agreement.agreement_id
                 );
+
+                // Mark idempotency key to prevent re-execution
+                if let Err(e) = self.audit_store.put(idem_key.as_bytes(), b"completed") {
+                    warn!("   Failed to record idempotency marker: {}", e);
+                }
+
                 icn_obs::metrics::governance::proposals_executed_inc(
                     "federation_terminate_clearing",
                 );
@@ -3285,6 +3306,11 @@ impl GovernanceEventHandler {
                     warn!("   Failed to record vouch audit entry: {}", e);
                 }
 
+                // Mark idempotency key to prevent re-execution
+                if let Err(e) = self.audit_store.put(idem_key.as_bytes(), b"completed") {
+                    warn!("   Failed to record idempotency marker: {}", e);
+                }
+
                 icn_obs::metrics::governance::proposals_executed_inc("federation_vouch");
             }
             Err(e) => {
@@ -3376,6 +3402,19 @@ impl GovernanceEventHandler {
             }
             Err(e) => {
                 error!("   Failed to lookup target in registry: {}", e);
+                let failed_op = FailedOperation::new(
+                    format!("federation:revoke:registry:{}", proposal_id.0),
+                    FailureType::FederationOperationFailed,
+                    serde_json::json!({
+                        "proposal_id": proposal_id.0,
+                        "error": "registry_lookup_failed",
+                        "target_coop_id": target_coop_id,
+                    }),
+                    format!("Registry lookup failed for '{target_coop_id}': {e}"),
+                );
+                if let Err(dlq_err) = self.dlq.enqueue(failed_op) {
+                    error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                }
                 icn_obs::metrics::governance::execution_failures_inc("federation_revoke_vouch");
                 return;
             }
@@ -3416,6 +3455,11 @@ impl GovernanceEventHandler {
             .as_bytes(),
         ) {
             warn!("   Failed to record vouch revocation audit entry: {}", e);
+        }
+
+        // Mark idempotency key to prevent re-execution
+        if let Err(e) = self.audit_store.put(idem_key.as_bytes(), b"completed") {
+            warn!("   Failed to record idempotency marker: {}", e);
         }
 
         icn_obs::metrics::governance::proposals_executed_inc("federation_revoke_vouch");
@@ -3505,6 +3549,11 @@ impl GovernanceEventHandler {
             .as_bytes(),
         ) {
             warn!("   Failed to record policy update audit entry: {}", e);
+        }
+
+        // Mark idempotency key to prevent re-execution
+        if let Err(e) = self.audit_store.put(idem_key.as_bytes(), b"completed") {
+            warn!("   Failed to record idempotency marker: {}", e);
         }
 
         info!("   ✓ Federation policy update recorded: {:?}", changes);
