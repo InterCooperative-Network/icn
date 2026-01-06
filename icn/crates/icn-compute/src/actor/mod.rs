@@ -30,6 +30,7 @@ use crate::checkpoint_store::CheckpointStore;
 use crate::error::ComputeError;
 use crate::executor::LocalExecutor;
 use crate::migration_manager::ActorMigrationManager;
+use crate::result_quorum::{ResultQuorumManager, VerificationConfig};
 use crate::task::TaskManager;
 use crate::types::{ComputeMessage, TaskHash};
 
@@ -78,6 +79,8 @@ pub struct ComputeActor {
     own_region: Option<String>,
     /// Contract registry handle for CclRef resolution
     contract_registry: Option<icn_ccl::ContractRegistryHandle>,
+    /// Result quorum manager for multi-executor verification (Issue #511)
+    quorum_manager: ResultQuorumManager,
 }
 
 impl ComputeActor {
@@ -105,6 +108,7 @@ impl ComputeActor {
             locality_callback: None,    // Phase 16C M5: Set via set_locality_callback()
             own_region: None,           // Set via set_region() or from config
             contract_registry: None,    // Set via set_contract_registry()
+            quorum_manager: ResultQuorumManager::new(VerificationConfig::default()),
         }
     }
 
@@ -194,6 +198,21 @@ impl ComputeActor {
     /// Set maximum concurrent tasks this executor will claim
     pub fn set_max_concurrent_tasks(&mut self, max: usize) {
         self.max_concurrent_tasks = max;
+    }
+
+    /// Set verification configuration for result quorum
+    ///
+    /// This configures thresholds for multi-executor verification:
+    /// - Tasks below `low_value_threshold` use single executor
+    /// - Tasks above `medium_value_threshold` require 3+ executors
+    /// - Critical tasks above `high_value_threshold` require 5 executors
+    pub fn set_verification_config(&mut self, config: VerificationConfig) {
+        self.quorum_manager = ResultQuorumManager::new(config);
+    }
+
+    /// Get a reference to the quorum manager for result verification
+    pub fn quorum_manager(&self) -> &ResultQuorumManager {
+        &self.quorum_manager
     }
 
     /// Check if we're at capacity for claiming new tasks
