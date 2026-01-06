@@ -559,6 +559,24 @@ pub fn init_descriptions() {
         "Trust score distribution by graph type"
     );
 
+    // Trust propagation metrics (Issue #498)
+    describe_histogram!(
+        "icn_trust_propagation_local_seconds",
+        "Time from trust attestation creation to gossip publish (local node)"
+    );
+    describe_histogram!(
+        "icn_trust_propagation_remote_seconds",
+        "Time from gossip receive to trust graph update (remote attestation)"
+    );
+    describe_gauge!(
+        "icn_trust_sync_lag_seconds",
+        "Trust sync lag based on attestation timestamp vs receive time"
+    );
+    describe_gauge!(
+        "icn_trust_updates_pending",
+        "Number of trust updates pending processing"
+    );
+
     // Contract metrics
     describe_gauge!(
         "icn_contract_installed_total",
@@ -674,6 +692,44 @@ pub fn init_descriptions() {
     // System metrics
     describe_gauge!("icn_system_uptime_seconds", "System uptime in seconds");
     describe_gauge!("icn_system_actors_active", "Number of active actors");
+
+    // Supervisor metrics (Issue #493)
+    describe_counter!(
+        "icn_supervisor_errors_total",
+        "Total supervisor errors by operation type"
+    );
+    describe_counter!(
+        "icn_supervisor_startup_phases_total",
+        "Startup phase completions by phase name"
+    );
+    describe_gauge!(
+        "icn_supervisor_state",
+        "Supervisor state: 0=stopped, 1=starting, 2=running, 3=stopping"
+    );
+    describe_counter!(
+        "icn_supervisor_actors_spawned_total",
+        "Total actors spawned by actor type"
+    );
+    describe_counter!(
+        "icn_supervisor_actor_spawn_failures_total",
+        "Actor spawn failures by actor type"
+    );
+    describe_counter!(
+        "icn_supervisor_actor_restarts_total",
+        "Actor restart count by actor type"
+    );
+    describe_gauge!(
+        "icn_supervisor_actor_restart_backoff_seconds",
+        "Current restart backoff delay by actor"
+    );
+    describe_counter!(
+        "icn_supervisor_actor_restart_limit_exceeded_total",
+        "Times an actor exceeded max restart attempts"
+    );
+    describe_gauge!(
+        "icn_supervisor_actor_active",
+        "Whether actor is currently active (1=active, 0=inactive)"
+    );
 
     // Core infrastructure metrics (dead-letter queue)
     describe_counter!(
@@ -1674,6 +1730,20 @@ pub fn init_descriptions() {
         "icn_ledger_dynamic_limit_recalculations_total",
         "Total times a limit was recalculated due to trust changes"
     );
+
+    // Causal ordering metrics (Issue #499)
+    describe_counter!(
+        "icn_ledger_orphan_entries_total",
+        "Total entries accepted without all parent entries present"
+    );
+    describe_counter!(
+        "icn_ledger_missing_parents_total",
+        "Total missing parent entries encountered"
+    );
+    describe_counter!(
+        "icn_ledger_entries_rejected_missing_parents_total",
+        "Total local entries rejected due to missing parents"
+    );
 }
 
 /// Network metrics
@@ -2229,6 +2299,21 @@ pub mod ledger {
     pub fn dynamic_limit_recalculations_inc() {
         counter!("icn_ledger_dynamic_limit_recalculations_total").increment(1);
     }
+
+    /// Issue #499: Increment counter when an entry is accepted without all parents present
+    pub fn orphan_entries_inc() {
+        counter!("icn_ledger_orphan_entries_total").increment(1);
+    }
+
+    /// Issue #499: Increment counter for each missing parent entry encountered
+    pub fn missing_parents_add(count: u64) {
+        counter!("icn_ledger_missing_parents_total").increment(count);
+    }
+
+    /// Issue #499: Increment counter when a local entry is rejected due to missing parents
+    pub fn entries_rejected_missing_parents_inc() {
+        counter!("icn_ledger_entries_rejected_missing_parents_total").increment(1);
+    }
 }
 
 /// Governance execution metrics
@@ -2463,6 +2548,30 @@ pub mod trust {
     /// Issue #181: Increment trust computation errors counter
     pub fn computation_errors_inc() {
         counter!("icn_trust_computation_errors_total").increment(1);
+    }
+
+    // ========================================
+    // Propagation metrics (Issue #498)
+    // ========================================
+
+    /// Record time from attestation creation to gossip publish (local node)
+    pub fn propagation_local_record(duration_secs: f64) {
+        histogram!("icn_trust_propagation_local_seconds").record(duration_secs);
+    }
+
+    /// Record time from gossip receive to trust graph update (remote attestation)
+    pub fn propagation_remote_record(duration_secs: f64) {
+        histogram!("icn_trust_propagation_remote_seconds").record(duration_secs);
+    }
+
+    /// Set the trust sync lag based on attestation timestamp vs receive time
+    pub fn sync_lag_set(lag_secs: f64) {
+        gauge!("icn_trust_sync_lag_seconds").set(lag_secs);
+    }
+
+    /// Set the number of pending trust updates
+    pub fn updates_pending_set(count: u64) {
+        gauge!("icn_trust_updates_pending").set(count as f64);
     }
 }
 
@@ -3806,6 +3915,15 @@ pub mod supervisor {
             "actor" => actor.to_string()
         )
         .increment(1);
+    }
+
+    /// Issue #493: Set actor active state (1=active, 0=inactive)
+    pub fn actor_active_set(actor: &str, active: bool) {
+        gauge!(
+            "icn_supervisor_actor_active",
+            "actor" => actor.to_string()
+        )
+        .set(if active { 1.0 } else { 0.0 });
     }
 }
 

@@ -1045,6 +1045,49 @@ impl Ledger {
         // Validate entry invariants (double-entry, frozen members, credit limits)
         self.validate_entry(&entry)?;
 
+        // Issue #499: Validate parent entries exist (hybrid causal ordering)
+        // For local operations (broadcast=true): reject if parents are missing
+        // For sync operations (broadcast=false): accept but track as orphan
+        if !entry.parents.is_empty() {
+            let missing_parents: Vec<_> = entry
+                .parents
+                .iter()
+                .filter(|parent_hash| {
+                    self.get_entry(parent_hash)
+                        .map(|opt| opt.is_none())
+                        .unwrap_or(true)
+                })
+                .collect();
+
+            if !missing_parents.is_empty() {
+                let missing_count = missing_parents.len();
+                icn_obs::metrics::ledger::missing_parents_add(missing_count as u64);
+
+                if broadcast {
+                    // Local operation: reject entry with missing parents
+                    icn_obs::metrics::ledger::entries_rejected_missing_parents_inc();
+                    warn!(
+                        entry_hash = %hash,
+                        missing_count = missing_count,
+                        missing_parents = ?missing_parents.iter().map(|h| h.to_hex()).collect::<Vec<_>>(),
+                        "Rejecting local entry with missing parent entries"
+                    );
+                    anyhow::bail!(
+                        "Entry {hash} references {missing_count} missing parent entries; ensure parents are committed first"
+                    );
+                } else {
+                    // Sync operation: accept but track as orphan
+                    icn_obs::metrics::ledger::orphan_entries_inc();
+                    debug!(
+                        entry_hash = %hash,
+                        missing_count = missing_count,
+                        "Accepting orphan entry from sync (missing {} parents)",
+                        missing_count
+                    );
+                }
+            }
+        }
+
         // Serialize and store
         let key = format!("{}{}", JOURNAL_PREFIX, hash.to_hex());
         let value = serde_json::to_vec(&entry)?;
@@ -2903,12 +2946,15 @@ impl Ledger {
 
     /// Validate a journal entry before accepting it
     ///
-    /// This is a simplified validation. A real implementation would:
-    /// - Verify signatures
-    /// - Check double-entry invariants (Σ debits == Σ credits per currency)
-    /// - Enforce credit limits
-    /// - Validate parent links in Merkle-DAG
-    /// - Check for frozen members (Issue #25)
+    /// This validates:
+    /// - Entry has at least one account delta
+    /// - Author and affected accounts are not frozen (Issue #25)
+    /// - Double-entry invariants (Σ debits == Σ credits per currency)
+    /// - Credit limits are respected
+    ///
+    /// Note: Parent validation (Merkle-DAG links) is done separately in
+    /// `append_entry_internal` with different behavior for local vs sync operations
+    /// (Issue #499: hybrid causal ordering).
     fn validate_entry(&mut self, entry: &JournalEntry) -> Result<()> {
         // Check that entry has at least one account delta
         if entry.accounts.is_empty() {
@@ -4058,5 +4104,117 @@ mod tests {
                 "Entries should be in descending timestamp order"
             );
         }
+    }
+
+    // Issue #499: Causal ordering tests
+
+    #[tokio::test]
+    async fn test_local_entry_with_missing_parent_rejected() {
+        let (mut ledger, _temp) = create_test_ledger();
+
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        // Create an entry that references a non-existent parent
+        let fake_parent = ContentHash::from_bytes([0xDE; 32]);
+
+        let entry = JournalEntryBuilder::new(alice.clone())
+            .debit(alice.clone(), "hours".to_string(), 10)
+            .credit(bob.clone(), "hours".to_string(), 10)
+            .add_parent(fake_parent)
+            .build()
+            .unwrap();
+
+        // Local append should fail due to missing parent
+        let result = ledger.append_entry(entry).await;
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("missing parent"),
+            "Error should mention missing parent: {err_msg}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_sync_entry_with_missing_parent_accepted_as_orphan() {
+        let (mut ledger, _temp) = create_test_ledger();
+
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        // Create an entry that references a non-existent parent
+        let fake_parent = ContentHash::from_bytes([0xDE; 32]);
+
+        let entry = JournalEntryBuilder::new(alice.clone())
+            .debit(alice.clone(), "hours".to_string(), 10)
+            .credit(bob.clone(), "hours".to_string(), 10)
+            .add_parent(fake_parent)
+            .build()
+            .unwrap();
+
+        let hash = entry.id.clone().unwrap();
+
+        // Sync append should succeed (orphan tracking)
+        let result = ledger.append_entry_from_sync(entry).await;
+        assert!(result.is_ok(), "Sync entry should be accepted: {result:?}");
+
+        // Verify entry was stored
+        let stored = ledger.get_entry(&hash).unwrap();
+        assert!(stored.is_some(), "Entry should be stored as orphan");
+    }
+
+    #[tokio::test]
+    async fn test_entry_with_valid_parent_accepted() {
+        let (mut ledger, _temp) = create_test_ledger();
+
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        // Create first entry (no parent)
+        let entry1 = JournalEntryBuilder::new(alice.clone())
+            .debit(alice.clone(), "hours".to_string(), 10)
+            .credit(bob.clone(), "hours".to_string(), 10)
+            .build()
+            .unwrap();
+        let hash1 = entry1.id.clone().unwrap();
+        ledger.append_entry(entry1).await.unwrap();
+
+        // Create second entry referencing the first as parent
+        let entry2 = JournalEntryBuilder::new(alice.clone())
+            .debit(alice.clone(), "hours".to_string(), 5)
+            .credit(bob.clone(), "hours".to_string(), 5)
+            .add_parent(hash1.clone())
+            .build()
+            .unwrap();
+        let hash2 = entry2.id.clone().unwrap();
+
+        // Local append should succeed since parent exists
+        let result = ledger.append_entry(entry2).await;
+        assert!(result.is_ok(), "Entry with valid parent should be accepted");
+
+        // Verify both entries exist
+        assert!(ledger.get_entry(&hash1).unwrap().is_some());
+        assert!(ledger.get_entry(&hash2).unwrap().is_some());
+    }
+
+    #[tokio::test]
+    async fn test_entry_without_parents_accepted() {
+        let (mut ledger, _temp) = create_test_ledger();
+
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        // Entry with no parents (genesis-style) should be accepted
+        let entry = JournalEntryBuilder::new(alice.clone())
+            .debit(alice.clone(), "hours".to_string(), 10)
+            .credit(bob.clone(), "hours".to_string(), 10)
+            .build()
+            .unwrap();
+
+        let result = ledger.append_entry(entry).await;
+        assert!(
+            result.is_ok(),
+            "Entry without parents should be accepted: {result:?}"
+        );
     }
 }

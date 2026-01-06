@@ -326,6 +326,7 @@ impl Supervisor {
             )
             .await?;
             icn_obs::metrics::supervisor::actor_spawned_inc("gossip");
+            icn_obs::metrics::supervisor::actor_active_set("gossip", true);
             let gossip_handle = gossip_services.gossip_handle.clone();
             let gossip_store = gossip_services.gossip_store.clone(); // Used for encryption sequence tracking
             let loaded_snapshot = gossip_services.loaded_snapshot;
@@ -342,6 +343,7 @@ impl Supervisor {
             )
             .await?;
             icn_obs::metrics::supervisor::actor_spawned_inc("ledger");
+            icn_obs::metrics::supervisor::actor_active_set("ledger", true);
             let ledger_handle = ledger_services.ledger_handle.clone();
             let dispute_manager_handle = ledger_services.dispute_manager.clone();
             let treasury_manager_handle = ledger_services.treasury_manager.clone();
@@ -353,6 +355,7 @@ impl Supervisor {
                 init_coop::init_coop_services(&self.config, gossip_handle.clone(), did.clone())
                     .await?;
             icn_obs::metrics::supervisor::actor_spawned_inc("coop");
+            icn_obs::metrics::supervisor::actor_active_set("coop", true);
             let coop_handle = coop_services.coop_handle.clone();
             let coop_store = coop_services.coop_store.clone(); // Used for gossip sync
 
@@ -483,6 +486,7 @@ impl Supervisor {
             *network_handle_for_handler.write().await = Some(network_handle.clone());
 
             icn_obs::metrics::supervisor::actor_spawned_inc("network");
+            icn_obs::metrics::supervisor::actor_active_set("network", true);
             info!("Network actor spawned on {}", listen_addr);
 
             // Restore network state from snapshot if available (re-use snapshot loaded earlier)
@@ -1336,6 +1340,7 @@ impl Supervisor {
             });
 
             icn_obs::metrics::supervisor::actor_spawned_inc("rpc_server");
+            icn_obs::metrics::supervisor::actor_active_set("rpc_server", true);
             info!("RPC server spawned on {}", rpc_addr);
 
             // Spawn anti-entropy task
@@ -1578,6 +1583,7 @@ impl Supervisor {
                 });
 
                 icn_obs::metrics::supervisor::actor_spawned_inc("gateway");
+                icn_obs::metrics::supervisor::actor_active_set("gateway", true);
                 info!("Gateway API spawned on {}", gateway_addr);
             }
         } else {
