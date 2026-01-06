@@ -37,6 +37,7 @@ fn create_test_task(id: u8) -> ComputeTask {
         resource_profile: Some(ResourceProfile::minimal()),
         actor_mode: None,
         placement_constraints: None,
+        federation_constraints: None,
         estimated_value: None,
         verification: None,
     }

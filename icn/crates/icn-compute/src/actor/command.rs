@@ -21,7 +21,7 @@ pub(crate) enum ComputeCommand {
         reason: String,
         resp: tokio::sync::oneshot::Sender<Result<(), ComputeError>>,
     },
-    GossipMessage(ComputeMessage),
+    GossipMessage(Box<ComputeMessage>),
     // Policy management commands (Phase 16E)
     SetPolicy {
         policy: CoopSchedulingPolicy,

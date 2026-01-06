@@ -23,11 +23,15 @@ impl ComputeActor {
 
         let info = ExecutorInfo {
             did: did.clone(),
+            cooperative_id: None, // Local executor
+            is_federated: false,  // Not from federation
             capabilities,
             trust_score,
+            federated_trust_score: None, // N/A for local executors
             last_seen: now,
             tasks_executing: 0,
             capacity: None,
+            gateway_endpoint: None, // N/A for local executors
         };
 
         let mut registry = self.executor_registry.lock().await;
@@ -238,6 +242,57 @@ impl ComputeActor {
                                 );
                                 icn_obs::metrics::compute::placement_constraints_enforced_inc(
                                     "capability",
+                                );
+                                drop(registry);
+                                drop(mgr);
+                                return Ok(());
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Phase 21: Check federation placement constraints
+            if let Some(ref fed_constraints) = task.federation_constraints {
+                // Determine if we're a federated executor (from another cooperative)
+                let is_local = self.own_cooperative_id.is_none()
+                    || task.coop_id.as_ref() == self.own_cooperative_id.as_ref();
+
+                // Check federation policy
+                if !fed_constraints.allows_cooperative(self.own_cooperative_id.as_deref(), is_local)
+                {
+                    tracing::info!(
+                        task_hash = %task_hash_str,
+                        executor = %self.own_did,
+                        our_coop = ?self.own_cooperative_id,
+                        task_coop = ?task.coop_id,
+                        policy = ?fed_constraints.federation_policy,
+                        "Federation policy rejects this executor, skipping placement"
+                    );
+                    icn_obs::metrics::compute::placement_constraints_enforced_inc(
+                        "federation_policy",
+                    );
+                    drop(mgr);
+                    return Ok(());
+                }
+
+                // Check federated trust threshold if we're a federated executor
+                if !is_local {
+                    let min_trust = fed_constraints.effective_min_trust();
+                    // Look up our federated trust score from registry
+                    let registry = self.executor_registry.lock().await;
+                    if let Some(info) = registry.get(&self.own_did) {
+                        if let Some(fed_trust) = info.federated_trust_score {
+                            if fed_trust < min_trust {
+                                tracing::info!(
+                                    task_hash = %task_hash_str,
+                                    executor = %self.own_did,
+                                    federated_trust = fed_trust,
+                                    min_required = min_trust,
+                                    "Federated trust below threshold, skipping placement"
+                                );
+                                icn_obs::metrics::compute::placement_constraints_enforced_inc(
+                                    "federation_trust",
                                 );
                                 drop(registry);
                                 drop(mgr);
@@ -601,11 +656,15 @@ impl ComputeActor {
             let trust_score = (self.trust_callback)(&executor);
             let info = ExecutorInfo {
                 did: executor.clone(),
+                cooperative_id: None,     // Local executor
+                is_federated: false,      // Not from federation
                 capabilities: Vec::new(), // Will be populated on ExecutorAvailable message
                 trust_score,
+                federated_trust_score: None, // N/A for local executors
                 last_seen: capacity.updated_at,
                 tasks_executing: 0,
                 capacity: Some(capacity.clone()),
+                gateway_endpoint: None, // N/A for local executors
             };
             registry.insert(executor.clone(), info);
             tracing::debug!(
@@ -616,6 +675,193 @@ impl ComputeActor {
 
         // Update metrics for executor capacity
         icn_obs::metrics::compute::executors_available_set(registry.len() as f64);
+
+        Ok(())
+    }
+
+    /// Handle federated executor announcement (Phase 21)
+    ///
+    /// Called when a federated cooperative announces available executors.
+    /// These executors are registered with attenuated trust scores.
+    pub(super) async fn on_federated_executor_announce(
+        &self,
+        executor: String,
+        cooperative_id: String,
+        capabilities: Vec<ExecutorCapability>,
+        attestation: crate::federation::FederatedExecutorAttestation,
+    ) -> Result<(), ComputeError> {
+        let local_trust = attestation.trust_attestation.trust_score;
+
+        tracing::info!(
+            executor = %executor,
+            cooperative_id = %cooperative_id,
+            capabilities = ?capabilities,
+            attested_trust = local_trust,
+            "Received federated executor announcement"
+        );
+
+        // Calculate attenuated trust score
+        // Get our trust in the announcing cooperative
+        let coop_trust = (self.trust_callback)(&cooperative_id);
+        let federated_trust = crate::federation::FederatedExecutorRegistry::attenuate_trust_static(
+            local_trust,
+            coop_trust,
+        );
+
+        let now = icn_time::current_timestamp_millis();
+
+        let info = ExecutorInfo {
+            did: executor.clone(),
+            cooperative_id: Some(cooperative_id.clone()),
+            is_federated: true,
+            capabilities,
+            trust_score: local_trust, // Original trust from source coop
+            federated_trust_score: Some(federated_trust),
+            last_seen: now,
+            tasks_executing: 0,
+            capacity: None, // Will be updated via capacity announcements
+            gateway_endpoint: attestation.gateway_endpoint.clone(),
+        };
+
+        // Register in local executor registry
+        let mut registry = self.executor_registry.lock().await;
+        registry.insert(executor.clone(), info);
+        icn_obs::metrics::compute::executors_available_set(registry.len() as f64);
+
+        tracing::debug!(
+            executor = %executor,
+            cooperative_id = %cooperative_id,
+            federated_trust = federated_trust,
+            "Registered federated executor"
+        );
+
+        Ok(())
+    }
+
+    /// Handle federated task request (Phase 21)
+    ///
+    /// Called when another cooperative requests task execution on our executors.
+    /// Validates payment terms and routes to local placement.
+    pub(super) async fn on_federated_task_request(
+        &self,
+        task_hash: TaskHash,
+        task: crate::types::ComputeTask,
+        from_coop: String,
+        to_coop: String,
+        payment: crate::federation::FederatedPaymentTerms,
+        requested_at: u64,
+    ) -> Result<(), ComputeError> {
+        let task_hash_str = hex::encode(task_hash);
+
+        tracing::info!(
+            task_hash = %task_hash_str,
+            from_coop = %from_coop,
+            to_coop = %to_coop,
+            amount = payment.amount,
+            "Received federated task request"
+        );
+
+        // Verify this request is intended for our cooperative
+        if let Some(ref our_coop) = self.own_cooperative_id {
+            if our_coop != &to_coop {
+                tracing::warn!(
+                    task_hash = %task_hash_str,
+                    our_coop = %our_coop,
+                    to_coop = %to_coop,
+                    "Federated task request not intended for our cooperative"
+                );
+                return Ok(());
+            }
+        } else {
+            tracing::warn!(
+                task_hash = %task_hash_str,
+                "No cooperative ID configured, cannot process federated task"
+            );
+            return Ok(());
+        }
+
+        // Verify payment terms are acceptable
+        // TODO: Integrate with ClearingManager for payment verification
+        if payment.amount == 0 {
+            tracing::warn!(
+                task_hash = %task_hash_str,
+                "Zero payment offered for federated task"
+            );
+            // Continue anyway for now - payment enforcement is future work
+        }
+
+        // Store task in task manager with federated metadata
+        {
+            let mut mgr = self.task_manager.lock().await;
+            if let Err(e) = mgr.submit(task.clone()) {
+                tracing::warn!(
+                    task_hash = %task_hash_str,
+                    error = %e,
+                    "Failed to submit federated task to task manager"
+                );
+                return Err(e);
+            }
+        }
+
+        // Emit local placement request
+        // This will be handled by our local executors
+        if let Some(ref cb) = self.send_callback {
+            cb(ComputeMessage::PlacementRequest {
+                task_hash,
+                submitter: from_coop.clone(),
+                resource_profile: task.resource_profile.unwrap_or_default(),
+                locality_hints: vec![],
+                max_cost: Some(payment.amount),
+                requested_at,
+            });
+        }
+
+        tracing::debug!(
+            task_hash = %task_hash_str,
+            from_coop = %from_coop,
+            "Initiated local placement for federated task"
+        );
+
+        Ok(())
+    }
+
+    /// Handle federated task result (Phase 21)
+    ///
+    /// Called when a federated executor reports task completion.
+    /// Routes the result back to the original submitter and triggers payment settlement.
+    pub(super) async fn on_federated_task_result(
+        &self,
+        result: crate::types::ComputeResult,
+        executor_coop: String,
+        attestation_hash: [u8; 32],
+    ) -> Result<(), ComputeError> {
+        let task_hash_str = hex::encode(result.task_hash);
+        let success = matches!(result.outcome, crate::types::ExecutionOutcome::Success(_));
+
+        tracing::info!(
+            task_hash = %task_hash_str,
+            executor = %result.executor,
+            executor_coop = %executor_coop,
+            success = success,
+            attestation_hash = %hex::encode(attestation_hash),
+            "Received federated task result"
+        );
+
+        // Process the result through normal channels
+        // The attestation_hash can be used to verify the result came from a trusted source
+        self.on_task_result(result.clone()).await?;
+
+        // TODO: Trigger payment settlement via ClearingManager
+        // This would involve:
+        // 1. Verify attestation_hash matches expected value
+        // 2. Look up payment terms from original FederatedTaskRequest
+        // 3. Call ClearingManager::propose_transfer()
+
+        tracing::debug!(
+            task_hash = %task_hash_str,
+            executor_coop = %executor_coop,
+            "Processed federated task result"
+        );
 
         Ok(())
     }

@@ -71,7 +71,7 @@ impl ComputeHandle {
     /// Handle incoming gossip message
     pub async fn handle_gossip(&self, msg: ComputeMessage) -> Result<(), ComputeError> {
         self.tx
-            .send(ComputeCommand::GossipMessage(msg))
+            .send(ComputeCommand::GossipMessage(Box::new(msg)))
             .await
             .map_err(|_| ComputeError::Internal("actor closed".into()))
     }

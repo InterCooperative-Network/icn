@@ -37,6 +37,7 @@ fn make_task(id: &str, submitter: &str) -> ComputeTask {
         resource_profile: None,
         actor_mode: None,
         placement_constraints: None,
+        federation_constraints: None,
         estimated_value: None,
         verification: None,
     }

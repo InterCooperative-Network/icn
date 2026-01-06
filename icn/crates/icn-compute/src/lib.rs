@@ -32,6 +32,7 @@ mod checkpoint_store;
 mod dispute;
 mod error;
 mod executor;
+mod federation;
 mod migration_manager;
 mod migration_policy;
 mod policy;
@@ -63,6 +64,10 @@ pub use dispute::{
 };
 pub use error::ComputeError;
 pub use executor::{ContractResolverCallback, ExecutionContext, Executor, LocalExecutor};
+pub use federation::{
+    FederatedExecutorAttestation, FederatedExecutorInfo, FederatedExecutorRegistry,
+    FederatedPaymentTerms, PaymentTrigger,
+};
 pub use migration_manager::{ActorMigrationManager, MigrationSender};
 pub use migration_policy::{
     DefaultMigrationPolicy, ExecutorInfo, LocalityFirstPolicy, MigrationPolicy, NetworkState,
@@ -77,8 +82,9 @@ pub use result_quorum::{
     MAX_CONCURRENT_VERIFICATIONS,
 };
 pub use scheduler::{
-    DefaultPlacementPolicy, GpuDevice, GpuSpec, LocalityContext, LocalityHint, NodeCapacity,
-    NodeState, PlacementOffer, PlacementPolicy, PlacementRequest, ResourceProfile,
+    DefaultPlacementPolicy, FederatedPlacementConstraints, FederationPolicy, GpuDevice, GpuSpec,
+    LocalityContext, LocalityHint, NodeCapacity, NodeState, PlacementOffer, PlacementPolicy,
+    PlacementRequest, ResourceProfile,
 };
 pub use task::{TaskManager, TaskStatus};
 pub use types::{
