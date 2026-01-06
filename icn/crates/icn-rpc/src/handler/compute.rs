@@ -129,6 +129,8 @@ pub async fn handle_compute_submit(
         resource_profile,            // From request
         actor_mode: None,            // Not actor mode (Phase 16D)
         placement_constraints: None, // No constraints from RPC (Phase 16E will set from policy)
+        estimated_value: None,       // Issue #478: Computed from task value or set by client
+        verification: None,          // Issue #478: Auto-determined from estimated_value
     };
 
     match compute_handle.submit(task).await {

@@ -421,6 +421,8 @@ mod tests {
             resource_profile: None,
             actor_mode: None,
             placement_constraints: None,
+            estimated_value: None,
+            verification: None,
         }
     }
 
@@ -505,6 +507,8 @@ mod tests {
             resource_profile: None,
             actor_mode: None,
             placement_constraints: None,
+            estimated_value: None,
+            verification: None,
         };
 
         assert!(!executor.can_execute(&wasm_task));
@@ -529,6 +533,8 @@ mod tests {
             resource_profile: None,
             actor_mode: None,
             placement_constraints: None,
+            estimated_value: None,
+            verification: None,
         };
 
         let result = executor.execute_task(&task, "did:icn:bob", &test_signing_key());
