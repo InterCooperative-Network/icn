@@ -534,8 +534,12 @@ impl ComputeActor {
                         });
                     }
                 } else {
-                    // Multi-executor: broadcast claims for all selected executors
-                    // Each executor will execute independently and submit results
+                    // Multi-executor verification mode (Issue #511):
+                    // - All selected executors receive TaskClaimed and execute independently
+                    // - Results are collected by ResultQuorumManager for consensus verification
+                    // - Only the first executor is recorded in TaskManager as the "primary"
+                    //   for tracking purposes; all executors' results are equally valid
+                    // - TaskManager.claim() doesn't affect execution - it's just bookkeeping
                     if let Some(cb) = send_callback {
                         for selected in &selected_executors {
                             cb(ComputeMessage::TaskClaimed {
@@ -545,18 +549,20 @@ impl ComputeActor {
                         }
                     }
 
-                    // Also claim in local task manager (record first executor as primary)
-                    let mut mgr = task_manager.lock().await;
-                    if let Err(e) =
-                        mgr.claim(&task_hash_copy, selected_executors[0].executor.clone())
-                    {
-                        tracing::warn!(
-                            task_hash = %hex::encode(task_hash_copy),
-                            error = %e,
-                            "Failed to claim task with primary executor"
-                        );
+                    // Record first executor as "primary" in TaskManager for tracking.
+                    // Note: This is purely for bookkeeping - all executors execute and
+                    // their results are verified by the quorum manager regardless.
+                    if let Some(primary) = selected_executors.first() {
+                        let mut mgr = task_manager.lock().await;
+                        if let Err(e) = mgr.claim(&task_hash_copy, primary.executor.clone()) {
+                            tracing::warn!(
+                                task_hash = %hex::encode(task_hash_copy),
+                                error = %e,
+                                "Failed to claim task with primary executor"
+                            );
+                        }
+                        drop(mgr);
                     }
-                    drop(mgr);
                 }
             });
         }

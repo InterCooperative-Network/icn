@@ -134,6 +134,10 @@ impl ComputeActor {
                         result_hash = %hex::encode(result_hash),
                         "Multi-executor task: consensus reached"
                     );
+
+                    // Record quorum metrics
+                    icn_obs::metrics::compute::quorum_consensus_inc("multi_executor");
+
                     // Get canonical result and proceed to completion
                     if let Ok(Some(canonical)) =
                         self.quorum_manager.get_canonical_result(&result.task_hash)
@@ -152,6 +156,12 @@ impl ComputeActor {
                         result_groups = result_groups,
                         total = total,
                         "Multi-executor task: results diverge, escalating to dispute"
+                    );
+
+                    // Record quorum metrics
+                    icn_obs::metrics::compute::quorum_divergent_inc(
+                        "multi_executor",
+                        result_groups,
                     );
 
                     // Get executor groups for dispute evidence
@@ -179,6 +189,14 @@ impl ComputeActor {
                         required = required,
                         "Multi-executor task: collection timed out"
                     );
+
+                    // Record quorum metrics
+                    icn_obs::metrics::compute::quorum_timeout_inc(
+                        "multi_executor",
+                        received,
+                        required,
+                    );
+
                     // Proceed with available results if any (before cleanup)
                     let canonical = self.quorum_manager.get_canonical_result(&result.task_hash);
 
@@ -541,6 +559,23 @@ impl ComputeActor {
                 }
             }
         }
+
+        // Clean up pending placement state (Issue #511 - prevent memory leak)
+        {
+            let mut requirements = self.pending_executor_requirements.lock().await;
+            requirements.remove(&task_hash);
+        }
+        {
+            let mut offers = self.pending_offers.lock().await;
+            offers.remove(&task_hash);
+        }
+        {
+            let mut timestamps = self.pending_request_timestamps.lock().await;
+            timestamps.remove(&task_hash);
+        }
+
+        // Clean up quorum tracking if task was registered
+        let _ = self.quorum_manager.remove_task(&task_hash);
 
         tracing::info!(
             task_hash = %task_hash_str,
