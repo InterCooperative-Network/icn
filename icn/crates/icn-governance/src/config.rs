@@ -347,7 +347,7 @@ impl EmergencyThresholds {
 }
 
 /// Quorum and approval thresholds for a specific proposal
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProposalThresholds {
     /// Minimum percentage of eligible voters that must vote (0-100)
     pub quorum_percentage: u8,

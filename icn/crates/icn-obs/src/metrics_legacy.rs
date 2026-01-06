@@ -481,6 +481,24 @@ pub fn init_descriptions() {
         "Total number of duplicate executions prevented by idempotency check"
     );
 
+    // Issue #477: Low-turnout monitoring metrics
+    describe_counter!(
+        "icn_governance_quorum_not_met_total",
+        "Total number of proposals that failed to meet quorum requirements by proposal type"
+    );
+    describe_counter!(
+        "icn_governance_emergency_quorum_not_met_total",
+        "Total number of emergency proposals that failed to meet quorum requirements by emergency type"
+    );
+    describe_histogram!(
+        "icn_governance_participation_percentage",
+        "Histogram of participation percentages (votes cast / eligible voters * 100) by proposal type"
+    );
+    describe_histogram!(
+        "icn_governance_quorum_margin_percentage",
+        "Histogram of quorum margins (actual participation - required quorum) by proposal type"
+    );
+
     // Trust graph metrics
     describe_gauge!(
         "icn_trust_edges_total",

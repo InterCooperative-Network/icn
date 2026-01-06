@@ -1430,6 +1430,15 @@ impl GovernanceActor {
                 // Resolve eligible membership
                 let eligible_count = self.resolver.member_count(&domain)?;
 
+                // Edge case: cannot evaluate proposal with zero eligible voters
+                // This prevents division issues and ensures meaningful quorum calculation
+                if eligible_count == 0 {
+                    return Err(anyhow::anyhow!(
+                        "Cannot close proposal: no eligible voters in domain {}",
+                        proposal.domain_id.0
+                    ));
+                }
+
                 // Get proposal-type-specific thresholds (Issue #477)
                 // Emergency proposals (freeze, veto, rollback) require higher quorum/approval
                 // to prevent low-turnout manipulation attacks.
