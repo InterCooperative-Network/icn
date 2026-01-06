@@ -126,11 +126,12 @@ pub async fn handle_compute_submit(
         deadline: request.deadline_ms,
         payment_rate: request.payment_rate,
         payment_currency: request.payment_currency,
-        resource_profile,            // From request
-        actor_mode: None,            // Not actor mode (Phase 16D)
-        placement_constraints: None, // No constraints from RPC (Phase 16E will set from policy)
-        estimated_value: None,       // Issue #478: Computed from task value or set by client
-        verification: None,          // Issue #478: Auto-determined from estimated_value
+        resource_profile,             // From request
+        actor_mode: None,             // Not actor mode (Phase 16D)
+        placement_constraints: None,  // No constraints from RPC (Phase 16E will set from policy)
+        federation_constraints: None, // No federation constraints from RPC (Phase 21)
+        estimated_value: None,        // Issue #478: Computed from task value or set by client
+        verification: None,           // Issue #478: Auto-determined from estimated_value
     };
 
     match compute_handle.submit(task).await {
