@@ -476,7 +476,10 @@ impl AgeKeyStore {
         // Save to disk
         self.save_v4(passphrase)?;
 
-        info!("Successfully upgraded identity {} to post-quantum security", did);
+        info!(
+            "Successfully upgraded identity {} to post-quantum security",
+            did
+        );
 
         Ok(did)
     }
@@ -544,13 +547,9 @@ impl AgeKeyStore {
                 .as_ref()
                 .map(|kp| kp.public_key().as_bytes().to_vec()),
             #[cfg(feature = "post-quantum")]
-            kem_pq_secret: identity_bundle
-                .kem_pq_secret_bytes()
-                .map(|s| s.to_vec()),
+            kem_pq_secret: identity_bundle.kem_pq_secret_bytes().map(|s| s.to_vec()),
             #[cfg(feature = "post-quantum")]
-            kem_pq_public: identity_bundle
-                .kem_pq_public_bytes()
-                .map(|p| p.to_vec()),
+            kem_pq_public: identity_bundle.kem_pq_public_bytes().map(|p| p.to_vec()),
             #[cfg(feature = "post-quantum")]
             is_hybrid: identity_bundle.keypair().is_hybrid(),
         };

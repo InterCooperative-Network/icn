@@ -452,8 +452,7 @@ mod tests {
     #[test]
     fn test_hybrid_capability_describe() {
         // Test that hybrid capabilities are described correctly
-        let caps =
-            CapabilityFlags::HYBRID_SIGNATURES | CapabilityFlags::HYBRID_KEM;
+        let caps = CapabilityFlags::HYBRID_SIGNATURES | CapabilityFlags::HYBRID_KEM;
         let described = caps.describe();
 
         assert!(described.contains(&"hybrid_signatures"));

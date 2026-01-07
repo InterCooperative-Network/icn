@@ -424,11 +424,15 @@ impl KeyPair {
         self.pq_keypair.is_some()
     }
 
-    /// Check if this is a native hybrid keypair
+    /// Check if this is a hybrid keypair
     ///
-    /// Returns true if this keypair was generated with hybrid PQ support
-    /// or loaded from a keystore with PQ keys. Legacy Ed25519-only keypairs
-    /// return false even after upgrade.
+    /// Returns true if this keypair has PQ keys AND was either:
+    /// - Generated with hybrid PQ support (`KeyPair::generate()`)
+    /// - Upgraded via `from_bytes_with_pq()`
+    /// - Loaded from a keystore with PQ keys
+    ///
+    /// This is equivalent to `has_pq_keys()` for practical purposes, but
+    /// explicitly checks the `is_hybrid` flag for future extensibility.
     #[cfg(feature = "post-quantum")]
     pub fn is_hybrid(&self) -> bool {
         self.is_hybrid && self.pq_keypair.is_some()

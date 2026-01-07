@@ -402,7 +402,14 @@ impl EncryptedEnvelope {
     ) -> Result<Self> {
         match recipient_pq_public {
             Some(pq_pk) => Self::encrypt_hybrid(from, to, sequence, pq_pk, plaintext),
-            None => Self::encrypt(from, to, sequence, sender_secret, recipient_public, plaintext),
+            None => Self::encrypt(
+                from,
+                to,
+                sequence,
+                sender_secret,
+                recipient_public,
+                plaintext,
+            ),
         }
     }
 }

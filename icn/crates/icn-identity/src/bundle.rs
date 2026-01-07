@@ -70,7 +70,10 @@ impl Clone for IdentityBundle {
             x25519_secret: Zeroizing::new(self.x25519_secret.to_vec()),
             x25519_public: self.x25519_public,
             #[cfg(feature = "post-quantum")]
-            kem_pq_secret: self.kem_pq_secret.as_ref().map(|s| Zeroizing::new(s.to_vec())),
+            kem_pq_secret: self
+                .kem_pq_secret
+                .as_ref()
+                .map(|s| Zeroizing::new(s.to_vec())),
             #[cfg(feature = "post-quantum")]
             kem_pq_public: self.kem_pq_public.clone(),
         }
@@ -353,19 +356,22 @@ impl IdentityBundle {
             return Ok(None);
         }
 
-        let kem_secret = self.kem_pq_secret.as_ref().ok_or_else(|| {
-            anyhow::anyhow!("KEM secret key not available")
-        })?;
-        let kem_public = self.kem_pq_public.as_ref().ok_or_else(|| {
-            anyhow::anyhow!("KEM public key not available")
-        })?;
+        let kem_secret = self
+            .kem_pq_secret
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("KEM secret key not available"))?;
+        let kem_public = self
+            .kem_pq_public
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("KEM public key not available"))?;
 
         let keypair = HybridKemKeypair::from_bytes(
             &self.x25519_secret,
             &self.x25519_public,
             kem_secret,
             kem_public,
-        ).map_err(|e| anyhow::anyhow!("Failed to reconstruct hybrid KEM keypair: {e}"))?;
+        )
+        .map_err(|e| anyhow::anyhow!("Failed to reconstruct hybrid KEM keypair: {e}"))?;
 
         Ok(Some(keypair))
     }
@@ -379,9 +385,10 @@ impl IdentityBundle {
             return Ok(None);
         }
 
-        let kem_public = self.kem_pq_public.as_ref().ok_or_else(|| {
-            anyhow::anyhow!("KEM public key not available")
-        })?;
+        let kem_public = self
+            .kem_pq_public
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("KEM public key not available"))?;
 
         let public_key = HybridKemPublicKey::from_bytes(&self.x25519_public, kem_public)
             .map_err(|e| anyhow::anyhow!("Failed to construct hybrid KEM public key: {e}"))?;

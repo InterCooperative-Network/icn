@@ -6,9 +6,22 @@
 //! ## Hybrid Post-Quantum Signatures
 //!
 //! When the `post-quantum` feature is enabled, envelopes can include both
-//! Ed25519 (classical) and ML-DSA (post-quantum) signatures. Both signatures
-//! must verify for the message to be accepted, providing defense-in-depth
-//! against future quantum threats.
+//! Ed25519 (classical) and ML-DSA (post-quantum) signatures. The hybrid
+//! signature model provides defense-in-depth against quantum threats.
+//!
+//! ### Verification Modes
+//!
+//! - **`verify()`**: Verifies Ed25519 signature. For hybrid envelopes, PQ
+//!   verification is deferred (logged as warning) pending PQ key infrastructure.
+//! - **`verify_with_pq_key()`**: Full hybrid verification requiring both
+//!   Ed25519 AND ML-DSA signatures to pass. Use when PQ public key is available.
+//!
+//! ### Migration Path
+//!
+//! During the transition period, `verify()` accepts hybrid envelopes with only
+//! classical verification to allow gradual infrastructure rollout. Once PQ key
+//! distribution (via DID documents or Hello messages) is complete, callers
+//! should use `verify_with_pq_key()` for full security.
 
 use anyhow::{Context, Result};
 use icn_identity::{Did, KeyPair};
@@ -237,10 +250,11 @@ impl SignedEnvelope {
         // 1. Always verify classical Ed25519 signature
         self.verify_classical(&sig_input)?;
 
-        // 2. Verify PQ signature if this is a hybrid envelope
+        // 2. For hybrid envelopes, validate PQ signature format (deferred verification)
+        // Full PQ verification requires the sender's PQ public key - use verify_with_pq_key()
         #[cfg(feature = "post-quantum")]
         if self.signature_type == SignatureType::Hybrid {
-            self.verify_pq(&sig_input)?;
+            self.verify_pq_deferred()?;
         }
 
         // 3. Verify age
@@ -267,36 +281,33 @@ impl SignedEnvelope {
         Ok(())
     }
 
-    /// Verify ML-DSA post-quantum signature
+    /// Verify ML-DSA post-quantum signature (deferred mode)
     ///
-    /// This requires the sender's PQ public key, which must be obtained
-    /// from the network's DID document cache or out-of-band.
+    /// This is called when no PQ public key is available. It validates the
+    /// signature format but defers actual cryptographic verification.
+    ///
+    /// For full hybrid security, use `verify_with_pq_key()` when the
+    /// sender's PQ public key is available.
     #[cfg(feature = "post-quantum")]
-    fn verify_pq(&self, _sig_input: &[u8]) -> Result<()> {
+    fn verify_pq_deferred(&self) -> Result<()> {
         let pq_sig = self
             .pq_signature
             .as_ref()
             .context("Hybrid envelope missing PQ signature")?;
 
-        // For now, we need the PQ public key from somewhere
-        // In a full implementation, this would come from:
-        // 1. DID Document cache (recommended)
-        // 2. Hello message exchange
-        // 3. Out-of-band key distribution
-        //
-        // For the initial implementation, we'll accept hybrid envelopes
-        // if the classical signature verifies, with a warning logged.
-        // This allows gradual migration while infrastructure catches up.
-        //
-        // TODO: Integrate with DidDocumentCache for PQ key lookup
-        if pq_sig.len() < 100 {
-            anyhow::bail!("Invalid ML-DSA signature: too short");
+        // ML-DSA-65 signatures are ~3309 bytes
+        if pq_sig.len() < 3000 {
+            anyhow::bail!(
+                "Invalid ML-DSA signature: expected ~3309 bytes, got {}",
+                pq_sig.len()
+            );
         }
 
-        // Log that we're accepting without full PQ verification
-        // (In production, this should fail or require PQ key lookup)
-        tracing::debug!(
-            "Hybrid envelope from {} - classical verified, PQ verification deferred (key not available)",
+        // Log warning that PQ verification is deferred
+        // This is acceptable during migration but should be addressed
+        tracing::warn!(
+            "Hybrid envelope from {} - PQ verification DEFERRED (key not available). \
+             Use verify_with_pq_key() for full security.",
             self.from
         );
 
@@ -329,10 +340,23 @@ impl SignedEnvelope {
         Ok(())
     }
 
-    /// Verify with explicit PQ public key
+    /// Verify with explicit PQ public key (full hybrid verification)
+    ///
+    /// This performs full both-must-verify hybrid verification:
+    /// 1. Ed25519 signature must be valid for sender's DID
+    /// 2. ML-DSA signature must be valid for provided PQ public key
+    /// 3. Message age must be within max_age_secs
     ///
     /// Use this when you have the sender's PQ public key available
     /// (e.g., from DID document cache or Hello message).
+    ///
+    /// # Arguments
+    /// * `max_age_secs` - Maximum message age in seconds
+    /// * `pq_public_key` - Sender's ML-DSA public key
+    ///
+    /// # Errors
+    /// Returns error if Ed25519 or ML-DSA signature verification fails,
+    /// or if message age exceeds the maximum.
     #[cfg(feature = "post-quantum")]
     pub fn verify_with_pq_key(
         &self,
@@ -556,5 +580,117 @@ mod tests {
         assert!(envelope.verify(300).is_ok());
         let decoded: TestMessage = envelope.decode_payload().unwrap();
         assert_eq!(decoded, msg);
+    }
+
+    #[test]
+    #[cfg(feature = "post-quantum")]
+    fn test_hybrid_envelope_creation_and_verification() {
+        let keypair = KeyPair::generate().unwrap();
+
+        // With post-quantum feature, generated keypairs should have PQ keys
+        assert!(
+            keypair.has_pq_keys(),
+            "Generated keypair should have PQ keys"
+        );
+
+        // Create hybrid envelope
+        let envelope = SignedEnvelope::new_hybrid(
+            keypair.did(),
+            &keypair,
+            1,
+            PayloadType::Gossip,
+            b"hybrid test".to_vec(),
+        )
+        .unwrap();
+
+        // Should be hybrid type
+        assert_eq!(envelope.signature_type, SignatureType::Hybrid);
+        assert!(envelope.pq_signature.is_some());
+
+        // PQ signature should be ~3309 bytes (ML-DSA-65)
+        let pq_sig_len = envelope.pq_signature.as_ref().unwrap().len();
+        assert!(
+            pq_sig_len > 3000,
+            "PQ signature should be ~3309 bytes, got {pq_sig_len}"
+        );
+
+        // Basic verify() should pass (with deferred PQ verification)
+        assert!(envelope.verify(300).is_ok());
+
+        // Full verification with PQ key should also pass
+        let pq_public = keypair.pq_public_key().unwrap();
+        assert!(envelope.verify_with_pq_key(300, &pq_public).is_ok());
+    }
+
+    #[test]
+    #[cfg(feature = "post-quantum")]
+    fn test_hybrid_envelope_tampered_pq_sig_rejected() {
+        let keypair = KeyPair::generate().unwrap();
+
+        let mut envelope = SignedEnvelope::new_hybrid(
+            keypair.did(),
+            &keypair,
+            1,
+            PayloadType::Gossip,
+            b"hybrid test".to_vec(),
+        )
+        .unwrap();
+
+        // Tamper with PQ signature
+        if let Some(ref mut pq_sig) = envelope.pq_signature {
+            pq_sig[100] ^= 0xFF;
+        }
+
+        // Full verification should fail
+        let pq_public = keypair.pq_public_key().unwrap();
+        let result = envelope.verify_with_pq_key(300, &pq_public);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("ML-DSA"));
+    }
+
+    #[test]
+    #[cfg(feature = "post-quantum")]
+    fn test_new_auto_uses_hybrid_for_pq_keypair() {
+        let keypair = KeyPair::generate().unwrap();
+        assert!(keypair.has_pq_keys());
+
+        let envelope = SignedEnvelope::new_auto(
+            keypair.did(),
+            &keypair,
+            1,
+            PayloadType::Gossip,
+            b"auto test".to_vec(),
+        )
+        .unwrap();
+
+        // Should auto-select hybrid for PQ-enabled keypair
+        assert_eq!(envelope.signature_type, SignatureType::Hybrid);
+    }
+
+    #[test]
+    #[cfg(feature = "post-quantum")]
+    fn test_classical_envelope_backward_compat() {
+        let keypair = KeyPair::generate().unwrap();
+
+        // Explicitly create classical envelope
+        let envelope = SignedEnvelope::new(
+            keypair.did(),
+            &keypair,
+            1,
+            PayloadType::Gossip,
+            b"classical test".to_vec(),
+        )
+        .unwrap();
+
+        // Should be classical type
+        assert_eq!(envelope.signature_type, SignatureType::Classical);
+        assert!(envelope.pq_signature.is_none());
+
+        // Should verify with basic verify()
+        assert!(envelope.verify(300).is_ok());
+
+        // Should also work with verify_with_pq_key() (skips PQ check for classical)
+        let pq_public = keypair.pq_public_key().unwrap();
+        assert!(envelope.verify_with_pq_key(300, &pq_public).is_ok());
     }
 }

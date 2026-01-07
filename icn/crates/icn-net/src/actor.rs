@@ -1206,9 +1206,7 @@ impl NetworkActor {
                         #[cfg(feature = "post-quantum")]
                         let (ml_dsa_public, ml_kem_public) = {
                             let keypair = self.identity_bundle.keypair();
-                            let ml_dsa = keypair
-                                .pq_public_key()
-                                .map(|pk| pk.as_bytes().to_vec());
+                            let ml_dsa = keypair.pq_public_key().map(|pk| pk.as_bytes().to_vec());
                             let ml_kem = self
                                 .identity_bundle
                                 .kem_pq_public_bytes()
