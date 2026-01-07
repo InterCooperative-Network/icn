@@ -174,7 +174,7 @@ impl ConnectionContext {
                         Ok(key) => key,
                         Err(e) => {
                             icn_obs::metrics::network::hybrid_verification_failed_inc(
-                                "invalid_pq_key",
+                                icn_obs::metrics::network::HybridVerificationFailure::InvalidPqKey,
                             );
                             return Err(anyhow::anyhow!("Invalid cached ML-DSA key: {e}"));
                         }
@@ -186,12 +186,23 @@ impl ConnectionContext {
                     );
 
                     let result = envelope.verify_with_pq_key(max_age_secs, &pq_key);
-                    if result.is_ok() {
-                        icn_obs::metrics::network::hybrid_verification_cache_hit_inc();
-                    } else {
-                        icn_obs::metrics::network::hybrid_verification_failed_inc(
-                            "pq_signature_mismatch",
-                        );
+                    match &result {
+                        Ok(()) => {
+                            icn_obs::metrics::network::hybrid_verification_cache_hit_inc();
+                        }
+                        Err(_) => {
+                            // Distinguish classical vs PQ signature failures:
+                            // If classical-only verify also fails -> classical signature issue
+                            // If classical-only verify succeeds -> PQ-side issue
+                            let failure_reason = if envelope.verify(max_age_secs).is_ok() {
+                                icn_obs::metrics::network::HybridVerificationFailure::PqSignatureMismatch
+                            } else {
+                                icn_obs::metrics::network::HybridVerificationFailure::ClassicalSignatureFailed
+                            };
+                            icn_obs::metrics::network::hybrid_verification_failed_inc(
+                                failure_reason,
+                            );
+                        }
                     }
                     return result;
                 }

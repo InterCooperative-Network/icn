@@ -316,14 +316,34 @@ pub fn hybrid_verification_cache_miss_inc() {
     counter!("icn_network_hybrid_verification_cache_miss_total").increment(1);
 }
 
+/// Failure reason for hybrid signature verification
+#[derive(Debug, Clone, Copy)]
+pub enum HybridVerificationFailure {
+    /// Cached ML-DSA key is malformed/corrupted
+    InvalidPqKey,
+    /// ML-DSA signature didn't verify with cached key
+    PqSignatureMismatch,
+    /// Ed25519 (classical) signature verification failed
+    ClassicalSignatureFailed,
+}
+
+impl HybridVerificationFailure {
+    fn as_str(&self) -> &'static str {
+        match self {
+            Self::InvalidPqKey => "invalid_pq_key",
+            Self::PqSignatureMismatch => "pq_signature_mismatch",
+            Self::ClassicalSignatureFailed => "classical_signature_failed",
+        }
+    }
+}
+
 /// Increment hybrid verification failed counter with reason
 ///
 /// Called when hybrid signature verification fails.
-/// Reasons: "invalid_pq_key", "pq_signature_mismatch", "ed25519_failed"
-pub fn hybrid_verification_failed_inc(reason: &str) {
+pub fn hybrid_verification_failed_inc(reason: HybridVerificationFailure) {
     counter!(
         "icn_network_hybrid_verification_failed_total",
-        "reason" => reason.to_string()
+        "reason" => reason.as_str()
     )
     .increment(1);
 }
