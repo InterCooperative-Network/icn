@@ -3,6 +3,10 @@ name = "icn-net"
 version.workspace = true
 edition.workspace = true
 
+[features]
+default = []
+post-quantum = ["icn-identity/post-quantum", "icn-crypto-pq"]
+
 [dependencies]
 tokio.workspace = true
 quinn.workspace = true
@@ -10,6 +14,7 @@ rustls.workspace = true
 tokio-rustls.workspace = true
 mdns-sd.workspace = true
 icn-identity.workspace = true
+icn-crypto-pq = { path = "../icn-crypto-pq", optional = true }
 icn-time = { path = "../icn-time" }
 icn-gossip.workspace = true
 icn-trust.workspace = true

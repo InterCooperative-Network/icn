@@ -855,7 +855,7 @@ mod tests {
         assert!(result
             .unwrap_err()
             .to_string()
-            .contains("Signature verification failed"));
+            .contains("signature verification failed"));
 
         // No sequence state should be created for invalid messages
         assert_eq!(guard.peer_count(), 0);

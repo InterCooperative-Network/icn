@@ -186,15 +186,30 @@ struct StoredKeyV4 {
     current_keybundle_version: u32,
 
     // === Post-Quantum fields (v5 additions) ===
-    /// PQ secret key for core identity (feature-gated)
+    /// PQ signature secret key for core identity (ML-DSA) (feature-gated)
     #[cfg(feature = "post-quantum")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pq_secret: Option<Vec<u8>>,
 
-    /// PQ public key for core identity (feature-gated)
+    /// PQ signature public key for core identity (ML-DSA) (feature-gated)
     #[cfg(feature = "post-quantum")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pq_public: Option<Vec<u8>>,
+
+    /// PQ encryption secret key (ML-KEM) (feature-gated)
+    #[cfg(feature = "post-quantum")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    kem_pq_secret: Option<Vec<u8>>,
+
+    /// PQ encryption public key (ML-KEM) (feature-gated)
+    #[cfg(feature = "post-quantum")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    kem_pq_public: Option<Vec<u8>>,
+
+    /// Whether this is a native hybrid identity
+    #[cfg(feature = "post-quantum")]
+    #[serde(default)]
+    is_hybrid: bool,
 }
 
 /// Stored KeyBundle for v4 keystore
@@ -233,6 +248,9 @@ impl Drop for StoredKeyV4 {
         {
             if let Some(ref mut pq_sec) = self.pq_secret {
                 pq_sec.zeroize();
+            }
+            if let Some(ref mut kem_sec) = self.kem_pq_secret {
+                kem_sec.zeroize();
             }
         }
         for kb in &mut self.keybundles {
@@ -394,6 +412,78 @@ impl AgeKeyStore {
             .expect("keybundles cannot be empty after push"))
     }
 
+    /// Upgrade identity to post-quantum security
+    ///
+    /// This adds ML-DSA (signing) and ML-KEM (encryption) keys to an existing
+    /// Ed25519 identity. The DID remains unchanged.
+    ///
+    /// # Arguments
+    /// * `passphrase` - Passphrase to encrypt the upgraded keystore
+    ///
+    /// # Returns
+    /// The upgraded DID (unchanged from original)
+    #[cfg(feature = "post-quantum")]
+    pub fn upgrade_to_pq(&mut self, passphrase: &[u8]) -> Result<Did> {
+        // Ensure keystore is unlocked
+        let identity_bundle = self
+            .identity_bundle
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Keystore must be unlocked to upgrade"))?;
+
+        // Check if already has PQ keys
+        if identity_bundle.keypair().has_pq_keys() {
+            info!("Identity already has post-quantum keys");
+            return Ok(identity_bundle.did().clone());
+        }
+
+        let did = identity_bundle.did().clone();
+        info!("Upgrading identity {} to post-quantum security", did);
+
+        // Generate ML-DSA keypair for signatures
+        let pq_keypair = icn_crypto_pq::MlDsaKeypair::generate()
+            .map_err(|e| anyhow::anyhow!("Failed to generate ML-DSA keypair: {e}"))?;
+
+        // Create upgraded KeyPair with PQ signing keys
+        let old_keypair = identity_bundle.keypair();
+        let (secret_bytes, public_bytes) = old_keypair.export_for_upgrade();
+        let upgraded_keypair = KeyPair::from_bytes_with_pq(
+            &secret_bytes,
+            &public_bytes,
+            pq_keypair.secret_key_bytes(),
+            pq_keypair.public_key().as_bytes(),
+        )?;
+
+        // Generate ML-KEM keypair for hybrid encryption
+        let kem_keypair = icn_crypto_pq::MlKemKeypair::generate()
+            .map_err(|e| anyhow::anyhow!("Failed to generate ML-KEM keypair: {e}"))?;
+
+        // Create new IdentityBundle with upgraded keypair and KEM keys
+        let upgraded_bundle = IdentityBundle::from_stored_with_kem(
+            upgraded_keypair,
+            identity_bundle.tls_cert().as_ref().to_vec(),
+            identity_bundle.tls_key_der_bytes().to_vec(),
+            identity_bundle.binding_info().tls_binding_sig.clone(),
+            identity_bundle.binding_info().created_at,
+            identity_bundle.x25519_secret_bytes().to_vec(),
+            *identity_bundle.x25519_public_bytes(),
+            Some(kem_keypair.secret_key_bytes().to_vec()),
+            Some(kem_keypair.public_key().as_bytes().to_vec()),
+        )?;
+
+        // Update in-memory state
+        self.identity_bundle = Some(upgraded_bundle);
+
+        // Save to disk
+        self.save_v4(passphrase)?;
+
+        info!(
+            "Successfully upgraded identity {} to post-quantum security",
+            did
+        );
+
+        Ok(did)
+    }
+
     /// Save keystore in v4 format
     fn save_v4(&self, passphrase: &[u8]) -> Result<()> {
         let identity_bundle = self
@@ -456,6 +546,12 @@ impl AgeKeyStore {
                 .pq_keypair
                 .as_ref()
                 .map(|kp| kp.public_key().as_bytes().to_vec()),
+            #[cfg(feature = "post-quantum")]
+            kem_pq_secret: identity_bundle.kem_pq_secret_bytes().map(|s| s.to_vec()),
+            #[cfg(feature = "post-quantum")]
+            kem_pq_public: identity_bundle.kem_pq_public_bytes().map(|p| p.to_vec()),
+            #[cfg(feature = "post-quantum")]
+            is_hybrid: identity_bundle.keypair().is_hybrid(),
         };
 
         Self::encrypt_and_save_v4(&self.path, &stored, passphrase)
@@ -849,7 +945,21 @@ impl KeyStore for AgeKeyStore {
             #[cfg(not(feature = "post-quantum"))]
             let keypair = KeyPair::from_bytes(&stored_v4.secret_bytes, &stored_v4.public_bytes)?;
 
-            // Reconstruct IdentityBundle
+            // Reconstruct IdentityBundle with optional KEM keys
+            #[cfg(feature = "post-quantum")]
+            let identity_bundle = IdentityBundle::from_stored_with_kem(
+                keypair,
+                stored_v4.tls_cert_der.clone(),
+                stored_v4.tls_key_der.clone(),
+                stored_v4.tls_binding_sig.clone(),
+                stored_v4.created_at,
+                stored_v4.x25519_secret.clone(),
+                stored_v4.x25519_public,
+                stored_v4.kem_pq_secret.clone(),
+                stored_v4.kem_pq_public.clone(),
+            )?;
+
+            #[cfg(not(feature = "post-quantum"))]
             let identity_bundle = IdentityBundle::from_stored(
                 keypair,
                 stored_v4.tls_cert_der.clone(),

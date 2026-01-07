@@ -83,9 +83,16 @@ pub enum HybridSignatureOrClassical {
 #[cfg(feature = "post-quantum")]
 impl HybridSignatureOrClassical {
     /// Verify the signature against a message and keypair
+    ///
+    /// For hybrid signatures, both Ed25519 and ML-DSA signatures must verify.
+    /// For classical signatures, only Ed25519 is checked.
     pub fn verify(&self, message: &[u8], keypair: &KeyPair) -> bool {
         match self {
             Self::Hybrid(sig) => {
+                // Hybrid signatures require PQ keys to verify
+                if !keypair.has_pq_keys() {
+                    return false;
+                }
                 if let Some(ref pq_kp) = keypair.pq_keypair {
                     let hybrid_pub = icn_crypto_pq::HybridPublicKey {
                         classical: keypair.verifying_key.to_bytes().to_vec(),
@@ -93,13 +100,34 @@ impl HybridSignatureOrClassical {
                     };
                     sig.verify(message, &hybrid_pub)
                 } else {
-                    false // Hybrid sig requires PQ keys
+                    false // Should not reach here due to has_pq_keys check
                 }
             }
             Self::Classical(sig) => {
                 use ed25519_dalek::Verifier;
                 keypair.verifying_key.verify(message, sig).is_ok()
             }
+        }
+    }
+
+    /// Check if this is a hybrid signature
+    pub fn is_hybrid(&self) -> bool {
+        matches!(self, Self::Hybrid(_))
+    }
+
+    /// Get the classical (Ed25519) signature bytes
+    pub fn classical_bytes(&self) -> Vec<u8> {
+        match self {
+            Self::Hybrid(sig) => sig.classical.clone(),
+            Self::Classical(sig) => sig.to_bytes().to_vec(),
+        }
+    }
+
+    /// Get the PQ (ML-DSA) signature bytes if present
+    pub fn pq_bytes(&self) -> Option<Vec<u8>> {
+        match self {
+            Self::Hybrid(sig) => Some(sig.pq.clone()),
+            Self::Classical(_) => None,
         }
     }
 
@@ -254,6 +282,10 @@ impl std::str::FromStr for Did {
 }
 
 /// A key pair for ICN identity
+///
+/// When the `post-quantum` feature is enabled, new keypairs are generated with
+/// hybrid Ed25519 + ML-DSA signatures by default. Legacy Ed25519-only keypairs
+/// can still be loaded and used for backward compatibility.
 pub struct KeyPair {
     // Store key bytes in a zeroizing container for security
     secret_bytes: Zeroizing<[u8; 32]>,
@@ -263,6 +295,11 @@ pub struct KeyPair {
     // Post-quantum keypair (optional, feature-gated)
     #[cfg(feature = "post-quantum")]
     pq_keypair: Option<icn_crypto_pq::MlDsaKeypair>,
+
+    // Whether this is a native hybrid keypair (generated with PQ) vs upgraded legacy
+    // Native hybrid keys should always use hybrid signatures; upgraded keys may fall back
+    #[cfg(feature = "post-quantum")]
+    is_hybrid: bool,
 }
 
 impl Clone for KeyPair {
@@ -273,12 +310,18 @@ impl Clone for KeyPair {
             did: self.did.clone(),
             #[cfg(feature = "post-quantum")]
             pq_keypair: self.pq_keypair.clone(),
+            #[cfg(feature = "post-quantum")]
+            is_hybrid: self.is_hybrid,
         }
     }
 }
 
 impl KeyPair {
     /// Generate a new random key pair
+    ///
+    /// When the `post-quantum` feature is enabled, this generates a hybrid keypair
+    /// with both Ed25519 and ML-DSA keys. The DID is derived from the Ed25519 key
+    /// for backward compatibility.
     pub fn generate() -> Result<Self> {
         let signing_key = SigningKey::generate(&mut OsRng);
         let secret_bytes = signing_key.to_bytes();
@@ -297,10 +340,15 @@ impl KeyPair {
             did,
             #[cfg(feature = "post-quantum")]
             pq_keypair,
+            #[cfg(feature = "post-quantum")]
+            is_hybrid: true, // Native hybrid keypair
         })
     }
 
-    /// Reconstruct a keypair from raw bytes
+    /// Reconstruct a keypair from raw bytes (legacy Ed25519-only format)
+    ///
+    /// This is used for loading existing keystores that don't have PQ components.
+    /// The keypair will work for classical signing but won't produce hybrid signatures.
     pub fn from_bytes(secret_bytes: &[u8; 32], public_bytes: &[u8; 32]) -> Result<Self> {
         let verifying_key = VerifyingKey::from_bytes(public_bytes)?;
         let did = Did::from_public_key(&verifying_key);
@@ -317,10 +365,15 @@ impl KeyPair {
             did,
             #[cfg(feature = "post-quantum")]
             pq_keypair: None, // Legacy keys don't have PQ component
+            #[cfg(feature = "post-quantum")]
+            is_hybrid: false, // Legacy keypair, not native hybrid
         })
     }
 
     /// Reconstruct a keypair with PQ keys from raw bytes
+    ///
+    /// This loads a hybrid keypair from stored bytes, including both Ed25519
+    /// and ML-DSA components. Used when loading from keystore v5+.
     #[cfg(feature = "post-quantum")]
     pub fn from_bytes_with_pq(
         secret_bytes: &[u8; 32],
@@ -346,6 +399,7 @@ impl KeyPair {
             verifying_key,
             did,
             pq_keypair: Some(pq_keypair),
+            is_hybrid: true, // Has PQ keys, treated as hybrid
         })
     }
 
@@ -368,6 +422,20 @@ impl KeyPair {
     #[cfg(feature = "post-quantum")]
     pub fn has_pq_keys(&self) -> bool {
         self.pq_keypair.is_some()
+    }
+
+    /// Check if this is a hybrid keypair
+    ///
+    /// Returns true if this keypair has PQ keys AND was either:
+    /// - Generated with hybrid PQ support (`KeyPair::generate()`)
+    /// - Upgraded via `from_bytes_with_pq()`
+    /// - Loaded from a keystore with PQ keys
+    ///
+    /// This is equivalent to `has_pq_keys()` for practical purposes, but
+    /// explicitly checks the `is_hybrid` flag for future extensibility.
+    #[cfg(feature = "post-quantum")]
+    pub fn is_hybrid(&self) -> bool {
+        self.is_hybrid && self.pq_keypair.is_some()
     }
 
     /// Get the PQ public key if available

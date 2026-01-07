@@ -117,6 +117,14 @@ pub enum MessagePayload {
         topology_info: Option<crate::TopologyInfo>,
         /// X25519 public key for end-to-end encryption (Phase 10)
         x25519_public: [u8; 32],
+        /// ML-DSA public key for hybrid signatures (post-quantum)
+        /// Sent when HYBRID_SIGNATURES capability is advertised
+        #[serde(default)]
+        ml_dsa_public: Option<Vec<u8>>,
+        /// ML-KEM public key for hybrid encryption (post-quantum)
+        /// Sent when HYBRID_KEM capability is advertised
+        #[serde(default)]
+        ml_kem_public: Option<Vec<u8>>,
     },
 
     /// Handshake with topology information (legacy, kept for compatibility)
@@ -313,6 +321,16 @@ impl NetworkMessage {
     }
 
     /// Create a Hello message with DID-TLS binding verification and X25519 key exchange
+    ///
+    /// # Arguments
+    /// * `from` - Sender DID
+    /// * `to` - Recipient DID
+    /// * `binding_info` - DID-TLS binding proof
+    /// * `version_info` - Protocol version and capabilities
+    /// * `topology_info` - Optional topology information
+    /// * `x25519_public` - X25519 public key for classical encryption
+    /// * `ml_dsa_public` - Optional ML-DSA public key for hybrid signatures
+    /// * `ml_kem_public` - Optional ML-KEM public key for hybrid encryption
     pub fn hello(
         from: Did,
         to: Did,
@@ -320,6 +338,8 @@ impl NetworkMessage {
         version_info: VersionInfo,
         topology_info: Option<crate::TopologyInfo>,
         x25519_public: [u8; 32],
+        ml_dsa_public: Option<Vec<u8>>,
+        ml_kem_public: Option<Vec<u8>>,
     ) -> Self {
         Self::new(
             from,
@@ -329,6 +349,8 @@ impl NetworkMessage {
                 version_info: Some(version_info),
                 topology_info,
                 x25519_public,
+                ml_dsa_public,
+                ml_kem_public,
             },
         )
     }

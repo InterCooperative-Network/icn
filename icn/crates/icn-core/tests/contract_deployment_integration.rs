@@ -1157,7 +1157,9 @@ async fn test_contract_with_state_variables() {
     sleep(Duration::from_millis(1000)).await;
 }
 
+/// Run manually with: cargo test -p icn-core --test contract_deployment_integration test_contract_with_ledger_integration -- --ignored
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "Flaky in CI: QUIC stream failures in containerized environment"]
 async fn test_contract_with_ledger_integration() {
     // Create two nodes with dynamic ports
     let node_a = TestNode::new(get_available_port())

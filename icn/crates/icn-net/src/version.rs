@@ -77,6 +77,12 @@ bitflags::bitflags! {
         /// Supports message-level compression (Issue #123)
         const MESSAGE_COMPRESSION = 0b100000000;
 
+        /// Supports hybrid post-quantum signatures (Ed25519 + ML-DSA)
+        const HYBRID_SIGNATURES = 0b1000000000;
+
+        /// Supports hybrid post-quantum key encapsulation (X25519 + ML-KEM)
+        const HYBRID_KEM = 0b10000000000;
+
         // Future capabilities can be added here
         // Reserve high bits for future use
     }
@@ -105,7 +111,8 @@ impl<'de> Deserialize<'de> for CapabilityFlags {
 impl CapabilityFlags {
     /// Get current capabilities supported by this build
     pub fn current() -> Self {
-        Self::E2E_ENCRYPTION
+        #[allow(unused_mut)]
+        let mut caps = Self::E2E_ENCRYPTION
             | Self::SIGNED_MESSAGES
             | Self::GRACEFUL_RESTART
             | Self::TOPOLOGY_AWARE
@@ -113,7 +120,15 @@ impl CapabilityFlags {
             | Self::GOSSIP_PULL
             | Self::MULTI_DEVICE
             | Self::ECONOMIC_SAFETY
-            | Self::MESSAGE_COMPRESSION
+            | Self::MESSAGE_COMPRESSION;
+
+        // Add post-quantum capabilities if feature is enabled
+        #[cfg(feature = "post-quantum")]
+        {
+            caps |= Self::HYBRID_SIGNATURES | Self::HYBRID_KEM;
+        }
+
+        caps
     }
 
     /// Get a human-readable list of capabilities
@@ -145,6 +160,12 @@ impl CapabilityFlags {
         }
         if self.contains(Self::MESSAGE_COMPRESSION) {
             features.push("message_compression");
+        }
+        if self.contains(Self::HYBRID_SIGNATURES) {
+            features.push("hybrid_signatures");
+        }
+        if self.contains(Self::HYBRID_KEM) {
+            features.push("hybrid_kem");
         }
         features
     }
@@ -406,5 +427,35 @@ mod tests {
         assert!(caps.contains(CapabilityFlags::MULTI_DEVICE));
         assert!(caps.contains(CapabilityFlags::ECONOMIC_SAFETY));
         assert!(caps.contains(CapabilityFlags::MESSAGE_COMPRESSION));
+    }
+
+    #[test]
+    #[cfg(feature = "post-quantum")]
+    fn test_pq_capabilities_with_feature() {
+        let caps = CapabilityFlags::current();
+
+        // With post-quantum feature, should have hybrid capabilities
+        assert!(caps.contains(CapabilityFlags::HYBRID_SIGNATURES));
+        assert!(caps.contains(CapabilityFlags::HYBRID_KEM));
+    }
+
+    #[test]
+    #[cfg(not(feature = "post-quantum"))]
+    fn test_pq_capabilities_without_feature() {
+        let caps = CapabilityFlags::current();
+
+        // Without post-quantum feature, should NOT have hybrid capabilities
+        assert!(!caps.contains(CapabilityFlags::HYBRID_SIGNATURES));
+        assert!(!caps.contains(CapabilityFlags::HYBRID_KEM));
+    }
+
+    #[test]
+    fn test_hybrid_capability_describe() {
+        // Test that hybrid capabilities are described correctly
+        let caps = CapabilityFlags::HYBRID_SIGNATURES | CapabilityFlags::HYBRID_KEM;
+        let described = caps.describe();
+
+        assert!(described.contains(&"hybrid_signatures"));
+        assert!(described.contains(&"hybrid_kem"));
     }
 }
