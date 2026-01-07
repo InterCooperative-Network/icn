@@ -73,6 +73,19 @@ impl PqBindingProof {
     /// This prevents replay attacks while allowing for clock skew
     pub const MAX_AGE_MILLIS: u64 = 5 * 60 * 1000;
 
+    /// Future tolerance for clock skew (1 minute)
+    /// Proofs with timestamps up to this far in the future are accepted
+    pub const FUTURE_TOLERANCE_MILLIS: u64 = 60_000;
+
+    /// Get current timestamp in milliseconds with safe u128->u64 conversion
+    fn current_timestamp_millis() -> Result<u64, anyhow::Error> {
+        use anyhow::anyhow;
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(|e| anyhow!("System time error: {e}"))
+            .map(|d| d.as_millis().min(u64::MAX as u128) as u64)
+    }
+
     /// Create the canonical binding message to sign
     pub fn binding_message(did: &Did, timestamp_millis: u64) -> Vec<u8> {
         format!("{}:{}:{}", Self::VERSION_PREFIX, did, timestamp_millis).into_bytes()
@@ -82,10 +95,7 @@ impl PqBindingProof {
     #[cfg(feature = "post-quantum")]
     pub fn create(did: &Did, keypair: &icn_identity::KeyPair) -> Option<Self> {
         let pq_keypair = keypair.pq_keypair()?;
-        let timestamp_millis = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .ok()?
-            .as_millis() as u64;
+        let timestamp_millis = Self::current_timestamp_millis().ok()?;
 
         let message = Self::binding_message(did, timestamp_millis);
         let signature = pq_keypair.sign(&message).ok()?.as_bytes().to_vec();
@@ -101,14 +111,10 @@ impl PqBindingProof {
     pub fn verify(&self, did: &Did, ml_dsa_public: &[u8]) -> Result<(), anyhow::Error> {
         use anyhow::anyhow;
 
-        // Check timestamp is not in the future (with small tolerance for clock skew)
-        let now_millis = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map_err(|e| anyhow!("System time error: {e}"))?
-            .as_millis() as u64;
+        let now_millis = Self::current_timestamp_millis()?;
 
-        // Allow 1 minute of future tolerance for clock skew
-        if self.timestamp_millis > now_millis + 60_000 {
+        // Check timestamp is not in the future (beyond clock skew tolerance)
+        if self.timestamp_millis > now_millis + Self::FUTURE_TOLERANCE_MILLIS {
             return Err(anyhow!("Binding proof timestamp is in the future"));
         }
 
@@ -454,7 +460,7 @@ impl NetworkMessage {
                 x25519_public,
                 ml_dsa_public,
                 ml_kem_public,
-                pq_binding_proof: None, // Use hello_with_binding for PQ binding
+                pq_binding_proof: None,
             },
         )
     }
@@ -1450,6 +1456,154 @@ mod tests {
         assert!(
             proof.is_none(),
             "Non-hybrid keypair should not create binding proof"
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "post-quantum")]
+    fn test_pq_binding_proof_rejects_future_timestamp() {
+        let keypair = KeyPair::generate().unwrap();
+        let did = keypair.did().clone();
+
+        // Create a proof with timestamp far in the future (beyond 1 minute tolerance)
+        let future_timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64
+            + PqBindingProof::FUTURE_TOLERANCE_MILLIS
+            + 60_000; // 2 minutes in future
+
+        let message = PqBindingProof::binding_message(&did, future_timestamp);
+        let signature = keypair
+            .pq_keypair()
+            .unwrap()
+            .sign(&message)
+            .unwrap()
+            .as_bytes()
+            .to_vec();
+
+        let proof = PqBindingProof {
+            timestamp_millis: future_timestamp,
+            signature,
+        };
+
+        let ml_dsa_public = keypair.pq_public_key().unwrap().as_bytes().to_vec();
+        let result = proof.verify(&did, &ml_dsa_public);
+        assert!(result.is_err(), "Should reject future timestamp");
+        assert!(
+            result.unwrap_err().to_string().contains("in the future"),
+            "Error should mention future timestamp"
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "post-quantum")]
+    fn test_pq_binding_proof_rejects_expired_timestamp() {
+        let keypair = KeyPair::generate().unwrap();
+        let did = keypair.did().clone();
+
+        // Create a proof with expired timestamp (6 minutes ago, beyond 5 minute max age)
+        let expired_timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64
+            - PqBindingProof::MAX_AGE_MILLIS
+            - 60_000; // 6 minutes ago
+
+        let message = PqBindingProof::binding_message(&did, expired_timestamp);
+        let signature = keypair
+            .pq_keypair()
+            .unwrap()
+            .sign(&message)
+            .unwrap()
+            .as_bytes()
+            .to_vec();
+
+        let proof = PqBindingProof {
+            timestamp_millis: expired_timestamp,
+            signature,
+        };
+
+        let ml_dsa_public = keypair.pq_public_key().unwrap().as_bytes().to_vec();
+        let result = proof.verify(&did, &ml_dsa_public);
+        assert!(result.is_err(), "Should reject expired timestamp");
+        assert!(
+            result.unwrap_err().to_string().contains("expired"),
+            "Error should mention expiration"
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "post-quantum")]
+    fn test_pq_binding_proof_accepts_edge_of_tolerance() {
+        let keypair = KeyPair::generate().unwrap();
+        let did = keypair.did().clone();
+
+        // Create a proof at the edge of future tolerance (should be accepted)
+        let edge_timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64
+            + PqBindingProof::FUTURE_TOLERANCE_MILLIS
+            - 1000; // Just under 1 minute in future
+
+        let message = PqBindingProof::binding_message(&did, edge_timestamp);
+        let signature = keypair
+            .pq_keypair()
+            .unwrap()
+            .sign(&message)
+            .unwrap()
+            .as_bytes()
+            .to_vec();
+
+        let proof = PqBindingProof {
+            timestamp_millis: edge_timestamp,
+            signature,
+        };
+
+        let ml_dsa_public = keypair.pq_public_key().unwrap().as_bytes().to_vec();
+        let result = proof.verify(&did, &ml_dsa_public);
+        assert!(
+            result.is_ok(),
+            "Should accept timestamp at edge of tolerance: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "post-quantum")]
+    fn test_pq_binding_proof_accepts_edge_of_max_age() {
+        let keypair = KeyPair::generate().unwrap();
+        let did = keypair.did().clone();
+
+        // Create a proof at the edge of max age (should be accepted)
+        let edge_timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64
+            - PqBindingProof::MAX_AGE_MILLIS
+            + 1000; // Just under 5 minutes ago
+
+        let message = PqBindingProof::binding_message(&did, edge_timestamp);
+        let signature = keypair
+            .pq_keypair()
+            .unwrap()
+            .sign(&message)
+            .unwrap()
+            .as_bytes()
+            .to_vec();
+
+        let proof = PqBindingProof {
+            timestamp_millis: edge_timestamp,
+            signature,
+        };
+
+        let ml_dsa_public = keypair.pq_public_key().unwrap().as_bytes().to_vec();
+        let result = proof.verify(&did, &ml_dsa_public);
+        assert!(
+            result.is_ok(),
+            "Should accept timestamp at edge of max age: {:?}",
+            result
         );
     }
 }

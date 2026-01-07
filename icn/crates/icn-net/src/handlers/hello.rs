@@ -56,8 +56,22 @@ impl ConnectionContext {
         );
 
         // Verify DID-PQ binding if proof is present
-        let pq_binding_verified =
+        // Returns: Ok(true) = verified, Ok(false) = no PQ key or legacy (no proof), Err = invalid proof
+        let pq_binding_result =
             Self::verify_pq_binding(from, ml_dsa_public.as_deref(), pq_binding_proof.as_ref());
+
+        // If binding verification explicitly failed (invalid proof), reject the connection
+        // This is a fail-closed security approach for potential attacks
+        if let Err(e) = &pq_binding_result {
+            warn!(
+                peer_did = %from,
+                error = %e,
+                "Rejecting connection: DID-PQ binding verification failed"
+            );
+            return Err(anyhow::anyhow!("DID-PQ binding verification failed: {e}"));
+        }
+
+        let pq_binding_verified = pq_binding_result.unwrap_or(false);
 
         // Perform version negotiation
         let local_version_info =
@@ -143,6 +157,18 @@ impl ConnectionContext {
                     None
                 }
             }
+        } else {
+            validated_ml_dsa
+        };
+
+        // Discard ML-DSA keys if binding wasn't verified (legacy nodes without proofs)
+        // This ensures we don't use unverified PQ keys for hybrid verification
+        let validated_ml_dsa = if !pq_binding_verified && validated_ml_dsa.is_some() {
+            debug!(
+                peer_did = %from,
+                "Discarding ML-DSA key: binding not verified (legacy node without proof)"
+            );
+            None
         } else {
             validated_ml_dsa
         };
@@ -289,6 +315,11 @@ impl ConnectionContext {
         );
 
         let connection_clone = connection.clone();
+        #[cfg(feature = "post-quantum")]
+        let log_msg = "Sent Hello response with X25519 public key and PQ binding";
+        #[cfg(not(feature = "post-quantum"))]
+        let log_msg = "Sent Hello response with X25519 public key";
+
         tokio::spawn(async move {
             match connection_clone.open_bi().await {
                 Ok((mut send, _recv)) => {
@@ -296,7 +327,7 @@ impl ConnectionContext {
                     {
                         warn!("Failed to write Hello response: {}", e);
                     } else {
-                        info!("Sent Hello response with X25519 public key and PQ binding");
+                        info!("{}", log_msg);
                     }
                 }
                 Err(e) => {
@@ -339,18 +370,19 @@ impl ConnectionContext {
 
     /// Verify DID-PQ key binding proof
     ///
-    /// Returns true if:
-    /// - No ML-DSA key is present (nothing to bind)
-    /// - ML-DSA key is present with valid binding proof
+    /// Returns:
+    /// - `Ok(true)` if ML-DSA key is present with valid binding proof
+    /// - `Ok(false)` if no ML-DSA key is present, or legacy node (no proof but no attack)
+    /// - `Err(e)` if ML-DSA key is present with INVALID binding proof (potential attack)
     ///
-    /// Returns false and logs warning if:
-    /// - ML-DSA key is present but no binding proof (legacy node or attack)
-    /// - ML-DSA key is present but binding proof is invalid
+    /// Security policy:
+    /// - Invalid proofs cause connection rejection (fail-closed)
+    /// - Missing proofs from legacy nodes are accepted but ML-DSA keys are discarded
     fn verify_pq_binding(
         peer_did: &Did,
         ml_dsa_public: Option<&[u8]>,
         binding_proof: Option<&PqBindingProof>,
-    ) -> bool {
+    ) -> Result<bool, anyhow::Error> {
         match (ml_dsa_public, binding_proof) {
             // No PQ key - nothing to verify
             (None, _) => {
@@ -358,7 +390,7 @@ impl ConnectionContext {
                     peer_did = %peer_did,
                     "No ML-DSA key present, skipping DID-PQ binding verification"
                 );
-                true
+                Ok(false)
             }
 
             // PQ key present with binding proof - verify it
@@ -368,27 +400,24 @@ impl ConnectionContext {
                         peer_did = %peer_did,
                         "DID-PQ binding verification successful"
                     );
-                    true
+                    Ok(true)
                 }
                 Err(e) => {
-                    warn!(
-                        peer_did = %peer_did,
-                        error = %e,
-                        "DID-PQ binding verification failed"
-                    );
-                    false
+                    // Invalid proof is a potential attack - return error to reject connection
+                    Err(anyhow::anyhow!(
+                        "Invalid DID-PQ binding proof from {peer_did}: {e}"
+                    ))
                 }
             },
 
-            // PQ key present but no binding proof - legacy node or potential attack
+            // PQ key present but no binding proof - legacy node
+            // Accept connection but return Ok(false) to discard ML-DSA keys
             (Some(_), None) => {
                 warn!(
                     peer_did = %peer_did,
-                    "ML-DSA key present without DID-PQ binding proof (legacy node or attack)"
+                    "ML-DSA key present without binding proof (legacy node); discarding PQ key"
                 );
-                // Accept but log warning - backward compatibility with nodes
-                // that haven't upgraded to include binding proofs
-                false
+                Ok(false)
             }
         }
     }
