@@ -95,12 +95,36 @@ impl HybridKemCiphertext {
         32 + self.pq_ciphertext.as_bytes().len()
     }
 
+    /// X25519 ephemeral key size
+    pub const CLASSICAL_SIZE: usize = 32;
+
     /// Serialize to bytes
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::with_capacity(self.size());
         bytes.extend_from_slice(&self.classical_ephemeral);
         bytes.extend_from_slice(self.pq_ciphertext.as_bytes());
         bytes
+    }
+
+    /// Deserialize from bytes
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        if bytes.len() < Self::CLASSICAL_SIZE {
+            return Err(CryptoError::InvalidKey(format!(
+                "Hybrid KEM ciphertext too short: {} bytes (need at least {})",
+                bytes.len(),
+                Self::CLASSICAL_SIZE
+            )));
+        }
+
+        let mut classical_ephemeral = [0u8; 32];
+        classical_ephemeral.copy_from_slice(&bytes[..Self::CLASSICAL_SIZE]);
+
+        let pq_ciphertext = MlKemCiphertext::from_bytes(&bytes[Self::CLASSICAL_SIZE..])?;
+
+        Ok(Self {
+            classical_ephemeral,
+            pq_ciphertext,
+        })
     }
 }
 
@@ -217,6 +241,52 @@ impl HybridKemKeypair {
     /// Get the ML-KEM public key only
     pub fn pq_public(&self) -> &MlKemPublicKey {
         &self.public_key.pq
+    }
+
+    /// Reconstruct a HybridKemKeypair from stored bytes
+    ///
+    /// # Arguments
+    /// * `x25519_secret` - X25519 secret key (32 bytes)
+    /// * `x25519_public` - X25519 public key (32 bytes)
+    /// * `ml_kem_secret` - ML-KEM secret key (~2.4KB)
+    /// * `ml_kem_public` - ML-KEM public key (~1.2KB)
+    pub fn from_bytes(
+        x25519_secret: &[u8],
+        x25519_public: &[u8],
+        ml_kem_secret: &[u8],
+        ml_kem_public: &[u8],
+    ) -> Result<Self> {
+        if x25519_secret.len() != 32 {
+            return Err(CryptoError::InvalidKey(format!(
+                "X25519 secret key must be 32 bytes, got {}",
+                x25519_secret.len()
+            )));
+        }
+        if x25519_public.len() != 32 {
+            return Err(CryptoError::InvalidKey(format!(
+                "X25519 public key must be 32 bytes, got {}",
+                x25519_public.len()
+            )));
+        }
+
+        let mut classical_secret = [0u8; 32];
+        classical_secret.copy_from_slice(x25519_secret);
+
+        let mut x25519_pub = [0u8; 32];
+        x25519_pub.copy_from_slice(x25519_public);
+
+        let pq_keypair = MlKemKeypair::from_bytes(ml_kem_secret, ml_kem_public)?;
+        let pq_public = MlKemPublicKey::from_bytes(ml_kem_public)?;
+        let public_key = HybridKemPublicKey {
+            classical: x25519_pub,
+            pq: pq_public,
+        };
+
+        Ok(Self {
+            classical_secret,
+            pq_keypair,
+            public_key,
+        })
     }
 }
 

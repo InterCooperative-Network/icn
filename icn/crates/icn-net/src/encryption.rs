@@ -10,12 +10,19 @@
 //! Transport:      QUIC/TLS 1.3 (channel encryption)
 //! ```
 //!
-//! ## Encryption Scheme
+//! ## Encryption Schemes
 //!
+//! ### Classical (Default)
 //! - **Key Exchange**: X25519 static ECDH (reused across messages)
 //! - **Symmetric Cipher**: ChaCha20-Poly1305 AEAD
 //! - **Nonce**: Derived from sequence number (no transmission overhead)
 //! - **Key Derivation**: Shared secret = x25519(sender_secret, recipient_public)
+//!
+//! ### Hybrid Post-Quantum (Feature-gated)
+//! - **Key Exchange**: X25519 + ML-KEM-768 (both combined via HKDF)
+//! - **Symmetric Cipher**: ChaCha20-Poly1305 AEAD
+//! - **Security**: Defense-in-depth against quantum threats
+//! - **Overhead**: ~1.2KB additional ciphertext for ML-KEM
 //!
 //! ## Security Properties
 //!
@@ -82,11 +89,28 @@ use sha2::{Digest, Sha256};
 use x25519_dalek::{PublicKey, StaticSecret};
 use zeroize::Zeroizing;
 
+#[cfg(feature = "post-quantum")]
+use icn_crypto_pq::{HybridKemCiphertext, HybridKemKeypair, HybridKemPublicKey};
+
+/// Encryption type discriminator for versioned envelope support
+///
+/// Allows backward compatibility with classical-only encryption while
+/// enabling hybrid post-quantum encryption for new messages.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[repr(u8)]
+pub enum EncryptionType {
+    /// Classical X25519 + ChaCha20-Poly1305 only (64 bytes overhead)
+    #[default]
+    Classical = 0,
+    /// Hybrid X25519 + ML-KEM-768 + ChaCha20-Poly1305 (~1.1KB overhead)
+    Hybrid = 1,
+}
+
 /// Encrypted message envelope
 ///
 /// Contains encrypted payload with metadata needed for decryption.
 /// The payload is encrypted using ChaCha20-Poly1305 with a shared secret
-/// derived from X25519 key exchange.
+/// derived from X25519 key exchange (classical) or X25519 + ML-KEM (hybrid).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EncryptedEnvelope {
     /// Sender's DID (public, for key lookup)
@@ -98,8 +122,18 @@ pub struct EncryptedEnvelope {
     /// Sequence number (for nonce derivation and replay protection)
     pub sequence: u64,
 
+    /// Encryption type (Classical or Hybrid)
+    #[serde(default)]
+    pub encryption_type: EncryptionType,
+
     /// Encrypted payload (includes Poly1305 authentication tag)
     pub ciphertext: Vec<u8>,
+
+    /// Hybrid KEM ciphertext (only present when encryption_type = Hybrid)
+    /// Contains X25519 ephemeral + ML-KEM ciphertext (~1.1KB)
+    /// Note: Using `#[serde(default)]` without `skip_serializing_if` for bincode compatibility
+    #[serde(default)]
+    pub pq_ciphertext: Option<Vec<u8>>,
 }
 
 impl EncryptedEnvelope {
@@ -157,7 +191,9 @@ impl EncryptedEnvelope {
             from: from.clone(),
             to: to.clone(),
             sequence,
+            encryption_type: EncryptionType::Classical,
             ciphertext,
+            pq_ciphertext: None,
         })
     }
 
@@ -213,7 +249,161 @@ impl EncryptedEnvelope {
     /// Get the size of the encrypted message in bytes
     pub fn size(&self) -> usize {
         // Approximate: DID strings + sequence + ciphertext + overhead
-        self.from.as_str().len() + self.to.as_str().len() + 8 + self.ciphertext.len() + 50
+        let base_size =
+            self.from.as_str().len() + self.to.as_str().len() + 8 + self.ciphertext.len() + 50;
+        // Add PQ ciphertext size if present (~1.1KB for ML-KEM)
+        base_size + self.pq_ciphertext.as_ref().map_or(0, |ct| ct.len())
+    }
+
+    /// Check if this envelope uses hybrid encryption
+    pub fn is_hybrid(&self) -> bool {
+        matches!(self.encryption_type, EncryptionType::Hybrid)
+    }
+
+    /// Encrypt a message using hybrid X25519 + ML-KEM encryption
+    ///
+    /// This provides defense-in-depth against quantum attacks by combining:
+    /// - X25519 ECDH (classical security)
+    /// - ML-KEM-768 key encapsulation (post-quantum security)
+    ///
+    /// Both shared secrets are combined via HKDF before deriving the
+    /// symmetric encryption key.
+    ///
+    /// # Arguments
+    ///
+    /// * `from` - Sender's DID
+    /// * `to` - Recipient's DID
+    /// * `sequence` - Message sequence number (must be unique per sender-recipient pair)
+    /// * `recipient_public` - Recipient's hybrid public key (X25519 + ML-KEM)
+    /// * `plaintext` - Message payload to encrypt
+    ///
+    /// # Returns
+    ///
+    /// Encrypted envelope with hybrid ciphertext
+    #[cfg(feature = "post-quantum")]
+    pub fn encrypt_hybrid(
+        from: &Did,
+        to: &Did,
+        sequence: u64,
+        recipient_public: &HybridKemPublicKey,
+        plaintext: &[u8],
+    ) -> Result<Self> {
+        // Use hybrid KEM to encapsulate a shared secret
+        // Context includes sender and recipient DIDs for domain separation
+        let context = format!("ICN-HYBRID-KEM:{}:{}", from.as_str(), to.as_str());
+        let (shared_secret, kem_ciphertext) =
+            HybridKemKeypair::encapsulate(recipient_public, context.as_bytes())
+                .map_err(|e| anyhow::anyhow!("Hybrid KEM encapsulation failed: {e}"))?;
+
+        // Derive encryption key from the hybrid shared secret
+        let key_bytes = Zeroizing::new(derive_encryption_key(&shared_secret));
+        let cipher = ChaCha20Poly1305::new((&*key_bytes).into());
+
+        // Derive nonce from sequence number and DIDs
+        let nonce = derive_nonce(sequence, from, to)?;
+
+        // Encrypt with AEAD (includes authentication tag)
+        let ciphertext = cipher
+            .encrypt(&nonce, plaintext)
+            .map_err(|e| anyhow::anyhow!("Encryption failed: {e}"))?;
+
+        Ok(EncryptedEnvelope {
+            from: from.clone(),
+            to: to.clone(),
+            sequence,
+            encryption_type: EncryptionType::Hybrid,
+            ciphertext,
+            pq_ciphertext: Some(kem_ciphertext.to_bytes()),
+        })
+    }
+
+    /// Decrypt a hybrid-encrypted message
+    ///
+    /// Requires the recipient's hybrid keypair to decapsulate both the
+    /// X25519 and ML-KEM shared secrets.
+    ///
+    /// # Arguments
+    ///
+    /// * `recipient_keypair` - Recipient's hybrid keypair
+    ///
+    /// # Returns
+    ///
+    /// Decrypted plaintext payload
+    ///
+    /// # Errors
+    ///
+    /// Returns error if:
+    /// - Envelope is not hybrid-encrypted
+    /// - PQ ciphertext is missing
+    /// - Decapsulation fails
+    /// - Decryption fails (wrong key, tampering, or authentication failure)
+    #[cfg(feature = "post-quantum")]
+    pub fn decrypt_hybrid(&self, recipient_keypair: &HybridKemKeypair) -> Result<Vec<u8>> {
+        // Verify this is a hybrid envelope
+        if !self.is_hybrid() {
+            return Err(anyhow::anyhow!(
+                "Cannot decrypt: envelope uses classical encryption, not hybrid"
+            ));
+        }
+
+        // Get PQ ciphertext
+        let pq_ciphertext_bytes = self.pq_ciphertext.as_ref().ok_or_else(|| {
+            anyhow::anyhow!("Missing PQ ciphertext for hybrid-encrypted envelope")
+        })?;
+
+        // Parse the KEM ciphertext
+        let kem_ciphertext = HybridKemCiphertext::from_bytes(pq_ciphertext_bytes)
+            .map_err(|e| anyhow::anyhow!("Invalid hybrid KEM ciphertext: {e}"))?;
+
+        // Decapsulate to recover the shared secret
+        let context = format!("ICN-HYBRID-KEM:{}:{}", self.from.as_str(), self.to.as_str());
+        let shared_secret = recipient_keypair
+            .decapsulate(&kem_ciphertext, context.as_bytes())
+            .map_err(|e| anyhow::anyhow!("Hybrid KEM decapsulation failed: {e}"))?;
+
+        // Derive encryption key from the hybrid shared secret
+        let key_bytes = Zeroizing::new(derive_encryption_key(&shared_secret));
+        let cipher = ChaCha20Poly1305::new((&*key_bytes).into());
+
+        // Derive nonce from sequence number and DIDs
+        let nonce = derive_nonce(self.sequence, &self.from, &self.to)?;
+
+        // Decrypt and verify authentication tag
+        let plaintext = cipher
+            .decrypt(&nonce, self.ciphertext.as_ref())
+            .map_err(|e| anyhow::anyhow!("Decryption failed: {e}"))?;
+
+        Ok(plaintext)
+    }
+
+    /// Automatically select encryption type and encrypt
+    ///
+    /// Uses hybrid encryption if a PQ public key is provided, otherwise
+    /// falls back to classical X25519 encryption.
+    ///
+    /// # Arguments
+    ///
+    /// * `from` - Sender's DID
+    /// * `to` - Recipient's DID
+    /// * `sequence` - Message sequence number
+    /// * `sender_secret` - Sender's X25519 private key (for classical)
+    /// * `recipient_public` - Recipient's X25519 public key (for classical)
+    /// * `recipient_pq_public` - Optional recipient's hybrid public key (for hybrid)
+    /// * `plaintext` - Message payload to encrypt
+    #[cfg(feature = "post-quantum")]
+    pub fn encrypt_auto(
+        from: &Did,
+        to: &Did,
+        sequence: u64,
+        sender_secret: &StaticSecret,
+        recipient_public: &PublicKey,
+        recipient_pq_public: Option<&HybridKemPublicKey>,
+        plaintext: &[u8],
+    ) -> Result<Self> {
+        match recipient_pq_public {
+            Some(pq_pk) => Self::encrypt_hybrid(from, to, sequence, pq_pk, plaintext),
+            None => Self::encrypt(from, to, sequence, sender_secret, recipient_public, plaintext),
+        }
     }
 }
 

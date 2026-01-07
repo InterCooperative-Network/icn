@@ -33,7 +33,7 @@ pub use blob_registry::{BlobLocation, BlobLocationRegistry};
 pub use candidate::ConnectionCandidate;
 pub use candidate_cache::CandidateCache;
 pub use discovery::{Discovery, PeerInfo};
-pub use encryption::EncryptedEnvelope;
+pub use encryption::{EncryptedEnvelope, EncryptionType};
 pub use envelope::{PayloadType, SignedEnvelope};
 pub use error::{NetError, Result};
 pub use global_rate_limit::GlobalRateLimiter;

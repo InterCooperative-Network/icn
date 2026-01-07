@@ -14,6 +14,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use x25519_dalek::{PublicKey, StaticSecret};
 use zeroize::Zeroizing;
 
+#[cfg(feature = "post-quantum")]
+use icn_crypto_pq::{HybridKemKeypair, HybridKemPublicKey, MlKemKeypair};
+
 /// Cryptographically bound identity bundle
 ///
 /// Combines a DID identity with a TLS certificate, proving that the holder
@@ -45,6 +48,14 @@ pub struct IdentityBundle {
 
     /// X25519 public key for encryption
     x25519_public: [u8; 32],
+
+    /// ML-KEM secret key for hybrid encryption (optional, feature-gated)
+    #[cfg(feature = "post-quantum")]
+    kem_pq_secret: Option<Zeroizing<Vec<u8>>>,
+
+    /// ML-KEM public key for hybrid encryption (optional, feature-gated)
+    #[cfg(feature = "post-quantum")]
+    kem_pq_public: Option<Vec<u8>>,
 }
 
 impl Clone for IdentityBundle {
@@ -58,6 +69,10 @@ impl Clone for IdentityBundle {
             created_at: self.created_at,
             x25519_secret: Zeroizing::new(self.x25519_secret.to_vec()),
             x25519_public: self.x25519_public,
+            #[cfg(feature = "post-quantum")]
+            kem_pq_secret: self.kem_pq_secret.as_ref().map(|s| Zeroizing::new(s.to_vec())),
+            #[cfg(feature = "post-quantum")]
+            kem_pq_public: self.kem_pq_public.clone(),
         }
     }
 }
@@ -92,6 +107,7 @@ impl IdentityBundle {
     ///
     /// This generates a new TLS certificate for the given keypair and creates
     /// the cryptographic binding signature. Also generates X25519 keys for encryption.
+    /// If the keypair has PQ keys, ML-KEM keys are also generated for hybrid encryption.
     pub fn from_keypair(did_keypair: KeyPair) -> Result<Self> {
         let did = did_keypair.did().clone();
 
@@ -110,6 +126,19 @@ impl IdentityBundle {
         // Generate X25519 keys for payload encryption
         let (x25519_secret, x25519_public) = Self::generate_x25519_keypair();
 
+        // Generate ML-KEM keys if keypair has PQ support
+        #[cfg(feature = "post-quantum")]
+        let (kem_pq_secret, kem_pq_public) = if did_keypair.is_hybrid() {
+            let kem_keypair = MlKemKeypair::generate()
+                .map_err(|e| anyhow::anyhow!("Failed to generate ML-KEM keypair: {e}"))?;
+            (
+                Some(Zeroizing::new(kem_keypair.secret_key_bytes().to_vec())),
+                Some(kem_keypair.public_key().as_bytes().to_vec()),
+            )
+        } else {
+            (None, None)
+        };
+
         Ok(IdentityBundle {
             did,
             did_keypair,
@@ -119,6 +148,10 @@ impl IdentityBundle {
             created_at,
             x25519_secret,
             x25519_public,
+            #[cfg(feature = "post-quantum")]
+            kem_pq_secret,
+            #[cfg(feature = "post-quantum")]
+            kem_pq_public,
         })
     }
 
@@ -126,6 +159,7 @@ impl IdentityBundle {
     ///
     /// This is used by the keystore to restore a previously saved bundle.
     /// The TLS certificate and binding signature are already generated.
+    #[allow(clippy::too_many_arguments)]
     pub fn from_stored(
         did_keypair: KeyPair,
         tls_cert_der: Vec<u8>,
@@ -134,6 +168,65 @@ impl IdentityBundle {
         created_at: u64,
         x25519_secret_bytes: Vec<u8>,
         x25519_public_bytes: [u8; 32],
+    ) -> Result<Self> {
+        #[cfg(feature = "post-quantum")]
+        return Self::from_stored_with_kem(
+            did_keypair,
+            tls_cert_der,
+            tls_key_der,
+            tls_binding_sig,
+            created_at,
+            x25519_secret_bytes,
+            x25519_public_bytes,
+            None,
+            None,
+        );
+
+        #[cfg(not(feature = "post-quantum"))]
+        {
+            let did = did_keypair.did().clone();
+            let tls_cert = CertificateDer::from(tls_cert_der);
+
+            // Verify the binding is still valid
+            let cert_hash = Self::hash_certificate(&tls_cert);
+            let verifying_key = did.to_verifying_key()?;
+            let signature = ed25519_dalek::Signature::from_slice(&tls_binding_sig)
+                .context("Invalid stored binding signature format")?;
+
+            use ed25519_dalek::Verifier;
+            verifying_key
+                .verify(&cert_hash, &signature)
+                .context("Stored TLS binding signature verification failed")?;
+
+            Ok(IdentityBundle {
+                did,
+                did_keypair,
+                tls_cert,
+                tls_key_der,
+                tls_binding_sig,
+                created_at,
+                x25519_secret: Zeroizing::new(x25519_secret_bytes),
+                x25519_public: x25519_public_bytes,
+            })
+        }
+    }
+
+    /// Reconstruct identity bundle from stored components with optional KEM keys
+    ///
+    /// This is used by the keystore to restore a previously saved bundle
+    /// that may include post-quantum KEM keys.
+    #[cfg(feature = "post-quantum")]
+    #[allow(clippy::too_many_arguments)]
+    pub fn from_stored_with_kem(
+        did_keypair: KeyPair,
+        tls_cert_der: Vec<u8>,
+        tls_key_der: Vec<u8>,
+        tls_binding_sig: Vec<u8>,
+        created_at: u64,
+        x25519_secret_bytes: Vec<u8>,
+        x25519_public_bytes: [u8; 32],
+        kem_pq_secret: Option<Vec<u8>>,
+        kem_pq_public: Option<Vec<u8>>,
     ) -> Result<Self> {
         let did = did_keypair.did().clone();
         let tls_cert = CertificateDer::from(tls_cert_der);
@@ -158,6 +251,8 @@ impl IdentityBundle {
             created_at,
             x25519_secret: Zeroizing::new(x25519_secret_bytes),
             x25519_public: x25519_public_bytes,
+            kem_pq_secret: kem_pq_secret.map(Zeroizing::new),
+            kem_pq_public,
         })
     }
 
@@ -229,6 +324,69 @@ impl IdentityBundle {
     /// Get the raw X25519 public key bytes
     pub fn x25519_public_bytes(&self) -> &[u8; 32] {
         &self.x25519_public
+    }
+
+    /// Check if this bundle has hybrid KEM keys
+    #[cfg(feature = "post-quantum")]
+    pub fn has_hybrid_kem(&self) -> bool {
+        self.kem_pq_secret.is_some() && self.kem_pq_public.is_some()
+    }
+
+    /// Get the raw ML-KEM secret key bytes (if available)
+    #[cfg(feature = "post-quantum")]
+    pub(crate) fn kem_pq_secret_bytes(&self) -> Option<&[u8]> {
+        self.kem_pq_secret.as_ref().map(|s| s.as_slice())
+    }
+
+    /// Get the raw ML-KEM public key bytes (if available)
+    #[cfg(feature = "post-quantum")]
+    pub fn kem_pq_public_bytes(&self) -> Option<&[u8]> {
+        self.kem_pq_public.as_deref()
+    }
+
+    /// Construct a HybridKemKeypair from this bundle's keys
+    ///
+    /// Returns None if KEM keys are not available.
+    #[cfg(feature = "post-quantum")]
+    pub fn hybrid_kem_keypair(&self) -> Result<Option<HybridKemKeypair>> {
+        if !self.has_hybrid_kem() {
+            return Ok(None);
+        }
+
+        let kem_secret = self.kem_pq_secret.as_ref().ok_or_else(|| {
+            anyhow::anyhow!("KEM secret key not available")
+        })?;
+        let kem_public = self.kem_pq_public.as_ref().ok_or_else(|| {
+            anyhow::anyhow!("KEM public key not available")
+        })?;
+
+        let keypair = HybridKemKeypair::from_bytes(
+            &self.x25519_secret,
+            &self.x25519_public,
+            kem_secret,
+            kem_public,
+        ).map_err(|e| anyhow::anyhow!("Failed to reconstruct hybrid KEM keypair: {e}"))?;
+
+        Ok(Some(keypair))
+    }
+
+    /// Construct a HybridKemPublicKey from this bundle's keys
+    ///
+    /// Returns None if KEM keys are not available.
+    #[cfg(feature = "post-quantum")]
+    pub fn hybrid_kem_public_key(&self) -> Result<Option<HybridKemPublicKey>> {
+        if !self.has_hybrid_kem() {
+            return Ok(None);
+        }
+
+        let kem_public = self.kem_pq_public.as_ref().ok_or_else(|| {
+            anyhow::anyhow!("KEM public key not available")
+        })?;
+
+        let public_key = HybridKemPublicKey::from_bytes(&self.x25519_public, kem_public)
+            .map_err(|e| anyhow::anyhow!("Failed to construct hybrid KEM public key: {e}"))?;
+
+        Ok(Some(public_key))
     }
 
     /// Get binding info for network transmission

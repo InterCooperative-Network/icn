@@ -1202,6 +1202,23 @@ impl NetworkActor {
                                 role: topo_cfg.role,
                             });
 
+                        // Include PQ public keys if available
+                        #[cfg(feature = "post-quantum")]
+                        let (ml_dsa_public, ml_kem_public) = {
+                            let keypair = self.identity_bundle.keypair();
+                            let ml_dsa = keypair
+                                .pq_public_key()
+                                .map(|pk| pk.as_bytes().to_vec());
+                            let ml_kem = self
+                                .identity_bundle
+                                .kem_pq_public_bytes()
+                                .map(|b| b.to_vec());
+                            (ml_dsa, ml_kem)
+                        };
+
+                        #[cfg(not(feature = "post-quantum"))]
+                        let (ml_dsa_public, ml_kem_public) = (None, None);
+
                         let hello_msg = NetworkMessage::hello(
                             self.own_did.clone(),
                             did.clone(),
@@ -1209,6 +1226,8 @@ impl NetworkActor {
                             version_info,
                             topology_info,
                             x25519_public,
+                            ml_dsa_public,
+                            ml_kem_public,
                         );
 
                         let session_mgr = self.session_manager.clone();
@@ -1542,7 +1561,11 @@ impl NetworkActor {
                                     version_info,
                                     topology_info,
                                     x25519_public,
+                                    ml_dsa_public: _,
+                                    ml_kem_public: _,
                                 } => {
+                                    // TODO: Store PQ public keys in peer connection state
+                                    // for future hybrid encryption/verification
                                     ctx.handle_hello(
                                         &connection,
                                         &message.from,
