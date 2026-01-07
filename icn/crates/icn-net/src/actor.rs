@@ -1577,6 +1577,7 @@ impl NetworkActor {
                                     x25519_public,
                                     ml_dsa_public,
                                     ml_kem_public,
+                                    pq_binding_proof,
                                 } => {
                                     ctx.handle_hello(
                                         &connection,
@@ -1587,6 +1588,7 @@ impl NetworkActor {
                                         x25519_public,
                                         ml_dsa_public.clone(),
                                         ml_kem_public.clone(),
+                                        pq_binding_proof.clone(),
                                     )
                                     .await?;
                                 }

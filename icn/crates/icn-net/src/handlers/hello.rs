@@ -5,10 +5,11 @@
 //! - Protocol version negotiation
 //! - Capability exchange
 //! - X25519 key exchange for E2E encryption
+//! - Post-quantum key binding verification (DID-PQ binding)
 
 use super::ConnectionContext;
 use crate::actor::PeerConnectionInfo;
-use crate::protocol::NetworkMessage;
+use crate::protocol::{NetworkMessage, PqBindingProof};
 use crate::topology::{NeighborLimitsConfig, PeerId, TopologyInfo};
 use anyhow::Result;
 use icn_identity::Did;
@@ -24,9 +25,10 @@ impl ConnectionContext {
     /// 3. Capability exchange
     /// 4. X25519 key storage for E2E encryption
     /// 5. PQ public key storage for hybrid crypto (if present)
-    /// 6. Connection storage in session manager
-    /// 7. Neighbor set updates (if topology enabled)
-    /// 8. Hello response with our info
+    /// 6. DID-PQ binding verification (if proof present)
+    /// 7. Connection storage in session manager
+    /// 8. Neighbor set updates (if topology enabled)
+    /// 9. Hello response with our info
     pub async fn handle_hello(
         &self,
         connection: &quinn::Connection,
@@ -37,6 +39,7 @@ impl ConnectionContext {
         x25519_public: &[u8; 32],
         ml_dsa_public: Option<Vec<u8>>,
         ml_kem_public: Option<Vec<u8>>,
+        pq_binding_proof: Option<PqBindingProof>,
     ) -> Result<()> {
         // Verify DID-TLS binding using TOFU model
         if let Err(e) = icn_identity::verify_did_matches_binding(from, binding_info) {
@@ -51,6 +54,10 @@ impl ConnectionContext {
             peer_did = %from,
             "DID-TLS binding verified successfully"
         );
+
+        // Verify DID-PQ binding if proof is present
+        let pq_binding_verified =
+            Self::verify_pq_binding(from, ml_dsa_public.as_deref(), pq_binding_proof.as_ref());
 
         // Perform version negotiation
         let local_version_info =
@@ -160,6 +167,7 @@ impl ConnectionContext {
                 peer_software = %peer_software,
                 capabilities = ?common_caps.describe(),
                 has_pq_keys = has_pq_keys,
+                pq_binding_verified = pq_binding_verified,
                 "Stored peer connection info"
             );
         }
@@ -244,21 +252,31 @@ impl ConnectionContext {
             role: topo_cfg.role,
         });
 
-        // Include PQ public keys if available
+        // Build Hello response with PQ binding proof if available
         #[cfg(feature = "post-quantum")]
-        let (ml_dsa_public, ml_kem_public) = {
+        let hello_response = {
             let keypair = self.identity_bundle.keypair();
             let ml_dsa = keypair.pq_public_key().map(|pk| pk.as_bytes().to_vec());
             let ml_kem = self
                 .identity_bundle
                 .kem_pq_public_bytes()
                 .map(|b| b.to_vec());
-            (ml_dsa, ml_kem)
+
+            // Use hello_with_binding to include DID-PQ binding proof
+            NetworkMessage::hello_with_binding(
+                self.own_did.clone(),
+                to.clone(),
+                binding_info,
+                version_info,
+                topology_info,
+                x25519_public,
+                ml_dsa,
+                ml_kem,
+                keypair,
+            )
         };
 
         #[cfg(not(feature = "post-quantum"))]
-        let (ml_dsa_public, ml_kem_public) = (None, None);
-
         let hello_response = NetworkMessage::hello(
             self.own_did.clone(),
             to.clone(),
@@ -266,8 +284,8 @@ impl ConnectionContext {
             version_info,
             topology_info,
             x25519_public,
-            ml_dsa_public,
-            ml_kem_public,
+            None,
+            None,
         );
 
         let connection_clone = connection.clone();
@@ -278,7 +296,7 @@ impl ConnectionContext {
                     {
                         warn!("Failed to write Hello response: {}", e);
                     } else {
-                        info!("Sent Hello response with X25519 public key");
+                        info!("Sent Hello response with X25519 public key and PQ binding");
                     }
                 }
                 Err(e) => {
@@ -316,6 +334,62 @@ impl ConnectionContext {
                 None
             }
             (None, _) => None,
+        }
+    }
+
+    /// Verify DID-PQ key binding proof
+    ///
+    /// Returns true if:
+    /// - No ML-DSA key is present (nothing to bind)
+    /// - ML-DSA key is present with valid binding proof
+    ///
+    /// Returns false and logs warning if:
+    /// - ML-DSA key is present but no binding proof (legacy node or attack)
+    /// - ML-DSA key is present but binding proof is invalid
+    fn verify_pq_binding(
+        peer_did: &Did,
+        ml_dsa_public: Option<&[u8]>,
+        binding_proof: Option<&PqBindingProof>,
+    ) -> bool {
+        match (ml_dsa_public, binding_proof) {
+            // No PQ key - nothing to verify
+            (None, _) => {
+                debug!(
+                    peer_did = %peer_did,
+                    "No ML-DSA key present, skipping DID-PQ binding verification"
+                );
+                true
+            }
+
+            // PQ key present with binding proof - verify it
+            (Some(ml_dsa_bytes), Some(proof)) => match proof.verify(peer_did, ml_dsa_bytes) {
+                Ok(()) => {
+                    info!(
+                        peer_did = %peer_did,
+                        "DID-PQ binding verification successful"
+                    );
+                    true
+                }
+                Err(e) => {
+                    warn!(
+                        peer_did = %peer_did,
+                        error = %e,
+                        "DID-PQ binding verification failed"
+                    );
+                    false
+                }
+            },
+
+            // PQ key present but no binding proof - legacy node or potential attack
+            (Some(_), None) => {
+                warn!(
+                    peer_did = %peer_did,
+                    "ML-DSA key present without DID-PQ binding proof (legacy node or attack)"
+                );
+                // Accept but log warning - backward compatibility with nodes
+                // that haven't upgraded to include binding proofs
+                false
+            }
         }
     }
 }
