@@ -119,6 +119,19 @@ pub fn init_descriptions() {
         "icn_network_encryption_circuit_breaker_trips_total",
         "Total number of times the encryption cleanup circuit breaker has tripped"
     );
+    // Hybrid PQ verification metrics (Issue #530)
+    describe_counter!(
+        "icn_network_hybrid_verification_cache_hit_total",
+        "Total number of hybrid signature verifications using cached PQ key (full verification)"
+    );
+    describe_counter!(
+        "icn_network_hybrid_verification_cache_miss_total",
+        "Total number of hybrid signature verifications with no cached PQ key (deferred verification)"
+    );
+    describe_counter!(
+        "icn_network_hybrid_verification_failed_total",
+        "Total number of hybrid signature verifications that failed"
+    );
 }
 
 // Simple counters
@@ -283,6 +296,56 @@ pub fn encryption_sequence_pairs_set(count: u64) {
 /// be degraded. Operators should investigate immediately.
 pub fn encryption_circuit_breaker_trips_inc() {
     counter!("icn_network_encryption_circuit_breaker_trips_total").increment(1);
+}
+
+// Hybrid PQ verification metrics (Issue #530)
+
+/// Increment hybrid verification cache hit counter
+///
+/// Called when a hybrid signature is verified using a cached PQ public key.
+/// This indicates full hybrid verification (both Ed25519 + ML-DSA verified).
+pub fn hybrid_verification_cache_hit_inc() {
+    counter!("icn_network_hybrid_verification_cache_hit_total").increment(1);
+}
+
+/// Increment hybrid verification cache miss counter
+///
+/// Called when a hybrid signature cannot be fully verified because no
+/// PQ public key is cached for the sender. Falls back to deferred verification.
+pub fn hybrid_verification_cache_miss_inc() {
+    counter!("icn_network_hybrid_verification_cache_miss_total").increment(1);
+}
+
+/// Failure reason for hybrid signature verification
+#[derive(Debug, Clone, Copy)]
+pub enum HybridVerificationFailure {
+    /// Cached ML-DSA key is malformed/corrupted
+    InvalidPqKey,
+    /// ML-DSA signature didn't verify with cached key
+    PqSignatureMismatch,
+    /// Ed25519 (classical) signature verification failed
+    ClassicalSignatureFailed,
+}
+
+impl HybridVerificationFailure {
+    fn as_str(&self) -> &'static str {
+        match self {
+            Self::InvalidPqKey => "invalid_pq_key",
+            Self::PqSignatureMismatch => "pq_signature_mismatch",
+            Self::ClassicalSignatureFailed => "classical_signature_failed",
+        }
+    }
+}
+
+/// Increment hybrid verification failed counter with reason
+///
+/// Called when hybrid signature verification fails.
+pub fn hybrid_verification_failed_inc(reason: HybridVerificationFailure) {
+    counter!(
+        "icn_network_hybrid_verification_failed_total",
+        "reason" => reason.as_str()
+    )
+    .increment(1);
 }
 
 // Complex function with custom logic
