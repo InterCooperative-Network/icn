@@ -195,15 +195,16 @@ Each phase in documentation must follow this format:
 **Implementation**: ~75% complete (272K LOC, 2,287 tests)
 **Deployed**: K3s cluster since 2025-12-03
 
-**Remaining phases before release**:
-- Phase 19: NAT Traversal (internet connectivity)
-- Phase 20: Community & Onboarding Polish
-- Phase 21: Dynamic Trust
-- Phase 22: Federation Completion
-- Phase 23: Post-Quantum Ledger Integration
-- Phase 24: Mobile SDK
-- Phase 25: Hardening & Polish
-- Phase 26: Pilot Deployment
+**Remaining phases (19-35)**:
+- 19-20: Release Infrastructure + Testing Foundation
+- 21-22: Network Connectivity + Security Hardening
+- 23-26: Identity, SDK, Observability, Documentation
+- 27-29: Ledger/Economics, CCL/Governance, Code Quality
+- 30-33: Mobile, Infrastructure, Federation, CLI/UX
+- 34: Release Candidate
+- 35: Pilot Deployment
+
+See [docs/dev-journal/ROADMAP.md](docs/dev-journal/ROADMAP.md) for full details and issue mapping.
 
 ### Rules for Agents
 
