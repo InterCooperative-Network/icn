@@ -23,9 +23,10 @@ impl ConnectionContext {
     /// 2. Protocol version negotiation
     /// 3. Capability exchange
     /// 4. X25519 key storage for E2E encryption
-    /// 5. Connection storage in session manager
-    /// 6. Neighbor set updates (if topology enabled)
-    /// 7. Hello response with our info
+    /// 5. PQ public key storage for hybrid crypto (if present)
+    /// 6. Connection storage in session manager
+    /// 7. Neighbor set updates (if topology enabled)
+    /// 8. Hello response with our info
     pub async fn handle_hello(
         &self,
         connection: &quinn::Connection,
@@ -34,6 +35,8 @@ impl ConnectionContext {
         version_info: &Option<crate::VersionInfo>,
         topology_info: &Option<TopologyInfo>,
         x25519_public: &[u8; 32],
+        ml_dsa_public: Option<Vec<u8>>,
+        ml_kem_public: Option<Vec<u8>>,
     ) -> Result<()> {
         // Verify DID-TLS binding using TOFU model
         if let Err(e) = icn_identity::verify_did_matches_binding(from, binding_info) {
@@ -105,12 +108,15 @@ impl ConnectionContext {
 
         // Store peer connection info
         {
+            let has_pq_keys = ml_dsa_public.is_some() || ml_kem_public.is_some();
             let connection_info = PeerConnectionInfo {
                 did: from.clone(),
                 negotiated_version,
                 peer_capabilities: common_caps,
                 peer_software: peer_software.clone(),
                 x25519_key: *x25519_public,
+                ml_dsa_public,
+                ml_kem_public,
             };
 
             let mut connections = self.peer_connections.write().await;
@@ -120,6 +126,7 @@ impl ConnectionContext {
                 negotiated_version = negotiated_version,
                 peer_software = %peer_software,
                 capabilities = ?common_caps.describe(),
+                has_pq_keys = has_pq_keys,
                 "Stored peer connection info"
             );
         }

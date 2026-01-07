@@ -130,6 +130,14 @@ pub struct PeerConnectionInfo {
 
     /// X25519 public key for end-to-end encryption
     pub x25519_key: [u8; 32],
+
+    /// ML-DSA public key for post-quantum signature verification (optional)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ml_dsa_public: Option<Vec<u8>>,
+
+    /// ML-KEM public key for post-quantum key encapsulation (optional)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ml_kem_public: Option<Vec<u8>>,
 }
 
 /// Network actor state for persistence
