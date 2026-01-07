@@ -336,6 +336,92 @@ pub enum LocalityHint {
     ColocateWith([u8; 32]),
 }
 
+/// Federation placement policy for cross-cooperative task execution.
+///
+/// Controls whether and how tasks can be placed on executors from
+/// federated cooperatives. This is evaluated during placement scoring.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub enum FederationPolicy {
+    /// Prefer local executors, only use federated if no local available.
+    /// Local executors get a score bonus (configurable).
+    #[default]
+    PreferLocal,
+
+    /// Allow federated executors with equal consideration.
+    /// No score adjustment based on federation status.
+    AllowFederated,
+
+    /// Only use executors from whitelisted cooperatives.
+    /// Tasks will only be placed on executors from listed coops.
+    FederatedWhitelist {
+        /// Cooperative IDs that are allowed to execute this task
+        cooperatives: Vec<String>,
+    },
+
+    /// Block all federated executors - local only.
+    /// Tasks can only be executed by same-cooperative executors.
+    LocalOnly,
+}
+
+/// Extended placement constraints with federation support.
+///
+/// Embeds base `PlacementConstraints` from the policy module and adds
+/// federation-specific controls for cross-cooperative task execution.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct FederatedPlacementConstraints {
+    /// Base placement constraints (region, whitelist, blacklist, capabilities)
+    #[serde(flatten)]
+    pub base: crate::policy::PlacementConstraints,
+
+    /// Federation placement policy
+    pub federation_policy: FederationPolicy,
+
+    /// Minimum required federated trust score (0.0-1.0)
+    /// Federated executors below this threshold are rejected.
+    /// Default: 0.3 (same as MIN_TRUST_EXECUTE)
+    pub min_federated_trust: Option<f64>,
+
+    /// Local preference weight (0.0-1.0) when using PreferLocal policy.
+    /// Higher values give more advantage to local executors.
+    /// Default: 0.15 (15% score bonus for local executors)
+    pub local_preference_weight: Option<f64>,
+}
+
+impl FederatedPlacementConstraints {
+    /// Default minimum federated trust threshold
+    pub const DEFAULT_MIN_FEDERATED_TRUST: f64 = 0.3;
+
+    /// Default local preference weight
+    pub const DEFAULT_LOCAL_PREFERENCE_WEIGHT: f64 = 0.15;
+
+    /// Check if an executor from a given cooperative is allowed by this policy
+    pub fn allows_cooperative(&self, coop_id: Option<&str>, is_local: bool) -> bool {
+        match &self.federation_policy {
+            FederationPolicy::LocalOnly => is_local,
+            FederationPolicy::PreferLocal | FederationPolicy::AllowFederated => true,
+            FederationPolicy::FederatedWhitelist { cooperatives } => {
+                if is_local {
+                    true // Local is always allowed
+                } else {
+                    coop_id.is_some_and(|id| cooperatives.iter().any(|c| c == id))
+                }
+            }
+        }
+    }
+
+    /// Get the effective minimum federated trust threshold
+    pub fn effective_min_trust(&self) -> f64 {
+        self.min_federated_trust
+            .unwrap_or(Self::DEFAULT_MIN_FEDERATED_TRUST)
+    }
+
+    /// Get the effective local preference weight
+    pub fn effective_local_preference(&self) -> f64 {
+        self.local_preference_weight
+            .unwrap_or(Self::DEFAULT_LOCAL_PREFERENCE_WEIGHT)
+    }
+}
+
 /// Placement request for a task.
 ///
 /// Sent via gossip to solicit bids from executors.

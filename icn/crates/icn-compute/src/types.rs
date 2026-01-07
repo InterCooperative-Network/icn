@@ -83,6 +83,9 @@ pub struct ComputeTask {
     /// Placement constraints from policy (Phase 16E Week 2)
     #[serde(default)]
     pub placement_constraints: Option<crate::policy::PlacementConstraints>,
+    /// Federation placement constraints (Phase 21 - cross-cooperative execution)
+    #[serde(default)]
+    pub federation_constraints: Option<crate::scheduler::FederatedPlacementConstraints>,
     /// Estimated task value in credits (Issue #478 - for verification requirements)
     /// Used to determine how many executors should verify the result
     #[serde(default)]
@@ -447,6 +450,45 @@ pub enum ComputeMessage {
         final_checkpoint: crate::actor_model::ActorCheckpoint,
         duration_ms: u64,
     },
+
+    // === Cross-Cooperative Federation (Issue #515) ===
+    /// Federated executor announces capabilities from another cooperative
+    FederatedExecutorAnnounce {
+        /// Executor DID (federated format: did:icn:coop-id:key)
+        executor: String,
+        /// Source cooperative ID
+        cooperative_id: String,
+        /// Executor capabilities
+        capabilities: Vec<ExecutorCapability>,
+        /// Attestation from source cooperative (serialized)
+        attestation: crate::federation::FederatedExecutorAttestation,
+    },
+
+    /// Request task execution on federated executor
+    FederatedTaskRequest {
+        /// Task hash
+        task_hash: TaskHash,
+        /// The task to execute (boxed for size)
+        task: Box<ComputeTask>,
+        /// Requesting cooperative
+        from_coop: String,
+        /// Target cooperative
+        to_coop: String,
+        /// Payment terms for cross-coop execution
+        payment: crate::federation::FederatedPaymentTerms,
+        /// When this request was sent
+        requested_at: u64,
+    },
+
+    /// Result from federated executor
+    FederatedTaskResult {
+        /// The computation result
+        result: ComputeResult,
+        /// Cooperative that executed the task
+        executor_coop: String,
+        /// Hash of attestation proving result integrity
+        attestation_hash: [u8; 32],
+    },
 }
 
 #[cfg(test)]
@@ -471,6 +513,7 @@ mod tests {
             resource_profile: None,
             actor_mode: None,
             placement_constraints: None,
+            federation_constraints: None,
             estimated_value: None,
             verification: None,
         };
@@ -630,6 +673,7 @@ mod tests {
             resource_profile: None,
             actor_mode: None,
             placement_constraints: None,
+            federation_constraints: None,
             estimated_value: None,
             verification: None,
         }

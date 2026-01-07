@@ -2739,6 +2739,7 @@ dependencies = [
  "ed25519-dalek",
  "hex",
  "icn-ccl",
+ "icn-federation",
  "icn-identity",
  "icn-obs",
  "icn-security",

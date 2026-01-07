@@ -144,8 +144,9 @@ impl ComputeManager {
                     .duration_estimate_secs
                     .map(std::time::Duration::from_secs),
             }),
-            actor_mode: None,            // Not actor mode (Phase 16D)
+            actor_mode: None,             // Not actor mode (Phase 16D)
             placement_constraints: None, // No constraints from API (Phase 16E will set from policy)
+            federation_constraints: None, // No federation constraints from API (Phase 21)
             estimated_value: None,       // Issue #478: Computed from task value or set by client
             verification: None,          // Issue #478: Auto-determined from estimated_value
         };

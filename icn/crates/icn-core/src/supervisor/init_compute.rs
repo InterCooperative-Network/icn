@@ -162,6 +162,19 @@ fn get_message_topic_and_data(
             icn_compute::TOPIC_MIGRATION,
             bincode::serde::encode_to_vec(compute_msg, bincode::config::legacy()),
         ),
+        // Phase 21: Cross-cooperative federation messages
+        ComputeMessage::FederatedExecutorAnnounce { .. } => (
+            icn_compute::TOPIC_FEDERATION,
+            bincode::serde::encode_to_vec(compute_msg, bincode::config::legacy()),
+        ),
+        ComputeMessage::FederatedTaskRequest { .. } => (
+            icn_compute::TOPIC_FEDERATION,
+            bincode::serde::encode_to_vec(compute_msg, bincode::config::legacy()),
+        ),
+        ComputeMessage::FederatedTaskResult { .. } => (
+            icn_compute::TOPIC_FEDERATION,
+            bincode::serde::encode_to_vec(compute_msg, bincode::config::legacy()),
+        ),
     }
 }
 

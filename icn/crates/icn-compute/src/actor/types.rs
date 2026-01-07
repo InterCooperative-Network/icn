@@ -10,11 +10,21 @@ use crate::types::{ComputeMessage, ComputeResult, ExecutorCapability, TaskHash};
 pub(crate) struct ExecutorInfo {
     /// Executor's DID
     pub did: String,
+    /// Cooperative ID this executor belongs to (None = local/same cooperative)
+    #[allow(dead_code)]
+    pub cooperative_id: Option<String>,
+    /// Whether this executor is from a federated cooperative
+    #[allow(dead_code)]
+    pub is_federated: bool,
     /// Capabilities this executor offers
     pub capabilities: Vec<ExecutorCapability>,
-    /// Current trust score (used for future executor selection)
+    /// Current trust score (local, from icn-trust)
     #[allow(dead_code)]
     pub trust_score: f64,
+    /// Federated trust score (attenuated based on coop trust)
+    /// Formula: federated_trust = local_trust × coop_trust × attenuation_factor
+    #[allow(dead_code)]
+    pub federated_trust_score: Option<f64>,
     /// Last announcement timestamp (milliseconds since epoch, used for staleness detection)
     #[allow(dead_code)]
     pub last_seen: u64,
@@ -22,6 +32,9 @@ pub(crate) struct ExecutorInfo {
     pub tasks_executing: usize,
     /// Current capacity (CPU, memory, storage, GPU)
     pub capacity: Option<NodeCapacity>,
+    /// Gateway endpoint for federated executors (used for result delivery)
+    #[allow(dead_code)]
+    pub gateway_endpoint: Option<String>,
 }
 
 /// Consensus tracking for task results

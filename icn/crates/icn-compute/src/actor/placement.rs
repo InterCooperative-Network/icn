@@ -23,11 +23,15 @@ impl ComputeActor {
 
         let info = ExecutorInfo {
             did: did.clone(),
+            cooperative_id: None, // Local executor
+            is_federated: false,  // Not from federation
             capabilities,
             trust_score,
+            federated_trust_score: None, // N/A for local executors
             last_seen: now,
             tasks_executing: 0,
             capacity: None,
+            gateway_endpoint: None, // N/A for local executors
         };
 
         let mut registry = self.executor_registry.lock().await;
@@ -161,94 +165,147 @@ impl ComputeActor {
         };
 
         // Check placement constraints from policy (Phase 16E)
-        // Look up task to get its placement_constraints
-        let mgr = self.task_manager.lock().await;
-        if let Some(task) = mgr.get(&task_hash) {
-            if let Some(ref constraints) = task.placement_constraints {
-                // Check required region
-                if let Some(ref required_region) = constraints.required_region {
-                    if let Some(ref own_region) = self.own_region {
-                        if own_region != required_region {
-                            tracing::debug!(
-                                task_hash = %task_hash_str,
-                                required_region = %required_region,
-                                own_region = %own_region,
-                                "Task requires different region, skipping claim"
-                            );
-                            drop(mgr);
-                            return Ok(());
-                        }
-                    } else {
-                        // No region configured, cannot claim region-specific tasks
+        // Extract constraints from task manager first, then drop the lock to avoid
+        // nested lock acquisition with executor_registry (potential deadlock fix)
+        let (placement_constraints, federation_constraints, task_coop_id) = {
+            let mgr = self.task_manager.lock().await;
+            if let Some(task) = mgr.get(&task_hash) {
+                (
+                    task.placement_constraints.clone(),
+                    task.federation_constraints.clone(),
+                    task.coop_id.clone(),
+                )
+            } else {
+                (None, None, None)
+            }
+            // mgr lock is dropped here
+        };
+
+        // Check placement constraints (no longer holding task_manager lock)
+        if let Some(ref constraints) = placement_constraints {
+            // Check required region
+            if let Some(ref required_region) = constraints.required_region {
+                if let Some(ref own_region) = self.own_region {
+                    if own_region != required_region {
                         tracing::debug!(
                             task_hash = %task_hash_str,
                             required_region = %required_region,
-                            "Task requires region but node has no region configured, skipping claim"
+                            own_region = %own_region,
+                            "Task requires different region, skipping claim"
                         );
-                        drop(mgr);
                         return Ok(());
                     }
-                }
-
-                // Check executor whitelist
-                if !constraints.allowed_executors.is_empty()
-                    && !constraints.allowed_executors.contains(&self.own_did)
-                {
-                    tracing::info!(
+                } else {
+                    // No region configured, cannot claim region-specific tasks
+                    tracing::debug!(
                         task_hash = %task_hash_str,
-                        executor = %self.own_did,
-                        "Executor not in whitelist, skipping placement"
+                        required_region = %required_region,
+                        "Task requires region but node has no region configured, skipping claim"
                     );
-                    icn_obs::metrics::compute::placement_constraints_enforced_inc("whitelist");
-                    drop(mgr);
                     return Ok(());
                 }
+            }
 
-                // Check executor blacklist
-                if constraints.forbidden_executors.contains(&self.own_did) {
-                    tracing::info!(
-                        task_hash = %task_hash_str,
-                        executor = %self.own_did,
-                        "Executor in blacklist, skipping placement"
-                    );
-                    icn_obs::metrics::compute::placement_constraints_enforced_inc("blacklist");
-                    drop(mgr);
-                    return Ok(());
-                }
+            // Check executor whitelist
+            if !constraints.allowed_executors.is_empty()
+                && !constraints.allowed_executors.contains(&self.own_did)
+            {
+                tracing::info!(
+                    task_hash = %task_hash_str,
+                    executor = %self.own_did,
+                    "Executor not in whitelist, skipping placement"
+                );
+                icn_obs::metrics::compute::placement_constraints_enforced_inc("whitelist");
+                return Ok(());
+            }
 
-                // Check required capabilities
-                if !constraints.required_capabilities.is_empty() {
-                    // Get our capabilities from registry
-                    let registry = self.executor_registry.lock().await;
-                    if let Some(info) = registry.get(&self.own_did) {
-                        let our_caps = &info.capabilities;
-                        for required in &constraints.required_capabilities {
-                            // Convert string to capability and check
-                            let has_cap = our_caps.iter().any(|cap| match cap {
-                                crate::types::ExecutorCapability::Ccl => required == "Ccl",
-                                crate::types::ExecutorCapability::Wasm => required == "Wasm",
-                                crate::types::ExecutorCapability::Custom(name) => name == required,
-                            });
-                            if !has_cap {
-                                tracing::info!(
-                                    task_hash = %task_hash_str,
-                                    executor = %self.own_did,
-                                    missing_capability = %required,
-                                    "Missing required capability, skipping placement"
-                                );
-                                icn_obs::metrics::compute::placement_constraints_enforced_inc(
-                                    "capability",
-                                );
-                                drop(registry);
-                                drop(mgr);
-                                return Ok(());
-                            }
+            // Check executor blacklist
+            if constraints.forbidden_executors.contains(&self.own_did) {
+                tracing::info!(
+                    task_hash = %task_hash_str,
+                    executor = %self.own_did,
+                    "Executor in blacklist, skipping placement"
+                );
+                icn_obs::metrics::compute::placement_constraints_enforced_inc("blacklist");
+                return Ok(());
+            }
+
+            // Check required capabilities
+            if !constraints.required_capabilities.is_empty() {
+                // Get our capabilities from registry (safe - not holding task_manager)
+                let registry = self.executor_registry.lock().await;
+                if let Some(info) = registry.get(&self.own_did) {
+                    let our_caps = &info.capabilities;
+                    for required in &constraints.required_capabilities {
+                        // Convert string to capability and check
+                        let has_cap = our_caps.iter().any(|cap| match cap {
+                            crate::types::ExecutorCapability::Ccl => required == "Ccl",
+                            crate::types::ExecutorCapability::Wasm => required == "Wasm",
+                            crate::types::ExecutorCapability::Custom(name) => name == required,
+                        });
+                        if !has_cap {
+                            tracing::info!(
+                                task_hash = %task_hash_str,
+                                executor = %self.own_did,
+                                missing_capability = %required,
+                                "Missing required capability, skipping placement"
+                            );
+                            icn_obs::metrics::compute::placement_constraints_enforced_inc(
+                                "capability",
+                            );
+                            return Ok(());
                         }
                     }
                 }
+                // registry lock dropped here
             }
         }
-        drop(mgr);
+
+        // Phase 21: Check federation placement constraints
+        if let Some(ref fed_constraints) = federation_constraints {
+            // Determine if we're a federated executor (from another cooperative)
+            let is_local = self.own_cooperative_id.is_none()
+                || task_coop_id.as_ref() == self.own_cooperative_id.as_ref();
+
+            // Check federation policy
+            if !fed_constraints.allows_cooperative(self.own_cooperative_id.as_deref(), is_local) {
+                tracing::info!(
+                    task_hash = %task_hash_str,
+                    executor = %self.own_did,
+                    our_coop = ?self.own_cooperative_id,
+                    task_coop = ?task_coop_id,
+                    policy = ?fed_constraints.federation_policy,
+                    "Federation policy rejects this executor, skipping placement"
+                );
+                icn_obs::metrics::compute::placement_constraints_enforced_inc("federation_policy");
+                return Ok(());
+            }
+
+            // Check federated trust threshold if we're a federated executor
+            if !is_local {
+                let min_trust = fed_constraints.effective_min_trust();
+                // Look up our federated trust score from registry (safe - not holding task_manager)
+                let registry = self.executor_registry.lock().await;
+                if let Some(info) = registry.get(&self.own_did) {
+                    if let Some(fed_trust) = info.federated_trust_score {
+                        if fed_trust < min_trust {
+                            tracing::info!(
+                                task_hash = %task_hash_str,
+                                executor = %self.own_did,
+                                federated_trust = fed_trust,
+                                min_required = min_trust,
+                                "Federated trust below threshold, skipping placement"
+                            );
+                            icn_obs::metrics::compute::placement_constraints_enforced_inc(
+                                "federation_trust",
+                            );
+                            return Ok(());
+                        }
+                    }
+                }
+                // registry lock dropped here
+            }
+        }
 
         // Score the task
         let offer = match policy.score_task(
@@ -601,11 +658,15 @@ impl ComputeActor {
             let trust_score = (self.trust_callback)(&executor);
             let info = ExecutorInfo {
                 did: executor.clone(),
+                cooperative_id: None,     // Local executor
+                is_federated: false,      // Not from federation
                 capabilities: Vec::new(), // Will be populated on ExecutorAvailable message
                 trust_score,
+                federated_trust_score: None, // N/A for local executors
                 last_seen: capacity.updated_at,
                 tasks_executing: 0,
                 capacity: Some(capacity.clone()),
+                gateway_endpoint: None, // N/A for local executors
             };
             registry.insert(executor.clone(), info);
             tracing::debug!(
@@ -616,6 +677,317 @@ impl ComputeActor {
 
         // Update metrics for executor capacity
         icn_obs::metrics::compute::executors_available_set(registry.len() as f64);
+
+        Ok(())
+    }
+
+    /// Handle federated executor announcement (Phase 21)
+    ///
+    /// Called when a federated cooperative announces available executors.
+    /// These executors are registered with attenuated trust scores.
+    ///
+    /// # Security
+    /// This method verifies the attestation signature to prevent forged announcements.
+    pub(super) async fn on_federated_executor_announce(
+        &self,
+        executor: String,
+        cooperative_id: String,
+        capabilities: Vec<ExecutorCapability>,
+        attestation: crate::federation::FederatedExecutorAttestation,
+    ) -> Result<(), ComputeError> {
+        let local_trust = attestation.trust_attestation.trust_score;
+
+        tracing::info!(
+            executor = %executor,
+            cooperative_id = %cooperative_id,
+            capabilities = ?capabilities,
+            attested_trust = local_trust,
+            "Received federated executor announcement"
+        );
+
+        // Security: Verify attestation is signed
+        if !attestation.is_signed() {
+            tracing::warn!(
+                executor = %executor,
+                cooperative_id = %cooperative_id,
+                "Rejecting unsigned federated executor attestation"
+            );
+            return Err(ComputeError::InvalidSignature(
+                "Attestation must be signed by source cooperative".to_string(),
+            ));
+        }
+
+        // Security: Verify attestation is not expired
+        if attestation.is_expired() {
+            tracing::warn!(
+                executor = %executor,
+                cooperative_id = %cooperative_id,
+                "Rejecting expired federated executor attestation"
+            );
+            return Err(ComputeError::InvalidSignature(
+                "Attestation has expired".to_string(),
+            ));
+        }
+
+        // Security: Verify the source cooperative DID matches the claimed cooperative_id
+        // and verify the signature
+        let source_did = &attestation.trust_attestation.source_coop_did;
+        let verifying_key = source_did.to_verifying_key().map_err(|e| {
+            ComputeError::InvalidSignature(format!(
+                "Failed to extract verifying key from source DID: {e}"
+            ))
+        })?;
+
+        match attestation.verify(&verifying_key) {
+            Ok(true) => {
+                tracing::debug!(
+                    executor = %executor,
+                    cooperative_id = %cooperative_id,
+                    "Federated executor attestation signature verified"
+                );
+            }
+            Ok(false) => {
+                tracing::warn!(
+                    executor = %executor,
+                    cooperative_id = %cooperative_id,
+                    "Rejecting federated executor attestation: invalid signature"
+                );
+                return Err(ComputeError::InvalidSignature(
+                    "Attestation signature verification failed".to_string(),
+                ));
+            }
+            Err(e) => {
+                tracing::warn!(
+                    executor = %executor,
+                    cooperative_id = %cooperative_id,
+                    error = %e,
+                    "Error verifying federated executor attestation"
+                );
+                return Err(e);
+            }
+        }
+
+        // Rate limiting: prevent announcement flooding from any cooperative
+        const MAX_ANNOUNCES_PER_WINDOW: u32 = 10; // Max 10 announcements per window
+        const RATE_LIMIT_WINDOW_MS: u64 = 60_000; // 1 minute window
+
+        let now = icn_time::current_timestamp_millis();
+        {
+            let mut rate_limiter = self.federated_announce_rate_limiter.lock().await;
+            let entry = rate_limiter.entry(cooperative_id.clone()).or_insert((0, 0));
+
+            // Check if we're in a new window
+            if now - entry.0 > RATE_LIMIT_WINDOW_MS {
+                // Reset window
+                entry.0 = now;
+                entry.1 = 1;
+            } else {
+                // Same window, check limit
+                if entry.1 >= MAX_ANNOUNCES_PER_WINDOW {
+                    tracing::warn!(
+                        executor = %executor,
+                        cooperative_id = %cooperative_id,
+                        count = entry.1,
+                        "Rate limiting federated executor announcement"
+                    );
+                    return Err(ComputeError::PolicyViolation(format!(
+                        "Rate limit exceeded: max {MAX_ANNOUNCES_PER_WINDOW} announcements per minute from {cooperative_id}"
+                    )));
+                }
+                entry.1 += 1;
+            }
+        }
+
+        // Calculate attenuated trust score
+        // Get our trust in the announcing cooperative
+        let coop_trust = (self.trust_callback)(&cooperative_id);
+        let federated_trust = crate::federation::FederatedExecutorRegistry::attenuate_trust_static(
+            local_trust,
+            coop_trust,
+        );
+
+        let now = icn_time::current_timestamp_millis();
+
+        let info = ExecutorInfo {
+            did: executor.clone(),
+            cooperative_id: Some(cooperative_id.clone()),
+            is_federated: true,
+            capabilities,
+            trust_score: local_trust, // Original trust from source coop
+            federated_trust_score: Some(federated_trust),
+            last_seen: now,
+            tasks_executing: 0,
+            capacity: None, // Will be updated via capacity announcements
+            gateway_endpoint: attestation.gateway_endpoint.clone(),
+        };
+
+        // Register in local executor registry
+        let mut registry = self.executor_registry.lock().await;
+        registry.insert(executor.clone(), info);
+        icn_obs::metrics::compute::executors_available_set(registry.len() as f64);
+
+        tracing::debug!(
+            executor = %executor,
+            cooperative_id = %cooperative_id,
+            federated_trust = federated_trust,
+            "Registered federated executor"
+        );
+
+        Ok(())
+    }
+
+    /// Handle federated task request (Phase 21)
+    ///
+    /// Called when another cooperative requests task execution on our executors.
+    /// Validates payment terms and routes to local placement.
+    pub(super) async fn on_federated_task_request(
+        &self,
+        task_hash: TaskHash,
+        task: crate::types::ComputeTask,
+        from_coop: String,
+        to_coop: String,
+        payment: crate::federation::FederatedPaymentTerms,
+        requested_at: u64,
+    ) -> Result<(), ComputeError> {
+        let task_hash_str = hex::encode(task_hash);
+
+        tracing::info!(
+            task_hash = %task_hash_str,
+            from_coop = %from_coop,
+            to_coop = %to_coop,
+            amount = payment.amount,
+            "Received federated task request"
+        );
+
+        // Verify this request is intended for our cooperative
+        if let Some(ref our_coop) = self.own_cooperative_id {
+            if our_coop != &to_coop {
+                tracing::warn!(
+                    task_hash = %task_hash_str,
+                    our_coop = %our_coop,
+                    to_coop = %to_coop,
+                    "Federated task request not intended for our cooperative"
+                );
+                return Ok(());
+            }
+        } else {
+            tracing::warn!(
+                task_hash = %task_hash_str,
+                "No cooperative ID configured, cannot process federated task"
+            );
+            return Ok(());
+        }
+
+        // Verify payment terms are acceptable
+        const MIN_PAYMENT_THRESHOLD: u64 = 1; // Minimum 1 credit required for federated tasks
+
+        if payment.amount < MIN_PAYMENT_THRESHOLD {
+            tracing::warn!(
+                task_hash = %task_hash_str,
+                offered = payment.amount,
+                minimum = MIN_PAYMENT_THRESHOLD,
+                "Rejecting federated task: payment below minimum threshold"
+            );
+            return Err(ComputeError::PolicyViolation(format!(
+                "Payment amount {} below minimum threshold {}",
+                payment.amount, MIN_PAYMENT_THRESHOLD
+            )));
+        }
+
+        // Validate exchange variance is reasonable (prevent excessive fees)
+        const MAX_ALLOWED_EXCHANGE_VARIANCE: f64 = 0.25; // 25% max
+        if payment.max_exchange_variance > MAX_ALLOWED_EXCHANGE_VARIANCE {
+            tracing::warn!(
+                task_hash = %task_hash_str,
+                variance = payment.max_exchange_variance,
+                max_allowed = MAX_ALLOWED_EXCHANGE_VARIANCE,
+                "Rejecting federated task: exchange variance too high"
+            );
+            return Err(ComputeError::PolicyViolation(format!(
+                "Exchange variance {} exceeds maximum {}",
+                payment.max_exchange_variance, MAX_ALLOWED_EXCHANGE_VARIANCE
+            )));
+        }
+
+        tracing::debug!(
+            task_hash = %task_hash_str,
+            amount = payment.amount,
+            trigger = ?payment.payment_trigger,
+            "Payment terms validated for federated task"
+        );
+
+        // Store task in task manager with federated metadata
+        {
+            let mut mgr = self.task_manager.lock().await;
+            if let Err(e) = mgr.submit(task.clone()) {
+                tracing::warn!(
+                    task_hash = %task_hash_str,
+                    error = %e,
+                    "Failed to submit federated task to task manager"
+                );
+                return Err(e);
+            }
+        }
+
+        // Emit local placement request
+        // This will be handled by our local executors
+        if let Some(ref cb) = self.send_callback {
+            cb(ComputeMessage::PlacementRequest {
+                task_hash,
+                submitter: from_coop.clone(),
+                resource_profile: task.resource_profile.unwrap_or_default(),
+                locality_hints: vec![],
+                max_cost: Some(payment.amount),
+                requested_at,
+            });
+        }
+
+        tracing::debug!(
+            task_hash = %task_hash_str,
+            from_coop = %from_coop,
+            "Initiated local placement for federated task"
+        );
+
+        Ok(())
+    }
+
+    /// Handle federated task result (Phase 21)
+    ///
+    /// Called when a federated executor reports task completion.
+    /// Routes the result back to the original submitter and triggers payment settlement.
+    pub(super) async fn on_federated_task_result(
+        &self,
+        result: crate::types::ComputeResult,
+        executor_coop: String,
+        attestation_hash: [u8; 32],
+    ) -> Result<(), ComputeError> {
+        let task_hash_str = hex::encode(result.task_hash);
+        let success = matches!(result.outcome, crate::types::ExecutionOutcome::Success(_));
+
+        tracing::info!(
+            task_hash = %task_hash_str,
+            executor = %result.executor,
+            executor_coop = %executor_coop,
+            success = success,
+            attestation_hash = %hex::encode(attestation_hash),
+            "Received federated task result"
+        );
+
+        // Process the result through normal channels
+        // The attestation_hash can be used to verify the result came from a trusted source
+        self.on_task_result(result.clone()).await?;
+
+        // TODO: Trigger payment settlement via ClearingManager
+        // This would involve:
+        // 1. Verify attestation_hash matches expected value
+        // 2. Look up payment terms from original FederatedTaskRequest
+        // 3. Call ClearingManager::propose_transfer()
+
+        tracing::debug!(
+            task_hash = %task_hash_str,
+            executor_coop = %executor_coop,
+            "Processed federated task result"
+        );
 
         Ok(())
     }

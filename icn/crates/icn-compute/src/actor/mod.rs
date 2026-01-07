@@ -83,6 +83,13 @@ pub struct ComputeActor {
     contract_registry: Option<icn_ccl::ContractRegistryHandle>,
     /// Result quorum manager for multi-executor verification (Issue #511)
     quorum_manager: Arc<ResultQuorumManager>,
+    /// Federated executor registry for cross-cooperative task placement (Phase 21)
+    federation_registry: Option<Arc<crate::federation::FederatedExecutorRegistry>>,
+    /// Our cooperative ID for federation purposes
+    own_cooperative_id: Option<String>,
+    /// Rate limiter for federated announcements (per cooperative)
+    /// Maps cooperative_id -> (last_announce_time, count_in_window)
+    federated_announce_rate_limiter: Arc<Mutex<HashMap<String, (u64, u32)>>>,
 }
 
 impl ComputeActor {
@@ -112,6 +119,9 @@ impl ComputeActor {
             own_region: None,           // Set via set_region() or from config
             contract_registry: None,    // Set via set_contract_registry()
             quorum_manager: Arc::new(ResultQuorumManager::new(VerificationConfig::default())),
+            federation_registry: None, // Phase 21: Set via set_federation_registry()
+            own_cooperative_id: None,  // Phase 21: Set via set_cooperative_id()
+            federated_announce_rate_limiter: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -216,6 +226,30 @@ impl ComputeActor {
     /// Get a reference to the quorum manager for result verification
     pub fn quorum_manager(&self) -> &Arc<ResultQuorumManager> {
         &self.quorum_manager
+    }
+
+    /// Set the federated executor registry for cross-cooperative task placement (Phase 21)
+    ///
+    /// When set, the compute actor can discover and use executors from federated
+    /// cooperatives for task execution.
+    pub fn set_federation_registry(
+        &mut self,
+        registry: Arc<crate::federation::FederatedExecutorRegistry>,
+    ) {
+        self.federation_registry = Some(registry);
+    }
+
+    /// Set this node's cooperative ID for federation purposes (Phase 21)
+    ///
+    /// This is used to identify which cooperative this node belongs to when
+    /// coordinating with federated executors.
+    pub fn set_cooperative_id(&mut self, coop_id: String) {
+        self.own_cooperative_id = Some(coop_id);
+    }
+
+    /// Get this node's cooperative ID
+    pub fn cooperative_id(&self) -> Option<&str> {
+        self.own_cooperative_id.as_deref()
     }
 
     /// Check if we're at capacity for claiming new tasks
@@ -344,7 +378,7 @@ impl ComputeActor {
                         let _ = resp.send(result);
                     }
                     ComputeCommand::GossipMessage(msg) => {
-                        if let Err(e) = self.handle_message(msg).await {
+                        if let Err(e) = self.handle_message(*msg).await {
                             tracing::warn!("compute message error: {}", e);
                         }
                     }
@@ -615,6 +649,48 @@ impl ComputeActor {
                     duration_ms,
                 )
                 .await
+            }
+
+            // Phase 21: Federation messages
+            ComputeMessage::FederatedExecutorAnnounce {
+                executor,
+                cooperative_id,
+                capabilities,
+                attestation,
+            } => {
+                self.on_federated_executor_announce(
+                    executor,
+                    cooperative_id,
+                    capabilities,
+                    attestation,
+                )
+                .await
+            }
+            ComputeMessage::FederatedTaskRequest {
+                task_hash,
+                task,
+                from_coop,
+                to_coop,
+                payment,
+                requested_at,
+            } => {
+                self.on_federated_task_request(
+                    task_hash,
+                    *task,
+                    from_coop,
+                    to_coop,
+                    payment,
+                    requested_at,
+                )
+                .await
+            }
+            ComputeMessage::FederatedTaskResult {
+                result,
+                executor_coop,
+                attestation_hash,
+            } => {
+                self.on_federated_task_result(result, executor_coop, attestation_hash)
+                    .await
             }
         }
     }
