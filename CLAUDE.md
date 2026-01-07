@@ -156,18 +156,62 @@ CCL (`icn-ccl`) is a domain-specific language for expressing agreements:
 
 **icnctl commands**: `id init`, `id show`, `id rotate`, `id export/import`
 
-## Current Development Status
+## Roadmap & Phase Tracking
 
-**Pilot Ready**: Byzantine fault-tolerant infrastructure operational with comprehensive monitoring.
+**Standard**: All development is tracked as sequential phases. No parallel tracks, no letter suffixes.
 
-**Recent Phases**:
-- Phase 18: Pre-Pilot Hardening (Byzantine detection, reputation system)
-- Phase 16: Scheduler Evolution (resource profiles, placement scoring, policies)
-- Phase 15: Distributed Compute Layer (trust-gated task execution)
+### Phase Format
 
-See **[docs/PHASE_HISTORY.md](docs/PHASE_HISTORY.md)** for complete phase history.
+Each phase in documentation must follow this format:
 
-**What's Next**: See [docs/dev-journal/ROADMAP.md](docs/dev-journal/ROADMAP.md) for the strategic roadmap.
+```
+### Phase N: <Name>
+**Status**: ✅ Complete | 🚧 In Progress | ⏳ Planned
+**Completed**: YYYY-MM-DD (if done)
+
+<One paragraph description of what this phase accomplishes>
+
+**Deliverables**:
+- Bullet list of concrete outputs
+```
+
+### Status Indicators
+
+| Symbol | Meaning |
+|--------|---------|
+| ✅ | Complete - merged to main, tested, deployed |
+| 🚧 | In Progress - active development |
+| ⏳ | Planned - scoped but not started |
+
+### Source of Truth
+
+- **Completed phases**: [docs/PHASE_HISTORY.md](docs/PHASE_HISTORY.md)
+- **Current & planned phases**: [docs/dev-journal/ROADMAP.md](docs/dev-journal/ROADMAP.md)
+- **This file**: Quick reference only, not authoritative
+
+### Current Status
+
+**Last Completed**: Phase 18 (Pre-Pilot Hardening) - 2025-11-27
+**Implementation**: ~75% complete (272K LOC, 2,287 tests)
+**Deployed**: K3s cluster since 2025-12-03
+
+**Remaining phases before release**:
+- Phase 19: NAT Traversal (internet connectivity)
+- Phase 20: Community & Onboarding Polish
+- Phase 21: Dynamic Trust
+- Phase 22: Federation Completion
+- Phase 23: Post-Quantum Ledger Integration
+- Phase 24: Mobile SDK
+- Phase 25: Hardening & Polish
+- Phase 26: Pilot Deployment
+
+### Rules for Agents
+
+1. **Never invent new tracking systems** - use phases with sequential numbers
+2. **Never use "Track A/B/C"** - everything is sequential
+3. **Update PHASE_HISTORY.md** when completing a phase
+4. **Update ROADMAP.md** when planning changes
+5. **Keep this section as quick reference only** - detail goes in the dedicated docs
 
 ## Common Development Workflows
 
