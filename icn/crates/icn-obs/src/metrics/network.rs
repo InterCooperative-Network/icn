@@ -119,6 +119,19 @@ pub fn init_descriptions() {
         "icn_network_encryption_circuit_breaker_trips_total",
         "Total number of times the encryption cleanup circuit breaker has tripped"
     );
+    // Hybrid PQ verification metrics (Issue #530)
+    describe_counter!(
+        "icn_network_hybrid_verification_cache_hit_total",
+        "Total number of hybrid signature verifications using cached PQ key (full verification)"
+    );
+    describe_counter!(
+        "icn_network_hybrid_verification_cache_miss_total",
+        "Total number of hybrid signature verifications with no cached PQ key (deferred verification)"
+    );
+    describe_counter!(
+        "icn_network_hybrid_verification_failed_total",
+        "Total number of hybrid signature verifications that failed"
+    );
 }
 
 // Simple counters
@@ -283,6 +296,36 @@ pub fn encryption_sequence_pairs_set(count: u64) {
 /// be degraded. Operators should investigate immediately.
 pub fn encryption_circuit_breaker_trips_inc() {
     counter!("icn_network_encryption_circuit_breaker_trips_total").increment(1);
+}
+
+// Hybrid PQ verification metrics (Issue #530)
+
+/// Increment hybrid verification cache hit counter
+///
+/// Called when a hybrid signature is verified using a cached PQ public key.
+/// This indicates full hybrid verification (both Ed25519 + ML-DSA verified).
+pub fn hybrid_verification_cache_hit_inc() {
+    counter!("icn_network_hybrid_verification_cache_hit_total").increment(1);
+}
+
+/// Increment hybrid verification cache miss counter
+///
+/// Called when a hybrid signature cannot be fully verified because no
+/// PQ public key is cached for the sender. Falls back to deferred verification.
+pub fn hybrid_verification_cache_miss_inc() {
+    counter!("icn_network_hybrid_verification_cache_miss_total").increment(1);
+}
+
+/// Increment hybrid verification failed counter with reason
+///
+/// Called when hybrid signature verification fails.
+/// Reasons: "invalid_pq_key", "pq_signature_mismatch", "ed25519_failed"
+pub fn hybrid_verification_failed_inc(reason: &str) {
+    counter!(
+        "icn_network_hybrid_verification_failed_total",
+        "reason" => reason.to_string()
+    )
+    .increment(1);
 }
 
 // Complex function with custom logic

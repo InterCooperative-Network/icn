@@ -170,15 +170,30 @@ impl ConnectionContext {
             if let Some(peer_info) = connections.get(&envelope.from) {
                 if let Some(ref ml_dsa_bytes) = peer_info.ml_dsa_public {
                     // We have the sender's PQ key - perform full hybrid verification
-                    let pq_key = icn_crypto_pq::MlDsaPublicKey::from_bytes(ml_dsa_bytes)
-                        .map_err(|e| anyhow::anyhow!("Invalid cached ML-DSA key: {e}"))?;
+                    let pq_key = match icn_crypto_pq::MlDsaPublicKey::from_bytes(ml_dsa_bytes) {
+                        Ok(key) => key,
+                        Err(e) => {
+                            icn_obs::metrics::network::hybrid_verification_failed_inc(
+                                "invalid_pq_key",
+                            );
+                            return Err(anyhow::anyhow!("Invalid cached ML-DSA key: {e}"));
+                        }
+                    };
 
                     debug!(
                         "Performing full hybrid verification for {} using cached PQ key",
                         envelope.from
                     );
 
-                    return envelope.verify_with_pq_key(max_age_secs, &pq_key);
+                    let result = envelope.verify_with_pq_key(max_age_secs, &pq_key);
+                    if result.is_ok() {
+                        icn_obs::metrics::network::hybrid_verification_cache_hit_inc();
+                    } else {
+                        icn_obs::metrics::network::hybrid_verification_failed_inc(
+                            "pq_signature_mismatch",
+                        );
+                    }
+                    return result;
                 }
             }
             // No cached PQ key - fall through to deferred verification
@@ -186,6 +201,7 @@ impl ConnectionContext {
                 "No cached PQ key for {} - using deferred hybrid verification",
                 envelope.from
             );
+            icn_obs::metrics::network::hybrid_verification_cache_miss_inc();
         }
 
         // Classical envelope or no cached PQ key - use standard verification
