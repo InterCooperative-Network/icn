@@ -49,6 +49,110 @@ impl TryFrom<u8> for CompressionFormat {
 /// Re-export TraceContext from icn-obs for distributed tracing propagation
 pub use icn_obs::TraceContext;
 
+/// Post-quantum key binding proof
+///
+/// Cryptographic proof that the sender controls both the Ed25519 key (DID)
+/// and the ML-DSA key. This prevents an attacker from claiming someone else's
+/// PQ public key in a Hello message.
+///
+/// The proof is an ML-DSA signature over the binding message:
+/// `"DID-PQ-BINDING-V1:<did>:<timestamp_millis>"`
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PqBindingProof {
+    /// Unix timestamp in milliseconds when the proof was created
+    pub timestamp_millis: u64,
+    /// ML-DSA signature over the binding message
+    pub signature: Vec<u8>,
+}
+
+impl PqBindingProof {
+    /// Binding message version prefix
+    pub const VERSION_PREFIX: &'static str = "DID-PQ-BINDING-V1";
+
+    /// Maximum age of a binding proof (5 minutes)
+    /// This prevents replay attacks while allowing for clock skew
+    pub const MAX_AGE_MILLIS: u64 = 5 * 60 * 1000;
+
+    /// Future tolerance for clock skew (1 minute)
+    /// Proofs with timestamps up to this far in the future are accepted
+    pub const FUTURE_TOLERANCE_MILLIS: u64 = 60_000;
+
+    /// Get current timestamp in milliseconds with safe u128->u64 conversion
+    fn current_timestamp_millis() -> Result<u64, anyhow::Error> {
+        use anyhow::anyhow;
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(|e| anyhow!("System time error: {e}"))
+            .map(|d| d.as_millis().min(u64::MAX as u128) as u64)
+    }
+
+    /// Create the canonical binding message to sign
+    pub fn binding_message(did: &Did, timestamp_millis: u64) -> Vec<u8> {
+        format!("{}:{}:{}", Self::VERSION_PREFIX, did, timestamp_millis).into_bytes()
+    }
+
+    /// Create a new binding proof
+    #[cfg(feature = "post-quantum")]
+    pub fn create(did: &Did, keypair: &icn_identity::KeyPair) -> Option<Self> {
+        let pq_keypair = keypair.pq_keypair()?;
+        let timestamp_millis = Self::current_timestamp_millis().ok()?;
+
+        let message = Self::binding_message(did, timestamp_millis);
+        let signature = pq_keypair.sign(&message).ok()?.as_bytes().to_vec();
+
+        Some(Self {
+            timestamp_millis,
+            signature,
+        })
+    }
+
+    /// Verify a binding proof against a DID and ML-DSA public key
+    #[cfg(feature = "post-quantum")]
+    pub fn verify(&self, did: &Did, ml_dsa_public: &[u8]) -> Result<(), anyhow::Error> {
+        use anyhow::anyhow;
+
+        let now_millis = Self::current_timestamp_millis()?;
+
+        // Check timestamp is not in the future (beyond clock skew tolerance)
+        if self.timestamp_millis > now_millis + Self::FUTURE_TOLERANCE_MILLIS {
+            return Err(anyhow!("Binding proof timestamp is in the future"));
+        }
+
+        // Check proof is not too old
+        if now_millis.saturating_sub(self.timestamp_millis) > Self::MAX_AGE_MILLIS {
+            return Err(anyhow!(
+                "Binding proof expired (older than {} seconds)",
+                Self::MAX_AGE_MILLIS / 1000
+            ));
+        }
+
+        // Parse the ML-DSA public key
+        let pq_pubkey = icn_crypto_pq::MlDsaPublicKey::from_bytes(ml_dsa_public)
+            .map_err(|e| anyhow!("Invalid ML-DSA public key: {e}"))?;
+
+        // Reconstruct the binding message
+        let message = Self::binding_message(did, self.timestamp_millis);
+
+        // Parse the signature
+        let signature = icn_crypto_pq::MlDsaSignature::from_bytes(&self.signature)
+            .map_err(|e| anyhow!("Invalid ML-DSA signature format: {e}"))?;
+
+        // Verify the signature using static method
+        if !icn_crypto_pq::MlDsaKeypair::verify(&pq_pubkey, &message, &signature) {
+            return Err(anyhow!("Binding proof signature verification failed"));
+        }
+        Ok(())
+    }
+
+    /// Verify without post-quantum feature (always fails)
+    #[cfg(not(feature = "post-quantum"))]
+    pub fn verify(&self, _did: &Did, _ml_dsa_public: &[u8]) -> Result<(), anyhow::Error> {
+        Err(anyhow::anyhow!(
+            "Post-quantum feature not enabled, cannot verify binding proof"
+        ))
+    }
+}
+
 /// Wire-format message envelope
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkMessage {
@@ -125,6 +229,11 @@ pub enum MessagePayload {
         /// Sent when HYBRID_KEM capability is advertised
         #[serde(default)]
         ml_kem_public: Option<Vec<u8>>,
+        /// DID-PQ key binding proof (post-quantum)
+        /// ML-DSA signature over "DID-PQ-BINDING-V1:<did>:<timestamp>" proving
+        /// the sender controls both Ed25519 (DID) and ML-DSA keys
+        #[serde(default)]
+        pq_binding_proof: Option<PqBindingProof>,
     },
 
     /// Handshake with topology information (legacy, kept for compatibility)
@@ -351,6 +460,46 @@ impl NetworkMessage {
                 x25519_public,
                 ml_dsa_public,
                 ml_kem_public,
+                pq_binding_proof: None,
+            },
+        )
+    }
+
+    /// Create a Hello message with post-quantum key binding proof
+    ///
+    /// This is the preferred method for nodes with hybrid capabilities.
+    /// The binding proof cryptographically proves the sender controls both
+    /// the Ed25519 key (DID) and the ML-DSA key.
+    #[cfg(feature = "post-quantum")]
+    pub fn hello_with_binding(
+        from: Did,
+        to: Did,
+        binding_info: BindingInfo,
+        version_info: VersionInfo,
+        topology_info: Option<crate::TopologyInfo>,
+        x25519_public: [u8; 32],
+        ml_dsa_public: Option<Vec<u8>>,
+        ml_kem_public: Option<Vec<u8>>,
+        keypair: &icn_identity::KeyPair,
+    ) -> Self {
+        // Generate binding proof if we have PQ keys
+        let pq_binding_proof = if ml_dsa_public.is_some() {
+            PqBindingProof::create(&from, keypair)
+        } else {
+            None
+        };
+
+        Self::new(
+            from,
+            Some(to),
+            MessagePayload::Hello {
+                binding_info,
+                version_info: Some(version_info),
+                topology_info,
+                x25519_public,
+                ml_dsa_public,
+                ml_kem_public,
+                pq_binding_proof,
             },
         )
     }
@@ -1177,5 +1326,285 @@ mod tests {
     fn test_compression_threshold() {
         // Verify the threshold constant
         assert_eq!(COMPRESSION_THRESHOLD, 1024);
+    }
+
+    // Issue #528: DID-PQ key binding verification tests
+
+    #[test]
+    fn test_pq_binding_message_format() {
+        let alice = KeyPair::generate().unwrap();
+        let timestamp = 1704067200000u64; // 2024-01-01 00:00:00 UTC
+
+        let message = PqBindingProof::binding_message(alice.did(), timestamp);
+        let expected = format!(
+            "{}:{}:{}",
+            PqBindingProof::VERSION_PREFIX,
+            alice.did(),
+            timestamp
+        );
+
+        assert_eq!(message, expected.as_bytes());
+    }
+
+    #[test]
+    #[cfg(feature = "post-quantum")]
+    fn test_pq_binding_proof_create_and_verify() {
+        // KeyPair::generate() creates hybrid keypairs when post-quantum feature is enabled
+        let keypair = KeyPair::generate().unwrap();
+        let did = keypair.did().clone();
+
+        // Create binding proof
+        let proof = PqBindingProof::create(&did, &keypair);
+        assert!(
+            proof.is_some(),
+            "Should create binding proof for hybrid keypair"
+        );
+
+        let proof = proof.unwrap();
+        assert!(!proof.signature.is_empty(), "Signature should not be empty");
+
+        // Verify the binding proof
+        let ml_dsa_public = keypair.pq_public_key().unwrap().as_bytes().to_vec();
+        let result = proof.verify(&did, &ml_dsa_public);
+        assert!(
+            result.is_ok(),
+            "Valid binding proof should verify: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "post-quantum")]
+    fn test_pq_binding_proof_fails_for_wrong_did() {
+        let keypair = KeyPair::generate().unwrap();
+        let did = keypair.did().clone();
+
+        // Create binding proof
+        let proof = PqBindingProof::create(&did, &keypair).unwrap();
+
+        // Try to verify with a different DID
+        let other_keypair = KeyPair::generate().unwrap();
+        let ml_dsa_public = keypair.pq_public_key().unwrap().as_bytes().to_vec();
+
+        let result = proof.verify(other_keypair.did(), &ml_dsa_public);
+        assert!(result.is_err(), "Should fail for wrong DID");
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("verification failed"),
+            "Error should mention verification failure"
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "post-quantum")]
+    fn test_pq_binding_proof_fails_for_wrong_key() {
+        let keypair = KeyPair::generate().unwrap();
+        let did = keypair.did().clone();
+
+        // Create binding proof
+        let proof = PqBindingProof::create(&did, &keypair).unwrap();
+
+        // Try to verify with a different ML-DSA public key
+        let other_keypair = KeyPair::generate().unwrap();
+        let wrong_ml_dsa_public = other_keypair.pq_public_key().unwrap().as_bytes().to_vec();
+
+        let result = proof.verify(&did, &wrong_ml_dsa_public);
+        assert!(result.is_err(), "Should fail for wrong public key");
+    }
+
+    #[test]
+    #[cfg(feature = "post-quantum")]
+    fn test_pq_binding_proof_fails_for_invalid_key_bytes() {
+        // Test with invalid ML-DSA key bytes
+        let keypair = KeyPair::generate().unwrap();
+        let proof = PqBindingProof {
+            timestamp_millis: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64,
+            signature: vec![0u8; 100], // Garbage signature
+        };
+
+        // Invalid key bytes should fail
+        let result = proof.verify(keypair.did(), &[0xDE, 0xAD, 0xBE, 0xEF]);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("Invalid ML-DSA public key"),
+            "Error should mention invalid key: {}",
+            err
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "post-quantum")]
+    fn test_pq_binding_proof_non_hybrid_keypair_returns_none() {
+        // Create a legacy (classical-only) keypair using from_bytes
+        use ed25519_dalek::SigningKey;
+        use rand::rngs::OsRng;
+
+        let signing_key = SigningKey::generate(&mut OsRng);
+        let secret_bytes: [u8; 32] = signing_key.to_bytes();
+        let public_bytes: [u8; 32] = signing_key.verifying_key().to_bytes();
+
+        // from_bytes creates a keypair WITHOUT PQ component
+        let keypair = KeyPair::from_bytes(&secret_bytes, &public_bytes).unwrap();
+
+        // Classical-only keypair should return None
+        let proof = PqBindingProof::create(keypair.did(), &keypair);
+        assert!(
+            proof.is_none(),
+            "Non-hybrid keypair should not create binding proof"
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "post-quantum")]
+    fn test_pq_binding_proof_rejects_future_timestamp() {
+        let keypair = KeyPair::generate().unwrap();
+        let did = keypair.did().clone();
+
+        // Create a proof with timestamp far in the future (beyond 1 minute tolerance)
+        let future_timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64
+            + PqBindingProof::FUTURE_TOLERANCE_MILLIS
+            + 60_000; // 2 minutes in future
+
+        let message = PqBindingProof::binding_message(&did, future_timestamp);
+        let signature = keypair
+            .pq_keypair()
+            .unwrap()
+            .sign(&message)
+            .unwrap()
+            .as_bytes()
+            .to_vec();
+
+        let proof = PqBindingProof {
+            timestamp_millis: future_timestamp,
+            signature,
+        };
+
+        let ml_dsa_public = keypair.pq_public_key().unwrap().as_bytes().to_vec();
+        let result = proof.verify(&did, &ml_dsa_public);
+        assert!(result.is_err(), "Should reject future timestamp");
+        assert!(
+            result.unwrap_err().to_string().contains("in the future"),
+            "Error should mention future timestamp"
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "post-quantum")]
+    fn test_pq_binding_proof_rejects_expired_timestamp() {
+        let keypair = KeyPair::generate().unwrap();
+        let did = keypair.did().clone();
+
+        // Create a proof with expired timestamp (6 minutes ago, beyond 5 minute max age)
+        let expired_timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64
+            - PqBindingProof::MAX_AGE_MILLIS
+            - 60_000; // 6 minutes ago
+
+        let message = PqBindingProof::binding_message(&did, expired_timestamp);
+        let signature = keypair
+            .pq_keypair()
+            .unwrap()
+            .sign(&message)
+            .unwrap()
+            .as_bytes()
+            .to_vec();
+
+        let proof = PqBindingProof {
+            timestamp_millis: expired_timestamp,
+            signature,
+        };
+
+        let ml_dsa_public = keypair.pq_public_key().unwrap().as_bytes().to_vec();
+        let result = proof.verify(&did, &ml_dsa_public);
+        assert!(result.is_err(), "Should reject expired timestamp");
+        assert!(
+            result.unwrap_err().to_string().contains("expired"),
+            "Error should mention expiration"
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "post-quantum")]
+    fn test_pq_binding_proof_accepts_edge_of_tolerance() {
+        let keypair = KeyPair::generate().unwrap();
+        let did = keypair.did().clone();
+
+        // Create a proof at the edge of future tolerance (should be accepted)
+        let edge_timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64
+            + PqBindingProof::FUTURE_TOLERANCE_MILLIS
+            - 1000; // Just under 1 minute in future
+
+        let message = PqBindingProof::binding_message(&did, edge_timestamp);
+        let signature = keypair
+            .pq_keypair()
+            .unwrap()
+            .sign(&message)
+            .unwrap()
+            .as_bytes()
+            .to_vec();
+
+        let proof = PqBindingProof {
+            timestamp_millis: edge_timestamp,
+            signature,
+        };
+
+        let ml_dsa_public = keypair.pq_public_key().unwrap().as_bytes().to_vec();
+        let result = proof.verify(&did, &ml_dsa_public);
+        assert!(
+            result.is_ok(),
+            "Should accept timestamp at edge of tolerance: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "post-quantum")]
+    fn test_pq_binding_proof_accepts_edge_of_max_age() {
+        let keypair = KeyPair::generate().unwrap();
+        let did = keypair.did().clone();
+
+        // Create a proof at the edge of max age (should be accepted)
+        let edge_timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64
+            - PqBindingProof::MAX_AGE_MILLIS
+            + 1000; // Just under 5 minutes ago
+
+        let message = PqBindingProof::binding_message(&did, edge_timestamp);
+        let signature = keypair
+            .pq_keypair()
+            .unwrap()
+            .sign(&message)
+            .unwrap()
+            .as_bytes()
+            .to_vec();
+
+        let proof = PqBindingProof {
+            timestamp_millis: edge_timestamp,
+            signature,
+        };
+
+        let ml_dsa_public = keypair.pq_public_key().unwrap().as_bytes().to_vec();
+        let result = proof.verify(&did, &ml_dsa_public);
+        assert!(
+            result.is_ok(),
+            "Should accept timestamp at edge of max age: {:?}",
+            result
+        );
     }
 }

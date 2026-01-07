@@ -444,6 +444,12 @@ impl KeyPair {
         self.pq_keypair.as_ref().map(|kp| kp.public_key().clone())
     }
 
+    /// Get the PQ keypair for signing operations
+    #[cfg(feature = "post-quantum")]
+    pub fn pq_keypair(&self) -> Option<&icn_crypto_pq::MlDsaKeypair> {
+        self.pq_keypair.as_ref()
+    }
+
     /// Sign a message
     pub fn sign(&self, message: &[u8]) -> ed25519_dalek::Signature {
         use ed25519_dalek::Signer;

@@ -1218,21 +1218,31 @@ impl NetworkActor {
                                 role: topo_cfg.role,
                             });
 
-                        // Include PQ public keys if available
+                        // Build Hello message with PQ binding proof if available
                         #[cfg(feature = "post-quantum")]
-                        let (ml_dsa_public, ml_kem_public) = {
+                        let hello_msg = {
                             let keypair = self.identity_bundle.keypair();
                             let ml_dsa = keypair.pq_public_key().map(|pk| pk.as_bytes().to_vec());
                             let ml_kem = self
                                 .identity_bundle
                                 .kem_pq_public_bytes()
                                 .map(|b| b.to_vec());
-                            (ml_dsa, ml_kem)
+
+                            // Use hello_with_binding to include DID-PQ binding proof
+                            NetworkMessage::hello_with_binding(
+                                self.own_did.clone(),
+                                did.clone(),
+                                binding_info,
+                                version_info,
+                                topology_info,
+                                x25519_public,
+                                ml_dsa,
+                                ml_kem,
+                                keypair,
+                            )
                         };
 
                         #[cfg(not(feature = "post-quantum"))]
-                        let (ml_dsa_public, ml_kem_public) = (None, None);
-
                         let hello_msg = NetworkMessage::hello(
                             self.own_did.clone(),
                             did.clone(),
@@ -1240,8 +1250,8 @@ impl NetworkActor {
                             version_info,
                             topology_info,
                             x25519_public,
-                            ml_dsa_public,
-                            ml_kem_public,
+                            None,
+                            None,
                         );
 
                         let session_mgr = self.session_manager.clone();
@@ -1577,6 +1587,7 @@ impl NetworkActor {
                                     x25519_public,
                                     ml_dsa_public,
                                     ml_kem_public,
+                                    pq_binding_proof,
                                 } => {
                                     ctx.handle_hello(
                                         &connection,
@@ -1587,6 +1598,7 @@ impl NetworkActor {
                                         x25519_public,
                                         ml_dsa_public.clone(),
                                         ml_kem_public.clone(),
+                                        pq_binding_proof.clone(),
                                     )
                                     .await?;
                                 }
