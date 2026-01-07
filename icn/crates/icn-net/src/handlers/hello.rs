@@ -107,16 +107,49 @@ impl ConnectionContext {
         );
 
         // Store peer connection info
+        // Validate and filter PQ keys based on negotiated capabilities
+        let validated_ml_dsa = Self::validate_pq_key_for_capability(
+            from,
+            ml_dsa_public,
+            common_caps.contains(crate::CapabilityFlags::HYBRID_SIGNATURES),
+            "ML-DSA",
+            "HYBRID_SIGNATURES",
+        );
+        let validated_ml_kem = Self::validate_pq_key_for_capability(
+            from,
+            ml_kem_public,
+            common_caps.contains(crate::CapabilityFlags::HYBRID_KEM),
+            "ML-KEM",
+            "HYBRID_KEM",
+        );
+
+        // Validate ML-DSA key format if present (fail-fast)
+        #[cfg(feature = "post-quantum")]
+        let validated_ml_dsa = if let Some(ref key_bytes) = validated_ml_dsa {
+            match icn_crypto_pq::MlDsaPublicKey::from_bytes(key_bytes) {
+                Ok(_) => validated_ml_dsa,
+                Err(e) => {
+                    warn!(
+                        peer_did = %from,
+                        "Invalid ML-DSA public key format: {e}, discarding"
+                    );
+                    None
+                }
+            }
+        } else {
+            validated_ml_dsa
+        };
+
         {
-            let has_pq_keys = ml_dsa_public.is_some() || ml_kem_public.is_some();
+            let has_pq_keys = validated_ml_dsa.is_some() || validated_ml_kem.is_some();
             let connection_info = PeerConnectionInfo {
                 did: from.clone(),
                 negotiated_version,
                 peer_capabilities: common_caps,
                 peer_software: peer_software.clone(),
                 x25519_key: *x25519_public,
-                ml_dsa_public,
-                ml_kem_public,
+                ml_dsa_public: validated_ml_dsa,
+                ml_kem_public: validated_ml_kem,
             };
 
             let mut connections = self.peer_connections.write().await;
@@ -253,5 +286,36 @@ impl ConnectionContext {
                 }
             }
         });
+    }
+
+    /// Validate PQ key against negotiated capability
+    ///
+    /// Returns the key only if:
+    /// - The key is present AND the capability was negotiated, OR
+    /// - The key is not present
+    ///
+    /// Logs a warning if a key was sent without the corresponding capability.
+    fn validate_pq_key_for_capability(
+        peer_did: &Did,
+        key: Option<Vec<u8>>,
+        capability_negotiated: bool,
+        key_name: &str,
+        capability_name: &str,
+    ) -> Option<Vec<u8>> {
+        match (key, capability_negotiated) {
+            (Some(k), true) => Some(k),
+            (Some(_), false) => {
+                warn!(
+                    peer_did = %peer_did,
+                    key_type = key_name,
+                    capability = capability_name,
+                    "Peer sent {} key without {} capability, discarding",
+                    key_name,
+                    capability_name
+                );
+                None
+            }
+            (None, _) => None,
+        }
     }
 }
