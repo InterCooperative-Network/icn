@@ -568,13 +568,17 @@ mod tests {
         use crate::actor::PeerConnectionInfo;
         use crate::version::CapabilityFlags;
 
-        let (ctx, forward_count) = create_test_context(None);
+        let detector = Arc::new(RwLock::new(MisbehaviorDetector::new(
+            MisbehaviorThresholds::default(),
+        )));
+        let (ctx, forward_count) = create_test_context(Some(detector.clone()));
         let sender = KeyPair::generate().unwrap();
 
         // Sender should have PQ keys
         assert!(sender.has_pq_keys(), "Sender should have PQ keys");
 
         // Cache an INVALID/corrupted ML-DSA public key (wrong size/format)
+        // ML-DSA-65 public keys are 1952 bytes; this 4-byte value will fail from_bytes()
         {
             let mut connections = ctx.peer_connections.write().await;
             connections.insert(
@@ -585,7 +589,7 @@ mod tests {
                     peer_capabilities: CapabilityFlags::HYBRID_SIGNATURES,
                     peer_software: "test".to_string(),
                     x25519_key: [0u8; 32],
-                    ml_dsa_public: Some(vec![0xDE, 0xAD, 0xBE, 0xEF]), // Invalid: too short
+                    ml_dsa_public: Some(vec![0xDE, 0xAD, 0xBE, 0xEF]), // Invalid: 4 bytes vs required 1952
                     ml_kem_public: None,
                 },
             );
@@ -620,6 +624,21 @@ mod tests {
             0,
             "Hybrid envelope should NOT be forwarded when cached PQ key is invalid"
         );
+
+        // Should record an InvalidSignature violation for Byzantine fault detection
+        let detector_guard = detector.read().await;
+        let violations = detector_guard.get_violations(sender.did());
+        assert!(
+            !violations.is_empty(),
+            "Should record a violation for invalid PQ key"
+        );
+        assert!(
+            matches!(
+                violations[0].violation,
+                icn_security::Violation::InvalidSignature { .. }
+            ),
+            "Violation should be InvalidSignature"
+        );
     }
 
     /// Test that hybrid envelopes fail verification when cached PQ key doesn't match sender
@@ -629,7 +648,10 @@ mod tests {
         use crate::actor::PeerConnectionInfo;
         use crate::version::CapabilityFlags;
 
-        let (ctx, forward_count) = create_test_context(None);
+        let detector = Arc::new(RwLock::new(MisbehaviorDetector::new(
+            MisbehaviorThresholds::default(),
+        )));
+        let (ctx, forward_count) = create_test_context(Some(detector.clone()));
         let sender = KeyPair::generate().unwrap();
         let other = KeyPair::generate().unwrap(); // Different keypair
 
@@ -683,6 +705,21 @@ mod tests {
             forward_count.load(Ordering::SeqCst),
             0,
             "Hybrid envelope should NOT be forwarded when cached PQ key doesn't match"
+        );
+
+        // Should record an InvalidSignature violation for Byzantine fault detection
+        let detector_guard = detector.read().await;
+        let violations = detector_guard.get_violations(sender.did());
+        assert!(
+            !violations.is_empty(),
+            "Should record a violation for wrong PQ key"
+        );
+        assert!(
+            matches!(
+                violations[0].violation,
+                icn_security::Violation::InvalidSignature { .. }
+            ),
+            "Violation should be InvalidSignature"
         );
     }
 }
