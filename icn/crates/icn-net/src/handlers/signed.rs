@@ -560,4 +560,129 @@ mod tests {
             "Hybrid envelope should be forwarded with deferred verification"
         );
     }
+
+    /// Test that hybrid envelopes fail verification when cached PQ key is invalid/corrupted
+    #[tokio::test]
+    #[cfg(feature = "post-quantum")]
+    async fn test_hybrid_verification_fails_with_invalid_cached_key() {
+        use crate::actor::PeerConnectionInfo;
+        use crate::version::CapabilityFlags;
+
+        let (ctx, forward_count) = create_test_context(None);
+        let sender = KeyPair::generate().unwrap();
+
+        // Sender should have PQ keys
+        assert!(sender.has_pq_keys(), "Sender should have PQ keys");
+
+        // Cache an INVALID/corrupted ML-DSA public key (wrong size/format)
+        {
+            let mut connections = ctx.peer_connections.write().await;
+            connections.insert(
+                sender.did().clone(),
+                PeerConnectionInfo {
+                    did: sender.did().clone(),
+                    negotiated_version: 1,
+                    peer_capabilities: CapabilityFlags::HYBRID_SIGNATURES,
+                    peer_software: "test".to_string(),
+                    x25519_key: [0u8; 32],
+                    ml_dsa_public: Some(vec![0xDE, 0xAD, 0xBE, 0xEF]), // Invalid: too short
+                    ml_kem_public: None,
+                },
+            );
+        }
+
+        // Create a valid hybrid envelope
+        let envelope = SignedEnvelope::new_hybrid(
+            sender.did(),
+            &sender,
+            1,
+            PayloadType::Gossip,
+            b"test invalid key".to_vec(),
+        )
+        .expect("Failed to create hybrid envelope");
+
+        assert!(envelope.is_hybrid(), "Envelope should be hybrid");
+
+        let message = NetworkMessage {
+            version: 1,
+            from: sender.did().clone(),
+            to: None,
+            trace_context: None,
+            payload: MessagePayload::Signed(envelope.clone()),
+        };
+
+        // Handle the signed message - should fail due to invalid cached key
+        ctx.handle_signed(message, &envelope).await;
+
+        // Message should NOT be forwarded (verification failed)
+        assert_eq!(
+            forward_count.load(Ordering::SeqCst),
+            0,
+            "Hybrid envelope should NOT be forwarded when cached PQ key is invalid"
+        );
+    }
+
+    /// Test that hybrid envelopes fail verification when cached PQ key doesn't match sender
+    #[tokio::test]
+    #[cfg(feature = "post-quantum")]
+    async fn test_hybrid_verification_fails_with_wrong_cached_key() {
+        use crate::actor::PeerConnectionInfo;
+        use crate::version::CapabilityFlags;
+
+        let (ctx, forward_count) = create_test_context(None);
+        let sender = KeyPair::generate().unwrap();
+        let other = KeyPair::generate().unwrap(); // Different keypair
+
+        // Sender should have PQ keys
+        assert!(sender.has_pq_keys(), "Sender should have PQ keys");
+        assert!(other.has_pq_keys(), "Other should have PQ keys");
+
+        // Cache the WRONG peer's PQ key (other's key instead of sender's)
+        let wrong_ml_dsa_public = other.pq_public_key().map(|pk| pk.as_bytes().to_vec());
+        {
+            let mut connections = ctx.peer_connections.write().await;
+            connections.insert(
+                sender.did().clone(),
+                PeerConnectionInfo {
+                    did: sender.did().clone(),
+                    negotiated_version: 1,
+                    peer_capabilities: CapabilityFlags::HYBRID_SIGNATURES,
+                    peer_software: "test".to_string(),
+                    x25519_key: [0u8; 32],
+                    ml_dsa_public: wrong_ml_dsa_public, // Wrong key!
+                    ml_kem_public: None,
+                },
+            );
+        }
+
+        // Create a valid hybrid envelope signed by sender
+        let envelope = SignedEnvelope::new_hybrid(
+            sender.did(),
+            &sender,
+            1,
+            PayloadType::Gossip,
+            b"test wrong key".to_vec(),
+        )
+        .expect("Failed to create hybrid envelope");
+
+        assert!(envelope.is_hybrid(), "Envelope should be hybrid");
+
+        let message = NetworkMessage {
+            version: 1,
+            from: sender.did().clone(),
+            to: None,
+            trace_context: None,
+            payload: MessagePayload::Signed(envelope.clone()),
+        };
+
+        // Handle the signed message - should fail because cached key is wrong
+        ctx.handle_signed(message, &envelope).await;
+
+        // Message should NOT be forwarded (ML-DSA signature won't verify with wrong key)
+        assert_eq!(
+            forward_count.load(Ordering::SeqCst),
+            0,
+            "Hybrid envelope should NOT be forwarded when cached PQ key doesn't match"
+        );
+    }
 }
