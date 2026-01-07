@@ -1415,6 +1415,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "post-quantum")]
     fn test_pq_binding_proof_fails_for_invalid_key_bytes() {
         // Test with invalid ML-DSA key bytes
         let keypair = KeyPair::generate().unwrap();
