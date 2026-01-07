@@ -214,6 +214,8 @@ mod tests {
                 peer_capabilities: crate::version::CapabilityFlags::E2E_ENCRYPTION,
                 peer_software: "test".to_string(),
                 x25519_key: peer_x25519,
+                ml_dsa_public: None,
+                ml_kem_public: None,
             },
         );
         let peer_connections = Arc::new(RwLock::new(peer_connections_map));

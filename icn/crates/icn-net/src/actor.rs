@@ -45,6 +45,16 @@ pub struct PeerConnectionInfo {
 
     /// X25519 public key for end-to-end encryption
     pub x25519_key: [u8; 32],
+
+    /// ML-DSA public key for post-quantum signature verification (optional)
+    /// Present when peer advertises HYBRID_SIGNATURES capability
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ml_dsa_public: Option<Vec<u8>>,
+
+    /// ML-KEM public key for post-quantum key encapsulation (optional)
+    /// Present when peer advertises HYBRID_KEM capability
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ml_kem_public: Option<Vec<u8>>,
 }
 
 /// Callback for handling incoming network messages
@@ -474,6 +484,8 @@ impl NetworkHandle {
                         peer_capabilities: info.peer_capabilities.bits(),
                         peer_software: info.peer_software.clone(),
                         x25519_key: info.x25519_key,
+                        ml_dsa_public: info.ml_dsa_public.clone(),
+                        ml_kem_public: info.ml_kem_public.clone(),
                     };
                     (did.to_string(), snapshot_info)
                 })
@@ -518,6 +530,8 @@ impl NetworkHandle {
                     ),
                     peer_software: snapshot_info.peer_software,
                     x25519_key: snapshot_info.x25519_key,
+                    ml_dsa_public: snapshot_info.ml_dsa_public,
+                    ml_kem_public: snapshot_info.ml_kem_public,
                 };
 
                 connections_write.insert(did, connection_info);
@@ -538,6 +552,8 @@ impl NetworkHandle {
                         peer_capabilities: crate::CapabilityFlags::empty(),
                         peer_software: "legacy-unknown".to_string(),
                         x25519_key: key,
+                        ml_dsa_public: None,
+                        ml_kem_public: None,
                     });
             }
 
@@ -1559,11 +1575,9 @@ impl NetworkActor {
                                     version_info,
                                     topology_info,
                                     x25519_public,
-                                    ml_dsa_public: _,
-                                    ml_kem_public: _,
+                                    ml_dsa_public,
+                                    ml_kem_public,
                                 } => {
-                                    // TODO: Store PQ public keys in peer connection state
-                                    // for future hybrid encryption/verification
                                     ctx.handle_hello(
                                         &connection,
                                         &message.from,
@@ -1571,6 +1585,8 @@ impl NetworkActor {
                                         version_info,
                                         topology_info,
                                         x25519_public,
+                                        ml_dsa_public.clone(),
+                                        ml_kem_public.clone(),
                                     )
                                     .await?;
                                 }
@@ -1700,7 +1716,7 @@ impl NetworkActor {
     /// Note: Active connections are NOT persisted - they will be re-established
     /// via discovery and dialing after restart.
     pub async fn export_state(&self) -> icn_snapshot::NetworkState {
-        // Export peer connection info (version, capabilities, X25519 keys)
+        // Export peer connection info (version, capabilities, X25519 keys, PQ keys)
         let peer_connections: std::collections::HashMap<String, icn_snapshot::PeerConnectionInfo> =
             self.peer_connections
                 .read()
@@ -1713,6 +1729,8 @@ impl NetworkActor {
                         peer_capabilities: info.peer_capabilities.bits(),
                         peer_software: info.peer_software.clone(),
                         x25519_key: info.x25519_key,
+                        ml_dsa_public: info.ml_dsa_public.clone(),
+                        ml_kem_public: info.ml_kem_public.clone(),
                     };
                     (did.to_string(), snapshot_info)
                 })
@@ -1764,6 +1782,8 @@ impl NetworkActor {
                 ),
                 peer_software: snapshot_info.peer_software,
                 x25519_key: snapshot_info.x25519_key,
+                ml_dsa_public: snapshot_info.ml_dsa_public,
+                ml_kem_public: snapshot_info.ml_kem_public,
             };
 
             connections.insert(did, connection_info);
@@ -1784,6 +1804,8 @@ impl NetworkActor {
                     peer_capabilities: crate::CapabilityFlags::empty(),
                     peer_software: "legacy-unknown".to_string(),
                     x25519_key: key,
+                    ml_dsa_public: None,
+                    ml_kem_public: None,
                 });
         }
         drop(connections);
@@ -1857,6 +1879,8 @@ mod tests {
                     | CapabilityFlags::SIGNED_MESSAGES,
                 peer_software: "icnd-0.1.0".to_string(),
                 x25519_key: [1u8; 32],
+                ml_dsa_public: None,
+                ml_kem_public: None,
             },
         );
 
@@ -1869,6 +1893,8 @@ mod tests {
                 peer_capabilities: CapabilityFlags::SIGNED_MESSAGES,
                 peer_software: "icnd-0.0.5".to_string(),
                 x25519_key: [2u8; 32],
+                ml_dsa_public: None,
+                ml_kem_public: None,
             },
         );
 
@@ -1943,6 +1969,8 @@ mod tests {
                     | CapabilityFlags::SIGNED_MESSAGES,
                 peer_software: "icnd-0.1.0".to_string(),
                 x25519_key: [1u8; 32],
+                ml_dsa_public: None,
+                ml_kem_public: None,
             },
         );
 
@@ -1955,6 +1983,8 @@ mod tests {
                 peer_capabilities: CapabilityFlags::SIGNED_MESSAGES,
                 peer_software: "icnd-0.0.5".to_string(),
                 x25519_key: [2u8; 32],
+                ml_dsa_public: None,
+                ml_kem_public: None,
             },
         );
 
@@ -1969,6 +1999,8 @@ mod tests {
                     | CapabilityFlags::GRACEFUL_RESTART,
                 peer_software: "icnd-0.2.0".to_string(),
                 x25519_key: [3u8; 32],
+                ml_dsa_public: None,
+                ml_kem_public: None,
             },
         );
 
@@ -2030,6 +2062,8 @@ mod tests {
                 peer_capabilities: CapabilityFlags::SIGNED_MESSAGES,
                 peer_software: "icnd-0.1.0".to_string(),
                 x25519_key: [1u8; 32],
+                ml_dsa_public: None,
+                ml_kem_public: None,
             },
         );
 
@@ -2042,6 +2076,8 @@ mod tests {
                 peer_capabilities: CapabilityFlags::E2E_ENCRYPTION,
                 peer_software: "icnd-0.2.0".to_string(),
                 x25519_key: [2u8; 32],
+                ml_dsa_public: None,
+                ml_kem_public: None,
             },
         );
 
@@ -2080,6 +2116,8 @@ mod tests {
             peer_capabilities: CapabilityFlags::E2E_ENCRYPTION | CapabilityFlags::GRACEFUL_RESTART,
             peer_software: "icnd-0.2.5".to_string(),
             x25519_key: [42u8; 32],
+            ml_dsa_public: None,
+            ml_kem_public: None,
         };
 
         peer_connections
