@@ -259,10 +259,12 @@ Hello {
     topology_info: Option<TopologyInfo>,
     x25519_public: [u8; 32],
     ml_dsa_public: Option<Vec<u8>>,        // ~1952 bytes
-    ml_kem_public: Option<Vec<u8>>,        // ~1088 bytes
+    ml_kem_public: Option<Vec<u8>>,        // ~1184 bytes
     pq_binding_proof: Option<PqBindingProof>,
 }
 ```
+
+> **Note**: PQ fields use `#[serde(default)]` for backward compatibility—pre-PQ nodes can deserialize Hello messages without these fields.
 
 ### PQ Binding Proof
 
@@ -270,8 +272,8 @@ The `PqBindingProof` cryptographically binds the ML-DSA public key to the sender
 
 ```rust
 pub struct PqBindingProof {
-    pub ml_dsa_signature: Vec<u8>,  // 3309 bytes
     pub timestamp_millis: u64,
+    pub signature: Vec<u8>,  // 3309 bytes (ML-DSA)
 }
 ```
 
@@ -314,8 +316,9 @@ The `handle_hello()` handler in `icn-net/src/handlers/hello.rs` processes these 
 | Both support `HYBRID_SIGNATURES` | Use hybrid (both must verify) |
 | Only sender supports PQ | Send classical signature |
 | Receiver has PQ, sender doesn't | Accept classical signature |
-| Invalid binding proof | **Reject connection** (security policy) |
-| Missing binding proof (legacy node) | Accept but discard PQ keys |
+| Invalid binding proof | **Reject connection** (fail-closed security policy) |
+| Missing binding proof (legacy node) | Accept with classical-only capability (PQ keys ignored) |
+| Advertises `HYBRID_SIGNATURES` but no `ml_dsa_public` | Log warning, discard capability (treat as classical) |
 
 ### Peer State Storage
 
