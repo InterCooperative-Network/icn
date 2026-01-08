@@ -2,6 +2,8 @@
 
 This file provides guidance to GitHub Copilot when working with the ICN (Intercooperative Network) codebase.
 
+> **Note**: This file contains repository-wide instructions. For path-specific instructions (Rust, web, SDK, docs), see `.github/instructions/` directory.
+
 ## Project Overview
 
 ICN is a substrate daemon for the cooperative internet. It is **not** a blockchain or federation server - it's a P2P coordination layer providing:
