@@ -56,6 +56,9 @@ pub enum CoopError {
     #[error("Serialization error: {0}")]
     Serialization(String),
 
+    #[error("Deserialization error: {0}")]
+    Deserialization(String),
+
     #[error("Governance error: {0}")]
     Governance(String),
 

@@ -2925,6 +2925,7 @@ dependencies = [
  "bincode",
  "chrono",
  "hex",
+ "icn-encoding",
  "icn-gossip",
  "icn-governance",
  "icn-identity",

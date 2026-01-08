@@ -12,6 +12,7 @@ icn-ledger = { path = "../icn-ledger" }
 icn-store = { path = "../icn-store" }
 icn-gossip = { path = "../icn-gossip" }
 icn-trust = { path = "../icn-trust" }
+icn-encoding = { path = "../icn-encoding" }
 
 serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "1", features = ["full"] }
