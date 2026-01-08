@@ -107,6 +107,11 @@ expression = "Apache-2.0"
 license-files = []
 
 [[licenses.clarify]]
+name = "icn-encoding"
+expression = "Apache-2.0"
+license-files = []
+
+[[licenses.clarify]]
 name = "icn-federation"
 expression = "Apache-2.0"
 license-files = []

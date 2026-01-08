@@ -27,6 +27,7 @@ members = [
     "crates/icn-steward",
     "crates/icn-zkp", "crates/icn-community", "crates/icn-coop",
     "crates/icn-entity",
+    "crates/icn-encoding",
 ]
 
 [workspace.package]
@@ -71,6 +72,7 @@ sled = "0.34"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 bincode = { version = "2.0", features = ["serde"] }
+postcard = { version = "1.1", features = ["alloc"] }
 toml = "0.9"
 
 # Observability
@@ -119,6 +121,7 @@ icn-federation = { path = "crates/icn-federation" }
 icn-crypto-pq = { path = "crates/icn-crypto-pq" }
 icn-steward = { path = "crates/icn-steward" }
 icn-zkp = { path = "crates/icn-zkp" }
+icn-encoding = { path = "crates/icn-encoding" }
 
 [workspace.lints.clippy]
 # Error handling - warn for now, will be upgraded to deny after cleanup
