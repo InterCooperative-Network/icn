@@ -62,29 +62,40 @@ pub fn encode_versioned<T: Serialize>(value: &T) -> Result<Vec<u8>> {
 /// Decode data, automatically detecting format version
 ///
 /// Supports:
-/// - Format 0x00: Legacy bincode format
+/// - Legacy data: Raw bincode format (no version prefix)
+/// - Format 0x00: Bincode with version prefix (for future use)
 /// - Format 0x01: Postcard format
+///
+/// Migration strategy: If first byte is not a known format marker (0x00 or 0x01),
+/// treats the entire buffer as legacy bincode data.
 pub fn decode_versioned<T: for<'de> Deserialize<'de>>(data: &[u8]) -> Result<T> {
     if data.is_empty() {
         return Err(EncodingError::EmptyBuffer);
     }
 
     let format = data[0];
-    let payload = &data[1..];
 
     match format {
         FORMAT_BINCODE => {
-            // Legacy format: decode using bincode
+            // Versioned bincode format: decode using bincode, skip version byte
+            let payload = &data[1..];
             let (decoded, _) =
                 bincode::serde::decode_from_slice(payload, bincode::config::legacy())?;
             Ok(decoded)
         }
         FORMAT_POSTCARD => {
-            // Current format: decode using postcard
+            // Current format: decode using postcard, skip version byte
+            let payload = &data[1..];
             let decoded = postcard::from_bytes(payload)?;
             Ok(decoded)
         }
-        _ => Err(EncodingError::UnknownFormat(format)),
+        _ => {
+            // Unknown format byte OR legacy data without version prefix
+            // Try decoding entire buffer as legacy bincode
+            let (decoded, _) =
+                bincode::serde::decode_from_slice(data, bincode::config::legacy())?;
+            Ok(decoded)
+        }
     }
 }
 
@@ -179,10 +190,12 @@ mod tests {
     }
 
     #[test]
-    fn test_unknown_format_error() {
-        let data = vec![0xFF, 1, 2, 3]; // Invalid format byte
+    fn test_invalid_bincode_data_error() {
+        // Data that is neither valid bincode nor valid postcard
+        let data = vec![0xFF, 0xFF, 0xFF, 0xFF]; // Garbage data
         let result: Result<TestStruct> = decode_versioned(&data);
-        assert!(matches!(result, Err(EncodingError::UnknownFormat(0xFF))));
+        // Should fail to decode as bincode (fallback)
+        assert!(result.is_err());
     }
 
     #[test]
@@ -219,6 +232,23 @@ mod tests {
 
         let encoded = encode_versioned(&data).unwrap();
         let decoded: Complex = decode_versioned(&encoded).unwrap();
+        assert_eq!(decoded, data);
+    }
+
+    #[test]
+    fn test_legacy_bincode_without_version_prefix() {
+        // Simulate existing stored data: raw bincode without version prefix
+        let data = TestStruct {
+            id: 42,
+            name: "legacy".to_string(),
+            values: vec![1, 2, 3],
+        };
+
+        // Encode using raw bincode (no version prefix) - simulates existing storage
+        let raw_bincode = bincode::serde::encode_to_vec(&data, bincode::config::legacy()).unwrap();
+
+        // Should be able to decode this legacy data
+        let decoded: TestStruct = decode_versioned(&raw_bincode).unwrap();
         assert_eq!(decoded, data);
     }
 }
