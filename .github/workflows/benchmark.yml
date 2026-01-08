@@ -218,7 +218,8 @@ jobs:
         if: steps.bench_compare.outputs.has_regressions == 'true'
         run: |
           # Check if perf-regression-ok label is present
-          LABELS=$(gh pr view ${{ github.event.pull_request.number }} --json labels --jq '.labels[].name')
+          # Note: --repo flag needed because git context may not be available after checkout steps
+          LABELS=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json labels --jq '.labels[].name')
           if echo "$LABELS" | grep -q "perf-regression-ok"; then
             echo "Performance regression acknowledged via label"
             exit 0
@@ -229,6 +230,8 @@ jobs:
           fi
         env:
           GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
 
       - name: Upload PR benchmark results
         if: always()

@@ -112,6 +112,44 @@ jobs:
         run: cargo test -p icn-gateway --features sled-storage
         working-directory: ./icn
 
+  backup-validation:
+    name: Backup Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Free disk space
+        uses: ./.github/actions/free-disk-space
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "icn -> target"
+
+      - name: Build icnctl
+        run: cargo build -p icnctl --release
+        working-directory: ./icn
+
+      - name: Create test identity and backup
+        run: |
+          export ICN_PASSPHRASE="ci-test-passphrase-$(date +%s)"
+          export DATA_DIR=$(mktemp -d)
+          export BACKUP_FILE=$(mktemp).tar
+
+          echo "Creating test identity..."
+          ./target/release/icnctl --data-dir "$DATA_DIR" id init
+
+          echo "Creating backup..."
+          ./target/release/icnctl --data-dir "$DATA_DIR" backup "$BACKUP_FILE"
+
+          echo "Verifying backup..."
+          ./target/release/icnctl verify-backup "$BACKUP_FILE"
+
+          echo "Cleanup..."
+          rm -rf "$DATA_DIR" "$BACKUP_FILE"
+        working-directory: ./icn
+
   coverage:
     name: Test Coverage
     runs-on: ubuntu-latest

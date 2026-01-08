@@ -374,3 +374,109 @@ fn extract_did(output: &str) -> Option<String> {
     }
     None
 }
+
+#[test]
+fn test_verify_backup_command() -> Result<()> {
+    use std::sync::Mutex;
+    static TEST_LOCK: Mutex<()> = Mutex::new(());
+    let _lock = TEST_LOCK.lock().unwrap();
+
+    let temp_dir = TempDir::new()?;
+    let data_dir = temp_dir.path().join("data");
+    let backup_file = temp_dir.path().join("backup.tar");
+    let passphrase = "test_verify_backup_123";
+
+    // Initialize identity
+    let output = Command::new(icnctl_bin())
+        .env("ICN_PASSPHRASE", passphrase)
+        .arg("--data-dir")
+        .arg(&data_dir)
+        .arg("id")
+        .arg("init")
+        .output()?;
+
+    assert!(
+        output.status.success(),
+        "Failed to init identity: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    // Create backup
+    let backup_output = Command::new(icnctl_bin())
+        .arg("--data-dir")
+        .arg(&data_dir)
+        .arg("backup")
+        .arg(&backup_file)
+        .output()?;
+
+    assert!(
+        backup_output.status.success(),
+        "Failed to create backup: {}",
+        String::from_utf8_lossy(&backup_output.stderr)
+    );
+
+    // Verify the backup (without ledger check since we don't have ledger data)
+    let verify_output = Command::new(icnctl_bin())
+        .arg("verify-backup")
+        .arg(&backup_file)
+        .output()?;
+
+    assert!(
+        verify_output.status.success(),
+        "Verify-backup failed: {}",
+        String::from_utf8_lossy(&verify_output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&verify_output.stdout);
+    assert!(
+        stdout.contains("BACKUP VERIFICATION PASSED"),
+        "Expected success message. Output:\n{}",
+        stdout
+    );
+    assert!(
+        stdout.contains("identity.age present"),
+        "Should report identity.age present. Output:\n{}",
+        stdout
+    );
+
+    Ok(())
+}
+
+#[test]
+fn test_verify_backup_invalid_file() -> Result<()> {
+    let temp_dir = TempDir::new()?;
+    let fake_backup = temp_dir.path().join("fake.tar");
+
+    // Create an empty file (invalid tar)
+    fs::write(&fake_backup, b"")?;
+
+    let output = Command::new(icnctl_bin())
+        .arg("verify-backup")
+        .arg(&fake_backup)
+        .output()?;
+
+    assert!(
+        !output.status.success(),
+        "Should fail on invalid backup file"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn test_verify_backup_nonexistent_file() -> Result<()> {
+    let output = Command::new(icnctl_bin())
+        .arg("verify-backup")
+        .arg("/nonexistent/backup.tar")
+        .output()?;
+
+    assert!(!output.status.success(), "Should fail on nonexistent file");
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("not found") || stderr.contains("Backup file not found"),
+        "Should mention file not found"
+    );
+
+    Ok(())
+}

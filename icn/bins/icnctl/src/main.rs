@@ -97,6 +97,16 @@ enum Commands {
         force: bool,
     },
 
+    /// Verify backup integrity without permanent restore
+    VerifyBackup {
+        /// Backup archive path to verify
+        input: PathBuf,
+
+        /// Also verify ledger integrity (requires more time)
+        #[arg(long)]
+        verify_ledger: bool,
+    },
+
     /// Snapshot management
     #[command(subcommand)]
     Snapshot(SnapshotCommands),
@@ -1892,6 +1902,11 @@ async fn main() -> Result<()> {
         Commands::Backup { output } => handle_backup_command(&data_dir, &output)?,
 
         Commands::Restore { input, force } => handle_restore_command(&data_dir, &input, force)?,
+
+        Commands::VerifyBackup {
+            input,
+            verify_ledger,
+        } => handle_verify_backup_command(&input, verify_ledger)?,
 
         Commands::InitCoop {
             name,
@@ -5016,6 +5031,203 @@ fn handle_restore_command(data_dir: &Path, input: &Path, force: bool) -> Result<
     println!("  Checksum verified: {restored_checksum}");
     println!();
     println!("You can now use 'icnctl id show' to verify your restored identity.");
+
+    Ok(())
+}
+
+/// Verify backup integrity without permanent restore (for CI validation)
+fn handle_verify_backup_command(input: &Path, verify_ledger: bool) -> Result<()> {
+    use tempfile::TempDir;
+
+    // Check if input backup file exists
+    if !input.exists() {
+        bail!("Backup file not found: {}", input.display());
+    }
+
+    println!("Verifying backup: {}", input.display());
+    println!();
+
+    // Create temporary directory for validation
+    let temp_dir = TempDir::new().context("Failed to create temporary directory")?;
+    let restore_dir = temp_dir.path();
+
+    // Open the backup archive
+    let input_file = File::open(input)
+        .with_context(|| format!("Failed to open backup file: {}", input.display()))?;
+    let mut archive = Archive::new(input_file);
+
+    // Extract metadata
+    println!("[1/4] Reading backup metadata...");
+    let metadata = extract_backup_metadata(&mut archive, input)?;
+
+    println!("  ICN version: {}", metadata.icn_version);
+    println!(
+        "  Created: {}",
+        chrono::DateTime::from_timestamp(metadata.created_at as i64, 0)
+            .map(|dt| dt.to_rfc3339())
+            .unwrap_or_else(|| "Unknown".to_string())
+    );
+
+    // Extract archive to temp directory
+    println!("[2/4] Extracting backup to temporary location...");
+    let input_file = File::open(input)
+        .with_context(|| format!("Failed to reopen backup file: {}", input.display()))?;
+    let mut archive = Archive::new(input_file);
+
+    for entry in archive.entries()? {
+        let mut entry = entry?;
+        let path = entry.path()?;
+
+        if path.to_string_lossy() == "backup_metadata.json" {
+            continue;
+        }
+
+        // Security: Prevent path traversal attacks
+        // Malicious tar files could contain paths like "../../../etc/passwd"
+        if path
+            .components()
+            .any(|c| matches!(c, std::path::Component::ParentDir))
+        {
+            bail!(
+                "FAILED: Backup contains path traversal attempt: {}",
+                path.display()
+            );
+        }
+
+        entry.unpack_in(restore_dir)?;
+    }
+
+    // Verify checksum
+    println!("[3/4] Verifying checksum...");
+    let restored_checksum = calculate_dir_checksum(restore_dir)?;
+    if restored_checksum != metadata.checksum {
+        bail!(
+            "FAILED: Checksum mismatch! Expected: {}, Got: {}",
+            metadata.checksum,
+            restored_checksum
+        );
+    }
+    println!("  ✓ Checksum verified: {restored_checksum}");
+
+    // Verify required files exist
+    println!("[4/4] Verifying backup contents...");
+    let identity_path = restore_dir.join("identity.age");
+    if !identity_path.exists() {
+        bail!("FAILED: Backup missing identity.age (keystore)");
+    }
+    println!("  ✓ identity.age present");
+
+    // Check for optional but important files
+    let state_snapshot = restore_dir.join("state.snapshot");
+    if state_snapshot.exists() {
+        println!("  ✓ state.snapshot present");
+    } else {
+        println!("  ⚠ state.snapshot not present (may be first-run backup)");
+    }
+
+    // Optional: verify ledger integrity
+    if verify_ledger {
+        println!();
+        println!("[Extra] Verifying ledger integrity...");
+        verify_ledger_in_backup(restore_dir)?;
+    }
+
+    // Temp directory auto-cleaned on drop
+    println!();
+    println!("═══════════════════════════════════════");
+    println!("✓ BACKUP VERIFICATION PASSED");
+    println!("═══════════════════════════════════════");
+    println!();
+    println!("This backup can be safely restored.");
+
+    Ok(())
+}
+
+/// Verify ledger integrity in a restored backup directory
+fn verify_ledger_in_backup(restore_dir: &Path) -> Result<()> {
+    use icn_store::{SledStore, Store};
+
+    // Check if ledger store exists
+    let ledger_db_path = restore_dir.join("ledger");
+    if !ledger_db_path.exists() {
+        println!("  ⚠ No ledger database found (may be new node)");
+        return Ok(());
+    }
+
+    // Open the ledger store in read-only mode
+    let store = SledStore::open(&ledger_db_path).context("Failed to open ledger store")?;
+
+    // Count entries using the correct ledger journal prefix
+    let entry_prefix = b"ledger:journal:";
+    let entries = store.scan(entry_prefix)?;
+    println!("  Found {} ledger entries", entries.len());
+
+    // Verify double-entry invariant: Σ debits == Σ credits per currency
+    // This means: sum of (debit - credit) per currency should be 0
+    let mut currency_sums: std::collections::HashMap<String, i128> =
+        std::collections::HashMap::new();
+    let mut parse_errors = 0usize;
+
+    for (_key, value) in entries {
+        // Try to deserialize entry and extract account deltas
+        match serde_json::from_slice::<serde_json::Value>(&value) {
+            Ok(entry) => {
+                if let Some(accounts) = entry.get("accounts").and_then(|a| a.as_array()) {
+                    for account in accounts {
+                        if let Some(currency) = account.get("currency").and_then(|c| c.as_str()) {
+                            // AccountDelta uses separate debit and credit fields (both Option<i64>)
+                            let debit = account.get("debit").and_then(|d| d.as_i64()).unwrap_or(0);
+                            let credit =
+                                account.get("credit").and_then(|c| c.as_i64()).unwrap_or(0);
+
+                            // Use checked arithmetic to prevent overflow
+                            let net =
+                                (debit as i128).checked_sub(credit as i128).ok_or_else(|| {
+                                    anyhow::anyhow!(
+                                        "Arithmetic overflow computing net for currency {}",
+                                        currency
+                                    )
+                                })?;
+
+                            let sum = currency_sums.entry(currency.to_string()).or_insert(0);
+                            *sum = sum.checked_add(net).ok_or_else(|| {
+                                anyhow::anyhow!("Arithmetic overflow summing currency {}", currency)
+                            })?;
+                        }
+                    }
+                }
+            }
+            Err(_) => {
+                parse_errors += 1;
+            }
+        }
+    }
+
+    if parse_errors > 0 {
+        println!("  ⚠ {} entries could not be parsed", parse_errors);
+    }
+
+    // Check invariant
+    let mut all_balanced = true;
+    for (currency, sum) in &currency_sums {
+        if *sum != 0 {
+            println!("  ✗ Currency {} has imbalance: {}", currency, sum);
+            all_balanced = false;
+        }
+    }
+
+    if all_balanced {
+        if currency_sums.is_empty() {
+            println!("  ✓ Ledger empty (no currencies)");
+        } else {
+            println!(
+                "  ✓ Double-entry invariant verified for {} currencies",
+                currency_sums.len()
+            );
+        }
+    } else {
+        bail!("FAILED: Ledger double-entry invariant violated");
+    }
 
     Ok(())
 }
