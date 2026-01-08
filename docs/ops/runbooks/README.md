@@ -11,6 +11,7 @@ Production runbooks for ICN daemon operations.
 | [Version Upgrade](./03-version-upgrade.md) | Deploying new ICN version |
 | [Security Incident](./04-security-incident.md) | Suspected security breach |
 | [Troubleshooting](./05-troubleshooting.md) | Common issues and fixes |
+| [Secrets Rotation](./06-secrets-rotation.md) | Rotating keys, passphrases, certificates |
 
 ## Quick Reference
 
