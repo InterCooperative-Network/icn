@@ -5082,6 +5082,18 @@ fn handle_verify_backup_command(input: &Path, verify_ledger: bool) -> Result<()>
             continue;
         }
 
+        // Security: Prevent path traversal attacks
+        // Malicious tar files could contain paths like "../../../etc/passwd"
+        if path
+            .components()
+            .any(|c| matches!(c, std::path::Component::ParentDir))
+        {
+            bail!(
+                "FAILED: Backup contains path traversal attempt: {}",
+                path.display()
+            );
+        }
+
         entry.unpack_in(restore_dir)?;
     }
 
@@ -5145,29 +5157,54 @@ fn verify_ledger_in_backup(restore_dir: &Path) -> Result<()> {
     // Open the ledger store in read-only mode
     let store = SledStore::open(&ledger_db_path).context("Failed to open ledger store")?;
 
-    // Count entries
-    let entry_prefix = b"entry:";
+    // Count entries using the correct ledger journal prefix
+    let entry_prefix = b"ledger:journal:";
     let entries = store.scan(entry_prefix)?;
     println!("  Found {} ledger entries", entries.len());
 
-    // Verify double-entry invariant: sum of all deltas per currency = 0
+    // Verify double-entry invariant: Σ debits == Σ credits per currency
+    // This means: sum of (debit - credit) per currency should be 0
     let mut currency_sums: std::collections::HashMap<String, i128> =
         std::collections::HashMap::new();
+    let mut parse_errors = 0usize;
 
     for (_key, value) in entries {
         // Try to deserialize entry and extract account deltas
-        if let Ok(entry) = serde_json::from_slice::<serde_json::Value>(&value) {
-            if let Some(accounts) = entry.get("accounts").and_then(|a| a.as_array()) {
-                for account in accounts {
-                    if let (Some(currency), Some(amount)) = (
-                        account.get("currency").and_then(|c| c.as_str()),
-                        account.get("amount").and_then(|a| a.as_i64()),
-                    ) {
-                        *currency_sums.entry(currency.to_string()).or_insert(0) += amount as i128;
+        match serde_json::from_slice::<serde_json::Value>(&value) {
+            Ok(entry) => {
+                if let Some(accounts) = entry.get("accounts").and_then(|a| a.as_array()) {
+                    for account in accounts {
+                        if let Some(currency) = account.get("currency").and_then(|c| c.as_str()) {
+                            // AccountDelta uses separate debit and credit fields (both Option<i64>)
+                            let debit = account.get("debit").and_then(|d| d.as_i64()).unwrap_or(0);
+                            let credit =
+                                account.get("credit").and_then(|c| c.as_i64()).unwrap_or(0);
+
+                            // Use checked arithmetic to prevent overflow
+                            let net =
+                                (debit as i128).checked_sub(credit as i128).ok_or_else(|| {
+                                    anyhow::anyhow!(
+                                        "Arithmetic overflow computing net for currency {}",
+                                        currency
+                                    )
+                                })?;
+
+                            let sum = currency_sums.entry(currency.to_string()).or_insert(0);
+                            *sum = sum.checked_add(net).ok_or_else(|| {
+                                anyhow::anyhow!("Arithmetic overflow summing currency {}", currency)
+                            })?;
+                        }
                     }
                 }
             }
+            Err(_) => {
+                parse_errors += 1;
+            }
         }
+    }
+
+    if parse_errors > 0 {
+        println!("  ⚠ {} entries could not be parsed", parse_errors);
     }
 
     // Check invariant
