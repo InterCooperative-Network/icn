@@ -470,10 +470,7 @@ fn test_verify_backup_nonexistent_file() -> Result<()> {
         .arg("/nonexistent/backup.tar")
         .output()?;
 
-    assert!(
-        !output.status.success(),
-        "Should fail on nonexistent file"
-    );
+    assert!(!output.status.success(), "Should fail on nonexistent file");
 
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(

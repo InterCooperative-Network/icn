@@ -5151,7 +5151,8 @@ fn verify_ledger_in_backup(restore_dir: &Path) -> Result<()> {
     println!("  Found {} ledger entries", entries.len());
 
     // Verify double-entry invariant: sum of all deltas per currency = 0
-    let mut currency_sums: std::collections::HashMap<String, i128> = std::collections::HashMap::new();
+    let mut currency_sums: std::collections::HashMap<String, i128> =
+        std::collections::HashMap::new();
 
     for (_key, value) in entries {
         // Try to deserialize entry and extract account deltas
