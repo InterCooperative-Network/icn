@@ -233,6 +233,111 @@ This requires:
 
 **Status**: Not yet implemented. Current encryption remains X25519-only even with PQ signatures enabled.
 
+## Protocol Negotiation
+
+This section documents how nodes negotiate post-quantum capabilities during connection establishment.
+
+### Capability Flags
+
+Two capability flags control PQ behavior (defined in `icn-net/src/version.rs`):
+
+| Flag | Bit Value | Purpose |
+|------|-----------|---------|
+| `HYBRID_SIGNATURES` | `0b1000000000` | Ed25519 + ML-DSA signatures |
+| `HYBRID_KEM` | `0b10000000000` | X25519 + ML-KEM encryption |
+
+These flags are only advertised when the `post-quantum` feature is enabled at compile time.
+
+### Hello Message Exchange
+
+The Hello message includes optional PQ fields (defined in `icn-net/src/protocol.rs`):
+
+```rust
+Hello {
+    binding_info: BindingInfo,
+    version_info: Option<VersionInfo>,
+    topology_info: Option<TopologyInfo>,
+    x25519_public: [u8; 32],
+    ml_dsa_public: Option<Vec<u8>>,        // ~1952 bytes
+    ml_kem_public: Option<Vec<u8>>,        // ~1184 bytes
+    pq_binding_proof: Option<PqBindingProof>,
+}
+```
+
+> **Note**: PQ fields use `#[serde(default)]` for backward compatibility—pre-PQ nodes can deserialize Hello messages without these fields.
+
+### PQ Binding Proof
+
+The `PqBindingProof` cryptographically binds the ML-DSA public key to the sender's DID, preventing key substitution attacks:
+
+```rust
+pub struct PqBindingProof {
+    pub timestamp_millis: u64,
+    pub signature: Vec<u8>,  // 3309 bytes (ML-DSA)
+}
+```
+
+**Message format signed**: `"DID-PQ-BINDING-V1:<did>:<timestamp_millis>"`
+
+**Validation rules**:
+- Timestamp max age: 5 minutes (prevents replay of old proofs)
+- Future tolerance: 1 minute (clock skew allowance)
+- Signature must verify with the provided ML-DSA public key
+
+### Negotiation Sequence
+
+```
+Node A                                    Node B
+   |                                         |
+   |-- Hello (ml_dsa_pub, pq_binding_proof) ->|
+   |                                         |
+   |<- Hello (ml_dsa_pub, pq_binding_proof) --|
+   |                                         |
+   |   [Compute common_capabilities()]       |
+   |   [Verify PQ binding proofs]            |
+   |   [Store peer PQ keys if verified]      |
+   |                                         |
+   |== Use hybrid signatures if both support =|
+```
+
+The `handle_hello()` handler in `icn-net/src/handlers/hello.rs` processes these steps:
+
+1. Verify DID-TLS binding (TOFU model)
+2. Verify DID-PQ binding proof (if present)
+3. Negotiate protocol version
+4. Compute capability intersection
+5. Validate PQ key format
+6. Store validated peer info
+
+### Fallback Behavior
+
+| Scenario | Behavior |
+|----------|----------|
+| Both support `HYBRID_SIGNATURES` | Use hybrid (both must verify) |
+| Only sender supports PQ | Send classical signature |
+| Receiver has PQ, sender doesn't | Accept classical signature |
+| Invalid binding proof | **Reject connection** (fail-closed security policy) |
+| Missing binding proof (legacy node) | Accept with classical-only capability (PQ keys ignored) |
+| Advertises `HYBRID_SIGNATURES` but no `ml_dsa_public` | Log warning, discard capability (treat as classical) |
+
+### Peer State Storage
+
+Validated PQ keys are cached in `PeerConnectionInfo` for the session:
+
+```rust
+pub struct PeerConnectionInfo {
+    did: Did,
+    negotiated_version: u32,
+    peer_capabilities: CapabilityFlags,
+    peer_software: String,
+    x25519_key: [u8; 32],
+    ml_dsa_public: Option<Vec<u8>>,  // Only if HYBRID_SIGNATURES negotiated
+    ml_kem_public: Option<Vec<u8>>,  // Only if HYBRID_KEM negotiated
+}
+```
+
+When sending messages, check `peer_capabilities.contains(HYBRID_SIGNATURES)` to decide whether to use `sign_hybrid()` or classical `sign()`.
+
 ## Security Properties
 
 ### Downgrade Protection
