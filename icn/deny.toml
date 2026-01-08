@@ -41,6 +41,11 @@ ignore = [
     # v1.3.3 is considered "complete" by the team. Used heavily for serialization.
     # Consider migrating to postcard or bitcode in a future release.
     "RUSTSEC-2025-0141",  # bincode unmaintained
+
+    # atomic-polyfill is deprecated, used transitively by postcard via heapless.
+    # Recommended replacement is portable-atomic. Tracking in #535 (postcard migration).
+    # Will be resolved when heapless updates or we use postcard without heapless feature.
+    "RUSTSEC-2023-0089",  # atomic-polyfill deprecated
 ]
 
 [licenses]
