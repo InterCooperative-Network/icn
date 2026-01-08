@@ -15,6 +15,7 @@ icn-ccl = { path = "../icn-ccl" }
 icn-obs = { path = "../icn-obs" }
 icn-security = { path = "../icn-security" }
 icn-federation = { path = "../icn-federation" }
+icn-encoding = { path = "../icn-encoding" }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
