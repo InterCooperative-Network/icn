@@ -3228,6 +3228,7 @@ dependencies = [
  "criterion",
  "ed25519-dalek",
  "hex",
+ "icn-encoding",
  "icn-entity",
  "icn-gossip",
  "icn-identity",

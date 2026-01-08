@@ -146,7 +146,8 @@ impl QuarantineStore {
 
         // Store the record
         let key = self.entry_key(&entry_id);
-        let value = bincode::serde::encode_to_vec(&record, bincode::config::legacy())?;
+        let value = icn_encoding::encode_versioned(&record)
+            .map_err(|e| anyhow::anyhow!("Failed to encode record: {}", e))?;
         self.store.put(key.as_bytes(), &value)?;
 
         // Update metadata (ring buffer)
@@ -179,8 +180,7 @@ impl QuarantineStore {
             }
 
             let record: QuarantineRecord =
-                bincode::serde::decode_from_slice(&value, bincode::config::legacy())
-                    .map(|(v, _)| v)
+                icn_encoding::decode_versioned(&value)
                     .context("Failed to deserialize quarantine record")?;
 
             // Skip expired entries
@@ -205,8 +205,7 @@ impl QuarantineStore {
         match value {
             Some(bytes) => {
                 let record: QuarantineRecord =
-                    bincode::serde::decode_from_slice(&bytes, bincode::config::legacy())
-                        .map(|(v, _)| v)?;
+                    icn_encoding::decode_versioned(&bytes)?;
 
                 // Check if expired
                 if record.is_expired() {
@@ -229,8 +228,7 @@ impl QuarantineStore {
         match value {
             Some(bytes) => {
                 let record: QuarantineRecord =
-                    bincode::serde::decode_from_slice(&bytes, bincode::config::legacy())
-                        .map(|(v, _)| v)?;
+                    icn_encoding::decode_versioned(&bytes)?;
 
                 // Check if expired
                 if record.is_expired() {
@@ -292,8 +290,8 @@ impl QuarantineStore {
             }
 
             let record: QuarantineRecord =
-                match bincode::serde::decode_from_slice(&value, bincode::config::legacy()) {
-                    Ok((r, _)) => r,
+                match icn_encoding::decode_versioned(&value) {
+                    Ok(r) => r,
                     Err(e) => {
                         warn!("Failed to deserialize quarantine record: {}", e);
                         continue;
@@ -336,8 +334,7 @@ impl QuarantineStore {
         match value {
             Some(bytes) => {
                 let meta: QuarantineMeta =
-                    bincode::serde::decode_from_slice(&bytes, bincode::config::legacy())
-                        .map(|(v, _)| v)?;
+                    icn_encoding::decode_versioned(&bytes)?;
                 Ok(meta)
             }
             None => {
@@ -351,7 +348,8 @@ impl QuarantineStore {
 
     /// Save quarantine metadata
     fn save_meta(&self, meta: &QuarantineMeta) -> Result<()> {
-        let value = bincode::serde::encode_to_vec(meta, bincode::config::legacy())?;
+        let value = icn_encoding::encode_versioned(meta)
+            .map_err(|e| anyhow::anyhow!("Failed to encode metadata: {}", e))?;
         self.store.put(QUARANTINE_META_KEY.as_bytes(), &value)?;
         Ok(())
     }
