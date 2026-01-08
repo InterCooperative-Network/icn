@@ -15,7 +15,7 @@ icn-trust = { path = "../../crates/icn-trust" }
 icn-store = { path = "../../crates/icn-store" }
 
 # TUI
-ratatui = "0.28"
+ratatui = "0.30"
 crossterm = "0.28"
 
 # Async

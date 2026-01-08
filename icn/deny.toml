@@ -23,10 +23,6 @@ ignore = [
     # Functionality now in rustls-pki-types. reqwest needs to update.
     "RUSTSEC-2025-0134",  # rustls-pemfile unmaintained
 
-    # paste is unmaintained, used by ratatui for icn-console TUI.
-    # Replacement pastey is available but ratatui needs to update.
-    "RUSTSEC-2024-0436",  # paste unmaintained
-
     # pqcrypto-dilithium replaced by pqcrypto-mldsa (FIPS204-compatible).
     # TODO: Migrate icn-crypto-pq to use ml-dsa crate directly.
     # Tracked in issue #292 (Post-quantum cryptography integration).
@@ -40,6 +36,11 @@ ignore = [
     # proc-macro-error is unmaintained, used by i18n-embed-fl (via age)
     # and utoipa-gen. Both upstream deps need to migrate to alternatives.
     "RUSTSEC-2024-0370",  # proc-macro-error unmaintained
+
+    # bincode is unmaintained after team ceased development due to harassment.
+    # v1.3.3 is considered "complete" by the team. Used heavily for serialization.
+    # Consider migrating to postcard or bitcode in a future release.
+    "RUSTSEC-2025-0141",  # bincode unmaintained
 ]
 
 [licenses]

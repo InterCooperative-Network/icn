@@ -891,7 +891,7 @@ fn render_members(f: &mut Frame, app: &App, area: Rect) {
             .borders(Borders::ALL)
             .title(format!(" Members ({}) ", app.members.len())),
     )
-    .highlight_style(Style::default().add_modifier(Modifier::REVERSED))
+    .row_highlight_style(Style::default().add_modifier(Modifier::REVERSED))
     .highlight_symbol(">> ");
 
     f.render_stateful_widget(table, area, &mut app.members_state.clone());
@@ -930,7 +930,7 @@ fn render_ledger(f: &mut Frame, app: &App, area: Rect) {
             .borders(Borders::ALL)
             .title(format!(" Transactions ({}) ", app.transactions.len())),
     )
-    .highlight_style(Style::default().add_modifier(Modifier::REVERSED))
+    .row_highlight_style(Style::default().add_modifier(Modifier::REVERSED))
     .highlight_symbol(">> ");
 
     f.render_stateful_widget(table, area, &mut app.transactions_state.clone());
@@ -976,7 +976,7 @@ fn render_governance(f: &mut Frame, app: &App, area: Rect) {
         " Proposals ({}) - Press Enter to vote ",
         app.proposals.len()
     )))
-    .highlight_style(Style::default().add_modifier(Modifier::REVERSED))
+    .row_highlight_style(Style::default().add_modifier(Modifier::REVERSED))
     .highlight_symbol(">> ");
 
     f.render_stateful_widget(table, area, &mut app.proposals_state.clone());
@@ -1021,7 +1021,7 @@ fn render_trust(f: &mut Frame, app: &App, area: Rect) {
             .borders(Borders::ALL)
             .title(format!(" Trust Relations ({}) ", app.trust_relations.len())),
     )
-    .highlight_style(Style::default().add_modifier(Modifier::REVERSED))
+    .row_highlight_style(Style::default().add_modifier(Modifier::REVERSED))
     .highlight_symbol(">> ");
 
     f.render_stateful_widget(table, area, &mut app.trust_state.clone());
