@@ -76,6 +76,6 @@ impl From<bincode::error::EncodeError> for CoopError {
 
 impl From<bincode::error::DecodeError> for CoopError {
     fn from(e: bincode::error::DecodeError) -> Self {
-        CoopError::Serialization(e.to_string())
+        CoopError::Deserialization(e.to_string())
     }
 }
