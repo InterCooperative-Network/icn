@@ -17,6 +17,12 @@ ICN is a substrate daemon for the cooperative internet. It is **not** a blockcha
 - **Distributed Compute**: Trust-gated CCL execution with intelligent scheduling
 - **Governance**: Democratic proposals and voting primitives
 - **Gateway API**: REST + WebSocket API for cooperative applications
+- **Cooperative Management**: Lifecycle, membership, and multi-stakeholder governance
+- **Federation**: Inter-cooperative coordination and cross-coop settlements
+- **Privacy**: Encrypted metadata, onion routing, traffic obfuscation
+- **Post-Quantum Security**: Hybrid cryptography for long-term protection
+- **SDIS Integration**: Sovereign Digital Identity with VUI and zero-knowledge proofs
+- **Byzantine Tolerance**: Misbehavior detection and reputation-based security
 
 ## Repository Structure
 
@@ -37,6 +43,17 @@ icn/
 │   │   ├── icn-governance/# Governance primitives
 │   │   ├── icn-compute/   # Distributed compute layer
 │   │   ├── icn-obs/       # Metrics & observability
+│   │   ├── icn-coop/      # Cooperative management & lifecycle
+│   │   ├── icn-community/ # Community structures & civic engine
+│   │   ├── icn-entity/    # Unified entity model (individuals/coops/federations)
+│   │   ├── icn-federation/# Inter-cooperative coordination
+│   │   ├── icn-privacy/   # Privacy primitives & metadata protection
+│   │   ├── icn-security/  # Byzantine fault detection & reputation
+│   │   ├── icn-crypto-pq/ # Post-quantum hybrid cryptography
+│   │   ├── icn-steward/   # SDIS steward network & VUI computation
+│   │   ├── icn-zkp/       # Zero-knowledge proofs for SDIS
+│   │   ├── icn-time/      # Clock synchronization (Rough Time Protocol)
+│   │   ├── icn-snapshot/  # State snapshots for restarts
 │   │   └── icn-testkit/   # Testing utilities
 │   └── bins/              # Binaries
 │       ├── icnd/          # ICN daemon
@@ -160,6 +177,82 @@ Three-layer security model:
 - Used for access control, rate limiting, and resource allocation
 - Trust thresholds vary by operation (e.g., MIN_TRUST_EXECUTE = 0.3)
 
+### Cooperative & Federation Architecture
+
+**Cooperatives** (`icn-coop`):
+- Management and lifecycle (formation, dissolution, membership)
+- CoopActor handles coop operations via gossip topic `coop:updates`
+- Member roles, tiers, and status tracking
+- Asset distribution and capital return methods
+
+**Communities** (`icn-community`):
+- Civic structures grouping cooperatives and individuals
+- Community types: Geographic, Interest-based, Project-based
+- Shared governance, resources, and mutual support
+- CommunityActor syncs via `community:updates` topic
+
+**Entities** (`icn-entity`):
+- Unified recursive model for individuals, cooperatives, and federations
+- EntityId format: `entity:icn:<type>:<identifier>`
+- DID interoperability for individuals
+- Enables arbitrary organizational hierarchies
+
+**Federation** (`icn-federation`):
+- Inter-cooperative coordination and discovery
+- Federated trust attestations and DID resolution
+- Cross-cooperative credit settlement
+- Cooperative-scoped gossip routing
+- DID format with cooperative prefix: `did:icn:coop-name:pubkey`
+
+### Security & Privacy
+
+**Byzantine Detection** (`icn-security`):
+- MisbehaviorDetector tracks violations and reputation
+- Automatic quarantine and banning based on thresholds
+- Trust penalty callbacks for network protection
+- Violation records with severity scoring
+
+**Privacy Primitives** (`icn-privacy`):
+- ChaCha20-Poly1305 encryption for topic metadata
+- Bloom filter-based topic discovery (privacy-preserving)
+- Onion routing for sender/receiver anonymity (planned)
+- Traffic obfuscation and cover traffic (planned)
+
+**Post-Quantum Cryptography** (`icn-crypto-pq`):
+- Hybrid classical/PQ constructions for long-term security
+- Ed25519 + ML-DSA (Dilithium) for signatures
+- X25519 + ML-KEM (Kyber) for key exchange
+- Defense-in-depth: attacker must break both algorithms
+
+### SDIS (Sovereign Digital Identity System)
+
+**Steward Network** (`icn-steward`):
+- Threshold PRF for Verifiable Unique Identifiers (VUI)
+- Proof-of-Personhood enrollment ceremonies
+- Blind signatures for privacy-preserving tokens
+- Social recovery through steward attestations
+- Distributed VUI registry for uniqueness checking
+
+**Zero-Knowledge Proofs** (`icn-zkp`):
+- Attribute proofs (age, citizenship, membership) without revealing data
+- Non-revocation proofs with RSA or Merkle accumulators
+- Compound proofs combining multiple attributes
+- PQ-safe Merkle accumulators for future-proof revocation
+
+### Infrastructure
+
+**Clock Synchronization** (`icn-time`):
+- Rough Time Protocol (RFC 8915) for cooperative-wide time sync
+- Distributed timestamp validation
+- Replay attack protection
+- Clock skew detection and correction
+
+**State Snapshots** (`icn-snapshot`):
+- Local state serialization for graceful restarts
+- Distributed snapshots (Chandy-Lamport) for network consistency
+- Actor state export/restore for gossip, network, ledger
+- Checkpoint-based recovery
+
 ## Common Development Tasks
 
 ### Adding a New Actor
@@ -224,14 +317,43 @@ Three-layer security model:
 
 When working on specific features, reference these files:
 
+**Core Infrastructure:**
 - **Actor Runtime**: `icn-core/src/supervisor.rs`, `icn-core/src/runtime.rs`
 - **Network Protocol**: `icn-net/src/protocol.rs`, `icn-net/src/actor.rs`
 - **Gossip Implementation**: `icn-gossip/src/gossip.rs`
+- **Storage**: `icn-store/src/lib.rs`
+- **Metrics**: `icn-obs/src/metrics.rs`
+
+**Identity & Cryptography:**
+- **Identity**: `icn-identity/src/keystore.rs`, `icn-identity/src/did.rs`
+- **Post-Quantum Crypto**: `icn-crypto-pq/src/keypair.rs`, `icn-crypto-pq/src/signature.rs`
+- **Trust Graph**: `icn-trust/src/graph.rs`, `icn-trust/src/computation.rs`
+
+**Economic & Governance:**
 - **Ledger Logic**: `icn-ledger/src/ledger.rs`, `icn-ledger/src/sync.rs`
 - **Contract Execution**: `icn-ccl/src/interpreter.rs`, `icn-ccl/src/ast.rs`
+- **Governance**: `icn-governance/src/proposal.rs`, `icn-governance/src/domain.rs`, `icn-governance/src/vote.rs`
+
+**Cooperative Structures:**
+- **Cooperatives**: `icn-coop/src/actor.rs`, `icn-coop/src/lifecycle.rs`, `icn-coop/src/membership.rs`
+- **Communities**: `icn-community/src/actor.rs`, `icn-community/src/types.rs`
+- **Entities**: `icn-entity/src/lib.rs`
+- **Federation**: `icn-federation/src/registry.rs`, `icn-federation/src/bridge.rs`
+
+**Security & Privacy:**
+- **Security**: `icn-security/src/misbehavior.rs`
+- **Privacy**: `icn-privacy/src/topic_encryption.rs`, `icn-privacy/src/bloom.rs`
+
+**SDIS (Sovereign Digital Identity):**
+- **Steward Network**: `icn-steward/src/vui.rs`, `icn-steward/src/enrollment.rs`
+- **Zero-Knowledge Proofs**: `icn-zkp/src/prover.rs`, `icn-zkp/src/verifier.rs`
+
+**Services:**
 - **Gateway API**: `icn-gateway/src/server.rs`, `icn-gateway/src/api/`
-- **Governance**: `icn-governance/src/proposal.rs`, `icn-governance/src/domain.rs`, `icn-governance/src/vote.rs`, `icn-governance/src/store.rs`
 - **Compute Layer**: `icn-compute/src/actor.rs`, `icn-compute/src/executor.rs`
+- **RPC Server**: `icn-rpc/src/server.rs`
+- **Clock Sync**: `icn-time/src/sync.rs`
+- **Snapshots**: `icn-snapshot/src/local.rs`, `icn-snapshot/src/distributed.rs`
 
 ## Documentation
 
@@ -280,16 +402,46 @@ The codebase includes extensive production hardening:
 **Status: PILOT-READY** ✅
 
 All core infrastructure is complete (Phases 1-20, 1134+ tests passing). The system includes:
+
+**Core Infrastructure:**
 - Complete actor runtime with supervisor
 - DID-TLS binding with persistent certificates
 - Message integrity with Ed25519 signatures
 - End-to-end encryption with X25519-ChaCha20-Poly1305
 - Multi-device identity support
+- Byzantine fault detection with reputation system
+- Storage replication with trust-weighted selection
+- State snapshots for graceful restarts
+
+**Economic & Governance:**
 - Economic safety rails (credit limits, dispute resolution)
 - Governance primitives (domains, proposals, voting)
+- Mutual credit ledger with Merkle-DAG
+- Cooperative lifecycle management (formation, dissolution)
+- Multi-stakeholder membership models
+
+**Federation & Coordination:**
+- Federation protocol for inter-cooperative coordination
+- Cross-cooperative credit settlement
+- Federated trust attestations
+- Community structures for civic organization
+- Unified entity model (individuals/coops/federations)
+
+**Security & Privacy:**
+- Post-quantum hybrid cryptography (Ed25519+ML-DSA, X25519+ML-KEM)
+- Privacy-preserving topic encryption
+- Clock synchronization for replay protection
+- Byzantine misbehavior detection
+
+**SDIS Integration:**
+- Steward network for VUI computation
+- Zero-knowledge attribute proofs
+- Enrollment ceremonies and token issuance
+- Social recovery mechanisms
+
+**Services:**
 - Gateway REST + WebSocket API
 - Distributed compute layer with intelligent scheduling
-- Byzantine fault detection
-- Storage replication with trust-weighted selection
+- Comprehensive Prometheus metrics
 
 See `ROADMAP.md` for upcoming features and `CHANGELOG.md` for recent changes.
