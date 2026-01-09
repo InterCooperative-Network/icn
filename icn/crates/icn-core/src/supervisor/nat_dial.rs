@@ -229,7 +229,7 @@ async fn dial_parallel(
                         errors.push(DialError {
                             addr_type: AddrType::Local,
                             addr: local_addr,
-                            error: format!("Task failed: {}", e),
+                            error: format!("Task failed: {e}"),
                         });
                     }
                 }
@@ -256,7 +256,7 @@ async fn dial_parallel(
                         errors.push(DialError {
                             addr_type: AddrType::Public,
                             addr: public_addr.unwrap(),
-                            error: format!("Task failed: {}", e),
+                            error: format!("Task failed: {e}"),
                         });
                     }
                 }

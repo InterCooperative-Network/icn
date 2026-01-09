@@ -37,9 +37,7 @@ impl ComputeActor {
         let mut registry = self.executor_registry.lock().await;
         registry.insert(did.clone(), info);
         icn_obs::metrics::compute::executors_available_set(registry.len() as f64);
-
-        // Update executor load metric
-        icn_obs::metrics::compute::executor_load_set(&did, 0.0);
+        // Note: Per-executor load tracking removed (high-cardinality)
 
         Ok(())
     }

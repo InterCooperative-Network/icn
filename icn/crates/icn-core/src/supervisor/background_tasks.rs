@@ -89,7 +89,7 @@ impl Default for MetricsUpdateConfig {
 pub fn spawn_metrics_update_task(
     config: MetricsUpdateConfig,
     network_handle: NetworkHandle,
-    did: Did,
+    _did: Did, // Unused after per-DID tracking removal
     start_time: std::time::Instant,
     mut shutdown_rx: BroadcastReceiver<()>,
 ) -> JoinHandle<()> {
@@ -104,23 +104,13 @@ pub fn spawn_metrics_update_task(
                     let uptime_secs = start_time.elapsed().as_secs();
                     icn_obs::metrics::system::uptime_seconds_set(uptime_secs);
 
-                    // Record uptime contribution (Phase 21.1)
+                    // Record uptime contribution (aggregate, no per-DID tracking)
                     // Track the delta since last recording to avoid double-counting
                     let uptime_delta = uptime_secs - last_uptime_recorded;
                     if uptime_delta > 0 {
-                        icn_obs::metrics::contribution::uptime_seconds_add(
-                            did.as_str(),
-                            uptime_delta,
-                        );
-                        // Record heartbeat timestamp for liveness tracking
-                        let now = std::time::SystemTime::now()
-                            .duration_since(std::time::UNIX_EPOCH)
-                            .unwrap_or_default()
-                            .as_secs();
-                        icn_obs::metrics::contribution::uptime_heartbeat_record(
-                            did.as_str(),
-                            now,
-                        );
+                        icn_obs::metrics::contribution::total_uptime_seconds_add(uptime_delta);
+                        // Record heartbeat for liveness tracking
+                        icn_obs::metrics::contribution::heartbeats_received_inc();
                         last_uptime_recorded = uptime_secs;
                     }
 

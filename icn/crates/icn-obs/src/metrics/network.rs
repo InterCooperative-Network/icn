@@ -375,16 +375,16 @@ pub fn hybrid_verification_failed_inc(reason: HybridVerificationFailure) {
     .increment(1);
 }
 
-// Complex function with custom logic
-pub fn connections_rejected_untrusted_inc(peer_did: &str, trust_score: f64) {
-    counter!(
-        "icn_network_connections_rejected_untrusted_total",
-        "peer_did" => peer_did.to_string(),
-        "trust_score" => format!("{:.3}", trust_score)
-    )
-    .increment(1);
+/// Record a rejected connection due to insufficient trust.
+///
+/// Note: This function uses trust class as the label to avoid high-cardinality
+/// metrics from per-DID labels. For debugging specific peers, use structured logs.
+/// See Issue #494 for cardinality guidelines.
+pub fn connections_rejected_untrusted_inc(_peer_did: &str, trust_score: f64) {
+    // Increment simple counter for total rejections
+    counter!("icn_network_connections_rejected_untrusted_total").increment(1);
 
-    // Also increment by trust class for aggregated metrics
+    // Also increment by trust class for aggregated metrics (bounded cardinality)
     let trust_class = if trust_score < 0.1 {
         "isolated"
     } else if trust_score < 0.4 {

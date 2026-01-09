@@ -1847,13 +1847,16 @@ pub mod network {
         counter!("icn_network_trust_class_changes_total").increment(1);
     }
 
-    pub fn connections_rejected_untrusted_inc(peer_did: &str, trust_score: f64) {
-        counter!("icn_network_connections_rejected_untrusted_total",
-                 "peer_did" => peer_did.to_string(),
-                 "trust_score" => format!("{:.3}", trust_score))
-        .increment(1);
+    /// Record a rejected connection due to insufficient trust.
+    ///
+    /// Note: This function uses trust class as the label to avoid high-cardinality
+    /// metrics from per-DID labels. For debugging specific peers, use structured logs.
+    /// See Issue #494 for cardinality guidelines.
+    pub fn connections_rejected_untrusted_inc(_peer_did: &str, trust_score: f64) {
+        // Increment simple counter for total rejections
+        counter!("icn_network_connections_rejected_untrusted_total").increment(1);
 
-        // Also increment by trust class for aggregated metrics
+        // Also increment by trust class for aggregated metrics (bounded cardinality)
         let trust_class = if trust_score < 0.1 {
             "isolated"
         } else if trust_score < 0.4 {
@@ -2056,8 +2059,20 @@ pub mod gossip {
         counter!("icn_gossip_bytes_pushed_total").increment(bytes);
     }
 
-    pub fn peer_deficit_bytes_set(peer: &str, deficit: i64) {
-        gauge!("icn_gossip_peer_deficit_bytes", "peer" => peer.to_string()).set(deficit as f64);
+    /// Set the deficit bytes for a peer.
+    ///
+    /// DEPRECATED: Per-peer deficit tracking has been removed to avoid high-cardinality
+    /// metrics. This function is now a no-op. Callers should aggregate deficit across
+    /// all peers and use `total_deficit_bytes_set()` instead. See Issue #494.
+    #[deprecated(since = "0.2.0", note = "Use total_deficit_bytes_set() instead to avoid high-cardinality metrics")]
+    pub fn peer_deficit_bytes_set(_peer: &str, _deficit: i64) {
+        // Intentionally a no-op. Per-peer tracking removed; callers should
+        // aggregate and use `total_deficit_bytes_set()` instead.
+    }
+
+    /// Set the total deficit bytes across all peers.
+    pub fn total_deficit_bytes_set(deficit: i64) {
+        gauge!("icn_gossip_total_deficit_bytes").set(deficit as f64);
     }
 
     pub fn bloom_fp_rate_record(topic: &str, rate: f64) {
@@ -2986,10 +3001,13 @@ pub mod gateway {
         counter!("icn_gateway_auth_successes_total").increment(1);
     }
 
-    pub fn rate_limit_exceeded_inc(did: &str) {
-        counter!("icn_gateway_rate_limit_exceeded_total",
-                 "did" => did.to_string())
-        .increment(1);
+    /// Increment rate limit exceeded counter.
+    ///
+    /// DEPRECATED: The `did` parameter is ignored to avoid high-cardinality metrics.
+    /// For auditing specific DIDs, use structured logs. See Issue #494.
+    #[deprecated(since = "0.2.0", note = "DID label removed for cardinality; use logs for audit")]
+    pub fn rate_limit_exceeded_inc(_did: &str) {
+        counter!("icn_gateway_rate_limit_exceeded_total").increment(1);
     }
 
     /// Increment counter when transaction velocity limit is exceeded (Issue #164)
@@ -3363,21 +3381,32 @@ pub mod compute {
         gauge!("icn_compute_executors_available").set(count);
     }
 
-    pub fn executor_load_set(executor_did: &str, load: f64) {
-        gauge!("icn_compute_executor_load", "executor" => executor_did.to_string()).set(load);
+    /// Set executor load.
+    ///
+    /// DEPRECATED: Per-executor load tracking has been removed to avoid high-cardinality
+    /// metrics. This function is now a no-op. Callers should compute the aggregate load
+    /// across all executors and use `average_executor_load_set()` instead. See Issue #494.
+    #[deprecated(since = "0.2.0", note = "Use average_executor_load_set() instead to avoid high-cardinality metrics")]
+    pub fn executor_load_set(_executor_did: &str, _load: f64) {
+        // Intentionally a no-op. Per-executor tracking removed; callers should
+        // aggregate and use `average_executor_load_set()` instead.
+    }
+
+    /// Set the average executor load across all executors.
+    pub fn average_executor_load_set(load: f64) {
+        gauge!("icn_compute_executor_load_average").set(load);
     }
 
     pub fn tasks_rejected_capacity_inc() {
         counter!("icn_compute_tasks_rejected_capacity_total").increment(1);
     }
 
-    /// Record compute result conflicts when executors return differing results
-    pub fn result_conflicts_inc(task_hash: &str) {
-        counter!(
-            "icn_compute_result_conflicts_total",
-            "task_hash" => task_hash.to_string()
-        )
-        .increment(1);
+    /// Record compute result conflicts when executors return differing results.
+    ///
+    /// Note: The `task_hash` parameter is ignored to avoid high-cardinality metrics.
+    /// For debugging specific tasks, use structured logs. See Issue #494.
+    pub fn result_conflicts_inc(_task_hash: &str) {
+        counter!("icn_compute_result_conflicts_total").increment(1);
     }
 
     /// Record disputes filed due to result conflicts
@@ -3544,10 +3573,14 @@ pub mod compute {
 pub mod misbehavior {
     use metrics::{counter, gauge};
 
-    pub fn violations_inc(did: &str, violation_type: &str) {
+    /// Record a misbehavior violation.
+    ///
+    /// Note: The `did` parameter is ignored to avoid high-cardinality metrics.
+    /// Violations are tracked by type only. For auditing specific DIDs, use structured logs.
+    /// See Issue #494 for cardinality guidelines.
+    pub fn violations_inc(_did: &str, violation_type: &str) {
         counter!(
             "icn_misbehavior_violations_total",
-            "did" => did.to_string(),
             "violation_type" => violation_type.to_string()
         )
         .increment(1);
@@ -3577,10 +3610,14 @@ pub mod misbehavior {
         counter!("icn_misbehavior_auto_bans_total").increment(1);
     }
 
-    pub fn reputation_penalties_inc(did: &str, severity: u32) {
+    /// Record a reputation penalty.
+    ///
+    /// Note: The `did` parameter is ignored to avoid high-cardinality metrics.
+    /// Penalties are tracked by severity only. For auditing specific DIDs, use structured logs.
+    /// See Issue #494 for cardinality guidelines.
+    pub fn reputation_penalties_inc(_did: &str, severity: u32) {
         counter!(
             "icn_misbehavior_reputation_penalties_total",
-            "did" => did.to_string(),
             "severity" => severity.to_string()
         )
         .increment(1);
@@ -3777,12 +3814,13 @@ pub mod ledger_forks {
 pub mod storage_quotas {
     use metrics::{counter, gauge};
 
-    pub fn quota_exceeded_inc(did: &str) {
-        counter!(
-            "icn_storage_quota_exceeded_total",
-            "did" => did.to_string()
-        )
-        .increment(1);
+    /// Increment quota exceeded counter for a DID.
+    ///
+    /// DEPRECATED: The `did` parameter is ignored to avoid high-cardinality metrics.
+    /// Use `exceeded_inc()` instead. See Issue #494.
+    #[deprecated(since = "0.2.0", note = "Use exceeded_inc() instead to avoid high-cardinality metrics")]
+    pub fn quota_exceeded_inc(_did: &str) {
+        counter!("icn_storage_quota_exceeded_total").increment(1);
     }
 
     pub fn evictions_inc(priority: &str) {
@@ -3805,20 +3843,24 @@ pub mod storage_quotas {
         gauge!("icn_storage_global_usage_percentage").set(percentage);
     }
 
-    pub fn did_quota_usage_set(did: &str, bytes: u64) {
-        gauge!(
-            "icn_storage_did_quota_usage_bytes",
-            "did" => did.to_string()
-        )
-        .set(bytes as f64);
+    /// Set storage quota usage for a DID.
+    ///
+    /// DEPRECATED: The `did` parameter is ignored to avoid high-cardinality metrics.
+    /// Per-DID quota tracking causes unbounded metric growth in large networks.
+    /// Use `global_usage_set()` for aggregate tracking. See Issue #494.
+    #[deprecated(since = "0.2.0", note = "Per-DID quota tracking removed for cardinality; use global_usage_set()")]
+    pub fn did_quota_usage_set(_did: &str, _bytes: u64) {
+        // No-op: per-DID tracking removed for cardinality
     }
 
-    pub fn did_quota_percentage_set(did: &str, percentage: f64) {
-        gauge!(
-            "icn_storage_did_quota_percentage",
-            "did" => did.to_string()
-        )
-        .set(percentage);
+    /// Set storage quota percentage for a DID.
+    ///
+    /// DEPRECATED: The `did` parameter is ignored to avoid high-cardinality metrics.
+    /// Per-DID quota tracking causes unbounded metric growth in large networks.
+    /// Use `global_usage_percentage_set()` for aggregate tracking. See Issue #494.
+    #[deprecated(since = "0.2.0", note = "Per-DID quota tracking removed for cardinality; use global_usage_percentage_set()")]
+    pub fn did_quota_percentage_set(_did: &str, _percentage: f64) {
+        // No-op: per-DID tracking removed for cardinality
     }
 
     pub fn total_quotas_set(count: usize) {
@@ -3889,6 +3931,10 @@ pub mod privacy {
 }
 
 /// Contribution metering metrics (Phase 21.1)
+///
+/// Note: Per-DID metrics have been deprecated in favor of aggregate metrics
+/// to avoid high-cardinality issues. See Issue #494 for details.
+/// Contribution tracking per-DID should use the ledger or dedicated stores.
 pub mod contribution {
     use metrics::{counter, gauge, histogram};
 
@@ -3896,89 +3942,132 @@ pub mod contribution {
     // Compute Contribution Metrics
     // ============================================================
 
-    /// Record compute CPU-seconds contributed by a DID
-    pub fn compute_cpu_seconds_add(did: &str, cpu_seconds: u64) {
-        counter!(
-            "icn_contribution_compute_cpu_seconds_total",
-            "did" => did.to_string()
-        )
-        .increment(cpu_seconds);
+    /// Record compute CPU-seconds contributed by a DID.
+    ///
+    /// DEPRECATED: The `did` parameter is ignored to avoid high-cardinality metrics.
+    /// Use `total_compute_cpu_seconds_add()` instead. See Issue #494.
+    #[deprecated(since = "0.2.0", note = "Use total_compute_cpu_seconds_add() instead to avoid high-cardinality metrics")]
+    pub fn compute_cpu_seconds_add(_did: &str, cpu_seconds: u64) {
+        counter!("icn_contribution_compute_cpu_seconds_total").increment(cpu_seconds);
     }
 
-    /// Record a completed compute job and its duration
-    pub fn compute_job_completed(did: &str, duration_secs: f64) {
-        gauge!(
-            "icn_contribution_compute_jobs_completed",
-            "did" => did.to_string()
-        )
-        .increment(1.0);
-        histogram!(
-            "icn_contribution_compute_job_duration_seconds",
-            "did" => did.to_string()
-        )
-        .record(duration_secs);
+    /// Record total compute CPU-seconds contributed across all DIDs.
+    pub fn total_compute_cpu_seconds_add(cpu_seconds: u64) {
+        counter!("icn_contribution_compute_cpu_seconds_total").increment(cpu_seconds);
     }
 
-    /// Set the number of jobs completed by a DID (for recovery/sync)
-    pub fn compute_jobs_completed_set(did: &str, count: u64) {
-        gauge!(
-            "icn_contribution_compute_jobs_completed",
-            "did" => did.to_string()
-        )
-        .set(count as f64);
+    /// Record a completed compute job and its duration.
+    ///
+    /// DEPRECATED: The `did` parameter is ignored to avoid high-cardinality metrics.
+    /// Use `total_compute_job_completed()` instead. See Issue #494.
+    #[deprecated(since = "0.2.0", note = "Use total_compute_job_completed() instead to avoid high-cardinality metrics")]
+    pub fn compute_job_completed(_did: &str, duration_secs: f64) {
+        gauge!("icn_contribution_compute_jobs_completed_total").increment(1.0);
+        histogram!("icn_contribution_compute_job_duration_seconds").record(duration_secs);
+    }
+
+    /// Record a completed compute job and its duration (aggregate).
+    pub fn total_compute_job_completed(duration_secs: f64) {
+        gauge!("icn_contribution_compute_jobs_completed_total").increment(1.0);
+        histogram!("icn_contribution_compute_job_duration_seconds").record(duration_secs);
+    }
+
+    /// Set the number of jobs completed by a DID (for recovery/sync).
+    ///
+    /// DEPRECATED: Per-DID job tracking has been removed to avoid high-cardinality
+    /// metrics. This function is now a no-op. Callers should aggregate job counts
+    /// across all DIDs and use `total_compute_jobs_completed_set()` instead.
+    /// See Issue #494.
+    #[deprecated(since = "0.2.0", note = "Use total_compute_jobs_completed_set() instead to avoid high-cardinality metrics")]
+    pub fn compute_jobs_completed_set(_did: &str, _count: u64) {
+        // Intentionally a no-op. Per-DID tracking removed; callers should
+        // aggregate and use `total_compute_jobs_completed_set()` instead.
+    }
+
+    /// Set the total number of jobs completed across all DIDs.
+    pub fn total_compute_jobs_completed_set(count: u64) {
+        gauge!("icn_contribution_compute_jobs_completed_total").set(count as f64);
     }
 
     // ============================================================
     // Storage Contribution Metrics
     // ============================================================
 
-    /// Record storage byte-seconds contributed by a DID
-    pub fn storage_byte_seconds_add(did: &str, byte_seconds: u64) {
-        counter!(
-            "icn_contribution_storage_byte_seconds_total",
-            "did" => did.to_string()
-        )
-        .increment(byte_seconds);
+    /// Record storage byte-seconds contributed by a DID.
+    ///
+    /// DEPRECATED: The `did` parameter is ignored to avoid high-cardinality metrics.
+    /// Use `total_storage_byte_seconds_add()` instead. See Issue #494.
+    #[deprecated(since = "0.2.0", note = "Use total_storage_byte_seconds_add() instead to avoid high-cardinality metrics")]
+    pub fn storage_byte_seconds_add(_did: &str, byte_seconds: u64) {
+        counter!("icn_contribution_storage_byte_seconds_total").increment(byte_seconds);
     }
 
-    /// Set the number of healthy replicas for a provider DID
-    pub fn storage_replicas_healthy_set(did: &str, count: u64) {
-        gauge!(
-            "icn_contribution_storage_replicas_healthy",
-            "did" => did.to_string()
-        )
-        .set(count as f64);
+    /// Record total storage byte-seconds contributed across all DIDs.
+    pub fn total_storage_byte_seconds_add(byte_seconds: u64) {
+        counter!("icn_contribution_storage_byte_seconds_total").increment(byte_seconds);
     }
 
-    /// Increment healthy replicas for a provider DID
-    pub fn storage_replicas_healthy_inc(did: &str) {
-        gauge!(
-            "icn_contribution_storage_replicas_healthy",
-            "did" => did.to_string()
-        )
-        .increment(1.0);
+    /// Set the number of healthy replicas for a provider DID.
+    ///
+    /// DEPRECATED: Per-provider replica tracking has been removed to avoid high-cardinality
+    /// metrics. This function is now a no-op. Callers should aggregate replica counts
+    /// across all providers and use `total_storage_replicas_healthy_set()` instead.
+    /// See Issue #494.
+    #[deprecated(since = "0.2.0", note = "Use total_storage_replicas_healthy_set() instead to avoid high-cardinality metrics")]
+    pub fn storage_replicas_healthy_set(_did: &str, _count: u64) {
+        // Intentionally a no-op. Per-provider tracking removed; callers should
+        // aggregate and use `total_storage_replicas_healthy_set()` instead.
     }
 
-    /// Decrement healthy replicas for a provider DID
-    pub fn storage_replicas_healthy_dec(did: &str) {
-        gauge!(
-            "icn_contribution_storage_replicas_healthy",
-            "did" => did.to_string()
-        )
-        .decrement(1.0);
+    /// Set the total number of healthy replicas across all providers.
+    pub fn total_storage_replicas_healthy_set(count: u64) {
+        gauge!("icn_contribution_storage_replicas_healthy_total").set(count as f64);
+    }
+
+    /// Increment healthy replicas for a provider DID.
+    ///
+    /// DEPRECATED: The `did` parameter is ignored to avoid high-cardinality metrics.
+    /// Use `total_storage_replicas_healthy_inc()` instead. See Issue #494.
+    #[deprecated(since = "0.2.0", note = "Use total_storage_replicas_healthy_inc() instead to avoid high-cardinality metrics")]
+    pub fn storage_replicas_healthy_inc(_did: &str) {
+        gauge!("icn_contribution_storage_replicas_healthy_total").increment(1.0);
+    }
+
+    /// Increment total healthy replicas across all providers.
+    pub fn total_storage_replicas_healthy_inc() {
+        gauge!("icn_contribution_storage_replicas_healthy_total").increment(1.0);
+    }
+
+    /// Decrement healthy replicas for a provider DID.
+    ///
+    /// DEPRECATED: The `did` parameter is ignored to avoid high-cardinality metrics.
+    /// Use `total_storage_replicas_healthy_dec()` instead. See Issue #494.
+    #[deprecated(since = "0.2.0", note = "Use total_storage_replicas_healthy_dec() instead to avoid high-cardinality metrics")]
+    pub fn storage_replicas_healthy_dec(_did: &str) {
+        gauge!("icn_contribution_storage_replicas_healthy_total").decrement(1.0);
+    }
+
+    /// Decrement total healthy replicas across all providers.
+    pub fn total_storage_replicas_healthy_dec() {
+        gauge!("icn_contribution_storage_replicas_healthy_total").decrement(1.0);
     }
 
     // ============================================================
     // Bandwidth Contribution Metrics
     // ============================================================
 
-    /// Record bandwidth bytes contributed by a DID
-    pub fn bandwidth_bytes_add(did: &str, bytes: u64) {
-        counter!(
-            "icn_contribution_bandwidth_bytes_total",
-            "did" => did.to_string()
-        )
-        .increment(bytes);
+    /// Record bandwidth bytes contributed by a DID.
+    ///
+    /// DEPRECATED: The `did` parameter is ignored to avoid high-cardinality metrics.
+    /// Use `total_bandwidth_bytes_add()` instead. See Issue #494.
+    #[deprecated(since = "0.2.0", note = "Use total_bandwidth_bytes_add() instead to avoid high-cardinality metrics")]
+    pub fn bandwidth_bytes_add(_did: &str, bytes: u64) {
+        counter!("icn_contribution_bandwidth_bytes_total").increment(bytes);
+    }
+
+    /// Record total bandwidth bytes contributed across all DIDs.
+    pub fn total_bandwidth_bytes_add(bytes: u64) {
+        counter!("icn_contribution_bandwidth_bytes_total").increment(bytes);
     }
 
     /// Record a bandwidth transfer for histogram tracking
@@ -3990,22 +4079,33 @@ pub mod contribution {
     // Uptime Contribution Metrics
     // ============================================================
 
-    /// Record uptime seconds contributed by a DID
-    pub fn uptime_seconds_add(did: &str, seconds: u64) {
-        counter!(
-            "icn_contribution_uptime_seconds_total",
-            "did" => did.to_string()
-        )
-        .increment(seconds);
+    /// Record uptime seconds contributed by a DID.
+    ///
+    /// DEPRECATED: The `did` parameter is ignored to avoid high-cardinality metrics.
+    /// Use `total_uptime_seconds_add()` instead. See Issue #494.
+    #[deprecated(since = "0.2.0", note = "Use total_uptime_seconds_add() instead to avoid high-cardinality metrics")]
+    pub fn uptime_seconds_add(_did: &str, seconds: u64) {
+        counter!("icn_contribution_uptime_seconds_total").increment(seconds);
     }
 
-    /// Record a heartbeat from a DID (sets last heartbeat timestamp)
-    pub fn uptime_heartbeat_record(did: &str, timestamp: u64) {
-        gauge!(
-            "icn_contribution_uptime_last_heartbeat",
-            "did" => did.to_string()
-        )
-        .set(timestamp as f64);
+    /// Record total uptime seconds contributed across all DIDs.
+    pub fn total_uptime_seconds_add(seconds: u64) {
+        counter!("icn_contribution_uptime_seconds_total").increment(seconds);
+    }
+
+    /// Record a heartbeat from a DID.
+    ///
+    /// DEPRECATED: Per-DID heartbeat tracking causes unbounded metric growth.
+    /// Use `heartbeats_received_inc()` for aggregate tracking. See Issue #494.
+    #[deprecated(since = "0.2.0", note = "Use heartbeats_received_inc() instead to avoid high-cardinality metrics")]
+    pub fn uptime_heartbeat_record(_did: &str, _timestamp: u64) {
+        // No-op: per-DID tracking removed for cardinality
+        counter!("icn_contribution_uptime_heartbeats_total").increment(1);
+    }
+
+    /// Increment total heartbeats received counter.
+    pub fn heartbeats_received_inc() {
+        counter!("icn_contribution_uptime_heartbeats_total").increment(1);
     }
 }
 
@@ -4220,20 +4320,23 @@ pub mod commons {
         counter!("icn_commons_stewards_registered_total").increment(1);
     }
 
-    /// Record steward vouch
-    pub fn steward_vouch_inc(steward_did: &str) {
-        counter!(
-            "icn_commons_stewards_vouches_total",
-            "steward" => steward_did.to_string()
-        )
-        .increment(1);
+    /// Record steward vouch.
+    ///
+    /// Note: The `steward_did` parameter is ignored to avoid high-cardinality metrics.
+    /// While stewards are a bounded set, we use aggregate metrics for consistency.
+    /// For audit trails, use structured logs. See Issue #494.
+    pub fn steward_vouch_inc(_steward_did: &str) {
+        counter!("icn_commons_stewards_vouches_total").increment(1);
     }
 
-    /// Record steward rejection of enrollment
-    pub fn steward_rejection_inc(steward_did: &str, reason: &str) {
+    /// Record steward rejection of enrollment.
+    ///
+    /// Note: The `steward_did` parameter is ignored to avoid high-cardinality metrics.
+    /// Rejections are tracked by reason only. For audit trails, use structured logs.
+    /// See Issue #494.
+    pub fn steward_rejection_inc(_steward_did: &str, reason: &str) {
         counter!(
             "icn_commons_stewards_rejections_total",
-            "steward" => steward_did.to_string(),
             "reason" => reason.to_string()
         )
         .increment(1);
