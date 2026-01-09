@@ -464,8 +464,10 @@ pub fn anomalies_to_sybil_flags(anomalies: &[TrustAnomaly]) -> Vec<crate::sybil:
                     format!("density_ratio:{:.2}", density_ratio),
                 ];
 
-                // Confidence based on density ratio (capped at 1.0)
-                let confidence = (density_ratio / 10.0).min(1.0);
+                // Confidence based on density ratio relative to the default detection
+                // threshold (sybil_density_ratio = 5.0), capped at 1.0.
+                // A cluster at the threshold gets 100% confidence since it was flagged.
+                let confidence = (density_ratio / 5.0).min(1.0);
 
                 for did in cluster {
                     flags.push(SybilFlag {
@@ -489,8 +491,10 @@ pub fn anomalies_to_sybil_flags(anomalies: &[TrustAnomaly]) -> Vec<crate::sybil:
                     format!("threshold:{:.2}", threshold),
                 ];
 
-                // Confidence based on how much the threshold was exceeded
-                let confidence = (growth_rate / (threshold * 2.0)).min(1.0);
+                // Confidence based on how much the threshold was exceeded.
+                // Saturate at 1.0 when growth_rate is roughly 3x the threshold,
+                // so a growth rate exactly at threshold gets ~33% confidence.
+                let confidence = (growth_rate / (threshold * 3.0)).min(1.0);
 
                 flags.push(SybilFlag {
                     did: did.clone(),
@@ -713,8 +717,8 @@ mod tests {
 
         for flag in &flags {
             assert_eq!(flag.flag_type, SybilFlagType::SybilCluster);
-            // Confidence = 8.0 / 10.0 = 0.8
-            assert!((flag.confidence - 0.8).abs() < 0.001);
+            // Confidence = 8.0 / 5.0 = 1.6, capped at 1.0
+            assert!((flag.confidence - 1.0).abs() < 0.001);
         }
     }
 
@@ -736,7 +740,7 @@ mod tests {
         assert_eq!(flags.len(), 1);
         assert_eq!(flags[0].did, did);
         assert_eq!(flags[0].flag_type, SybilFlagType::RapidTrustGrowth);
-        // Confidence = 0.75 / (0.5 * 2) = 0.75
-        assert!((flags[0].confidence - 0.75).abs() < 0.001);
+        // Confidence = 0.75 / (0.5 * 3) = 0.5
+        assert!((flags[0].confidence - 0.5).abs() < 0.001);
     }
 }

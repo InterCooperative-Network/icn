@@ -40,8 +40,11 @@
 //!     },
 //! )?;
 //!
+//! // Base trust score from the trust computation (example value)
+//! let base_trust_score: f64 = 0.8;
+//!
 //! // Compute trust with Sybil resistance
-//! let effective_score = sybil.compute_effective_trust(&trust_graph, &target)?;
+//! let effective_score = sybil.compute_effective_trust(base_trust_score, &target)?;
 //! ```
 
 use anyhow::Result;
@@ -304,11 +307,14 @@ impl SybilResistance {
 
     /// Add a Sybil flag for a DID
     pub fn add_sybil_flag(&self, flag: SybilFlag) -> Result<()> {
+        // Include flag_type in key to prevent collision when multiple flags
+        // are added for the same DID within the same second
         let key = format!(
-            "{}{}:{}",
+            "{}{}:{}:{:?}",
             SYBIL_FLAG_PREFIX,
             flag.did.as_str(),
-            flag.flagged_at
+            flag.flagged_at,
+            flag.flag_type
         );
         let value = serde_json::to_vec(&flag)?;
         self.store.put(key.as_bytes(), &value)?;
@@ -419,10 +425,9 @@ impl SybilResistance {
             if !status.is_verified(now) {
                 // Cap at threshold if not verified
                 debug!(
-                    "Capping trust for {} at {} (VUI required above {})",
+                    "Capping trust for {} at {} (VUI required for higher scores)",
                     did,
                     self.config.require_vui_above_threshold,
-                    self.config.require_vui_above_threshold
                 );
                 return Ok(self.config.require_vui_above_threshold);
             }
@@ -495,6 +500,22 @@ mod tests {
             expires_at: Some(now - 100), // Expired
         };
         assert!(!status.is_verified(now));
+    }
+
+    #[test]
+    fn test_verification_status_expires_at_boundary() {
+        let now = icn_time::current_timestamp_secs();
+        // Expires exactly at 'now' - should still be valid (now <= expires_at)
+        let status = VerificationStatus::Verified {
+            method: VerificationMethod::PhoneVerification,
+            verified_at: now - 1000,
+            verified_by: None,
+            expires_at: Some(now),
+        };
+        assert!(
+            status.is_verified(now),
+            "Verification should still be valid when expires_at == now"
+        );
     }
 
     #[test]
