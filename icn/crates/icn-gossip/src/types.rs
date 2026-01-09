@@ -89,7 +89,7 @@ pub enum Scope {
 impl std::fmt::Display for Scope {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Scope::LocalCluster => write!(f, "local"),
+            Scope::LocalCluster => write!(f, "local_cluster"),
             Scope::Regional => write!(f, "regional"),
             Scope::Global => write!(f, "global"),
         }
