@@ -2229,6 +2229,15 @@ pub mod scalability {
     pub fn timestamp_validation_rejected_inc() {
         counter!("icn_scalability_timestamp_validation_rejected_total").increment(1);
     }
+
+    // Bootstrap peer health metrics (M2)
+    pub fn bootstrap_peers_connected_set(count: u64) {
+        gauge!("icn_bootstrap_peers_connected").set(count as f64);
+    }
+
+    pub fn bootstrap_peers_disconnected_set(count: u64) {
+        gauge!("icn_bootstrap_peers_disconnected").set(count as f64);
+    }
 }
 
 /// Ledger metrics

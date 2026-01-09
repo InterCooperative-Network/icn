@@ -160,6 +160,10 @@ pub async fn dial_with_fallback(
 }
 
 /// Dial local and public addresses in parallel, return first success
+///
+/// Note: Uses unwrap() in select! branches that are guarded by is_some() checks.
+/// These are safe because the guards ensure the Option is Some before accessing.
+#[allow(clippy::unwrap_used)]
 async fn dial_parallel(
     network_handle: &NetworkHandle,
     candidate: &ConnectionCandidate,

@@ -696,6 +696,211 @@ pub fn spawn_candidate_announcement_task(
     })
 }
 
+/// Callback type for recording peer cache successes
+pub type PeerCacheCallback = Arc<dyn Fn(&Did, std::net::SocketAddr) + Send + Sync>;
+
+/// Configuration for bootstrap peer health checking task
+pub struct BootstrapHealthConfig {
+    /// Interval between health checks (default: 60s)
+    pub check_interval: Duration,
+    /// Timeout for reconnection attempts (default: 10s)
+    pub reconnect_timeout: Duration,
+    /// Maximum consecutive failures before alerting (default: 3)
+    pub max_failures: u32,
+}
+
+impl Default for BootstrapHealthConfig {
+    fn default() -> Self {
+        Self {
+            check_interval: Duration::from_secs(60),
+            reconnect_timeout: Duration::from_secs(10),
+            max_failures: 3,
+        }
+    }
+}
+
+/// Status of bootstrap peer connectivity
+#[derive(Debug, Clone)]
+pub struct BootstrapPeerStatus {
+    /// Peer DID
+    pub did: Did,
+    /// Peer address
+    pub address: std::net::SocketAddr,
+    /// Currently connected
+    pub connected: bool,
+    /// Consecutive connection failures
+    pub failure_count: u32,
+}
+
+/// Spawn the bootstrap health checking background task
+///
+/// This task periodically checks connectivity to configured bootstrap peers
+/// and attempts reconnection if disconnected. It provides early warning when
+/// bootstrap connectivity is lost.
+///
+/// Key behaviors:
+/// - Checks bootstrap peer connectivity every `check_interval`
+/// - Attempts reconnection for disconnected bootstrap peers
+/// - Records successful connections to peer cache for faster rejoining
+/// - Emits metrics for bootstrap connectivity monitoring
+///
+/// # Parameters
+/// - `config`: Health check configuration
+/// - `bootstrap_peers`: List of (DID, Address) pairs for bootstrap peers
+/// - `network_handle`: Handle to check connectivity and dial
+/// - `peer_cache`: Optional peer cache for recording connections
+/// - `shutdown_rx`: Shutdown signal receiver
+pub fn spawn_bootstrap_health_task(
+    config: BootstrapHealthConfig,
+    bootstrap_peers: Vec<(Did, std::net::SocketAddr)>,
+    network_handle: NetworkHandle,
+    peer_cache: Option<PeerCacheCallback>,
+    mut shutdown_rx: BroadcastReceiver<()>,
+) -> JoinHandle<()> {
+    tokio::spawn(async move {
+        if bootstrap_peers.is_empty() {
+            info!("No bootstrap peers configured, health task exiting");
+            return;
+        }
+
+        info!(
+            peer_count = bootstrap_peers.len(),
+            interval_secs = config.check_interval.as_secs(),
+            "Bootstrap health task started"
+        );
+
+        // Track status for each bootstrap peer
+        let mut peer_status: Vec<BootstrapPeerStatus> = bootstrap_peers
+            .iter()
+            .map(|(did, addr)| BootstrapPeerStatus {
+                did: did.clone(),
+                address: *addr,
+                connected: true, // Assume initially connected (we dial at startup)
+                failure_count: 0,
+            })
+            .collect();
+
+        let mut interval = tokio::time::interval(config.check_interval);
+
+        // Skip first tick - startup connection happens elsewhere
+        interval.tick().await;
+
+        loop {
+            tokio::select! {
+                _ = interval.tick() => {
+                    let mut connected_count = 0;
+                    let mut disconnected_count = 0;
+
+                    for status in &mut peer_status {
+                        // Check if peer is currently connected
+                        let is_connected = network_handle
+                            .is_peer_connected(&status.did)
+                            .await
+                            .unwrap_or(false);
+
+                        if is_connected {
+                            // Peer is connected
+                            connected_count += 1;
+                            status.connected = true;
+                            status.failure_count = 0;
+
+                            // Record success to peer cache if available
+                            if let Some(ref cache_fn) = peer_cache {
+                                cache_fn(&status.did, status.address);
+                            }
+                        } else {
+                            // Peer is disconnected - attempt reconnection
+                            disconnected_count += 1;
+                            status.connected = false;
+
+                            debug!(
+                                peer = %status.did,
+                                address = %status.address,
+                                failures = status.failure_count,
+                                "Bootstrap peer disconnected, attempting reconnection"
+                            );
+
+                            // Attempt reconnection with timeout
+                            match tokio::time::timeout(
+                                config.reconnect_timeout,
+                                network_handle.dial(status.address, status.did.clone()),
+                            )
+                            .await
+                            {
+                                Ok(Ok(_)) => {
+                                    info!(
+                                        peer = %status.did,
+                                        "Reconnected to bootstrap peer"
+                                    );
+                                    status.connected = true;
+                                    status.failure_count = 0;
+                                    connected_count += 1;
+                                    disconnected_count -= 1;
+
+                                    // Record success to peer cache
+                                    if let Some(ref cache_fn) = peer_cache {
+                                        cache_fn(&status.did, status.address);
+                                    }
+
+                                    icn_obs::metrics::nat::dial_success_inc("bootstrap_reconnect");
+                                }
+                                Ok(Err(e)) => {
+                                    status.failure_count += 1;
+                                    warn!(
+                                        peer = %status.did,
+                                        error = %e,
+                                        failures = status.failure_count,
+                                        "Failed to reconnect to bootstrap peer"
+                                    );
+                                    icn_obs::metrics::nat::dial_failure_inc();
+                                }
+                                Err(_) => {
+                                    status.failure_count += 1;
+                                    warn!(
+                                        peer = %status.did,
+                                        timeout_ms = config.reconnect_timeout.as_millis(),
+                                        failures = status.failure_count,
+                                        "Bootstrap reconnection timed out"
+                                    );
+                                    icn_obs::metrics::nat::dial_failure_inc();
+                                }
+                            }
+
+                            // Alert if max failures exceeded
+                            if status.failure_count >= config.max_failures {
+                                warn!(
+                                    peer = %status.did,
+                                    failures = status.failure_count,
+                                    "Bootstrap peer unreachable after {} consecutive failures",
+                                    config.max_failures
+                                );
+                            }
+                        }
+                    }
+
+                    // Update metrics
+                    icn_obs::metrics::scalability::bootstrap_peers_connected_set(connected_count);
+                    icn_obs::metrics::scalability::bootstrap_peers_disconnected_set(disconnected_count);
+
+                    // Log summary if any disconnected
+                    if disconnected_count > 0 {
+                        debug!(
+                            connected = connected_count,
+                            disconnected = disconnected_count,
+                            total = peer_status.len(),
+                            "Bootstrap peer health check summary"
+                        );
+                    }
+                }
+                _ = shutdown_rx.recv() => {
+                    info!("Bootstrap health task shutting down");
+                    break;
+                }
+            }
+        }
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -732,5 +937,13 @@ mod tests {
         assert_eq!(config.retention_days, 365);
         assert_eq!(config.max_records_per_entity, 10000);
         assert_eq!(config.batch_size, 1000);
+    }
+
+    #[test]
+    fn test_bootstrap_health_config_default() {
+        let config = BootstrapHealthConfig::default();
+        assert_eq!(config.check_interval, Duration::from_secs(60));
+        assert_eq!(config.reconnect_timeout, Duration::from_secs(10));
+        assert_eq!(config.max_failures, 3);
     }
 }
