@@ -426,8 +426,7 @@ impl SybilResistance {
                 // Cap at threshold if not verified
                 debug!(
                     "Capping trust for {} at {} (VUI required for higher scores)",
-                    did,
-                    self.config.require_vui_above_threshold,
+                    did, self.config.require_vui_above_threshold,
                 );
                 return Ok(self.config.require_vui_above_threshold);
             }
