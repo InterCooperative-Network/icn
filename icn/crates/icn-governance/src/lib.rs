@@ -74,6 +74,9 @@ pub mod vote;
 // Orphan cleanup (Phase 21)
 pub mod orphan_cleanup;
 
+// Proposal cleanup and archival
+pub mod proposal_cleanup;
+
 pub use amendment::{
     Amendment, AmendmentChange, AmendmentId, AmendmentScope, AmendmentStatus, AmendmentType,
     ChangeTarget, ChangeType, Ratification, RatificationRequirements, RatificationResult,
@@ -147,6 +150,9 @@ pub use orphan_cleanup::{
     cleanup_orphan_parameters, cleanup_orphan_parameters_sync, count_orphan_parameters,
     OrphanCleanupConfig, OrphanCleanupResult, OrphanDetail,
 };
+
+// Proposal cleanup and archival types
+pub use proposal_cleanup::{CleanupStats, ProposalArchive, ProposalCleanupTask, ProposalRetention};
 
 /// Unix timestamp in seconds
 pub type Timestamp = u64;
