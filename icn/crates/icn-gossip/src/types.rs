@@ -434,6 +434,10 @@ impl Topic {
 }
 
 /// Access control for topics
+///
+/// **Security Note**: When creating topics, always specify explicit access control.
+/// The default is `TrustClass(Partner)` which requires a trust score >= 0.4.
+/// Use `AccessControl::Public` only for topics that genuinely need open access.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AccessControl {
     /// Anyone can publish/subscribe
@@ -444,6 +448,14 @@ pub enum AccessControl {
 
     /// Only specific participants (e.g., contract members)
     Participants(Vec<Did>),
+}
+
+impl Default for AccessControl {
+    /// Default to Partner trust class (score >= 0.4) for security.
+    /// This prevents unknown peers from publishing to auto-created topics.
+    fn default() -> Self {
+        AccessControl::TrustClass(TrustClass::Partner)
+    }
 }
 
 /// Resource limits for a specific trust class
@@ -629,6 +641,46 @@ mod tests {
         assert!(topic.can_publish(&alice, None));
         assert!(topic.can_publish(&bob, None));
         assert!(!topic.can_publish(&charlie, None));
+    }
+
+    #[test]
+    fn test_access_control_default_is_strict() {
+        // Default AccessControl should be TrustClass::Partner (strict)
+        // This prevents unknown peers from publishing to auto-created topics
+        let default_acl = AccessControl::default();
+        assert_eq!(
+            default_acl,
+            AccessControl::TrustClass(TrustClass::Partner),
+            "Default ACL should require Partner trust level"
+        );
+
+        // Verify a topic with default ACL requires Partner trust
+        let topic = Topic::new("auto-created".to_string(), default_acl);
+        let did = KeyPair::generate().unwrap().did().clone();
+
+        // No trust class - denied
+        assert!(
+            !topic.can_publish(&did, None),
+            "Default ACL should deny untrusted peers"
+        );
+        assert!(
+            !topic.can_publish(&did, Some(TrustClass::Isolated)),
+            "Default ACL should deny Isolated peers"
+        );
+        assert!(
+            !topic.can_publish(&did, Some(TrustClass::Known)),
+            "Default ACL should deny Known peers"
+        );
+
+        // Partner and above - allowed
+        assert!(
+            topic.can_publish(&did, Some(TrustClass::Partner)),
+            "Default ACL should allow Partner peers"
+        );
+        assert!(
+            topic.can_publish(&did, Some(TrustClass::Federated)),
+            "Default ACL should allow Federated peers"
+        );
     }
 
     #[test]

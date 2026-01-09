@@ -214,6 +214,10 @@ pub fn init_descriptions() {
 
     // Gossip metrics
     describe_gauge!("icn_gossip_topics_total", "Total number of gossip topics");
+    describe_counter!(
+        "icn_gossip_topics_auto_created_total",
+        "Topics auto-created with default ACL (indicates missing explicit registration)"
+    );
     describe_gauge!(
         "icn_gossip_entries_total",
         "Total number of gossip entries across all topics"
@@ -1954,6 +1958,11 @@ pub mod gossip {
 
     pub fn topics_total_set(value: u64) {
         gauge!("icn_gossip_topics_total").set(value as f64);
+    }
+
+    /// Increment counter for topics auto-created with default ACL
+    pub fn topics_auto_created_inc() {
+        counter!("icn_gossip_topics_auto_created_total").increment(1);
     }
 
     pub fn entries_total_set(value: u64) {

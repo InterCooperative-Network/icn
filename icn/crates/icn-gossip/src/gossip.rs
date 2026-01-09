@@ -487,10 +487,15 @@ impl GossipActor {
     /// Publish an entry to a topic
     #[instrument(skip(self, data), fields(topic = %topic, data_size = data.len()))]
     pub async fn publish(&mut self, topic: &str, data: Vec<u8>) -> Result<ContentHash> {
-        // Auto-create topic if it doesn't exist (as public topic)
+        // Auto-create topic if it doesn't exist (with strict default ACL)
         if !self.topics.contains_key(topic) {
-            debug!("Auto-creating public topic: {}", topic);
-            self.create_topic(Topic::new(topic.to_string(), AccessControl::Public));
+            warn!(
+                topic = %topic,
+                "Auto-creating topic with default ACL (TrustClass::Partner). \
+                 Consider registering topics explicitly with appropriate access control."
+            );
+            icn_obs::metrics::gossip::topics_auto_created_inc();
+            self.create_topic(Topic::new(topic.to_string(), AccessControl::default()));
         }
 
         let topic_obj = self.topics.get(topic).context("Topic not found")?;
