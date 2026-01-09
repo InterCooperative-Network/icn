@@ -278,7 +278,7 @@ impl GossipActor {
         gossip.create_topic(
             Topic::new(
                 crate::labor_shares::topics::BONDS_PAYMENTS.to_string(),
-                AccessControl::TrustClass(TrustClass::Partner), // TrustGated - Partner+
+                AccessControl::TrustClass(TrustClass::Partner), // TrustClass::Partner
             )
             .with_scope(crate::types::Scope::Regional), // Payment notifications are regional
         );
@@ -528,7 +528,7 @@ impl GossipActor {
                         "Auto-creating topic with strict defaults (Federated trust required). \
                          Consider explicitly creating topics with appropriate access control."
                     );
-                    // Use the strict default (AccessControl::default() = TrustGated(Federated))
+                    // Use the strict default (AccessControl::default() = TrustClass(Federated))
                     self.create_topic(Topic::new(topic.to_string(), AccessControl::default()));
                 }
                 TopicAutoCreationPolicy::CreatePublic => {
