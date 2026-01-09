@@ -96,7 +96,7 @@ impl GossipActor {
         let estimated_bytes = hint_count * 512; // Rough estimate
 
         // Update peer sync state (borrow mutable)
-        let (request_nonce, deficit_after) = {
+        let (request_nonce, _deficit) = {
             let peer_state = self.peer_sync.get_or_create(peer_did.clone());
 
             // Update peer's known state
@@ -109,8 +109,8 @@ impl GossipActor {
                     "Cannot send to peer {} - backpressured or at limit",
                     peer_did
                 );
-                let deficit = peer_state.deficit_bytes;
-                icn_obs::metrics::gossip::peer_deficit_bytes_set(peer_did.as_str(), deficit);
+                // Note: Per-peer deficit tracking removed to avoid high-cardinality metrics.
+                // Use aggregated metrics (pull_requests_sent/received) for overall health.
                 return Ok(());
             }
 
@@ -146,7 +146,6 @@ impl GossipActor {
 
         // Track metrics
         icn_obs::metrics::gossip::pull_requests_sent_inc();
-        icn_obs::metrics::gossip::peer_deficit_bytes_set(peer_did.as_str(), deficit_after);
 
         Ok(())
     }
@@ -340,11 +339,7 @@ impl GossipActor {
                 peer_for_continuation, peer_state.deficit_bytes, peer_state.outstanding_requests
             );
 
-            // Track peer deficit metric
-            icn_obs::metrics::gossip::peer_deficit_bytes_set(
-                peer_for_continuation.as_str(),
-                peer_state.deficit_bytes,
-            );
+            // Note: Per-peer deficit tracking removed to avoid high-cardinality metrics.
         }
 
         icn_obs::metrics::gossip::bytes_pulled_add(total_bytes as u64);
