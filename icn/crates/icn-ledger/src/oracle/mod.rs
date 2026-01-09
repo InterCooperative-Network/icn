@@ -82,7 +82,7 @@ pub use price_feed::PriceFeed;
 pub use sources::{FederationRateSource, ManualRateSource};
 pub use types::{
     CurrencyPair, ExchangeRate, ManualRateRecord, OracleConfig, RateAuditEntry, RateObservation,
-    SourceInfo,
+    SourceInfo, DEFAULT_SUSPICIOUS_RATE_THRESHOLD,
 };
 
 // Re-export AgreementRates for federation integration
