@@ -1104,7 +1104,7 @@ impl NetworkActor {
                     }
                 }
                 _ = cleanup_interval.tick() => {
-                    // Cleanup stale replay guard entries using single write lock
+                    // Cleanup stale replay guard entries using single write lock (#153)
                     let (peer_count_before, peer_count_after) = {
                         let mut guard = self.replay_guard.write().await;
                         let before = guard.peer_count();
@@ -1113,13 +1113,16 @@ impl NetworkActor {
                         (before, after)
                     };
 
-                    // Update metric
+                    // Update metrics (#153)
                     icn_obs::metrics::network::replay_guard_peers_set(peer_count_after as u64);
+                    icn_obs::metrics::network::replay_guard_cleanups_inc();
 
-                    if peer_count_before != peer_count_after {
+                    let peers_cleaned = peer_count_before.saturating_sub(peer_count_after);
+                    if peers_cleaned > 0 {
+                        icn_obs::metrics::network::replay_guard_peers_cleaned_add(peers_cleaned as u64);
                         info!(
-                            "Replay guard cleanup: {} -> {} peers",
-                            peer_count_before, peer_count_after
+                            "Replay guard cleanup: {} -> {} peers ({} removed)",
+                            peer_count_before, peer_count_after, peers_cleaned
                         );
                     }
 

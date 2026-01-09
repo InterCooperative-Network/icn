@@ -78,6 +78,7 @@ impl PqBindingProof {
     pub const FUTURE_TOLERANCE_MILLIS: u64 = 60_000;
 
     /// Get current timestamp in milliseconds with safe u128->u64 conversion
+    #[allow(dead_code)] // Used by post-quantum feature
     fn current_timestamp_millis() -> Result<u64, anyhow::Error> {
         use anyhow::anyhow;
         std::time::SystemTime::now()
