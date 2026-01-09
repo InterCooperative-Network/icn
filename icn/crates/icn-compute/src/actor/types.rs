@@ -6,26 +6,34 @@ use crate::scheduler::NodeCapacity;
 use crate::types::{ComputeMessage, ComputeResult, ExecutorCapability, TaskHash};
 
 /// Information about an available executor
+///
+/// Some fields are reserved for future federated compute features and are
+/// currently unused. See Phase 29 cleanup (#156) for tracking.
 #[derive(Debug, Clone)]
 pub(crate) struct ExecutorInfo {
     /// Executor's DID
     pub did: String,
     /// Cooperative ID this executor belongs to (None = local/same cooperative)
+    /// Reserved: Federated compute - cross-cooperative task routing
     #[allow(dead_code)]
     pub cooperative_id: Option<String>,
     /// Whether this executor is from a federated cooperative
+    /// Reserved: Federated compute - trust attenuation for remote executors
     #[allow(dead_code)]
     pub is_federated: bool,
     /// Capabilities this executor offers
     pub capabilities: Vec<ExecutorCapability>,
     /// Current trust score (local, from icn-trust)
+    /// Reserved: Trust-gated execution - minimum trust for task assignment
     #[allow(dead_code)]
     pub trust_score: f64,
     /// Federated trust score (attenuated based on coop trust)
     /// Formula: federated_trust = local_trust × coop_trust × attenuation_factor
+    /// Reserved: Federated compute - cross-cooperative trust scoring
     #[allow(dead_code)]
     pub federated_trust_score: Option<f64>,
     /// Last announcement timestamp (milliseconds since epoch, used for staleness detection)
+    /// Reserved: Executor health - detect stale/offline executors
     #[allow(dead_code)]
     pub last_seen: u64,
     /// Number of tasks currently executing
@@ -33,14 +41,18 @@ pub(crate) struct ExecutorInfo {
     /// Current capacity (CPU, memory, storage, GPU)
     pub capacity: Option<NodeCapacity>,
     /// Gateway endpoint for federated executors (used for result delivery)
+    /// Reserved: Federated compute - route results back through gateway
     #[allow(dead_code)]
     pub gateway_endpoint: Option<String>,
 }
 
 /// Consensus tracking for task results
+///
+/// Tracks results from multiple executors for Byzantine fault tolerance.
 #[derive(Debug, Clone)]
 pub(crate) struct ResultConsensus {
     /// Task hash (used for tracking in HashMap)
+    /// Reserved: Multi-executor consensus - correlate results across executors
     #[allow(dead_code)]
     pub task_hash: TaskHash,
     /// Results received from different executors

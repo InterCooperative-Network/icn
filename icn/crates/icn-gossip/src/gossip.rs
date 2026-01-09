@@ -973,53 +973,12 @@ impl GossipActor {
         missing
     }
 
-    /// Get all entry hashes for a topic
-    #[allow(dead_code)]
-    fn get_topic_hashes(&self, topic: &str) -> Vec<ContentHash> {
-        self.entries
-            .get(topic)
-            .map(|entries| entries.keys().copied().collect())
-            .unwrap_or_default()
-    }
-
-    /// Find entries we have that remote might not have (based on bloom filter)
-    #[allow(dead_code)]
-    fn find_entries_to_push(&self, topic: &str, remote_bloom: &BloomFilter) -> Vec<ContentHash> {
-        let mut to_push = Vec::new();
-
-        if let Some(entries) = self.entries.get(topic) {
-            for hash in entries.keys() {
-                // If remote bloom says they don't have it, we should offer it
-                if !remote_bloom.contains(hash) {
-                    to_push.push(*hash);
-                }
-            }
-        }
-
-        to_push
-    }
-
-    /// Find entries we're missing based on remote vector clock
-    #[allow(dead_code)]
-    fn find_entries_to_pull(&self, topic: &str, remote_vector: &VectorClock) -> Vec<ContentHash> {
-        let to_pull = Vec::new();
-
-        if let Some(entries) = self.entries.get(topic) {
-            // Check each entry we have
-            for entry in entries.values() {
-                // If remote clock is ahead of this entry's clock, we might be missing entries
-                if remote_vector.happened_after(&entry.clock) {
-                    // This entry is causally before remote state
-                    // We might be missing newer entries from remote
-                    continue;
-                }
-            }
-        }
-
-        // For now, we'll use a simpler heuristic: compare local bloom against remote
-        // A full implementation would track per-peer vector clocks and compute diffs
-        to_pull
-    }
+    // Note: Legacy dead code removed in Phase 29 (#155):
+    // - get_topic_hashes() - unused helper
+    // - find_entries_to_push() - superseded by Digest-based protocol
+    // - find_entries_to_pull() - incomplete implementation, never used
+    // The gossip protocol uses Digest → PullRequest → PullResponse flow.
+    // See handle_digest(), handle_pull_request(), handle_pull_response().
 
     /// Handle incoming gossip message from network
     #[instrument(skip(self, message), fields(peer_did = %sender, message_type = message.variant_name()))]

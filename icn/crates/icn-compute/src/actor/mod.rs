@@ -50,7 +50,8 @@ pub struct ComputeActor {
     payment_callback: Option<PaymentCallback>,
     /// Callback to broadcast compute events
     event_callback: Option<EventCallback>,
-    /// Signing key for results (placeholder)
+    /// Signing key for results
+    /// Reserved: Result signing for verifiable execution proofs
     #[allow(dead_code)]
     signing_key: Vec<u8>,
     /// Registry of available executors
