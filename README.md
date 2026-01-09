@@ -192,6 +192,34 @@ cat docs/PRODUCTION_DEPLOYMENT_GUIDE.md
 ```
 
 ---
+
+## 🔐 Release Verification
+
+All ICN release binaries are signed using [Sigstore](https://www.sigstore.dev/) keyless signing and include a Software Bill of Materials (SBOM).
+
+**Verify a release:**
+```bash
+# Install cosign
+# See: https://docs.sigstore.dev/cosign/system_config/installation/
+
+# Download release files
+curl -LO https://github.com/InterCooperative-Network/icn/releases/latest/download/icn-linux-amd64.tar.gz
+curl -LO https://github.com/InterCooperative-Network/icn/releases/latest/download/icn-linux-amd64.tar.gz.sig
+curl -LO https://github.com/InterCooperative-Network/icn/releases/latest/download/icn-linux-amd64.tar.gz.pem
+
+# Verify signature
+cosign verify-blob icn-linux-amd64.tar.gz \
+  --signature icn-linux-amd64.tar.gz.sig \
+  --certificate icn-linux-amd64.tar.gz.pem \
+  --certificate-identity-regexp "https://github.com/InterCooperative-Network/icn" \
+  --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
+
+# Verify checksum
+curl -LO https://github.com/InterCooperative-Network/icn/releases/latest/download/SHA256SUMS.txt
+sha256sum -c SHA256SUMS.txt --ignore-missing
+```
+
+---
 - [x] Phase 16: Intelligent scheduler (resource profiles, locality awareness, cooperative policies)
 - [x] Phase 17: Storage hardening & replication (99.9% durability target)
 - [x] Phase 18: Pre-pilot hardening (Byzantine detection, partition healing, conflict resolution)
