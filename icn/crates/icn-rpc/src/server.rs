@@ -75,7 +75,9 @@ use std::sync::LazyLock;
 static ANONYMOUS_DID: LazyLock<Did> = LazyLock::new(|| {
     // Generate a deterministic keypair from fixed seed
     // The seed is all zeros - this creates a valid DID that:
-    // 1. Will never match any real keypair (no one would use all-zeros)
+    // 1. Is extremely unlikely to match any real keypair (no one would use all-zeros)
+    //    Note: Even if someone did, authenticated users get their own rate limit bucket
+    //    based on their JWT claims.sub, so this only affects truly unauthenticated requests.
     // 2. Is consistent across restarts (same bucket)
     // 3. Passes DID format validation
     let seed = [0u8; 32];
