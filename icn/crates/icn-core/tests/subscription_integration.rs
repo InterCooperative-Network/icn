@@ -195,7 +195,6 @@ impl TestNode {
 }
 
 #[tokio::test]
-#[ignore] // Uses blocking_write() in async context - needs refactoring to use async handlers
 async fn test_subscription_end_to_end() -> Result<()> {
     // Install rustls crypto provider
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();

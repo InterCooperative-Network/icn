@@ -198,7 +198,7 @@ impl TestNode {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore] // Uses blocking_write() in async context - needs refactoring to use async handlers
+#[ignore] // Fails: test nodes lack trust to subscribe to trust:attestations topic
 async fn test_trust_attestation_propagation() -> Result<()> {
     // Install rustls crypto provider
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
@@ -291,7 +291,7 @@ async fn test_trust_attestation_propagation() -> Result<()> {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore] // Uses blocking_write() in async context - needs refactoring to use async handlers
+#[ignore] // Fails: test nodes lack trust to subscribe to trust:attestations topic
 async fn test_three_node_transitive_trust() -> Result<()> {
     // Install rustls crypto provider
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();

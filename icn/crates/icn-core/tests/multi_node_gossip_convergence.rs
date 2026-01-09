@@ -262,7 +262,7 @@ impl TestNode {
 }
 
 #[tokio::test]
-#[ignore] // Uses blocking_write() in async context - needs refactoring to use async handlers
+#[ignore] // Fails: connection timing issues between test nodes
 async fn test_response_handler_triggers_notifications_across_nodes() -> Result<()> {
     // Install rustls crypto provider
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
@@ -421,7 +421,7 @@ async fn test_response_handler_triggers_notifications_across_nodes() -> Result<(
 }
 
 #[tokio::test]
-#[ignore] // Uses blocking_write() in async context - needs refactoring to use async handlers
+#[ignore] // Fails: connection timing issues between test nodes
 async fn test_response_handler_enforces_max_entries_across_nodes() -> Result<()> {
     // Install rustls crypto provider
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();

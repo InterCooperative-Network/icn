@@ -9,8 +9,22 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 /// Trait for resolving membership from different sources
+///
+/// # Sync vs Async
+///
+/// This trait provides synchronous methods for compatibility with sync code paths.
+/// Implementations that access async resources (like `TrustMembershipResolver`) use
+/// `block_in_place` internally to safely block from async contexts.
+///
+/// For better performance in async code, use the async methods directly on concrete
+/// types (e.g., `TrustMembershipResolver::resolve_members_async`) when possible.
 pub trait MembershipResolver: Send + Sync {
     /// Resolve the list of eligible voters for a domain
+    ///
+    /// # Note
+    ///
+    /// Some implementations (e.g., `TrustMembershipResolver`) may block the current
+    /// thread briefly. In async contexts, consider using type-specific async methods.
     fn resolve_members(&self, domain: &GovernanceDomain) -> Result<Vec<Did>>;
 
     /// Check if a specific DID is an eligible voter
@@ -80,10 +94,16 @@ impl MembershipResolver for TrustMembershipResolver {
         match &domain.config.membership.source {
             MembershipSource::StaticList(members) => Ok(members.clone()),
             MembershipSource::TrustThreshold(threshold) => {
-                // Use blocking_read since MembershipResolver trait is sync
-                // In an async context, use resolve_members_async instead
-                let graph = self.trust_graph.blocking_read();
-                graph.get_dids_above_threshold(*threshold)
+                // SAFETY: Use block_in_place to safely run blocking code from async context.
+                // This allows other Tokio tasks to be moved off the current thread before
+                // blocking. The MembershipResolver trait is sync, so we must block here.
+                // For better async performance, use resolve_members_async instead when you
+                // have a concrete TrustMembershipResolver reference.
+                let threshold = *threshold;
+                tokio::task::block_in_place(|| {
+                    let graph = self.trust_graph.blocking_read();
+                    graph.get_dids_above_threshold(threshold)
+                })
             }
         }
     }
@@ -92,9 +112,14 @@ impl MembershipResolver for TrustMembershipResolver {
         match &domain.config.membership.source {
             MembershipSource::StaticList(members) => Ok(members.contains(did)),
             MembershipSource::TrustThreshold(threshold) => {
-                let graph = self.trust_graph.blocking_read();
-                let score = graph.compute_trust_score(did)?;
-                Ok(score >= *threshold)
+                // SAFETY: Use block_in_place to safely run blocking code from async context.
+                // See resolve_members for details. For async contexts, use is_member_async.
+                let threshold = *threshold;
+                tokio::task::block_in_place(|| {
+                    let graph = self.trust_graph.blocking_read();
+                    let score = graph.compute_trust_score(did)?;
+                    Ok(score >= threshold)
+                })
             }
         }
     }

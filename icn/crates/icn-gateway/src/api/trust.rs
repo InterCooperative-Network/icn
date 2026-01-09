@@ -166,7 +166,7 @@ pub async fn get_trust_network(
         .map_err(|e| GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
 
     let max_distance = query.depth.unwrap_or(2).min(5); // Cap at 5 hops
-    let network = trust_manager.get_trust_network(&did, max_distance);
+    let network = trust_manager.get_trust_network_async(&did, max_distance).await;
 
     Ok(HttpResponse::Ok().json(network))
 }

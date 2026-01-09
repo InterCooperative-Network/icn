@@ -575,15 +575,108 @@ impl TrustManager {
         (direct_score * 0.7 + transitive_score * 0.3).min(1.0)
     }
 
-    /// Get trust network around a DID (for visualization)
+    /// Get trust network around a DID (for visualization) - async version
+    ///
+    /// Returns nodes and edges within `max_distance` hops.
+    /// Prefer this over the sync version when calling from async context.
+    pub async fn get_trust_network_async(&self, center: &Did, max_distance: u32) -> TrustNetwork {
+        use std::collections::{HashMap, HashSet, VecDeque};
+
+        let mut nodes = HashMap::new();
+        let mut edges = Vec::new();
+        let mut visited = HashSet::new();
+        let mut queue = VecDeque::new();
+
+        // Start with center node
+        queue.push_back((center.clone(), 0u32));
+        nodes.insert(center.clone(), 1.0); // Self-trust = 1.0
+
+        while let Some((current, distance)) = queue.pop_front() {
+            if distance >= max_distance {
+                continue;
+            }
+
+            if !visited.insert(current.clone()) {
+                continue;
+            }
+
+            // Get outgoing edges
+            for edge in self.get_outgoing_edges_async(&current).await {
+                // Add edge to result
+                edges.push(TrustEdgeResponse {
+                    from: edge.source.to_string(),
+                    to: edge.target.to_string(),
+                    score: edge.score,
+                    created_at: edge.created_at,
+                    labels: if edge.labels.is_empty() {
+                        None
+                    } else {
+                        Some(edge.labels.clone())
+                    },
+                });
+
+                // Add target node if not visited
+                if !nodes.contains_key(&edge.target) {
+                    // Compute trust score from center
+                    let trust_score = self.compute_trust_score_async(center, &edge.target).await;
+                    nodes.insert(edge.target.clone(), trust_score);
+
+                    // Add to queue for further exploration
+                    queue.push_back((edge.target.clone(), distance + 1));
+                }
+            }
+        }
+
+        // Convert nodes to response format
+        let mut node_list: Vec<TrustNetworkNode> = nodes
+            .into_iter()
+            .map(|(did, trust_score)| TrustNetworkNode {
+                did: did.to_string(),
+                trust_score,
+                distance: 0, // Will be computed below
+            })
+            .collect();
+
+        // Compute distances using BFS
+        let mut distances = HashMap::new();
+        let mut queue = VecDeque::new();
+        queue.push_back((center.clone(), 0u32));
+        distances.insert(center.clone(), 0u32);
+
+        while let Some((current, distance)) = queue.pop_front() {
+            for edge in self.get_outgoing_edges_async(&current).await {
+                if !distances.contains_key(&edge.target) {
+                    distances.insert(edge.target.clone(), distance + 1);
+                    queue.push_back((edge.target.clone(), distance + 1));
+                }
+            }
+        }
+
+        // Update distances in nodes
+        for node in &mut node_list {
+            let did: Did = node.did.parse().unwrap_or_else(|_| center.clone());
+            node.distance = *distances.get(&did).unwrap_or(&0);
+        }
+
+        TrustNetwork {
+            nodes: node_list,
+            edges,
+        }
+    }
+
+    /// Get trust network around a DID (for visualization) - sync version
     ///
     /// Returns nodes and edges within `max_distance` hops.
     ///
-    /// # Note
+    /// # Warning: Blocking I/O
     ///
-    /// This method uses sync APIs internally. Consider adding an async version
-    /// (`get_trust_network_async`) if this becomes a performance bottleneck.
-    #[allow(deprecated)] // Uses sync APIs intentionally for now
+    /// This method uses sync APIs internally which block worker threads.
+    /// **For async contexts, use [`get_trust_network_async`] instead.**
+    #[deprecated(
+        since = "0.2.0",
+        note = "Use get_trust_network_async for async contexts to avoid blocking worker threads"
+    )]
+    #[allow(deprecated)] // Uses sync APIs intentionally
     pub fn get_trust_network(&self, center: &Did, max_distance: u32) -> TrustNetwork {
         use std::collections::{HashMap, HashSet, VecDeque};
 

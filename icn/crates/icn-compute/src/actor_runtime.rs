@@ -499,7 +499,11 @@ impl StatefulActorRegistry {
                     let handle = tokio::runtime::Handle::try_current()
                         .map_err(|e| ComputeError::Internal(e.to_string()))?;
 
-                    handle.block_on(async {
+                    // SAFETY: Use block_in_place to safely run blocking code from async context.
+                    // This callback may be invoked from within a tokio task (e.g., MigrationManager),
+                    // and block_on alone would panic. block_in_place moves other tasks off this
+                    // thread before blocking.
+                    tokio::task::block_in_place(|| handle.block_on(async {
                         let mut actors = actors.write().await;
                         let info = actors.get_mut(&actor_id).ok_or_else(|| {
                             ComputeError::Internal(format!(
@@ -522,14 +526,15 @@ impl StatefulActorRegistry {
                         };
 
                         Ok(())
-                    })
+                    }))
                 }
 
                 ActorRuntimeCommand::Resume { actor_id } => {
                     let handle = tokio::runtime::Handle::try_current()
                         .map_err(|e| ComputeError::Internal(e.to_string()))?;
 
-                    handle.block_on(async {
+                    // SAFETY: Use block_in_place to safely run blocking code from async context.
+                    tokio::task::block_in_place(|| handle.block_on(async {
                         let mut actors = actors.write().await;
                         let info = actors.get_mut(&actor_id).ok_or_else(|| {
                             ComputeError::Internal(format!(
@@ -548,7 +553,7 @@ impl StatefulActorRegistry {
 
                         info.state = StatefulActorState::Running;
                         Ok(())
-                    })
+                    }))
                 }
 
                 ActorRuntimeCommand::Restore {
@@ -558,7 +563,8 @@ impl StatefulActorRegistry {
                     let handle = tokio::runtime::Handle::try_current()
                         .map_err(|e| ComputeError::Internal(e.to_string()))?;
 
-                    handle.block_on(async {
+                    // SAFETY: Use block_in_place to safely run blocking code from async context.
+                    tokio::task::block_in_place(|| handle.block_on(async {
                         let mut actors = actors.write().await;
 
                         // Create new entry or update existing
@@ -572,14 +578,15 @@ impl StatefulActorRegistry {
                         info.memory_bytes = info.current_state.len() as u64;
 
                         Ok(())
-                    })
+                    }))
                 }
 
                 ActorRuntimeCommand::Terminate { actor_id, reason } => {
                     let handle = tokio::runtime::Handle::try_current()
                         .map_err(|e| ComputeError::Internal(e.to_string()))?;
 
-                    handle.block_on(async {
+                    // SAFETY: Use block_in_place to safely run blocking code from async context.
+                    tokio::task::block_in_place(|| handle.block_on(async {
                         let mut actors = actors.write().await;
                         let info = actors.get_mut(&actor_id).ok_or_else(|| {
                             ComputeError::Internal(format!(
@@ -594,7 +601,7 @@ impl StatefulActorRegistry {
                         };
 
                         Ok(())
-                    })
+                    }))
                 }
 
                 ActorRuntimeCommand::GetState { actor_id: _ } => {
