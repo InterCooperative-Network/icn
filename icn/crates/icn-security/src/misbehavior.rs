@@ -652,6 +652,180 @@ impl MisbehaviorDetector {
             total_violations: self.violations.values().map(|v| v.len()).sum(),
         }
     }
+
+    // =========================================================================
+    // Persistence Methods (Issue #496)
+    // =========================================================================
+
+    /// Storage key prefixes
+    const KEY_PREFIX_REPUTATION: &'static str = "security:reputation:";
+    const KEY_PREFIX_BANNED: &'static str = "security:banned:";
+    const KEY_PREFIX_QUARANTINE: &'static str = "security:quarantine:";
+    const KEY_PREFIX_VIOLATION: &'static str = "security:violation:";
+
+    /// Save all misbehavior state to persistent storage.
+    ///
+    /// This persists:
+    /// - Reputation scores for all tracked DIDs
+    /// - Banned DIDs with ban timestamps
+    /// - Quarantined DIDs with quarantine timestamps
+    /// - Violation records (most recent per DID, up to MAX_VIOLATIONS_PER_PEER)
+    ///
+    /// Call this periodically or before shutdown to ensure state survives restarts.
+    pub fn save_to_store(&self, store: &dyn icn_store::Store) -> anyhow::Result<()> {
+        // Save reputation scores
+        for (did, score) in &self.reputation_scores {
+            let key = format!("{}{}", Self::KEY_PREFIX_REPUTATION, did);
+            let value = serde_json::to_vec(score)?;
+            store.put(key.as_bytes(), &value)?;
+        }
+
+        // Save banned DIDs
+        for (did, timestamp) in &self.banned {
+            let key = format!("{}{}", Self::KEY_PREFIX_BANNED, did);
+            let ts_secs = timestamp
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+            let value = serde_json::to_vec(&ts_secs)?;
+            store.put(key.as_bytes(), &value)?;
+        }
+
+        // Save quarantined DIDs
+        for (did, timestamp) in &self.quarantined {
+            let key = format!("{}{}", Self::KEY_PREFIX_QUARANTINE, did);
+            let ts_secs = timestamp
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+            let value = serde_json::to_vec(&ts_secs)?;
+            store.put(key.as_bytes(), &value)?;
+        }
+
+        // Save violation records
+        for (did, violations) in &self.violations {
+            let key = format!("{}{}", Self::KEY_PREFIX_VIOLATION, did);
+            let value = serde_json::to_vec(violations)?;
+            store.put(key.as_bytes(), &value)?;
+        }
+
+        debug!(
+            "Saved misbehavior state: {} reputation scores, {} banned, {} quarantined, {} violation records",
+            self.reputation_scores.len(),
+            self.banned.len(),
+            self.quarantined.len(),
+            self.violations.len()
+        );
+
+        Ok(())
+    }
+
+    /// Load misbehavior state from persistent storage.
+    ///
+    /// This restores:
+    /// - Reputation scores (bad actors stay penalized)
+    /// - Banned DIDs (permanent bans persist)
+    /// - Quarantined DIDs (temporary quarantine persists)
+    /// - Violation records (attack history preserved)
+    ///
+    /// Call this on startup to restore security state from before restart.
+    pub fn load_from_store(&mut self, store: &dyn icn_store::Store) -> anyhow::Result<()> {
+        // Load reputation scores
+        let reputation_entries = store.scan(Self::KEY_PREFIX_REPUTATION.as_bytes())?;
+        for (key, value) in reputation_entries {
+            let key_str = std::str::from_utf8(&key)?;
+            if let Some(did_str) = key_str.strip_prefix(Self::KEY_PREFIX_REPUTATION) {
+                if let Ok(did) = did_str.parse::<Did>() {
+                    if let Ok(score) = serde_json::from_slice::<ReputationScore>(&value) {
+                        self.reputation_scores.insert(did, score);
+                    }
+                }
+            }
+        }
+
+        // Load banned DIDs
+        let banned_entries = store.scan(Self::KEY_PREFIX_BANNED.as_bytes())?;
+        for (key, value) in banned_entries {
+            let key_str = std::str::from_utf8(&key)?;
+            if let Some(did_str) = key_str.strip_prefix(Self::KEY_PREFIX_BANNED) {
+                if let Ok(did) = did_str.parse::<Did>() {
+                    if let Ok(ts_secs) = serde_json::from_slice::<u64>(&value) {
+                        let timestamp = SystemTime::UNIX_EPOCH + Duration::from_secs(ts_secs);
+                        self.banned.insert(did, timestamp);
+                    }
+                }
+            }
+        }
+
+        // Load quarantined DIDs
+        let quarantine_entries = store.scan(Self::KEY_PREFIX_QUARANTINE.as_bytes())?;
+        for (key, value) in quarantine_entries {
+            let key_str = std::str::from_utf8(&key)?;
+            if let Some(did_str) = key_str.strip_prefix(Self::KEY_PREFIX_QUARANTINE) {
+                if let Ok(did) = did_str.parse::<Did>() {
+                    if let Ok(ts_secs) = serde_json::from_slice::<u64>(&value) {
+                        let timestamp = SystemTime::UNIX_EPOCH + Duration::from_secs(ts_secs);
+                        self.quarantined.insert(did, timestamp);
+                    }
+                }
+            }
+        }
+
+        // Load violation records
+        let violation_entries = store.scan(Self::KEY_PREFIX_VIOLATION.as_bytes())?;
+        for (key, value) in violation_entries {
+            let key_str = std::str::from_utf8(&key)?;
+            if let Some(did_str) = key_str.strip_prefix(Self::KEY_PREFIX_VIOLATION) {
+                if let Ok(did) = did_str.parse::<Did>() {
+                    if let Ok(violations) = serde_json::from_slice::<Vec<ViolationRecord>>(&value) {
+                        self.violations.insert(did, violations);
+                    }
+                }
+            }
+        }
+
+        info!(
+            "Loaded misbehavior state: {} reputation scores, {} banned, {} quarantined, {} violation records",
+            self.reputation_scores.len(),
+            self.banned.len(),
+            self.quarantined.len(),
+            self.violations.len()
+        );
+
+        Ok(())
+    }
+
+    /// Create a new detector and load existing state from storage.
+    ///
+    /// This is the recommended way to create a detector on node startup.
+    pub fn with_store(
+        thresholds: MisbehaviorThresholds,
+        store: &dyn icn_store::Store,
+    ) -> anyhow::Result<Self> {
+        let mut detector = Self::new(thresholds);
+        detector.load_from_store(store)?;
+        Ok(detector)
+    }
+
+    /// Remove a DID's persisted state from storage.
+    ///
+    /// Used when administratively clearing a DID's history.
+    pub fn clear_persisted_state(did: &Did, store: &dyn icn_store::Store) -> anyhow::Result<()> {
+        let prefixes = [
+            Self::KEY_PREFIX_REPUTATION,
+            Self::KEY_PREFIX_BANNED,
+            Self::KEY_PREFIX_QUARANTINE,
+            Self::KEY_PREFIX_VIOLATION,
+        ];
+
+        for prefix in prefixes {
+            let key = format!("{prefix}{did}");
+            store.delete(key.as_bytes())?;
+        }
+
+        debug!("Cleared persisted misbehavior state for {}", did);
+        Ok(())
+    }
 }
 
 /// Statistics for monitoring
@@ -1176,6 +1350,241 @@ mod tests {
         assert_eq!(
             actual_hash, expected_hash,
             "Hash in truncation marker should match SHA-256 of original evidence"
+        );
+    }
+
+    // =========================================================================
+    // Persistence Tests (Issue #496)
+    // =========================================================================
+
+    #[test]
+    fn test_persistence_round_trip() {
+        // Test that state survives save/load cycle
+        let store = icn_store::SledStore::temporary().unwrap();
+
+        // Create detector with some state
+        let mut detector = MisbehaviorDetector::new(MisbehaviorThresholds::default());
+        let did1 = test_did();
+        let did2 = test_did();
+
+        // Record violations
+        detector.record_violation(
+            &did1,
+            Violation::ExcessiveResourceUse {
+                metric: "test".to_string(),
+                observed: 100,
+                limit: 50,
+            },
+            vec![1, 2, 3],
+        );
+
+        // Auto-ban did2
+        detector.record_violation(
+            &did2,
+            Violation::ConflictingLedgerEntries {
+                entry1: [0u8; 32],
+                entry2: [1u8; 32],
+            },
+            vec![],
+        );
+
+        // Verify initial state
+        assert!(detector.get_reputation(&did1).is_some());
+        assert!(detector.is_banned(&did2));
+        assert_eq!(detector.get_violations(&did1).len(), 1);
+
+        // Save to store
+        detector.save_to_store(&store).unwrap();
+
+        // Create new detector and load from store
+        let mut detector2 = MisbehaviorDetector::new(MisbehaviorThresholds::default());
+        detector2.load_from_store(&store).unwrap();
+
+        // Verify state was restored
+        assert!(detector2.get_reputation(&did1).is_some());
+        assert!(detector2.is_banned(&did2));
+        assert_eq!(detector2.get_violations(&did1).len(), 1);
+
+        // Verify reputation score values match
+        let orig_score = detector.get_reputation(&did1).unwrap().score;
+        let loaded_score = detector2.get_reputation(&did1).unwrap().score;
+        assert!(
+            (orig_score - loaded_score).abs() < 0.01,
+            "Reputation score should be preserved"
+        );
+    }
+
+    #[test]
+    fn test_persistence_banned_survives_restart() {
+        // Critical: banned peers MUST stay banned after restart
+        let store = icn_store::SledStore::temporary().unwrap();
+
+        let mut detector = MisbehaviorDetector::new(MisbehaviorThresholds::default());
+        let bad_actor = test_did();
+
+        // Ban the peer
+        detector.record_violation(
+            &bad_actor,
+            Violation::ConflictingLedgerEntries {
+                entry1: [0u8; 32],
+                entry2: [1u8; 32],
+            },
+            vec![],
+        );
+        assert!(detector.is_banned(&bad_actor));
+
+        // Save and "restart" (create new detector)
+        detector.save_to_store(&store).unwrap();
+        let detector2 =
+            MisbehaviorDetector::with_store(MisbehaviorThresholds::default(), &store).unwrap();
+
+        // Banned peer must still be banned
+        assert!(
+            detector2.is_banned(&bad_actor),
+            "Banned peer must remain banned after restart"
+        );
+    }
+
+    #[test]
+    fn test_persistence_quarantine_survives_restart() {
+        let store = icn_store::SledStore::temporary().unwrap();
+
+        let mut detector = MisbehaviorDetector::new(MisbehaviorThresholds {
+            max_violations_per_hour: 3,
+            ..Default::default()
+        });
+        let spammer = test_did();
+
+        // Exceed rate limit to trigger quarantine
+        for _ in 0..5 {
+            detector.record_violation(
+                &spammer,
+                Violation::ExcessiveResourceUse {
+                    metric: "test".to_string(),
+                    observed: 10,
+                    limit: 5,
+                },
+                vec![],
+            );
+        }
+        assert!(detector.is_quarantined(&spammer));
+
+        // Save and "restart"
+        detector.save_to_store(&store).unwrap();
+        let detector2 = MisbehaviorDetector::with_store(
+            MisbehaviorThresholds {
+                max_violations_per_hour: 3,
+                ..Default::default()
+            },
+            &store,
+        )
+        .unwrap();
+
+        // Quarantined peer must still be quarantined
+        assert!(
+            detector2.is_quarantined(&spammer),
+            "Quarantined peer must remain quarantined after restart"
+        );
+    }
+
+    #[test]
+    fn test_persistence_reputation_decay_continues() {
+        // Reputation decay should continue from persisted values
+        let store = icn_store::SledStore::temporary().unwrap();
+
+        let mut detector = MisbehaviorDetector::new(MisbehaviorThresholds::default());
+        let did = test_did();
+
+        // Record a violation to lower reputation
+        detector.record_violation(
+            &did,
+            Violation::InvalidSignature {
+                message_hash: [0u8; 32],
+            },
+            vec![],
+        );
+
+        let original_score = detector.get_reputation(&did).unwrap().score;
+        assert!(original_score < 1.0, "Score should be penalized");
+
+        // Save state
+        detector.save_to_store(&store).unwrap();
+
+        // Load into new detector
+        let detector2 =
+            MisbehaviorDetector::with_store(MisbehaviorThresholds::default(), &store).unwrap();
+
+        let loaded_score = detector2.get_reputation(&did).unwrap().score;
+        assert!(
+            (original_score - loaded_score).abs() < 0.01,
+            "Loaded score should match original"
+        );
+    }
+
+    #[test]
+    fn test_persistence_violation_history_preserved() {
+        let store = icn_store::SledStore::temporary().unwrap();
+
+        let mut detector = MisbehaviorDetector::new(MisbehaviorThresholds::default());
+        let did = test_did();
+
+        // Record multiple violations
+        for i in 0..5 {
+            detector.record_violation(
+                &did,
+                Violation::ExcessiveResourceUse {
+                    metric: format!("test_{i}"),
+                    observed: 10,
+                    limit: 5,
+                },
+                vec![i as u8],
+            );
+        }
+
+        assert_eq!(detector.get_violations(&did).len(), 5);
+
+        // Save and reload
+        detector.save_to_store(&store).unwrap();
+        let detector2 =
+            MisbehaviorDetector::with_store(MisbehaviorThresholds::default(), &store).unwrap();
+
+        // Violation history should be preserved
+        assert_eq!(
+            detector2.get_violations(&did).len(),
+            5,
+            "Violation history should be preserved"
+        );
+    }
+
+    #[test]
+    fn test_clear_persisted_state() {
+        let store = icn_store::SledStore::temporary().unwrap();
+
+        let mut detector = MisbehaviorDetector::new(MisbehaviorThresholds::default());
+        let did = test_did();
+
+        // Record violation and save
+        detector.record_violation(
+            &did,
+            Violation::ExcessiveResourceUse {
+                metric: "test".to_string(),
+                observed: 10,
+                limit: 5,
+            },
+            vec![],
+        );
+        detector.save_to_store(&store).unwrap();
+
+        // Clear persisted state
+        MisbehaviorDetector::clear_persisted_state(&did, &store).unwrap();
+
+        // Load into new detector - should not have the DID's state
+        let detector2 =
+            MisbehaviorDetector::with_store(MisbehaviorThresholds::default(), &store).unwrap();
+
+        assert!(
+            detector2.get_reputation(&did).is_none(),
+            "DID state should be cleared from storage"
         );
     }
 }
