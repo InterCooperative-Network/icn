@@ -86,6 +86,16 @@ pub enum Scope {
     Global,
 }
 
+impl std::fmt::Display for Scope {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Scope::LocalCluster => write!(f, "local_cluster"),
+            Scope::Regional => write!(f, "regional"),
+            Scope::Global => write!(f, "global"),
+        }
+    }
+}
+
 /// Replica health status (Phase 17)
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ReplicaHealth {
@@ -501,6 +511,75 @@ pub struct Subscription {
     pub subscriber: Did,
 }
 
+/// Configuration for adaptive gossip fanout (#484)
+///
+/// Adjusts gossip fanout dynamically based on network size using the formula:
+/// `fanout = clamp(ceil(log2(network_size) + 1), min, max)`
+///
+/// This prevents:
+/// - Over-messaging in small networks (wastes bandwidth)
+/// - Under-propagation in large networks (slow convergence)
+#[derive(Debug, Clone)]
+pub struct AdaptiveFanoutConfig {
+    /// Minimum fanout (for small networks or floor)
+    pub min_fanout: usize,
+
+    /// Maximum fanout (prevents flooding)
+    pub max_fanout: usize,
+
+    /// Multiplier per scope (Local=1.5, Regional=1.0, Global=0.75)
+    /// Higher multiplier for local scope where latency matters more
+    pub local_multiplier: f64,
+    pub regional_multiplier: f64,
+    pub global_multiplier: f64,
+
+    /// Minimum peers before adaptive fanout kicks in
+    /// Below this threshold, use min_fanout
+    pub min_peers_for_adaptive: usize,
+}
+
+impl Default for AdaptiveFanoutConfig {
+    fn default() -> Self {
+        Self {
+            min_fanout: 3,
+            max_fanout: 10,
+            local_multiplier: 1.5,
+            regional_multiplier: 1.0,
+            global_multiplier: 0.75,
+            min_peers_for_adaptive: 5,
+        }
+    }
+}
+
+impl AdaptiveFanoutConfig {
+    /// Calculate adaptive fanout based on network size and scope
+    ///
+    /// Formula: fanout = clamp(ceil(log2(network_size) + 1) * scope_multiplier, min, max)
+    pub fn calculate_fanout(&self, network_size: usize, scope: &Scope) -> usize {
+        // Below threshold, use minimum
+        if network_size < self.min_peers_for_adaptive {
+            return self.min_fanout;
+        }
+
+        // Base fanout: ceil(log2(n) + 1)
+        // This gives: 4->3, 8->4, 16->5, 32->6, 64->7, 128->8, etc.
+        let log2_size = (network_size as f64).log2();
+        let base_fanout = (log2_size + 1.0).ceil();
+
+        // Apply scope multiplier
+        let multiplier = match scope {
+            Scope::LocalCluster => self.local_multiplier,
+            Scope::Regional => self.regional_multiplier,
+            Scope::Global => self.global_multiplier,
+        };
+
+        let adjusted = (base_fanout * multiplier).ceil() as usize;
+
+        // Clamp to bounds
+        adjusted.clamp(self.min_fanout, self.max_fanout)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -710,5 +789,88 @@ mod tests {
 
         // Even with matching topic, expired cursor is invalid
         assert!(!cursor.is_valid_for_topic("my-topic"));
+    }
+
+    // Adaptive fanout tests (#484)
+
+    #[test]
+    fn test_adaptive_fanout_default_config() {
+        let config = AdaptiveFanoutConfig::default();
+        assert_eq!(config.min_fanout, 3);
+        assert_eq!(config.max_fanout, 10);
+        assert_eq!(config.min_peers_for_adaptive, 5);
+    }
+
+    #[test]
+    fn test_adaptive_fanout_small_network() {
+        let config = AdaptiveFanoutConfig::default();
+
+        // Below threshold, use min_fanout
+        assert_eq!(config.calculate_fanout(1, &Scope::Global), 3);
+        assert_eq!(config.calculate_fanout(4, &Scope::Global), 3);
+    }
+
+    #[test]
+    fn test_adaptive_fanout_scales_with_network_size() {
+        let config = AdaptiveFanoutConfig::default();
+
+        // Using Regional (multiplier=1.0) for cleaner math
+        // log2(8) + 1 = 4
+        assert_eq!(config.calculate_fanout(8, &Scope::Regional), 4);
+
+        // log2(16) + 1 = 5
+        assert_eq!(config.calculate_fanout(16, &Scope::Regional), 5);
+
+        // log2(32) + 1 = 6
+        assert_eq!(config.calculate_fanout(32, &Scope::Regional), 6);
+
+        // log2(64) + 1 = 7
+        assert_eq!(config.calculate_fanout(64, &Scope::Regional), 7);
+
+        // log2(128) + 1 = 8
+        assert_eq!(config.calculate_fanout(128, &Scope::Regional), 8);
+    }
+
+    #[test]
+    fn test_adaptive_fanout_scope_multipliers() {
+        let config = AdaptiveFanoutConfig::default();
+
+        // 32 peers: base = log2(32) + 1 = 6
+        // Local: 6 * 1.5 = 9
+        // Regional: 6 * 1.0 = 6
+        // Global: 6 * 0.75 = 4.5 -> 5
+        assert_eq!(config.calculate_fanout(32, &Scope::LocalCluster), 9);
+        assert_eq!(config.calculate_fanout(32, &Scope::Regional), 6);
+        assert_eq!(config.calculate_fanout(32, &Scope::Global), 5);
+    }
+
+    #[test]
+    fn test_adaptive_fanout_respects_max() {
+        let config = AdaptiveFanoutConfig::default();
+
+        // Very large network: log2(10000) + 1 = 14.3
+        // With local multiplier 1.5 = 21, but capped at max_fanout=10
+        assert_eq!(config.calculate_fanout(10000, &Scope::LocalCluster), 10);
+    }
+
+    #[test]
+    fn test_adaptive_fanout_custom_config() {
+        let config = AdaptiveFanoutConfig {
+            min_fanout: 2,
+            max_fanout: 5,
+            local_multiplier: 1.0,
+            regional_multiplier: 1.0,
+            global_multiplier: 1.0,
+            min_peers_for_adaptive: 3,
+        };
+
+        // Below threshold
+        assert_eq!(config.calculate_fanout(2, &Scope::Global), 2);
+
+        // At threshold: log2(3) + 1 ≈ 2.58 -> 3
+        assert_eq!(config.calculate_fanout(3, &Scope::Global), 3);
+
+        // Large network capped at 5
+        assert_eq!(config.calculate_fanout(1000, &Scope::Global), 5);
     }
 }

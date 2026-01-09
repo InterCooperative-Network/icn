@@ -530,10 +530,7 @@ mod tests {
         // With only 100 entries, filter is oversized (>4x optimal)
         // Note: depends on optimal_size calculation, may or may not trigger
         let needs = filter.needs_resize(100, &config);
-        println!(
-            "Filter sized for 10k with 100 entries needs resize: {}",
-            needs
-        );
+        println!("Filter sized for 10k with 100 entries needs resize: {needs}");
     }
 
     #[test]

@@ -314,6 +314,14 @@ pub fn init_descriptions() {
         "icn_gossip_bloom_resize_total",
         "Total number of Bloom filter resizes"
     );
+    describe_gauge!(
+        "icn_gossip_adaptive_fanout",
+        "Current adaptive fanout value by scope"
+    );
+    describe_gauge!(
+        "icn_gossip_network_size_estimate",
+        "Estimated network size used for adaptive fanout calculation"
+    );
     describe_counter!(
         "icn_gossip_pull_truncated_total",
         "Total number of pull responses truncated due to size limits"
@@ -2059,6 +2067,12 @@ pub mod gossip {
     /// M2: Track Bloom filter resizes for dynamic sizing (#472)
     pub fn bloom_resize_inc() {
         counter!("icn_gossip_bloom_resize_total").increment(1);
+    }
+
+    /// M2 #484: Record adaptive fanout decision
+    pub fn adaptive_fanout_record(scope: &str, fanout: usize, network_size: usize) {
+        gauge!("icn_gossip_adaptive_fanout", "scope" => scope.to_string()).set(fanout as f64);
+        gauge!("icn_gossip_network_size_estimate").set(network_size as f64);
     }
 
     pub fn pull_truncated_inc() {
