@@ -972,9 +972,9 @@ impl Ledger {
             let author_did = &entry.author;
             let min_trust = self.min_trust_for_entry;
 
-            // Acquire read lock on trust graph using blocking_read for sync context
+            // Acquire read lock on trust graph using async read
             let trust_result: Result<f64, anyhow::Error> = {
-                let graph = trust_graph.blocking_read();
+                let graph = trust_graph.read().await;
                 graph
                     .compute_trust_score(author_did)
                     .map_err(|e| anyhow::anyhow!(e))
@@ -3036,9 +3036,13 @@ impl Ledger {
                 let current_balance = self.get_balance(account, currency);
 
                 // Get trust score for the account (or 0.0 if unknown)
+                // SAFETY: Use block_in_place because validate_entry is sync but may be
+                // called from async context (e.g., append_entry_internal).
                 let trust_score: f64 = if let Some(ref trust_graph) = self.trust_graph {
-                    let graph = trust_graph.blocking_read();
-                    graph.compute_trust_score(account).unwrap_or(0.0)
+                    tokio::task::block_in_place(|| {
+                        let graph = trust_graph.blocking_read();
+                        graph.compute_trust_score(account).unwrap_or(0.0)
+                    })
                 } else {
                     0.0
                 }
