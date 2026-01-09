@@ -62,7 +62,15 @@ pub enum KeyRotationMessage {
     },
 }
 
-/// Reason for key rotation (matches identity crate's RotationReason)
+/// Reason for key rotation.
+///
+/// Note: This is a local definition matching the `RotationReason` in `icn-identity/src/keystore.rs`.
+/// We intentionally duplicate this enum to avoid a circular dependency between icn-gossip and
+/// icn-identity. If the identity crate's enum changes, this must be updated to match.
+///
+/// The identity crate also has `KeyRotationReason` in personhood.rs and keybundle.rs with
+/// slightly different variants for different contexts. This gossip-layer enum uses the
+/// keystore.rs variant which is appropriate for general rotation announcements.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum RotationReason {
     /// Regular scheduled rotation
@@ -114,15 +122,33 @@ impl KeyRotationMessage {
         }
     }
 
-    /// Get the message to be signed for rotation verification
+    /// Get the message to be signed for rotation verification.
     ///
-    /// Format: "key-rotation:{old_did}:{new_did}:{timestamp}"
+    /// Format: `"key-rotation:{old_did}:{new_did}:{timestamp}"`
+    ///
+    /// **NOTE**: This format MUST match the canonical rotation message used for signing
+    /// in the identity crate (`icn-identity/src/keystore.rs`, see lines 1182-1187).
+    /// If you change this format, you must update the identity crate implementation
+    /// accordingly to avoid signature verification mismatches.
     pub fn rotation_message(old_did: &Did, new_did: &Did, timestamp: u64) -> String {
         format!("key-rotation:{old_did}:{new_did}:{timestamp}")
     }
 }
 
-/// Tracks active key rotations for grace period handling
+/// Maximum number of rotation records to keep in cache
+/// to prevent unbounded memory growth in case cleanup isn't called regularly.
+const MAX_ROTATION_CACHE_SIZE: usize = 10_000;
+
+/// Tracks active key rotations for grace period handling.
+///
+/// This cache stores mappings from old DIDs to their new DIDs during the
+/// grace period after key rotation. The grace period allows peers to
+/// continue accepting messages signed with the old key while they update
+/// their caches.
+///
+/// **Important**: Call `cleanup_expired()` periodically (e.g., every hour)
+/// to prevent the cache from growing unbounded. The cache also enforces
+/// a maximum size limit, evicting oldest entries when exceeded.
 #[derive(Debug, Default)]
 pub struct KeyRotationCache {
     /// Map from old DID to (new DID, expiry timestamp)
@@ -135,9 +161,27 @@ impl KeyRotationCache {
         Self::default()
     }
 
-    /// Record a key rotation
+    /// Record a key rotation.
+    ///
+    /// If the cache exceeds `MAX_ROTATION_CACHE_SIZE`, oldest entries
+    /// (by expiry time) will be evicted to make room.
     pub fn record_rotation(&mut self, old_did: &Did, new_did: Did, timestamp: u64) {
-        let expiry = timestamp + KEY_ROTATION_GRACE_PERIOD_SECS;
+        // Use saturating_add to prevent overflow on far-future timestamps
+        let expiry = timestamp.saturating_add(KEY_ROTATION_GRACE_PERIOD_SECS);
+
+        // Evict oldest entries if at capacity
+        if self.rotations.len() >= MAX_ROTATION_CACHE_SIZE {
+            // Find and remove the entry with the earliest expiry
+            if let Some(oldest_key) = self
+                .rotations
+                .iter()
+                .min_by_key(|(_, (_, exp))| *exp)
+                .map(|(k, _)| k.clone())
+            {
+                self.rotations.remove(&oldest_key);
+            }
+        }
+
         self.rotations
             .insert(old_did.to_string(), (new_did, expiry));
     }
@@ -150,16 +194,28 @@ impl KeyRotationCache {
             .map(|(new_did, _)| new_did)
     }
 
-    /// Check if a DID is valid (either current or within grace period after rotation)
+    /// Check whether a DID is still acceptable according to the rotation cache.
+    ///
+    /// This helper is intended to be used with an *old* (pre-rotation) DID when
+    /// enforcing the key-rotation grace period. It returns:
+    /// - `true` if there is a rotation record and the grace period has not yet expired
+    /// - `true` if there is no rotation record for this DID at all (we have no
+    ///   knowledge of it being rotated, so we continue to accept it)
+    /// - `false` if there is a rotation record and its grace period has expired
+    ///
+    /// **Note**: This does NOT verify that a "new" or current DID is known in the
+    /// rotation cache; it only answers "is this specific DID still acceptable?".
     pub fn is_did_valid(&self, did: &Did, current_time: u64) -> bool {
-        // DID is valid if it hasn't been rotated, or if within grace period
         match self.rotations.get(&did.to_string()) {
             Some((_, expiry)) => current_time < *expiry,
-            None => true, // Not rotated, still valid
+            // No rotation record: either current DID or never rotated, both are accepted
+            None => true,
         }
     }
 
-    /// Clean up expired rotation records
+    /// Clean up expired rotation records.
+    ///
+    /// Call this periodically (e.g., every hour) to prevent memory growth.
     pub fn cleanup_expired(&mut self, current_time: u64) {
         self.rotations
             .retain(|_, (_, expiry)| current_time < *expiry);
