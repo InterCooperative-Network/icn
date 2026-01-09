@@ -196,6 +196,9 @@ pub struct GossipActor {
 
     /// Bloom filter resize configuration (M2 - dynamic sizing)
     bloom_resize_config: crate::bloom::BloomResizeConfig,
+
+    /// Adaptive fanout configuration (M2 #484 - dynamic fanout based on network size)
+    adaptive_fanout_config: crate::types::AdaptiveFanoutConfig,
 }
 
 impl GossipActor {
@@ -232,6 +235,7 @@ impl GossipActor {
             partition_healer: None,     // Phase 18 Week 3: Set via set_partition_healer()
             storage_quota_manager: None, // Phase 18 Week 6: Set via set_storage_quota_manager()
             bloom_resize_config: crate::bloom::BloomResizeConfig::default(), // M2: Dynamic Bloom sizing
+            adaptive_fanout_config: crate::types::AdaptiveFanoutConfig::default(), // M2 #484: Adaptive fanout
         };
 
         // Create default topics with appropriate scopes
@@ -1306,26 +1310,28 @@ impl GossipActor {
             nonce,
         };
 
-        // Get topic scope and fanout
+        // Get topic scope and calculate adaptive fanout (#484)
         // SAFETY: topic existence was checked above via contains_key()
         #[allow(clippy::unwrap_used)]
         let topic_obj = self.topics.get(topic).unwrap();
         let scope = topic_obj.scope;
-        let fanout = match scope {
-            crate::types::Scope::LocalCluster => 8, // Default local fanout
-            crate::types::Scope::Regional => 6,     // Default regional fanout
-            crate::types::Scope::Global => 4,       // Default global fanout
-        };
+
+        // M2 #484: Calculate adaptive fanout based on network size
+        let network_size = self.peer_sync.peer_count();
+        let fanout = self
+            .adaptive_fanout_config
+            .calculate_fanout(network_size, &scope);
 
         // Send with scope-aware peer selection
         debug!(
-            "Emitting digest for topic {} ({:?} scope, fanout={}): {} entries, nonce={}",
-            topic, scope, fanout, entry_count, nonce
+            "Emitting digest for topic {} ({:?} scope, fanout={}, peers={}): {} entries, nonce={}",
+            topic, scope, fanout, network_size, entry_count, nonce
         );
         self.send_message_scoped(scope, fanout, digest);
 
         // Track metrics
         icn_obs::metrics::gossip::digests_sent_inc();
+        icn_obs::metrics::gossip::adaptive_fanout_record(&scope.to_string(), fanout, network_size);
 
         Ok(())
     }

@@ -64,8 +64,8 @@ pub use partition::{
 pub use scalability::{CompressedVectorClock, ShardStats, ShardedTopic, TopicShard, VarInt};
 pub use sync::{Backoff, PeerSyncManager, PeerSyncState};
 pub use types::{
-    AccessControl, ContentHash, GossipEntry, GossipMessage, Scope, Subscription, SyncCursor, Topic,
-    TrustResourceLimits,
+    AccessControl, AdaptiveFanoutConfig, ContentHash, GossipEntry, GossipMessage, Scope,
+    Subscription, SyncCursor, Topic, TrustResourceLimits,
 };
 pub use vector_clock::VectorClock;
 
