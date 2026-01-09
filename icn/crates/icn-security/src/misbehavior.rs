@@ -683,10 +683,13 @@ impl MisbehaviorDetector {
         // Save banned DIDs
         for (did, timestamp) in &self.banned {
             let key = format!("{}{}", Self::KEY_PREFIX_BANNED, did);
-            let ts_secs = timestamp
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .map(|d| d.as_secs())
-                .unwrap_or(0);
+            let ts_secs = match timestamp.duration_since(SystemTime::UNIX_EPOCH) {
+                Ok(d) => d.as_secs(),
+                Err(e) => {
+                    warn!(did = %did, error = %e, "Ban timestamp before UNIX_EPOCH, storing as 0");
+                    0
+                }
+            };
             let value = serde_json::to_vec(&ts_secs)?;
             store.put(key.as_bytes(), &value)?;
         }
@@ -694,10 +697,13 @@ impl MisbehaviorDetector {
         // Save quarantined DIDs
         for (did, timestamp) in &self.quarantined {
             let key = format!("{}{}", Self::KEY_PREFIX_QUARANTINE, did);
-            let ts_secs = timestamp
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .map(|d| d.as_secs())
-                .unwrap_or(0);
+            let ts_secs = match timestamp.duration_since(SystemTime::UNIX_EPOCH) {
+                Ok(d) => d.as_secs(),
+                Err(e) => {
+                    warn!(did = %did, error = %e, "Quarantine timestamp before UNIX_EPOCH, storing as 0");
+                    0
+                }
+            };
             let value = serde_json::to_vec(&ts_secs)?;
             store.put(key.as_bytes(), &value)?;
         }
@@ -735,9 +741,17 @@ impl MisbehaviorDetector {
         for (key, value) in reputation_entries {
             let key_str = std::str::from_utf8(&key)?;
             if let Some(did_str) = key_str.strip_prefix(Self::KEY_PREFIX_REPUTATION) {
-                if let Ok(did) = did_str.parse::<Did>() {
-                    if let Ok(score) = serde_json::from_slice::<ReputationScore>(&value) {
-                        self.reputation_scores.insert(did, score);
+                match did_str.parse::<Did>() {
+                    Ok(did) => match serde_json::from_slice::<ReputationScore>(&value) {
+                        Ok(score) => {
+                            self.reputation_scores.insert(did, score);
+                        }
+                        Err(e) => {
+                            warn!(did = %did_str, error = %e, "Failed to deserialize reputation score, skipping");
+                        }
+                    },
+                    Err(e) => {
+                        warn!(key = %did_str, error = %e, "Failed to parse DID from reputation key, skipping");
                     }
                 }
             }
@@ -748,10 +762,18 @@ impl MisbehaviorDetector {
         for (key, value) in banned_entries {
             let key_str = std::str::from_utf8(&key)?;
             if let Some(did_str) = key_str.strip_prefix(Self::KEY_PREFIX_BANNED) {
-                if let Ok(did) = did_str.parse::<Did>() {
-                    if let Ok(ts_secs) = serde_json::from_slice::<u64>(&value) {
-                        let timestamp = SystemTime::UNIX_EPOCH + Duration::from_secs(ts_secs);
-                        self.banned.insert(did, timestamp);
+                match did_str.parse::<Did>() {
+                    Ok(did) => match serde_json::from_slice::<u64>(&value) {
+                        Ok(ts_secs) => {
+                            let timestamp = SystemTime::UNIX_EPOCH + Duration::from_secs(ts_secs);
+                            self.banned.insert(did, timestamp);
+                        }
+                        Err(e) => {
+                            warn!(did = %did_str, error = %e, "Failed to deserialize ban timestamp, skipping");
+                        }
+                    },
+                    Err(e) => {
+                        warn!(key = %did_str, error = %e, "Failed to parse DID from banned key, skipping");
                     }
                 }
             }
@@ -762,10 +784,18 @@ impl MisbehaviorDetector {
         for (key, value) in quarantine_entries {
             let key_str = std::str::from_utf8(&key)?;
             if let Some(did_str) = key_str.strip_prefix(Self::KEY_PREFIX_QUARANTINE) {
-                if let Ok(did) = did_str.parse::<Did>() {
-                    if let Ok(ts_secs) = serde_json::from_slice::<u64>(&value) {
-                        let timestamp = SystemTime::UNIX_EPOCH + Duration::from_secs(ts_secs);
-                        self.quarantined.insert(did, timestamp);
+                match did_str.parse::<Did>() {
+                    Ok(did) => match serde_json::from_slice::<u64>(&value) {
+                        Ok(ts_secs) => {
+                            let timestamp = SystemTime::UNIX_EPOCH + Duration::from_secs(ts_secs);
+                            self.quarantined.insert(did, timestamp);
+                        }
+                        Err(e) => {
+                            warn!(did = %did_str, error = %e, "Failed to deserialize quarantine timestamp, skipping");
+                        }
+                    },
+                    Err(e) => {
+                        warn!(key = %did_str, error = %e, "Failed to parse DID from quarantine key, skipping");
                     }
                 }
             }
@@ -776,9 +806,17 @@ impl MisbehaviorDetector {
         for (key, value) in violation_entries {
             let key_str = std::str::from_utf8(&key)?;
             if let Some(did_str) = key_str.strip_prefix(Self::KEY_PREFIX_VIOLATION) {
-                if let Ok(did) = did_str.parse::<Did>() {
-                    if let Ok(violations) = serde_json::from_slice::<Vec<ViolationRecord>>(&value) {
-                        self.violations.insert(did, violations);
+                match did_str.parse::<Did>() {
+                    Ok(did) => match serde_json::from_slice::<Vec<ViolationRecord>>(&value) {
+                        Ok(violations) => {
+                            self.violations.insert(did, violations);
+                        }
+                        Err(e) => {
+                            warn!(did = %did_str, error = %e, "Failed to deserialize violation records, skipping");
+                        }
+                    },
+                    Err(e) => {
+                        warn!(key = %did_str, error = %e, "Failed to parse DID from violation key, skipping");
                     }
                 }
             }
@@ -798,6 +836,16 @@ impl MisbehaviorDetector {
     /// Create a new detector and load existing state from storage.
     ///
     /// This is the recommended way to create a detector on node startup.
+    ///
+    /// **Important**: This method does not restore the `trust_penalty_callback`.
+    /// After calling this method, you must call `set_trust_penalty_callback()`
+    /// to integrate with the trust graph for reputation penalty propagation.
+    ///
+    /// # Example
+    /// ```ignore
+    /// let detector = MisbehaviorDetector::with_store(thresholds, &store)?;
+    /// detector.set_trust_penalty_callback(trust_callback);
+    /// ```
     pub fn with_store(
         thresholds: MisbehaviorThresholds,
         store: &dyn icn_store::Store,
