@@ -151,5 +151,8 @@ pub use orphan_cleanup::{
     OrphanCleanupConfig, OrphanCleanupResult, OrphanDetail,
 };
 
+// Proposal cleanup and archival types
+pub use proposal_cleanup::{CleanupStats, ProposalArchive, ProposalCleanupTask, ProposalRetention};
+
 /// Unix timestamp in seconds
 pub type Timestamp = u64;

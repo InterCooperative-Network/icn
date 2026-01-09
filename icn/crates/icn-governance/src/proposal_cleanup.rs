@@ -20,7 +20,7 @@
 //! let task = ProposalCleanupTask::new(store, retention);
 //!
 //! // Run cleanup (typically called periodically)
-//! let stats = task.run_cleanup().await?;
+//! let stats = task.run_cleanup()?;
 //! println!("Archived {} proposals, deleted {} archives", stats.archived, stats.deleted);
 //! ```
 
@@ -85,8 +85,27 @@ impl ProposalRetention {
     }
 
     /// Check if an archive should be deleted
+    ///
+    /// Deletion is based on total time since the proposal was closed
+    /// (`delete_after_secs`), not since it was archived. This ensures
+    /// consistent retention regardless of when archiving runs.
     pub fn should_delete(&self, archive: &ProposalArchive, now: Timestamp) -> bool {
-        now.saturating_sub(archive.archived_at) >= self.archive_ttl_secs
+        now.saturating_sub(archive.closed_at) >= self.delete_after_secs
+    }
+
+    /// Validate that retention constraints are satisfied
+    ///
+    /// Returns an error if `delete_after_secs < active_ttl_secs + archive_ttl_secs`,
+    /// which would cause archives to be deleted before their expected retention.
+    pub fn validate(&self) -> Result<(), String> {
+        let min_delete_after = self.active_ttl_secs.saturating_add(self.archive_ttl_secs);
+        if self.delete_after_secs < min_delete_after {
+            return Err(format!(
+                "delete_after_secs ({}) must be >= active_ttl_secs ({}) + archive_ttl_secs ({})",
+                self.delete_after_secs, self.active_ttl_secs, self.archive_ttl_secs
+            ));
+        }
+        Ok(())
     }
 }
 
@@ -139,11 +158,23 @@ pub struct ArchivedTally {
 
 impl ProposalArchive {
     /// Create an archive from a closed proposal
-    pub fn from_proposal(proposal: &Proposal, tally: &crate::VoteTally) -> Option<Self> {
-        let closed_at = proposal.closed_at()?;
-        let outcome = proposal.outcome()?;
+    ///
+    /// Returns an error if the proposal is not in a closed state.
+    pub fn from_proposal(proposal: &Proposal, tally: &crate::VoteTally) -> Result<Self, String> {
+        let closed_at = proposal.closed_at().ok_or_else(|| {
+            format!(
+                "Proposal {} is not closed (state: {:?}), cannot archive",
+                proposal.id, proposal.state
+            )
+        })?;
+        let outcome = proposal.outcome().ok_or_else(|| {
+            format!(
+                "Proposal {} has no outcome despite being closed, cannot archive",
+                proposal.id
+            )
+        })?;
 
-        Some(Self {
+        Ok(Self {
             id: proposal.id.clone(),
             domain_id: proposal.domain_id.clone(),
             title: proposal.title.clone(),
@@ -282,57 +313,88 @@ impl<S: crate::GovernanceStore> ProposalCleanupTask<S> {
         let tally = self.store.compute_tally(&proposal.id)?;
 
         // Create archive
-        let archive = ProposalArchive::from_proposal(proposal, &tally)
-            .ok_or_else(|| anyhow::anyhow!("Proposal is not closed, cannot archive"))?;
+        let archive =
+            ProposalArchive::from_proposal(proposal, &tally).map_err(|e| anyhow::anyhow!(e))?;
 
-        // Store archive
+        // Store archive (currently a stub - see store_archive docs)
         self.store_archive(&archive)?;
 
         // Remove original proposal from store
-        // Note: We don't remove votes since they may be referenced by other systems
-        // The proposal index is updated when we store the archive
+        //
+        // Note: We don't remove votes since they may be referenced by:
+        // - Delegation verification (checking if delegatee voted)
+        // - Member participation metrics (voting history)
+        // - Dispute evidence (proving how someone voted)
+        //
+        // Vote cleanup could be a separate scheduled task that runs after
+        // a longer retention period (e.g., 5 years) or when all referencing
+        // systems have been updated. This is documented as a future
+        // consideration for storage optimization.
+        //
+        // TODO: Once store_archive is fully implemented, the proposal index
+        // should be updated there to maintain consistency.
         self.remove_proposal(&proposal.id)?;
 
         Ok(())
     }
 
     /// Store an archive (implementation depends on store type)
+    ///
+    /// **Note: This is currently a stub implementation.** A full implementation
+    /// requires extending `GovernanceStore` trait with archive-specific methods:
+    /// - `store_archive(archive: &ProposalArchive) -> Result<()>`
+    /// - `get_archive(id: &ProposalId) -> Result<Option<ProposalArchive>>`
+    /// - `list_archives(domain: &GovernanceDomainId) -> Result<Vec<ProposalArchive>>`
+    /// - `delete_archive(id: &ProposalId) -> Result<()>`
     fn store_archive(&self, archive: &ProposalArchive) -> anyhow::Result<()> {
-        // For now, store as a special "archived" proposal
-        // A full implementation would add archive methods to GovernanceStore trait
         let key = format!("archive:{}", archive.id.0);
         let value = serde_json::to_vec(archive)?;
 
-        // Use the underlying store if available
-        // For simplicity, we'll skip this for the initial implementation
-        // and just log the archive creation
+        // Stub: log the archive that would be stored
         debug!(key = %key, "Would store archive (size: {} bytes)", value.len());
 
         Ok(())
     }
 
     /// Remove a proposal from the store
+    ///
+    /// **Note: This is currently a stub implementation.** A full implementation
+    /// requires adding `delete_proposal(id: &ProposalId) -> Result<()>` to
+    /// the `GovernanceStore` trait. Until then, proposals remain in the store
+    /// after archival.
     fn remove_proposal(&self, _id: &ProposalId) -> anyhow::Result<()> {
-        // For now, this is a no-op since we don't have delete methods in GovernanceStore
-        // A full implementation would add delete_proposal to the trait
+        // Stub: proposals are not actually removed yet
+        // Returning Ok(()) to allow the archival workflow to complete,
+        // but proposals will remain in the store until trait is extended.
         Ok(())
     }
 
     /// List all archives
+    ///
+    /// **Note: This is currently a stub implementation.** Returns empty until
+    /// `GovernanceStore` trait is extended with archive storage methods.
     fn list_archives(&self) -> anyhow::Result<Vec<ProposalArchive>> {
-        // For now, return empty since we don't have archive storage implemented
+        // Stub: no archive storage implemented yet
         // A full implementation would scan the archive prefix
         Ok(Vec::new())
     }
 
     /// Delete an archive
+    ///
+    /// **Note: This is currently a stub implementation.** A full implementation
+    /// requires adding `delete_archive(id: &ProposalId) -> Result<()>` to
+    /// the `GovernanceStore` trait.
     fn delete_archive(&self, _id: &ProposalId) -> anyhow::Result<()> {
-        // For now, this is a no-op
+        // Stub: archives are not actually deleted yet
         Ok(())
     }
 }
 
-// Extension trait for Proposal to get closed_at and outcome
+// Extension methods for Proposal to support cleanup operations.
+//
+// These methods are defined here rather than in `proposal.rs` because they are
+// only needed for the cleanup workflow. If cleanup becomes more integrated with
+// the core Proposal type, consider moving these to the main impl block.
 impl Proposal {
     /// Get the timestamp when the proposal was closed
     pub fn closed_at(&self) -> Option<Timestamp> {
@@ -349,14 +411,26 @@ impl Proposal {
 
     /// Get the outcome of a closed proposal
     ///
-    /// Note: Cancelled and Vetoed states map to Rejected since ProposalOutcome
-    /// only has Accepted/Rejected/NoQuorum variants.
+    /// # Design Note: Cancelled and Vetoed Mapping
+    ///
+    /// The `Cancelled` and `Vetoed` states are mapped to `ProposalOutcome::Rejected`
+    /// because `ProposalOutcome` only has three variants: `Accepted`, `Rejected`,
+    /// and `NoQuorum`. This is a deliberate simplification for archival purposes:
+    ///
+    /// - **Cancelled**: The proposer withdrew the proposal (voluntary rejection)
+    /// - **Vetoed**: Emergency override by authorized party (administrative rejection)
+    /// - **Rejected**: Democratic vote result
+    ///
+    /// While these are semantically different, they all result in the proposal not
+    /// being enacted. If audit trails need to distinguish between these outcomes,
+    /// consider extending `ProposalOutcome` to include `Cancelled` and `Vetoed`
+    /// variants in a future iteration.
     pub fn outcome(&self) -> Option<ProposalOutcome> {
         match &self.state {
             ProposalState::Accepted { .. } => Some(ProposalOutcome::Accepted),
             ProposalState::Rejected { .. } => Some(ProposalOutcome::Rejected),
             ProposalState::NoQuorum { .. } => Some(ProposalOutcome::NoQuorum),
-            // Cancelled and Vetoed are effectively rejections
+            // Cancelled and Vetoed map to Rejected (see doc comment above)
             ProposalState::Cancelled { .. } => Some(ProposalOutcome::Rejected),
             ProposalState::Vetoed { .. } => Some(ProposalOutcome::Rejected),
             ProposalState::ForceClosed { outcome, .. } => Some(outcome.clone()),
@@ -585,5 +659,99 @@ mod tests {
         assert_eq!(parsed.id.0, archive.id.0);
         assert_eq!(parsed.outcome, archive.outcome);
         assert_eq!(parsed.tally.for_votes, archive.tally.for_votes);
+    }
+
+    #[test]
+    fn test_retention_validation_valid() {
+        let retention = ProposalRetention::default();
+        assert!(retention.validate().is_ok());
+
+        let retention = ProposalRetention::for_testing();
+        assert!(retention.validate().is_ok());
+    }
+
+    #[test]
+    fn test_retention_validation_invalid() {
+        let retention = ProposalRetention {
+            active_ttl_secs: 100,
+            archive_ttl_secs: 100,
+            delete_after_secs: 150, // Less than 100 + 100 = 200
+        };
+        let result = retention.validate();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("must be >="));
+    }
+
+    #[test]
+    fn test_from_proposal_error_on_open() {
+        let domain_id = GovernanceDomainId::new("test");
+        let mut proposal = test_proposal(&domain_id);
+
+        // Open but not closed
+        proposal.open(3600).unwrap();
+
+        let tally = crate::VoteTally::new(0, 0, 0);
+        let result = ProposalArchive::from_proposal(&proposal, &tally);
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not closed"));
+    }
+
+    #[test]
+    fn test_should_delete_uses_closed_at() {
+        let retention = ProposalRetention {
+            active_ttl_secs: 60,
+            archive_ttl_secs: 120,
+            delete_after_secs: 300, // 5 minutes from close
+        };
+
+        let now = icn_time::current_timestamp_secs();
+
+        // Archive created 2 minutes ago, closed 4 minutes ago
+        let archive = ProposalArchive {
+            id: ProposalId("test".to_string()),
+            domain_id: GovernanceDomainId::new("test"),
+            title: "Test".to_string(),
+            proposer: icn_identity::KeyPair::generate().unwrap().did().clone(),
+            proposal_type: "text".to_string(),
+            outcome: ProposalOutcome::Accepted,
+            tally: ArchivedTally {
+                for_votes: 5,
+                against_votes: 2,
+                abstain_votes: 0,
+            },
+            created_at: now - 600,
+            closed_at: now - 240, // 4 minutes ago (< 5 min delete_after)
+            archived_at: now - 120,
+        };
+
+        // Should NOT be deleted - only 4 minutes since close, need 5
+        assert!(!retention.should_delete(&archive, now));
+
+        // Archive closed 6 minutes ago
+        let archive_old = ProposalArchive {
+            closed_at: now - 360, // 6 minutes ago (> 5 min delete_after)
+            ..archive.clone()
+        };
+
+        // SHOULD be deleted - 6 minutes since close, delete_after is 5
+        assert!(retention.should_delete(&archive_old, now));
+    }
+
+    #[test]
+    fn test_cleanup_task_delete_phase_stub() {
+        // This test verifies the deletion phase exists but is a stub.
+        // Once list_archives is implemented, this test should be updated
+        // to verify actual deletion behavior.
+        let store = InMemoryGovernanceStore::new();
+        let retention = ProposalRetention::for_testing();
+
+        // No domains/proposals, but run_cleanup should still process
+        // the (empty) archive deletion phase without errors
+        let task = ProposalCleanupTask::new(store, retention);
+        let stats = task.run_cleanup().unwrap();
+
+        // Currently list_archives returns empty, so no deletions
+        assert_eq!(stats.deleted, 0);
     }
 }
