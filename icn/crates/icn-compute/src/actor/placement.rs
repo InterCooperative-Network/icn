@@ -45,6 +45,9 @@ impl ComputeActor {
     }
 
     /// Get list of available executors with required capabilities
+    ///
+    /// Reserved: Capability-based executor filtering for task placement.
+    /// Currently placement uses scheduler directly; this is for future API use.
     #[allow(dead_code)]
     pub async fn find_executors(&self, required_caps: &[ExecutorCapability]) -> Vec<String> {
         let registry = self.executor_registry.lock().await;
@@ -63,6 +66,7 @@ impl ComputeActor {
     /// Get capacity information for an executor
     ///
     /// Returns None if the executor is not registered or has no capacity info.
+    /// Reserved: Capacity monitoring API for gateway/admin interfaces.
     #[allow(dead_code)]
     pub async fn get_executor_capacity(
         &self,
@@ -77,6 +81,7 @@ impl ComputeActor {
     /// Get capacity information for all registered executors
     ///
     /// Returns a map of executor DID to capacity. Executors without capacity info are excluded.
+    /// Reserved: Cluster-wide capacity dashboard for operators.
     #[allow(dead_code)]
     pub async fn get_all_executor_capacities(
         &self,
