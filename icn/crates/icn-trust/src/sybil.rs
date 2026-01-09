@@ -84,10 +84,11 @@ pub enum VerificationMethod {
 }
 
 /// Verification status of an identity
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(tag = "status")]
 pub enum VerificationStatus {
     /// Identity has not been verified
+    #[default]
     Unverified,
 
     /// Verification is pending
@@ -136,12 +137,6 @@ impl VerificationStatus {
     /// Check if this identity is unverified
     pub fn is_unverified(&self) -> bool {
         matches!(self, Self::Unverified)
-    }
-}
-
-impl Default for VerificationStatus {
-    fn default() -> Self {
-        Self::Unverified
     }
 }
 
