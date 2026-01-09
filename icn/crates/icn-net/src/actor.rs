@@ -1562,9 +1562,8 @@ impl NetworkActor {
                     // Read network message
                     match read_message(&mut recv).await {
                         Ok((message, bytes_read)) => {
-                            // Track bandwidth contribution (Phase 21.1)
-                            icn_obs::metrics::contribution::bandwidth_bytes_add(
-                                own_did.as_str(),
+                            // Track bandwidth contribution (aggregate, no per-DID tracking)
+                            icn_obs::metrics::contribution::total_bandwidth_bytes_add(
                                 bytes_read as u64,
                             );
 

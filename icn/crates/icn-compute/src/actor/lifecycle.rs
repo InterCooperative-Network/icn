@@ -346,10 +346,7 @@ impl ComputeActor {
             if let Some(info) = registry.get_mut(&executor_did) {
                 if info.tasks_executing > 0 {
                     info.tasks_executing -= 1;
-                    icn_obs::metrics::compute::executor_load_set(
-                        &executor_did,
-                        info.tasks_executing as f64,
-                    );
+                    // Note: Per-executor load tracking removed (high-cardinality)
                 }
             }
             drop(registry);
@@ -394,10 +391,7 @@ impl ComputeActor {
         if let Some(info) = registry.get_mut(&executor_did) {
             if info.tasks_executing > 0 {
                 info.tasks_executing -= 1;
-                icn_obs::metrics::compute::executor_load_set(
-                    &executor_did,
-                    info.tasks_executing as f64,
-                );
+                // Note: Per-executor load tracking removed (high-cardinality)
             }
         }
         drop(registry);
@@ -552,10 +546,7 @@ impl ComputeActor {
             if let Some(info) = registry.get_mut(&executor) {
                 if info.tasks_executing > 0 {
                     info.tasks_executing -= 1;
-                    icn_obs::metrics::compute::executor_load_set(
-                        &executor,
-                        info.tasks_executing as f64,
-                    );
+                    // Note: Per-executor load tracking removed (high-cardinality)
                 }
             }
         }
@@ -693,10 +684,7 @@ impl ComputeActor {
         let mut registry = self.executor_registry.lock().await;
         if let Some(info) = registry.get_mut(&self.own_did) {
             info.tasks_executing += 1;
-            icn_obs::metrics::compute::executor_load_set(
-                &self.own_did,
-                info.tasks_executing as f64,
-            );
+            // Note: Per-executor load tracking removed (high-cardinality)
         }
         drop(registry);
 
@@ -743,9 +731,9 @@ impl ComputeActor {
         // For now, 1000 fuel = 1 CPU-second (calibrated based on CCL interpreter)
         let cpu_seconds = result.fuel_used / 1000;
         if cpu_seconds > 0 {
-            icn_obs::metrics::contribution::compute_cpu_seconds_add(&self.own_did, cpu_seconds);
+            icn_obs::metrics::contribution::total_compute_cpu_seconds_add(cpu_seconds);
         }
-        icn_obs::metrics::contribution::compute_job_completed(&self.own_did, duration);
+        icn_obs::metrics::contribution::total_compute_job_completed(duration);
 
         // Log outcome
         match &result.outcome {
@@ -803,10 +791,7 @@ impl ComputeActor {
         if let Some(info) = registry.get_mut(&self.own_did) {
             if info.tasks_executing > 0 {
                 info.tasks_executing -= 1;
-                icn_obs::metrics::compute::executor_load_set(
-                    &self.own_did,
-                    info.tasks_executing as f64,
-                );
+                // Note: Per-executor load tracking removed (high-cardinality)
             }
         }
         drop(registry);
@@ -926,7 +911,7 @@ impl ComputeActor {
         let mut registry = self.executor_registry.lock().await;
         if let Some(info) = registry.get_mut(&executor) {
             info.tasks_executing += 1;
-            icn_obs::metrics::compute::executor_load_set(&executor, info.tasks_executing as f64);
+            // Note: Per-executor load tracking removed (high-cardinality)
         }
 
         Ok(())
@@ -980,10 +965,7 @@ impl ComputeActor {
                 if let Some(info) = registry.get_mut(&executor) {
                     if info.tasks_executing > 0 {
                         info.tasks_executing -= 1;
-                        icn_obs::metrics::compute::executor_load_set(
-                            &executor,
-                            info.tasks_executing as f64,
-                        );
+                        // Note: Per-executor load tracking removed (high-cardinality)
                     }
                 }
             }
