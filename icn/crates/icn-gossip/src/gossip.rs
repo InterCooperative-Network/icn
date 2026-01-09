@@ -278,6 +278,15 @@ impl GossipActor {
             .with_scope(crate::types::Scope::Regional), // Payment notifications are regional
         );
 
+        // Key rotation topic (Issue #469)
+        gossip.create_topic(
+            Topic::new(
+                crate::key_rotation::TOPIC_KEY_ROTATION.to_string(),
+                AccessControl::TrustClass(TrustClass::Known), // Known peers can receive rotations
+            )
+            .with_scope(crate::types::Scope::Global), // Key rotations propagate globally
+        );
+
         gossip
     }
 

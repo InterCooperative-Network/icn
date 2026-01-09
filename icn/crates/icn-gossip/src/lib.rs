@@ -41,6 +41,7 @@ pub mod bloom;
 pub mod error;
 pub mod gossip;
 mod handlers;
+pub mod key_rotation;
 pub mod labor_shares;
 #[allow(missing_docs)]
 pub mod partition;
@@ -72,4 +73,10 @@ pub use vector_clock::VectorClock;
 // Labor share gossip messages (Issue #391)
 pub use labor_shares::{
     topics as labor_share_topics, BondMessage, BondPaymentType, LaborShareMessage,
+};
+
+// Key rotation gossip messages (Issue #469)
+pub use key_rotation::{
+    KeyRotationCache, KeyRotationMessage, RotationReason, KEY_ROTATION_GRACE_PERIOD_SECS,
+    TOPIC_KEY_ROTATION,
 };
