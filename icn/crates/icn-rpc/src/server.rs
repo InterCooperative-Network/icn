@@ -9,6 +9,23 @@
 //! 4. Include the token in the `Authorization: Bearer <token>` header
 //!
 //! Methods are protected based on their scope requirements (see `auth::required_scope_for_method`).
+//!
+//! ## Rate Limiting
+//!
+//! When trust-based rate limiting is enabled via `enable_trust_rate_limiting()`:
+//!
+//! | Trust Class   | Score Range | Rate Limit  | Burst Capacity |
+//! |--------------|-------------|-------------|----------------|
+//! | Isolated     | < 0.1       | 10 req/sec  | 2              |
+//! | Known        | 0.1-0.4     | 50 req/sec  | 10             |
+//! | Partner      | 0.4-0.7     | 100 req/sec | 20             |
+//! | Federated    | 0.7+        | 200 req/sec | 50             |
+//!
+//! **Important**: Rate limiting applies to ALL requests:
+//! - **Authenticated requests**: Limited based on the user's trust class
+//! - **Unauthenticated requests**: Limited at Isolated level (strictest)
+//!
+//! This prevents anonymous users from bypassing rate limits by not authenticating.
 
 use anyhow::Result;
 use http_body_util::{BodyExt, Full};
@@ -42,6 +59,36 @@ use crate::receipt::ReceiptStore;
 use crate::types::{RpcRequest, RpcResponse};
 
 use icn_gossip::GossipActor;
+use icn_identity::KeyPair;
+use std::sync::LazyLock;
+
+/// Synthetic DID for rate-limiting anonymous/unauthenticated requests
+/// All anonymous requests share this single DID bucket, applying
+/// Isolated-level limits (10 req/sec, burst 2) to the aggregate.
+///
+/// Uses a deterministic keypair derived from all-zero seed so the DID
+/// is consistent across restarts.
+///
+/// SAFETY: The keypair is created from fixed bytes which always succeeds.
+/// The expect runs once during initialization, not in response to user input.
+#[allow(clippy::expect_used)]
+static ANONYMOUS_DID: LazyLock<Did> = LazyLock::new(|| {
+    // Generate a deterministic keypair from fixed seed
+    // The seed is all zeros - this creates a valid DID that:
+    // 1. Will never match any real keypair (no one would use all-zeros)
+    // 2. Is consistent across restarts (same bucket)
+    // 3. Passes DID format validation
+    let seed = [0u8; 32];
+    let public_seed = [0u8; 32];
+    let kp = KeyPair::from_bytes(&seed, &public_seed)
+        .expect("Fixed-seed keypair creation is infallible");
+    kp.did().clone()
+});
+
+/// Get the synthetic anonymous DID for rate limiting
+fn anonymous_did() -> Did {
+    ANONYMOUS_DID.clone()
+}
 
 /// RPC server state
 pub struct RpcServer {
@@ -413,15 +460,29 @@ async fn handle_request(
     };
 
     // Apply trust-based rate limiting if enabled (C8)
-    // Rate limit based on the authenticated user's DID
-    if let (Some(ref rate_limiter), Some(ref claims)) = (&state.rate_limiter, &claims) {
-        // Parse DID from claims
-        if let Ok(did) = claims.sub.parse::<Did>() {
+    // Rate limits apply to ALL requests:
+    // - Authenticated: Based on user's trust class
+    // - Unauthenticated: Strictest limits (Isolated = 10 req/sec)
+    if let Some(ref rate_limiter) = &state.rate_limiter {
+        let rate_limit_did = if let Some(ref claims) = claims {
+            // Authenticated: use their DID
+            claims.sub.parse::<Did>().ok()
+        } else {
+            // Unauthenticated: use a synthetic anonymous DID
+            // This applies Isolated-level limits to all anonymous requests
+            Some(anonymous_did())
+        };
+
+        if let Some(did) = rate_limit_did {
             let allowed = rate_limiter.check_rate_limit(&did).await;
             if !allowed {
+                let identity = claims
+                    .as_ref()
+                    .map(|c| c.sub.as_str())
+                    .unwrap_or("anonymous");
                 warn!(
-                    "Rate limit exceeded for DID {} on method {}",
-                    claims.sub, rpc_request.method
+                    "Rate limit exceeded for {} on method {}",
+                    identity, rpc_request.method
                 );
                 counter!("icn_rpc_rate_limited_total", "method" => method.clone()).increment(1);
                 gauge!("icn_rpc_active_requests").decrement(1.0);
