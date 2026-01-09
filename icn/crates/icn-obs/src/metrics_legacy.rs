@@ -311,6 +311,10 @@ pub fn init_descriptions() {
         "Bloom filter false positive rate by topic"
     );
     describe_counter!(
+        "icn_gossip_bloom_resize_total",
+        "Total number of Bloom filter resizes"
+    );
+    describe_counter!(
         "icn_gossip_pull_truncated_total",
         "Total number of pull responses truncated due to size limits"
     );
@@ -2050,6 +2054,11 @@ pub mod gossip {
 
     pub fn bloom_fp_rate_record(topic: &str, rate: f64) {
         histogram!("icn_gossip_bloom_fp_rate", "topic" => topic.to_string()).record(rate);
+    }
+
+    /// M2: Track Bloom filter resizes for dynamic sizing (#472)
+    pub fn bloom_resize_inc() {
+        counter!("icn_gossip_bloom_resize_total").increment(1);
     }
 
     pub fn pull_truncated_inc() {

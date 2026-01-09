@@ -193,6 +193,9 @@ pub struct GossipActor {
     /// Storage quota manager (Phase 18 Week 6 - optional)
     /// Enforces per-DID storage limits and provides priority-based eviction
     storage_quota_manager: Option<Arc<RwLock<icn_store::StorageQuotaManager>>>,
+
+    /// Bloom filter resize configuration (M2 - dynamic sizing)
+    bloom_resize_config: crate::bloom::BloomResizeConfig,
 }
 
 impl GossipActor {
@@ -228,6 +231,7 @@ impl GossipActor {
             partition_detector: None,   // Phase 18 Week 3: Set via set_partition_detector()
             partition_healer: None,     // Phase 18 Week 3: Set via set_partition_healer()
             storage_quota_manager: None, // Phase 18 Week 6: Set via set_storage_quota_manager()
+            bloom_resize_config: crate::bloom::BloomResizeConfig::default(), // M2: Dynamic Bloom sizing
         };
 
         // Create default topics with appropriate scopes
@@ -613,6 +617,37 @@ impl GossipActor {
 
         // Store entry
         topic_entries.insert(hash, entry.clone());
+
+        // M2: Check if bloom filter needs dynamic resizing
+        let entry_count = topic_entries.len();
+        if let Some(bloom) = self.bloom_filters.get(topic) {
+            if bloom.needs_resize(entry_count, &self.bloom_resize_config) {
+                // Collect all entry hashes for this topic
+                let hashes: Vec<ContentHash> = topic_entries.keys().copied().collect();
+                let old_size = bloom.capacity();
+                let old_fp_rate = bloom.estimated_fp_rate();
+
+                // Rebuild with optimal sizing
+                let new_bloom = BloomFilter::rebuild(&hashes, &self.bloom_resize_config);
+                let new_size = new_bloom.capacity();
+
+                debug!(
+                    topic = %topic,
+                    old_size = old_size,
+                    new_size = new_size,
+                    entry_count = entry_count,
+                    old_fp_rate = %format!("{:.4}", old_fp_rate),
+                    "Resized bloom filter for topic"
+                );
+
+                // Replace the bloom filter
+                self.bloom_filters.insert(topic.clone(), new_bloom);
+
+                // Track metrics
+                icn_obs::metrics::gossip::bloom_resize_inc();
+                icn_obs::metrics::gossip::bloom_fp_rate_record(topic, old_fp_rate);
+            }
+        }
 
         // Phase 18 Week 6: Record quota usage for new entry
         if let Some(quota_manager) = &self.storage_quota_manager {
