@@ -311,6 +311,10 @@ pub fn init_descriptions() {
         "Bloom filter false positive rate by topic"
     );
     describe_counter!(
+        "icn_gossip_bloom_resize_total",
+        "Total number of Bloom filter resizes"
+    );
+    describe_counter!(
         "icn_gossip_pull_truncated_total",
         "Total number of pull responses truncated due to size limits"
     );
@@ -2052,6 +2056,11 @@ pub mod gossip {
         histogram!("icn_gossip_bloom_fp_rate", "topic" => topic.to_string()).record(rate);
     }
 
+    /// M2: Track Bloom filter resizes for dynamic sizing (#472)
+    pub fn bloom_resize_inc() {
+        counter!("icn_gossip_bloom_resize_total").increment(1);
+    }
+
     pub fn pull_truncated_inc() {
         counter!("icn_gossip_pull_truncated_total").increment(1);
     }
@@ -2228,6 +2237,15 @@ pub mod scalability {
 
     pub fn timestamp_validation_rejected_inc() {
         counter!("icn_scalability_timestamp_validation_rejected_total").increment(1);
+    }
+
+    // Bootstrap peer health metrics (M2)
+    pub fn bootstrap_peers_connected_set(count: u64) {
+        gauge!("icn_bootstrap_peers_connected").set(count as f64);
+    }
+
+    pub fn bootstrap_peers_disconnected_set(count: u64) {
+        gauge!("icn_bootstrap_peers_disconnected").set(count as f64);
     }
 }
 
@@ -3247,9 +3265,6 @@ pub mod nat_traversal {
         counter!("icn_relay_data_bytes_received_total").increment(bytes);
     }
 }
-
-/// Alias for nat_traversal module for convenience
-pub use nat_traversal as nat;
 
 /// Compute metrics
 pub mod compute {

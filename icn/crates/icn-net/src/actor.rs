@@ -322,6 +322,18 @@ impl NetworkHandle {
         }
     }
 
+    /// Check if a peer is currently connected
+    ///
+    /// Returns true if the peer has completed the Hello handshake and has
+    /// an active connection entry.
+    pub async fn is_peer_connected(&self, did: &Did) -> Result<bool> {
+        if let Some(ref connections) = self.peer_connections {
+            Ok(connections.read().await.contains_key(did))
+        } else {
+            Ok(false)
+        }
+    }
+
     /// Get all peers that support a specific capability
     ///
     /// Useful for broadcasting feature-specific messages only to capable peers

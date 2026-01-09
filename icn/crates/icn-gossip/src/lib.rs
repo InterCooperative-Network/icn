@@ -51,7 +51,7 @@ pub mod sync;
 pub mod types;
 pub mod vector_clock;
 
-pub use bloom::BloomFilter;
+pub use bloom::{BloomFilter, BloomResizeConfig};
 pub use error::{GossipError, Result};
 pub use gossip::{
     start_digest_emitter, start_partition_checker, EntryNotificationCallback, GossipActor,

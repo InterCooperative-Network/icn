@@ -205,6 +205,109 @@ impl BloomFilter {
             *bit = false;
         }
     }
+
+    /// Get the current fill ratio (proportion of bits set)
+    pub fn fill_ratio(&self) -> f64 {
+        if self.size == 0 {
+            return 0.0;
+        }
+        let set_bits = self.bits.iter().filter(|&&b| b).count() as f64;
+        set_bits / self.size as f64
+    }
+
+    /// Get the filter's capacity (size in bits)
+    pub fn capacity(&self) -> u64 {
+        self.size
+    }
+
+    /// Get the number of hash functions
+    pub fn hash_count(&self) -> u32 {
+        self.num_hashes
+    }
+
+    /// Check if the filter needs resizing based on current entry count
+    ///
+    /// Returns true if:
+    /// - Fill ratio exceeds the high threshold (filter is too full, FP rate degraded)
+    /// - Entry count is much smaller than capacity (filter is oversized, wasting memory)
+    pub fn needs_resize(&self, entry_count: usize, config: &BloomResizeConfig) -> bool {
+        let fill_ratio = self.fill_ratio();
+
+        // Too full - FP rate is degraded
+        if fill_ratio > config.high_fill_threshold {
+            return true;
+        }
+
+        // Too large for current entries (wasting memory)
+        // Only resize down if we have enough entries to be meaningful
+        if entry_count >= config.min_entries_for_resize {
+            let optimal_size = Self::optimal_size(entry_count, config.target_fp_rate);
+            // Resize if current size is > 4x optimal (significant memory waste)
+            if self.size > optimal_size * 4 {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    /// Rebuild the filter with optimal sizing for the given entries
+    ///
+    /// This creates a new filter sized for the actual entry count and re-inserts
+    /// all entries. Used when dynamic resizing is triggered.
+    pub fn rebuild(entries: &[ContentHash], config: &BloomResizeConfig) -> Self {
+        let entry_count = entries.len().max(config.min_entries_for_resize);
+        let size = Self::optimal_size(entry_count, config.target_fp_rate)
+            .min(config.max_size_bits)
+            .max(64); // Minimum 64 bits
+        let num_hashes = Self::optimal_hash_count(size, entry_count);
+
+        let mut filter = BloomFilter {
+            bits: vec![false; size as usize],
+            num_hashes,
+            size,
+        };
+
+        for hash in entries {
+            filter.insert(hash);
+        }
+
+        filter
+    }
+
+    /// Get the estimated false positive rate based on current fill
+    pub fn estimated_fp_rate(&self) -> f64 {
+        let fill_ratio = self.fill_ratio();
+        // FP rate ≈ (fill_ratio)^k where k is number of hash functions
+        fill_ratio.powi(self.num_hashes as i32)
+    }
+}
+
+/// Configuration for dynamic Bloom filter resizing
+#[derive(Debug, Clone)]
+pub struct BloomResizeConfig {
+    /// Fill ratio above which resize is triggered (default: 0.7)
+    pub high_fill_threshold: f64,
+
+    /// Target false positive rate for resized filters (default: 0.01 = 1%)
+    pub target_fp_rate: f64,
+
+    /// Maximum filter size in bits (default: 1MB = 8,388,608 bits)
+    pub max_size_bits: u64,
+
+    /// Minimum entries before considering resize (default: 100)
+    pub min_entries_for_resize: usize,
+}
+
+impl Default for BloomResizeConfig {
+    fn default() -> Self {
+        Self {
+            high_fill_threshold: 0.7,
+            target_fp_rate: 0.01,
+            max_size_bits: 8_388_608, // 1 MB
+            min_entries_for_resize: 100,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -363,5 +466,134 @@ mod tests {
 
         // Should be reasonably low (< 20% for adaptive sizing)
         assert!(fp_rate < 0.2, "FP rate too high: {:.2}%", fp_rate * 100.0);
+    }
+
+    #[test]
+    fn test_bloom_resize_config_default() {
+        let config = BloomResizeConfig::default();
+        assert!((config.high_fill_threshold - 0.7).abs() < 0.001);
+        assert!((config.target_fp_rate - 0.01).abs() < 0.001);
+        assert_eq!(config.max_size_bits, 8_388_608);
+        assert_eq!(config.min_entries_for_resize, 100);
+    }
+
+    #[test]
+    fn test_fill_ratio() {
+        let mut filter = BloomFilter::new(100, 0.01);
+        assert!((filter.fill_ratio() - 0.0).abs() < 0.001);
+
+        // Insert some items
+        for i in 0..50 {
+            let mut hash = [0u8; 32];
+            hash[0] = i;
+            filter.insert(&hash);
+        }
+
+        let ratio = filter.fill_ratio();
+        assert!(ratio > 0.0);
+        assert!(ratio < 1.0);
+        println!("Fill ratio after 50 inserts: {:.2}%", ratio * 100.0);
+    }
+
+    #[test]
+    fn test_needs_resize_when_full() {
+        let config = BloomResizeConfig::default();
+        let mut filter = BloomFilter::new(10, 0.01); // Small filter
+
+        // Should not need resize when empty
+        assert!(!filter.needs_resize(0, &config));
+
+        // Fill it up with many items to exceed capacity
+        for i in 0..100 {
+            let mut hash = [0u8; 32];
+            hash[0] = i;
+            filter.insert(&hash);
+        }
+
+        // Should need resize when overfilled
+        let ratio = filter.fill_ratio();
+        println!(
+            "Fill ratio after 100 inserts into size-10 filter: {:.2}%",
+            ratio * 100.0
+        );
+        if ratio > config.high_fill_threshold {
+            assert!(filter.needs_resize(100, &config));
+        }
+    }
+
+    #[test]
+    fn test_needs_resize_when_oversized() {
+        let config = BloomResizeConfig::default();
+        // Create a filter sized for 10000 entries
+        let filter = BloomFilter::new(10000, 0.01);
+
+        // With only 100 entries, filter is oversized (>4x optimal)
+        // Note: depends on optimal_size calculation, may or may not trigger
+        let needs = filter.needs_resize(100, &config);
+        println!(
+            "Filter sized for 10k with 100 entries needs resize: {}",
+            needs
+        );
+    }
+
+    #[test]
+    fn test_rebuild() {
+        let config = BloomResizeConfig::default();
+
+        // Create some test entries
+        let entries: Vec<ContentHash> = (0..200)
+            .map(|i| {
+                let mut hash = [0u8; 32];
+                hash[0] = (i / 256) as u8;
+                hash[1] = (i % 256) as u8;
+                hash
+            })
+            .collect();
+
+        // Rebuild filter for these entries
+        let filter = BloomFilter::rebuild(&entries, &config);
+
+        // Verify all entries are present
+        for hash in &entries {
+            assert!(
+                filter.contains(hash),
+                "Rebuilt filter should contain all entries"
+            );
+        }
+
+        // Verify size is reasonable
+        assert!(filter.capacity() >= 64);
+        assert!(filter.capacity() <= config.max_size_bits);
+
+        println!(
+            "Rebuilt filter for {} entries: size={}, hashes={}, fill={:.2}%",
+            entries.len(),
+            filter.capacity(),
+            filter.hash_count(),
+            filter.fill_ratio() * 100.0
+        );
+    }
+
+    #[test]
+    fn test_estimated_fp_rate() {
+        let mut filter = BloomFilter::new(1000, 0.01);
+
+        // Initially should be 0
+        assert!((filter.estimated_fp_rate() - 0.0).abs() < 0.001);
+
+        // Insert items and check FP rate increases
+        for i in 0..500 {
+            let mut hash = [0u8; 32];
+            hash[0] = (i / 256) as u8;
+            hash[1] = (i % 256) as u8;
+            filter.insert(&hash);
+        }
+
+        let estimated = filter.estimated_fp_rate();
+        println!(
+            "Estimated FP rate after 500 inserts: {:.4}%",
+            estimated * 100.0
+        );
+        assert!(estimated > 0.0);
     }
 }

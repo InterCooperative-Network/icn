@@ -12,6 +12,8 @@ pub mod budgets;
 pub mod escrow;
 /// Notification storage and management
 pub mod notifications;
+/// Peer cache for persisting discovered peers
+pub mod peer_cache;
 /// Storage quota management
 pub mod quotas;
 /// Recurring payment scheduling
@@ -23,6 +25,9 @@ use std::time::SystemTime;
 
 // Re-export quota types
 pub use quotas::{QuotaPriority, QuotaStats, StorageItem, StorageQuota, StorageQuotaManager};
+
+// Re-export peer cache types
+pub use peer_cache::{CachedPeer, PeerCache, PeerSource, DEFAULT_PEER_TTL};
 
 /// Content hash type (32-byte SHA-256)
 pub type ContentHash = [u8; 32];
