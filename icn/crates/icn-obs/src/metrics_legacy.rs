@@ -2061,12 +2061,13 @@ pub mod gossip {
 
     /// Set the deficit bytes for a peer.
     ///
-    /// DEPRECATED: The `peer` parameter is ignored to avoid high-cardinality metrics.
-    /// Use `total_deficit_bytes_set()` for aggregate tracking. See Issue #494.
+    /// DEPRECATED: Per-peer deficit tracking has been removed to avoid high-cardinality
+    /// metrics. This function is now a no-op. Callers should aggregate deficit across
+    /// all peers and use `total_deficit_bytes_set()` instead. See Issue #494.
     #[deprecated(since = "0.2.0", note = "Use total_deficit_bytes_set() instead to avoid high-cardinality metrics")]
-    pub fn peer_deficit_bytes_set(_peer: &str, deficit: i64) {
-        // Per-peer tracking removed for cardinality. Track total instead.
-        gauge!("icn_gossip_total_deficit_bytes").set(deficit as f64);
+    pub fn peer_deficit_bytes_set(_peer: &str, _deficit: i64) {
+        // Intentionally a no-op. Per-peer tracking removed; callers should
+        // aggregate and use `total_deficit_bytes_set()` instead.
     }
 
     /// Set the total deficit bytes across all peers.
@@ -3382,12 +3383,13 @@ pub mod compute {
 
     /// Set executor load.
     ///
-    /// DEPRECATED: The `executor_did` parameter is ignored to avoid high-cardinality metrics.
-    /// Use `average_executor_load_set()` for aggregate tracking. See Issue #494.
+    /// DEPRECATED: Per-executor load tracking has been removed to avoid high-cardinality
+    /// metrics. This function is now a no-op. Callers should compute the aggregate load
+    /// across all executors and use `average_executor_load_set()` instead. See Issue #494.
     #[deprecated(since = "0.2.0", note = "Use average_executor_load_set() instead to avoid high-cardinality metrics")]
-    pub fn executor_load_set(_executor_did: &str, load: f64) {
-        // Per-executor tracking removed for cardinality. Track average instead.
-        gauge!("icn_compute_executor_load_average").set(load);
+    pub fn executor_load_set(_executor_did: &str, _load: f64) {
+        // Intentionally a no-op. Per-executor tracking removed; callers should
+        // aggregate and use `average_executor_load_set()` instead.
     }
 
     /// Set the average executor load across all executors.
@@ -3972,11 +3974,14 @@ pub mod contribution {
 
     /// Set the number of jobs completed by a DID (for recovery/sync).
     ///
-    /// DEPRECATED: The `did` parameter is ignored to avoid high-cardinality metrics.
-    /// Use `total_compute_jobs_completed_set()` instead. See Issue #494.
+    /// DEPRECATED: Per-DID job tracking has been removed to avoid high-cardinality
+    /// metrics. This function is now a no-op. Callers should aggregate job counts
+    /// across all DIDs and use `total_compute_jobs_completed_set()` instead.
+    /// See Issue #494.
     #[deprecated(since = "0.2.0", note = "Use total_compute_jobs_completed_set() instead to avoid high-cardinality metrics")]
-    pub fn compute_jobs_completed_set(_did: &str, count: u64) {
-        gauge!("icn_contribution_compute_jobs_completed_total").set(count as f64);
+    pub fn compute_jobs_completed_set(_did: &str, _count: u64) {
+        // Intentionally a no-op. Per-DID tracking removed; callers should
+        // aggregate and use `total_compute_jobs_completed_set()` instead.
     }
 
     /// Set the total number of jobs completed across all DIDs.
@@ -4004,11 +4009,14 @@ pub mod contribution {
 
     /// Set the number of healthy replicas for a provider DID.
     ///
-    /// DEPRECATED: The `did` parameter is ignored to avoid high-cardinality metrics.
-    /// Use `total_storage_replicas_healthy_set()` instead. See Issue #494.
+    /// DEPRECATED: Per-provider replica tracking has been removed to avoid high-cardinality
+    /// metrics. This function is now a no-op. Callers should aggregate replica counts
+    /// across all providers and use `total_storage_replicas_healthy_set()` instead.
+    /// See Issue #494.
     #[deprecated(since = "0.2.0", note = "Use total_storage_replicas_healthy_set() instead to avoid high-cardinality metrics")]
-    pub fn storage_replicas_healthy_set(_did: &str, count: u64) {
-        gauge!("icn_contribution_storage_replicas_healthy_total").set(count as f64);
+    pub fn storage_replicas_healthy_set(_did: &str, _count: u64) {
+        // Intentionally a no-op. Per-provider tracking removed; callers should
+        // aggregate and use `total_storage_replicas_healthy_set()` instead.
     }
 
     /// Set the total number of healthy replicas across all providers.
