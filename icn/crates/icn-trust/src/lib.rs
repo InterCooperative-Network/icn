@@ -56,17 +56,22 @@ pub mod multi_graph;
 pub mod pathfinder;
 pub mod precompute;
 pub mod reachability;
+pub mod sybil;
 pub mod trust_cache;
 pub mod typed_graph;
 pub mod types;
 
-pub use anomaly::{TrustAnomaly, TrustGraphAnalyzer};
+pub use anomaly::{anomalies_to_sybil_flags, TrustAnomaly, TrustGraphAnalyzer};
 pub use attestation::TrustAttestation;
 pub use facade::TrustGraphFacade;
 pub use multi_graph::MultiTrustGraph;
 pub use pathfinder::{PathfinderConfig, TrustPathfinder};
 pub use precompute::TrustPrecomputer;
 pub use reachability::ReachabilityFilter;
+pub use sybil::{
+    SybilFlag, SybilFlagType, SybilResistance, SybilResistanceConfig, VerificationMethod,
+    VerificationStatus,
+};
 pub use trust_cache::TrustCache;
 pub use typed_graph::TypedTrustGraph;
 pub use types::{ScoringWeights, TrustGraphType};

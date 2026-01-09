@@ -413,7 +413,99 @@ impl TrustGraphAnalyzer {
     }
 }
 
-#[allow(dead_code)]
+/// Convert detected anomalies into Sybil flags
+///
+/// This bridges the gap between anomaly detection and the Sybil resistance layer.
+/// Each anomaly type maps to a corresponding `SybilFlagType`:
+/// - `CircularVouching` → `SybilFlagType::CircularVouching`
+/// - `SybilCluster` → `SybilFlagType::SybilCluster`
+/// - `RapidTrustGrowth` → `SybilFlagType::RapidTrustGrowth`
+pub fn anomalies_to_sybil_flags(anomalies: &[TrustAnomaly]) -> Vec<crate::sybil::SybilFlag> {
+    use crate::sybil::{SybilFlag, SybilFlagType};
+
+    let now = current_timestamp();
+    let mut flags = Vec::new();
+
+    for anomaly in anomalies {
+        match anomaly {
+            TrustAnomaly::CircularVouching {
+                cycle,
+                cycle_strength,
+                min_trust,
+            } => {
+                // Flag all DIDs in the cycle
+                let evidence = vec![
+                    format!("cycle_length:{}", cycle.len()),
+                    format!("cycle_strength:{:.2}", cycle_strength),
+                    format!("min_trust:{:.2}", min_trust),
+                ];
+
+                for did in cycle {
+                    flags.push(SybilFlag {
+                        did: did.clone(),
+                        flag_type: SybilFlagType::CircularVouching,
+                        confidence: *cycle_strength, // Use cycle strength as confidence
+                        flagged_at: now,
+                        evidence: evidence.clone(),
+                    });
+                }
+            }
+            TrustAnomaly::SybilCluster {
+                cluster,
+                internal_density,
+                external_density,
+                density_ratio,
+            } => {
+                // Flag all DIDs in the cluster
+                let evidence = vec![
+                    format!("cluster_size:{}", cluster.len()),
+                    format!("internal_density:{:.2}", internal_density),
+                    format!("external_density:{:.2}", external_density),
+                    format!("density_ratio:{:.2}", density_ratio),
+                ];
+
+                // Confidence based on density ratio (capped at 1.0)
+                let confidence = (density_ratio / 10.0).min(1.0);
+
+                for did in cluster {
+                    flags.push(SybilFlag {
+                        did: did.clone(),
+                        flag_type: SybilFlagType::SybilCluster,
+                        confidence,
+                        flagged_at: now,
+                        evidence: evidence.clone(),
+                    });
+                }
+            }
+            TrustAnomaly::RapidTrustGrowth {
+                did,
+                growth_rate,
+                period_days,
+                threshold,
+            } => {
+                let evidence = vec![
+                    format!("growth_rate:{:.2}", growth_rate),
+                    format!("period_days:{}", period_days),
+                    format!("threshold:{:.2}", threshold),
+                ];
+
+                // Confidence based on how much the threshold was exceeded
+                let confidence = (growth_rate / (threshold * 2.0)).min(1.0);
+
+                flags.push(SybilFlag {
+                    did: did.clone(),
+                    flag_type: SybilFlagType::RapidTrustGrowth,
+                    confidence,
+                    flagged_at: now,
+                    evidence,
+                });
+            }
+        }
+    }
+
+    flags
+}
+
 fn current_timestamp() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -572,5 +664,79 @@ mod tests {
         assert_eq!(analyzer.high_trust_threshold, 0.7);
         assert_eq!(analyzer.min_cycle_strength, 0.75);
         assert_eq!(analyzer.sybil_density_ratio, 10.0);
+    }
+
+    #[test]
+    fn test_anomalies_to_sybil_flags_circular_vouching() {
+        use crate::sybil::SybilFlagType;
+
+        let did_a = test_did(1);
+        let did_b = test_did(2);
+        let did_c = test_did(3);
+
+        let anomalies = vec![TrustAnomaly::CircularVouching {
+            cycle: vec![did_a.clone(), did_b.clone(), did_c.clone()],
+            cycle_strength: 0.9,
+            min_trust: 0.85,
+        }];
+
+        let flags = anomalies_to_sybil_flags(&anomalies);
+
+        // Should create 3 flags (one per DID in cycle)
+        assert_eq!(flags.len(), 3);
+
+        for flag in &flags {
+            assert_eq!(flag.flag_type, SybilFlagType::CircularVouching);
+            assert!((flag.confidence - 0.9).abs() < 0.001);
+            assert!(!flag.evidence.is_empty());
+        }
+    }
+
+    #[test]
+    fn test_anomalies_to_sybil_flags_sybil_cluster() {
+        use crate::sybil::SybilFlagType;
+
+        let did_a = test_did(1);
+        let did_b = test_did(2);
+
+        let anomalies = vec![TrustAnomaly::SybilCluster {
+            cluster: vec![did_a.clone(), did_b.clone()],
+            internal_density: 0.8,
+            external_density: 0.1,
+            density_ratio: 8.0,
+        }];
+
+        let flags = anomalies_to_sybil_flags(&anomalies);
+
+        // Should create 2 flags (one per DID in cluster)
+        assert_eq!(flags.len(), 2);
+
+        for flag in &flags {
+            assert_eq!(flag.flag_type, SybilFlagType::SybilCluster);
+            // Confidence = 8.0 / 10.0 = 0.8
+            assert!((flag.confidence - 0.8).abs() < 0.001);
+        }
+    }
+
+    #[test]
+    fn test_anomalies_to_sybil_flags_rapid_growth() {
+        use crate::sybil::SybilFlagType;
+
+        let did = test_did(1);
+
+        let anomalies = vec![TrustAnomaly::RapidTrustGrowth {
+            did: did.clone(),
+            growth_rate: 0.75,
+            period_days: 7,
+            threshold: 0.5,
+        }];
+
+        let flags = anomalies_to_sybil_flags(&anomalies);
+
+        assert_eq!(flags.len(), 1);
+        assert_eq!(flags[0].did, did);
+        assert_eq!(flags[0].flag_type, SybilFlagType::RapidTrustGrowth);
+        // Confidence = 0.75 / (0.5 * 2) = 0.75
+        assert!((flags[0].confidence - 0.75).abs() < 0.001);
     }
 }
