@@ -102,6 +102,11 @@ impl OracleManager {
         }
     }
 
+    /// Get a reference to the oracle configuration
+    pub fn config(&self) -> &OracleConfig {
+        &self.config
+    }
+
     // === Source Management ===
 
     /// Register a price feed source

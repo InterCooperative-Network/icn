@@ -171,6 +171,11 @@ impl ExchangeRate {
     }
 }
 
+/// Default threshold for suspicious exchange rates.
+/// Most major currency pairs range from 0.01 to ~150. Rates above this threshold
+/// may indicate oracle misconfiguration (decimal point errors, stale data, bugs).
+pub const DEFAULT_SUSPICIOUS_RATE_THRESHOLD: f64 = 1000.0;
+
 /// Configuration for the oracle manager
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OracleConfig {
@@ -182,6 +187,18 @@ pub struct OracleConfig {
     pub outlier_threshold: f64,
     /// Staleness threshold (seconds since last update)
     pub staleness_threshold_secs: u64,
+    /// Per-currency-pair suspicious rate thresholds.
+    /// Key format: "FROM:TO" (e.g., "USD:JPY", "BTC:USD").
+    /// If a pair is not in this map, `default_suspicious_rate_threshold` is used.
+    #[serde(default)]
+    pub suspicious_rate_thresholds: std::collections::HashMap<String, f64>,
+    /// Default suspicious rate threshold for pairs not in `suspicious_rate_thresholds`
+    #[serde(default = "default_suspicious_threshold")]
+    pub default_suspicious_rate_threshold: f64,
+}
+
+fn default_suspicious_threshold() -> f64 {
+    DEFAULT_SUSPICIOUS_RATE_THRESHOLD
 }
 
 impl Default for OracleConfig {
@@ -191,6 +208,8 @@ impl Default for OracleConfig {
             min_sources_for_consensus: 1,    // At least 1 source
             outlier_threshold: 0.15,         // 15% deviation
             staleness_threshold_secs: 86400, // 24 hours
+            suspicious_rate_thresholds: std::collections::HashMap::new(),
+            default_suspicious_rate_threshold: DEFAULT_SUSPICIOUS_RATE_THRESHOLD,
         }
     }
 }
@@ -204,7 +223,37 @@ impl OracleConfig {
             min_sources_for_consensus: 1,
             outlier_threshold: 0.15,
             staleness_threshold_secs: 300,
+            suspicious_rate_thresholds: std::collections::HashMap::new(),
+            default_suspicious_rate_threshold: DEFAULT_SUSPICIOUS_RATE_THRESHOLD,
         }
+    }
+
+    /// Get the suspicious rate threshold for a specific currency pair.
+    ///
+    /// Returns the per-pair threshold if configured, otherwise the default.
+    pub fn get_suspicious_rate_threshold(&self, pair: &CurrencyPair) -> f64 {
+        self.suspicious_rate_thresholds
+            .get(&pair.key())
+            .copied()
+            .unwrap_or(self.default_suspicious_rate_threshold)
+    }
+
+    /// Set a suspicious rate threshold for a specific currency pair.
+    ///
+    /// # Example
+    /// ```ignore
+    /// config.set_suspicious_rate_threshold("USD", "JPY", 200.0);
+    /// config.set_suspicious_rate_threshold("BTC", "USD", 100_000.0);
+    /// ```
+    pub fn set_suspicious_rate_threshold(
+        &mut self,
+        from: impl Into<String>,
+        to: impl Into<String>,
+        threshold: f64,
+    ) {
+        let pair = CurrencyPair::new(from, to);
+        self.suspicious_rate_thresholds
+            .insert(pair.key(), threshold);
     }
 }
 
@@ -382,5 +431,61 @@ mod tests {
         let config = OracleConfig::default();
         assert_eq!(config.default_ttl_secs, 3600);
         assert_eq!(config.outlier_threshold, 0.15);
+        assert_eq!(
+            config.default_suspicious_rate_threshold,
+            DEFAULT_SUSPICIOUS_RATE_THRESHOLD
+        );
+        assert!(config.suspicious_rate_thresholds.is_empty());
+    }
+
+    #[test]
+    fn test_suspicious_rate_threshold_default() {
+        let config = OracleConfig::default();
+        let pair = CurrencyPair::new("USD", "EUR");
+
+        // Should return default threshold for unconfigured pairs
+        assert_eq!(
+            config.get_suspicious_rate_threshold(&pair),
+            DEFAULT_SUSPICIOUS_RATE_THRESHOLD
+        );
+    }
+
+    #[test]
+    fn test_suspicious_rate_threshold_per_pair() {
+        let mut config = OracleConfig::default();
+
+        // Configure per-pair thresholds
+        config.set_suspicious_rate_threshold("USD", "JPY", 200.0);
+        config.set_suspicious_rate_threshold("BTC", "USD", 100_000.0);
+
+        // Should return per-pair threshold when configured
+        let usd_jpy = CurrencyPair::new("USD", "JPY");
+        assert_eq!(config.get_suspicious_rate_threshold(&usd_jpy), 200.0);
+
+        let btc_usd = CurrencyPair::new("BTC", "USD");
+        assert_eq!(config.get_suspicious_rate_threshold(&btc_usd), 100_000.0);
+
+        // Should return default for unconfigured pairs
+        let eur_usd = CurrencyPair::new("EUR", "USD");
+        assert_eq!(
+            config.get_suspicious_rate_threshold(&eur_usd),
+            DEFAULT_SUSPICIOUS_RATE_THRESHOLD
+        );
+    }
+
+    #[test]
+    fn test_suspicious_rate_threshold_serialization() {
+        let mut config = OracleConfig::default();
+        config.set_suspicious_rate_threshold("USD", "JPY", 200.0);
+        config.default_suspicious_rate_threshold = 500.0;
+
+        // Serialize and deserialize
+        let json = serde_json::to_string(&config).expect("serialize");
+        let deserialized: OracleConfig = serde_json::from_str(&json).expect("deserialize");
+
+        // Verify round-trip
+        let usd_jpy = CurrencyPair::new("USD", "JPY");
+        assert_eq!(deserialized.get_suspicious_rate_threshold(&usd_jpy), 200.0);
+        assert_eq!(deserialized.default_suspicious_rate_threshold, 500.0);
     }
 }

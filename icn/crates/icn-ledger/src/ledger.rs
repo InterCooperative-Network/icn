@@ -51,10 +51,8 @@ pub struct ForkStats {
 /// Key prefix for cached balances in storage
 const BALANCE_PREFIX: &str = "ledger:balance:";
 
-/// Threshold for logging warnings about suspiciously high exchange rates.
-/// Most major currency pairs range from 0.01 to ~150. Rates above this threshold
-/// may indicate oracle misconfiguration (decimal point errors, stale data, bugs).
-const SUSPICIOUS_RATE_THRESHOLD: f64 = 1000.0;
+// Suspicious rate threshold moved to OracleConfig for per-pair configuration (Issue #474)
+// Use oracle.config().get_suspicious_rate_threshold(&pair) instead
 
 /// Key prefix for cleared volume index (total credits received per account/currency)
 const CLEARED_VOLUME_PREFIX: &str = "ledger:cleared_volume:";
@@ -556,9 +554,11 @@ impl Ledger {
         // Convert amount using oracle rate
         let gross_target_amount = rate.convert(source_amount).ok_or_else(|| {
             // Log a warning if overflow occurs with a suspiciously high rate
-            if rate.rate > SUSPICIOUS_RATE_THRESHOLD {
+            let threshold = oracle.config().get_suspicious_rate_threshold(&pair);
+            if rate.rate > threshold {
                 tracing::warn!(
                     rate = rate.rate,
+                    threshold = threshold,
                     source_amount = source_amount,
                     from_currency = from_currency,
                     to_currency = to_currency,
@@ -739,9 +739,16 @@ impl Ledger {
         // Convert amount using oracle rate
         let gross_target_amount = rate.convert(source_amount).ok_or_else(|| {
             // Log a warning if overflow occurs with a suspiciously high rate
-            if rate.rate > SUSPICIOUS_RATE_THRESHOLD {
+            // Use per-pair threshold from oracle config, or default if no oracle configured
+            let threshold = self
+                .oracle_manager
+                .as_ref()
+                .map(|oracle| oracle.config().get_suspicious_rate_threshold(&rate.pair))
+                .unwrap_or(crate::oracle::DEFAULT_SUSPICIOUS_RATE_THRESHOLD);
+            if rate.rate > threshold {
                 tracing::warn!(
                     rate = rate.rate,
+                    threshold = threshold,
                     source_amount = source_amount,
                     from_currency = from_currency,
                     to_currency = to_currency,
