@@ -66,7 +66,7 @@ pub use scalability::{CompressedVectorClock, ShardStats, ShardedTopic, TopicShar
 pub use sync::{Backoff, PeerSyncManager, PeerSyncState};
 pub use types::{
     AccessControl, AdaptiveFanoutConfig, ContentHash, GossipEntry, GossipMessage, Scope,
-    Subscription, SyncCursor, Topic, TrustResourceLimits,
+    Subscription, SyncCursor, Topic, TopicAutoCreationPolicy, TrustResourceLimits,
 };
 pub use vector_clock::VectorClock;
 

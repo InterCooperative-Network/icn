@@ -10,7 +10,9 @@ use std::sync::Arc;
 use tempfile::TempDir;
 
 /// Create a test ledger with gossip integration
-fn create_test_node() -> (Ledger, TempDir, Arc<tokio::sync::RwLock<GossipActor>>) {
+async fn create_test_node() -> (Ledger, TempDir, Arc<tokio::sync::RwLock<GossipActor>>) {
+    use icn_gossip::{AccessControl, Topic};
+
     let temp_dir = TempDir::new().unwrap();
     let store = Arc::new(SledStore::open(temp_dir.path()).unwrap());
 
@@ -20,6 +22,16 @@ fn create_test_node() -> (Ledger, TempDir, Arc<tokio::sync::RwLock<GossipActor>>
     // Create gossip actor
     let trust_lookup = Arc::new(|_: &icn_identity::Did| Some(TrustClass::Partner));
     let gossip = GossipActor::spawn(did.clone(), trust_lookup);
+
+    // Create the ledger topic before use (required with strict access control defaults)
+    {
+        let mut actor = gossip.write().await;
+        let topic = Topic::new(
+            "ledger:hours".to_string(),
+            AccessControl::TrustClass(TrustClass::Known),
+        );
+        actor.create_topic(topic);
+    }
 
     // Create ledger with gossip
     let mut ledger = Ledger::new(store).unwrap();
@@ -78,7 +90,7 @@ async fn test_direct_sync_message() {
 #[tokio::test]
 async fn test_ledger_publishes_to_gossip() {
     // Create a node with gossip integration
-    let (mut ledger, _temp, gossip) = create_test_node();
+    let (mut ledger, _temp, gossip) = create_test_node().await;
 
     let alice = KeyPair::generate().unwrap().did().clone();
     let bob = KeyPair::generate().unwrap().did().clone();
@@ -123,7 +135,7 @@ async fn test_ledger_publishes_to_gossip() {
 #[tokio::test]
 async fn test_multiple_entries_to_gossip() {
     // Create a node with gossip
-    let (mut ledger, _temp, gossip) = create_test_node();
+    let (mut ledger, _temp, gossip) = create_test_node().await;
 
     let alice = KeyPair::generate().unwrap().did().clone();
     let bob = KeyPair::generate().unwrap().did().clone();

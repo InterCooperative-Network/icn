@@ -434,6 +434,10 @@ impl Topic {
 }
 
 /// Access control for topics
+///
+/// Defaults to the most restrictive access level (Federated trust class)
+/// to ensure security by default. Topics must explicitly opt into
+/// more permissive access.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AccessControl {
     /// Anyone can publish/subscribe
@@ -444,6 +448,36 @@ pub enum AccessControl {
 
     /// Only specific participants (e.g., contract members)
     Participants(Vec<Did>),
+}
+
+impl Default for AccessControl {
+    /// Returns the most restrictive access control by default.
+    ///
+    /// This ensures that undeclared or auto-created topics default to
+    /// requiring Federated-level trust (0.7+), preventing unauthorized
+    /// access or information leakage.
+    fn default() -> Self {
+        AccessControl::TrustClass(TrustClass::Federated)
+    }
+}
+
+/// Policy for handling undeclared topics during publish operations
+///
+/// Controls what happens when a peer attempts to publish to a topic
+/// that hasn't been explicitly registered.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum TopicAutoCreationPolicy {
+    /// Reject publishes to undeclared topics (most secure)
+    #[default]
+    Reject,
+
+    /// Auto-create with strict default access control (TrustClass::Federated)
+    /// Logs a warning when this happens
+    CreateWithStrictDefaults,
+
+    /// Auto-create with public access (legacy behavior, not recommended)
+    /// Logs a warning when this happens
+    CreatePublic,
 }
 
 /// Resource limits for a specific trust class
@@ -629,6 +663,78 @@ mod tests {
         assert!(topic.can_publish(&alice, None));
         assert!(topic.can_publish(&bob, None));
         assert!(!topic.can_publish(&charlie, None));
+    }
+
+    // Issue #473: Test strict access control defaults
+
+    #[test]
+    fn test_access_control_default_is_strict() {
+        // Verify default is TrustClass(Federated) - the strictest level
+        let default_acl = AccessControl::default();
+        assert_eq!(
+            default_acl,
+            AccessControl::TrustClass(TrustClass::Federated),
+            "Default AccessControl should be TrustClass(Federated) for security"
+        );
+    }
+
+    #[test]
+    fn test_access_control_default_requires_high_trust() {
+        let topic = Topic::new("test".to_string(), AccessControl::default());
+        let did = KeyPair::generate().unwrap().did().clone();
+
+        // No trust - denied
+        assert!(
+            !topic.can_publish(&did, None),
+            "Default ACL should deny peers with no trust"
+        );
+
+        // Isolated - denied
+        assert!(
+            !topic.can_publish(&did, Some(TrustClass::Isolated)),
+            "Default ACL should deny Isolated trust"
+        );
+
+        // Known - denied
+        assert!(
+            !topic.can_publish(&did, Some(TrustClass::Known)),
+            "Default ACL should deny Known trust"
+        );
+
+        // Partner - denied (below Federated)
+        assert!(
+            !topic.can_publish(&did, Some(TrustClass::Partner)),
+            "Default ACL should deny Partner trust"
+        );
+
+        // Federated - allowed (matches requirement)
+        assert!(
+            topic.can_publish(&did, Some(TrustClass::Federated)),
+            "Default ACL should allow Federated trust"
+        );
+    }
+
+    #[test]
+    fn test_topic_auto_creation_policy_default() {
+        // Default policy should be Reject (most secure)
+        let policy = TopicAutoCreationPolicy::default();
+        assert_eq!(
+            policy,
+            TopicAutoCreationPolicy::Reject,
+            "Default policy should be Reject for security"
+        );
+    }
+
+    #[test]
+    fn test_topic_auto_creation_policy_variants() {
+        // Verify all variants exist and are distinguishable
+        let reject = TopicAutoCreationPolicy::Reject;
+        let strict = TopicAutoCreationPolicy::CreateWithStrictDefaults;
+        let public = TopicAutoCreationPolicy::CreatePublic;
+
+        assert_ne!(reject, strict);
+        assert_ne!(strict, public);
+        assert_ne!(reject, public);
     }
 
     #[test]
