@@ -122,9 +122,32 @@ impl Interpreter {
 
                 // Evaluate and persist the value
                 let val = self.eval_expr(value)?;
-                self.state.data.insert(key.clone(), val.clone());
 
-                // Also update locals so the new value is visible in the current execution
+                // DUAL UPDATE SEMANTICS (Issue #475):
+                //
+                // We intentionally update BOTH persistent state and local context:
+                //
+                // 1. `self.state.data` - The persistent contract state that will be
+                //    returned in ExecutionResult.state_changes if the rule succeeds.
+                //    This is the authoritative state for persistence.
+                //
+                // 2. `self.locals` - The local execution context that allows subsequent
+                //    statements in the same rule to see the new value immediately.
+                //    This is necessary for read-after-write consistency within a rule.
+                //
+                // ATOMICITY GUARANTEE:
+                // - If any subsequent statement fails, the interpreter returns Err and
+                //   the state_changes are NOT returned to the caller.
+                // - The interpreter consumes self (takes ownership), so partial state
+                //   updates from a failed rule cannot leak to the caller.
+                // - Only successful rule executions return state_changes.
+                //
+                // This approach ensures:
+                // - Read-after-write consistency within a rule
+                // - All-or-nothing semantics for state changes
+                // - No observable side effects on failure
+
+                self.state.data.insert(key.clone(), val.clone());
                 self.locals.insert(key.clone(), val);
 
                 debug!("SetState: {} updated", key);
@@ -646,5 +669,317 @@ mod tests {
             matches!(err, crate::error::CclError::FuelExhausted { .. }),
             "Expected FuelExhausted error, got: {err}"
         );
+    }
+
+    // Issue #475: SetState dual update semantics tests
+
+    fn create_context_with_write_state(
+        caller: icn_identity::Did,
+        state_key: &str,
+    ) -> ExecutionContext {
+        ExecutionContext::new(
+            caller,
+            1234567890,
+            10000,
+            vec![
+                Capability::WriteLedger { accounts: vec![] },
+                Capability::WriteState {
+                    keys: vec![state_key.to_string()],
+                },
+            ],
+            vec![],
+        )
+    }
+
+    #[test]
+    fn test_setstate_updates_both_state_and_locals() {
+        // Verify SetState updates both persistent state and local context
+        let mut contract = Contract::new("test".to_string());
+
+        // Add a rule that sets state and then reads it
+        contract.rules.push(crate::ast::Rule {
+            name: "test_rule".to_string(),
+            params: vec![],
+            requires: vec![],
+            body: vec![
+                // Set state to 42
+                Stmt::SetState {
+                    key: "counter".to_string(),
+                    value: Expr::Literal(Value::Int(42)),
+                },
+                // Return the value from state (reads from locals)
+                Stmt::Return {
+                    value: Expr::Var("counter".to_string()),
+                },
+            ],
+        });
+
+        let state = ContractState::new();
+        let keypair = KeyPair::generate().unwrap();
+        let context = create_context_with_write_state(keypair.did().clone(), "counter");
+
+        let interp = Interpreter::new(contract, state, context);
+        let result = interp.execute_rule("test_rule", HashMap::new()).unwrap();
+
+        // Return value should be 42 (read from locals after SetState)
+        assert_eq!(result.value, Value::Int(42));
+
+        // State changes should also contain 42
+        assert_eq!(result.state_changes.get("counter"), Some(&Value::Int(42)));
+    }
+
+    #[test]
+    fn test_setstate_read_after_write_consistency() {
+        // Verify that a value set via SetState can be read immediately
+        let mut contract = Contract::new("test".to_string());
+
+        contract.rules.push(crate::ast::Rule {
+            name: "increment_rule".to_string(),
+            params: vec![],
+            requires: vec![],
+            body: vec![
+                // Set initial value
+                Stmt::SetState {
+                    key: "value".to_string(),
+                    value: Expr::Literal(Value::Int(10)),
+                },
+                // Read it back and add 5
+                Stmt::SetState {
+                    key: "value".to_string(),
+                    value: Expr::BinOp {
+                        op: BinOp::Add,
+                        left: Box::new(Expr::Var("value".to_string())),
+                        right: Box::new(Expr::Literal(Value::Int(5))),
+                    },
+                },
+                // Return the final value
+                Stmt::Return {
+                    value: Expr::Var("value".to_string()),
+                },
+            ],
+        });
+
+        let state = ContractState::new();
+        let keypair = KeyPair::generate().unwrap();
+        let context = create_context_with_write_state(keypair.did().clone(), "value");
+
+        let interp = Interpreter::new(contract, state, context);
+        let result = interp
+            .execute_rule("increment_rule", HashMap::new())
+            .unwrap();
+
+        // Final value should be 15 (10 + 5)
+        assert_eq!(result.value, Value::Int(15));
+        assert_eq!(result.state_changes.get("value"), Some(&Value::Int(15)));
+    }
+
+    #[test]
+    fn test_setstate_failure_atomicity() {
+        // Verify that if a rule fails after SetState, state changes are not returned
+        let mut contract = Contract::new("test".to_string());
+
+        contract.rules.push(crate::ast::Rule {
+            name: "failing_rule".to_string(),
+            params: vec![],
+            requires: vec![],
+            body: vec![
+                // Set state successfully
+                Stmt::SetState {
+                    key: "counter".to_string(),
+                    value: Expr::Literal(Value::Int(100)),
+                },
+                // This will fail - division by zero
+                Stmt::Assign {
+                    name: "x".to_string(),
+                    value: Expr::BinOp {
+                        op: BinOp::Div,
+                        left: Box::new(Expr::Literal(Value::Int(1))),
+                        right: Box::new(Expr::Literal(Value::Int(0))),
+                    },
+                },
+                Stmt::Return {
+                    value: Expr::Var("counter".to_string()),
+                },
+            ],
+        });
+
+        let state = ContractState::new();
+        let keypair = KeyPair::generate().unwrap();
+        let context = create_context_with_write_state(keypair.did().clone(), "counter");
+
+        let interp = Interpreter::new(contract, state, context);
+        let result = interp.execute_rule("failing_rule", HashMap::new());
+
+        // Rule should fail due to division by zero
+        assert!(
+            result.is_err(),
+            "Expected rule to fail due to division by zero"
+        );
+
+        // Importantly: no ExecutionResult is returned, so no state changes can leak
+        // The caller cannot observe the partial state update
+    }
+
+    #[test]
+    fn test_setstate_multiple_keys() {
+        // Verify multiple SetState statements work correctly
+        let mut contract = Contract::new("test".to_string());
+
+        contract.rules.push(crate::ast::Rule {
+            name: "multi_set_rule".to_string(),
+            params: vec![],
+            requires: vec![],
+            body: vec![
+                Stmt::SetState {
+                    key: "a".to_string(),
+                    value: Expr::Literal(Value::Int(1)),
+                },
+                Stmt::SetState {
+                    key: "b".to_string(),
+                    value: Expr::Literal(Value::Int(2)),
+                },
+                Stmt::SetState {
+                    key: "c".to_string(),
+                    value: Expr::Literal(Value::Int(3)),
+                },
+                // Return sum of all three (verifies all are readable)
+                Stmt::Return {
+                    value: Expr::BinOp {
+                        op: BinOp::Add,
+                        left: Box::new(Expr::BinOp {
+                            op: BinOp::Add,
+                            left: Box::new(Expr::Var("a".to_string())),
+                            right: Box::new(Expr::Var("b".to_string())),
+                        }),
+                        right: Box::new(Expr::Var("c".to_string())),
+                    },
+                },
+            ],
+        });
+
+        let state = ContractState::new();
+        let keypair = KeyPair::generate().unwrap();
+        let mut context = ExecutionContext::new(
+            keypair.did().clone(),
+            1234567890,
+            10000,
+            vec![
+                Capability::WriteLedger { accounts: vec![] },
+                Capability::WriteState {
+                    keys: vec!["a".to_string(), "b".to_string(), "c".to_string()],
+                },
+            ],
+            vec![],
+        );
+        context.fuel = 10000;
+
+        let interp = Interpreter::new(contract, state, context);
+        let result = interp
+            .execute_rule("multi_set_rule", HashMap::new())
+            .unwrap();
+
+        // Return value should be 6 (1 + 2 + 3)
+        assert_eq!(result.value, Value::Int(6));
+
+        // All state changes should be present
+        assert_eq!(result.state_changes.get("a"), Some(&Value::Int(1)));
+        assert_eq!(result.state_changes.get("b"), Some(&Value::Int(2)));
+        assert_eq!(result.state_changes.get("c"), Some(&Value::Int(3)));
+    }
+
+    #[test]
+    fn test_setstate_in_loop() {
+        // Verify SetState works correctly inside a loop
+        let mut contract = Contract::new("test".to_string());
+
+        contract.rules.push(crate::ast::Rule {
+            name: "loop_set_rule".to_string(),
+            params: vec![],
+            requires: vec![],
+            body: vec![
+                // Initialize counter to 0
+                Stmt::SetState {
+                    key: "sum".to_string(),
+                    value: Expr::Literal(Value::Int(0)),
+                },
+                // Loop 5 times, adding i each time (iterate over [1,2,3,4,5])
+                Stmt::For {
+                    var: "i".to_string(),
+                    iterable: Expr::List(vec![
+                        Expr::Literal(Value::Int(1)),
+                        Expr::Literal(Value::Int(2)),
+                        Expr::Literal(Value::Int(3)),
+                        Expr::Literal(Value::Int(4)),
+                        Expr::Literal(Value::Int(5)),
+                    ]),
+                    body: vec![Stmt::SetState {
+                        key: "sum".to_string(),
+                        value: Expr::BinOp {
+                            op: BinOp::Add,
+                            left: Box::new(Expr::Var("sum".to_string())),
+                            right: Box::new(Expr::Var("i".to_string())),
+                        },
+                    }],
+                },
+                Stmt::Return {
+                    value: Expr::Var("sum".to_string()),
+                },
+            ],
+        });
+
+        let state = ContractState::new();
+        let keypair = KeyPair::generate().unwrap();
+        let context = create_context_with_write_state(keypair.did().clone(), "sum");
+
+        let interp = Interpreter::new(contract, state, context);
+        let result = interp
+            .execute_rule("loop_set_rule", HashMap::new())
+            .unwrap();
+
+        // Sum of 1+2+3+4+5 = 15
+        assert_eq!(result.value, Value::Int(15));
+        assert_eq!(result.state_changes.get("sum"), Some(&Value::Int(15)));
+    }
+
+    #[test]
+    fn test_setstate_with_initial_state() {
+        // Verify SetState works when there's existing state
+        let mut contract = Contract::new("test".to_string());
+
+        contract.rules.push(crate::ast::Rule {
+            name: "update_existing".to_string(),
+            params: vec![],
+            requires: vec![],
+            body: vec![
+                // Double the existing value
+                Stmt::SetState {
+                    key: "counter".to_string(),
+                    value: Expr::BinOp {
+                        op: BinOp::Mul,
+                        left: Box::new(Expr::Var("counter".to_string())),
+                        right: Box::new(Expr::Literal(Value::Int(2))),
+                    },
+                },
+                Stmt::Return {
+                    value: Expr::Var("counter".to_string()),
+                },
+            ],
+        });
+
+        // Start with existing state
+        let mut state = ContractState::new();
+        state.data.insert("counter".to_string(), Value::Int(21));
+
+        let keypair = KeyPair::generate().unwrap();
+        let context = create_context_with_write_state(keypair.did().clone(), "counter");
+
+        let interp = Interpreter::new(contract, state, context);
+        let result = interp
+            .execute_rule("update_existing", HashMap::new())
+            .unwrap();
+
+        // 21 * 2 = 42
+        assert_eq!(result.value, Value::Int(42));
+        assert_eq!(result.state_changes.get("counter"), Some(&Value::Int(42)));
     }
 }
