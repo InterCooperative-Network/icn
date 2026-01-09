@@ -205,6 +205,91 @@ pub struct NetworkConfig {
     /// Default: 3 (failures detected within 3 hours)
     #[serde(default = "default_circuit_breaker_threshold")]
     pub encryption_cleanup_circuit_breaker_threshold: u32,
+
+    /// NAT traversal dial strategy configuration
+    #[serde(default)]
+    pub nat_dial: NatDialConfig,
+}
+
+/// NAT traversal dial strategy configuration
+///
+/// Controls how ICN attempts to connect to peers with multiple candidate addresses.
+/// The strategy tries addresses in order: local → public → relay, with configurable
+/// timeouts and parallel attempts.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NatDialConfig {
+    /// Enable parallel dial attempts for local and public addresses
+    ///
+    /// When true, local and public addresses are dialed simultaneously and the
+    /// first successful connection wins. When false, addresses are tried sequentially.
+    ///
+    /// Default: true (faster connection establishment)
+    #[serde(default = "default_true")]
+    pub parallel_dial: bool,
+
+    /// Timeout for local address dial attempts in milliseconds
+    ///
+    /// Local addresses (same LAN) should connect quickly. A short timeout
+    /// avoids waiting too long when peers are not on the same network.
+    ///
+    /// Default: 2000 (2 seconds)
+    #[serde(default = "default_local_dial_timeout_ms")]
+    pub local_dial_timeout_ms: u64,
+
+    /// Timeout for public address dial attempts in milliseconds
+    ///
+    /// Public addresses require NAT hole punching which may take longer.
+    /// This timeout should allow for packet loss and retransmission.
+    ///
+    /// Default: 10000 (10 seconds)
+    #[serde(default = "default_public_dial_timeout_ms")]
+    pub public_dial_timeout_ms: u64,
+
+    /// Timeout for relay address dial attempts in milliseconds
+    ///
+    /// Relay connections go through a TURN server, adding latency.
+    /// This should be the longest timeout as it's the fallback option.
+    ///
+    /// Default: 30000 (30 seconds)
+    #[serde(default = "default_relay_dial_timeout_ms")]
+    pub relay_dial_timeout_ms: u64,
+
+    /// Interval for re-announcing connection candidates in seconds
+    ///
+    /// Candidates are periodically re-published to gossip to account for
+    /// IP changes and keep TTL fresh. Should be less than candidate TTL (5 min).
+    ///
+    /// Default: 150 (2.5 minutes)
+    #[serde(default = "default_candidate_announce_interval_secs")]
+    pub candidate_announce_interval_secs: u64,
+}
+
+impl Default for NatDialConfig {
+    fn default() -> Self {
+        Self {
+            parallel_dial: true,
+            local_dial_timeout_ms: default_local_dial_timeout_ms(),
+            public_dial_timeout_ms: default_public_dial_timeout_ms(),
+            relay_dial_timeout_ms: default_relay_dial_timeout_ms(),
+            candidate_announce_interval_secs: default_candidate_announce_interval_secs(),
+        }
+    }
+}
+
+fn default_local_dial_timeout_ms() -> u64 {
+    2000
+}
+
+fn default_public_dial_timeout_ms() -> u64 {
+    10000
+}
+
+fn default_relay_dial_timeout_ms() -> u64 {
+    30000
+}
+
+fn default_candidate_announce_interval_secs() -> u64 {
+    150
 }
 
 fn default_circuit_breaker_threshold() -> u32 {
@@ -769,6 +854,7 @@ impl Default for Config {
                 turn_password: None,
                 e2e_encryption_enabled: true,
                 encryption_cleanup_circuit_breaker_threshold: 3,
+                nat_dial: NatDialConfig::default(),
             },
             observability: ObservabilityConfig {
                 metrics_port: 9100,

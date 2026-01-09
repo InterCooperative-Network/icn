@@ -16,6 +16,7 @@ pub mod init_rpc;
 pub mod init_snapshot;
 pub mod init_steward;
 pub mod init_trust;
+pub mod nat_dial;
 pub mod registry;
 pub mod shutdown;
 pub mod version_tracker;
@@ -970,6 +971,7 @@ impl Supervisor {
                         federation_handler: federation_handler_for_notifications,
                         attestation_rate_limiter,
                         contract_registry: contract_registry_holder.clone(),
+                        nat_dial_config: self.config.network.nat_dial.clone(),
                     },
                 );
 
@@ -1461,6 +1463,29 @@ impl Supervisor {
             );
 
             info!("Parameter scheduler task spawned (interval: 10 seconds)");
+
+            // Spawn connection candidate re-announcement task (Phase M2)
+            let candidate_announce_config = background_tasks::CandidateAnnouncementConfig {
+                announce_interval: std::time::Duration::from_secs(
+                    self.config
+                        .network
+                        .nat_dial
+                        .candidate_announce_interval_secs,
+                ),
+            };
+            let _candidate_announce_handle = background_tasks::spawn_candidate_announcement_task(
+                candidate_announce_config,
+                network_handle.clone(),
+                gossip_handle.clone(),
+                self.shutdown_tx.subscribe(),
+            );
+            info!(
+                "Connection candidate announcement task spawned (interval: {} seconds)",
+                self.config
+                    .network
+                    .nat_dial
+                    .candidate_announce_interval_secs
+            );
 
             // Activate node profile now that all actors are initialized (Phase 17)
             {

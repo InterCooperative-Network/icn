@@ -3248,9 +3248,6 @@ pub mod nat_traversal {
     }
 }
 
-/// Alias for nat_traversal module for convenience
-pub use nat_traversal as nat;
-
 /// Compute metrics
 pub mod compute {
     use metrics::{counter, gauge, histogram};

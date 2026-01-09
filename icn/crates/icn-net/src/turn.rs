@@ -399,6 +399,149 @@ impl TurnClient {
         }
     }
 
+    /// Send data to a peer through the TURN relay
+    ///
+    /// This sends a SEND-INDICATION message to the TURN server, which will
+    /// then forward the data to the specified peer address. A permission must
+    /// already exist for the peer address.
+    ///
+    /// Note: SEND-INDICATION is an indication (not a request), so there is no
+    /// response from the server. Delivery is not guaranteed.
+    pub async fn send_indication(
+        &self,
+        local_socket: &UdpSocket,
+        peer_addr: SocketAddr,
+        data: &[u8],
+    ) -> Result<()> {
+        if self.allocation.read().await.is_none() {
+            anyhow::bail!("No active allocation - call allocate() first");
+        }
+
+        // Check if we have permission for this peer
+        let permissions = self.permissions.read().await;
+        if let Some(perm) = permissions.get(&peer_addr) {
+            if perm.is_expired() {
+                drop(permissions);
+                anyhow::bail!("Permission for peer {peer_addr} has expired");
+            }
+        } else {
+            drop(permissions);
+            anyhow::bail!("No permission for peer {peer_addr} - call create_permission() first");
+        }
+        drop(permissions);
+
+        debug!(
+            peer = %peer_addr,
+            data_len = data.len(),
+            "Sending data indication through TURN relay"
+        );
+
+        // Generate a transaction ID for XOR encoding (not used for response matching
+        // since indications have no response)
+        let mut transaction_id = [0u8; 12];
+        rand::thread_rng().fill_bytes(&mut transaction_id);
+
+        // Build SEND-INDICATION message
+        let indication = self.build_send_indication(&transaction_id, peer_addr, data)?;
+
+        // Send to TURN server
+        local_socket
+            .send_to(&indication, self.config.server)
+            .await
+            .context("Failed to send TURN indication")?;
+
+        icn_obs::metrics::nat::turn_relay_send_inc();
+        Ok(())
+    }
+
+    /// Parse a DATA-INDICATION message received from the TURN server
+    ///
+    /// Returns the peer address the data came from and the data payload.
+    /// This should be called when data is received from the TURN server
+    /// to extract relayed peer data.
+    pub fn parse_data_indication(&self, data: &[u8]) -> Result<(SocketAddr, Vec<u8>)> {
+        if data.len() < 20 {
+            anyhow::bail!("DATA-INDICATION too short");
+        }
+
+        // Check message type
+        let msg_type = u16::from_be_bytes([data[0], data[1]]);
+        if msg_type != message_type::DATA_INDICATION {
+            anyhow::bail!(
+                "Not a DATA-INDICATION message: expected 0x{:04x}, got 0x{msg_type:04x}",
+                message_type::DATA_INDICATION
+            );
+        }
+
+        // Verify magic cookie
+        let cookie = u32::from_be_bytes([data[4], data[5], data[6], data[7]]);
+        if cookie != MAGIC_COOKIE {
+            anyhow::bail!("Invalid magic cookie in DATA-INDICATION");
+        }
+
+        // Extract transaction ID for XOR decoding
+        let transaction_id: [u8; 12] = data[8..20]
+            .try_into()
+            .context("Failed to extract transaction ID")?;
+
+        // Parse attributes
+        let mut peer_addr = None;
+        let mut payload = None;
+
+        let msg_len = u16::from_be_bytes([data[2], data[3]]) as usize;
+        let mut pos = 20;
+
+        while pos + 4 <= 20 + msg_len && pos + 4 <= data.len() {
+            let attr_type = u16::from_be_bytes([data[pos], data[pos + 1]]);
+            let attr_len = u16::from_be_bytes([data[pos + 2], data[pos + 3]]) as usize;
+
+            if pos + 4 + attr_len > data.len() {
+                break;
+            }
+
+            let attr_data = &data[pos + 4..pos + 4 + attr_len];
+
+            match attr_type {
+                attribute_type::XOR_PEER_ADDRESS => {
+                    peer_addr = Some(self.xor_decode_address(attr_data, &transaction_id)?);
+                }
+                attribute_type::DATA => {
+                    payload = Some(attr_data.to_vec());
+                }
+                _ => {
+                    debug!(attr_type, "Ignoring unknown attribute in DATA-INDICATION");
+                }
+            }
+
+            // Move to next attribute (4-byte aligned)
+            pos += 4 + ((attr_len + 3) & !3);
+        }
+
+        let peer_addr = peer_addr.context("No XOR-PEER-ADDRESS in DATA-INDICATION")?;
+        let payload = payload.context("No DATA attribute in DATA-INDICATION")?;
+
+        icn_obs::metrics::nat::turn_relay_recv_inc();
+        debug!(
+            peer = %peer_addr,
+            data_len = payload.len(),
+            "Received data indication from TURN relay"
+        );
+
+        Ok((peer_addr, payload))
+    }
+
+    /// Check if a received packet is a DATA-INDICATION from the TURN server
+    ///
+    /// This can be used to filter incoming UDP packets and identify which
+    /// ones need to be processed as relay data.
+    pub fn is_data_indication(data: &[u8]) -> bool {
+        if data.len() < 4 {
+            return false;
+        }
+        let msg_type = u16::from_be_bytes([data[0], data[1]]);
+        msg_type == message_type::DATA_INDICATION
+    }
+
     // =========================================================================
     // Message building helpers
     // =========================================================================
@@ -497,6 +640,53 @@ impl TurnClient {
         }
 
         // Update message length
+        let attr_len = (msg.len() - 20) as u16;
+        msg[len_pos..len_pos + 2].copy_from_slice(&attr_len.to_be_bytes());
+
+        Ok(msg)
+    }
+
+    fn build_send_indication(
+        &self,
+        transaction_id: &[u8; 12],
+        peer_addr: SocketAddr,
+        data: &[u8],
+    ) -> Result<Vec<u8>> {
+        let mut msg = Vec::with_capacity(20 + 8 + 4 + data.len() + 8); // header + peer addr attr + data attr
+
+        // Message type (SEND-INDICATION)
+        msg.extend_from_slice(&message_type::SEND_INDICATION.to_be_bytes());
+
+        // Message length (placeholder)
+        let len_pos = msg.len();
+        msg.extend_from_slice(&[0, 0]);
+
+        // Magic cookie
+        msg.extend_from_slice(&MAGIC_COOKIE.to_be_bytes());
+
+        // Transaction ID
+        msg.extend_from_slice(transaction_id);
+
+        // XOR-PEER-ADDRESS attribute
+        let xor_addr = self.xor_encode_address(peer_addr, transaction_id)?;
+        msg.extend_from_slice(&attribute_type::XOR_PEER_ADDRESS.to_be_bytes());
+        msg.extend_from_slice(&(xor_addr.len() as u16).to_be_bytes());
+        msg.extend_from_slice(&xor_addr);
+        // Pad to 4-byte boundary
+        while msg.len() % 4 != 0 {
+            msg.push(0);
+        }
+
+        // DATA attribute
+        msg.extend_from_slice(&attribute_type::DATA.to_be_bytes());
+        msg.extend_from_slice(&(data.len() as u16).to_be_bytes());
+        msg.extend_from_slice(data);
+        // Pad to 4-byte boundary
+        while msg.len() % 4 != 0 {
+            msg.push(0);
+        }
+
+        // Update message length (excluding 20-byte header)
         let attr_len = (msg.len() - 20) as u16;
         msg[len_pos..len_pos + 2].copy_from_slice(&attr_len.to_be_bytes());
 
@@ -811,5 +1001,122 @@ mod tests {
             .unwrap();
 
         assert_eq!(addr, decoded);
+    }
+
+    #[test]
+    fn test_build_send_indication() {
+        let client = TurnClient::new(TurnConfig::default());
+        let transaction_id = [1u8; 12];
+        let peer_addr: SocketAddr = "10.0.0.1:5000".parse().unwrap();
+        let data = b"hello world";
+
+        let indication = client
+            .build_send_indication(&transaction_id, peer_addr, data)
+            .unwrap();
+
+        // Verify header
+        let msg_type = u16::from_be_bytes([indication[0], indication[1]]);
+        assert_eq!(msg_type, message_type::SEND_INDICATION);
+
+        // Verify magic cookie
+        let cookie =
+            u32::from_be_bytes([indication[4], indication[5], indication[6], indication[7]]);
+        assert_eq!(cookie, MAGIC_COOKIE);
+
+        // Verify transaction ID
+        assert_eq!(&indication[8..20], &transaction_id);
+
+        // Message should be well-formed (length should be > 0)
+        let msg_len = u16::from_be_bytes([indication[2], indication[3]]);
+        assert!(msg_len > 0);
+    }
+
+    #[test]
+    fn test_is_data_indication() {
+        // Valid DATA-INDICATION header
+        let mut data_ind = vec![0, 0x17, 0, 0]; // msg type + length placeholder
+        data_ind.extend_from_slice(&MAGIC_COOKIE.to_be_bytes());
+        data_ind.extend_from_slice(&[0u8; 12]); // transaction ID
+        assert!(TurnClient::is_data_indication(&data_ind));
+
+        // Not a DATA-INDICATION (ALLOCATE_REQUEST)
+        let mut not_data_ind = vec![0, 0x03, 0, 0];
+        not_data_ind.extend_from_slice(&MAGIC_COOKIE.to_be_bytes());
+        assert!(!TurnClient::is_data_indication(&not_data_ind));
+
+        // Too short
+        assert!(!TurnClient::is_data_indication(&[0, 0x17]));
+        assert!(!TurnClient::is_data_indication(&[]));
+    }
+
+    #[test]
+    fn test_parse_data_indication() {
+        let client = TurnClient::new(TurnConfig::default());
+        let transaction_id = [2u8; 12];
+        let peer_addr: SocketAddr = "10.0.0.5:9000".parse().unwrap();
+        let payload = b"test data payload";
+
+        // Build a mock DATA-INDICATION message
+        let mut msg = Vec::with_capacity(100);
+
+        // Message type (DATA-INDICATION)
+        msg.extend_from_slice(&message_type::DATA_INDICATION.to_be_bytes());
+
+        // Message length (placeholder)
+        let len_pos = msg.len();
+        msg.extend_from_slice(&[0, 0]);
+
+        // Magic cookie
+        msg.extend_from_slice(&MAGIC_COOKIE.to_be_bytes());
+
+        // Transaction ID
+        msg.extend_from_slice(&transaction_id);
+
+        // XOR-PEER-ADDRESS attribute
+        let xor_addr = client
+            .xor_encode_address(peer_addr, &transaction_id)
+            .unwrap();
+        msg.extend_from_slice(&attribute_type::XOR_PEER_ADDRESS.to_be_bytes());
+        msg.extend_from_slice(&(xor_addr.len() as u16).to_be_bytes());
+        msg.extend_from_slice(&xor_addr);
+        // Pad to 4-byte boundary
+        while msg.len() % 4 != 0 {
+            msg.push(0);
+        }
+
+        // DATA attribute
+        msg.extend_from_slice(&attribute_type::DATA.to_be_bytes());
+        msg.extend_from_slice(&(payload.len() as u16).to_be_bytes());
+        msg.extend_from_slice(payload);
+        // Pad to 4-byte boundary
+        while msg.len() % 4 != 0 {
+            msg.push(0);
+        }
+
+        // Update message length (excluding 20-byte header)
+        let attr_len = (msg.len() - 20) as u16;
+        msg[len_pos..len_pos + 2].copy_from_slice(&attr_len.to_be_bytes());
+
+        // Parse and verify
+        let (parsed_addr, parsed_data) = client.parse_data_indication(&msg).unwrap();
+        assert_eq!(parsed_addr, peer_addr);
+        assert_eq!(parsed_data, payload);
+    }
+
+    #[test]
+    fn test_parse_data_indication_invalid_type() {
+        let client = TurnClient::new(TurnConfig::default());
+
+        // Build an ALLOCATE_RESPONSE (wrong type)
+        let mut msg = Vec::new();
+        msg.extend_from_slice(&message_type::ALLOCATE_RESPONSE.to_be_bytes());
+        msg.extend_from_slice(&[0, 0]); // length
+        msg.extend_from_slice(&MAGIC_COOKIE.to_be_bytes());
+        msg.extend_from_slice(&[0u8; 12]); // transaction ID
+
+        let result = client.parse_data_indication(&msg);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("Not a DATA-INDICATION"));
     }
 }

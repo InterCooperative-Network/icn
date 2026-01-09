@@ -3,8 +3,10 @@
 //! This module extracts the notification callback handlers from the supervisor,
 //! providing a cleaner separation of concerns for gossip message routing.
 
+use crate::config::NatDialConfig;
 use crate::supervisor::init_coop;
 use crate::supervisor::init_gossip::NETWORK_CANDIDATES_TOPIC;
+use crate::supervisor::nat_dial::{dial_with_fallback, DialResult};
 use anyhow::Result;
 use icn_gossip::GossipEntry;
 use icn_identity::{Did, RecoveryMessage, IDENTITY_RECOVERY_TOPIC};
@@ -68,6 +70,8 @@ pub struct NotificationDeps {
     pub attestation_rate_limiter: AttestationRateLimiterHandle,
     /// Contract registry handle holder for gossip sync (filled after actor spawns)
     pub contract_registry: ContractRegistryHolder,
+    /// NAT dial configuration
+    pub nat_dial_config: NatDialConfig,
 }
 
 /// Handle trust attestation entries
@@ -366,10 +370,16 @@ async fn apply_recovery_finalization(
 }
 
 /// Handle connection candidate entries for NAT traversal
+///
+/// Uses the configurable dial fallback strategy to attempt connection via:
+/// 1. Local address (LAN) - fast, 2s timeout
+/// 2. Public address (NAT hole punch) - medium, 10s timeout
+/// 3. Relay address (TURN) - fallback, 30s timeout
 pub async fn handle_connection_candidate(
     entry_data: Vec<u8>,
     candidate_cache: CandidateCache,
     network_handle: icn_net::NetworkHandle,
+    config: NatDialConfig,
 ) {
     match serde_json::from_slice::<icn_net::ConnectionCandidate>(&entry_data) {
         Ok(candidate) => {
@@ -402,51 +412,21 @@ pub async fn handle_connection_candidate(
                 }
             }
 
-            // Try to establish connection
-            let mut connected = false;
-
-            // Try local address first (LAN connectivity)
-            debug!(
-                "Attempting connection to {} via local address {}",
-                did, candidate.local_addr
-            );
-            match network_handle.dial(candidate.local_addr, did.clone()).await {
-                Ok(_) => {
-                    info!(
-                        "Connected to {} via local address {}",
-                        did, candidate.local_addr
-                    );
-                    connected = true;
+            // Use the dial fallback strategy to try multiple addresses
+            match dial_with_fallback(&network_handle, &candidate, &config).await {
+                DialResult::Connected { addr_type, addr } => {
+                    info!("Connected to {} via {} address {}", did, addr_type, addr);
                 }
-                Err(e) => {
-                    debug!("Failed to connect via local address: {}", e);
-                }
-            }
-
-            // Try public address if local failed (NAT hole punching)
-            if !connected {
-                if let Some(public_addr) = candidate.public_addr {
+                DialResult::Failed { errors } => {
                     debug!(
-                        "Attempting connection to {} via public address {}",
-                        did, public_addr
+                        "Could not establish connection to {} after {} attempts",
+                        did,
+                        errors.len()
                     );
-                    match network_handle.dial(public_addr, did.clone()).await {
-                        Ok(_) => {
-                            info!(
-                                "Connected to {} via public address {} (NAT traversal)",
-                                did, public_addr
-                            );
-                            connected = true;
-                        }
-                        Err(e) => {
-                            debug!("Failed to connect via public address: {}", e);
-                        }
+                    for err in errors {
+                        debug!("  - {} ({}): {}", err.addr_type, err.addr, err.error);
                     }
                 }
-            }
-
-            if !connected {
-                debug!("Could not establish direct connection to {}", did);
             }
         }
         Err(e) => {
@@ -822,8 +802,15 @@ pub fn create_notification_callback(
             if let Some(data) = entry_data {
                 let candidate_cache = deps.candidate_cache.clone();
                 let network_handle = deps.network_handle.clone();
+                let nat_dial_config = deps.nat_dial_config.clone();
                 tokio::spawn(async move {
-                    handle_connection_candidate(data, candidate_cache, network_handle).await;
+                    handle_connection_candidate(
+                        data,
+                        candidate_cache,
+                        network_handle,
+                        nat_dial_config,
+                    )
+                    .await;
                 });
             }
         } else if topic == "snapshot:coordinate" {

@@ -28,4 +28,5 @@ mod legacy {
 pub use legacy::*;
 
 pub mod gateway;
+pub mod nat;
 pub mod network;

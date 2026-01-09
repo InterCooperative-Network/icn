@@ -579,6 +579,123 @@ pub fn spawn_audit_prune_task(
     })
 }
 
+/// Configuration for connection candidate re-announcement task
+pub struct CandidateAnnouncementConfig {
+    /// Interval between candidate announcements (default: 150s = 2.5 min)
+    /// This should be less than the gossip entry TTL (typically 5 min)
+    pub announce_interval: Duration,
+}
+
+impl Default for CandidateAnnouncementConfig {
+    fn default() -> Self {
+        Self {
+            announce_interval: Duration::from_secs(150), // 2.5 minutes
+        }
+    }
+}
+
+/// Cached connection candidate for change detection
+#[derive(Clone, Debug, PartialEq)]
+struct CachedCandidate {
+    local_addr: std::net::SocketAddr,
+    public_addr: Option<std::net::SocketAddr>,
+    relay_addr: Option<std::net::SocketAddr>,
+}
+
+/// Spawn the connection candidate re-announcement background task
+///
+/// This task periodically re-announces the node's connection candidate to gossip.
+/// It ensures peers have up-to-date connectivity information even if the gossip
+/// entry TTL expires.
+///
+/// Key behaviors:
+/// - Announces every `announce_interval` (default 2.5 min, before 5-min TTL)
+/// - Detects address changes and announces immediately
+/// - Handles STUN/TURN updates that may change addresses
+///
+/// # Parameters
+/// - `config`: Announcement configuration
+/// - `network_handle`: Handle to get connection candidate
+/// - `gossip_handle`: Handle to publish to gossip
+/// - `shutdown_rx`: Shutdown signal receiver
+pub fn spawn_candidate_announcement_task(
+    config: CandidateAnnouncementConfig,
+    network_handle: NetworkHandle,
+    gossip_handle: Arc<RwLock<GossipActor>>,
+    mut shutdown_rx: BroadcastReceiver<()>,
+) -> JoinHandle<()> {
+    tokio::spawn(async move {
+        info!(
+            interval_secs = config.announce_interval.as_secs(),
+            "Connection candidate announcement task started"
+        );
+
+        let mut interval = tokio::time::interval(config.announce_interval);
+        let mut last_candidate: Option<CachedCandidate> = None;
+
+        // Skip first tick - initial announcement happens at startup
+        interval.tick().await;
+
+        loop {
+            select! {
+                _ = interval.tick() => {
+                    // Get current connection candidate
+                    let candidate = match network_handle.connection_candidate().await {
+                        Ok(c) => c,
+                        Err(e) => {
+                            debug!("Failed to get connection candidate for re-announcement: {}", e);
+                            continue;
+                        }
+                    };
+
+                    // Check if candidate has changed
+                    let current = CachedCandidate {
+                        local_addr: candidate.local_addr,
+                        public_addr: candidate.public_addr,
+                        relay_addr: candidate.relay_addr,
+                    };
+
+                    let changed = last_candidate.as_ref() != Some(&current);
+
+                    if changed {
+                        info!(
+                            "Connection candidate changed: local={}, public={:?}, relay={:?}",
+                            current.local_addr, current.public_addr, current.relay_addr
+                        );
+                        icn_obs::metrics::nat::dial_attempt_inc("candidate_change");
+                    }
+
+                    // Serialize and publish
+                    match serde_json::to_vec(&candidate) {
+                        Ok(candidate_bytes) => {
+                            let mut gossip = gossip_handle.write().await;
+                            match gossip.publish(super::init_gossip::NETWORK_CANDIDATES_TOPIC, candidate_bytes).await {
+                                Ok(_) => {
+                                    debug!(
+                                        changed = changed,
+                                        "Re-announced connection candidate"
+                                    );
+                                    last_candidate = Some(current);
+                                }
+                                Err(e) => {
+                                    warn!("Failed to re-announce connection candidate: {}", e);
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            warn!("Failed to serialize connection candidate: {}", e);
+                        }
+                    }
+                }
+                _ = shutdown_rx.recv() => {
+                    info!("Connection candidate announcement task shutting down");
+                    break;
+                }
+            }
+        }
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -587,6 +704,12 @@ mod tests {
     fn test_clock_sync_config_default() {
         let config = ClockSyncConfig::default();
         assert_eq!(config.sync_interval, Duration::from_secs(600));
+    }
+
+    #[test]
+    fn test_candidate_announcement_config_default() {
+        let config = CandidateAnnouncementConfig::default();
+        assert_eq!(config.announce_interval, Duration::from_secs(150));
     }
 
     #[test]

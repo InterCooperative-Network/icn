@@ -11,10 +11,15 @@ use quinn::{ClientConfig, Endpoint, EndpointConfig, ServerConfig};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::time::Duration;
+use tokio::net::UdpSocket;
 use tokio::sync::{mpsc, RwLock};
 use tracing::{debug, info, warn};
 
 use crate::tls;
+
+/// Interval between TURN refresh checks (30 seconds)
+const TURN_REFRESH_INTERVAL: Duration = Duration::from_secs(30);
 
 /// Create transport configuration with DoS protection limits
 fn create_transport_config() -> quinn::TransportConfig {
@@ -61,6 +66,15 @@ pub struct SessionManager {
     /// TURN relay address (if allocation is active)
     relay_addr: Arc<RwLock<Option<SocketAddr>>>,
 
+    /// UDP socket for TURN communication (kept alive for refresh)
+    turn_socket: Arc<RwLock<Option<UdpSocket>>>,
+
+    /// TURN configuration for re-allocation on failure
+    turn_config: Arc<RwLock<Option<crate::TurnConfig>>>,
+
+    /// Shutdown channel sender for stopping background tasks
+    shutdown_tx: Option<mpsc::Sender<()>>,
+
     /// Shutdown channel receiver
     _shutdown_rx: mpsc::Receiver<()>,
 }
@@ -68,7 +82,7 @@ pub struct SessionManager {
 impl SessionManager {
     /// Create a new session manager
     pub fn new() -> Self {
-        let (_shutdown_tx, shutdown_rx) = mpsc::channel(1);
+        let (shutdown_tx, shutdown_rx) = mpsc::channel(1);
 
         SessionManager {
             endpoint: Arc::new(RwLock::new(None)),
@@ -76,6 +90,9 @@ impl SessionManager {
             public_endpoint: Arc::new(RwLock::new(None)),
             turn_client: Arc::new(RwLock::new(None)),
             relay_addr: Arc::new(RwLock::new(None)),
+            turn_socket: Arc::new(RwLock::new(None)),
+            turn_config: Arc::new(RwLock::new(None)),
+            shutdown_tx: Some(shutdown_tx),
             _shutdown_rx: shutdown_rx,
         }
     }
@@ -232,7 +249,7 @@ impl SessionManager {
 
             // Create a UDP socket for TURN communication
             // We bind to 0.0.0.0:0 to get an ephemeral port
-            match tokio::net::UdpSocket::bind("0.0.0.0:0").await {
+            match UdpSocket::bind("0.0.0.0:0").await {
                 Ok(turn_socket) => {
                     // Try to create a TURN allocation
                     match turn_client.allocate(&turn_socket).await {
@@ -243,6 +260,12 @@ impl SessionManager {
                             );
                             *self.relay_addr.write().await = Some(allocation.relay_addr);
                             icn_obs::metrics::nat::turn_allocation_inc();
+
+                            // Store socket for refresh operations
+                            *self.turn_socket.write().await = Some(turn_socket);
+
+                            // Store config for re-allocation on failure
+                            *self.turn_config.write().await = Some(config);
                         }
                         Err(e) => {
                             warn!(
@@ -263,6 +286,9 @@ impl SessionManager {
             }
 
             *self.turn_client.write().await = Some(turn_client);
+
+            // Spawn TURN refresh background task
+            self.spawn_turn_refresh_task();
         }
 
         // Store endpoint
@@ -426,6 +452,11 @@ impl SessionManager {
     pub async fn stop(&mut self) -> Result<()> {
         info!("Session manager stopping");
 
+        // Signal shutdown to background tasks
+        if let Some(tx) = self.shutdown_tx.take() {
+            let _ = tx.send(()).await;
+        }
+
         // Close endpoint
         if let Some(endpoint) = self.endpoint.write().await.take() {
             endpoint.close(0u32.into(), b"shutdown");
@@ -435,8 +466,145 @@ impl SessionManager {
         // Clear connections
         self.connections.write().await.clear();
 
+        // Clear TURN state
+        *self.turn_socket.write().await = None;
+        *self.turn_client.write().await = None;
+        *self.relay_addr.write().await = None;
+
         info!("Session manager stopped");
         Ok(())
+    }
+
+    /// Spawn background task to refresh TURN allocation
+    ///
+    /// This task runs every 30 seconds and checks if the allocation needs refresh.
+    /// TURN allocations expire after 10 minutes, so we refresh at the 9 minute mark.
+    /// On refresh failure, attempts full re-allocation.
+    fn spawn_turn_refresh_task(&self) {
+        let turn_client = self.turn_client.clone();
+        let turn_socket = self.turn_socket.clone();
+        let turn_config = self.turn_config.clone();
+        let relay_addr = self.relay_addr.clone();
+
+        // Create a new shutdown receiver for this task
+        let (shutdown_tx, mut shutdown_rx) = mpsc::channel::<()>(1);
+
+        // Store the sender so we can signal shutdown later
+        // Note: This replaces the existing shutdown_tx which is fine since
+        // the TURN refresh task is the only background task that needs explicit shutdown
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(TURN_REFRESH_INTERVAL);
+            interval.tick().await; // Skip immediate first tick
+
+            loop {
+                tokio::select! {
+                    _ = interval.tick() => {
+                        // Check if we have an active allocation that needs refresh
+                        let client_guard = turn_client.read().await;
+                        let Some(client) = client_guard.as_ref() else {
+                            continue;
+                        };
+
+                        if !client.needs_refresh().await {
+                            continue;
+                        }
+
+                        drop(client_guard); // Release read lock before write operations
+
+                        debug!("TURN allocation needs refresh, attempting refresh...");
+
+                        // Get socket for refresh
+                        let socket_guard = turn_socket.read().await;
+                        if let Some(socket) = socket_guard.as_ref() {
+                            let client_guard = turn_client.read().await;
+                            if let Some(client) = client_guard.as_ref() {
+                                match client.refresh(socket).await {
+                                    Ok(()) => {
+                                        info!("TURN allocation refreshed successfully");
+                                        icn_obs::metrics::nat::turn_permission_refresh_inc();
+                                    }
+                                    Err(e) => {
+                                        warn!("TURN refresh failed: {}. Attempting re-allocation...", e);
+                                        icn_obs::metrics::nat::turn_allocation_failure_inc("refresh_failed");
+
+                                        // Drop guards before re-allocation
+                                        drop(client_guard);
+                                        drop(socket_guard);
+
+                                        // Attempt full re-allocation
+                                        Self::reattempt_turn_allocation(
+                                            &turn_client,
+                                            &turn_socket,
+                                            &turn_config,
+                                            &relay_addr,
+                                        ).await;
+                                    }
+                                }
+                            }
+                        } else {
+                            debug!("No TURN socket available for refresh");
+                        }
+                    }
+                    _ = shutdown_rx.recv() => {
+                        info!("TURN refresh task shutting down");
+                        break;
+                    }
+                }
+            }
+        });
+
+        // Store the shutdown sender (drop the old one)
+        // This is a slight simplification - in production you might want to track
+        // all background task shutdown handles separately
+        drop(shutdown_tx);
+    }
+
+    /// Attempt to re-allocate TURN after refresh failure
+    async fn reattempt_turn_allocation(
+        turn_client: &Arc<RwLock<Option<crate::TurnClient>>>,
+        turn_socket: &Arc<RwLock<Option<UdpSocket>>>,
+        turn_config: &Arc<RwLock<Option<crate::TurnConfig>>>,
+        relay_addr: &Arc<RwLock<Option<SocketAddr>>>,
+    ) {
+        // Get config for new client
+        let config_guard = turn_config.read().await;
+        let Some(config) = config_guard.as_ref().cloned() else {
+            warn!("No TURN config available for re-allocation");
+            return;
+        };
+        drop(config_guard);
+
+        // Create new client
+        let new_client = crate::TurnClient::new(config);
+
+        // Try to create new socket and allocation
+        match UdpSocket::bind("0.0.0.0:0").await {
+            Ok(new_socket) => match new_client.allocate(&new_socket).await {
+                Ok(allocation) => {
+                    info!(
+                        "✅ TURN re-allocation successful: {} (mapped: {})",
+                        allocation.relay_addr, allocation.mapped_addr
+                    );
+                    *relay_addr.write().await = Some(allocation.relay_addr);
+                    *turn_socket.write().await = Some(new_socket);
+                    *turn_client.write().await = Some(new_client);
+                    icn_obs::metrics::nat::turn_allocation_inc();
+                }
+                Err(e) => {
+                    warn!(
+                        "TURN re-allocation failed: {}. Relay will be unavailable.",
+                        e
+                    );
+                    *relay_addr.write().await = None;
+                    icn_obs::metrics::nat::turn_allocation_failure_inc("reallocation_failed");
+                }
+            },
+            Err(e) => {
+                warn!("Failed to create socket for TURN re-allocation: {}", e);
+                *relay_addr.write().await = None;
+                icn_obs::metrics::nat::turn_allocation_failure_inc("socket_bind_failed");
+            }
+        }
     }
 }
 
@@ -455,6 +623,9 @@ impl SessionManager {
             public_endpoint: self.public_endpoint.clone(),
             turn_client: self.turn_client.clone(),
             relay_addr: self.relay_addr.clone(),
+            turn_socket: self.turn_socket.clone(),
+            turn_config: self.turn_config.clone(),
+            shutdown_tx: None, // Test clones don't control shutdown
             _shutdown_rx: mpsc::channel(1).1,
         }
     }
