@@ -90,6 +90,18 @@ pub fn init_descriptions() {
         "icn_network_replay_guard_peers",
         "Number of peers tracked in replay guard"
     );
+    describe_counter!(
+        "icn_network_replay_guard_cleanups_total",
+        "Total number of replay guard cleanup cycles executed"
+    );
+    describe_counter!(
+        "icn_network_replay_guard_peers_cleaned_total",
+        "Total number of stale peers removed during cleanup"
+    );
+    describe_counter!(
+        "icn_network_replay_guard_bloom_rotations_total",
+        "Total number of Bloom filter rotations to prevent saturation"
+    );
     // E2E Encryption metrics (Issue #404)
     describe_counter!(
         "icn_network_encrypted_messages_sent_total",
@@ -238,6 +250,21 @@ pub fn peer_capability_set(capability: &str, count: u64) {
 /// Set the number of peers tracked in replay guard
 pub fn replay_guard_peers_set(value: u64) {
     gauge!("icn_network_replay_guard_peers").set(value as f64);
+}
+
+/// Increment replay guard cleanup cycles counter (#153)
+pub fn replay_guard_cleanups_inc() {
+    counter!("icn_network_replay_guard_cleanups_total").increment(1);
+}
+
+/// Add to the count of peers removed during cleanup (#153)
+pub fn replay_guard_peers_cleaned_add(count: u64) {
+    counter!("icn_network_replay_guard_peers_cleaned_total").increment(count);
+}
+
+/// Increment Bloom filter rotation counter (#154)
+pub fn replay_guard_bloom_rotations_inc() {
+    counter!("icn_network_replay_guard_bloom_rotations_total").increment(1);
 }
 
 // E2E Encryption metrics (Issue #404)

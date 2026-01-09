@@ -650,7 +650,7 @@ impl SequenceWindow {
         self.insertion_count += 1;
     }
 
-    /// Rotate (reset) the Bloom filter to prevent saturation
+    /// Rotate (reset) the Bloom filter to prevent saturation (#154)
     ///
     /// After rotation:
     /// - The filter is empty and can accept new sequences
@@ -668,6 +668,9 @@ impl SequenceWindow {
         );
         self.recent = BloomFilter::new(BLOOM_CAPACITY, 0.001);
         self.insertion_count = 0;
+
+        // Track rotation for monitoring (#154)
+        icn_obs::metrics::network::replay_guard_bloom_rotations_inc();
     }
 }
 
