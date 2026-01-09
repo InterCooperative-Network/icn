@@ -9,7 +9,7 @@ on:
       dry_run:
         description: 'Dry run (build but do not publish)'
         required: false
-        default: 'false'
+        default: false
         type: boolean
 
 permissions:
@@ -42,7 +42,7 @@ jobs:
             artifact_name: icn-macos-arm64
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Free disk space (Linux)
         if: runner.os == 'Linux'
@@ -78,14 +78,18 @@ jobs:
 
       - name: Package binaries
         run: |
+          set -euo pipefail
           mkdir -p dist
           cp icn/target/${{ matrix.target }}/release/icnd dist/
           cp icn/target/${{ matrix.target }}/release/icnctl dist/
-          cp icn/target/${{ matrix.target }}/release/icn-console dist/ || true
+          # icn-console is optional; copy it if it was built
+          if [ -f "icn/target/${{ matrix.target }}/release/icn-console" ]; then
+            cp icn/target/${{ matrix.target }}/release/icn-console dist/
+          fi
           tar -czvf ${{ matrix.artifact_name }}.tar.gz -C dist .
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.artifact_name }}
           path: ${{ matrix.artifact_name }}.tar.gz
@@ -95,17 +99,22 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           path: artifacts
 
       - name: Flatten artifacts
         run: |
+          set -euo pipefail
           mkdir -p release
           find artifacts -name "*.tar.gz" -exec mv {} release/ \;
+          if ! ls release/*.tar.gz >/dev/null 2>&1; then
+            echo "Error: No .tar.gz artifacts found in release/ after flattening."
+            exit 1
+          fi
           ls -la release/
 
       - name: Install cosign
@@ -113,8 +122,15 @@ jobs:
 
       - name: Sign artifacts with cosign (keyless)
         run: |
+          set -euo pipefail
           cd release
-          for file in *.tar.gz; do
+          shopt -s nullglob
+          files=( *.tar.gz )
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "Error: No .tar.gz artifacts found to sign."
+            exit 1
+          fi
+          for file in "${files[@]}"; do
             echo "Signing $file..."
             cosign sign-blob --yes "$file" \
               --output-signature "${file}.sig" \
@@ -123,7 +139,7 @@ jobs:
           ls -la
 
       - name: Generate SBOM
-        uses: anchore/sbom-action@v0
+        uses: anchore/sbom-action@v0.17
         with:
           path: ./icn
           artifact-name: sbom.spdx.json
@@ -131,8 +147,15 @@ jobs:
 
       - name: Generate checksums
         run: |
+          set -euo pipefail
           cd release
-          sha256sum *.tar.gz > SHA256SUMS.txt
+          shopt -s nullglob
+          files=( *.tar.gz )
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "Error: No .tar.gz artifacts found for checksum generation."
+            exit 1
+          fi
+          sha256sum "${files[@]}" > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
       - name: Create attestation
@@ -141,7 +164,7 @@ jobs:
           subject-path: 'release/*.tar.gz'
 
       - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/') && github.event.inputs.dry_run != 'true'
+        if: startsWith(github.ref, 'refs/tags/') && (github.event_name != 'workflow_dispatch' || github.event.inputs.dry_run != true)
         uses: softprops/action-gh-release@v2
         with:
           files: |
@@ -173,7 +196,11 @@ jobs:
             ### Verify checksums
 
             ```bash
+            # Linux
             sha256sum -c SHA256SUMS.txt
+
+            # macOS
+            shasum -a 256 -c SHA256SUMS.txt
             ```
 
             ### Software Bill of Materials
@@ -182,7 +209,7 @@ jobs:
 
       - name: Summary
         run: |
-          echo "## Release Artifacts 📦" >> $GITHUB_STEP_SUMMARY
+          echo "## Release Artifacts" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| File | Size |" >> $GITHUB_STEP_SUMMARY
           echo "|------|------|" >> $GITHUB_STEP_SUMMARY

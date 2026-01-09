@@ -216,7 +216,10 @@ cosign verify-blob icn-linux-amd64.tar.gz \
 
 # Verify checksum
 curl -LO https://github.com/InterCooperative-Network/icn/releases/latest/download/SHA256SUMS.txt
+# Linux
 sha256sum -c SHA256SUMS.txt --ignore-missing
+# macOS
+shasum -a 256 -c SHA256SUMS.txt
 ```
 
 ---
