@@ -199,6 +199,10 @@ pub struct GossipActor {
 
     /// Adaptive fanout configuration (M2 #484 - dynamic fanout based on network size)
     adaptive_fanout_config: crate::types::AdaptiveFanoutConfig,
+
+    /// Topic auto-creation policy (Issue #473 - strict defaults)
+    /// Controls what happens when publishing to an undeclared topic
+    topic_auto_creation_policy: crate::types::TopicAutoCreationPolicy,
 }
 
 impl GossipActor {
@@ -236,6 +240,7 @@ impl GossipActor {
             storage_quota_manager: None, // Phase 18 Week 6: Set via set_storage_quota_manager()
             bloom_resize_config: crate::bloom::BloomResizeConfig::default(), // M2: Dynamic Bloom sizing
             adaptive_fanout_config: crate::types::AdaptiveFanoutConfig::default(), // M2 #484: Adaptive fanout
+            topic_auto_creation_policy: crate::types::TopicAutoCreationPolicy::default(), // Issue #473: Strict defaults
         };
 
         // Create default topics with appropriate scopes
@@ -345,6 +350,22 @@ impl GossipActor {
         manager: Arc<RwLock<icn_store::StorageQuotaManager>>,
     ) {
         self.storage_quota_manager = Some(manager);
+    }
+
+    /// Set the topic auto-creation policy (Issue #473)
+    ///
+    /// Controls what happens when attempting to publish to an undeclared topic.
+    /// By default, publishes to undeclared topics are rejected for security.
+    pub fn set_topic_auto_creation_policy(
+        &mut self,
+        policy: crate::types::TopicAutoCreationPolicy,
+    ) {
+        self.topic_auto_creation_policy = policy;
+    }
+
+    /// Get the current topic auto-creation policy
+    pub fn topic_auto_creation_policy(&self) -> crate::types::TopicAutoCreationPolicy {
+        self.topic_auto_creation_policy
     }
 
     /// Attempt to heal partition with a reconnected peer (Phase 18 Week 3)
@@ -487,10 +508,38 @@ impl GossipActor {
     /// Publish an entry to a topic
     #[instrument(skip(self, data), fields(topic = %topic, data_size = data.len()))]
     pub async fn publish(&mut self, topic: &str, data: Vec<u8>) -> Result<ContentHash> {
-        // Auto-create topic if it doesn't exist (as public topic)
+        // Handle undeclared topics according to policy (Issue #473)
         if !self.topics.contains_key(topic) {
-            debug!("Auto-creating public topic: {}", topic);
-            self.create_topic(Topic::new(topic.to_string(), AccessControl::Public));
+            use crate::types::TopicAutoCreationPolicy;
+
+            match self.topic_auto_creation_policy {
+                TopicAutoCreationPolicy::Reject => {
+                    warn!(
+                        topic = %topic,
+                        "Rejecting publish to undeclared topic (policy: Reject)"
+                    );
+                    bail!(
+                        "Topic '{topic}' not found. Topics must be explicitly created before use."
+                    );
+                }
+                TopicAutoCreationPolicy::CreateWithStrictDefaults => {
+                    warn!(
+                        topic = %topic,
+                        "Auto-creating topic with strict defaults (Federated trust required). \
+                         Consider explicitly creating topics with appropriate access control."
+                    );
+                    // Use the strict default (AccessControl::default() = TrustGated(Federated))
+                    self.create_topic(Topic::new(topic.to_string(), AccessControl::default()));
+                }
+                TopicAutoCreationPolicy::CreatePublic => {
+                    warn!(
+                        topic = %topic,
+                        "Auto-creating public topic (INSECURE - legacy behavior). \
+                         This allows anyone to publish/subscribe. Consider using CreateWithStrictDefaults or Reject."
+                    );
+                    self.create_topic(Topic::new(topic.to_string(), AccessControl::Public));
+                }
+            }
         }
 
         let topic_obj = self.topics.get(topic).context("Topic not found")?;
@@ -2323,6 +2372,12 @@ mod tests {
         let owner = KeyPair::generate().unwrap().did().clone();
         let mut gossip = GossipActor::new(owner.clone(), Arc::new(mock_trust_lookup));
 
+        // Create topic first (required since Issue #473 - topics must be explicitly created)
+        gossip.create_topic(Topic::new(
+            "test:no-subs".to_string(),
+            AccessControl::Public,
+        ));
+
         let notification_count = Arc::new(Mutex::new(0));
         let count_clone = notification_count.clone();
 
@@ -3163,5 +3218,139 @@ mod tests {
         );
 
         Ok(())
+    }
+
+    // Issue #473: Topic auto-creation policy tests
+
+    #[tokio::test]
+    async fn test_topic_auto_creation_policy_reject() {
+        let owner = KeyPair::generate().unwrap().did().clone();
+        let mut gossip = GossipActor::new(owner.clone(), Arc::new(mock_trust_lookup));
+
+        // Default policy is Reject
+        assert_eq!(
+            gossip.topic_auto_creation_policy(),
+            crate::types::TopicAutoCreationPolicy::Reject
+        );
+
+        // Try to publish to undeclared topic - should fail
+        let result = gossip.publish("undeclared:topic", b"test".to_vec()).await;
+        assert!(
+            result.is_err(),
+            "Publishing to undeclared topic should fail with Reject policy"
+        );
+
+        let error = result.unwrap_err().to_string();
+        assert!(
+            error.contains("not found") || error.contains("must be explicitly created"),
+            "Error should indicate topic not found: {error}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_topic_auto_creation_policy_create_with_strict_defaults() {
+        let owner = KeyPair::generate().unwrap().did().clone();
+
+        // Use Federated trust so we can publish to the auto-created topic
+        let trust_lookup: TrustLookup = Arc::new(|_did| Some(TrustClass::Federated));
+        let mut gossip = GossipActor::new(owner.clone(), trust_lookup);
+
+        // Set policy to CreateWithStrictDefaults
+        gossip.set_topic_auto_creation_policy(
+            crate::types::TopicAutoCreationPolicy::CreateWithStrictDefaults,
+        );
+
+        // Publish to undeclared topic - should succeed (with Federated trust)
+        let result = gossip.publish("auto:strict", b"test".to_vec()).await;
+        assert!(
+            result.is_ok(),
+            "Publishing should succeed with Federated trust"
+        );
+
+        // Verify topic was created with strict defaults (Federated trust required)
+        let topic_obj = gossip.topics.get("auto:strict");
+        assert!(topic_obj.is_some(), "Topic should have been created");
+        assert_eq!(
+            topic_obj.unwrap().acl,
+            AccessControl::TrustClass(TrustClass::Federated),
+            "Auto-created topic should have Federated trust ACL"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_topic_auto_creation_policy_create_with_strict_defaults_denies_low_trust() {
+        let owner = KeyPair::generate().unwrap().did().clone();
+
+        // Use Known trust (below Federated threshold)
+        let trust_lookup: TrustLookup = Arc::new(|_did| Some(TrustClass::Known));
+        let mut gossip = GossipActor::new(owner.clone(), trust_lookup);
+
+        // Set policy to CreateWithStrictDefaults
+        gossip.set_topic_auto_creation_policy(
+            crate::types::TopicAutoCreationPolicy::CreateWithStrictDefaults,
+        );
+
+        // Publish to undeclared topic - should fail (Known < Federated)
+        let result = gossip.publish("auto:strict", b"test".to_vec()).await;
+        assert!(
+            result.is_err(),
+            "Publishing should fail with Known trust (below Federated requirement)"
+        );
+
+        let error = result.unwrap_err().to_string();
+        assert!(
+            error.contains("Not authorized"),
+            "Error should indicate authorization failure: {error}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_topic_auto_creation_policy_create_public() {
+        let owner = KeyPair::generate().unwrap().did().clone();
+        let mut gossip = GossipActor::new(owner.clone(), Arc::new(mock_trust_lookup));
+
+        // Set policy to CreatePublic (legacy behavior)
+        gossip.set_topic_auto_creation_policy(crate::types::TopicAutoCreationPolicy::CreatePublic);
+
+        // Publish to undeclared topic - should succeed
+        let result = gossip.publish("auto:public", b"test".to_vec()).await;
+        assert!(
+            result.is_ok(),
+            "Publishing should succeed with CreatePublic policy"
+        );
+
+        // Verify topic was created as public
+        let topic_obj = gossip.topics.get("auto:public");
+        assert!(topic_obj.is_some(), "Topic should have been created");
+        assert_eq!(
+            topic_obj.unwrap().acl,
+            AccessControl::Public,
+            "Auto-created topic should have Public ACL"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_explicit_topic_creation_bypasses_policy() {
+        let owner = KeyPair::generate().unwrap().did().clone();
+        let mut gossip = GossipActor::new(owner.clone(), Arc::new(mock_trust_lookup));
+
+        // Default policy is Reject
+        assert_eq!(
+            gossip.topic_auto_creation_policy(),
+            crate::types::TopicAutoCreationPolicy::Reject
+        );
+
+        // Explicitly create topic
+        gossip.create_topic(Topic::new(
+            "explicit:topic".to_string(),
+            AccessControl::Public,
+        ));
+
+        // Now publish should succeed
+        let result = gossip.publish("explicit:topic", b"test".to_vec()).await;
+        assert!(
+            result.is_ok(),
+            "Publishing to explicitly created topic should succeed"
+        );
     }
 }
