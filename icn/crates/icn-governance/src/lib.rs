@@ -74,6 +74,9 @@ pub mod vote;
 // Orphan cleanup (Phase 21)
 pub mod orphan_cleanup;
 
+// Proposal cleanup and archival
+pub mod proposal_cleanup;
+
 pub use amendment::{
     Amendment, AmendmentChange, AmendmentId, AmendmentScope, AmendmentStatus, AmendmentType,
     ChangeTarget, ChangeType, Ratification, RatificationRequirements, RatificationResult,
