@@ -180,7 +180,7 @@ pub async fn handle_auth_revoke(
     };
 
     // Check if token was already revoked (idempotent operation)
-    if let Ok(true) = auth_manager.is_token_revoked(&claims.jti) {
+    if auth_manager.is_token_revoked(&claims.jti) {
         return RpcResponse::success(
             id,
             serde_json::json!({

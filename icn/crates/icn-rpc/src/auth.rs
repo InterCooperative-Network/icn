@@ -180,13 +180,20 @@ impl<S: Store> TokenRevocationList<S> {
     }
 
     /// Check if a token ID has been revoked
-    pub fn is_revoked(&self, jti: &str) -> Result<bool, AuthError> {
-        let cache = self
-            .cache
+    ///
+    /// Returns `false` on cache lock errors (fail-open). This is intentional:
+    /// - Lock poisoning is extremely rare (requires a panic while holding the lock)
+    /// - Failing closed (rejecting all tokens) creates a DoS vector
+    /// - The persistent storage is the source of truth; cache is only a performance optimization
+    /// - Better to allow one potentially-revoked token through than reject all valid tokens
+    pub fn is_revoked(&self, jti: &str) -> bool {
+        self.cache
             .read()
-            .map_err(|e| AuthError::InternalError(format!("Lock poisoned: {e}")))?;
-
-        Ok(cache.contains(jti))
+            .map(|cache| cache.contains(jti))
+            .unwrap_or_else(|e| {
+                tracing::warn!(error = %e, jti = %jti, "Cache lock poisoned in is_revoked, failing open");
+                false
+            })
     }
 
     /// Revoke a token
@@ -570,7 +577,7 @@ impl<S: Store + 'static> RpcAuthManager<S> {
 
         // Check if token has been revoked
         if let Some(ref trl) = self.revocation_list {
-            if trl.is_revoked(&token_data.claims.jti)? {
+            if trl.is_revoked(&token_data.claims.jti) {
                 return Err(AuthError::TokenRevoked);
             }
         }
@@ -652,11 +659,11 @@ impl<S: Store + 'static> RpcAuthManager<S> {
 
     /// Check if a specific token (by JTI) has been revoked
     ///
-    /// Returns Ok(false) if revocation is not enabled.
-    pub fn is_token_revoked(&self, jti: &str) -> Result<bool, AuthError> {
+    /// Returns `false` if revocation is not enabled or on cache errors (fail-open).
+    pub fn is_token_revoked(&self, jti: &str) -> bool {
         match &self.revocation_list {
             Some(trl) => trl.is_revoked(jti),
-            None => Ok(false),
+            None => false,
         }
     }
 
@@ -1187,7 +1194,7 @@ mod tests {
             ));
 
             // Check by JTI directly
-            assert!(auth2.is_token_revoked(&jti).unwrap());
+            assert!(auth2.is_token_revoked(&jti));
         }
     }
 
@@ -1243,7 +1250,7 @@ mod tests {
         trl.revoke("new-jti", "did:icn:test", future_expiry, None)
             .unwrap();
         assert_eq!(trl.count(), 1);
-        assert!(trl.is_revoked("new-jti").unwrap());
-        assert!(!trl.is_revoked("old-jti").unwrap());
+        assert!(trl.is_revoked("new-jti"));
+        assert!(!trl.is_revoked("old-jti"));
     }
 }
