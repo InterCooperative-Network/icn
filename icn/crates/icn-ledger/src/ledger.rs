@@ -2162,7 +2162,8 @@ impl Ledger {
                 entry2: conflicting_hash.as_bytes().try_into().unwrap_or([0u8; 32]),
             };
 
-            // Report violation using block_in_place (may be called from tokio runtime)
+            // SAFETY: Use block_in_place to report violation from sync context.
+            // This may be called from tokio runtime; block_in_place moves other tasks off this thread.
             let detector_clone = detector.clone();
             let author = entry.author.clone();
             tokio::task::block_in_place(|| {
