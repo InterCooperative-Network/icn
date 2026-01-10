@@ -503,30 +503,32 @@ impl StatefulActorRegistry {
                     // This callback may be invoked from within a tokio task (e.g., MigrationManager),
                     // and block_on alone would panic. block_in_place moves other tasks off this
                     // thread before blocking.
-                    tokio::task::block_in_place(|| handle.block_on(async {
-                        let mut actors = actors.write().await;
-                        let info = actors.get_mut(&actor_id).ok_or_else(|| {
-                            ComputeError::Internal(format!(
-                                "Actor {} not found",
-                                hex::encode(actor_id)
-                            ))
-                        })?;
+                    tokio::task::block_in_place(|| {
+                        handle.block_on(async {
+                            let mut actors = actors.write().await;
+                            let info = actors.get_mut(&actor_id).ok_or_else(|| {
+                                ComputeError::Internal(format!(
+                                    "Actor {} not found",
+                                    hex::encode(actor_id)
+                                ))
+                            })?;
 
-                        if info.state != StatefulActorState::Running {
-                            return Err(ComputeError::Internal(format!(
-                                "Cannot pause actor {} in state {:?}",
-                                hex::encode(actor_id),
-                                info.state
-                            )));
-                        }
+                            if info.state != StatefulActorState::Running {
+                                return Err(ComputeError::Internal(format!(
+                                    "Cannot pause actor {} in state {:?}",
+                                    hex::encode(actor_id),
+                                    info.state
+                                )));
+                            }
 
-                        info.state = StatefulActorState::Paused {
-                            reason,
-                            paused_at: now_millis(),
-                        };
+                            info.state = StatefulActorState::Paused {
+                                reason,
+                                paused_at: now_millis(),
+                            };
 
-                        Ok(())
-                    }))
+                            Ok(())
+                        })
+                    })
                 }
 
                 ActorRuntimeCommand::Resume { actor_id } => {
@@ -534,26 +536,28 @@ impl StatefulActorRegistry {
                         .map_err(|e| ComputeError::Internal(e.to_string()))?;
 
                     // SAFETY: Use block_in_place to safely run blocking code from async context.
-                    tokio::task::block_in_place(|| handle.block_on(async {
-                        let mut actors = actors.write().await;
-                        let info = actors.get_mut(&actor_id).ok_or_else(|| {
-                            ComputeError::Internal(format!(
-                                "Actor {} not found",
-                                hex::encode(actor_id)
-                            ))
-                        })?;
+                    tokio::task::block_in_place(|| {
+                        handle.block_on(async {
+                            let mut actors = actors.write().await;
+                            let info = actors.get_mut(&actor_id).ok_or_else(|| {
+                                ComputeError::Internal(format!(
+                                    "Actor {} not found",
+                                    hex::encode(actor_id)
+                                ))
+                            })?;
 
-                        if !matches!(info.state, StatefulActorState::Paused { .. }) {
-                            return Err(ComputeError::Internal(format!(
-                                "Cannot resume actor {} in state {:?}",
-                                hex::encode(actor_id),
-                                info.state
-                            )));
-                        }
+                            if !matches!(info.state, StatefulActorState::Paused { .. }) {
+                                return Err(ComputeError::Internal(format!(
+                                    "Cannot resume actor {} in state {:?}",
+                                    hex::encode(actor_id),
+                                    info.state
+                                )));
+                            }
 
-                        info.state = StatefulActorState::Running;
-                        Ok(())
-                    }))
+                            info.state = StatefulActorState::Running;
+                            Ok(())
+                        })
+                    })
                 }
 
                 ActorRuntimeCommand::Restore {
@@ -564,21 +568,23 @@ impl StatefulActorRegistry {
                         .map_err(|e| ComputeError::Internal(e.to_string()))?;
 
                     // SAFETY: Use block_in_place to safely run blocking code from async context.
-                    tokio::task::block_in_place(|| handle.block_on(async {
-                        let mut actors = actors.write().await;
+                    tokio::task::block_in_place(|| {
+                        handle.block_on(async {
+                            let mut actors = actors.write().await;
 
-                        // Create new entry or update existing
-                        let info = actors.entry(actor_id).or_insert_with(|| {
-                            StatefulActorInfo::new(actor_id, ActorMode::default())
-                        });
+                            // Create new entry or update existing
+                            let info = actors.entry(actor_id).or_insert_with(|| {
+                                StatefulActorInfo::new(actor_id, ActorMode::default())
+                            });
 
-                        info.current_state = checkpoint.state;
-                        info.last_checkpoint_seq = checkpoint.sequence;
-                        info.state = StatefulActorState::Running;
-                        info.memory_bytes = info.current_state.len() as u64;
+                            info.current_state = checkpoint.state;
+                            info.last_checkpoint_seq = checkpoint.sequence;
+                            info.state = StatefulActorState::Running;
+                            info.memory_bytes = info.current_state.len() as u64;
 
-                        Ok(())
-                    }))
+                            Ok(())
+                        })
+                    })
                 }
 
                 ActorRuntimeCommand::Terminate { actor_id, reason } => {
@@ -586,22 +592,24 @@ impl StatefulActorRegistry {
                         .map_err(|e| ComputeError::Internal(e.to_string()))?;
 
                     // SAFETY: Use block_in_place to safely run blocking code from async context.
-                    tokio::task::block_in_place(|| handle.block_on(async {
-                        let mut actors = actors.write().await;
-                        let info = actors.get_mut(&actor_id).ok_or_else(|| {
-                            ComputeError::Internal(format!(
-                                "Actor {} not found",
-                                hex::encode(actor_id)
-                            ))
-                        })?;
+                    tokio::task::block_in_place(|| {
+                        handle.block_on(async {
+                            let mut actors = actors.write().await;
+                            let info = actors.get_mut(&actor_id).ok_or_else(|| {
+                                ComputeError::Internal(format!(
+                                    "Actor {} not found",
+                                    hex::encode(actor_id)
+                                ))
+                            })?;
 
-                        info.state = StatefulActorState::Terminated {
-                            reason,
-                            terminated_at: now_millis(),
-                        };
+                            info.state = StatefulActorState::Terminated {
+                                reason,
+                                terminated_at: now_millis(),
+                            };
 
-                        Ok(())
-                    }))
+                            Ok(())
+                        })
+                    })
                 }
 
                 ActorRuntimeCommand::GetState { actor_id: _ } => {
