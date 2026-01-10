@@ -449,9 +449,10 @@ impl GatewayServer {
         info!("Budget store initialized");
 
         // Create entity audit manager for compliance logging
+        // Uses a separate store path to avoid Sled lock conflicts with gateway_store
         let entity_audit_store: Arc<dyn icn_store::Store> =
             if let Some(ref data_dir) = self.data_dir {
-                let store_path = data_dir.join("gateway_store");
+                let store_path = data_dir.join("entity_audit_store");
                 Arc::new(SledStore::open(&store_path).map_err(|e| {
                     GatewayError::InternalError(format!("Failed to open entity audit store: {e}"))
                 })?)
