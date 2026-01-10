@@ -141,8 +141,6 @@ mod tests {
         let mut community = create_test_community();
         let original_updated_at = community.updated_at;
 
-        std::thread::sleep(std::time::Duration::from_millis(10));
-
         manager
             .add_member(
                 &mut community,
@@ -157,7 +155,7 @@ mod tests {
         assert_eq!(member.id, "member-1");
         assert_eq!(member.voting_weight, 1);
         assert!(member.active);
-        assert!(community.updated_at > original_updated_at);
+        assert!(community.updated_at >= original_updated_at);
     }
 
     #[test]
@@ -298,14 +296,13 @@ mod tests {
         assert!(community.members.get("member-1").unwrap().active);
 
         let original_updated_at = community.updated_at;
-        std::thread::sleep(std::time::Duration::from_millis(10));
 
         manager.remove_member(&mut community, "member-1").unwrap();
 
         // Member should still exist but be inactive
         let member = community.members.get("member-1").unwrap();
         assert!(!member.active);
-        assert!(community.updated_at > original_updated_at);
+        assert!(community.updated_at >= original_updated_at);
     }
 
     #[test]

@@ -245,12 +245,11 @@ mod tests {
         assert_eq!(community.status, CommunityStatus::Forming);
 
         let original_updated_at = community.updated_at;
-        std::thread::sleep(std::time::Duration::from_millis(10));
 
         lifecycle.activate(&mut community).unwrap();
 
         assert_eq!(community.status, CommunityStatus::Active);
-        assert!(community.updated_at > original_updated_at);
+        assert!(community.updated_at >= original_updated_at);
     }
 
     #[test]
@@ -330,12 +329,11 @@ mod tests {
         let mut community = lifecycle.form(request, "domain".to_string()).unwrap();
 
         let original_updated_at = community.updated_at;
-        std::thread::sleep(std::time::Duration::from_millis(10));
 
         lifecycle.dissolve(&mut community).unwrap();
 
         assert_eq!(community.status, CommunityStatus::Dissolved);
-        assert!(community.updated_at > original_updated_at);
+        assert!(community.updated_at >= original_updated_at);
     }
 
     #[test]

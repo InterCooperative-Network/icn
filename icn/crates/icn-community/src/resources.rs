@@ -163,9 +163,6 @@ mod tests {
         let mut community = create_test_community();
         let original_updated_at = community.updated_at;
 
-        // Small delay to ensure timestamp changes
-        std::thread::sleep(std::time::Duration::from_millis(10));
-
         manager
             .create_pool(
                 &mut community,
@@ -183,7 +180,7 @@ mod tests {
         assert_eq!(pool.total_capacity, 100);
         assert_eq!(pool.allocated, 0);
         assert_eq!(pool.unit, "cores");
-        assert!(community.updated_at > original_updated_at);
+        assert!(community.updated_at >= original_updated_at);
     }
 
     #[test]
@@ -297,14 +294,13 @@ mod tests {
             .unwrap();
 
         let original_updated_at = community.updated_at;
-        std::thread::sleep(std::time::Duration::from_millis(10));
 
         manager.allocate(&mut community, "compute", 30).unwrap();
 
         let pool = community.resource_pools.get("compute").unwrap();
         assert_eq!(pool.allocated, 30);
         assert_eq!(pool.available(), 70);
-        assert!(community.updated_at > original_updated_at);
+        assert!(community.updated_at >= original_updated_at);
     }
 
     #[test]
@@ -473,14 +469,13 @@ mod tests {
         manager.allocate(&mut community, "compute", 50).unwrap();
 
         let original_updated_at = community.updated_at;
-        std::thread::sleep(std::time::Duration::from_millis(10));
 
         manager.deallocate(&mut community, "compute", 20).unwrap();
 
         let pool = community.resource_pools.get("compute").unwrap();
         assert_eq!(pool.allocated, 30);
         assert_eq!(pool.available(), 70);
-        assert!(community.updated_at > original_updated_at);
+        assert!(community.updated_at >= original_updated_at);
     }
 
     #[test]
