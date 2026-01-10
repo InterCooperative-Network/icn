@@ -171,23 +171,24 @@ pub async fn handle_auth_revoke(
         }
     };
 
-    // Parse the token to get claims (without expiration validation)
-    let claims = match auth_manager.verify_token(&params.token) {
+    // Parse the token to get claims (without expiration validation to allow revoking expired tokens)
+    let claims = match auth_manager.parse_token_claims(&params.token) {
         Ok(c) => c,
-        Err(crate::auth::AuthError::TokenRevoked) => {
-            // Token already revoked - success (idempotent)
-            return RpcResponse::success(
-                id,
-                serde_json::json!({
-                    "revoked": true,
-                    "message": "Token was already revoked"
-                }),
-            );
-        }
         Err(e) => {
             return RpcResponse::error(id, -32602, format!("Invalid token: {e}"));
         }
     };
+
+    // Check if token was already revoked (idempotent operation)
+    if let Ok(true) = auth_manager.is_token_revoked(&claims.jti) {
+        return RpcResponse::success(
+            id,
+            serde_json::json!({
+                "revoked": true,
+                "message": "Token was already revoked"
+            }),
+        );
+    }
 
     // Authorization check: only the token owner or an admin can revoke
     // If caller is not authenticated, they can only revoke if they have the token itself
