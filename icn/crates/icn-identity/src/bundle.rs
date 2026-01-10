@@ -33,8 +33,8 @@ pub struct IdentityBundle {
     /// Self-signed TLS certificate
     tls_cert: CertificateDer<'static>,
 
-    /// TLS private key (stored as bytes for cloning)
-    tls_key_der: Vec<u8>,
+    /// TLS private key (stored as bytes for cloning, zeroized on drop)
+    tls_key_der: Zeroizing<Vec<u8>>,
 
     /// Binding signature proving ownership
     /// Signature = Sign_did_key(SHA256(tls_cert))
@@ -64,7 +64,7 @@ impl Clone for IdentityBundle {
             did: self.did.clone(),
             did_keypair: self.did_keypair.clone(),
             tls_cert: self.tls_cert.clone(),
-            tls_key_der: self.tls_key_der.clone(),
+            tls_key_der: Zeroizing::new(self.tls_key_der.to_vec()),
             tls_binding_sig: self.tls_binding_sig.clone(),
             created_at: self.created_at,
             x25519_secret: Zeroizing::new(self.x25519_secret.to_vec()),
@@ -146,7 +146,7 @@ impl IdentityBundle {
             did,
             did_keypair,
             tls_cert,
-            tls_key_der,
+            tls_key_der: Zeroizing::new(tls_key_der),
             tls_binding_sig,
             created_at,
             x25519_secret,
@@ -162,14 +162,15 @@ impl IdentityBundle {
     ///
     /// This is used by the keystore to restore a previously saved bundle.
     /// The TLS certificate and binding signature are already generated.
+    /// Secret parameters are wrapped in Zeroizing to prevent copies.
     #[allow(clippy::too_many_arguments)]
     pub fn from_stored(
         did_keypair: KeyPair,
         tls_cert_der: Vec<u8>,
-        tls_key_der: Vec<u8>,
+        tls_key_der: Zeroizing<Vec<u8>>,
         tls_binding_sig: Vec<u8>,
         created_at: u64,
-        x25519_secret_bytes: Vec<u8>,
+        x25519_secret_bytes: Zeroizing<Vec<u8>>,
         x25519_public_bytes: [u8; 32],
     ) -> Result<Self> {
         #[cfg(feature = "post-quantum")]
@@ -208,7 +209,7 @@ impl IdentityBundle {
                 tls_key_der,
                 tls_binding_sig,
                 created_at,
-                x25519_secret: Zeroizing::new(x25519_secret_bytes),
+                x25519_secret: x25519_secret_bytes,
                 x25519_public: x25519_public_bytes,
             })
         }
@@ -218,17 +219,18 @@ impl IdentityBundle {
     ///
     /// This is used by the keystore to restore a previously saved bundle
     /// that may include post-quantum KEM keys.
+    /// Secret parameters are wrapped in Zeroizing to prevent copies.
     #[cfg(feature = "post-quantum")]
     #[allow(clippy::too_many_arguments)]
     pub fn from_stored_with_kem(
         did_keypair: KeyPair,
         tls_cert_der: Vec<u8>,
-        tls_key_der: Vec<u8>,
+        tls_key_der: Zeroizing<Vec<u8>>,
         tls_binding_sig: Vec<u8>,
         created_at: u64,
-        x25519_secret_bytes: Vec<u8>,
+        x25519_secret_bytes: Zeroizing<Vec<u8>>,
         x25519_public_bytes: [u8; 32],
-        kem_pq_secret: Option<Vec<u8>>,
+        kem_pq_secret: Option<Zeroizing<Vec<u8>>>,
         kem_pq_public: Option<Vec<u8>>,
     ) -> Result<Self> {
         let did = did_keypair.did().clone();
@@ -252,9 +254,9 @@ impl IdentityBundle {
             tls_key_der,
             tls_binding_sig,
             created_at,
-            x25519_secret: Zeroizing::new(x25519_secret_bytes),
+            x25519_secret: x25519_secret_bytes,
             x25519_public: x25519_public_bytes,
-            kem_pq_secret: kem_pq_secret.map(Zeroizing::new),
+            kem_pq_secret,
             kem_pq_public,
         })
     }
@@ -298,7 +300,9 @@ impl IdentityBundle {
 
     /// Get the TLS private key
     pub fn tls_key(&self) -> PrivateKeyDer<'static> {
-        PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(self.tls_key_der.clone()))
+        // Note: Creates a copy of the key bytes for the PrivateKeyDer wrapper.
+        // The source remains protected by Zeroizing.
+        PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(self.tls_key_der.to_vec()))
     }
 
     /// Get the raw TLS private key bytes (DER format)
