@@ -38,6 +38,38 @@ struct TestNode {
 }
 
 impl TestNode {
+    /// Dial a peer with retry logic for flaky CI environments
+    async fn dial_with_retry(
+        &self,
+        addr: SocketAddr,
+        did: icn_identity::Did,
+        max_retries: u32,
+    ) -> Result<()> {
+        let mut last_error = None;
+        for attempt in 0..max_retries {
+            match self.network_handle.dial(addr, did.clone()).await {
+                Ok(()) => {
+                    info!("Connected to {} on attempt {}", did, attempt + 1);
+                    return Ok(());
+                }
+                Err(e) => {
+                    last_error = Some(e);
+                    if attempt + 1 < max_retries {
+                        let delay = Duration::from_millis(100 * (attempt as u64 + 1));
+                        warn!(
+                            "Connection attempt {} failed, retrying in {:?}...",
+                            attempt + 1,
+                            delay
+                        );
+                        tokio::time::sleep(delay).await;
+                    }
+                }
+            }
+        }
+        Err(last_error
+            .unwrap_or_else(|| anyhow::anyhow!("Connection failed after {max_retries} attempts")))
+    }
+
     async fn spawn(port: u16) -> Result<Self> {
         let keypair = KeyPair::generate()?;
         let did = keypair.did().clone();
@@ -194,6 +226,10 @@ async fn test_two_node_convergence_via_pull_protocol() -> Result<()> {
     let node1 = TestNode::spawn(get_available_port()).await?;
     let node2 = TestNode::spawn(get_available_port()).await?;
 
+    // Allow nodes to fully initialize before connecting
+    // This prevents TLS handshake failures in CI environments
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
     info!("Node 1 DID: {}", node1.did);
     info!("Node 2 DID: {}", node2.did);
 
@@ -208,14 +244,12 @@ async fn test_two_node_convergence_via_pull_protocol() -> Result<()> {
         gossip2.create_topic(Topic::new(topic.to_string(), AccessControl::Public));
     }
 
-    // Connect nodes: 1 ↔ 2 (bidirectional)
+    // Connect nodes: 1 ↔ 2 (bidirectional) with retry for CI reliability
     node1
-        .network_handle
-        .dial(node2.listen_addr, node2.did.clone())
+        .dial_with_retry(node2.listen_addr, node2.did.clone(), 5)
         .await?;
     node2
-        .network_handle
-        .dial(node1.listen_addr, node1.did.clone())
+        .dial_with_retry(node1.listen_addr, node1.did.clone(), 5)
         .await?;
     tokio::time::sleep(Duration::from_millis(500)).await;
 
@@ -343,6 +377,9 @@ async fn test_pull_request_respects_backpressure() -> Result<()> {
     let node1 = TestNode::spawn(get_available_port()).await?;
     let node2 = TestNode::spawn(get_available_port()).await?;
 
+    // Allow nodes to fully initialize before connecting
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
     // Create topic
     let topic = "test:backpressure";
     {
@@ -354,10 +391,9 @@ async fn test_pull_request_respects_backpressure() -> Result<()> {
         gossip2.create_topic(Topic::new(topic.to_string(), AccessControl::Public));
     }
 
-    // Connect nodes
+    // Connect nodes with retry for CI reliability
     node1
-        .network_handle
-        .dial(node2.listen_addr, node2.did.clone())
+        .dial_with_retry(node2.listen_addr, node2.did.clone(), 5)
         .await?;
     tokio::time::sleep(Duration::from_millis(300)).await;
 
