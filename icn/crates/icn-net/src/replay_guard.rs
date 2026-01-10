@@ -374,6 +374,91 @@ impl ReplayGuard {
         Ok(())
     }
 
+    /// Check if message is fresh (not replayed) without verifying signature
+    ///
+    /// Use this when signature has already been verified by the caller
+    /// (e.g., via `verify_with_cached_pq_key()` in the signed message handler).
+    ///
+    /// This method performs all replay detection checks but skips signature
+    /// verification to avoid redundant cryptographic operations.
+    ///
+    /// # When to use
+    ///
+    /// - Use `check()` when you need both signature verification and replay detection
+    /// - Use `check_replay_only()` when signature was already verified elsewhere
+    ///
+    /// # Safety
+    ///
+    /// Caller MUST ensure the signature has been verified before calling this method.
+    /// Failure to verify signatures before replay checking could allow attackers
+    /// to inject forged messages that bypass replay detection.
+    pub fn check_replay_only(&mut self, envelope: &SignedEnvelope) -> Result<()> {
+        // Ensure initialized for persistent mode
+        if !self.initialized.load(Ordering::Acquire) {
+            self.load_and_apply_safety_gap()?;
+        }
+
+        // Note: Signature verification is SKIPPED - caller must have already verified
+
+        // Get or create sequence window for this sender
+        let window = self
+            .sequences
+            .entry(envelope.from.clone())
+            .or_insert_with(SequenceWindow::new);
+
+        // Check if sequence is finalized (CRITICAL: prevents replay after processing)
+        if window.finalized.contains_key(&envelope.sequence) {
+            bail!(
+                "Replay attempt detected from {}: sequence {} is finalized (processed)",
+                envelope.from.as_str(),
+                envelope.sequence
+            );
+        }
+
+        // Check against floor_seq (CRITICAL: prevents replay after restart)
+        if envelope.sequence <= window.floor_seq {
+            bail!(
+                "Replay detected from {}: sequence {} already seen (floor: {})",
+                envelope.from.as_str(),
+                envelope.sequence,
+                window.floor_seq
+            );
+        }
+
+        // Check sequence number against Bloom filter
+        let seq_hash = hash_sequence(envelope.sequence);
+        if envelope.sequence <= window.max_seq && window.recent.contains(&seq_hash) {
+            bail!(
+                "Replay detected from {}: sequence {} already seen (max: {})",
+                envelope.from.as_str(),
+                envelope.sequence,
+                window.max_seq
+            );
+        }
+
+        // Update window
+        let max_seq_changed = envelope.sequence > window.max_seq;
+        if max_seq_changed {
+            window.max_seq = envelope.sequence;
+        }
+        window.insert_sequence(&seq_hash);
+        window.last_update = Instant::now();
+
+        // Persist max_seq if changed
+        if max_seq_changed {
+            if let Err(e) = self.persist_max_seq(&envelope.from, envelope.sequence) {
+                tracing::warn!(
+                    peer = %envelope.from,
+                    seq = envelope.sequence,
+                    error = %e,
+                    "Failed to persist max_seq (continuing anyway)"
+                );
+            }
+        }
+
+        Ok(())
+    }
+
     /// Finalize a sequence number (permanently prevent replay)
     ///
     /// Call this after successfully processing a message (e.g., ledger entry written).
@@ -1254,5 +1339,88 @@ mod tests {
 
         assert!(guard.check(&envelope).is_ok());
         assert!(guard.is_initialized());
+    }
+
+    #[test]
+    fn test_check_replay_only_skips_signature_verification() {
+        let mut guard = ReplayGuard::new(300, 3600);
+        let keypair = KeyPair::generate().unwrap();
+
+        // Create a valid envelope
+        let mut envelope = SignedEnvelope::new(
+            keypair.did(),
+            &keypair,
+            1,
+            PayloadType::Gossip,
+            b"test".to_vec(),
+        )
+        .unwrap();
+
+        // Tamper with the signature (would fail signature verification)
+        envelope.signature[0] ^= 0xFF;
+
+        // check() should fail because signature is invalid
+        let result = guard.check(&envelope);
+        assert!(result.is_err());
+        assert!(
+            result.unwrap_err().to_string().contains("signature"),
+            "Should fail signature verification"
+        );
+
+        // But check_replay_only() should succeed because it skips signature
+        // (caller is responsible for verifying signature first)
+        assert!(
+            guard.check_replay_only(&envelope).is_ok(),
+            "check_replay_only should skip signature verification"
+        );
+    }
+
+    #[test]
+    fn test_check_replay_only_still_detects_replays() {
+        let mut guard = ReplayGuard::new(300, 3600);
+        let keypair = KeyPair::generate().unwrap();
+
+        let envelope = SignedEnvelope::new(
+            keypair.did(),
+            &keypair,
+            1,
+            PayloadType::Gossip,
+            b"test".to_vec(),
+        )
+        .unwrap();
+
+        // First delivery via check_replay_only: OK
+        assert!(guard.check_replay_only(&envelope).is_ok());
+
+        // Replay via check_replay_only: Rejected
+        let result = guard.check_replay_only(&envelope);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Replay detected"));
+    }
+
+    #[test]
+    fn test_check_replay_only_respects_finalization() {
+        let mut guard = ReplayGuard::new(300, 3600);
+        let keypair = KeyPair::generate().unwrap();
+
+        let envelope = SignedEnvelope::new(
+            keypair.did(),
+            &keypair,
+            1,
+            PayloadType::Gossip,
+            b"test".to_vec(),
+        )
+        .unwrap();
+
+        // First delivery
+        assert!(guard.check_replay_only(&envelope).is_ok());
+
+        // Finalize
+        assert!(guard.finalize(keypair.did(), 1).is_ok());
+
+        // Replay of finalized sequence: Rejected
+        let result = guard.check_replay_only(&envelope);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("finalized"));
     }
 }
