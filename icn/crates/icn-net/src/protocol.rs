@@ -2087,4 +2087,73 @@ mod tests {
         // They'll decompress successfully, then fail to decode postcard
         assert_eq!(0x11 & 0x0F, 1);
     }
+
+    #[test]
+    fn test_forward_compatible_postcard_node_decodes_bincode() {
+        // Verify that a postcard-capable node can decode bincode messages from old nodes.
+        // This tests forward compatibility: new nodes must understand old wire format.
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        let msg = NetworkMessage::ping(alice.clone(), bob.clone());
+
+        // Simulate old node: sends bincode-encoded message (use_postcard = false)
+        let bincode_bytes = msg.to_bytes_negotiated(false, false).unwrap();
+
+        // Verify wire byte indicates bincode encoding (high nibble = 0)
+        assert_eq!(
+            bincode_bytes[0] >> 4,
+            0,
+            "Old node should use bincode encoding"
+        );
+
+        // New postcard-capable node should decode it via from_bytes_negotiated
+        let decoded = NetworkMessage::from_bytes_negotiated(&bincode_bytes).unwrap();
+
+        assert_eq!(decoded.from, alice);
+        assert_eq!(decoded.to, Some(bob));
+        assert!(matches!(decoded.payload, MessagePayload::Ping { .. }));
+    }
+
+    #[test]
+    fn test_forward_compatible_postcard_node_decodes_bincode_compressed() {
+        // Same as above but with compression enabled
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        // Create a large, compressible message (similar to other compression tests)
+        let mut clock = VectorClock::new();
+        clock.increment(&alice);
+
+        let large_data = vec![42u8; 4096]; // 4KB of same byte (compresses well)
+        let gossip_msg = GossipMessage::Response {
+            entry: icn_gossip::types::GossipEntry {
+                hash: [1u8; 32],
+                author: alice.clone(),
+                clock,
+                topic: "test".to_string(),
+                data: large_data,
+                compressed: false,
+                timestamp: 0,
+                replica_offered: None,
+            },
+        };
+
+        let msg = NetworkMessage::gossip(alice.clone(), Some(bob), gossip_msg);
+
+        // Simulate old node: sends bincode + zstd (use_postcard = false, compression = true)
+        let bincode_compressed = msg.to_bytes_negotiated(false, true).unwrap();
+
+        // Verify wire byte indicates bincode + zstd (high nibble = 0, low nibble = 1)
+        assert_eq!(
+            bincode_compressed[0],
+            0x01,
+            "Old node should use bincode + zstd"
+        );
+
+        // New postcard-capable node should decode it
+        let decoded = NetworkMessage::from_bytes_negotiated(&bincode_compressed).unwrap();
+        assert_eq!(decoded.from, alice);
+        assert!(matches!(decoded.payload, MessagePayload::Gossip(_)));
+    }
 }
