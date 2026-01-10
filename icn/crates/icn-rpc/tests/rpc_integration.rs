@@ -17,9 +17,6 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
 
-// For token revocation tests
-use hex;
-
 /// Find an available port for testing by binding to port 0
 /// Returns the port and keeps the listener open to prevent reuse
 fn find_available_port_with_listener() -> (u16, std::net::TcpListener) {
