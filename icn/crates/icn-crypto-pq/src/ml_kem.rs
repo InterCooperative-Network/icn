@@ -1,16 +1,16 @@
 //! ML-KEM (Module-Lattice Key Encapsulation Mechanism) wrapper
 //!
-//! This module wraps the pqcrypto-kyber crate to provide a clean API
+//! This module wraps the pqcrypto-mlkem crate to provide a clean API
 //! for ML-KEM key encapsulation (NIST FIPS 203).
 //!
-//! We use Kyber768 (ML-KEM-768) which provides:
+//! We use ML-KEM-768 which provides:
 //! - Security level: NIST Level 3 (~128-bit post-quantum security)
 //! - Public key: 1184 bytes
 //! - Secret key: 2400 bytes
 //! - Ciphertext: 1088 bytes
 //! - Shared secret: 32 bytes
 
-use pqcrypto_kyber::kyber768::{
+use pqcrypto_mlkem::mlkem768::{
     decapsulate, encapsulate, keypair, Ciphertext, PublicKey, SecretKey,
 };
 use pqcrypto_traits::kem::{Ciphertext as _, PublicKey as _, SecretKey as _, SharedSecret as _};
@@ -19,7 +19,7 @@ use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::{CryptoError, Result};
 
-/// ML-KEM public key (Kyber768)
+/// ML-KEM public key (ML-KEM-768)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MlKemPublicKey {
     bytes: Vec<u8>,
@@ -91,7 +91,7 @@ impl MlKemCiphertext {
     }
 }
 
-/// ML-KEM keypair (Kyber768)
+/// ML-KEM keypair (ML-KEM-768)
 #[derive(Zeroize, ZeroizeOnDrop)]
 pub struct MlKemKeypair {
     #[zeroize(skip)]

@@ -1,9 +1,9 @@
 //! ML-DSA (Module-Lattice Digital Signature Algorithm) wrapper
 //!
-//! This module wraps the pqcrypto-dilithium crate to provide a clean API
+//! This module wraps the pqcrypto-mldsa crate to provide a clean API
 //! for ML-DSA signatures (NIST FIPS 204).
 //!
-//! We use Dilithium3 (ML-DSA-65) which provides:
+//! We use ML-DSA-65 which provides:
 //! - Security level: NIST Level 3 (~128-bit post-quantum security)
 //! - Public key: 1952 bytes
 //! - Signature: 3309 bytes
@@ -27,7 +27,7 @@
 
 use hkdf::Hkdf;
 use ml_dsa::{KeyGen, MlDsa65};
-use pqcrypto_dilithium::dilithium3::{
+use pqcrypto_mldsa::mldsa65::{
     detached_sign, keypair, verify_detached_signature, DetachedSignature, PublicKey, SecretKey,
 };
 use pqcrypto_traits::sign::{DetachedSignature as _, PublicKey as _, SecretKey as _};
@@ -42,7 +42,7 @@ use crate::{CryptoError, Result};
 /// Domain separator for ML-DSA key derivation
 const ML_DSA_KEY_DERIVATION_DOMAIN: &[u8] = b"icn-ml-dsa-key-v1";
 
-/// ML-DSA public key (Dilithium3)
+/// ML-DSA public key (ML-DSA-65)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MlDsaPublicKey {
     bytes: Vec<u8>,
@@ -78,7 +78,7 @@ impl MlDsaPublicKey {
     }
 }
 
-/// ML-DSA signature (Dilithium3)
+/// ML-DSA signature (ML-DSA-65)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MlDsaSignature {
     bytes: Vec<u8>,
@@ -114,7 +114,7 @@ impl MlDsaSignature {
     }
 }
 
-/// ML-DSA keypair (Dilithium3)
+/// ML-DSA keypair (ML-DSA-65)
 #[derive(Zeroize, ZeroizeOnDrop)]
 pub struct MlDsaKeypair {
     #[zeroize(skip)]
