@@ -104,6 +104,7 @@ pub fn init_metrics() -> Result<()> {
     // Initialize new submodule metrics descriptions
     metrics::gateway::init_descriptions();
     metrics::network::init_descriptions();
+    metrics::rpc::init_descriptions();
     tracing::info!("Metrics descriptions initialized");
     Ok(())
 }
