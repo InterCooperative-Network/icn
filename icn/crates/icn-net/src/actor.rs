@@ -453,10 +453,19 @@ impl NetworkHandle {
     ) {
         // Update local registry
         if let Some(ref registry) = self.blob_registry {
-            registry
-                .write()
-                .await
-                .announce_blob(blob_hash, peer_did.clone(), size_bytes);
+            if let Err(e) =
+                registry
+                    .write()
+                    .await
+                    .announce_blob(blob_hash, peer_did.clone(), size_bytes)
+            {
+                tracing::warn!(
+                    error = %e,
+                    blob_size = size_bytes,
+                    "Failed to register local blob announcement"
+                );
+                return; // Don't broadcast if we can't register locally
+            }
         }
 
         // Broadcast BlobAnnounce message via gossip
@@ -1666,11 +1675,18 @@ impl NetworkActor {
 
                                         // Update blob location registry
                                         if let Some(ref registry) = blob_registry {
-                                            registry.write().await.announce_blob(
+                                            if let Err(e) = registry.write().await.announce_blob(
                                                 *blob_hash,
                                                 peer_did.clone(),
                                                 *size_bytes,
-                                            );
+                                            ) {
+                                                debug!(
+                                                    error = %e,
+                                                    peer_did = %peer_did,
+                                                    blob_size = size_bytes,
+                                                    "Rejected blob announcement from peer"
+                                                );
+                                            }
                                         }
                                     }
 

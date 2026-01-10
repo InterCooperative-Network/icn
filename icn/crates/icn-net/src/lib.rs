@@ -29,7 +29,9 @@ pub mod turn;
 pub mod version;
 
 pub use actor::{IncomingMessageHandler, NetworkActor, NetworkHandle, NetworkMsg, NetworkStats};
-pub use blob_registry::{BlobLocation, BlobLocationRegistry};
+pub use blob_registry::{
+    BlobLocation, BlobLocationRegistry, BlobRegistryConfig, BlobRegistryError,
+};
 pub use candidate::ConnectionCandidate;
 pub use candidate_cache::CandidateCache;
 pub use discovery::{Discovery, PeerInfo};

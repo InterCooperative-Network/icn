@@ -144,6 +144,23 @@ pub fn init_descriptions() {
         "icn_network_hybrid_verification_failed_total",
         "Total number of hybrid signature verifications that failed"
     );
+    // Blob registry metrics (Issue #570)
+    describe_counter!(
+        "icn_network_blob_rejected_total",
+        "Total number of blob announcements rejected"
+    );
+    describe_counter!(
+        "icn_network_blob_evicted_total",
+        "Total number of blob entries evicted due to capacity limits"
+    );
+    describe_gauge!(
+        "icn_network_blob_registry_size_bytes",
+        "Current total size of all blobs in the registry"
+    );
+    describe_gauge!(
+        "icn_network_blob_registry_entries",
+        "Current number of blob location entries in the registry"
+    );
 }
 
 // Simple counters
@@ -400,4 +417,52 @@ pub fn connections_rejected_untrusted_inc(_peer_did: &str, trust_score: f64) {
         "class" => trust_class.to_string()
     )
     .increment(1);
+}
+
+// Blob registry metrics (Issue #570)
+
+/// Reason for blob announcement rejection
+#[derive(Debug, Clone, Copy)]
+pub enum BlobRejectionReason {
+    /// Blob size exceeds the maximum allowed size
+    TooLarge,
+    /// Peer has exceeded their quota
+    PeerQuotaExceeded,
+}
+
+impl BlobRejectionReason {
+    fn as_str(&self) -> &'static str {
+        match self {
+            Self::TooLarge => "too_large",
+            Self::PeerQuotaExceeded => "peer_quota_exceeded",
+        }
+    }
+}
+
+/// Increment blob rejection counter with reason
+///
+/// Called when a blob announcement is rejected due to size limits or quotas.
+pub fn blob_rejected_inc(reason: BlobRejectionReason) {
+    counter!(
+        "icn_network_blob_rejected_total",
+        "reason" => reason.as_str()
+    )
+    .increment(1);
+}
+
+/// Increment blob eviction counter
+///
+/// Called when a blob entry is evicted to make room for new entries.
+pub fn blob_evicted_inc() {
+    counter!("icn_network_blob_evicted_total").increment(1);
+}
+
+/// Set the current total size of all blobs in the registry
+pub fn blob_registry_size_set(bytes: u64) {
+    gauge!("icn_network_blob_registry_size_bytes").set(bytes as f64);
+}
+
+/// Set the current number of blob location entries in the registry
+pub fn blob_registry_entries_set(count: usize) {
+    gauge!("icn_network_blob_registry_entries").set(count as f64);
 }
