@@ -75,7 +75,7 @@ impl EncodingFormat {
         let encoding = match byte >> 4 {
             0 => EncodingFormat::Bincode,
             1 => EncodingFormat::Postcard,
-            n => anyhow::bail!("Unknown encoding format: {n}"),
+            n => anyhow::bail!("Unknown encoding format: {n} (wire byte: {byte:#04x})"),
         };
         let compression = CompressionFormat::try_from(byte & 0x0F)?;
         Ok((encoding, compression))
@@ -804,6 +804,13 @@ impl NetworkMessage {
                 result.push(format_byte);
                 result.extend(compressed);
 
+                // Record metrics before size check so we track oversized messages too
+                icn_obs::metrics::gossip::bytes_before_compression_add(bytes_before as u64);
+                icn_obs::metrics::gossip::bytes_after_compression_add(result.len() as u64);
+                icn_obs::metrics::gossip::compression_ratio_record(
+                    bytes_before as f64 / result.len() as f64,
+                );
+
                 if result.len() > MAX_MESSAGE_SIZE {
                     anyhow::bail!(
                         "Compressed message too large: {} bytes (max {})",
@@ -811,12 +818,6 @@ impl NetworkMessage {
                         MAX_MESSAGE_SIZE
                     );
                 }
-
-                icn_obs::metrics::gossip::bytes_before_compression_add(bytes_before as u64);
-                icn_obs::metrics::gossip::bytes_after_compression_add(result.len() as u64);
-                icn_obs::metrics::gossip::compression_ratio_record(
-                    bytes_before as f64 / result.len() as f64,
-                );
 
                 return Ok(result);
             }
@@ -828,6 +829,10 @@ impl NetworkMessage {
         result.push(format_byte);
         result.extend(raw_bytes);
 
+        // Record metrics before size check so we track oversized messages too
+        icn_obs::metrics::gossip::bytes_before_compression_add(bytes_before as u64);
+        icn_obs::metrics::gossip::bytes_after_compression_add(result.len() as u64);
+
         if result.len() > MAX_MESSAGE_SIZE {
             anyhow::bail!(
                 "Message too large: {} bytes (max {})",
@@ -835,9 +840,6 @@ impl NetworkMessage {
                 MAX_MESSAGE_SIZE
             );
         }
-
-        icn_obs::metrics::gossip::bytes_before_compression_add(bytes_before as u64);
-        icn_obs::metrics::gossip::bytes_after_compression_add(result.len() as u64);
 
         Ok(result)
     }
