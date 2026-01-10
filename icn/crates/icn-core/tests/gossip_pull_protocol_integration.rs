@@ -66,7 +66,8 @@ impl TestNode {
                 }
             }
         }
-        Err(last_error.unwrap_or_else(|| anyhow::anyhow!("Connection failed after {max_retries} attempts")))
+        Err(last_error
+            .unwrap_or_else(|| anyhow::anyhow!("Connection failed after {max_retries} attempts")))
     }
 
     async fn spawn(port: u16) -> Result<Self> {
