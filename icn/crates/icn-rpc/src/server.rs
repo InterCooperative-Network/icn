@@ -533,6 +533,10 @@ async fn dispatch_request(
         // Authentication methods (no auth required - bootstrap)
         "auth.challenge" => handler::auth::handle_auth_challenge(req.id, &req.params, state).await,
         "auth.verify" => handler::auth::handle_auth_verify(req.id, &req.params, state).await,
+        // Token revocation (caller claims passed for ownership/admin check)
+        "auth.revoke" => {
+            handler::auth::handle_auth_revoke(req.id, &req.params, state, claims).await
+        }
 
         // Network methods
         "network.peers" => handler::network::handle_network_peers(req.id, state).await,
