@@ -209,6 +209,61 @@ pub struct NetworkConfig {
     /// NAT traversal dial strategy configuration
     #[serde(default)]
     pub nat_dial: NatDialConfig,
+
+    /// Blob registry configuration for distributed data tracking
+    #[serde(default)]
+    pub blob_registry: BlobRegistryConfig,
+}
+
+/// Blob registry configuration for distributed data tracking
+///
+/// Controls size limits and quotas to prevent memory exhaustion attacks.
+/// The blob registry tracks which peers have which data blobs for
+/// locality-aware task placement.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BlobRegistryConfig {
+    /// Maximum size of a single blob in bytes (default: 10MB)
+    ///
+    /// Blobs larger than this are rejected. This prevents malicious peers
+    /// from announcing extremely large blobs that could exhaust memory.
+    #[serde(default = "default_max_blob_size")]
+    pub max_blob_size: u64,
+
+    /// Maximum total size of all blobs in the registry in bytes (default: 100MB)
+    ///
+    /// When this limit is reached, the oldest entries are evicted (LRU)
+    /// to make room for new announcements.
+    #[serde(default = "default_max_registry_size")]
+    pub max_registry_size: u64,
+
+    /// Maximum total blob size per peer in bytes (default: 10MB)
+    ///
+    /// This prevents a single peer from consuming too much of the registry
+    /// capacity. Announcements from peers exceeding their quota are rejected.
+    #[serde(default = "default_max_per_peer_size")]
+    pub max_per_peer_size: u64,
+}
+
+impl Default for BlobRegistryConfig {
+    fn default() -> Self {
+        Self {
+            max_blob_size: default_max_blob_size(),
+            max_registry_size: default_max_registry_size(),
+            max_per_peer_size: default_max_per_peer_size(),
+        }
+    }
+}
+
+fn default_max_blob_size() -> u64 {
+    10 * 1024 * 1024 // 10MB
+}
+
+fn default_max_registry_size() -> u64 {
+    100 * 1024 * 1024 // 100MB
+}
+
+fn default_max_per_peer_size() -> u64 {
+    10 * 1024 * 1024 // 10MB
 }
 
 /// NAT traversal dial strategy configuration
@@ -855,6 +910,7 @@ impl Default for Config {
                 e2e_encryption_enabled: true,
                 encryption_cleanup_circuit_breaker_threshold: 3,
                 nat_dial: NatDialConfig::default(),
+                blob_registry: BlobRegistryConfig::default(),
             },
             observability: ObservabilityConfig {
                 metrics_port: 9100,
