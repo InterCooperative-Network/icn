@@ -164,6 +164,25 @@ impl RpcServer {
         self.auth_manager = Some(Arc::new(RpcAuthManager::new(jwt_secret, true)));
     }
 
+    /// Set authentication manager with persistent storage for token revocation
+    ///
+    /// This enables token revocation support via `auth.revoke` RPC method.
+    /// Revoked tokens and challenges will persist across daemon restarts.
+    ///
+    /// # Arguments
+    /// * `jwt_secret` - Secret for signing JWTs (should be at least 32 bytes)
+    /// * `store` - Persistent storage for revocation list and challenges
+    pub fn set_auth_manager_with_store(
+        &mut self,
+        jwt_secret: Vec<u8>,
+        store: Arc<icn_store::SledStore>,
+    ) -> Result<()> {
+        let auth_manager = RpcAuthManager::new_with_store(jwt_secret, true, store)
+            .map_err(|e| anyhow::anyhow!("Failed to create auth manager: {e}"))?;
+        self.auth_manager = Some(Arc::new(auth_manager));
+        Ok(())
+    }
+
     /// Enable trust-based rate limiting for API requests (C8)
     ///
     /// Requires a trust graph to be set first via `set_trust_handle`.
@@ -453,8 +472,14 @@ async fn handle_request(
                 }
             }
         } else {
-            // Method doesn't require auth (e.g., auth.challenge)
-            None
+            // Method doesn't require auth (e.g., auth.challenge, auth.revoke)
+            // But if a token IS present, extract claims for optional authorization
+            // (e.g., auth.revoke uses caller claims to verify ownership/admin)
+            if let Some(token) = &bearer_token {
+                auth_manager.verify_token(token).ok()
+            } else {
+                None
+            }
         }
     } else {
         // Auth not enabled - allow all (backward compatibility / dev mode)
@@ -533,6 +558,10 @@ async fn dispatch_request(
         // Authentication methods (no auth required - bootstrap)
         "auth.challenge" => handler::auth::handle_auth_challenge(req.id, &req.params, state).await,
         "auth.verify" => handler::auth::handle_auth_verify(req.id, &req.params, state).await,
+        // Token revocation (caller claims passed for ownership/admin check)
+        "auth.revoke" => {
+            handler::auth::handle_auth_revoke(req.id, &req.params, state, claims).await
+        }
 
         // Network methods
         "network.peers" => handler::network::handle_network_peers(req.id, state).await,

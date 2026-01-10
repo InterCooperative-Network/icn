@@ -1199,3 +1199,492 @@ async fn test_compute_submit_excessive_fuel_limit() {
 
     handle.abort();
 }
+
+// === Token Revocation Tests (auth.revoke endpoint) ===
+
+/// Start a test server with persistent storage for token revocation support
+async fn start_test_server_with_revocation() -> Result<(SocketAddr, tokio::task::JoinHandle<()>)> {
+    const MAX_RETRIES: u32 = 5;
+
+    for attempt in 0..MAX_RETRIES {
+        let (port, listener) = find_available_port_with_listener();
+        let addr: SocketAddr = format!("127.0.0.1:{port}").parse()?;
+        drop(listener);
+
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let mut server = RpcServer::new(addr);
+        let jwt_secret = b"test-secret-for-rpc-revocation-tests-32b".to_vec();
+        if server
+            .set_auth_manager_with_store(jwt_secret, store)
+            .is_err()
+        {
+            continue;
+        }
+
+        let (tx, mut rx) = tokio::sync::mpsc::channel::<bool>(1);
+
+        let handle = tokio::spawn(async move {
+            match server.run().await {
+                Ok(()) => {}
+                Err(e) => {
+                    let _ = tx.send(false).await;
+                    eprintln!("Server error: {e}");
+                }
+            }
+        });
+
+        sleep(Duration::from_millis(50)).await;
+
+        match rx.try_recv() {
+            Ok(false) => {
+                handle.abort();
+                if attempt < MAX_RETRIES - 1 {
+                    sleep(Duration::from_millis(10)).await;
+                    continue;
+                }
+            }
+            Err(tokio::sync::mpsc::error::TryRecvError::Empty) => {
+                sleep(Duration::from_millis(50)).await;
+                return Ok((addr, handle));
+            }
+            _ => {}
+        }
+
+        if attempt == MAX_RETRIES - 1 {
+            return Ok((addr, handle));
+        }
+    }
+
+    anyhow::bail!("Failed to start test server with revocation after {MAX_RETRIES} attempts")
+}
+
+/// Helper to authenticate and get a token
+async fn authenticate_and_get_token(
+    addr: SocketAddr,
+    keypair: &KeyPair,
+    scopes: Vec<&str>,
+) -> Result<String> {
+    let client_http = reqwest::Client::new();
+    let did = keypair.did().to_string();
+
+    // Get challenge
+    let challenge_req = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "auth.challenge",
+        "params": { "did": did },
+        "id": 1
+    });
+
+    let response = client_http
+        .post(format!("http://{}", addr))
+        .json(&challenge_req)
+        .send()
+        .await?;
+
+    let challenge_resp: serde_json::Value = response.json().await?;
+    let nonce = challenge_resp["result"]["nonce"]
+        .as_str()
+        .ok_or_else(|| anyhow::anyhow!("No nonce in challenge response"))?;
+
+    // Sign the nonce
+    let nonce_bytes = hex::decode(nonce)?;
+    let signature = keypair.sign(&nonce_bytes);
+    let signature_hex = hex::encode(signature.to_bytes());
+
+    // Verify and get token
+    let verify_req = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "auth.verify",
+        "params": {
+            "did": did,
+            "signature": signature_hex,
+            "scopes": scopes
+        },
+        "id": 2
+    });
+
+    let response = client_http
+        .post(format!("http://{}", addr))
+        .json(&verify_req)
+        .send()
+        .await?;
+
+    let verify_resp: serde_json::Value = response.json().await?;
+    let token = verify_resp["result"]["token"]
+        .as_str()
+        .ok_or_else(|| anyhow::anyhow!("No token in verify response: {:?}", verify_resp))?;
+
+    Ok(token.to_string())
+}
+
+#[tokio::test]
+async fn test_auth_revoke_without_revocation_support() {
+    // Server without revocation support (no persistent storage)
+    let (addr, handle) = start_test_server(true).await.unwrap();
+
+    let keypair = KeyPair::generate().unwrap();
+    let token = authenticate_and_get_token(addr, &keypair, vec!["network:read"])
+        .await
+        .unwrap();
+
+    let client_http = reqwest::Client::new();
+
+    // Try to revoke token
+    let revoke_req = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "auth.revoke",
+        "params": { "token": token },
+        "id": 1
+    });
+
+    let response = client_http
+        .post(format!("http://{}", addr))
+        .json(&revoke_req)
+        .send()
+        .await
+        .unwrap();
+
+    let resp: serde_json::Value = response.json().await.unwrap();
+
+    // Should fail because revocation is not supported
+    assert!(
+        resp["error"].is_object(),
+        "Expected error when revocation not supported"
+    );
+    let error_msg = resp["error"]["message"]
+        .as_str()
+        .unwrap_or("")
+        .to_lowercase();
+    assert!(
+        error_msg.contains("revocation")
+            || error_msg.contains("not available")
+            || error_msg.contains("storage"),
+        "Expected revocation not available error, got: {}",
+        error_msg
+    );
+
+    handle.abort();
+}
+
+#[tokio::test]
+async fn test_auth_revoke_own_token_unauthenticated() {
+    let (addr, handle) = start_test_server_with_revocation().await.unwrap();
+
+    let keypair = KeyPair::generate().unwrap();
+    let token = authenticate_and_get_token(addr, &keypair, vec!["network:read"])
+        .await
+        .unwrap();
+
+    let client_http = reqwest::Client::new();
+
+    // Revoke without providing Authorization header (unauthenticated revocation)
+    // This is allowed because possessing the token is proof of ownership
+    let revoke_req = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "auth.revoke",
+        "params": { "token": token.clone() },
+        "id": 1
+    });
+
+    let response = client_http
+        .post(format!("http://{}", addr))
+        .json(&revoke_req)
+        .send()
+        .await
+        .unwrap();
+
+    let resp: serde_json::Value = response.json().await.unwrap();
+
+    // Should succeed
+    assert!(
+        resp["result"].is_object(),
+        "Expected success for unauthenticated revocation of own token, got: {:?}",
+        resp
+    );
+    assert_eq!(resp["result"]["revoked"], true);
+    assert!(resp["result"]["jti"].is_string());
+
+    // Verify the token is now rejected
+    let request = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "network.peers",
+        "params": {},
+        "id": 2
+    });
+
+    let response = client_http
+        .post(format!("http://{}", addr))
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&request)
+        .send()
+        .await
+        .unwrap();
+
+    let resp: serde_json::Value = response.json().await.unwrap();
+    assert!(
+        resp["error"].is_object(),
+        "Expected error for revoked token"
+    );
+
+    handle.abort();
+}
+
+#[tokio::test]
+async fn test_auth_revoke_own_token_authenticated() {
+    let (addr, handle) = start_test_server_with_revocation().await.unwrap();
+
+    let keypair = KeyPair::generate().unwrap();
+    let token = authenticate_and_get_token(addr, &keypair, vec!["network:read"])
+        .await
+        .unwrap();
+
+    let client_http = reqwest::Client::new();
+
+    // Revoke with Authorization header (authenticated revocation of own token)
+    let revoke_req = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "auth.revoke",
+        "params": { "token": token.clone() },
+        "id": 1
+    });
+
+    let response = client_http
+        .post(format!("http://{}", addr))
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&revoke_req)
+        .send()
+        .await
+        .unwrap();
+
+    let resp: serde_json::Value = response.json().await.unwrap();
+
+    // Should succeed
+    assert!(
+        resp["result"].is_object(),
+        "Expected success for authenticated revocation of own token, got: {:?}",
+        resp
+    );
+    assert_eq!(resp["result"]["revoked"], true);
+
+    handle.abort();
+}
+
+#[tokio::test]
+async fn test_auth_revoke_other_user_token_denied() {
+    let (addr, handle) = start_test_server_with_revocation().await.unwrap();
+
+    // User A gets a token
+    let keypair_a = KeyPair::generate().unwrap();
+    let token_a = authenticate_and_get_token(addr, &keypair_a, vec!["network:read"])
+        .await
+        .unwrap();
+
+    // User B gets a token (without admin scope)
+    let keypair_b = KeyPair::generate().unwrap();
+    let token_b = authenticate_and_get_token(addr, &keypair_b, vec!["network:read"])
+        .await
+        .unwrap();
+
+    let client_http = reqwest::Client::new();
+
+    // User B tries to revoke User A's token
+    let revoke_req = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "auth.revoke",
+        "params": { "token": token_a },
+        "id": 1
+    });
+
+    let response = client_http
+        .post(format!("http://{}", addr))
+        .header("Authorization", format!("Bearer {}", token_b))
+        .json(&revoke_req)
+        .send()
+        .await
+        .unwrap();
+
+    let resp: serde_json::Value = response.json().await.unwrap();
+
+    // Should fail with authorization error (-32403)
+    assert!(
+        resp["error"].is_object(),
+        "Expected error for unauthorized revocation, got: {:?}",
+        resp
+    );
+    let error_code = resp["error"]["code"].as_i64().unwrap_or(0);
+    assert_eq!(
+        error_code, -32403,
+        "Expected -32403 (not authorized), got code {} with response: {:?}",
+        error_code, resp
+    );
+
+    handle.abort();
+}
+
+#[tokio::test]
+async fn test_auth_revoke_admin_can_revoke_any_token() {
+    let (addr, handle) = start_test_server_with_revocation().await.unwrap();
+
+    // Regular user gets a token
+    let keypair_user = KeyPair::generate().unwrap();
+    let token_user = authenticate_and_get_token(addr, &keypair_user, vec!["network:read"])
+        .await
+        .unwrap();
+
+    // Admin gets a token with admin scope
+    let keypair_admin = KeyPair::generate().unwrap();
+    let token_admin = authenticate_and_get_token(addr, &keypair_admin, vec!["admin"])
+        .await
+        .unwrap();
+
+    let client_http = reqwest::Client::new();
+
+    // Admin revokes user's token
+    let revoke_req = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "auth.revoke",
+        "params": {
+            "token": token_user.clone(),
+            "reason": "Admin action: suspicious activity"
+        },
+        "id": 1
+    });
+
+    let response = client_http
+        .post(format!("http://{}", addr))
+        .header("Authorization", format!("Bearer {}", token_admin))
+        .json(&revoke_req)
+        .send()
+        .await
+        .unwrap();
+
+    let resp: serde_json::Value = response.json().await.unwrap();
+
+    // Should succeed
+    assert!(
+        resp["result"].is_object(),
+        "Expected success for admin revocation, got: {:?}",
+        resp
+    );
+    assert_eq!(resp["result"]["revoked"], true);
+
+    // Verify user's token is now rejected
+    let request = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "network.peers",
+        "params": {},
+        "id": 2
+    });
+
+    let response = client_http
+        .post(format!("http://{}", addr))
+        .header("Authorization", format!("Bearer {}", token_user))
+        .json(&request)
+        .send()
+        .await
+        .unwrap();
+
+    let resp: serde_json::Value = response.json().await.unwrap();
+    assert!(
+        resp["error"].is_object(),
+        "Expected error for revoked token"
+    );
+
+    handle.abort();
+}
+
+#[tokio::test]
+async fn test_auth_revoke_idempotent() {
+    let (addr, handle) = start_test_server_with_revocation().await.unwrap();
+
+    let keypair = KeyPair::generate().unwrap();
+    let token = authenticate_and_get_token(addr, &keypair, vec!["network:read"])
+        .await
+        .unwrap();
+
+    let client_http = reqwest::Client::new();
+
+    // First revocation
+    let revoke_req = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "auth.revoke",
+        "params": { "token": token.clone() },
+        "id": 1
+    });
+
+    let response = client_http
+        .post(format!("http://{}", addr))
+        .json(&revoke_req)
+        .send()
+        .await
+        .unwrap();
+
+    let resp: serde_json::Value = response.json().await.unwrap();
+    assert!(
+        resp["result"].is_object(),
+        "First revocation should succeed"
+    );
+    assert_eq!(resp["result"]["revoked"], true);
+
+    // Second revocation of same token (should be idempotent)
+    let response = client_http
+        .post(format!("http://{}", addr))
+        .json(&revoke_req)
+        .send()
+        .await
+        .unwrap();
+
+    let resp: serde_json::Value = response.json().await.unwrap();
+    assert!(
+        resp["result"].is_object(),
+        "Second revocation should also succeed (idempotent)"
+    );
+    assert_eq!(resp["result"]["revoked"], true);
+    // Should indicate it was already revoked
+    let message = resp["result"]["message"].as_str().unwrap_or("");
+    assert!(
+        message.contains("already revoked"),
+        "Expected 'already revoked' message, got: {}",
+        message
+    );
+
+    handle.abort();
+}
+
+#[tokio::test]
+async fn test_auth_revoke_invalid_token() {
+    let (addr, handle) = start_test_server_with_revocation().await.unwrap();
+
+    let client_http = reqwest::Client::new();
+
+    // Try to revoke an invalid token
+    let revoke_req = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "auth.revoke",
+        "params": { "token": "not.a.valid.jwt.token" },
+        "id": 1
+    });
+
+    let response = client_http
+        .post(format!("http://{}", addr))
+        .json(&revoke_req)
+        .send()
+        .await
+        .unwrap();
+
+    let resp: serde_json::Value = response.json().await.unwrap();
+
+    // Should fail with invalid params error
+    assert!(
+        resp["error"].is_object(),
+        "Expected error for invalid token"
+    );
+    let error_code = resp["error"]["code"].as_i64().unwrap_or(0);
+    assert_eq!(
+        error_code, -32602,
+        "Expected -32602 (invalid params), got: {}",
+        error_code
+    );
+
+    handle.abort();
+}

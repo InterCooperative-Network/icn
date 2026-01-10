@@ -18,8 +18,10 @@ use tokio::sync::broadcast;
 
 use ed25519_dalek::{Signature, Verifier};
 use icn_identity::Did;
+use icn_store::Store;
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 /// Authentication error types
 #[derive(Debug, thiserror::Error)]
@@ -29,6 +31,9 @@ pub enum AuthError {
 
     #[error("Authorization failed: {0}")]
     AuthorizationFailed(String),
+
+    #[error("Token has been revoked")]
+    TokenRevoked,
 
     #[error("Internal error: {0}")]
     InternalError(String),
@@ -48,6 +53,8 @@ struct Challenge {
 pub struct RpcTokenClaims {
     /// Subject (DID string)
     pub sub: String,
+    /// JWT ID - unique identifier for this token (enables revocation)
+    pub jti: String,
     /// Issued at (Unix timestamp)
     pub iat: u64,
     /// Expiration (Unix timestamp)
@@ -88,18 +95,354 @@ impl RpcTokenClaims {
 /// Cleanup interval for expired challenges (5 minutes)
 const CLEANUP_INTERVAL: Duration = Duration::from_secs(300);
 
+/// Storage key prefix for revoked tokens
+const REVOKED_TOKEN_PREFIX: &[u8] = b"auth:revoked:";
+
+/// Storage key prefix for challenge nonces
+const CHALLENGE_PREFIX: &[u8] = b"auth:challenge:";
+
+/// Revoked token entry stored in persistent storage
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct RevokedToken {
+    /// The JWT ID that was revoked
+    jti: String,
+    /// The DID that owned this token
+    subject: String,
+    /// When the token was revoked (Unix timestamp)
+    revoked_at: u64,
+    /// When the original token would have expired (Unix timestamp)
+    /// Used for cleanup - no need to store revocations past token expiry
+    original_expiry: u64,
+    /// Reason for revocation (optional)
+    reason: Option<String>,
+}
+
+/// Persistent challenge entry
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct PersistentChallenge {
+    /// The challenge nonce
+    nonce: String,
+    /// The DID that requested this challenge
+    did: String,
+    /// When the challenge was created (Unix timestamp)
+    created_at: u64,
+}
+
+/// Token Revocation List with persistence
+///
+/// Provides fast lookups for revoked tokens using both in-memory cache
+/// and persistent storage for durability across restarts.
+pub struct TokenRevocationList<S: Store> {
+    /// In-memory cache of revoked token IDs for fast lookup
+    cache: Arc<RwLock<std::collections::HashSet<String>>>,
+    /// Persistent storage backend
+    store: Arc<S>,
+}
+
+impl<S: Store> TokenRevocationList<S> {
+    /// Create a new Token Revocation List with the given store
+    pub fn new(store: Arc<S>) -> Result<Self, AuthError> {
+        let trl = Self {
+            cache: Arc::new(RwLock::new(std::collections::HashSet::new())),
+            store,
+        };
+
+        // Load existing revocations into cache
+        trl.load_cache()?;
+
+        Ok(trl)
+    }
+
+    /// Load revoked tokens from persistent storage into memory cache
+    fn load_cache(&self) -> Result<(), AuthError> {
+        let entries = self
+            .store
+            .scan(REVOKED_TOKEN_PREFIX)
+            .map_err(|e| AuthError::InternalError(format!("Failed to scan revoked tokens: {e}")))?;
+
+        let mut cache = self
+            .cache
+            .write()
+            .map_err(|e| AuthError::InternalError(format!("Lock poisoned: {e}")))?;
+
+        let now = Self::current_timestamp()?;
+
+        for (_key, value) in entries {
+            if let Ok(revoked) = serde_json::from_slice::<RevokedToken>(&value) {
+                // Only cache tokens that haven't expired yet
+                if revoked.original_expiry > now {
+                    cache.insert(revoked.jti);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Check if a token ID has been revoked
+    ///
+    /// Returns `false` on cache lock errors (fail-open). This is intentional:
+    /// - Lock poisoning is extremely rare (requires a panic while holding the lock)
+    /// - Failing closed (rejecting all tokens) creates a DoS vector
+    /// - The persistent storage is the source of truth; cache is only a performance optimization
+    /// - Better to allow one potentially-revoked token through than reject all valid tokens
+    pub fn is_revoked(&self, jti: &str) -> bool {
+        self.cache
+            .read()
+            .map(|cache| cache.contains(jti))
+            .unwrap_or_else(|e| {
+                tracing::warn!(error = %e, jti = %jti, "Cache lock poisoned in is_revoked, failing open");
+                false
+            })
+    }
+
+    /// Revoke a token
+    pub fn revoke(
+        &self,
+        jti: &str,
+        subject: &str,
+        original_expiry: u64,
+        reason: Option<String>,
+    ) -> Result<(), AuthError> {
+        let now = Self::current_timestamp()?;
+
+        // Don't revoke already-expired tokens
+        if original_expiry <= now {
+            return Ok(());
+        }
+
+        let revoked = RevokedToken {
+            jti: jti.to_string(),
+            subject: subject.to_string(),
+            revoked_at: now,
+            original_expiry,
+            reason,
+        };
+
+        // Store persistently
+        let key = Self::make_key(jti);
+        let value = serde_json::to_vec(&revoked).map_err(|e| {
+            AuthError::InternalError(format!("Failed to serialize revoked token: {e}"))
+        })?;
+
+        self.store
+            .put(&key, &value)
+            .map_err(|e| AuthError::InternalError(format!("Failed to store revoked token: {e}")))?;
+
+        // Update cache
+        let mut cache = self
+            .cache
+            .write()
+            .map_err(|e| AuthError::InternalError(format!("Lock poisoned: {e}")))?;
+
+        cache.insert(jti.to_string());
+
+        tracing::info!(jti = %jti, subject = %subject, "Token revoked");
+
+        Ok(())
+    }
+
+    /// Clean up expired revocations from storage
+    pub fn cleanup_expired(&self) -> Result<usize, AuthError> {
+        let entries = self
+            .store
+            .scan(REVOKED_TOKEN_PREFIX)
+            .map_err(|e| AuthError::InternalError(format!("Failed to scan revoked tokens: {e}")))?;
+
+        let now = Self::current_timestamp()?;
+        let mut cleaned = 0;
+
+        for (key, value) in entries {
+            if let Ok(revoked) = serde_json::from_slice::<RevokedToken>(&value) {
+                if revoked.original_expiry <= now {
+                    // Token has expired, remove revocation record
+                    self.store.delete(&key).map_err(|e| {
+                        AuthError::InternalError(format!(
+                            "Failed to delete expired revocation: {e}"
+                        ))
+                    })?;
+                    cleaned += 1;
+
+                    // Remove from cache - propagate lock errors
+                    let mut cache = self
+                        .cache
+                        .write()
+                        .map_err(|e| AuthError::InternalError(format!("Lock poisoned: {e}")))?;
+                    cache.remove(&revoked.jti);
+                }
+            }
+        }
+
+        Ok(cleaned)
+    }
+
+    /// Get count of revoked tokens
+    pub fn count(&self) -> usize {
+        self.cache.read().map(|c| c.len()).unwrap_or(0)
+    }
+
+    fn make_key(jti: &str) -> Vec<u8> {
+        let mut key = Vec::with_capacity(REVOKED_TOKEN_PREFIX.len() + jti.len());
+        key.extend_from_slice(REVOKED_TOKEN_PREFIX);
+        key.extend_from_slice(jti.as_bytes());
+        key
+    }
+
+    fn current_timestamp() -> Result<u64, AuthError> {
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .map_err(|e| AuthError::InternalError(format!("System clock error: {e}")))
+    }
+}
+
 /// RPC Authentication Manager
-pub struct RpcAuthManager {
+pub struct RpcAuthManager<S: Store = icn_store::SledStore> {
     challenges: Arc<RwLock<HashMap<Did, Challenge>>>,
     jwt_secret: Vec<u8>,
     challenge_ttl: Duration,
     token_ttl: Duration,
     /// If true, authentication is required. If false, all requests are allowed (dev mode).
     enabled: bool,
+    /// Token revocation list (optional, requires persistent storage)
+    revocation_list: Option<Arc<TokenRevocationList<S>>>,
+    /// Persistent storage for challenges (optional)
+    store: Option<Arc<S>>,
 }
 
-impl RpcAuthManager {
-    /// Create a new auth manager
+impl<S: Store + 'static> RpcAuthManager<S> {
+    /// Create a new auth manager with persistent storage
+    ///
+    /// This enables token revocation and challenge persistence across restarts.
+    ///
+    /// # Arguments
+    /// * `jwt_secret` - Secret for signing JWTs (should be at least 32 bytes)
+    /// * `enabled` - If false, authentication is bypassed (for development only)
+    /// * `store` - Persistent storage backend for challenges and revocations
+    pub fn new_with_store(
+        jwt_secret: Vec<u8>,
+        enabled: bool,
+        store: Arc<S>,
+    ) -> Result<Self, AuthError> {
+        let revocation_list = TokenRevocationList::new(Arc::clone(&store))?;
+
+        let mut manager = Self {
+            challenges: Arc::new(RwLock::new(HashMap::new())),
+            jwt_secret,
+            challenge_ttl: Duration::from_secs(300), // 5 minutes
+            token_ttl: Duration::from_secs(86400),   // 24 hours
+            enabled,
+            revocation_list: Some(Arc::new(revocation_list)),
+            store: Some(store),
+        };
+
+        // Load persisted challenges
+        manager.load_challenges()?;
+
+        Ok(manager)
+    }
+
+    /// Check if authentication is enabled
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    /// Check if token revocation is enabled
+    pub fn has_revocation_support(&self) -> bool {
+        self.revocation_list.is_some()
+    }
+
+    /// Load challenges from persistent storage
+    fn load_challenges(&mut self) -> Result<(), AuthError> {
+        let store = match &self.store {
+            Some(s) => s,
+            None => return Ok(()),
+        };
+
+        let entries = store
+            .scan(CHALLENGE_PREFIX)
+            .map_err(|e| AuthError::InternalError(format!("Failed to scan challenges: {e}")))?;
+
+        let mut challenges = self
+            .challenges
+            .write()
+            .map_err(|e| AuthError::InternalError(format!("Lock poisoned: {e}")))?;
+
+        let now = Self::current_timestamp()?;
+
+        for (_key, value) in entries {
+            if let Ok(persistent) = serde_json::from_slice::<PersistentChallenge>(&value) {
+                // Only load non-expired challenges
+                if now.saturating_sub(persistent.created_at) < self.challenge_ttl.as_secs() {
+                    if let Ok(did) = persistent.did.parse::<Did>() {
+                        let challenge = Challenge {
+                            nonce: persistent.nonce,
+                            did: did.clone(),
+                            created_at: persistent.created_at,
+                        };
+                        challenges.insert(did, challenge);
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Persist a challenge to storage
+    fn persist_challenge(&self, did: &Did, challenge: &Challenge) -> Result<(), AuthError> {
+        let store = match &self.store {
+            Some(s) => s,
+            None => return Ok(()),
+        };
+
+        let persistent = PersistentChallenge {
+            nonce: challenge.nonce.clone(),
+            did: did.to_string(),
+            created_at: challenge.created_at,
+        };
+
+        let key = Self::make_challenge_key(did);
+        let value = serde_json::to_vec(&persistent)
+            .map_err(|e| AuthError::InternalError(format!("Failed to serialize challenge: {e}")))?;
+
+        store
+            .put(&key, &value)
+            .map_err(|e| AuthError::InternalError(format!("Failed to store challenge: {e}")))?;
+
+        Ok(())
+    }
+
+    /// Remove a challenge from persistent storage
+    fn remove_persisted_challenge(&self, did: &Did) -> Result<(), AuthError> {
+        let store = match &self.store {
+            Some(s) => s,
+            None => return Ok(()),
+        };
+
+        let key = Self::make_challenge_key(did);
+        store
+            .delete(&key)
+            .map_err(|e| AuthError::InternalError(format!("Failed to delete challenge: {e}")))?;
+
+        Ok(())
+    }
+
+    fn make_challenge_key(did: &Did) -> Vec<u8> {
+        let did_str = did.to_string();
+        let mut key = Vec::with_capacity(CHALLENGE_PREFIX.len() + did_str.len());
+        key.extend_from_slice(CHALLENGE_PREFIX);
+        key.extend_from_slice(did_str.as_bytes());
+        key
+    }
+}
+
+/// Non-generic impl for backwards compatibility (no persistence)
+impl RpcAuthManager<icn_store::SledStore> {
+    /// Create a new auth manager without persistence
+    ///
+    /// Token revocation and challenge persistence will NOT be available.
+    /// Use `new_with_store` for production deployments.
     ///
     /// # Arguments
     /// * `jwt_secret` - Secret for signing JWTs (should be at least 32 bytes)
@@ -111,14 +454,13 @@ impl RpcAuthManager {
             challenge_ttl: Duration::from_secs(300), // 5 minutes
             token_ttl: Duration::from_secs(86400),   // 24 hours
             enabled,
+            revocation_list: None,
+            store: None,
         }
     }
+}
 
-    /// Check if authentication is enabled
-    pub fn is_enabled(&self) -> bool {
-        self.enabled
-    }
-
+impl<S: Store + 'static> RpcAuthManager<S> {
     /// Generate a challenge for a DID
     pub fn create_challenge(&self, did: &Did) -> Result<String, AuthError> {
         let nonce = self.generate_nonce();
@@ -127,6 +469,9 @@ impl RpcAuthManager {
             did: did.clone(),
             created_at: Self::current_timestamp()?,
         };
+
+        // Persist challenge if storage is available
+        self.persist_challenge(did, &challenge)?;
 
         let mut challenges = self
             .challenges
@@ -157,6 +502,9 @@ impl RpcAuthManager {
 
             challenges.remove(did).ok_or_else(auth_error)?
         };
+
+        // Remove from persistent storage
+        self.remove_persisted_challenge(did)?;
 
         // Parse inputs
         let verifying_key_result = did.to_verifying_key();
@@ -190,8 +538,11 @@ impl RpcAuthManager {
     /// Issue a JWT token
     fn issue_token(&self, did: &Did, scopes: Vec<String>) -> Result<String, AuthError> {
         let now = Self::current_timestamp()?;
+        let jti = Uuid::new_v4().to_string();
+
         let claims = RpcTokenClaims {
             sub: did.to_string(),
+            jti,
             iat: now,
             exp: now + self.token_ttl.as_secs(),
             scopes,
@@ -209,6 +560,11 @@ impl RpcAuthManager {
     }
 
     /// Verify a JWT token and extract claims
+    ///
+    /// This checks:
+    /// 1. Token signature is valid
+    /// 2. Token has not expired
+    /// 3. Token has not been revoked (if revocation list is enabled)
     pub fn verify_token(&self, token: &str) -> Result<RpcTokenClaims, AuthError> {
         let validation = Validation::default();
 
@@ -219,7 +575,96 @@ impl RpcAuthManager {
         )
         .map_err(|e| AuthError::AuthenticationFailed(format!("Invalid token: {e}")))?;
 
+        // Check if token has been revoked
+        if let Some(ref trl) = self.revocation_list {
+            if trl.is_revoked(&token_data.claims.jti) {
+                return Err(AuthError::TokenRevoked);
+            }
+        }
+
         Ok(token_data.claims)
+    }
+
+    /// Parse token claims without expiration or revocation validation
+    ///
+    /// This is useful for:
+    /// - Extracting claims from expired tokens (e.g., for revocation)
+    /// - Authorization checks where you need claims but token may be expired
+    ///
+    /// NOTE: This still validates the signature - only expiration and revocation checks are skipped.
+    pub fn parse_token_claims(&self, token: &str) -> Result<RpcTokenClaims, AuthError> {
+        let mut validation = Validation::default();
+        validation.validate_exp = false;
+
+        let token_data = decode::<RpcTokenClaims>(
+            token,
+            &DecodingKey::from_secret(&self.jwt_secret),
+            &validation,
+        )
+        .map_err(|e| AuthError::AuthenticationFailed(format!("Invalid token: {e}")))?;
+
+        Ok(token_data.claims)
+    }
+
+    /// Revoke a token by its claims
+    ///
+    /// This adds the token to the revocation list, preventing it from being used
+    /// for authentication until it would have naturally expired.
+    ///
+    /// Returns an error if revocation support is not enabled (no persistent storage).
+    pub fn revoke_token(
+        &self,
+        claims: &RpcTokenClaims,
+        reason: Option<String>,
+    ) -> Result<(), AuthError> {
+        let trl = self.revocation_list.as_ref().ok_or_else(|| {
+            AuthError::InternalError(
+                "Token revocation not available (no persistent storage)".to_string(),
+            )
+        })?;
+
+        trl.revoke(&claims.jti, &claims.sub, claims.exp, reason)
+    }
+
+    /// Revoke a token by parsing and extracting its claims
+    ///
+    /// This is a convenience method that extracts claims from a raw token string
+    /// and then revokes it. Useful when you have the token but not the claims.
+    pub fn revoke_token_string(
+        &self,
+        token: &str,
+        reason: Option<String>,
+    ) -> Result<(), AuthError> {
+        // Decode without full validation (we don't care if it's expired for revocation)
+        let mut validation = Validation::default();
+        validation.validate_exp = false;
+
+        let token_data = decode::<RpcTokenClaims>(
+            token,
+            &DecodingKey::from_secret(&self.jwt_secret),
+            &validation,
+        )
+        .map_err(|e| AuthError::AuthenticationFailed(format!("Invalid token: {e}")))?;
+
+        self.revoke_token(&token_data.claims, reason)
+    }
+
+    /// Get the number of revoked tokens
+    pub fn revoked_token_count(&self) -> usize {
+        self.revocation_list
+            .as_ref()
+            .map(|trl| trl.count())
+            .unwrap_or(0)
+    }
+
+    /// Check if a specific token (by JTI) has been revoked
+    ///
+    /// Returns `false` if revocation is not enabled or on cache errors (fail-open).
+    pub fn is_token_revoked(&self, jti: &str) -> bool {
+        match &self.revocation_list {
+            Some(trl) => trl.is_revoked(jti),
+            None => false,
+        }
     }
 
     /// Generate cryptographically random nonce
@@ -238,26 +683,60 @@ impl RpcAuthManager {
             .map_err(|e| AuthError::InternalError(format!("System clock error: {e}")))
     }
 
-    /// Clean up expired challenges
+    /// Clean up expired challenges from memory and persistent storage
     pub fn cleanup_expired_challenges(&self) -> Result<usize, AuthError> {
-        let mut challenges = self
-            .challenges
-            .write()
-            .map_err(|e| AuthError::InternalError(format!("Lock poisoned: {e}")))?;
-
         let now = Self::current_timestamp()?;
         let ttl = self.challenge_ttl.as_secs();
-        let initial_count = challenges.len();
 
-        challenges.retain(|_, challenge| now.saturating_sub(challenge.created_at) < ttl);
+        // Collect expired challenge DIDs while holding the lock
+        let expired_dids: Vec<Did> = {
+            let challenges = self
+                .challenges
+                .read()
+                .map_err(|e| AuthError::InternalError(format!("Lock poisoned: {e}")))?;
 
-        Ok(initial_count - challenges.len())
+            challenges
+                .iter()
+                .filter(|(_, challenge)| now.saturating_sub(challenge.created_at) >= ttl)
+                .map(|(did, _)| did.clone())
+                .collect()
+        };
+
+        if expired_dids.is_empty() {
+            return Ok(0);
+        }
+
+        // Remove from in-memory map
+        {
+            let mut challenges = self
+                .challenges
+                .write()
+                .map_err(|e| AuthError::InternalError(format!("Lock poisoned: {e}")))?;
+
+            for did in &expired_dids {
+                challenges.remove(did);
+            }
+        }
+
+        // Remove from persistent storage (if configured)
+        for did in &expired_dids {
+            if let Err(e) = self.remove_persisted_challenge(did) {
+                tracing::warn!(
+                    did = %did,
+                    error = %e,
+                    "Failed to remove expired persisted RPC auth challenge"
+                );
+            }
+        }
+
+        Ok(expired_dids.len())
     }
 
-    /// Start background task to periodically clean up expired challenges
+    /// Start background task to periodically clean up expired challenges and revocations
     ///
     /// Returns immediately. The cleanup task runs every 5 minutes until the shutdown
-    /// signal is received. This prevents memory growth from abandoned authentication attempts.
+    /// signal is received. This prevents memory growth from abandoned authentication attempts
+    /// and cleans up expired token revocations.
     pub fn start_cleanup_task(
         self: &Arc<Self>,
         mut shutdown: broadcast::Receiver<()>,
@@ -271,6 +750,7 @@ impl RpcAuthManager {
             loop {
                 tokio::select! {
                     _ = interval.tick() => {
+                        // Clean up expired challenges
                         match manager.cleanup_expired_challenges() {
                             Ok(0) => {} // No expired challenges
                             Ok(n) => {
@@ -278,6 +758,19 @@ impl RpcAuthManager {
                             }
                             Err(e) => {
                                 tracing::warn!(error = %e, "Failed to clean up expired challenges");
+                            }
+                        }
+
+                        // Clean up expired token revocations
+                        if let Some(ref trl) = manager.revocation_list {
+                            match trl.cleanup_expired() {
+                                Ok(0) => {} // No expired revocations
+                                Ok(n) => {
+                                    tracing::debug!(cleaned = n, "Cleaned up expired token revocations");
+                                }
+                                Err(e) => {
+                                    tracing::warn!(error = %e, "Failed to clean up expired revocations");
+                                }
                             }
                         }
                     }
@@ -353,8 +846,8 @@ pub mod scopes {
 /// Method to scope mapping
 pub fn required_scope_for_method(method: &str) -> Option<&'static str> {
     match method {
-        // Auth methods don't require auth (bootstrap)
-        "auth.challenge" | "auth.verify" => None,
+        // Auth methods don't require scope (auth.revoke checks ownership in handler)
+        "auth.challenge" | "auth.verify" | "auth.revoke" => None,
 
         // Network methods
         "network.peers" | "network.stats" | "network.status" => Some(scopes::NETWORK_READ),
@@ -470,6 +963,7 @@ mod tests {
     fn test_scope_checking() {
         let claims = RpcTokenClaims {
             sub: "did:icn:test".to_string(),
+            jti: "test-token-id".to_string(),
             iat: 0,
             exp: u64::MAX,
             scopes: vec!["compute:write".to_string(), "ledger:*".to_string()],
@@ -486,6 +980,7 @@ mod tests {
     fn test_wildcard_scope() {
         let claims = RpcTokenClaims {
             sub: "did:icn:test".to_string(),
+            jti: "test-token-id".to_string(),
             iat: 0,
             exp: u64::MAX,
             scopes: vec!["*".to_string()],
@@ -522,5 +1017,240 @@ mod tests {
             required_scope_for_method("governance.vote.cast"),
             Some(scopes::GOVERNANCE_WRITE)
         );
+
+        // Auth revoke doesn't require specific scope
+        assert_eq!(required_scope_for_method("auth.revoke"), None);
+    }
+
+    #[test]
+    fn test_token_contains_jti() {
+        let auth = RpcAuthManager::new(b"test_secret".to_vec(), true);
+        let bundle = IdentityBundle::generate().unwrap();
+
+        // Create and verify challenge
+        let nonce = auth.create_challenge(bundle.did()).unwrap();
+        let nonce_bytes = hex::decode(&nonce).unwrap();
+        let signature = bundle.keypair().sign(&nonce_bytes);
+        let signature_bytes = signature.to_bytes();
+
+        let token = auth
+            .verify_challenge(
+                bundle.did(),
+                &signature_bytes,
+                vec!["compute:write".to_string()],
+            )
+            .unwrap();
+
+        // Verify token contains jti
+        let claims = auth.verify_token(&token).unwrap();
+        assert!(!claims.jti.is_empty());
+        // JTI should be a valid UUID
+        assert!(uuid::Uuid::parse_str(&claims.jti).is_ok());
+    }
+
+    #[test]
+    fn test_token_revocation_with_persistence() {
+        // Create a temporary store for testing
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let auth = RpcAuthManager::new_with_store(b"test_secret".to_vec(), true, store).unwrap();
+        let bundle = IdentityBundle::generate().unwrap();
+
+        // Create and verify challenge to get a token
+        let nonce = auth.create_challenge(bundle.did()).unwrap();
+        let nonce_bytes = hex::decode(&nonce).unwrap();
+        let signature = bundle.keypair().sign(&nonce_bytes);
+        let signature_bytes = signature.to_bytes();
+
+        let token = auth
+            .verify_challenge(
+                bundle.did(),
+                &signature_bytes,
+                vec!["compute:write".to_string()],
+            )
+            .unwrap();
+
+        // Token should be valid
+        let claims = auth.verify_token(&token).unwrap();
+        assert_eq!(claims.sub, bundle.did().to_string());
+
+        // Revoke the token
+        auth.revoke_token(&claims, Some("test revocation".to_string()))
+            .unwrap();
+
+        // Token should now be rejected
+        let result = auth.verify_token(&token);
+        assert!(matches!(result, Err(AuthError::TokenRevoked)));
+
+        // Verify revocation count
+        assert_eq!(auth.revoked_token_count(), 1);
+    }
+
+    #[test]
+    fn test_revoke_token_string() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let auth = RpcAuthManager::new_with_store(b"test_secret".to_vec(), true, store).unwrap();
+        let bundle = IdentityBundle::generate().unwrap();
+
+        // Get a token
+        let nonce = auth.create_challenge(bundle.did()).unwrap();
+        let nonce_bytes = hex::decode(&nonce).unwrap();
+        let signature = bundle.keypair().sign(&nonce_bytes);
+        let signature_bytes = signature.to_bytes();
+
+        let token = auth
+            .verify_challenge(bundle.did(), &signature_bytes, vec![])
+            .unwrap();
+
+        // Revoke using the token string directly
+        auth.revoke_token_string(&token, None).unwrap();
+
+        // Token should be rejected
+        let result = auth.verify_token(&token);
+        assert!(matches!(result, Err(AuthError::TokenRevoked)));
+    }
+
+    #[test]
+    fn test_challenge_persistence() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let bundle = IdentityBundle::generate().unwrap();
+
+        // Create first auth manager and create a challenge
+        let auth1 =
+            RpcAuthManager::new_with_store(b"test_secret".to_vec(), true, Arc::clone(&store))
+                .unwrap();
+        let nonce = auth1.create_challenge(bundle.did()).unwrap();
+        assert_eq!(auth1.pending_challenge_count(), 1);
+
+        // Create second auth manager with same store (simulates restart)
+        let auth2 = RpcAuthManager::new_with_store(b"test_secret".to_vec(), true, store).unwrap();
+
+        // Challenge should be loaded from persistence
+        assert_eq!(auth2.pending_challenge_count(), 1);
+
+        // Should be able to verify the challenge
+        let nonce_bytes = hex::decode(&nonce).unwrap();
+        let signature = bundle.keypair().sign(&nonce_bytes);
+        let signature_bytes = signature.to_bytes();
+
+        let token = auth2
+            .verify_challenge(bundle.did(), &signature_bytes, vec![])
+            .unwrap();
+
+        assert!(!token.is_empty());
+    }
+
+    #[test]
+    fn test_revocation_persistence_across_restart() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let bundle = IdentityBundle::generate().unwrap();
+
+        let token: String;
+        let jti: String;
+
+        // First session: create a token and revoke it
+        {
+            let auth1 =
+                RpcAuthManager::new_with_store(b"test_secret".to_vec(), true, Arc::clone(&store))
+                    .unwrap();
+
+            // Get a token
+            let nonce = auth1.create_challenge(bundle.did()).unwrap();
+            let nonce_bytes = hex::decode(&nonce).unwrap();
+            let signature = bundle.keypair().sign(&nonce_bytes);
+            let signature_bytes = signature.to_bytes();
+
+            token = auth1
+                .verify_challenge(bundle.did(), &signature_bytes, vec![])
+                .unwrap();
+
+            let claims = auth1.verify_token(&token).unwrap();
+            jti = claims.jti.clone();
+
+            // Revoke the token
+            auth1
+                .revoke_token(&claims, Some("test revocation".to_string()))
+                .unwrap();
+
+            // Verify it's revoked in this session
+            assert!(matches!(
+                auth1.verify_token(&token),
+                Err(AuthError::TokenRevoked)
+            ));
+            assert_eq!(auth1.revoked_token_count(), 1);
+        }
+
+        // Second session: create new auth manager with same store (simulates restart)
+        {
+            let auth2 =
+                RpcAuthManager::new_with_store(b"test_secret".to_vec(), true, store).unwrap();
+
+            // Revocation should be loaded from persistence
+            assert_eq!(auth2.revoked_token_count(), 1);
+
+            // Token should still be rejected after restart
+            assert!(matches!(
+                auth2.verify_token(&token),
+                Err(AuthError::TokenRevoked)
+            ));
+
+            // Check by JTI directly
+            assert!(auth2.is_token_revoked(&jti));
+        }
+    }
+
+    #[test]
+    fn test_revocation_without_persistence() {
+        // Without persistence, revocation should fail
+        let auth = RpcAuthManager::new(b"test_secret".to_vec(), true);
+        let bundle = IdentityBundle::generate().unwrap();
+
+        // Get a token
+        let nonce = auth.create_challenge(bundle.did()).unwrap();
+        let nonce_bytes = hex::decode(&nonce).unwrap();
+        let signature = bundle.keypair().sign(&nonce_bytes);
+        let signature_bytes = signature.to_bytes();
+
+        let token = auth
+            .verify_challenge(bundle.did(), &signature_bytes, vec![])
+            .unwrap();
+
+        let claims = auth.verify_token(&token).unwrap();
+
+        // Try to revoke - should fail because no persistence
+        let result = auth.revoke_token(&claims, None);
+        assert!(matches!(result, Err(AuthError::InternalError(_))));
+    }
+
+    #[test]
+    fn test_token_revocation_list_cleanup() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let trl = TokenRevocationList::new(Arc::clone(&store)).unwrap();
+
+        // Add a revoked token that would have already expired
+        let past_expiry = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+            .saturating_sub(3600); // 1 hour ago
+
+        // This should be a no-op since the token is already expired
+        trl.revoke("old-jti", "did:icn:test", past_expiry, None)
+            .unwrap();
+        assert_eq!(trl.count(), 0); // Shouldn't be added since already expired
+
+        // Add a valid revoked token
+        let future_expiry = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+            + 3600; // 1 hour from now
+
+        trl.revoke("new-jti", "did:icn:test", future_expiry, None)
+            .unwrap();
+        assert_eq!(trl.count(), 1);
+        assert!(trl.is_revoked("new-jti"));
+        assert!(!trl.is_revoked("old-jti"));
     }
 }
