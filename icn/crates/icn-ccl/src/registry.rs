@@ -229,17 +229,15 @@ impl ContractRegistry {
         // Persist to store if available
         if let Some(store) = &self.store {
             let contract_key = format!("contract:{hash_hex}");
-            let contract_bytes =
-                bincode::serde::encode_to_vec(&contract, bincode::config::legacy())
-                    .map_err(|e| RegistryError::SerializationError(e.to_string()))?;
+            let contract_bytes = icn_encoding::encode_versioned(&contract)
+                .map_err(|e| RegistryError::SerializationError(e.to_string()))?;
             store
                 .put(contract_key.as_bytes(), &contract_bytes)
                 .map_err(|e| RegistryError::StorageError(e.to_string()))?;
 
             let metadata_key = format!("metadata:{hash_hex}");
-            let metadata_bytes =
-                bincode::serde::encode_to_vec(&metadata, bincode::config::legacy())
-                    .map_err(|e| RegistryError::SerializationError(e.to_string()))?;
+            let metadata_bytes = icn_encoding::encode_versioned(&metadata)
+                .map_err(|e| RegistryError::SerializationError(e.to_string()))?;
             store
                 .put(metadata_key.as_bytes(), &metadata_bytes)
                 .map_err(|e| RegistryError::StorageError(e.to_string()))?;
@@ -294,10 +292,8 @@ impl ContractRegistry {
                 .get(key.as_bytes())
                 .map_err(|e| RegistryError::StorageError(e.to_string()))?
             {
-                let contract: Contract =
-                    bincode::serde::decode_from_slice(&bytes, bincode::config::legacy())
-                        .map(|(v, _)| v)
-                        .map_err(|e| RegistryError::SerializationError(e.to_string()))?;
+                let contract: Contract = icn_encoding::decode_versioned(&bytes)
+                    .map_err(|e| RegistryError::SerializationError(e.to_string()))?;
 
                 // Populate cache
                 let mut contracts = self.contracts.write().await;
@@ -327,10 +323,8 @@ impl ContractRegistry {
                 .get(key.as_bytes())
                 .map_err(|e| RegistryError::StorageError(e.to_string()))?
             {
-                let meta: ContractMetadata =
-                    bincode::serde::decode_from_slice(&bytes, bincode::config::legacy())
-                        .map(|(v, _)| v)
-                        .map_err(|e| RegistryError::SerializationError(e.to_string()))?;
+                let meta: ContractMetadata = icn_encoding::decode_versioned(&bytes)
+                    .map_err(|e| RegistryError::SerializationError(e.to_string()))?;
 
                 // Populate cache
                 let mut metadata = self.metadata.write().await;
@@ -438,11 +432,7 @@ impl ContractRegistry {
                             let mut hash = [0u8; 32];
                             hash.copy_from_slice(&hash_bytes);
 
-                            if let Ok((contract, _)) =
-                                bincode::serde::decode_from_slice::<Contract, _>(
-                                    &value,
-                                    bincode::config::legacy(),
-                                )
+                            if let Ok(contract) = icn_encoding::decode_versioned::<Contract>(&value)
                             {
                                 let mut contracts = self.contracts.write().await;
                                 contracts.insert(hash, contract.clone());
@@ -450,10 +440,9 @@ impl ContractRegistry {
                                 // Also load metadata
                                 let meta_key = format!("metadata:{hash_hex}");
                                 if let Ok(Some(meta_bytes)) = store.get(meta_key.as_bytes()) {
-                                    if let Ok((meta, _)) =
-                                        bincode::serde::decode_from_slice::<ContractMetadata, _>(
+                                    if let Ok(meta) =
+                                        icn_encoding::decode_versioned::<ContractMetadata>(
                                             &meta_bytes,
-                                            bincode::config::legacy(),
                                         )
                                     {
                                         let mut metadata = self.metadata.write().await;

@@ -6,6 +6,7 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+icn-encoding = { path = "../icn-encoding" }
 icn-identity = { path = "../icn-identity" }
 icn-governance = { path = "../icn-governance" }
 icn-ledger = { path = "../icn-ledger" }

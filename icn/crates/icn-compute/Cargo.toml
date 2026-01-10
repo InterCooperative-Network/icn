@@ -8,6 +8,7 @@ description = "Distributed compute layer for ICN"
 
 [dependencies]
 # ICN crates
+icn-encoding = { path = "../icn-encoding" }
 icn-identity = { path = "../icn-identity" }
 icn-time = { path = "../icn-time" }
 icn-trust = { path = "../icn-trust" }

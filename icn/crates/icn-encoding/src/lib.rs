@@ -95,17 +95,22 @@ pub fn decode<T: DeserializeOwned>(bytes: &[u8]) -> Result<T> {
 /// Encode a value using bincode legacy format (for backward compatibility).
 ///
 /// Use this when communicating with peers that don't support postcard.
+/// Uses `bincode::serde` for compatibility with types using only serde derives.
 #[inline]
-pub fn encode_bincode_legacy<T: Serialize + bincode::Encode>(value: &T) -> Result<Vec<u8>> {
-    Ok(bincode::encode_to_vec(value, bincode::config::legacy())?)
+pub fn encode_bincode_legacy<T: Serialize>(value: &T) -> Result<Vec<u8>> {
+    Ok(bincode::serde::encode_to_vec(
+        value,
+        bincode::config::legacy(),
+    )?)
 }
 
 /// Decode a value using bincode legacy format.
 ///
 /// Use this when receiving from peers that don't support postcard.
+/// Uses `bincode::serde` for compatibility with types using only serde derives.
 #[inline]
-pub fn decode_bincode_legacy<T: DeserializeOwned + bincode::Decode<()>>(bytes: &[u8]) -> Result<T> {
-    let (value, _) = bincode::decode_from_slice(bytes, bincode::config::legacy())?;
+pub fn decode_bincode_legacy<T: DeserializeOwned>(bytes: &[u8]) -> Result<T> {
+    let (value, _) = bincode::serde::decode_from_slice(bytes, bincode::config::legacy())?;
     Ok(value)
 }
 
@@ -129,8 +134,9 @@ pub fn encode_versioned<T: Serialize>(value: &T) -> Result<Vec<u8>> {
 /// Decode a version-prefixed value from persistent storage.
 ///
 /// Supports both old bincode format (version 0) and new postcard format (version 1).
+/// Uses `bincode::serde` for bincode compatibility with types using only serde derives.
 #[inline]
-pub fn decode_versioned<T: DeserializeOwned + bincode::Decode<()>>(bytes: &[u8]) -> Result<T> {
+pub fn decode_versioned<T: DeserializeOwned>(bytes: &[u8]) -> Result<T> {
     if bytes.is_empty() {
         return Err(Error::EmptyData);
     }
@@ -140,7 +146,7 @@ pub fn decode_versioned<T: DeserializeOwned + bincode::Decode<()>>(bytes: &[u8])
 
     match version {
         FormatVersion::BincodeLegacy => {
-            let (value, _) = bincode::decode_from_slice(payload, bincode::config::legacy())?;
+            let (value, _) = bincode::serde::decode_from_slice(payload, bincode::config::legacy())?;
             Ok(value)
         }
         FormatVersion::Postcard => Ok(postcard::from_bytes(payload)?),
@@ -148,10 +154,14 @@ pub fn decode_versioned<T: DeserializeOwned + bincode::Decode<()>>(bytes: &[u8])
 }
 
 /// Encode using bincode legacy with version prefix (for testing/migration).
+/// Uses `bincode::serde` for compatibility with types using only serde derives.
 #[inline]
-pub fn encode_versioned_bincode<T: Serialize + bincode::Encode>(value: &T) -> Result<Vec<u8>> {
+pub fn encode_versioned_bincode<T: Serialize>(value: &T) -> Result<Vec<u8>> {
     let mut buf = vec![FormatVersion::BincodeLegacy as u8];
-    buf.extend(bincode::encode_to_vec(value, bincode::config::legacy())?);
+    buf.extend(bincode::serde::encode_to_vec(
+        value,
+        bincode::config::legacy(),
+    )?);
     Ok(buf)
 }
 
@@ -177,7 +187,7 @@ pub fn is_postcard_format(bytes: &[u8]) -> bool {
 /// Returns `Err` if decoding or re-encoding fails.
 pub fn migrate_to_postcard<T>(bytes: &[u8]) -> Result<Option<Vec<u8>>>
 where
-    T: DeserializeOwned + Serialize + bincode::Decode<()>,
+    T: DeserializeOwned + Serialize,
 {
     if bytes.is_empty() {
         return Err(Error::EmptyData);
