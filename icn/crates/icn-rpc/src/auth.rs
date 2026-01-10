@@ -13,10 +13,11 @@
 
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::broadcast;
 
 use ed25519_dalek::{Signature, Verifier};
+use metrics::{counter, gauge, histogram};
 use icn_identity::Did;
 use icn_store::Store;
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
@@ -155,6 +156,8 @@ impl<S: Store> TokenRevocationList<S> {
 
     /// Load revoked tokens from persistent storage into memory cache
     fn load_cache(&self) -> Result<(), AuthError> {
+        let start = Instant::now();
+
         let entries = self
             .store
             .scan(REVOKED_TOKEN_PREFIX)
@@ -166,8 +169,10 @@ impl<S: Store> TokenRevocationList<S> {
             .map_err(|e| AuthError::InternalError(format!("Lock poisoned: {e}")))?;
 
         let now = Self::current_timestamp()?;
+        let mut scanned = 0;
 
         for (_key, value) in entries {
+            scanned += 1;
             if let Ok(revoked) = serde_json::from_slice::<RevokedToken>(&value) {
                 // Only cache tokens that haven't expired yet
                 if revoked.original_expiry > now {
@@ -175,6 +180,18 @@ impl<S: Store> TokenRevocationList<S> {
                 }
             }
         }
+
+        // Record load metrics
+        let duration = start.elapsed();
+        histogram!("icn_rpc_revocation_load_duration_seconds").record(duration.as_secs_f64());
+        gauge!("icn_rpc_revoked_tokens_total").set(cache.len() as f64);
+
+        tracing::info!(
+            loaded = cache.len(),
+            scanned = scanned,
+            duration_ms = duration.as_millis(),
+            "Loaded token revocation list from storage"
+        );
 
         Ok(())
     }
@@ -187,13 +204,22 @@ impl<S: Store> TokenRevocationList<S> {
     /// - The persistent storage is the source of truth; cache is only a performance optimization
     /// - Better to allow one potentially-revoked token through than reject all valid tokens
     pub fn is_revoked(&self, jti: &str) -> bool {
-        self.cache
+        counter!("icn_rpc_revocation_checks_total").increment(1);
+
+        let is_revoked = self
+            .cache
             .read()
             .map(|cache| cache.contains(jti))
             .unwrap_or_else(|e| {
                 tracing::warn!(error = %e, jti = %jti, "Cache lock poisoned in is_revoked, failing open");
                 false
-            })
+            });
+
+        if is_revoked {
+            counter!("icn_rpc_revocation_hits_total").increment(1);
+        }
+
+        is_revoked
     }
 
     /// Revoke a token
@@ -237,6 +263,9 @@ impl<S: Store> TokenRevocationList<S> {
 
         cache.insert(jti.to_string());
 
+        // Update gauge with current count
+        gauge!("icn_rpc_revoked_tokens_total").set(cache.len() as f64);
+
         tracing::info!(jti = %jti, subject = %subject, "Token revoked");
 
         Ok(())
@@ -244,6 +273,8 @@ impl<S: Store> TokenRevocationList<S> {
 
     /// Clean up expired revocations from storage
     pub fn cleanup_expired(&self) -> Result<usize, AuthError> {
+        let start = Instant::now();
+
         let entries = self
             .store
             .scan(REVOKED_TOKEN_PREFIX)
@@ -251,8 +282,10 @@ impl<S: Store> TokenRevocationList<S> {
 
         let now = Self::current_timestamp()?;
         let mut cleaned = 0;
+        let mut scanned = 0;
 
         for (key, value) in entries {
+            scanned += 1;
             if let Ok(revoked) = serde_json::from_slice::<RevokedToken>(&value) {
                 if revoked.original_expiry <= now {
                     // Token has expired, remove revocation record
@@ -270,6 +303,19 @@ impl<S: Store> TokenRevocationList<S> {
                         .map_err(|e| AuthError::InternalError(format!("Lock poisoned: {e}")))?;
                     cache.remove(&revoked.jti);
                 }
+            }
+        }
+
+        // Record cleanup metrics
+        let duration = start.elapsed();
+        histogram!("icn_rpc_revocation_cleanup_duration_seconds").record(duration.as_secs_f64());
+        counter!("icn_rpc_revocation_cleanup_total").increment(cleaned as u64);
+        gauge!("icn_rpc_revocation_scan_entries").set(scanned as f64);
+
+        // Update the revoked tokens gauge after cleanup
+        if cleaned > 0 {
+            if let Ok(cache) = self.cache.read() {
+                gauge!("icn_rpc_revoked_tokens_total").set(cache.len() as f64);
             }
         }
 
@@ -1252,5 +1298,69 @@ mod tests {
         assert_eq!(trl.count(), 1);
         assert!(trl.is_revoked("new-jti"));
         assert!(!trl.is_revoked("old-jti"));
+    }
+
+    #[test]
+    fn test_concurrent_token_revocation() {
+        use std::sync::Arc;
+        use std::thread;
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let trl = Arc::new(TokenRevocationList::new(Arc::clone(&store)).unwrap());
+
+        // Token expiry 1 hour from now
+        let expiry = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+            + 3600;
+
+        let jti = "concurrent-test-jti";
+        let subject = "did:icn:concurrent-test";
+
+        // Spawn multiple threads all trying to revoke the same token
+        let num_threads = 10;
+        let handles: Vec<_> = (0..num_threads)
+            .map(|i| {
+                let trl = Arc::clone(&trl);
+                let jti = jti.to_string();
+                let subject = subject.to_string();
+                thread::spawn(move || {
+                    // Each thread tries to revoke the same token
+                    let result = trl.revoke(&jti, &subject, expiry, Some(format!("thread-{i}")));
+                    // Should succeed (idempotent operation)
+                    result.is_ok()
+                })
+            })
+            .collect();
+
+        // Wait for all threads and collect results
+        let results: Vec<bool> = handles.into_iter().map(|h| h.join().unwrap()).collect();
+
+        // All threads should have succeeded
+        assert!(
+            results.iter().all(|&r| r),
+            "All concurrent revocations should succeed"
+        );
+
+        // Token should be revoked exactly once in the cache
+        assert_eq!(trl.count(), 1, "Token should be in cache exactly once");
+        assert!(trl.is_revoked(jti), "Token should be marked as revoked");
+
+        // Verify concurrent reads don't cause issues
+        let read_handles: Vec<_> = (0..num_threads)
+            .map(|_| {
+                let trl = Arc::clone(&trl);
+                let jti = jti.to_string();
+                thread::spawn(move || trl.is_revoked(&jti))
+            })
+            .collect();
+
+        let read_results: Vec<bool> = read_handles.into_iter().map(|h| h.join().unwrap()).collect();
+        assert!(
+            read_results.iter().all(|&r| r),
+            "All concurrent reads should return revoked"
+        );
     }
 }
