@@ -137,7 +137,9 @@ pub async fn init_ledger_services(
             // Use timeout-based lock acquisition to balance availability with security.
             let timeout_duration = Duration::from_millis(TREASURY_VALIDATION_LOCK_TIMEOUT_MS);
 
-            // Use block_in_place to acquire async lock in sync validation context
+            // SAFETY: Use block_in_place to acquire async lock in sync validation context.
+            // The validation callback is sync (required by ledger API), but treasury access
+            // is async. block_in_place moves other tokio tasks off this thread before blocking.
             let validation_result = tokio::task::block_in_place(|| {
                 let rt = tokio::runtime::Handle::current();
                 rt.block_on(async {

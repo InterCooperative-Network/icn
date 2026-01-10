@@ -63,7 +63,9 @@ async fn export_state(
 
     // Export network state
     if let Some(network_handle) = network_handle {
-        // Need to use blocking context for async export_state
+        // SAFETY: Use block_in_place to safely call async export_state from sync context.
+        // This moves other tokio tasks off the current thread before blocking.
+        // catch_unwind handles any panics from runtime state issues during shutdown.
         match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             tokio::task::block_in_place(|| {
                 tokio::runtime::Handle::current()
