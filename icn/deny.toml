@@ -23,15 +23,10 @@ ignore = [
     # Functionality now in rustls-pki-types. reqwest needs to update.
     "RUSTSEC-2025-0134",  # rustls-pemfile unmaintained
 
-    # pqcrypto-dilithium replaced by pqcrypto-mldsa (FIPS204-compatible).
-    # TODO: Migrate icn-crypto-pq to use ml-dsa crate directly.
-    # Tracked in issue #292 (Post-quantum cryptography integration).
-    "RUSTSEC-2024-0380",  # pqcrypto-dilithium replaced
-
-    # pqcrypto-kyber replaced by pqcrypto-mlkem (FIPS203-compatible).
-    # TODO: Migrate icn-crypto-pq to use ml-kem crate directly.
-    # Tracked in issue #292 (Post-quantum cryptography integration).
-    "RUSTSEC-2024-0381",  # pqcrypto-kyber replaced
+    # paste is no longer maintained but is a stable macro utility with no
+    # known vulnerabilities. Used transitively by pqcrypto-mldsa (NIST PQ crypto).
+    # The maintainer archived the repo, but paste v1.x is widely used and stable.
+    "RUSTSEC-2024-0436",  # paste unmaintained (transitive via pqcrypto-mldsa)
 
     # proc-macro-error is unmaintained, used by i18n-embed-fl (via age)
     # and utoipa-gen. Both upstream deps need to migrate to alternatives.
