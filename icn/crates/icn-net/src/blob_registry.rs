@@ -59,6 +59,9 @@ pub enum BlobRegistryError {
 }
 
 /// Configuration for the blob location registry
+///
+/// NOTE: This struct is duplicated in `icn-core/src/config.rs` for configuration loading.
+/// Keep both definitions in sync when making changes.
 #[derive(Debug, Clone)]
 pub struct BlobRegistryConfig {
     /// Maximum size of a single blob in bytes (default: 10MB)
