@@ -10,6 +10,7 @@ repository.workspace = true
 default = []
 
 [dependencies]
+icn-encoding = { path = "../icn-encoding" }
 icn-identity = { path = "../icn-identity" }
 icn-time = { path = "../icn-time" }
 serde.workspace = true

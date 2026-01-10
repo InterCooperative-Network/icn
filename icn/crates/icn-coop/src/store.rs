@@ -14,7 +14,7 @@ impl CoopStore {
 
     pub fn save_cooperative(&self, coop: &Cooperative) -> Result<()> {
         let key = format!("coop:{}", coop.id);
-        let value = bincode::serde::encode_to_vec(coop, bincode::config::legacy())?;
+        let value = icn_encoding::encode_versioned(coop)?;
         self.db.insert(key.as_bytes(), value)?;
         Ok(())
     }
@@ -25,7 +25,7 @@ impl CoopStore {
             .db
             .get(key.as_bytes())?
             .ok_or_else(|| CoopError::NotFound(coop_id.to_string()))?;
-        Ok(bincode::serde::decode_from_slice(&value, bincode::config::legacy()).map(|(v, _)| v)?)
+        Ok(icn_encoding::decode_versioned(&value)?)
     }
 
     pub fn list_cooperatives(&self) -> Result<Vec<Cooperative>> {
@@ -34,9 +34,7 @@ impl CoopStore {
 
         for item in self.db.scan_prefix(prefix) {
             let (_, value) = item?;
-            let coop: Cooperative =
-                bincode::serde::decode_from_slice(&value, bincode::config::legacy())
-                    .map(|(v, _)| v)?;
+            let coop: Cooperative = icn_encoding::decode_versioned(&value)?;
             coops.push(coop);
         }
 
@@ -51,7 +49,7 @@ impl CoopStore {
 
     pub fn save_member(&self, member: &Member) -> Result<()> {
         let key = format!("member:{}:{}", member.coop_id, member.did);
-        let value = bincode::serde::encode_to_vec(member, bincode::config::legacy())?;
+        let value = icn_encoding::encode_versioned(member)?;
         self.db.insert(key.as_bytes(), value)?;
         Ok(())
     }
@@ -62,7 +60,7 @@ impl CoopStore {
             .db
             .get(key.as_bytes())?
             .ok_or_else(|| CoopError::MemberNotFound(did.to_string()))?;
-        Ok(bincode::serde::decode_from_slice(&value, bincode::config::legacy()).map(|(v, _)| v)?)
+        Ok(icn_encoding::decode_versioned(&value)?)
     }
 
     pub fn list_members(&self, coop_id: &str) -> Result<Vec<Member>> {
@@ -71,9 +69,7 @@ impl CoopStore {
 
         for item in self.db.scan_prefix(prefix.as_bytes()) {
             let (_, value) = item?;
-            let member: Member =
-                bincode::serde::decode_from_slice(&value, bincode::config::legacy())
-                    .map(|(v, _)| v)?;
+            let member: Member = icn_encoding::decode_versioned(&value)?;
             members.push(member);
         }
 
@@ -92,9 +88,7 @@ impl CoopStore {
 
         for item in self.db.scan_prefix(prefix) {
             let (_key, value) = item?;
-            let member: Member =
-                bincode::serde::decode_from_slice(&value, bincode::config::legacy())
-                    .map(|(v, _)| v)?;
+            let member: Member = icn_encoding::decode_versioned(&value)?;
             if member.did == *did {
                 coop_ids.push(member.coop_id.clone());
             }

@@ -213,27 +213,24 @@ impl SledEntityRegistry {
     // ========================================
 
     fn serialize_entity(entity: &CooperativeEntity) -> Result<Vec<u8>> {
-        bincode::serde::encode_to_vec(entity, bincode::config::legacy())
+        icn_encoding::encode_versioned(entity)
             .map_err(|e| EntityError::RegistryError(format!("Failed to serialize entity: {e}")))
     }
 
     fn deserialize_entity(bytes: &[u8]) -> Result<CooperativeEntity> {
-        bincode::serde::decode_from_slice(bytes, bincode::config::legacy())
-            .map(|(entity, _)| entity)
+        icn_encoding::decode_versioned(bytes)
             .map_err(|e| EntityError::RegistryError(format!("Failed to deserialize entity: {e}")))
     }
 
     fn serialize_membership(membership: &Membership) -> Result<Vec<u8>> {
-        bincode::serde::encode_to_vec(membership, bincode::config::legacy())
+        icn_encoding::encode_versioned(membership)
             .map_err(|e| EntityError::RegistryError(format!("Failed to serialize membership: {e}")))
     }
 
     fn deserialize_membership(bytes: &[u8]) -> Result<Membership> {
-        bincode::serde::decode_from_slice(bytes, bincode::config::legacy())
-            .map(|(membership, _)| membership)
-            .map_err(|e| {
-                EntityError::RegistryError(format!("Failed to deserialize membership: {e}"))
-            })
+        icn_encoding::decode_versioned(bytes).map_err(|e| {
+            EntityError::RegistryError(format!("Failed to deserialize membership: {e}"))
+        })
     }
 
     // ========================================
