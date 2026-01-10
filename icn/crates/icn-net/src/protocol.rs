@@ -1881,21 +1881,18 @@ mod tests {
             let wire_byte = encoding.to_wire_byte(compression);
             assert_eq!(
                 wire_byte, expected_byte,
-                "Wire byte mismatch for {:?}/{:?}",
-                encoding, compression
+                "Wire byte mismatch for {encoding:?}/{compression:?}",
             );
 
             let (parsed_encoding, parsed_compression) =
                 EncodingFormat::from_wire_byte(wire_byte).unwrap();
             assert_eq!(
                 parsed_encoding, encoding,
-                "Encoding mismatch for byte {:#x}",
-                wire_byte
+                "Encoding mismatch for byte {wire_byte:#x}",
             );
             assert_eq!(
                 parsed_compression, compression,
-                "Compression mismatch for byte {:#x}",
-                wire_byte
+                "Compression mismatch for byte {wire_byte:#x}",
             );
         }
     }
@@ -2071,6 +2068,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::erasing_op)] // Intentional: documenting that old nodes see compression = 0
     fn test_backward_compatible_wire_byte() {
         // Verify that old nodes reading new wire format bytes correctly parse
         // the compression format (low nibble) even if they ignore the encoding (high nibble)

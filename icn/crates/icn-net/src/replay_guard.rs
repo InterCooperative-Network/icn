@@ -1416,7 +1416,7 @@ mod tests {
                     &keypair,
                     seq,
                     PayloadType::Gossip,
-                    format!("msg{}", seq).as_bytes().to_vec(),
+                    format!("msg{seq}").as_bytes().to_vec(),
                 )
                 .unwrap(),
             );
