@@ -17,10 +17,10 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::broadcast;
 
 use ed25519_dalek::{Signature, Verifier};
-use metrics::{counter, gauge, histogram};
 use icn_identity::Did;
 use icn_store::Store;
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+use metrics::{counter, gauge, histogram};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -1365,7 +1365,10 @@ mod tests {
             })
             .collect();
 
-        let read_results: Vec<bool> = read_handles.into_iter().map(|h| h.join().unwrap()).collect();
+        let read_results: Vec<bool> = read_handles
+            .into_iter()
+            .map(|h| h.join().unwrap())
+            .collect();
         assert!(
             read_results.iter().all(|&r| r),
             "All concurrent reads should return revoked"
