@@ -46,6 +46,54 @@ impl TryFrom<u8> for CompressionFormat {
     }
 }
 
+/// Wire format encoding type
+///
+/// Used in combination with compression to indicate how messages are serialized.
+/// The wire format byte combines encoding and compression:
+/// - Low nibble (bits 0-3): compression format
+/// - High nibble (bits 4-7): encoding format
+///
+/// This allows backward compatibility: old nodes only check the low nibble,
+/// while new nodes can distinguish between bincode and postcard.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum EncodingFormat {
+    /// Bincode encoding (legacy, compatible with all nodes)
+    Bincode = 0,
+    /// Postcard encoding (more compact, requires POSTCARD_ENCODING capability)
+    Postcard = 1,
+}
+
+impl EncodingFormat {
+    /// Create wire format byte from encoding and compression
+    pub fn to_wire_byte(self, compression: CompressionFormat) -> u8 {
+        ((self as u8) << 4) | (compression as u8)
+    }
+
+    /// Parse encoding format from wire format byte
+    pub fn from_wire_byte(byte: u8) -> Result<(Self, CompressionFormat)> {
+        let encoding = match byte >> 4 {
+            0 => EncodingFormat::Bincode,
+            1 => EncodingFormat::Postcard,
+            n => anyhow::bail!("Unknown encoding format: {n}"),
+        };
+        let compression = CompressionFormat::try_from(byte & 0x0F)?;
+        Ok((encoding, compression))
+    }
+}
+
+impl TryFrom<u8> for EncodingFormat {
+    type Error = anyhow::Error;
+
+    fn try_from(value: u8) -> Result<Self> {
+        match value {
+            0 => Ok(EncodingFormat::Bincode),
+            1 => Ok(EncodingFormat::Postcard),
+            _ => anyhow::bail!("Unknown encoding format: {value}"),
+        }
+    }
+}
+
 /// Re-export TraceContext from icn-obs for distributed tracing propagation
 pub use icn_obs::TraceContext;
 
@@ -717,6 +765,127 @@ impl NetworkMessage {
         Ok(msg)
     }
 
+    /// Serialize to bytes with encoding and compression negotiation
+    ///
+    /// Wire format: [format_byte: 1 byte][payload: variable]
+    /// - format_byte high nibble (bits 4-7): encoding format (0=bincode, 1=postcard)
+    /// - format_byte low nibble (bits 0-3): compression format (0=none, 1=zstd)
+    ///
+    /// Use this for peers that support POSTCARD_ENCODING capability.
+    /// Falls back to bincode for peers without this capability.
+    pub fn to_bytes_negotiated(
+        &self,
+        use_postcard: bool,
+        enable_compression: bool,
+    ) -> Result<Vec<u8>> {
+        let encoding = if use_postcard {
+            EncodingFormat::Postcard
+        } else {
+            EncodingFormat::Bincode
+        };
+
+        let raw_bytes = if use_postcard {
+            postcard::to_allocvec(self).context("Failed to serialize with postcard")?
+        } else {
+            bincode::serde::encode_to_vec(self, bincode::config::legacy())
+                .context("Failed to serialize with bincode")?
+        };
+
+        let bytes_before = raw_bytes.len();
+
+        // Only compress if enabled, above threshold, and would reduce size
+        if enable_compression && raw_bytes.len() >= COMPRESSION_THRESHOLD {
+            let compressed =
+                zstd::encode_all(raw_bytes.as_slice(), 3).context("Failed to compress message")?;
+
+            if compressed.len() < raw_bytes.len() {
+                let format_byte = encoding.to_wire_byte(CompressionFormat::Zstd);
+                let mut result = Vec::with_capacity(1 + compressed.len());
+                result.push(format_byte);
+                result.extend(compressed);
+
+                if result.len() > MAX_MESSAGE_SIZE {
+                    anyhow::bail!(
+                        "Compressed message too large: {} bytes (max {})",
+                        result.len(),
+                        MAX_MESSAGE_SIZE
+                    );
+                }
+
+                icn_obs::metrics::gossip::bytes_before_compression_add(bytes_before as u64);
+                icn_obs::metrics::gossip::bytes_after_compression_add(result.len() as u64);
+                icn_obs::metrics::gossip::compression_ratio_record(
+                    bytes_before as f64 / result.len() as f64,
+                );
+
+                return Ok(result);
+            }
+        }
+
+        // No compression
+        let format_byte = encoding.to_wire_byte(CompressionFormat::None);
+        let mut result = Vec::with_capacity(1 + raw_bytes.len());
+        result.push(format_byte);
+        result.extend(raw_bytes);
+
+        if result.len() > MAX_MESSAGE_SIZE {
+            anyhow::bail!(
+                "Message too large: {} bytes (max {})",
+                result.len(),
+                MAX_MESSAGE_SIZE
+            );
+        }
+
+        icn_obs::metrics::gossip::bytes_before_compression_add(bytes_before as u64);
+        icn_obs::metrics::gossip::bytes_after_compression_add(result.len() as u64);
+
+        Ok(result)
+    }
+
+    /// Deserialize from bytes with encoding and compression negotiation
+    ///
+    /// Auto-detects encoding format from wire format byte and handles both
+    /// bincode and postcard encoded messages.
+    ///
+    /// This method is backward-compatible: it can decode messages from both
+    /// old nodes (bincode-only) and new nodes (postcard-capable).
+    pub fn from_bytes_negotiated(bytes: &[u8]) -> Result<Self> {
+        if bytes.is_empty() {
+            anyhow::bail!("Empty message");
+        }
+
+        if bytes.len() > MAX_MESSAGE_SIZE {
+            anyhow::bail!(
+                "Message too large: {} bytes (max {})",
+                bytes.len(),
+                MAX_MESSAGE_SIZE
+            );
+        }
+
+        let (encoding, compression) = EncodingFormat::from_wire_byte(bytes[0])?;
+        let payload = &bytes[1..];
+
+        let decompressed = match compression {
+            CompressionFormat::None => payload.to_vec(),
+            CompressionFormat::Zstd => {
+                zstd::decode_all(payload).context("Failed to decompress message")?
+            }
+        };
+
+        let msg: NetworkMessage = match encoding {
+            EncodingFormat::Bincode => {
+                bincode::serde::decode_from_slice(&decompressed, bincode::config::legacy())
+                    .map(|(v, _)| v)
+                    .context("Failed to deserialize with bincode")?
+            }
+            EncodingFormat::Postcard => postcard::from_bytes(&decompressed)
+                .context("Failed to deserialize with postcard")?,
+        };
+
+        Self::validate_version(msg.version)?;
+        Ok(msg)
+    }
+
     /// Validate protocol version compatibility
     ///
     /// Returns Ok if the version is supported, Err otherwise.
@@ -878,6 +1047,80 @@ pub async fn write_message_compressed(
     use tokio::io::AsyncWriteExt;
 
     let bytes = msg.to_bytes_compressed(enable_compression)?;
+    let len = bytes.len() as u32;
+
+    // Write 4-byte length prefix (big-endian)
+    send.write_all(&len.to_be_bytes())
+        .await
+        .context("Failed to write message length")?;
+
+    // Write message bytes
+    send.write_all(&bytes)
+        .await
+        .context("Failed to write message body")?;
+
+    send.flush().await.context("Failed to flush stream")?;
+
+    // Return total bytes: 4 (length prefix) + message body
+    Ok(4 + bytes.len())
+}
+
+/// Helper for reading length-prefixed messages with negotiated encoding
+///
+/// Use this for peers that support both POSTCARD_ENCODING and MESSAGE_COMPRESSION capabilities.
+/// Auto-detects encoding format from wire format byte.
+/// Returns the message and the number of bytes read (including 4-byte length prefix)
+pub async fn read_message_negotiated(
+    recv: &mut quinn::RecvStream,
+) -> Result<(NetworkMessage, usize)> {
+    // Read 4-byte length prefix (big-endian)
+    let mut len_buf = [0u8; 4];
+    recv.read_exact(&mut len_buf)
+        .await
+        .context("Failed to read message length")?;
+    let len_u32 = u32::from_be_bytes(len_buf);
+
+    // Validate message size BEFORE casting to usize to prevent overflow on 32-bit systems
+    if len_u32 == 0 {
+        anyhow::bail!("Invalid message: zero length");
+    }
+    if len_u32 > MAX_MESSAGE_SIZE as u32 {
+        anyhow::bail!("Message too large: {len_u32} bytes (max {MAX_MESSAGE_SIZE})");
+    }
+
+    // Safe to cast after validation
+    let len = len_u32 as usize;
+
+    // Allocate buffer (size is now validated)
+    let mut buf = vec![0u8; len];
+    recv.read_exact(&mut buf)
+        .await
+        .context("Failed to read message body")?;
+
+    let msg = NetworkMessage::from_bytes_negotiated(&buf)?;
+    // Return total bytes: 4 (length prefix) + message body
+    Ok((msg, 4 + len))
+}
+
+/// Helper for writing length-prefixed messages with negotiated encoding
+///
+/// Use this for peers that support both POSTCARD_ENCODING and MESSAGE_COMPRESSION capabilities.
+/// Returns the number of bytes written (including 4-byte length prefix)
+///
+/// # Arguments
+/// * `send` - QUIC send stream
+/// * `msg` - Message to send
+/// * `use_postcard` - Use postcard encoding (true if peer supports POSTCARD_ENCODING)
+/// * `enable_compression` - Enable zstd compression (true if peer supports MESSAGE_COMPRESSION)
+pub async fn write_message_negotiated(
+    send: &mut quinn::SendStream,
+    msg: &NetworkMessage,
+    use_postcard: bool,
+    enable_compression: bool,
+) -> Result<usize> {
+    use tokio::io::AsyncWriteExt;
+
+    let bytes = msg.to_bytes_negotiated(use_postcard, enable_compression)?;
     let len = bytes.len() as u32;
 
     // Write 4-byte length prefix (big-endian)
@@ -1607,5 +1850,243 @@ mod tests {
             "Should accept timestamp at edge of max age: {:?}",
             result
         );
+    }
+
+    // Issue #539: Wire protocol negotiated encoding tests
+
+    #[test]
+    fn test_encoding_format_conversion() {
+        assert_eq!(
+            EncodingFormat::try_from(0).unwrap(),
+            EncodingFormat::Bincode
+        );
+        assert_eq!(
+            EncodingFormat::try_from(1).unwrap(),
+            EncodingFormat::Postcard
+        );
+        assert!(EncodingFormat::try_from(2).is_err());
+    }
+
+    #[test]
+    fn test_wire_byte_roundtrip() {
+        // Test all combinations of encoding and compression
+        let combinations = [
+            (EncodingFormat::Bincode, CompressionFormat::None, 0x00),
+            (EncodingFormat::Bincode, CompressionFormat::Zstd, 0x01),
+            (EncodingFormat::Postcard, CompressionFormat::None, 0x10),
+            (EncodingFormat::Postcard, CompressionFormat::Zstd, 0x11),
+        ];
+
+        for (encoding, compression, expected_byte) in combinations {
+            let wire_byte = encoding.to_wire_byte(compression);
+            assert_eq!(
+                wire_byte, expected_byte,
+                "Wire byte mismatch for {:?}/{:?}",
+                encoding, compression
+            );
+
+            let (parsed_encoding, parsed_compression) =
+                EncodingFormat::from_wire_byte(wire_byte).unwrap();
+            assert_eq!(
+                parsed_encoding, encoding,
+                "Encoding mismatch for byte {:#x}",
+                wire_byte
+            );
+            assert_eq!(
+                parsed_compression, compression,
+                "Compression mismatch for byte {:#x}",
+                wire_byte
+            );
+        }
+    }
+
+    #[test]
+    fn test_negotiated_bincode_roundtrip() {
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        let msg = NetworkMessage::ping(alice.clone(), bob.clone());
+
+        // Bincode without compression
+        let bytes = msg.to_bytes_negotiated(false, false).unwrap();
+        assert_eq!(bytes[0], 0x00, "Should be bincode without compression");
+
+        let decoded = NetworkMessage::from_bytes_negotiated(&bytes).unwrap();
+        assert_eq!(decoded.from, alice);
+        assert_eq!(decoded.to, Some(bob));
+        assert!(matches!(decoded.payload, MessagePayload::Ping { .. }));
+    }
+
+    #[test]
+    fn test_negotiated_postcard_roundtrip() {
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        let msg = NetworkMessage::ping(alice.clone(), bob.clone());
+
+        // Postcard without compression
+        let bytes = msg.to_bytes_negotiated(true, false).unwrap();
+        assert_eq!(bytes[0], 0x10, "Should be postcard without compression");
+
+        let decoded = NetworkMessage::from_bytes_negotiated(&bytes).unwrap();
+        assert_eq!(decoded.from, alice);
+        assert_eq!(decoded.to, Some(bob));
+        assert!(matches!(decoded.payload, MessagePayload::Ping { .. }));
+    }
+
+    #[test]
+    fn test_postcard_is_more_compact() {
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        let msg = NetworkMessage::ping(alice, bob);
+
+        let bincode_bytes = msg.to_bytes_negotiated(false, false).unwrap();
+        let postcard_bytes = msg.to_bytes_negotiated(true, false).unwrap();
+
+        // Postcard is typically more compact
+        println!(
+            "Bincode: {} bytes, Postcard: {} bytes",
+            bincode_bytes.len(),
+            postcard_bytes.len()
+        );
+
+        // Both should decode correctly
+        let decoded_bincode = NetworkMessage::from_bytes_negotiated(&bincode_bytes).unwrap();
+        let decoded_postcard = NetworkMessage::from_bytes_negotiated(&postcard_bytes).unwrap();
+
+        assert!(matches!(
+            decoded_bincode.payload,
+            MessagePayload::Ping { .. }
+        ));
+        assert!(matches!(
+            decoded_postcard.payload,
+            MessagePayload::Ping { .. }
+        ));
+    }
+
+    #[test]
+    fn test_negotiated_postcard_with_compression() {
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        // Create a large, compressible message
+        let mut clock = VectorClock::new();
+        clock.increment(&alice);
+
+        let large_data = vec![42u8; 4096]; // 4KB of same byte
+        let gossip_msg = GossipMessage::Response {
+            entry: icn_gossip::types::GossipEntry {
+                hash: [1u8; 32],
+                author: alice.clone(),
+                clock,
+                topic: "test".to_string(),
+                data: large_data,
+                compressed: false,
+                timestamp: 0,
+                replica_offered: None,
+            },
+        };
+
+        let msg = NetworkMessage::gossip(alice.clone(), Some(bob.clone()), gossip_msg);
+
+        // Postcard with compression
+        let bytes = msg.to_bytes_negotiated(true, true).unwrap();
+        assert_eq!(bytes[0], 0x11, "Should be postcard with zstd compression");
+
+        // Should be smaller than without compression
+        let uncompressed = msg.to_bytes_negotiated(true, false).unwrap();
+        assert!(
+            bytes.len() < uncompressed.len(),
+            "Compressed ({}) should be smaller than uncompressed ({})",
+            bytes.len(),
+            uncompressed.len()
+        );
+
+        let decoded = NetworkMessage::from_bytes_negotiated(&bytes).unwrap();
+        assert_eq!(decoded.from, alice);
+        assert!(matches!(decoded.payload, MessagePayload::Gossip(_)));
+    }
+
+    #[test]
+    fn test_negotiated_bincode_with_compression() {
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        // Create a large, compressible message
+        let mut clock = VectorClock::new();
+        clock.increment(&alice);
+
+        let large_data = vec![42u8; 4096];
+        let gossip_msg = GossipMessage::Response {
+            entry: icn_gossip::types::GossipEntry {
+                hash: [1u8; 32],
+                author: alice.clone(),
+                clock,
+                topic: "test".to_string(),
+                data: large_data,
+                compressed: false,
+                timestamp: 0,
+                replica_offered: None,
+            },
+        };
+
+        let msg = NetworkMessage::gossip(alice.clone(), Some(bob.clone()), gossip_msg);
+
+        // Bincode with compression
+        let bytes = msg.to_bytes_negotiated(false, true).unwrap();
+        assert_eq!(bytes[0], 0x01, "Should be bincode with zstd compression");
+
+        let decoded = NetworkMessage::from_bytes_negotiated(&bytes).unwrap();
+        assert_eq!(decoded.from, alice);
+        assert!(matches!(decoded.payload, MessagePayload::Gossip(_)));
+    }
+
+    #[test]
+    fn test_negotiated_unknown_encoding_rejected() {
+        // Create a message with invalid encoding format (0x20)
+        let wire_byte = 0x20; // encoding = 2 (invalid)
+        let result = EncodingFormat::from_wire_byte(wire_byte);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Unknown encoding"));
+    }
+
+    #[test]
+    fn test_negotiated_unknown_compression_rejected() {
+        // Create a message with invalid compression format (0x02)
+        let wire_byte = 0x02; // encoding = 0, compression = 2 (invalid)
+        let result = EncodingFormat::from_wire_byte(wire_byte);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Unknown compression"));
+    }
+
+    #[test]
+    fn test_negotiated_empty_message_rejected() {
+        let result = NetworkMessage::from_bytes_negotiated(&[]);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Empty message"));
+    }
+
+    #[test]
+    fn test_backward_compatible_wire_byte() {
+        // Verify that old nodes reading new wire format bytes correctly parse
+        // the compression format (low nibble) even if they ignore the encoding (high nibble)
+
+        // 0x00 = bincode + none -> old nodes see compression = 0 (none)
+        assert_eq!(0x00 & 0x0F, 0);
+
+        // 0x01 = bincode + zstd -> old nodes see compression = 1 (zstd)
+        assert_eq!(0x01 & 0x0F, 1);
+
+        // 0x10 = postcard + none -> old nodes see compression = 0 (none)
+        // They'll fail to decode postcard, but at least won't crash on decompression
+        assert_eq!(0x10 & 0x0F, 0);
+
+        // 0x11 = postcard + zstd -> old nodes see compression = 1 (zstd)
+        // They'll decompress successfully, then fail to decode postcard
+        assert_eq!(0x11 & 0x0F, 1);
     }
 }
