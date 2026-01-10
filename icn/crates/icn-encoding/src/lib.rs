@@ -98,7 +98,10 @@ pub fn decode<T: DeserializeOwned>(bytes: &[u8]) -> Result<T> {
 /// Uses `bincode::serde` for compatibility with types using only serde derives.
 #[inline]
 pub fn encode_bincode_legacy<T: Serialize>(value: &T) -> Result<Vec<u8>> {
-    Ok(bincode::serde::encode_to_vec(value, bincode::config::legacy())?)
+    Ok(bincode::serde::encode_to_vec(
+        value,
+        bincode::config::legacy(),
+    )?)
 }
 
 /// Decode a value using bincode legacy format.
@@ -155,7 +158,10 @@ pub fn decode_versioned<T: DeserializeOwned>(bytes: &[u8]) -> Result<T> {
 #[inline]
 pub fn encode_versioned_bincode<T: Serialize>(value: &T) -> Result<Vec<u8>> {
     let mut buf = vec![FormatVersion::BincodeLegacy as u8];
-    buf.extend(bincode::serde::encode_to_vec(value, bincode::config::legacy())?);
+    buf.extend(bincode::serde::encode_to_vec(
+        value,
+        bincode::config::legacy(),
+    )?);
     Ok(buf)
 }
 

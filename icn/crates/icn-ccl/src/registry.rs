@@ -432,8 +432,7 @@ impl ContractRegistry {
                             let mut hash = [0u8; 32];
                             hash.copy_from_slice(&hash_bytes);
 
-                            if let Ok(contract) =
-                                icn_encoding::decode_versioned::<Contract>(&value)
+                            if let Ok(contract) = icn_encoding::decode_versioned::<Contract>(&value)
                             {
                                 let mut contracts = self.contracts.write().await;
                                 contracts.insert(hash, contract.clone());
