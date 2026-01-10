@@ -107,19 +107,19 @@ struct StoredKeyV3 {
     /// Format version (always 3 for this struct)
     version: u8,
 
-    /// This device's identity keys (SENSITIVE - must be zeroized)
-    secret_bytes: [u8; 32],
+    /// This device's identity keys (SENSITIVE - auto-zeroized via Zeroizing)
+    secret_bytes: Zeroizing<[u8; 32]>,
     public_bytes: [u8; 32],
     did: String,
 
-    /// TLS binding (from IdentityBundle) (SENSITIVE - must be zeroized)
+    /// TLS binding (from IdentityBundle) (SENSITIVE - auto-zeroized via Zeroizing)
     tls_cert_der: Vec<u8>,
-    tls_key_der: Vec<u8>,
+    tls_key_der: Zeroizing<Vec<u8>>,
     tls_binding_sig: Vec<u8>,
     created_at: u64,
 
-    /// X25519 encryption keys (SENSITIVE - must be zeroized)
-    x25519_secret: Vec<u8>,
+    /// X25519 encryption keys (SENSITIVE - auto-zeroized via Zeroizing)
+    x25519_secret: Zeroizing<Vec<u8>>,
     x25519_public: [u8; 32],
 
     /// DID Document (public, no need to zeroize)
@@ -132,14 +132,7 @@ struct StoredKeyV3 {
     rotation_chain: Vec<RotationEvent>,
 }
 
-impl Drop for StoredKeyV3 {
-    fn drop(&mut self) {
-        // Zeroize sensitive fields
-        self.secret_bytes.zeroize();
-        self.x25519_secret.zeroize();
-        self.tls_key_der.zeroize();
-    }
-}
+// Note: No manual Drop needed - Zeroizing handles secure cleanup automatically
 
 /// Keystore v4 format: SDIS support with Anchor and KeyBundles
 #[derive(Serialize, Deserialize)]
@@ -148,19 +141,19 @@ struct StoredKeyV4 {
     version: u8,
 
     // === Legacy fields from v3 (for backward compatibility) ===
-    /// This device's Ed25519 identity keys (SENSITIVE)
-    secret_bytes: [u8; 32],
+    /// This device's Ed25519 identity keys (SENSITIVE - auto-zeroized via Zeroizing)
+    secret_bytes: Zeroizing<[u8; 32]>,
     public_bytes: [u8; 32],
     did: String,
 
-    /// TLS binding (SENSITIVE)
+    /// TLS binding (SENSITIVE - auto-zeroized via Zeroizing)
     tls_cert_der: Vec<u8>,
-    tls_key_der: Vec<u8>,
+    tls_key_der: Zeroizing<Vec<u8>>,
     tls_binding_sig: Vec<u8>,
     created_at: u64,
 
-    /// X25519 encryption keys (SENSITIVE)
-    x25519_secret: Vec<u8>,
+    /// X25519 encryption keys (SENSITIVE - auto-zeroized via Zeroizing)
+    x25519_secret: Zeroizing<Vec<u8>>,
     x25519_public: [u8; 32],
 
     /// DID Document
@@ -186,22 +179,22 @@ struct StoredKeyV4 {
     current_keybundle_version: u32,
 
     // === Post-Quantum fields (v5 additions) ===
-    /// PQ signature secret key for core identity (ML-DSA) (feature-gated)
+    /// PQ signature secret key for core identity (ML-DSA) (SENSITIVE - auto-zeroized)
     #[cfg(feature = "post-quantum")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pq_secret: Option<Vec<u8>>,
+    pq_secret: Option<Zeroizing<Vec<u8>>>,
 
-    /// PQ signature public key for core identity (ML-DSA) (feature-gated)
+    /// PQ signature public key for core identity (ML-DSA)
     #[cfg(feature = "post-quantum")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pq_public: Option<Vec<u8>>,
 
-    /// PQ encryption secret key (ML-KEM) (feature-gated)
+    /// PQ encryption secret key (ML-KEM) (SENSITIVE - auto-zeroized)
     #[cfg(feature = "post-quantum")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    kem_pq_secret: Option<Vec<u8>>,
+    kem_pq_secret: Option<Zeroizing<Vec<u8>>>,
 
-    /// PQ encryption public key (ML-KEM) (feature-gated)
+    /// PQ encryption public key (ML-KEM)
     #[cfg(feature = "post-quantum")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     kem_pq_public: Option<Vec<u8>>,
@@ -218,16 +211,16 @@ struct StoredKeyBundleV4 {
     /// KeyBundle version
     version: u32,
 
-    /// Ed25519 signing key (from hybrid keypair) (SENSITIVE)
-    classical_secret: Vec<u8>,
+    /// Ed25519 signing key (from hybrid keypair) (SENSITIVE - auto-zeroized)
+    classical_secret: Zeroizing<Vec<u8>>,
     classical_public: Vec<u8>,
 
-    /// ML-DSA signing key (from hybrid keypair) (SENSITIVE)
-    pq_secret: Vec<u8>,
+    /// ML-DSA signing key (from hybrid keypair) (SENSITIVE - auto-zeroized)
+    pq_secret: Zeroizing<Vec<u8>>,
     pq_public: Vec<u8>,
 
-    /// X25519 encryption key for this bundle (SENSITIVE)
-    bundle_x25519_secret: Vec<u8>,
+    /// X25519 encryption key for this bundle (SENSITIVE - auto-zeroized)
+    bundle_x25519_secret: Zeroizing<Vec<u8>>,
     bundle_x25519_public: [u8; 32],
 
     /// Timestamps
@@ -238,28 +231,8 @@ struct StoredKeyBundleV4 {
     revoked_at: Option<u64>,
 }
 
-impl Drop for StoredKeyV4 {
-    fn drop(&mut self) {
-        // Zeroize sensitive fields
-        self.secret_bytes.zeroize();
-        self.x25519_secret.zeroize();
-        self.tls_key_der.zeroize();
-        #[cfg(feature = "post-quantum")]
-        {
-            if let Some(ref mut pq_sec) = self.pq_secret {
-                pq_sec.zeroize();
-            }
-            if let Some(ref mut kem_sec) = self.kem_pq_secret {
-                kem_sec.zeroize();
-            }
-        }
-        for kb in &mut self.keybundles {
-            kb.classical_secret.zeroize();
-            kb.pq_secret.zeroize();
-            kb.bundle_x25519_secret.zeroize();
-        }
-    }
-}
+// Note: No manual Drop needed for StoredKeyV4 or StoredKeyBundleV4
+// Zeroizing<T> handles secure cleanup automatically when dropped
 
 /// Age-encrypted key storage
 pub struct AgeKeyStore {
@@ -505,11 +478,11 @@ impl AgeKeyStore {
             .iter()
             .map(|kb| StoredKeyBundleV4 {
                 version: kb.version,
-                classical_secret: kb.classical_secret_bytes().to_vec(),
+                classical_secret: Zeroizing::new(kb.classical_secret_bytes().to_vec()),
                 classical_public: kb.classical_public_bytes(),
-                pq_secret: kb.pq_secret_bytes().to_vec(),
+                pq_secret: Zeroizing::new(kb.pq_secret_bytes().to_vec()),
                 pq_public: kb.pq_public_bytes(),
-                bundle_x25519_secret: kb.x25519_secret_bytes().to_vec(),
+                bundle_x25519_secret: Zeroizing::new(kb.x25519_secret_bytes().to_vec()),
                 bundle_x25519_public: kb.x25519_public(),
                 issued_at: kb.issued_at,
                 expires_at: kb.expires_at,
@@ -519,14 +492,14 @@ impl AgeKeyStore {
 
         let stored = StoredKeyV4 {
             version: 4,
-            secret_bytes: *identity_bundle.keypair().secret_bytes(),
+            secret_bytes: Zeroizing::new(*identity_bundle.keypair().secret_bytes()),
             public_bytes: identity_bundle.keypair().verifying_key().to_bytes(),
             did: identity_bundle.did().as_str().to_string(),
             tls_cert_der: identity_bundle.tls_cert().as_ref().to_vec(),
-            tls_key_der: identity_bundle.tls_key_der_bytes().to_vec(),
+            tls_key_der: Zeroizing::new(identity_bundle.tls_key_der_bytes().to_vec()),
             tls_binding_sig: identity_bundle.binding_info().tls_binding_sig.clone(),
             created_at: identity_bundle.binding_info().created_at,
-            x25519_secret: identity_bundle.x25519_secret_bytes().to_vec(),
+            x25519_secret: Zeroizing::new(identity_bundle.x25519_secret_bytes().to_vec()),
             x25519_public: *identity_bundle.x25519_public_bytes(),
             did_document: did_document.clone(),
             device_id: device_id.clone(),
@@ -539,7 +512,7 @@ impl AgeKeyStore {
                 .keypair()
                 .pq_keypair
                 .as_ref()
-                .map(|kp| kp.secret_key_bytes().to_vec()),
+                .map(|kp| Zeroizing::new(kp.secret_key_bytes().to_vec())),
             #[cfg(feature = "post-quantum")]
             pq_public: identity_bundle
                 .keypair()
@@ -547,7 +520,9 @@ impl AgeKeyStore {
                 .as_ref()
                 .map(|kp| kp.public_key().as_bytes().to_vec()),
             #[cfg(feature = "post-quantum")]
-            kem_pq_secret: identity_bundle.kem_pq_secret_bytes().map(|s| s.to_vec()),
+            kem_pq_secret: identity_bundle
+                .kem_pq_secret_bytes()
+                .map(|s| Zeroizing::new(s.to_vec())),
             #[cfg(feature = "post-quantum")]
             kem_pq_public: identity_bundle.kem_pq_public_bytes().map(|p| p.to_vec()),
             #[cfg(feature = "post-quantum")]
@@ -686,14 +661,14 @@ impl AgeKeyStore {
         let keypair = identity_bundle.keypair();
         let stored_v3 = StoredKeyV3 {
             version: 3,
-            secret_bytes: *keypair.secret_bytes(),
+            secret_bytes: Zeroizing::new(*keypair.secret_bytes()),
             public_bytes: keypair.verifying_key().to_bytes(),
             did: identity_bundle.did().as_str().to_string(),
             tls_cert_der: identity_bundle.tls_cert().as_ref().to_vec(),
-            tls_key_der: identity_bundle.tls_key_der_bytes().to_vec(),
+            tls_key_der: Zeroizing::new(identity_bundle.tls_key_der_bytes().to_vec()),
             tls_binding_sig: identity_bundle.binding_info().tls_binding_sig.clone(),
             created_at: identity_bundle.binding_info().created_at,
-            x25519_secret: identity_bundle.x25519_secret_bytes().to_vec(),
+            x25519_secret: Zeroizing::new(identity_bundle.x25519_secret_bytes().to_vec()),
             x25519_public: *identity_bundle.x25519_public_bytes(),
             did_document: did_document.clone(),
             device_id: device_id.clone(),
@@ -742,14 +717,14 @@ impl AgeKeyStore {
         let keypair = identity_bundle.keypair();
         let stored_v3 = StoredKeyV3 {
             version: 3,
-            secret_bytes: *keypair.secret_bytes(),
+            secret_bytes: Zeroizing::new(*keypair.secret_bytes()),
             public_bytes: keypair.verifying_key().to_bytes(),
             did: identity_bundle.did().as_str().to_string(),
             tls_cert_der: identity_bundle.tls_cert().as_ref().to_vec(),
-            tls_key_der: identity_bundle.tls_key_der_bytes().to_vec(),
+            tls_key_der: Zeroizing::new(identity_bundle.tls_key_der_bytes().to_vec()),
             tls_binding_sig: identity_bundle.binding_info().tls_binding_sig.clone(),
             created_at: identity_bundle.binding_info().created_at,
-            x25519_secret: identity_bundle.x25519_secret_bytes().to_vec(),
+            x25519_secret: Zeroizing::new(identity_bundle.x25519_secret_bytes().to_vec()),
             x25519_public: *identity_bundle.x25519_public_bytes(),
             did_document: did_document.clone(),
             device_id: "device-1".to_string(),
@@ -1068,13 +1043,16 @@ impl KeyStore for AgeKeyStore {
             stored.tls_binding_sig.clone(),
             stored.created_at,
         ) {
+            // Wrap TLS key in Zeroizing for secure handling
+            let tls_key_der = Zeroizing::new(tls_key_der);
+
             // Check if we have X25519 keys (v2.1+)
             let (x25519_secret, x25519_public) = if let (Some(secret), Some(public)) =
                 (stored.x25519_secret.clone(), stored.x25519_public)
             {
-                // V2.1+ keystore: has X25519 keys
+                // V2.1+ keystore: has X25519 keys - wrap in Zeroizing
                 info!("Unlocked v2.1 keystore, migrating to v3 (multi-device)");
-                (secret, public)
+                (Zeroizing::new(secret), public)
             } else {
                 // V2.0 keystore: has TLS but no X25519, generate new X25519 keys
                 info!("Unlocked v2.0 keystore, migrating to v3 with X25519 keys");
@@ -1086,7 +1064,7 @@ impl KeyStore for AgeKeyStore {
 
                 let secret_key = StaticSecret::random_from_rng(OsRng);
                 let public_key = PublicKey::from(&secret_key);
-                let secret_bytes = secret_key.to_bytes().to_vec();
+                let secret_bytes = Zeroizing::new(secret_key.to_bytes().to_vec());
                 let public_bytes = public_key.to_bytes();
 
                 (secret_bytes, public_bytes)
@@ -1121,14 +1099,14 @@ impl KeyStore for AgeKeyStore {
         // Save as v3 keystore
         let stored_v3 = StoredKeyV3 {
             version: 3,
-            secret_bytes: *identity_bundle.keypair().secret_bytes(),
+            secret_bytes: Zeroizing::new(*identity_bundle.keypair().secret_bytes()),
             public_bytes: identity_bundle.keypair().verifying_key().to_bytes(),
             did: identity_bundle.did().as_str().to_string(),
             tls_cert_der: identity_bundle.tls_cert().as_ref().to_vec(),
-            tls_key_der: identity_bundle.tls_key_der_bytes().to_vec(),
+            tls_key_der: Zeroizing::new(identity_bundle.tls_key_der_bytes().to_vec()),
             tls_binding_sig: identity_bundle.binding_info().tls_binding_sig.clone(),
             created_at: identity_bundle.binding_info().created_at,
-            x25519_secret: identity_bundle.x25519_secret_bytes().to_vec(),
+            x25519_secret: Zeroizing::new(identity_bundle.x25519_secret_bytes().to_vec()),
             x25519_public: *identity_bundle.x25519_public_bytes(),
             did_document: did_document.clone(),
             device_id: "device-1".to_string(),
