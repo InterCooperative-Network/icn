@@ -514,3 +514,684 @@ impl CoopActor {
         Ok((coop, events))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        AssetDistributionPlan, BalanceAction, CapitalReturnMethod, CoopHandle, CoopStatus,
+        CoopType, DebtAction, FormationRequest, MemberRole, MemberStatus,
+    };
+    use icn_identity::KeyPair;
+    use std::sync::Arc;
+    use tempfile::tempdir;
+
+    fn create_test_store() -> CoopStore {
+        let dir = tempdir().unwrap();
+        let db = sled::open(dir.path()).unwrap();
+        CoopStore::new(Arc::new(db))
+    }
+
+    fn create_test_did() -> Did {
+        KeyPair::generate().unwrap().did().clone()
+    }
+
+    fn spawn_test_actor() -> CoopHandle {
+        let store = create_test_store();
+        let tx = CoopActor::spawn(store, None);
+        CoopHandle::new(tx)
+    }
+
+    // === Basic cooperative operations ===
+
+    #[tokio::test]
+    async fn test_create_cooperative() {
+        let handle = spawn_test_actor();
+        let founder = create_test_did();
+
+        let coop = handle
+            .create_cooperative(
+                None,
+                "Test Coop".to_string(),
+                CoopType::Worker,
+                founder.clone(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(coop.name, "Test Coop");
+        assert_eq!(coop.coop_type, CoopType::Worker);
+        assert_eq!(coop.status, CoopStatus::Forming);
+    }
+
+    #[tokio::test]
+    async fn test_create_cooperative_with_explicit_id() {
+        let handle = spawn_test_actor();
+        let founder = create_test_did();
+
+        let coop = handle
+            .create_cooperative(
+                Some("my-custom-id".to_string()),
+                "My Coop".to_string(),
+                CoopType::Consumer,
+                founder,
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(coop.id, "my-custom-id");
+        assert_eq!(coop.name, "My Coop");
+    }
+
+    #[tokio::test]
+    async fn test_create_cooperative_all_types() {
+        let handle = spawn_test_actor();
+
+        for coop_type in [
+            CoopType::Worker,
+            CoopType::Consumer,
+            CoopType::Producer,
+            CoopType::MultiStakeholder,
+            CoopType::Platform,
+            CoopType::Housing,
+            CoopType::Credit,
+        ] {
+            let founder = create_test_did();
+            let coop = handle
+                .create_cooperative(None, format!("Coop {:?}", coop_type), coop_type, founder)
+                .await
+                .unwrap();
+
+            assert_eq!(coop.coop_type, coop_type);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_cooperative() {
+        let handle = spawn_test_actor();
+        let founder = create_test_did();
+
+        let created = handle
+            .create_cooperative(None, "Test Coop".to_string(), CoopType::Worker, founder)
+            .await
+            .unwrap();
+
+        let retrieved = handle.get_cooperative(created.id.clone()).await.unwrap();
+        assert_eq!(retrieved.id, created.id);
+        assert_eq!(retrieved.name, created.name);
+    }
+
+    #[tokio::test]
+    async fn test_get_cooperative_not_found() {
+        let handle = spawn_test_actor();
+
+        let result = handle.get_cooperative("nonexistent".to_string()).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_list_cooperatives_empty() {
+        let handle = spawn_test_actor();
+
+        let coops = handle.list_cooperatives().await.unwrap();
+        assert!(coops.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_list_cooperatives() {
+        let handle = spawn_test_actor();
+
+        // Create multiple coops
+        for i in 1..=3 {
+            let founder = create_test_did();
+            handle
+                .create_cooperative(None, format!("Coop {i}"), CoopType::Worker, founder)
+                .await
+                .unwrap();
+        }
+
+        let coops = handle.list_cooperatives().await.unwrap();
+        assert_eq!(coops.len(), 3);
+    }
+
+    #[tokio::test]
+    async fn test_delete_cooperative() {
+        let handle = spawn_test_actor();
+        let founder = create_test_did();
+
+        let coop = handle
+            .create_cooperative(None, "To Delete".to_string(), CoopType::Worker, founder)
+            .await
+            .unwrap();
+
+        // Verify it exists
+        assert!(handle.get_cooperative(coop.id.clone()).await.is_ok());
+
+        // Delete it
+        handle.delete_cooperative(coop.id.clone()).await.unwrap();
+
+        // Verify it's gone
+        assert!(handle.get_cooperative(coop.id).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_delete_cooperative_with_members() {
+        let handle = spawn_test_actor();
+        let founder = create_test_did();
+
+        let coop = handle
+            .create_cooperative(
+                None,
+                "With Members".to_string(),
+                CoopType::Worker,
+                founder.clone(),
+            )
+            .await
+            .unwrap();
+
+        // Add another member
+        let member_did = create_test_did();
+        handle
+            .add_member(coop.id.clone(), member_did, MemberRole::Worker)
+            .await
+            .unwrap();
+
+        // Delete the coop (should also delete members)
+        handle.delete_cooperative(coop.id.clone()).await.unwrap();
+
+        // Verify coop is gone
+        assert!(handle.get_cooperative(coop.id).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_activate_cooperative() {
+        let handle = spawn_test_actor();
+        let founder = create_test_did();
+
+        let coop = handle
+            .create_cooperative(None, "Test Coop".to_string(), CoopType::Worker, founder)
+            .await
+            .unwrap();
+
+        assert_eq!(coop.status, CoopStatus::Forming);
+
+        let activated = handle
+            .activate_cooperative(coop.id.clone(), "charter-hash-123".to_string())
+            .await
+            .unwrap();
+
+        assert_eq!(activated.status, CoopStatus::Active);
+        assert_eq!(activated.charter_hash, Some("charter-hash-123".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_update_cooperative() {
+        let handle = spawn_test_actor();
+        let founder = create_test_did();
+
+        let coop = handle
+            .create_cooperative(None, "Original Name".to_string(), CoopType::Worker, founder)
+            .await
+            .unwrap();
+
+        // Update name only
+        let updated = handle
+            .update_cooperative(coop.id.clone(), Some("New Name".to_string()), None)
+            .await
+            .unwrap();
+        assert_eq!(updated.name, "New Name");
+
+        // Update metadata only
+        let mut metadata = std::collections::HashMap::new();
+        metadata.insert("key".to_string(), "value".to_string());
+        let updated = handle
+            .update_cooperative(coop.id.clone(), None, Some(metadata))
+            .await
+            .unwrap();
+        assert_eq!(updated.metadata.get("key"), Some(&"value".to_string()));
+
+        // Update both
+        let mut more_metadata = std::collections::HashMap::new();
+        more_metadata.insert("another".to_string(), "data".to_string());
+        let updated = handle
+            .update_cooperative(coop.id, Some("Final Name".to_string()), Some(more_metadata))
+            .await
+            .unwrap();
+        assert_eq!(updated.name, "Final Name");
+        assert_eq!(updated.metadata.get("key"), Some(&"value".to_string()));
+        assert_eq!(updated.metadata.get("another"), Some(&"data".to_string()));
+    }
+
+    // === Member operations ===
+
+    #[tokio::test]
+    async fn test_add_member() {
+        let handle = spawn_test_actor();
+        let founder = create_test_did();
+
+        let coop = handle
+            .create_cooperative(None, "Test Coop".to_string(), CoopType::Worker, founder)
+            .await
+            .unwrap();
+
+        let member_did = create_test_did();
+        let member = handle
+            .add_member(coop.id.clone(), member_did.clone(), MemberRole::Worker)
+            .await
+            .unwrap();
+
+        assert_eq!(member.did, member_did);
+        assert_eq!(member.role, MemberRole::Worker);
+        assert_eq!(member.status, MemberStatus::Pending);
+    }
+
+    #[tokio::test]
+    async fn test_add_member_all_roles() {
+        let handle = spawn_test_actor();
+        let founder = create_test_did();
+
+        let coop = handle
+            .create_cooperative(None, "Test Coop".to_string(), CoopType::Worker, founder)
+            .await
+            .unwrap();
+
+        for role in [
+            MemberRole::Member,
+            MemberRole::Worker,
+            MemberRole::Consumer,
+            MemberRole::Producer,
+            MemberRole::BoardMember,
+            MemberRole::Officer,
+        ] {
+            let member_did = create_test_did();
+            let member = handle
+                .add_member(coop.id.clone(), member_did, role)
+                .await
+                .unwrap();
+            assert_eq!(member.role, role);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_add_member_to_nonexistent_coop() {
+        let handle = spawn_test_actor();
+        let member_did = create_test_did();
+
+        let result = handle
+            .add_member("nonexistent".to_string(), member_did, MemberRole::Worker)
+            .await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_approve_member() {
+        let handle = spawn_test_actor();
+        let founder = create_test_did();
+
+        let coop = handle
+            .create_cooperative(None, "Test Coop".to_string(), CoopType::Worker, founder)
+            .await
+            .unwrap();
+
+        let member_did = create_test_did();
+        let member = handle
+            .add_member(coop.id.clone(), member_did.clone(), MemberRole::Worker)
+            .await
+            .unwrap();
+        assert_eq!(member.status, MemberStatus::Pending);
+
+        let approved = handle
+            .approve_member(coop.id.clone(), member_did)
+            .await
+            .unwrap();
+        assert_eq!(approved.status, MemberStatus::Active);
+    }
+
+    #[tokio::test]
+    async fn test_remove_member() {
+        let handle = spawn_test_actor();
+        let founder = create_test_did();
+
+        let coop = handle
+            .create_cooperative(None, "Test Coop".to_string(), CoopType::Worker, founder)
+            .await
+            .unwrap();
+
+        let member_did = create_test_did();
+        handle
+            .add_member(coop.id.clone(), member_did.clone(), MemberRole::Worker)
+            .await
+            .unwrap();
+
+        // Remove the member
+        handle
+            .remove_member(coop.id.clone(), member_did.clone())
+            .await
+            .unwrap();
+
+        // Verify member list
+        let members = handle.list_members(coop.id).await.unwrap();
+        // Only founder should remain
+        assert_eq!(members.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_update_member_role() {
+        let handle = spawn_test_actor();
+        let founder = create_test_did();
+
+        let coop = handle
+            .create_cooperative(None, "Test Coop".to_string(), CoopType::Worker, founder)
+            .await
+            .unwrap();
+
+        let member_did = create_test_did();
+        handle
+            .add_member(coop.id.clone(), member_did.clone(), MemberRole::Member)
+            .await
+            .unwrap();
+
+        let updated = handle
+            .update_member_role(coop.id, member_did, MemberRole::BoardMember)
+            .await
+            .unwrap();
+        assert_eq!(updated.role, MemberRole::BoardMember);
+    }
+
+    #[tokio::test]
+    async fn test_list_members() {
+        let handle = spawn_test_actor();
+        let founder = create_test_did();
+
+        let coop = handle
+            .create_cooperative(
+                None,
+                "Test Coop".to_string(),
+                CoopType::Worker,
+                founder.clone(),
+            )
+            .await
+            .unwrap();
+
+        // Add more members
+        for _ in 0..3 {
+            let member_did = create_test_did();
+            handle
+                .add_member(coop.id.clone(), member_did, MemberRole::Worker)
+                .await
+                .unwrap();
+        }
+
+        let members = handle.list_members(coop.id).await.unwrap();
+        // 1 founder + 3 workers = 4
+        assert_eq!(members.len(), 4);
+    }
+
+    #[tokio::test]
+    async fn test_get_member_coops() {
+        let handle = spawn_test_actor();
+        let member_did = create_test_did();
+
+        // Create multiple coops and add the same member to each
+        for i in 1..=3 {
+            let founder = create_test_did();
+            let coop = handle
+                .create_cooperative(None, format!("Coop {i}"), CoopType::Worker, founder)
+                .await
+                .unwrap();
+
+            handle
+                .add_member(coop.id, member_did.clone(), MemberRole::Worker)
+                .await
+                .unwrap();
+        }
+
+        let coops = handle.get_member_coops(member_did).await.unwrap();
+        assert_eq!(coops.len(), 3);
+    }
+
+    // === Formation request workflow ===
+
+    #[tokio::test]
+    async fn test_create_from_request() {
+        let handle = spawn_test_actor();
+
+        let founder1 = create_test_did();
+        let founder2 = create_test_did();
+        let founder3 = create_test_did();
+
+        let request = FormationRequest::new(
+            "My Coop".to_string(),
+            CoopType::Worker,
+            vec![founder1.clone(), founder2, founder3],
+        )
+        .with_description("A test cooperative".to_string())
+        .with_currency("hours".to_string());
+
+        let (coop, event) = handle
+            .create_from_request(request, "formed-coop".to_string(), founder1.clone())
+            .await
+            .unwrap();
+
+        assert_eq!(coop.id, "formed-coop");
+        assert_eq!(coop.name, "My Coop");
+        assert_eq!(coop.status, CoopStatus::Forming);
+        assert_eq!(coop.min_founders, 3);
+        assert_eq!(coop.description, Some("A test cooperative".to_string()));
+        assert_eq!(coop.currency, Some("hours".to_string()));
+
+        if let LifecycleEvent::Created { coop_id, founder } = event {
+            assert_eq!(coop_id, "formed-coop");
+            assert_eq!(founder, founder1);
+        } else {
+            panic!("Expected Created event");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_sign_charter_workflow() {
+        let handle = spawn_test_actor();
+
+        let founder1 = create_test_did();
+        let founder2 = create_test_did();
+        let founder3 = create_test_did();
+
+        let request = FormationRequest::new(
+            "Charter Coop".to_string(),
+            CoopType::Worker,
+            vec![founder1.clone(), founder2.clone(), founder3.clone()],
+        );
+
+        let (coop, _) = handle
+            .create_from_request(request, "charter-coop".to_string(), founder1.clone())
+            .await
+            .unwrap();
+
+        // Sign with first founder
+        let sig1 = icn_governance::charter::FounderSignature {
+            did: founder1,
+            signature: vec![1, 2, 3],
+            timestamp: 1000,
+            role: Some("initiator".to_string()),
+        };
+        let (coop, events) = handle.sign_charter(coop.id.clone(), sig1).await.unwrap();
+        assert_eq!(events.len(), 1);
+        assert!(!coop.charter_ratified);
+
+        // Sign with second founder
+        let sig2 = icn_governance::charter::FounderSignature {
+            did: founder2,
+            signature: vec![4, 5, 6],
+            timestamp: 1001,
+            role: None,
+        };
+        let (coop, events) = handle.sign_charter(coop.id.clone(), sig2).await.unwrap();
+        assert_eq!(events.len(), 1);
+        assert!(!coop.charter_ratified);
+
+        // Sign with third founder (should ratify)
+        let sig3 = icn_governance::charter::FounderSignature {
+            did: founder3,
+            signature: vec![7, 8, 9],
+            timestamp: 1002,
+            role: None,
+        };
+        let (coop, events) = handle.sign_charter(coop.id, sig3).await.unwrap();
+        assert_eq!(events.len(), 2); // CharterSigned + CharterRatified
+        assert!(coop.charter_ratified);
+    }
+
+    // === Dissolution workflow ===
+
+    #[tokio::test]
+    async fn test_dissolution_workflow() {
+        let handle = spawn_test_actor();
+        let founder = create_test_did();
+
+        // Create and activate a coop
+        let coop = handle
+            .create_cooperative(
+                None,
+                "To Dissolve".to_string(),
+                CoopType::Worker,
+                founder.clone(),
+            )
+            .await
+            .unwrap();
+        let coop = handle
+            .activate_cooperative(coop.id.clone(), "charter".to_string())
+            .await
+            .unwrap();
+        assert_eq!(coop.status, CoopStatus::Active);
+
+        // Start dissolution
+        let plan = AssetDistributionPlan {
+            positive_balance_action: BalanceAction::ReturnToMember,
+            negative_balance_action: DebtAction::WriteOff,
+            capital_return: CapitalReturnMethod::ProRata,
+            residual_recipient: Some("federation:treasury".to_string()),
+        };
+
+        let (coop, event) = handle
+            .start_dissolution(
+                coop.id.clone(),
+                founder.clone(),
+                plan,
+                Some("prop-123".to_string()),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(coop.status, CoopStatus::Dissolving);
+        assert!(coop.dissolution_plan.is_some());
+        assert_eq!(coop.dissolution_proposal_id, Some("prop-123".to_string()));
+
+        if let LifecycleEvent::DissolutionStarted {
+            initiator,
+            proposal_id,
+            ..
+        } = event
+        {
+            assert_eq!(initiator, founder);
+            assert_eq!(proposal_id, Some("prop-123".to_string()));
+        } else {
+            panic!("Expected DissolutionStarted event");
+        }
+
+        // Complete dissolution
+        let (coop, events) = handle.complete_dissolution(coop.id).await.unwrap();
+
+        assert_eq!(coop.status, CoopStatus::Dissolved);
+        assert_eq!(events.len(), 2); // AssetsDistributed + Dissolved
+    }
+
+    #[tokio::test]
+    async fn test_cannot_dissolve_forming_coop() {
+        let handle = spawn_test_actor();
+        let founder = create_test_did();
+
+        let coop = handle
+            .create_cooperative(
+                None,
+                "Forming".to_string(),
+                CoopType::Worker,
+                founder.clone(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(coop.status, CoopStatus::Forming);
+
+        let plan = AssetDistributionPlan::default();
+        let result = handle.start_dissolution(coop.id, founder, plan, None).await;
+
+        assert!(result.is_err());
+    }
+
+    // === Founder adds themselves on creation ===
+
+    #[tokio::test]
+    async fn test_founder_is_member_on_creation() {
+        let handle = spawn_test_actor();
+        let founder = create_test_did();
+
+        let coop = handle
+            .create_cooperative(
+                None,
+                "Test Coop".to_string(),
+                CoopType::Worker,
+                founder.clone(),
+            )
+            .await
+            .unwrap();
+
+        let members = handle.list_members(coop.id).await.unwrap();
+        assert_eq!(members.len(), 1);
+
+        let founder_member = &members[0];
+        assert_eq!(founder_member.did, founder);
+        assert_eq!(founder_member.role, MemberRole::Founder);
+        assert_eq!(founder_member.status, MemberStatus::Active);
+    }
+
+    // === Concurrent operations ===
+
+    #[tokio::test]
+    async fn test_concurrent_member_additions() {
+        let handle = spawn_test_actor();
+        let founder = create_test_did();
+
+        let coop = handle
+            .create_cooperative(
+                None,
+                "Concurrent Coop".to_string(),
+                CoopType::Worker,
+                founder,
+            )
+            .await
+            .unwrap();
+
+        // Add members concurrently
+        let mut tasks = Vec::new();
+        for _ in 0..10 {
+            let handle_clone = handle.clone();
+            let coop_id = coop.id.clone();
+            let member_did = create_test_did();
+
+            tasks.push(tokio::spawn(async move {
+                handle_clone
+                    .add_member(coop_id, member_did, MemberRole::Worker)
+                    .await
+            }));
+        }
+
+        // Wait for all to complete
+        for task in tasks {
+            let result = task.await.unwrap();
+            assert!(result.is_ok());
+        }
+
+        // Verify all members were added
+        let members = handle.list_members(coop.id).await.unwrap();
+        assert_eq!(members.len(), 11); // 1 founder + 10 workers
+    }
+}
