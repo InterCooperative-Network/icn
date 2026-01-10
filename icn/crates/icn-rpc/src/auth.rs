@@ -249,9 +249,11 @@ impl<S: Store> TokenRevocationList<S> {
             if let Ok(revoked) = serde_json::from_slice::<RevokedToken>(&value) {
                 if revoked.original_expiry <= now {
                     // Token has expired, remove revocation record
-                    self.store
-                        .delete(&key)
-                        .map_err(|e| AuthError::InternalError(format!("Failed to delete expired revocation: {e}")))?;
+                    self.store.delete(&key).map_err(|e| {
+                        AuthError::InternalError(format!(
+                            "Failed to delete expired revocation: {e}"
+                        ))
+                    })?;
                     cleaned += 1;
 
                     // Remove from cache - propagate lock errors
