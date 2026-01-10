@@ -453,10 +453,11 @@ impl NetworkHandle {
     ) {
         // Update local registry
         if let Some(ref registry) = self.blob_registry {
-            if let Err(e) = registry
-                .write()
-                .await
-                .announce_blob(blob_hash, peer_did.clone(), size_bytes)
+            if let Err(e) =
+                registry
+                    .write()
+                    .await
+                    .announce_blob(blob_hash, peer_did.clone(), size_bytes)
             {
                 tracing::warn!(
                     error = %e,

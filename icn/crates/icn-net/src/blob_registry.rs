@@ -34,7 +34,7 @@
 use icn_gossip::types::ContentHash;
 use icn_identity::Did;
 use icn_obs::metrics::network::{
-    blob_evicted_inc, blob_rejected_inc, blob_registry_entries_set, blob_registry_size_set,
+    blob_evicted_inc, blob_registry_entries_set, blob_registry_size_set, blob_rejected_inc,
     BlobRejectionReason,
 };
 use std::collections::{HashMap, VecDeque};
@@ -457,7 +457,7 @@ mod tests {
 
     fn create_test_config() -> BlobRegistryConfig {
         BlobRegistryConfig {
-            max_blob_size: 1024 * 1024,      // 1MB
+            max_blob_size: 1024 * 1024,          // 1MB
             max_registry_size: 10 * 1024 * 1024, // 10MB
             max_per_peer_size: 2 * 1024 * 1024,  // 2MB
         }
@@ -470,7 +470,9 @@ mod tests {
         let peer1 = create_test_did();
 
         // Announce blob
-        registry.announce_blob(blob_hash, peer1.clone(), 1024).unwrap();
+        registry
+            .announce_blob(blob_hash, peer1.clone(), 1024)
+            .unwrap();
 
         // Query should return the peer
         let peers = registry.get_peers_with_blob(&blob_hash);
@@ -487,8 +489,12 @@ mod tests {
         let peer2 = create_test_did();
 
         // Multiple peers announce same blob
-        registry.announce_blob(blob_hash, peer1.clone(), 1024).unwrap();
-        registry.announce_blob(blob_hash, peer2.clone(), 2048).unwrap();
+        registry
+            .announce_blob(blob_hash, peer1.clone(), 1024)
+            .unwrap();
+        registry
+            .announce_blob(blob_hash, peer2.clone(), 2048)
+            .unwrap();
 
         let peers = registry.get_peers_with_blob(&blob_hash);
         assert_eq!(peers.len(), 2);
@@ -501,13 +507,17 @@ mod tests {
         let peer = create_test_did();
 
         // First announcement
-        registry.announce_blob(blob_hash, peer.clone(), 1024).unwrap();
+        registry
+            .announce_blob(blob_hash, peer.clone(), 1024)
+            .unwrap();
         let peers1 = registry.get_peers_with_blob(&blob_hash);
         assert_eq!(peers1.len(), 1);
         assert_eq!(peers1[0].size_bytes, 1024);
 
         // Update announcement (different size)
-        registry.announce_blob(blob_hash, peer.clone(), 2048).unwrap();
+        registry
+            .announce_blob(blob_hash, peer.clone(), 2048)
+            .unwrap();
         let peers2 = registry.get_peers_with_blob(&blob_hash);
         assert_eq!(peers2.len(), 1); // Still one entry
         assert_eq!(peers2[0].size_bytes, 2048); // Size updated
@@ -633,8 +643,12 @@ mod tests {
         let peer = create_test_did();
 
         // Announce blobs up to the per-peer quota (2MB)
-        registry.announce_blob([1u8; 32], peer.clone(), 1024 * 1024).unwrap();
-        registry.announce_blob([2u8; 32], peer.clone(), 1024 * 1024).unwrap();
+        registry
+            .announce_blob([1u8; 32], peer.clone(), 1024 * 1024)
+            .unwrap();
+        registry
+            .announce_blob([2u8; 32], peer.clone(), 1024 * 1024)
+            .unwrap();
 
         // This should exceed the quota
         let result = registry.announce_blob([3u8; 32], peer, 1024 * 1024);
@@ -661,11 +675,17 @@ mod tests {
         let peer3 = create_test_did();
 
         // Add three blobs, each from a different peer (to avoid per-peer quota issues)
-        registry.announce_blob([1u8; 32], peer1.clone(), 1024).unwrap();
-        registry.announce_blob([2u8; 32], peer2.clone(), 1024).unwrap();
+        registry
+            .announce_blob([1u8; 32], peer1.clone(), 1024)
+            .unwrap();
+        registry
+            .announce_blob([2u8; 32], peer2.clone(), 1024)
+            .unwrap();
 
         // Adding a third should evict the oldest
-        registry.announce_blob([3u8; 32], peer3.clone(), 1024).unwrap();
+        registry
+            .announce_blob([3u8; 32], peer3.clone(), 1024)
+            .unwrap();
 
         // Should have evicted the first blob
         assert_eq!(registry.evicted_count(), 1);
@@ -687,14 +707,20 @@ mod tests {
         let mut registry = BlobLocationRegistry::new();
         let peer = create_test_did();
 
-        registry.announce_blob([1u8; 32], peer.clone(), 1024).unwrap();
+        registry
+            .announce_blob([1u8; 32], peer.clone(), 1024)
+            .unwrap();
         assert_eq!(registry.total_size(), 1024);
 
-        registry.announce_blob([2u8; 32], peer.clone(), 2048).unwrap();
+        registry
+            .announce_blob([2u8; 32], peer.clone(), 2048)
+            .unwrap();
         assert_eq!(registry.total_size(), 3072);
 
         // Update first blob with smaller size
-        registry.announce_blob([1u8; 32], peer.clone(), 512).unwrap();
+        registry
+            .announce_blob([1u8; 32], peer.clone(), 512)
+            .unwrap();
         assert_eq!(registry.total_size(), 2560); // 512 + 2048
     }
 
@@ -704,9 +730,15 @@ mod tests {
         let peer1 = create_test_did();
         let peer2 = create_test_did();
 
-        registry.announce_blob([1u8; 32], peer1.clone(), 1024).unwrap();
-        registry.announce_blob([2u8; 32], peer1.clone(), 2048).unwrap();
-        registry.announce_blob([3u8; 32], peer2.clone(), 512).unwrap();
+        registry
+            .announce_blob([1u8; 32], peer1.clone(), 1024)
+            .unwrap();
+        registry
+            .announce_blob([2u8; 32], peer1.clone(), 2048)
+            .unwrap();
+        registry
+            .announce_blob([3u8; 32], peer2.clone(), 512)
+            .unwrap();
 
         assert_eq!(registry.peer_size(&peer1), 3072);
         assert_eq!(registry.peer_size(&peer2), 512);
@@ -725,16 +757,26 @@ mod tests {
         let peer = create_test_did();
 
         // Use most of quota with two blobs (1MB + 0.5MB = 1.5MB of 2MB quota)
-        registry.announce_blob([1u8; 32], peer.clone(), 1024 * 1024).unwrap();
-        registry.announce_blob([2u8; 32], peer.clone(), 512 * 1024).unwrap();
+        registry
+            .announce_blob([1u8; 32], peer.clone(), 1024 * 1024)
+            .unwrap();
+        registry
+            .announce_blob([2u8; 32], peer.clone(), 512 * 1024)
+            .unwrap();
 
         // Update first blob with same size should work (no net increase)
         let result = registry.announce_blob([1u8; 32], peer.clone(), 1024 * 1024);
-        assert!(result.is_ok(), "Updating blob with same size should succeed");
+        assert!(
+            result.is_ok(),
+            "Updating blob with same size should succeed"
+        );
 
         // Update first blob with smaller size should work
         let result = registry.announce_blob([1u8; 32], peer.clone(), 512 * 1024);
-        assert!(result.is_ok(), "Updating blob with smaller size should succeed");
+        assert!(
+            result.is_ok(),
+            "Updating blob with smaller size should succeed"
+        );
     }
 
     #[test]
@@ -749,7 +791,9 @@ mod tests {
         let peer = create_test_did();
 
         // Should accept blob up to 5000 bytes
-        registry.announce_blob([1u8; 32], peer.clone(), 5000).unwrap();
+        registry
+            .announce_blob([1u8; 32], peer.clone(), 5000)
+            .unwrap();
 
         // Should reject blob over 5000 bytes
         let result = registry.announce_blob([2u8; 32], peer, 5001);
