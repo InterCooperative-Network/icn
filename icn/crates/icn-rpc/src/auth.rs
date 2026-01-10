@@ -230,6 +230,7 @@ impl<S: Store> TokenRevocationList<S> {
         original_expiry: u64,
         reason: Option<String>,
     ) -> Result<(), AuthError> {
+        let start = Instant::now();
         let now = Self::current_timestamp()?;
 
         // Don't revoke already-expired tokens
@@ -265,6 +266,9 @@ impl<S: Store> TokenRevocationList<S> {
 
         // Update gauge with current count
         gauge!("icn_rpc_revoked_tokens_total").set(cache.len() as f64);
+
+        // Record operation duration
+        histogram!("icn_rpc_revocation_add_duration_seconds").record(start.elapsed().as_secs_f64());
 
         tracing::info!(jti = %jti, subject = %subject, "Token revoked");
 
@@ -312,11 +316,9 @@ impl<S: Store> TokenRevocationList<S> {
         counter!("icn_rpc_revocation_cleanup_total").increment(cleaned as u64);
         gauge!("icn_rpc_revocation_scan_entries").set(scanned as f64);
 
-        // Update the revoked tokens gauge after cleanup
-        if cleaned > 0 {
-            if let Ok(cache) = self.cache.read() {
-                gauge!("icn_rpc_revoked_tokens_total").set(cache.len() as f64);
-            }
+        // Always update the revoked tokens gauge to reflect current cache size
+        if let Ok(cache) = self.cache.read() {
+            gauge!("icn_rpc_revoked_tokens_total").set(cache.len() as f64);
         }
 
         Ok(cleaned)
@@ -1300,6 +1302,12 @@ mod tests {
         assert!(!trl.is_revoked("old-jti"));
     }
 
+    /// Test concurrent token revocation from multiple threads.
+    ///
+    /// Verifies that the TRL is thread-safe and handles concurrent revocations
+    /// of the same token correctly. The revoke() operation is idempotent - multiple
+    /// threads revoking the same token will all succeed, but the token will only
+    /// appear once in the cache (HashMap::insert overwrites).
     #[test]
     fn test_concurrent_token_revocation() {
         use std::sync::Arc;
