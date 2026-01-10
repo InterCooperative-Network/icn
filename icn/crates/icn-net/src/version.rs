@@ -83,6 +83,11 @@ bitflags::bitflags! {
         /// Supports hybrid post-quantum key encapsulation (X25519 + ML-KEM)
         const HYBRID_KEM = 0b10000000000;
 
+        /// Supports postcard wire encoding (more compact than bincode)
+        /// When both peers support this, messages are encoded with postcard.
+        /// Falls back to bincode for peers without this capability.
+        const POSTCARD_ENCODING = 0b100000000000;
+
         // Future capabilities can be added here
         // Reserve high bits for future use
     }
@@ -120,7 +125,8 @@ impl CapabilityFlags {
             | Self::GOSSIP_PULL
             | Self::MULTI_DEVICE
             | Self::ECONOMIC_SAFETY
-            | Self::MESSAGE_COMPRESSION;
+            | Self::MESSAGE_COMPRESSION
+            | Self::POSTCARD_ENCODING;
 
         // Add post-quantum capabilities if feature is enabled
         #[cfg(feature = "post-quantum")]
@@ -166,6 +172,9 @@ impl CapabilityFlags {
         }
         if self.contains(Self::HYBRID_KEM) {
             features.push("hybrid_kem");
+        }
+        if self.contains(Self::POSTCARD_ENCODING) {
+            features.push("postcard_encoding");
         }
         features
     }
@@ -427,6 +436,7 @@ mod tests {
         assert!(caps.contains(CapabilityFlags::MULTI_DEVICE));
         assert!(caps.contains(CapabilityFlags::ECONOMIC_SAFETY));
         assert!(caps.contains(CapabilityFlags::MESSAGE_COMPRESSION));
+        assert!(caps.contains(CapabilityFlags::POSTCARD_ENCODING));
     }
 
     #[test]
