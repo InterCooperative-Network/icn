@@ -2146,8 +2146,7 @@ mod tests {
 
         // Verify wire byte indicates bincode + zstd (high nibble = 0, low nibble = 1)
         assert_eq!(
-            bincode_compressed[0],
-            0x01,
+            bincode_compressed[0], 0x01,
             "Old node should use bincode + zstd"
         );
 
