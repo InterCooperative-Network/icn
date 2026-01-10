@@ -17,7 +17,9 @@ use tracing::{debug, info, instrument, warn};
 
 use crate::{
     handlers::ConnectionContext,
-    protocol::{read_message, write_message, MessagePayload, NetworkMessage},
+    protocol::{
+        read_message, write_message, write_message_negotiated, MessagePayload, NetworkMessage,
+    },
     rate_limit::{RateLimitConfig, RateLimiter},
     replay_guard::ReplayGuard,
     topology::{NeighborSets, TopologyConfig, TopologyInfo},
@@ -1332,6 +1334,23 @@ impl NetworkActor {
         // Timeout for the entire send operation (10 seconds)
         const SEND_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 
+        // Look up peer's negotiated capabilities for encoding selection
+        let (use_postcard, use_compression) = {
+            let connections = self.peer_connections.read().await;
+            if let Some(peer_info) = connections.get(did) {
+                let postcard = peer_info
+                    .peer_capabilities
+                    .contains(CapabilityFlags::POSTCARD_ENCODING);
+                let compression = peer_info
+                    .peer_capabilities
+                    .contains(CapabilityFlags::MESSAGE_COMPRESSION);
+                (postcard, compression)
+            } else {
+                // No peer info yet (pre-Hello) - use legacy encoding for compatibility
+                (false, false)
+            }
+        };
+
         let send_future = async {
             // Get connection for this peer
             let connections = self.session_manager.read().await.connections().await;
@@ -1348,10 +1367,10 @@ impl NetworkActor {
                     .context("Timeout opening stream to peer")?
                     .context("Failed to open stream")?;
 
-            // Write message (with timeout to prevent hanging on slow writes)
+            // Write message with negotiated encoding (with timeout to prevent hanging on slow writes)
             tokio::time::timeout(
                 std::time::Duration::from_secs(5),
-                write_message(&mut send, &message),
+                write_message_negotiated(&mut send, &message, use_postcard, use_compression),
             )
             .await
             .context("Timeout writing message to peer")?
@@ -1382,14 +1401,37 @@ impl NetworkActor {
 
         let connections = self.session_manager.read().await.connections().await;
 
+        // Get snapshot of peer capabilities for encoding selection
+        let peer_caps = self.peer_connections.read().await;
+
         // Send to all connected peers
         let mut sent_count = 0;
-        for (_did, connection) in connections {
+        for (did_str, connection) in connections {
+            // Look up peer's negotiated capabilities for encoding selection
+            let (use_postcard, use_compression) = if let Ok(did) = did_str.parse::<Did>() {
+                if let Some(peer_info) = peer_caps.get(&did) {
+                    let postcard = peer_info
+                        .peer_capabilities
+                        .contains(CapabilityFlags::POSTCARD_ENCODING);
+                    let compression = peer_info
+                        .peer_capabilities
+                        .contains(CapabilityFlags::MESSAGE_COMPRESSION);
+                    (postcard, compression)
+                } else {
+                    // No peer info yet - use legacy encoding
+                    (false, false)
+                }
+            } else {
+                // Invalid DID string - use legacy encoding
+                (false, false)
+            };
+
             // Use timeout for each peer to prevent one slow peer from blocking broadcast
             let send_result = tokio::time::timeout(PEER_TIMEOUT, async {
-                // Open a new stream and send the message
+                // Open a new stream and send the message with negotiated encoding
                 let (mut send, _recv) = connection.open_bi().await?;
-                write_message(&mut send, &message).await?;
+                write_message_negotiated(&mut send, &message, use_postcard, use_compression)
+                    .await?;
                 send.finish()?;
                 Ok::<(), anyhow::Error>(())
             })
@@ -2247,5 +2289,112 @@ mod tests {
         assert_eq!(peer_matches.len(), 1);
         assert_eq!(peer_matches[0].0, own_did);
         assert_eq!(peer_matches[0].1, 1); // 1 matching blob
+    }
+
+    #[tokio::test]
+    async fn test_encoding_selection_based_on_capabilities() {
+        // Test that encoding is correctly selected based on peer capabilities
+        let peer_connections = Arc::new(RwLock::new(std::collections::HashMap::new()));
+
+        let modern_keypair = KeyPair::generate().unwrap();
+        let modern_did = modern_keypair.did().clone();
+        let legacy_keypair = KeyPair::generate().unwrap();
+        let legacy_did = legacy_keypair.did().clone();
+
+        // Modern peer: supports both POSTCARD_ENCODING and MESSAGE_COMPRESSION
+        peer_connections.write().await.insert(
+            modern_did.clone(),
+            PeerConnectionInfo {
+                did: modern_did.clone(),
+                negotiated_version: 1,
+                peer_capabilities: CapabilityFlags::POSTCARD_ENCODING
+                    | CapabilityFlags::MESSAGE_COMPRESSION
+                    | CapabilityFlags::SIGNED_MESSAGES,
+                peer_software: "icnd-0.3.0".to_string(),
+                x25519_key: [1u8; 32],
+                ml_dsa_public: None,
+                ml_kem_public: None,
+            },
+        );
+
+        // Legacy peer: no postcard support, only compression
+        peer_connections.write().await.insert(
+            legacy_did.clone(),
+            PeerConnectionInfo {
+                did: legacy_did.clone(),
+                negotiated_version: 1,
+                peer_capabilities: CapabilityFlags::MESSAGE_COMPRESSION
+                    | CapabilityFlags::SIGNED_MESSAGES,
+                peer_software: "icnd-0.1.0".to_string(),
+                x25519_key: [2u8; 32],
+                ml_dsa_public: None,
+                ml_kem_public: None,
+            },
+        );
+
+        // Test encoding selection for modern peer
+        {
+            let connections = peer_connections.read().await;
+            if let Some(peer_info) = connections.get(&modern_did) {
+                let use_postcard = peer_info
+                    .peer_capabilities
+                    .contains(CapabilityFlags::POSTCARD_ENCODING);
+                let use_compression = peer_info
+                    .peer_capabilities
+                    .contains(CapabilityFlags::MESSAGE_COMPRESSION);
+
+                assert!(use_postcard, "Modern peer should use postcard encoding");
+                assert!(use_compression, "Modern peer should use compression");
+            } else {
+                panic!("Modern peer not found");
+            }
+        }
+
+        // Test encoding selection for legacy peer
+        {
+            let connections = peer_connections.read().await;
+            if let Some(peer_info) = connections.get(&legacy_did) {
+                let use_postcard = peer_info
+                    .peer_capabilities
+                    .contains(CapabilityFlags::POSTCARD_ENCODING);
+                let use_compression = peer_info
+                    .peer_capabilities
+                    .contains(CapabilityFlags::MESSAGE_COMPRESSION);
+
+                assert!(
+                    !use_postcard,
+                    "Legacy peer should NOT use postcard encoding"
+                );
+                assert!(use_compression, "Legacy peer should use compression");
+            } else {
+                panic!("Legacy peer not found");
+            }
+        }
+
+        // Test unknown peer (pre-Hello)
+        {
+            let connections = peer_connections.read().await;
+            let unknown_did = KeyPair::generate().unwrap().did().clone();
+
+            let (use_postcard, use_compression) =
+                if let Some(peer_info) = connections.get(&unknown_did) {
+                    let postcard = peer_info
+                        .peer_capabilities
+                        .contains(CapabilityFlags::POSTCARD_ENCODING);
+                    let compression = peer_info
+                        .peer_capabilities
+                        .contains(CapabilityFlags::MESSAGE_COMPRESSION);
+                    (postcard, compression)
+                } else {
+                    // No peer info yet - use legacy encoding
+                    (false, false)
+                };
+
+            assert!(
+                !use_postcard,
+                "Unknown peer should NOT use postcard encoding"
+            );
+            assert!(!use_compression, "Unknown peer should NOT use compression");
+        }
     }
 }
