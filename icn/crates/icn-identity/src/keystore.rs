@@ -434,12 +434,12 @@ impl AgeKeyStore {
         let upgraded_bundle = IdentityBundle::from_stored_with_kem(
             upgraded_keypair,
             identity_bundle.tls_cert().as_ref().to_vec(),
-            identity_bundle.tls_key_der_bytes().to_vec(),
+            Zeroizing::new(identity_bundle.tls_key_der_bytes().to_vec()),
             identity_bundle.binding_info().tls_binding_sig.clone(),
             identity_bundle.binding_info().created_at,
-            identity_bundle.x25519_secret_bytes().to_vec(),
+            Zeroizing::new(identity_bundle.x25519_secret_bytes().to_vec()),
             *identity_bundle.x25519_public_bytes(),
-            Some(kem_keypair.secret_key_bytes().to_vec()),
+            Some(Zeroizing::new(kem_keypair.secret_key_bytes().to_vec())),
             Some(kem_keypair.public_key().as_bytes().to_vec()),
         )?;
 
