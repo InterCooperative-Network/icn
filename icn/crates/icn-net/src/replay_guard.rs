@@ -297,81 +297,11 @@ impl ReplayGuard {
     ///
     /// This allows some out-of-order delivery while preventing replays.
     pub fn check(&mut self, envelope: &SignedEnvelope) -> Result<()> {
-        // Ensure initialized for persistent mode
-        if !self.initialized.load(Ordering::Acquire) {
-            self.load_and_apply_safety_gap()?;
-        }
-
         // 1. Verify signature and age
         envelope.verify(self.max_clock_skew)?;
 
-        // 2. Get or create sequence window for this sender
-        let window = self
-            .sequences
-            .entry(envelope.from.clone())
-            .or_insert_with(SequenceWindow::new);
-
-        // 3. Check if sequence is finalized (CRITICAL: prevents replay after processing)
-        if window.finalized.contains_key(&envelope.sequence) {
-            bail!(
-                "Replay attempt detected from {}: sequence {} is finalized (processed)",
-                envelope.from.as_str(),
-                envelope.sequence
-            );
-        }
-
-        // 4. Check against floor_seq (CRITICAL: prevents replay after restart)
-        // After restart, floor_seq is set to max_seq + RESTART_SAFETY_GAP
-        // All sequences at or below this are rejected (bloom filter is lost on restart)
-        if envelope.sequence <= window.floor_seq {
-            bail!(
-                "Replay detected from {}: sequence {} already seen (floor: {})",
-                envelope.from.as_str(),
-                envelope.sequence,
-                window.floor_seq
-            );
-        }
-
-        // 5. Check sequence number against Bloom filter
-        let seq_hash = hash_sequence(envelope.sequence);
-        if envelope.sequence <= window.max_seq {
-            // Potentially out-of-order or replay
-            if window.recent.contains(&seq_hash) {
-                bail!(
-                    "Replay detected from {}: sequence {} already seen (max: {})",
-                    envelope.from.as_str(),
-                    envelope.sequence,
-                    window.max_seq
-                );
-            }
-            // Not in filter: accept as out-of-order
-        }
-
-        // 6. Update window
-        let max_seq_changed = envelope.sequence > window.max_seq;
-        if max_seq_changed {
-            window.max_seq = envelope.sequence;
-        }
-        window.insert_sequence(&seq_hash);
-        window.last_update = Instant::now();
-
-        // 7. Persist max_seq if changed (best-effort: safety gap handles missed writes)
-        if max_seq_changed {
-            if let Err(e) = self.persist_max_seq(&envelope.from, envelope.sequence) {
-                tracing::warn!(
-                    peer = %envelope.from,
-                    seq = envelope.sequence,
-                    error = %e,
-                    "Failed to persist max_seq (continuing anyway)"
-                );
-                // Note: We continue despite persistence failure because:
-                // - The message has been validated and should be processed
-                // - The safety gap on restart handles missed persistence
-                // - Better to process valid messages than fail on storage issues
-            }
-        }
-
-        Ok(())
+        // 2. Perform replay detection (signature already verified, so use check_replay_only)
+        self.check_replay_only(envelope)
     }
 
     /// Check if message is fresh (not replayed) without verifying signature
@@ -1422,5 +1352,98 @@ mod tests {
         let result = guard.check_replay_only(&envelope);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("finalized"));
+    }
+
+    #[test]
+    fn test_check_and_check_replay_only_share_state() {
+        // Verifies that check() and check_replay_only() share the same
+        // replay detection state (since check() now calls check_replay_only())
+        let mut guard = ReplayGuard::new(300, 3600);
+        let keypair = KeyPair::generate().unwrap();
+
+        // Create two envelopes with different sequences
+        let envelope1 = SignedEnvelope::new(
+            keypair.did(),
+            &keypair,
+            1,
+            PayloadType::Gossip,
+            b"msg1".to_vec(),
+        )
+        .unwrap();
+
+        let envelope2 = SignedEnvelope::new(
+            keypair.did(),
+            &keypair,
+            2,
+            PayloadType::Gossip,
+            b"msg2".to_vec(),
+        )
+        .unwrap();
+
+        // Use check() for first envelope
+        assert!(guard.check(&envelope1).is_ok());
+
+        // Use check_replay_only() for second envelope
+        assert!(guard.check_replay_only(&envelope2).is_ok());
+
+        // Both sequences should now be tracked
+        assert_eq!(guard.get_max_seq(keypair.did()), Some(2));
+
+        // Replaying envelope1 via check_replay_only should fail
+        let result1 = guard.check_replay_only(&envelope1);
+        assert!(result1.is_err());
+        assert!(result1.unwrap_err().to_string().contains("Replay detected"));
+
+        // Replaying envelope2 via check() should also fail
+        let result2 = guard.check(&envelope2);
+        assert!(result2.is_err());
+        assert!(result2.unwrap_err().to_string().contains("Replay detected"));
+    }
+
+    #[test]
+    fn test_check_calls_check_replay_only_internally() {
+        // Verifies that check() properly calls check_replay_only() by checking
+        // that state is consistent between both methods
+        let mut guard = ReplayGuard::new(300, 3600);
+        let keypair = KeyPair::generate().unwrap();
+
+        // Create a sequence of envelopes
+        let mut envelopes = Vec::new();
+        for seq in 1..=5 {
+            envelopes.push(
+                SignedEnvelope::new(
+                    keypair.did(),
+                    &keypair,
+                    seq,
+                    PayloadType::Gossip,
+                    format!("msg{}", seq).as_bytes().to_vec(),
+                )
+                .unwrap(),
+            );
+        }
+
+        // Alternate between check() and check_replay_only()
+        assert!(guard.check(&envelopes[0]).is_ok()); // seq 1 via check()
+        assert!(guard.check_replay_only(&envelopes[1]).is_ok()); // seq 2 via check_replay_only()
+        assert!(guard.check(&envelopes[2]).is_ok()); // seq 3 via check()
+        assert!(guard.check_replay_only(&envelopes[3]).is_ok()); // seq 4 via check_replay_only()
+        assert!(guard.check(&envelopes[4]).is_ok()); // seq 5 via check()
+
+        // All 5 sequences should be tracked
+        assert_eq!(guard.get_max_seq(keypair.did()), Some(5));
+
+        // All should be rejected as replays regardless of which method is used
+        for (i, envelope) in envelopes.iter().enumerate() {
+            let result = if i % 2 == 0 {
+                guard.check(envelope)
+            } else {
+                guard.check_replay_only(envelope)
+            };
+            assert!(
+                result.is_err(),
+                "Sequence {} should be rejected as replay",
+                i + 1
+            );
+        }
     }
 }
