@@ -249,18 +249,20 @@ impl<S: Store> TokenRevocationList<S> {
         // Store persistently
         let key = Self::make_key(jti);
         let value = serde_json::to_vec(&revoked).map_err(|e| {
+            counter!("icn_rpc_revocation_errors_total").increment(1);
             AuthError::InternalError(format!("Failed to serialize revoked token: {e}"))
         })?;
 
-        self.store
-            .put(&key, &value)
-            .map_err(|e| AuthError::InternalError(format!("Failed to store revoked token: {e}")))?;
+        self.store.put(&key, &value).map_err(|e| {
+            counter!("icn_rpc_revocation_errors_total").increment(1);
+            AuthError::InternalError(format!("Failed to store revoked token: {e}"))
+        })?;
 
         // Update cache
-        let mut cache = self
-            .cache
-            .write()
-            .map_err(|e| AuthError::InternalError(format!("Lock poisoned: {e}")))?;
+        let mut cache = self.cache.write().map_err(|e| {
+            counter!("icn_rpc_revocation_errors_total").increment(1);
+            AuthError::InternalError(format!("Lock poisoned: {e}"))
+        })?;
 
         cache.insert(jti.to_string());
 
@@ -279,14 +281,15 @@ impl<S: Store> TokenRevocationList<S> {
     pub fn cleanup_expired(&self) -> Result<usize, AuthError> {
         let start = Instant::now();
 
-        let entries = self
-            .store
-            .scan(REVOKED_TOKEN_PREFIX)
-            .map_err(|e| AuthError::InternalError(format!("Failed to scan revoked tokens: {e}")))?;
+        let entries = self.store.scan(REVOKED_TOKEN_PREFIX).map_err(|e| {
+            counter!("icn_rpc_revocation_errors_total").increment(1);
+            AuthError::InternalError(format!("Failed to scan revoked tokens: {e}"))
+        })?;
 
         let now = Self::current_timestamp()?;
         let mut cleaned = 0;
         let mut scanned = 0;
+        let mut to_remove = Vec::new();
 
         for (key, value) in entries {
             scanned += 1;
@@ -294,19 +297,25 @@ impl<S: Store> TokenRevocationList<S> {
                 if revoked.original_expiry <= now {
                     // Token has expired, remove revocation record
                     self.store.delete(&key).map_err(|e| {
+                        counter!("icn_rpc_revocation_errors_total").increment(1);
                         AuthError::InternalError(format!(
                             "Failed to delete expired revocation: {e}"
                         ))
                     })?;
                     cleaned += 1;
-
-                    // Remove from cache - propagate lock errors
-                    let mut cache = self
-                        .cache
-                        .write()
-                        .map_err(|e| AuthError::InternalError(format!("Lock poisoned: {e}")))?;
-                    cache.remove(&revoked.jti);
+                    to_remove.push(revoked.jti);
                 }
+            }
+        }
+
+        // Batch remove from cache - single lock acquisition instead of O(n)
+        if !to_remove.is_empty() {
+            let mut cache = self.cache.write().map_err(|e| {
+                counter!("icn_rpc_revocation_errors_total").increment(1);
+                AuthError::InternalError(format!("Lock poisoned: {e}"))
+            })?;
+            for jti in to_remove {
+                cache.remove(&jti);
             }
         }
 
@@ -1308,6 +1317,9 @@ mod tests {
     /// of the same token correctly. The revoke() operation is idempotent - multiple
     /// threads revoking the same token will all succeed, but the token will only
     /// appear once in the cache (HashMap::insert overwrites).
+    ///
+    /// Note: This test validates in-memory concurrency only. It does not test
+    /// concurrent access from different process instances sharing the same storage.
     #[test]
     fn test_concurrent_token_revocation() {
         use std::sync::Arc;

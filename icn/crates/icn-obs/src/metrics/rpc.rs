@@ -39,4 +39,8 @@ pub fn init_descriptions() {
         "icn_rpc_revocation_add_duration_seconds",
         "Time taken to add a token to the revocation list"
     );
+    describe_counter!(
+        "icn_rpc_revocation_errors_total",
+        "Total number of revocation operation errors (storage, serialization, lock)"
+    );
 }
