@@ -183,7 +183,12 @@ mod tests {
             role: MemberRole::Worker,
         };
 
-        if let MembershipChange::Added { coop_id, member, role } = change {
+        if let MembershipChange::Added {
+            coop_id,
+            member,
+            role,
+        } = change
+        {
             assert_eq!(coop_id, "coop-1");
             assert_eq!(member, did);
             assert_eq!(role, MemberRole::Worker);
@@ -576,7 +581,10 @@ mod tests {
         assert_eq!(member.shares, 100);
 
         // 4. Change role
-        let member = manager.change_role(member, MemberRole::BoardMember).await.unwrap();
+        let member = manager
+            .change_role(member, MemberRole::BoardMember)
+            .await
+            .unwrap();
         assert_eq!(member.role, MemberRole::BoardMember);
 
         // 5. Suspend

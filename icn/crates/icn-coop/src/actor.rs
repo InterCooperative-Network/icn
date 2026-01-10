@@ -550,7 +550,12 @@ mod tests {
         let founder = create_test_did();
 
         let coop = handle
-            .create_cooperative(None, "Test Coop".to_string(), CoopType::Worker, founder.clone())
+            .create_cooperative(
+                None,
+                "Test Coop".to_string(),
+                CoopType::Worker,
+                founder.clone(),
+            )
             .await
             .unwrap();
 
@@ -675,7 +680,12 @@ mod tests {
         let founder = create_test_did();
 
         let coop = handle
-            .create_cooperative(None, "With Members".to_string(), CoopType::Worker, founder.clone())
+            .create_cooperative(
+                None,
+                "With Members".to_string(),
+                CoopType::Worker,
+                founder.clone(),
+            )
             .await
             .unwrap();
 
@@ -894,7 +904,12 @@ mod tests {
         let founder = create_test_did();
 
         let coop = handle
-            .create_cooperative(None, "Test Coop".to_string(), CoopType::Worker, founder.clone())
+            .create_cooperative(
+                None,
+                "Test Coop".to_string(),
+                CoopType::Worker,
+                founder.clone(),
+            )
             .await
             .unwrap();
 
@@ -999,10 +1014,7 @@ mod tests {
             timestamp: 1000,
             role: Some("initiator".to_string()),
         };
-        let (coop, events) = handle
-            .sign_charter(coop.id.clone(), sig1)
-            .await
-            .unwrap();
+        let (coop, events) = handle.sign_charter(coop.id.clone(), sig1).await.unwrap();
         assert_eq!(events.len(), 1);
         assert!(!coop.charter_ratified);
 
@@ -1013,10 +1025,7 @@ mod tests {
             timestamp: 1001,
             role: None,
         };
-        let (coop, events) = handle
-            .sign_charter(coop.id.clone(), sig2)
-            .await
-            .unwrap();
+        let (coop, events) = handle.sign_charter(coop.id.clone(), sig2).await.unwrap();
         assert_eq!(events.len(), 1);
         assert!(!coop.charter_ratified);
 
@@ -1041,7 +1050,12 @@ mod tests {
 
         // Create and activate a coop
         let coop = handle
-            .create_cooperative(None, "To Dissolve".to_string(), CoopType::Worker, founder.clone())
+            .create_cooperative(
+                None,
+                "To Dissolve".to_string(),
+                CoopType::Worker,
+                founder.clone(),
+            )
             .await
             .unwrap();
         let coop = handle
@@ -1059,7 +1073,12 @@ mod tests {
         };
 
         let (coop, event) = handle
-            .start_dissolution(coop.id.clone(), founder.clone(), plan, Some("prop-123".to_string()))
+            .start_dissolution(
+                coop.id.clone(),
+                founder.clone(),
+                plan,
+                Some("prop-123".to_string()),
+            )
             .await
             .unwrap();
 
@@ -1092,15 +1111,18 @@ mod tests {
         let founder = create_test_did();
 
         let coop = handle
-            .create_cooperative(None, "Forming".to_string(), CoopType::Worker, founder.clone())
+            .create_cooperative(
+                None,
+                "Forming".to_string(),
+                CoopType::Worker,
+                founder.clone(),
+            )
             .await
             .unwrap();
         assert_eq!(coop.status, CoopStatus::Forming);
 
         let plan = AssetDistributionPlan::default();
-        let result = handle
-            .start_dissolution(coop.id, founder, plan, None)
-            .await;
+        let result = handle.start_dissolution(coop.id, founder, plan, None).await;
 
         assert!(result.is_err());
     }
@@ -1113,7 +1135,12 @@ mod tests {
         let founder = create_test_did();
 
         let coop = handle
-            .create_cooperative(None, "Test Coop".to_string(), CoopType::Worker, founder.clone())
+            .create_cooperative(
+                None,
+                "Test Coop".to_string(),
+                CoopType::Worker,
+                founder.clone(),
+            )
             .await
             .unwrap();
 
@@ -1134,7 +1161,12 @@ mod tests {
         let founder = create_test_did();
 
         let coop = handle
-            .create_cooperative(None, "Concurrent Coop".to_string(), CoopType::Worker, founder)
+            .create_cooperative(
+                None,
+                "Concurrent Coop".to_string(),
+                CoopType::Worker,
+                founder,
+            )
             .await
             .unwrap();
 
