@@ -49,7 +49,10 @@ impl ConnectionContext {
         }
 
         // Signature valid, now check for replay attack
-        match self.replay_guard.write().await.check(envelope) {
+        // Use check_replay_only since we already verified the signature above
+        // This avoids redundant signature verification and ensures immediate PQ
+        // verification (via verify_with_cached_pq_key) is the only path used
+        match self.replay_guard.write().await.check_replay_only(envelope) {
             Ok(()) => {
                 debug!(
                     "Verified signed message from {} (seq={}, type={:?})",
