@@ -105,13 +105,17 @@ pub fn spawn_rpc_server(
     }
 
     // Spawn RPC server
+    let rpc_addr = config.addr;
     background_tasks.spawn(async move {
         if let Err(e) = rpc_server.run().await {
             warn!("RPC server error: {}", e);
+            icn_obs::metrics::supervisor::error_inc("rpc_server");
         }
     });
 
-    info!("RPC server spawned on {}", config.addr);
+    icn_obs::metrics::supervisor::actor_spawned_inc("rpc_server");
+    icn_obs::metrics::supervisor::actor_active_set("rpc_server", true);
+    info!("RPC server spawned on {}", rpc_addr);
 
     compute_handle_for_gateway
 }

@@ -2,17 +2,21 @@
 
 pub mod background_tasks;
 pub mod governance_handlers;
+pub mod init_bootstrap;
 pub mod init_community;
 pub mod init_compute;
 pub mod init_contract_registry;
 pub mod init_coop;
 pub mod init_entity;
+pub mod init_federation;
+pub mod init_gateway;
 pub mod init_gossip;
 pub mod init_governance;
 pub mod init_ledger;
 pub mod init_network;
 pub mod init_notifications;
 pub mod init_rpc;
+pub mod init_send_callback;
 pub mod init_snapshot;
 pub mod init_steward;
 pub mod init_trust;
@@ -23,14 +27,13 @@ pub mod version_tracker;
 
 use anyhow::{bail, Context, Result};
 use icn_identity::{Did, IdentityBundle};
-use icn_rpc::RpcServer;
 use icn_store::SledStore;
 use serde_json;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::select;
 use tokio::task::JoinSet;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 
 use crate::config::Config;
 use crate::runtime::ShutdownTx;
@@ -526,271 +529,29 @@ impl Supervisor {
             let clearing_manager_for_governance: Option<Arc<icn_federation::ClearingManager>>;
             let attestation_store_for_governance: Option<Arc<icn_federation::AttestationStore>>;
 
-            // Set send callback on gossip actor to enable request/response
-            {
-                let mut gossip = gossip_handle.write().await;
-                let network_handle_clone = network_handle.clone();
-                let own_did_clone = did.clone();
-                let keypair_clone = identity_bundle.keypair().clone();
-                let sequence_counter = Arc::new(std::sync::atomic::AtomicU64::new(0));
-
-                // E2E encryption support (Issue #404)
-                let encryption_enabled = self.config.network.e2e_encryption_enabled;
-                let x25519_secret_bytes = *identity_bundle.x25519_secret().as_bytes();
-                let encryption_sequence_tracker = Arc::new(
-                    icn_net::OutgoingSequenceTracker::new(gossip_store.clone())
-                        .context("Failed to create encryption sequence tracker")?,
-                );
-
-                // Only start encryption-related tasks if encryption is enabled
-                if encryption_enabled {
-                    info!("E2E encryption enabled - messages to capable peers will be encrypted");
-
-                    // Initialize sequence tracker synchronously on startup to ensure
-                    // predictable startup behavior and avoid first-message delays.
-                    // This applies the restart safety gap to all persisted sequences.
-                    encryption_sequence_tracker
-                        .load_and_apply_safety_gap()
-                        .await
-                        .context("Failed to apply encryption sequence safety gap")?;
-
-                    // Run initial cleanup on startup (Issue #404 review feedback)
-                    // This handles the edge case where a node accumulates >50K recipient pairs
-                    // before the first hourly cleanup runs. Without this, new encryptions would
-                    // fail if the capacity limit is hit before the first cleanup.
-                    if let Err(e) = encryption_sequence_tracker
-                        .cleanup_stale_entries(86400)
-                        .await
-                    {
-                        warn!("Initial encryption sequence cleanup failed: {}", e);
-                        // Non-fatal: cleanup task will retry hourly
-                    }
-
-                    // Periodic cleanup task for stale sequence tracker entries (Issue #404 review feedback)
-                    // Removes entries not used in the last 24 hours to prevent unbounded memory growth.
-                    //
-                    // Memory bounds analysis:
-                    // - In a fully-connected network, worst case is N×(N-1) ≈ N² pairs
-                    // - MAX_SEQUENCE_PAIRS limit is 50K, suitable for networks up to ~220 nodes
-                    // - Each SequenceEntry is ~50 bytes (DID strings + u64 sequence + timestamp)
-                    // - Maximum memory: 50K × 50 bytes = 2.5MB (acceptable for production)
-                    // - Cleanup runs hourly with 24h retention, so active pairs are retained
-                    // - For larger networks, increase MAX_SEQUENCE_PAIRS or reduce retention
-                    //
-                    // Circuit breaker: After N consecutive failures, escalate to ERROR.
-                    // This helps operators detect persistent storage issues before they cause
-                    // unbounded memory growth.
-                    //
-                    // ## Recommended Prometheus Alerts
-                    //
-                    // ```yaml
-                    // # CRITICAL: Storage may be degraded, encryption at risk
-                    // - alert: ICNEncryptionCircuitBreakerTripped
-                    //   expr: increase(icn_network_encryption_circuit_breaker_trips_total[5m]) > 0
-                    //   severity: critical
-                    //
-                    // # WARNING: Cleanup failing, investigate before circuit breaker trips
-                    // - alert: ICNEncryptionCleanupFailing
-                    //   expr: increase(icn_network_encryption_sequence_cleanup_failed_total[1h]) > 0
-                    //   severity: warning
-                    //
-                    // # NOTICE: Approaching capacity limit, may need to scale or adjust retention
-                    // - alert: ICNEncryptionSequencePairsHigh
-                    //   expr: icn_network_encryption_sequence_pairs > 40000
-                    //   severity: info
-                    // ```
-                    let tracker_for_cleanup = encryption_sequence_tracker.clone();
-                    let shutdown_rx_for_cleanup = self.shutdown_tx.subscribe();
-                    let circuit_breaker_threshold = self
+            // Initialize send callback with E2E encryption support
+            let send_callback_services = init_send_callback::init_send_callback(
+                init_send_callback::SendCallbackDeps {
+                    network_handle: network_handle.clone(),
+                    own_did: did.clone(),
+                    keypair: identity_bundle.keypair().clone(),
+                    x25519_secret_bytes: *identity_bundle.x25519_secret().as_bytes(),
+                    gossip_store: gossip_store.clone(),
+                    encryption_enabled: self.config.network.e2e_encryption_enabled,
+                    circuit_breaker_threshold: self
                         .config
                         .network
-                        .encryption_cleanup_circuit_breaker_threshold;
-                    background_tasks.spawn(async move {
-                        let mut interval =
-                            tokio::time::interval(std::time::Duration::from_secs(3600));
-                        let mut shutdown_rx = shutdown_rx_for_cleanup;
-                        let mut consecutive_failures: u32 = 0;
+                        .encryption_cleanup_circuit_breaker_threshold,
+                    shutdown_tx: self.shutdown_tx.clone(),
+                },
+                &mut background_tasks,
+            )
+            .await?;
 
-                        loop {
-                            tokio::select! {
-                                _ = interval.tick() => {
-                                    match tracker_for_cleanup.cleanup_stale_entries(86400).await {
-                                        Ok(removed) => {
-                                            if removed > 0 {
-                                                debug!("Cleaned up {} stale encryption sequence entries", removed);
-                                            }
-                                            consecutive_failures = 0; // Reset on success
-
-                                            // Update gauge with current pair count for observability
-                                            let pair_count = tracker_for_cleanup.pair_count().await;
-                                            icn_obs::metrics::network::encryption_sequence_pairs_set(pair_count as u64);
-                                        }
-                                        Err(e) => {
-                                            consecutive_failures += 1;
-                                            icn_obs::metrics::network::encryption_sequence_cleanup_failed_inc();
-
-                                            if consecutive_failures >= circuit_breaker_threshold {
-                                                // Circuit breaker tripped - escalate to ERROR and alert via metric
-                                                error!(
-                                                    consecutive_failures = consecutive_failures,
-                                                    "Encryption sequence cleanup has failed {} consecutive times! \
-                                                     Storage may be degraded. Sequence tracker memory may grow unbounded. \
-                                                     Error: {}",
-                                                    consecutive_failures, e
-                                                );
-                                                // Critical alert metric - operators should alert on this
-                                                icn_obs::metrics::network::encryption_circuit_breaker_trips_inc();
-                                            } else {
-                                                warn!(
-                                                    consecutive_failures = consecutive_failures,
-                                                    threshold = circuit_breaker_threshold,
-                                                    "Encryption sequence cleanup failed ({}/{}): {}",
-                                                    consecutive_failures, circuit_breaker_threshold, e
-                                                );
-                                            }
-                                        }
-                                    }
-                                }
-                                _ = shutdown_rx.recv() => {
-                                    debug!("Running final encryption sequence cleanup before shutdown");
-                                    // Run final cleanup to remove any accumulated entries
-                                    if let Err(e) = tracker_for_cleanup.cleanup_stale_entries(86400).await {
-                                        warn!("Final encryption sequence cleanup failed: {}", e);
-                                    }
-                                    debug!("Encryption sequence cleanup task shutting down");
-                                    break;
-                                }
-                            }
-                        }
-                    });
-                }
-
-                let send_callback: icn_gossip::SendMessageCallback = Arc::new(
-                    move |recipient, gossip_msg| {
-                        let net_handle = network_handle_clone.clone();
-                        let from_did = own_did_clone.clone();
-                        let keypair = keypair_clone.clone();
-                        let sequence_ctr = sequence_counter.clone();
-                        let enc_seq_tracker = encryption_sequence_tracker.clone();
-                        let x25519_secret = x25519_dalek::StaticSecret::from(x25519_secret_bytes);
-
-                        // Track metrics based on message type
-                        use icn_gossip::GossipMessage;
-                        match &gossip_msg {
-                            GossipMessage::Announce { .. } => {
-                                icn_obs::metrics::gossip::announces_sent_inc()
-                            }
-                            GossipMessage::Request { .. } => {
-                                icn_obs::metrics::gossip::requests_sent_inc()
-                            }
-                            GossipMessage::Response { .. } => {
-                                icn_obs::metrics::gossip::responses_sent_inc()
-                            }
-                            _ => {} // Other message types
-                        }
-
-                        // Spawn async task to send message
-                        tokio::spawn(async move {
-                            // Get next sequence number for signed envelope
-                            let sequence =
-                                sequence_ctr.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-
-                            // Create inner signed envelope with gossip payload
-                            let inner_envelope = match icn_net::SignedEnvelope::from_payload(
-                                &from_did,
-                                &keypair,
-                                sequence,
-                                icn_net::PayloadType::Gossip,
-                                &gossip_msg,
-                            ) {
-                                Ok(env) => env,
-                                Err(e) => {
-                                    warn!("Failed to create signed envelope: {}", e);
-                                    return;
-                                }
-                            };
-
-                            // Determine if we should encrypt (unicast + encryption enabled + peer supports it)
-                            let should_encrypt = if let Some(ref target_did) = recipient {
-                                encryption_enabled
-                                    && net_handle
-                                        .peer_has_capability(
-                                            target_did,
-                                            icn_net::CapabilityFlags::E2E_ENCRYPTION,
-                                        )
-                                        .await
-                            } else {
-                                false // Broadcast cannot be encrypted
-                            };
-
-                            let result = if let Some(target_did) = recipient {
-                                // Unicast
-                                if should_encrypt {
-                                    // Try to encrypt the message.
-                                    // Both inner and outer envelopes use the SAME signing sequence.
-                                    // This is safe because:
-                                    // 1. ChaCha20-Poly1305 AEAD provides ciphertext integrity
-                                    // 2. The inner envelope cannot be extracted without decryption
-                                    // 3. handle_signed_inner skips replay check (outer protects)
-                                    // See handlers/signed.rs::handle_signed_inner for full security analysis.
-                                    match try_encrypt_envelope(
-                                        &net_handle,
-                                        &from_did,
-                                        &target_did,
-                                        &inner_envelope,
-                                        &keypair,
-                                        &x25519_secret,
-                                        &enc_seq_tracker,
-                                        sequence, // Use same sequence as inner envelope
-                                    )
-                                    .await
-                                    {
-                                        Ok(outer_envelope) => {
-                                            debug!("Sending encrypted gossip to {}", target_did);
-                                            icn_obs::metrics::network::encrypted_messages_sent_inc(
-                                            );
-                                            let net_msg = icn_net::NetworkMessage::signed(
-                                                Some(target_did.clone()),
-                                                outer_envelope,
-                                            );
-                                            net_handle.send_message(target_did, net_msg).await
-                                        }
-                                        Err(e) => {
-                                            // Fail-closed: drop the message rather than transmit plaintext.
-                                            // This ensures we never leak confidential data unencrypted.
-                                            error!(
-                                                "Encryption failed for {}, dropping message (fail-closed): {}",
-                                                target_did, e
-                                            );
-                                            icn_obs::metrics::network::encryption_failed_inc(
-                                                "encryption_error",
-                                            );
-                                            // Return Ok to avoid triggering retry logic - this is intentional drop
-                                            Ok(())
-                                        }
-                                    }
-                                } else {
-                                    // Send unencrypted (peer doesn't support E2E or encryption disabled)
-                                    let net_msg = icn_net::NetworkMessage::signed(
-                                        Some(target_did.clone()),
-                                        inner_envelope,
-                                    );
-                                    net_handle.send_message(target_did, net_msg).await
-                                }
-                            } else {
-                                // Broadcast (cannot be encrypted)
-                                let net_msg = icn_net::NetworkMessage::signed(None, inner_envelope);
-                                net_handle.broadcast(net_msg).await
-                            };
-
-                            if let Err(e) = result {
-                                warn!("Failed to send gossip message: {}", e);
-                            }
-                        });
-                    },
-                );
-
-                gossip.set_send_callback(send_callback);
+            // Set send callback on gossip actor
+            {
+                let mut gossip = gossip_handle.write().await;
+                gossip.set_send_callback(send_callback_services.send_callback);
 
                 // Set up notification callback for trust attestations, contract deployments, and recovery events
                 let trust_graph_for_notifications = trust_graph_handle.clone();
@@ -825,126 +586,32 @@ impl Supervisor {
                 let attestation_rate_limiter =
                     Arc::new(crate::trust_propagation::AttestationRateLimiter::new());
 
-                // Create FederationGossipHandler if federation is enabled
+                // Initialize federation services if enabled
+                let federation_services = init_federation::init_federation_services(
+                    &self.config.federation,
+                    init_federation::FederationDeps {
+                        gossip_handle: gossip_handle.clone(),
+                        did: did.clone(),
+                        store_path: self.config.store_path(),
+                    },
+                )
+                .await?;
+
+                // Extract federation components for use by other modules
                 let federation_handler_for_notifications: Option<
                     Arc<icn_federation::FederationGossipHandler>,
-                > = if federation_enabled {
-                    // Derive coop_id and coop_name from config or defaults
-                    let coop_id = if self.config.federation.coop_id.is_empty() {
-                        // Use network_name as default coop_id
-                        self.config.federation.network_name.clone()
-                    } else {
-                        self.config.federation.coop_id.clone()
-                    };
-
-                    let coop_name = if self.config.federation.coop_name.is_empty() {
-                        // Use network_name as default coop_name
-                        self.config.federation.network_name.clone()
-                    } else {
-                        self.config.federation.coop_name.clone()
-                    };
-
-                    // Create own cooperative info
-                    let own_coop_info = icn_federation::CooperativeInfo::new(
-                        coop_id.clone(),
-                        coop_name.clone(),
-                        did.clone(),
-                        icn_federation::FederationPolicy::default(), // Open by default
-                    );
-
-                    // Create federation store
-                    let federation_store_path = self.config.store_path().join("federation");
-                    let federation_store: Arc<dyn icn_store::Store> =
-                        Arc::new(SledStore::open(&federation_store_path)?);
-
-                    // Create cooperative registry
-                    let federation_registry = Arc::new(
-                        icn_federation::CooperativeRegistry::new(
-                            federation_store,
-                            own_coop_info.clone(),
-                        )
-                        .map_err(|e| {
-                            anyhow::anyhow!("Failed to create federation registry: {e}")
-                        })?,
-                    );
-
-                    // Keep reference for RPC server
-                    federation_registry_for_rpc = Some(federation_registry.clone());
-
-                    // Create clearing manager for bilateral clearing agreements (Issue #517)
-                    let clearing_store_path = self.config.store_path().join("clearing");
-                    let clearing_store: Arc<dyn icn_store::Store> =
-                        Arc::new(SledStore::open(&clearing_store_path)?);
-                    let clearing_manager = Arc::new(
-                        icn_federation::ClearingManager::new(clearing_store, coop_id.clone())
-                            .map_err(|e| {
-                                anyhow::anyhow!("Failed to create clearing manager: {e}")
-                            })?,
-                    );
-                    clearing_manager_for_governance = Some(clearing_manager);
-                    info!(
-                        "✓ Clearing manager initialized: store={}",
-                        clearing_store_path.display()
-                    );
-
-                    // Create attestation store for trust attestations (Issue #517)
-                    let attestation_store_path = self.config.store_path().join("attestations");
-                    let attestation_store_backend: Arc<dyn icn_store::Store> =
-                        Arc::new(SledStore::open(&attestation_store_path)?);
-                    let attestation_store = Arc::new(icn_federation::AttestationStore::new(
-                        attestation_store_backend,
-                    ));
-                    attestation_store_for_governance = Some(attestation_store);
-                    info!(
-                        "✓ Attestation store initialized: store={}",
-                        attestation_store_path.display()
-                    );
-
-                    // Create federation gossip handler
-                    let federation_handler = Arc::new(
-                        icn_federation::FederationGossipHandler::new(federation_registry),
-                    );
-
-                    // Set own coop info on handler
-                    federation_handler.set_own_coop(own_coop_info);
-
-                    // Set up send callback for federation messages (using gossip)
-                    let gossip_for_federation = gossip_handle.clone();
-                    let federation_send_callback: icn_federation::gossip::GossipSendCallback =
-                        Arc::new(move |topic: &str, data: Vec<u8>| {
-                            let gossip = gossip_for_federation.clone();
-                            let topic_owned = topic.to_string();
-                            // Use a sync approach since we're in a sync callback
-                            tokio::task::block_in_place(|| {
-                                tokio::runtime::Handle::current().block_on(async {
-                                    let mut gossip = gossip.write().await;
-                                    gossip
-                                        .publish(&topic_owned, data)
-                                        .await
-                                        .map(|_| ()) // Discard the hash, just return ()
-                                        .map_err(|e| {
-                                            icn_federation::FederationError::GossipPublishFailed(
-                                                e.to_string(),
-                                            )
-                                        })
-                                })
-                            })
-                        });
-                    federation_handler.set_send_callback(federation_send_callback);
-
-                    info!(
-                        "✓ Federation enabled: coop_id={}, coop_name={}, store={}",
-                        coop_id,
-                        coop_name,
-                        federation_store_path.display()
-                    );
-
-                    Some(federation_handler)
+                >;
+                if let Some(ref services) = federation_services {
+                    federation_registry_for_rpc = Some(services.registry.clone());
+                    clearing_manager_for_governance = Some(services.clearing_manager.clone());
+                    attestation_store_for_governance = Some(services.attestation_store.clone());
+                    federation_handler_for_notifications =
+                        Some(services.federation_handler.clone());
                 } else {
                     federation_registry_for_rpc = None;
                     clearing_manager_for_governance = None;
                     attestation_store_for_governance = None;
-                    None
+                    federation_handler_for_notifications = None;
                 };
 
                 // Clone federation handler for announcement task (before it's moved into notification callback)
@@ -1000,49 +667,13 @@ impl Supervisor {
                 )
                 .await;
 
-                // Spawn periodic federation announcement task (every 5 minutes) if enabled
-                if federation_enabled {
-                    // Spawn periodic federation announcement task (every 5 minutes)
-                    if let Some(ref handler) = federation_handler_for_announce {
-                        let handler_clone = handler.clone();
-                        let mut federation_shutdown = self.shutdown_tx.subscribe();
-
-                        // Announce immediately on startup
-                        if let Err(e) = handler_clone.announce() {
-                            warn!("Failed to send initial federation announcement: {}", e);
-                        } else {
-                            info!("✓ Sent initial federation announcement");
-                        }
-
-                        // Spawn periodic announcement task
-                        let handler_for_task = handler_clone.clone();
-                        background_tasks.spawn(async move {
-                            // Use icn_federation::defaults::ANNOUNCEMENT_INTERVAL (5 minutes)
-                            let mut interval = tokio::time::interval(icn_federation::defaults::ANNOUNCEMENT_INTERVAL);
-                            interval.tick().await; // Skip first tick (already announced above)
-
-                            loop {
-                                tokio::select! {
-                                    _ = interval.tick() => {
-                                        if let Err(e) = handler_for_task.announce() {
-                                            warn!("Failed to send periodic federation announcement: {}", e);
-                                        } else {
-                                            debug!("Sent periodic federation announcement");
-                                        }
-                                    }
-                                    _ = federation_shutdown.recv() => {
-                                        info!("Federation announcement task shutting down");
-                                        break;
-                                    }
-                                }
-                            }
-                        });
-
-                        info!(
-                            "Federation announcement task spawned (interval: {:?})",
-                            icn_federation::defaults::ANNOUNCEMENT_INTERVAL
-                        );
-                    }
+                // Spawn periodic federation announcement task if enabled
+                if let Some(ref handler) = federation_handler_for_announce {
+                    init_federation::spawn_federation_announcement_task(
+                        handler.clone(),
+                        self.shutdown_tx.subscribe(),
+                        &mut background_tasks,
+                    );
                 }
 
                 // Spawn candidate cache cleanup task
@@ -1076,146 +707,20 @@ impl Supervisor {
 
             info!("Gossip send callback configured");
 
-            // Dial bootstrap peers for WAN connectivity
-            if !self.config.network.bootstrap_peers.is_empty() {
-                info!(
-                    "Dialing {} bootstrap peers",
-                    self.config.network.bootstrap_peers.len()
-                );
-                let mut connected_bootstrap_peers = Vec::new();
-
-                for peer_url in &self.config.network.bootstrap_peers {
-                    match parse_bootstrap_peer(peer_url).await {
-                        Ok((peer_did, peer_addr)) => {
-                            info!(
-                                "Connecting to bootstrap peer: {} at {}",
-                                peer_did, peer_addr
-                            );
-                            match network_handle.dial(peer_addr, peer_did.clone()).await {
-                                Ok(_) => {
-                                    info!("✓ Connected to bootstrap peer: {}", peer_did);
-                                    connected_bootstrap_peers.push(peer_did);
-                                }
-                                Err(e) => {
-                                    warn!("Failed to connect to bootstrap peer {}: {}", peer_did, e)
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            warn!(
-                                "Failed to parse/resolve bootstrap peer URL '{}': {}",
-                                peer_url, e
-                            );
-                        }
-                    }
-                }
-
-                // Request peer exchange from bootstrap peers if federation is enabled
-                if self.config.federation.enabled && !connected_bootstrap_peers.is_empty() {
-                    info!(
-                        "Federation enabled - requesting peer exchange from {} bootstrap peers",
-                        connected_bootstrap_peers.len()
-                    );
-
-                    let network_filter = if self.config.federation.network_name != "icn-mainnet" {
-                        Some(self.config.federation.network_name.clone())
-                    } else {
-                        None
-                    };
-
-                    let peer_exchange_delay = std::time::Duration::from_millis(
-                        self.config.supervisor.peer_exchange_delay_ms,
-                    );
-                    let peer_exchange_max = self.config.supervisor.peer_exchange_max_peers;
-
-                    for peer_did in connected_bootstrap_peers {
-                        // Small delay to allow Hello handshake to complete
-                        tokio::time::sleep(peer_exchange_delay).await;
-
-                        match network_handle
-                            .request_peer_exchange(
-                                &peer_did,
-                                Some(peer_exchange_max),
-                                network_filter.clone(),
-                            )
-                            .await
-                        {
-                            Ok(_) => info!("✓ Requested peer exchange from {}", peer_did),
-                            Err(e) => {
-                                debug!("Failed to request peer exchange from {}: {}", peer_did, e)
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Announce connection candidate for NAT traversal
-            {
-                info!("Announcing connection candidate for NAT traversal...");
-                match network_handle.connection_candidate().await {
-                    Ok(candidate) => {
-                        info!(
-                            "Connection candidate: local={}, public={:?}, relay={:?}",
-                            candidate.local_addr, candidate.public_addr, candidate.relay_addr
-                        );
-
-                        // Serialize candidate and publish to gossip
-                        match serde_json::to_vec(&candidate) {
-                            Ok(candidate_bytes) => {
-                                let mut gossip = gossip_handle.write().await;
-                                match gossip
-                                    .publish(init_gossip::NETWORK_CANDIDATES_TOPIC, candidate_bytes)
-                                    .await
-                                {
-                                    Ok(_) => info!("✓ Published connection candidate to gossip"),
-                                    Err(e) => {
-                                        warn!("Failed to publish connection candidate: {}", e)
-                                    }
-                                }
-                            }
-                            Err(e) => warn!("Failed to serialize connection candidate: {}", e),
-                        }
-                    }
-                    Err(e) => warn!("Failed to get connection candidate: {}", e),
-                }
-            }
-
-            // Subscribe to node profiles topic and announce our profile
-            {
-                let mut gossip = gossip_handle.write().await;
-
-                // Subscribe to network:profiles topic for peer capability discovery
-                if let Err(e) = gossip
-                    .subscribe(crate::node::TOPIC_NODE_PROFILES, did.clone())
-                    .await
-                {
-                    warn!("Failed to subscribe to network:profiles topic: {}", e);
-                } else {
-                    info!("Subscribed to network:profiles topic");
-                }
-
-                // Publish our node profile announcement
-                let profile_msg = crate::node::ProfileMessage::Announce(node_profile.clone());
-                match serde_json::to_vec(&profile_msg) {
-                    Ok(profile_bytes) => {
-                        match gossip
-                            .publish(crate::node::TOPIC_NODE_PROFILES, profile_bytes)
-                            .await
-                        {
-                            Ok(_) => {
-                                info!(
-                                    "✓ Published node profile: {} roles ({:?}), {} extended capabilities",
-                                    node_profile.roles.len(),
-                                    node_profile.roles_sorted(),
-                                    node_profile.extended.capabilities.len(),
-                                );
-                            }
-                            Err(e) => warn!("Failed to publish node profile: {}", e),
-                        }
-                    }
-                    Err(e) => warn!("Failed to serialize node profile: {}", e),
-                }
-            }
+            // Run network bootstrap: dial peers, announce candidate, publish profile
+            let bootstrap_config = init_bootstrap::BootstrapConfig::from_configs(
+                self.config.network.bootstrap_peers.clone(),
+                &self.config.federation,
+                &self.config.supervisor,
+            );
+            init_bootstrap::run_bootstrap(
+                &bootstrap_config,
+                &network_handle,
+                &gossip_handle,
+                &did,
+                &node_profile,
+            )
+            .await;
 
             // Create event bus for inter-actor communication
             let event_bus = Arc::new(crate::events::EventBus::new());
@@ -1345,48 +850,24 @@ impl Supervisor {
 
             info!("✓ Policy governance integration active");
 
-            // Spawn RPC server with network, ledger, contract, gossip, and governance handles
-            let rpc_port = self.config.network.rpc_port;
-            let rpc_addr = format!("127.0.0.1:{rpc_port}").parse()?;
-
-            // Enable RPC auth if gateway is enabled with a jwt_secret
-            let mut rpc_server =
-                if self.config.gateway.enabled && !self.config.gateway.jwt_secret.is_empty() {
-                    info!("RPC server auth enabled (using gateway JWT secret)");
-                    RpcServer::new_with_auth(
-                        rpc_addr,
-                        self.config.gateway.jwt_secret.as_bytes().to_vec(),
-                    )
-                } else {
-                    RpcServer::new(rpc_addr)
-                };
-            rpc_server.set_network_handle(network_handle.clone());
-            rpc_server.set_ledger_handle(ledger_handle.clone());
-            rpc_server.set_contract_runtime(contract_runtime_handle.clone());
-            rpc_server.set_gossip_handle(gossip_handle.clone());
-            rpc_server.set_governance_handle(governance_handle);
-            // Clone compute_handle for gateway before giving to RPC
-            compute_handle_for_gateway = Some(compute_handle.clone());
-            rpc_server.set_compute_handle(compute_handle);
-            rpc_server.set_trust_handle(trust_graph_handle.clone());
-            rpc_server.set_dispute_manager(dispute_manager_handle);
-            if let Some(registry) = federation_registry_for_rpc {
-                rpc_server.set_federation_registry(registry);
-            }
-
-            // Enable trust-based rate limiting for API requests (C8)
-            rpc_server.enable_trust_rate_limiting();
-
-            background_tasks.spawn(async move {
-                if let Err(e) = rpc_server.run().await {
-                    warn!("RPC server error: {}", e);
-                    icn_obs::metrics::supervisor::error_inc("rpc_server");
-                }
-            });
-
-            icn_obs::metrics::supervisor::actor_spawned_inc("rpc_server");
-            icn_obs::metrics::supervisor::actor_active_set("rpc_server", true);
-            info!("RPC server spawned on {}", rpc_addr);
+            // Spawn RPC server with all actor handles
+            let rpc_config = init_rpc::RpcConfig::from_daemon_config(&self.config);
+            let rpc_compute_handle = init_rpc::spawn_rpc_server(
+                rpc_config,
+                init_rpc::RpcDeps {
+                    network_handle: network_handle.clone(),
+                    ledger_handle: ledger_handle.clone(),
+                    contract_runtime: contract_runtime_handle.clone(),
+                    gossip_handle: gossip_handle.clone(),
+                    governance_handle,
+                    compute_handle,
+                    trust_graph: trust_graph_handle.clone(),
+                    dispute_manager: dispute_manager_handle,
+                    federation_registry: federation_registry_for_rpc,
+                },
+                &mut background_tasks,
+            );
+            compute_handle_for_gateway = Some(rpc_compute_handle);
 
             // Spawn anti-entropy task
             let anti_entropy_config = crate::anti_entropy::AntiEntropyConfig::default();
@@ -1553,110 +1034,23 @@ impl Supervisor {
             (None, None, None)
         };
 
-        // Spawn Gateway API server if enabled (works with or without identity)
-        if self.config.gateway.enabled {
-            info!(
-                "Gateway spawn check - enabled: true, jwt_secret length: {}",
-                self.config.gateway.jwt_secret.len()
-            );
-            let gateway_addr: std::net::SocketAddr = self.config.gateway.bind_addr.parse()?;
-
-            // Check that JWT secret is configured
-            if self.config.gateway.jwt_secret.is_empty() {
-                warn!("Gateway enabled but JWT secret not configured - gateway will not start");
-                warn!("Set jwt_secret in config or ICN_GATEWAY_JWT_SECRET environment variable");
-                icn_obs::metrics::supervisor::error_inc("gateway_jwt_secret_missing");
-            } else {
-                info!("Gateway JWT secret verified, spawning server...");
-
-                let jwt_secret = self.config.gateway.jwt_secret.clone().into_bytes();
-                let data_dir = self.config.data_dir.clone();
-
-                // Get event broadcaster if compute actor was created
-                let broadcaster_for_gateway = if let Some(ref broadcaster) = event_broadcaster {
-                    info!("Using shared EventBroadcaster for real-time WebSocket delivery");
-                    Some(broadcaster.clone())
-                } else {
-                    None
-                };
-
-                // Spawn gateway in a dedicated thread (actix-web has its own runtime)
-                std::thread::spawn(move || {
-                    // SAFETY: Runtime creation only fails with invalid config or resource exhaustion
-                    #[allow(clippy::unwrap_used)]
-                    let rt = tokio::runtime::Runtime::new().unwrap();
-                    rt.block_on(async move {
-                        let mut gateway_server = if let Some(broadcaster) = broadcaster_for_gateway
-                        {
-                            icn_gateway::GatewayServer::new_with_broadcaster(
-                                gateway_addr,
-                                jwt_secret,
-                                Some(data_dir),
-                                broadcaster,
-                            )
-                        } else {
-                            icn_gateway::GatewayServer::new(gateway_addr, jwt_secret)
-                        };
-
-                        // Connect compute handle if available
-                        if let Some(handle) = compute_handle_for_gateway {
-                            gateway_server = gateway_server.with_compute_handle(handle);
-                        }
-
-                        // Connect cooperative handle if available
-                        if let Some(handle) = coop_handle_for_gateway {
-                            gateway_server = gateway_server.with_coop_handle(handle);
-                        }
-
-                        // Connect community handle if available
-                        if let Some(handle) = community_handle_for_gateway {
-                            gateway_server = gateway_server.with_community_handle(handle);
-                        }
-
-                        // Connect trust graph handle if available
-                        if let Some(handle) = trust_graph_handle_for_gateway {
-                            gateway_server = gateway_server.with_trust_handle(handle);
-                        }
-
-                        // Connect governance handle if available
-                        if let Some(handle) = governance_handle_for_gateway {
-                            gateway_server = gateway_server.with_governance_handle(handle);
-                        }
-
-                        // Connect treasury handle if available
-                        if let Some(handle) = treasury_handle_for_gateway {
-                            gateway_server = gateway_server.with_treasury_handle(handle);
-                        }
-
-                        // Connect ledger handle for balance queries
-                        if let Some(handle) = ledger_handle_for_gateway {
-                            gateway_server = gateway_server.with_ledger_handle(handle);
-                        }
-
-                        // Connect entity handle for entity management
-                        if let Some(handle) = entity_handle_for_gateway {
-                            gateway_server = gateway_server.with_entity_handle(handle);
-                        }
-
-                        // Connect steward handle for SDIS ceremonies
-                        if let Some(handle) = steward_handle_for_gateway {
-                            gateway_server = gateway_server.with_steward_handle(handle);
-                        }
-
-                        if let Err(e) = gateway_server.run().await {
-                            warn!("Gateway server error: {}", e);
-                            icn_obs::metrics::supervisor::error_inc("gateway_server");
-                        }
-                    });
-                });
-
-                icn_obs::metrics::supervisor::actor_spawned_inc("gateway");
-                icn_obs::metrics::supervisor::actor_active_set("gateway", true);
-                info!("Gateway API spawned on {}", gateway_addr);
-            }
-        } else {
-            debug!("Gateway API disabled in configuration");
-        }
+        // Spawn Gateway API server if enabled
+        init_gateway::spawn_gateway(
+            &self.config.gateway,
+            self.config.data_dir.clone(),
+            init_gateway::GatewayHandles {
+                event_broadcaster,
+                compute: compute_handle_for_gateway,
+                coop: coop_handle_for_gateway,
+                community: community_handle_for_gateway,
+                trust_graph: trust_graph_handle_for_gateway,
+                governance: governance_handle_for_gateway,
+                treasury: treasury_handle_for_gateway,
+                ledger: ledger_handle_for_gateway,
+                entity: entity_handle_for_gateway,
+                steward: steward_handle_for_gateway,
+            },
+        );
 
         // Set supervisor state to running
         icn_obs::metrics::supervisor::state_set(2);
