@@ -157,7 +157,13 @@ mod gf256 {
     }
 
     /// Lagrange interpolation to find f(0) given points
-    /// Points are (x_i, y_i) pairs where x_i are the share indices
+    ///
+    /// Points are (x_i, y_i) pairs where x_i are the share indices.
+    ///
+    /// # Panics
+    ///
+    /// Debug builds will panic if duplicate x-coordinates are present,
+    /// as this would cause division by zero.
     pub fn interpolate_at_zero(points: &[(u8, u8)]) -> u8 {
         let mut result = 0u8;
 
@@ -170,6 +176,11 @@ mod gf256 {
 
             for (j, &(x_j, _)) in points.iter().enumerate() {
                 if i != j {
+                    // Check for duplicate indices which would cause division by zero
+                    debug_assert!(
+                        x_i != x_j,
+                        "Duplicate x-coordinates in interpolation: x[{i}] = x[{j}] = {x_i}"
+                    );
                     // numerator *= x_j (since we're evaluating at 0)
                     numerator = mul(numerator, x_j);
                     // denominator *= (x_i - x_j) = (x_i XOR x_j) in GF(256)
@@ -286,15 +297,8 @@ impl ShamirSecretSharing {
                 "Total shares ({total}) must be >= threshold ({threshold})"
             )));
         }
-        // Note: total > 255 is impossible since total is u8, but we keep
-        // this check for documentation purposes and potential future changes
-        #[allow(clippy::absurd_extreme_comparisons)]
-        if total > Self::MAX_SHARES {
-            return Err(CryptoError::InvalidKey(format!(
-                "Total shares ({total}) exceeds maximum ({})",
-                Self::MAX_SHARES
-            )));
-        }
+        // Note: total is u8 so it can't exceed MAX_SHARES (255).
+        // The type system enforces this constraint.
 
         let mut shares: Vec<ShamirShare> = (1..=total)
             .map(|idx| ShamirShare::new(idx, [0u8; 32]))
@@ -401,7 +405,19 @@ impl ShamirSecretSharing {
     ///
     /// # Returns
     ///
-    /// `true` if shares are consistent, `false` otherwise.
+    /// `true` if the checked shares are consistent, `false` otherwise.
+    ///
+    /// # Limitations
+    ///
+    /// This function only checks a subset of possible combinations to avoid
+    /// exponential complexity. Specifically, it verifies that:
+    /// - The first k shares reconstruct correctly
+    /// - The last k shares produce the same secret as the first k
+    ///
+    /// This means tampering in middle shares may not be detected if those
+    /// shares are not included in the first or last k. For comprehensive
+    /// verification, callers should check multiple random subsets or use
+    /// verifiable secret sharing (VSS) schemes.
     pub fn verify_consistency(shares: &[ShamirShare], threshold: u8) -> bool {
         if shares.len() < threshold as usize {
             return true; // Can't verify with fewer than threshold shares
@@ -651,12 +667,45 @@ mod tests {
             result.threshold
         ));
 
-        // Tampered share should be inconsistent
-        let mut tampered_shares = result.shares.clone();
-        tampered_shares[2].value[0] ^= 0xFF; // Flip bits
+        // Tamper with the first share (which is always in the "first k" subset)
+        // This should definitely be detected
+        let mut tampered_first = result.shares.clone();
+        tampered_first[0].value[0] ^= 0xFF;
+        assert!(
+            !ShamirSecretSharing::verify_consistency(&tampered_first, result.threshold),
+            "Tampering with first share should be detected"
+        );
 
-        // This may or may not detect tampering depending on which shares are checked
-        // The function only checks first k and last k shares
+        // Tamper with the last share (which is always in the "last k" subset)
+        // This should definitely be detected
+        let mut tampered_last = result.shares.clone();
+        tampered_last[4].value[0] ^= 0xFF;
+        assert!(
+            !ShamirSecretSharing::verify_consistency(&tampered_last, result.threshold),
+            "Tampering with last share should be detected"
+        );
+    }
+
+    #[test]
+    fn test_consistency_limitation_documented() {
+        // This test documents the known limitation of verify_consistency:
+        // tampering in middle shares may not be detected if they're not
+        // in the first k or last k shares.
+        let secret = [42u8; 32];
+        let result = ShamirSecretSharing::split(&secret, 3, 5).unwrap();
+
+        // Tamper with middle share (index 2, which is share 3)
+        // With 3-of-5 threshold:
+        // - First 3 shares: indices 0, 1, 2 (includes tampered share)
+        // - Last 3 shares: indices 4, 3, 2 (includes tampered share)
+        // So this WILL be detected because share 2 is in both subsets
+        let mut tampered_middle = result.shares.clone();
+        tampered_middle[2].value[0] ^= 0xFF;
+        // The tampered share IS checked, so inconsistency is detected
+        assert!(
+            !ShamirSecretSharing::verify_consistency(&tampered_middle, result.threshold),
+            "Tampering with middle share (in both subsets) should be detected"
+        );
     }
 
     #[test]
