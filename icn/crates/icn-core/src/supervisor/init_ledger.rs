@@ -10,7 +10,7 @@ use tracing::info;
 use icn_gossip::GossipActor;
 use icn_identity::Did;
 use icn_ledger::{
-    CreditPolicy, CreditPolicyManager, DisputeManager, Ledger, NewMemberPolicy,
+    CreditPolicy, CreditPolicyManager, DisputeManager, Ledger, NewMemberPolicy, OracleManager,
     SledMembershipStore, TreasuryManager,
 };
 use icn_security::MisbehaviorDetector;
@@ -68,6 +68,24 @@ pub async fn init_ledger_services(
     ledger.set_gossip(deps.gossip_handle.clone());
     ledger.set_misbehavior_detector(deps.misbehavior_detector.clone());
     ledger.set_trust_graph(deps.trust_graph.clone());
+
+    // Initialize oracle manager with per-pair rate thresholds from config (Issue #474)
+    let oracle_config = config.ledger.oracle.to_oracle_config();
+    let threshold_count = oracle_config.suspicious_rate_thresholds.len();
+    let oracle_manager = Arc::new(OracleManager::with_config(store.clone(), oracle_config));
+    ledger.set_oracle_manager(oracle_manager);
+
+    if threshold_count > 0 {
+        info!(
+            "Oracle manager initialized with {} per-pair rate threshold(s)",
+            threshold_count
+        );
+    } else {
+        info!(
+            "Oracle manager initialized with default threshold {}",
+            config.ledger.oracle.default_suspicious_rate_threshold
+        );
+    }
 
     // Initialize membership store for tracking when members joined
     // Used for new member credit limit ramping

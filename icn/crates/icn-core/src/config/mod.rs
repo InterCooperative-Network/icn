@@ -6,6 +6,7 @@
 mod cooperative;
 mod federation;
 mod gateway;
+mod ledger;
 mod network;
 mod observability;
 mod privacy;
@@ -16,6 +17,7 @@ mod supervisor;
 pub use cooperative::*;
 pub use federation::*;
 pub use gateway::*;
+pub use ledger::*;
 pub use network::*;
 pub use observability::*;
 pub use privacy::*;
@@ -71,6 +73,10 @@ pub struct Config {
     /// Supervisor configuration for background tasks and timeouts
     #[serde(default)]
     pub supervisor: SupervisorConfig,
+
+    /// Ledger configuration for mutual credit and exchange rate oracle
+    #[serde(default)]
+    pub ledger: LedgerConfig,
 }
 
 impl Default for Config {
@@ -108,6 +114,7 @@ impl Default for Config {
             cooperative: CooperativeConfig::default(),
             steward: StewardNodeConfig::default(),
             supervisor: SupervisorConfig::default(),
+            ledger: LedgerConfig::default(),
         }
     }
 }

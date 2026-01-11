@@ -251,6 +251,35 @@ max_concurrent_recoveries = 50
 token_validity_secs = 604800
 
 # =============================================================================
+# LEDGER & ORACLE (Exchange Rates)
+# =============================================================================
+[ledger.oracle]
+# Default TTL for cached exchange rates (seconds)
+default_ttl_secs = 3600
+
+# Minimum sources required for rate consensus
+min_sources_for_consensus = 1
+
+# Maximum deviation from median for valid rate (0.15 = 15%)
+outlier_threshold = 0.15
+
+# Staleness threshold for rates (seconds)
+staleness_threshold_secs = 86400
+
+# Default suspicious rate threshold for unconfigured currency pairs.
+# Rates exceeding this trigger additional validation.
+# Most major pairs (EUR/USD, GBP/USD) range 0.01 to ~150.
+default_suspicious_rate_threshold = 1000.0
+
+# Per-currency-pair rate thresholds.
+# Use for pairs that legitimately exceed the default (e.g., JPY, crypto).
+# Key format: "FROM:TO" (e.g., "USD:JPY", "BTC:USD")
+[ledger.oracle.suspicious_rate_thresholds]
+# "USD:JPY" = 200.0      # JPY pairs typically ~100-150
+# "BTC:USD" = 100000.0   # Crypto pairs can be very high
+# "hours:USD" = 500.0    # Cooperative time credits
+
+# =============================================================================
 # SUPERVISOR (Background Tasks & Timeouts)
 # =============================================================================
 [supervisor]
