@@ -203,6 +203,10 @@ pub struct GossipActor {
     /// Topic auto-creation policy (Issue #473 - strict defaults)
     /// Controls what happens when publishing to an undeclared topic
     topic_auto_creation_policy: crate::types::TopicAutoCreationPolicy,
+
+    /// Key rotation cache for tracking rotated DIDs during grace period (Issue #469)
+    /// Used to accept messages signed with old keys during the transition period
+    key_rotation_cache: crate::key_rotation::KeyRotationCache,
 }
 
 impl GossipActor {
@@ -241,6 +245,7 @@ impl GossipActor {
             bloom_resize_config: crate::bloom::BloomResizeConfig::default(), // M2: Dynamic Bloom sizing
             adaptive_fanout_config: crate::types::AdaptiveFanoutConfig::default(), // M2 #484: Adaptive fanout
             topic_auto_creation_policy: crate::types::TopicAutoCreationPolicy::default(), // Issue #473: Strict defaults
+            key_rotation_cache: crate::key_rotation::KeyRotationCache::new(), // Issue #469: Key rotation tracking
         };
 
         // Create default topics with appropriate scopes
@@ -376,6 +381,260 @@ impl GossipActor {
     pub fn topic_auto_creation_policy(&self) -> crate::types::TopicAutoCreationPolicy {
         self.topic_auto_creation_policy
     }
+
+    // ==================== Key Rotation Methods (Issue #469) ====================
+
+    /// Record a key rotation in the cache.
+    ///
+    /// This should be called when receiving a valid RotationAnnouncement message
+    /// or when this node rotates its own keys.
+    pub fn record_key_rotation(&mut self, old_did: &Did, new_did: Did, timestamp: u64) {
+        self.key_rotation_cache
+            .record_rotation(old_did, new_did, timestamp);
+    }
+
+    /// Check if a DID is still valid (either current or within rotation grace period).
+    ///
+    /// Returns true if:
+    /// - The DID has no rotation record (current or never rotated)
+    /// - The DID was rotated but is within the grace period
+    ///
+    /// Returns false if the DID was rotated and the grace period has expired.
+    pub fn is_did_valid(&self, did: &Did) -> bool {
+        let current_time = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        self.key_rotation_cache.is_did_valid(did, current_time)
+    }
+
+    /// Get the new DID for a rotated key, if within grace period.
+    ///
+    /// Returns Some(new_did) if the old_did was rotated and we're within the grace period.
+    /// Returns None if no rotation record exists or the grace period has expired.
+    pub fn get_rotated_did(&self, old_did: &Did) -> Option<Did> {
+        let current_time = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        self.key_rotation_cache
+            .get_rotated_did(old_did, current_time)
+            .cloned()
+    }
+
+    /// Clean up expired rotation records from the cache.
+    ///
+    /// Call this periodically (e.g., every hour) to prevent memory growth.
+    pub fn cleanup_rotation_cache(&mut self) {
+        let current_time = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        self.key_rotation_cache.cleanup_expired(current_time);
+    }
+
+    /// Publish a key rotation announcement to the network.
+    ///
+    /// This broadcasts the rotation to all peers subscribed to the key:rotation topic.
+    /// The announcement includes signatures from both old and new keys to prove
+    /// authorization and possession.
+    ///
+    /// # Arguments
+    /// * `old_did` - DID before rotation
+    /// * `new_did` - DID after rotation
+    /// * `new_public_key` - New Ed25519 public key bytes (32 bytes)
+    /// * `timestamp` - Unix timestamp when rotation occurred
+    /// * `reason` - Reason for the rotation
+    /// * `signature_old` - Signature from old key
+    /// * `signature_new` - Signature from new key
+    pub async fn publish_rotation_announcement(
+        &mut self,
+        old_did: Did,
+        new_did: Did,
+        new_public_key: Vec<u8>,
+        timestamp: u64,
+        reason: crate::key_rotation::RotationReason,
+        signature_old: Vec<u8>,
+        signature_new: Vec<u8>,
+    ) -> Result<()> {
+        use crate::key_rotation::{KeyRotationMessage, TOPIC_KEY_ROTATION};
+
+        // Record in our own cache first
+        self.record_key_rotation(&old_did, new_did.clone(), timestamp);
+
+        // Create the rotation announcement message
+        let rotation_msg = KeyRotationMessage::announcement(
+            old_did,
+            new_did,
+            new_public_key,
+            timestamp,
+            reason,
+            signature_old,
+            signature_new,
+        );
+
+        // Serialize and publish to the key:rotation topic
+        let data = bincode::serde::encode_to_vec(&rotation_msg, bincode::config::standard())
+            .map_err(|e| anyhow::anyhow!("Failed to serialize rotation message: {e}"))?;
+
+        self.publish(TOPIC_KEY_ROTATION, data).await?;
+
+        info!(
+            "Published key rotation announcement to {}",
+            TOPIC_KEY_ROTATION
+        );
+        Ok(())
+    }
+
+    /// Handle an incoming key rotation message.
+    ///
+    /// Verifies the signatures and updates the local cache if valid.
+    /// Returns Ok(true) if the rotation was recorded, Ok(false) if it was a query/response.
+    pub fn handle_rotation_message(&mut self, data: &[u8]) -> Result<bool> {
+        use crate::key_rotation::KeyRotationMessage;
+
+        let (msg, _): (KeyRotationMessage, _) =
+            bincode::serde::decode_from_slice(data, bincode::config::standard())
+                .map_err(|e| anyhow::anyhow!("Failed to deserialize rotation message: {e}"))?;
+
+        match msg {
+            KeyRotationMessage::RotationAnnouncement {
+                old_did,
+                new_did,
+                new_public_key,
+                timestamp,
+                reason: _,
+                signature_old,
+                signature_new,
+            } => {
+                // Verify signatures before accepting the rotation
+                let message_to_verify =
+                    KeyRotationMessage::rotation_message(&old_did, &new_did, timestamp);
+                let message_bytes = message_to_verify.as_bytes();
+
+                // Verify old key signature
+                if !self.verify_signature(&old_did, message_bytes, &signature_old)? {
+                    warn!(
+                        "Invalid old key signature in rotation announcement from {}",
+                        old_did
+                    );
+                    return Err(anyhow::anyhow!("Invalid old key signature"));
+                }
+
+                // Verify new key signature using the provided public key
+                if !self.verify_signature_with_key(
+                    &new_public_key,
+                    message_bytes,
+                    &signature_new,
+                )? {
+                    warn!("Invalid new key signature in rotation announcement");
+                    return Err(anyhow::anyhow!("Invalid new key signature"));
+                }
+
+                // Both signatures valid, record the rotation
+                self.record_key_rotation(&old_did, new_did.clone(), timestamp);
+                info!("Recorded key rotation: {} -> {}", old_did, new_did);
+                Ok(true)
+            }
+            KeyRotationMessage::RotationQuery {
+                queried_did,
+                requester,
+            } => {
+                // Handle query - check if we know about a rotation for this DID
+                let (current_did, last_rotation) =
+                    if let Some(new_did) = self.get_rotated_did(&queried_did) {
+                        (
+                            new_did,
+                            self.get_rotation_timestamp(&queried_did).unwrap_or(0),
+                        )
+                    } else {
+                        (queried_did.clone(), 0)
+                    };
+
+                // Send response
+                let response =
+                    KeyRotationMessage::response(queried_did, current_did, last_rotation);
+                let response_data =
+                    bincode::serde::encode_to_vec(&response, bincode::config::standard())
+                        .map_err(|e| anyhow::anyhow!("Failed to serialize response: {e}"))?;
+
+                self.send_message(
+                    Some(requester),
+                    GossipMessage::Response {
+                        entry: GossipEntry {
+                            hash: blake3::hash(&response_data).into(),
+                            author: self.own_did.clone(),
+                            clock: self.clock.clone(),
+                            topic: crate::key_rotation::TOPIC_KEY_ROTATION.to_string(),
+                            data: response_data,
+                            compressed: false,
+                            timestamp: std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .map(|d| d.as_secs())
+                                .unwrap_or(0),
+                            replica_offered: None,
+                        },
+                    },
+                );
+                Ok(false)
+            }
+            KeyRotationMessage::RotationResponse { .. } => {
+                // Response handling would be done by the requester
+                Ok(false)
+            }
+        }
+    }
+
+    /// Get the timestamp when a DID was rotated (if known).
+    fn get_rotation_timestamp(&self, _did: &Did) -> Option<u64> {
+        // The cache doesn't store the original timestamp, just expiry.
+        // For now, return None. A more complete implementation would
+        // store the original timestamp.
+        None
+    }
+
+    /// Verify a signature using the public key from a DID.
+    fn verify_signature(&self, did: &Did, message: &[u8], signature: &[u8]) -> Result<bool> {
+        use ed25519_dalek::{Signature, Verifier};
+
+        // Extract public key from DID
+        let verifying_key = did.to_verifying_key()?;
+
+        let sig_bytes: [u8; 64] = match signature.try_into() {
+            Ok(bytes) => bytes,
+            Err(_) => return Ok(false), // Invalid signature length
+        };
+        let sig = Signature::from_bytes(&sig_bytes);
+
+        Ok(verifying_key.verify(message, &sig).is_ok())
+    }
+
+    /// Verify a signature using raw public key bytes.
+    fn verify_signature_with_key(
+        &self,
+        public_key: &[u8],
+        message: &[u8],
+        signature: &[u8],
+    ) -> Result<bool> {
+        use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+
+        let pubkey_bytes: [u8; 32] = public_key
+            .try_into()
+            .map_err(|_| anyhow::anyhow!("Invalid public key length: {}", public_key.len()))?;
+
+        let verifying_key = VerifyingKey::from_bytes(&pubkey_bytes)
+            .map_err(|e| anyhow::anyhow!("Invalid public key: {e}"))?;
+
+        let sig_bytes: [u8; 64] = match signature.try_into() {
+            Ok(bytes) => bytes,
+            Err(_) => return Ok(false), // Invalid signature length
+        };
+        let sig = Signature::from_bytes(&sig_bytes);
+
+        Ok(verifying_key.verify(message, &sig).is_ok())
+    }
+
+    // ==================== End Key Rotation Methods ====================
 
     /// Attempt to heal partition with a reconnected peer (Phase 18 Week 3)
     ///
