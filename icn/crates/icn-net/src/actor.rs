@@ -59,6 +59,23 @@ pub struct PeerConnectionInfo {
     pub ml_kem_public: Option<Vec<u8>>,
 }
 
+impl PeerConnectionInfo {
+    /// Get encoding flags for this peer based on negotiated capabilities
+    ///
+    /// Returns `(use_postcard, use_compression)` tuple indicating which
+    /// encoding options should be used when sending messages to this peer.
+    #[inline]
+    pub fn encoding_flags(&self) -> (bool, bool) {
+        let use_postcard = self
+            .peer_capabilities
+            .contains(CapabilityFlags::POSTCARD_ENCODING);
+        let use_compression = self
+            .peer_capabilities
+            .contains(CapabilityFlags::MESSAGE_COMPRESSION);
+        (use_postcard, use_compression)
+    }
+}
+
 /// Callback for handling incoming network messages
 pub type IncomingMessageHandler = Arc<dyn Fn(NetworkMessage) + Send + Sync>;
 
@@ -1337,18 +1354,10 @@ impl NetworkActor {
         // Look up peer's negotiated capabilities for encoding selection
         let (use_postcard, use_compression) = {
             let connections = self.peer_connections.read().await;
-            if let Some(peer_info) = connections.get(did) {
-                let postcard = peer_info
-                    .peer_capabilities
-                    .contains(CapabilityFlags::POSTCARD_ENCODING);
-                let compression = peer_info
-                    .peer_capabilities
-                    .contains(CapabilityFlags::MESSAGE_COMPRESSION);
-                (postcard, compression)
-            } else {
-                // No peer info yet (pre-Hello) - use legacy encoding for compatibility
-                (false, false)
-            }
+            connections
+                .get(did)
+                .map(|peer_info| peer_info.encoding_flags())
+                .unwrap_or((false, false)) // No peer info yet (pre-Hello) - use legacy encoding
         };
 
         let send_future = async {
@@ -1408,23 +1417,12 @@ impl NetworkActor {
         let mut sent_count = 0;
         for (did_str, connection) in connections {
             // Look up peer's negotiated capabilities for encoding selection
-            let (use_postcard, use_compression) = if let Ok(did) = did_str.parse::<Did>() {
-                if let Some(peer_info) = peer_caps.get(&did) {
-                    let postcard = peer_info
-                        .peer_capabilities
-                        .contains(CapabilityFlags::POSTCARD_ENCODING);
-                    let compression = peer_info
-                        .peer_capabilities
-                        .contains(CapabilityFlags::MESSAGE_COMPRESSION);
-                    (postcard, compression)
-                } else {
-                    // No peer info yet - use legacy encoding
-                    (false, false)
-                }
-            } else {
-                // Invalid DID string - use legacy encoding
-                (false, false)
-            };
+            let (use_postcard, use_compression) = did_str
+                .parse::<Did>()
+                .ok()
+                .and_then(|did| peer_caps.get(&did))
+                .map(|peer_info| peer_info.encoding_flags())
+                .unwrap_or((false, false)); // No peer info or invalid DID - use legacy encoding
 
             // Use timeout for each peer to prevent one slow peer from blocking broadcast
             let send_result = tokio::time::timeout(PEER_TIMEOUT, async {
@@ -2376,19 +2374,10 @@ mod tests {
             let connections = peer_connections.read().await;
             let unknown_did = KeyPair::generate().unwrap().did().clone();
 
-            let (use_postcard, use_compression) =
-                if let Some(peer_info) = connections.get(&unknown_did) {
-                    let postcard = peer_info
-                        .peer_capabilities
-                        .contains(CapabilityFlags::POSTCARD_ENCODING);
-                    let compression = peer_info
-                        .peer_capabilities
-                        .contains(CapabilityFlags::MESSAGE_COMPRESSION);
-                    (postcard, compression)
-                } else {
-                    // No peer info yet - use legacy encoding
-                    (false, false)
-                };
+            let (use_postcard, use_compression) = connections
+                .get(&unknown_did)
+                .map(|peer_info| peer_info.encoding_flags())
+                .unwrap_or((false, false)); // No peer info yet - use legacy encoding
 
             assert!(
                 !use_postcard,
