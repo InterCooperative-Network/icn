@@ -278,10 +278,10 @@ impl ComputeActor {
                                 expected: outcome_to_value(&first_result.outcome),
                                 actual: outcome_to_value(&conflicting.outcome),
                             },
-                            additional_data: bincode::serde::encode_to_vec(
-                                (&first_result.fuel_used, &conflicting.fuel_used),
-                                bincode::config::legacy(),
-                            )
+                            additional_data: icn_encoding::encode_bincode_legacy(&(
+                                &first_result.fuel_used,
+                                &conflicting.fuel_used,
+                            ))
                             .unwrap_or_default(),
                             filed_at: std::time::SystemTime::now(),
                         };

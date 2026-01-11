@@ -21,11 +21,11 @@ tracing.workspace = true
 icn-obs.workspace = true
 icn-crypto-pq.workspace = true
 icn-time.workspace = true
+icn-encoding = { path = "../icn-encoding" }
 multibase = "0.9"
 age = "0.10"
 secrecy = "0.8"
 serde_json = "1.0"
-bincode.workspace = true
 base64 = "0.22"
 rcgen.workspace = true
 sha2.workspace = true

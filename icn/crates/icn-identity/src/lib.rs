@@ -134,16 +134,15 @@ impl HybridSignatureOrClassical {
     /// Convert to bytes for serialization
     pub fn to_bytes(&self) -> Vec<u8> {
         // SAFETY: HybridSignature is a simple struct with byte arrays that always serializes
-        // successfully. Bincode encoding cannot fail for well-formed data.
+        // successfully. Encoding cannot fail for well-formed data.
         #[allow(clippy::expect_used)]
-        bincode::serde::encode_to_vec(self, bincode::config::legacy())
+        icn_encoding::encode_bincode_legacy(self)
             .expect("HybridSignature serialization is infallible")
     }
 
     /// Parse from bytes
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        bincode::serde::decode_from_slice(bytes, bincode::config::legacy())
-            .map(|(v, _)| v)
+        icn_encoding::decode_bincode_legacy(bytes)
             .map_err(|e| anyhow::anyhow!("Failed to parse signature: {e}"))
     }
 }

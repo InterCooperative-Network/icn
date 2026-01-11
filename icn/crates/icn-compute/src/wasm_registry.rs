@@ -230,7 +230,7 @@ impl WasmRegistry {
                 .map_err(|e| WasmRegistryError::StorageError(e.to_string()))?;
 
             let meta_key = format!("wasm_meta:{hash_hex}");
-            let meta_bytes = bincode::serde::encode_to_vec(&metadata, bincode::config::legacy())
+            let meta_bytes = icn_encoding::encode_versioned(&metadata)
                 .map_err(|e| WasmRegistryError::SerializationError(e.to_string()))?;
             store
                 .insert(meta_key.as_bytes(), meta_bytes)
@@ -337,10 +337,8 @@ impl WasmRegistry {
                 .get(key.as_bytes())
                 .map_err(|e| WasmRegistryError::StorageError(e.to_string()))?
             {
-                let meta: WasmMetadata =
-                    bincode::serde::decode_from_slice(&bytes, bincode::config::legacy())
-                        .map(|(v, _)| v)
-                        .map_err(|e| WasmRegistryError::SerializationError(e.to_string()))?;
+                let meta: WasmMetadata = icn_encoding::decode_versioned(&bytes)
+                    .map_err(|e| WasmRegistryError::SerializationError(e.to_string()))?;
 
                 // Populate cache
                 let mut metadata = self
@@ -469,11 +467,8 @@ impl WasmRegistry {
                         // Also load metadata
                         let meta_key = format!("wasm_meta:{hash_hex}");
                         if let Ok(Some(meta_bytes)) = store.get(meta_key.as_bytes()) {
-                            if let Ok((meta, _)) =
-                                bincode::serde::decode_from_slice::<WasmMetadata, _>(
-                                    &meta_bytes,
-                                    bincode::config::legacy(),
-                                )
+                            if let Ok(meta) =
+                                icn_encoding::decode_versioned::<WasmMetadata>(&meta_bytes)
                             {
                                 let mut metadata = self.metadata.write().map_err(|e| {
                                     WasmRegistryError::StorageError(format!("Lock poisoned: {e}"))

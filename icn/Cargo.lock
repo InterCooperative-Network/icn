@@ -2829,7 +2829,6 @@ name = "icn-ccl"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bincode",
  "blake3",
  "ed25519-dalek",
  "hex",
@@ -3146,6 +3145,7 @@ dependencies = [
  "ed25519-dalek",
  "futures",
  "hex",
+ "icn-encoding",
  "icn-identity",
  "icn-obs",
  "icn-security",
@@ -3195,10 +3195,10 @@ dependencies = [
  "age",
  "anyhow",
  "base64 0.22.1",
- "bincode",
  "ed25519-dalek",
  "hex",
  "icn-crypto-pq",
+ "icn-encoding",
  "icn-obs",
  "icn-time",
  "lru",
