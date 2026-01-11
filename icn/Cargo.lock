@@ -3144,6 +3144,7 @@ dependencies = [
  "blake3",
  "bytes",
  "criterion",
+ "ed25519-dalek",
  "futures",
  "hex",
  "icn-identity",
