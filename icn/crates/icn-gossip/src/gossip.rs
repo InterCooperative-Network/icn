@@ -479,7 +479,10 @@ impl GossipActor {
 
         self.publish(TOPIC_KEY_ROTATION, data).await?;
 
-        info!("Published key rotation announcement to {}", TOPIC_KEY_ROTATION);
+        info!(
+            "Published key rotation announcement to {}",
+            TOPIC_KEY_ROTATION
+        );
         Ok(())
     }
 
@@ -511,12 +514,19 @@ impl GossipActor {
 
                 // Verify old key signature
                 if !self.verify_signature(&old_did, message_bytes, &signature_old)? {
-                    warn!("Invalid old key signature in rotation announcement from {}", old_did);
+                    warn!(
+                        "Invalid old key signature in rotation announcement from {}",
+                        old_did
+                    );
                     return Err(anyhow::anyhow!("Invalid old key signature"));
                 }
 
                 // Verify new key signature using the provided public key
-                if !self.verify_signature_with_key(&new_public_key, message_bytes, &signature_new)? {
+                if !self.verify_signature_with_key(
+                    &new_public_key,
+                    message_bytes,
+                    &signature_new,
+                )? {
                     warn!("Invalid new key signature in rotation announcement");
                     return Err(anyhow::anyhow!("Invalid new key signature"));
                 }
@@ -526,17 +536,24 @@ impl GossipActor {
                 info!("Recorded key rotation: {} -> {}", old_did, new_did);
                 Ok(true)
             }
-            KeyRotationMessage::RotationQuery { queried_did, requester } => {
+            KeyRotationMessage::RotationQuery {
+                queried_did,
+                requester,
+            } => {
                 // Handle query - check if we know about a rotation for this DID
                 let (current_did, last_rotation) =
                     if let Some(new_did) = self.get_rotated_did(&queried_did) {
-                        (new_did, self.get_rotation_timestamp(&queried_did).unwrap_or(0))
+                        (
+                            new_did,
+                            self.get_rotation_timestamp(&queried_did).unwrap_or(0),
+                        )
                     } else {
                         (queried_did.clone(), 0)
                     };
 
                 // Send response
-                let response = KeyRotationMessage::response(queried_did, current_did, last_rotation);
+                let response =
+                    KeyRotationMessage::response(queried_did, current_did, last_rotation);
                 let response_data =
                     bincode::serde::encode_to_vec(&response, bincode::config::standard())
                         .map_err(|e| anyhow::anyhow!("Failed to serialize response: {e}"))?;
