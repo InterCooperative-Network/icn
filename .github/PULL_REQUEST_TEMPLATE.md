@@ -1,8 +1,14 @@
 ## Summary
-<!-- Brief description of changes -->
+<!-- Brief description of what changed and why -->
+
+## How
+<!-- Implementation approach - key design decisions, algorithms, or patterns used -->
 
 ## Related Issues
 <!-- Link to related GitHub issues: Fixes #XX, Closes #XX -->
+
+## Risk
+<!-- What could break? Any edge cases or known limitations? -->
 
 ## Type of Change
 - [ ] Bug fix (non-breaking change fixing an issue)
