@@ -12,6 +12,10 @@ pub type ContentHash = [u8; 32];
 /// Minimum size (in bytes) for compression to be worthwhile
 const COMPRESSION_THRESHOLD: usize = 1024; // 1 KB
 
+/// Maximum decompressed size for gossip entry data (10 MB)
+/// This prevents memory exhaustion from malicious/corrupted compressed data
+const MAX_DECOMPRESSED_SIZE: usize = 10 * 1024 * 1024;
+
 /// Cursor expiry in milliseconds (5 minutes)
 const CURSOR_EXPIRY_MS: u64 = 5 * 60 * 1000;
 
@@ -167,12 +171,15 @@ impl GossipEntry {
     }
 
     /// Decompress entry data if it's compressed
+    ///
+    /// Uses bounded decompression to prevent memory exhaustion from
+    /// malicious or corrupted compressed data.
     pub fn decompress(&mut self) -> anyhow::Result<()> {
         if !self.compressed {
             return Ok(()); // Not compressed
         }
 
-        let decompressed_data = zstd::decode_all(self.data.as_slice())?;
+        let decompressed_data = decompress_bounded(&self.data, MAX_DECOMPRESSED_SIZE)?;
         self.data = decompressed_data;
         self.compressed = false;
 
@@ -180,13 +187,48 @@ impl GossipEntry {
     }
 
     /// Get decompressed data without modifying the entry
+    ///
+    /// Uses bounded decompression to prevent memory exhaustion from
+    /// malicious or corrupted compressed data.
     pub fn get_data(&self) -> anyhow::Result<Vec<u8>> {
         if self.compressed {
-            Ok(zstd::decode_all(self.data.as_slice())?)
+            decompress_bounded(&self.data, MAX_DECOMPRESSED_SIZE)
         } else {
             Ok(self.data.clone())
         }
     }
+}
+
+/// Decompress zstd data with a bounded output size to prevent memory exhaustion.
+///
+/// This prevents malicious or corrupted compressed data with an absurd size header
+/// from causing allocation failures.
+fn decompress_bounded(compressed: &[u8], max_size: usize) -> anyhow::Result<Vec<u8>> {
+    use anyhow::Context;
+    use std::io::Read;
+
+    let mut decoder =
+        zstd::stream::read::Decoder::new(compressed).context("Failed to create zstd decoder")?;
+
+    // Allocate buffer with reasonable initial capacity
+    let initial_capacity = std::cmp::min(compressed.len().saturating_mul(4), max_size);
+    let mut decompressed = Vec::with_capacity(initial_capacity);
+
+    // Read up to max_size + 1 bytes to detect if we'd exceed the limit
+    let mut limited_reader = (&mut decoder).take((max_size + 1) as u64);
+    limited_reader
+        .read_to_end(&mut decompressed)
+        .context("Failed to decompress data")?;
+
+    if decompressed.len() > max_size {
+        anyhow::bail!(
+            "Decompressed data too large: {} bytes (max {})",
+            decompressed.len(),
+            max_size
+        );
+    }
+
+    Ok(decompressed)
 }
 
 /// Gossip message types

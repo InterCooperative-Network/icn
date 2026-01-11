@@ -24,6 +24,45 @@ pub const MAX_MESSAGE_SIZE: usize = 10 * 1024 * 1024;
 /// Compression threshold in bytes (1KB) - messages below this are not compressed
 pub const COMPRESSION_THRESHOLD: usize = 1024;
 
+/// Decompress zstd data with a bounded output size to prevent memory exhaustion.
+///
+/// This prevents malicious or corrupted compressed data with an absurd size header
+/// from causing allocation failures. The decompressed size is limited to `max_size`.
+///
+/// # Arguments
+/// * `compressed` - The zstd-compressed data
+/// * `max_size` - Maximum allowed decompressed size
+///
+/// # Returns
+/// * `Ok(Vec<u8>)` - Decompressed data if within size limit
+/// * `Err` - If decompression fails or output would exceed max_size
+fn decompress_bounded(compressed: &[u8], max_size: usize) -> Result<Vec<u8>> {
+    use std::io::Read;
+
+    let mut decoder =
+        zstd::stream::read::Decoder::new(compressed).context("Failed to create zstd decoder")?;
+
+    // Allocate buffer with reasonable initial capacity, but cap at max_size
+    let initial_capacity = std::cmp::min(compressed.len().saturating_mul(4), max_size);
+    let mut decompressed = Vec::with_capacity(initial_capacity);
+
+    // Read up to max_size + 1 bytes to detect if we'd exceed the limit
+    let mut limited_reader = (&mut decoder).take((max_size + 1) as u64);
+    limited_reader
+        .read_to_end(&mut decompressed)
+        .context("Failed to decompress message")?;
+
+    if decompressed.len() > max_size {
+        anyhow::bail!(
+            "Decompressed message too large: {} bytes (max {})",
+            decompressed.len(),
+            max_size
+        );
+    }
+
+    Ok(decompressed)
+}
+
 /// Compression format marker bytes
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
@@ -751,9 +790,7 @@ impl NetworkMessage {
 
         let decompressed = match compression_format {
             CompressionFormat::None => payload.to_vec(),
-            CompressionFormat::Zstd => {
-                zstd::decode_all(payload).context("Failed to decompress message")?
-            }
+            CompressionFormat::Zstd => decompress_bounded(payload, MAX_MESSAGE_SIZE)?,
         };
 
         let msg: NetworkMessage =
@@ -869,9 +906,7 @@ impl NetworkMessage {
 
         let decompressed = match compression {
             CompressionFormat::None => payload.to_vec(),
-            CompressionFormat::Zstd => {
-                zstd::decode_all(payload).context("Failed to decompress message")?
-            }
+            CompressionFormat::Zstd => decompress_bounded(payload, MAX_MESSAGE_SIZE)?,
         };
 
         let msg: NetworkMessage = match encoding {
@@ -2155,6 +2190,129 @@ mod tests {
         // New postcard-capable node should decode it
         let decoded = NetworkMessage::from_bytes_negotiated(&bincode_compressed).unwrap();
         assert_eq!(decoded.from, alice);
+        assert!(matches!(decoded.payload, MessagePayload::Gossip(_)));
+    }
+
+    // Issue #595: Bounded decompression tests
+
+    #[test]
+    fn test_bounded_decompression_valid_data() {
+        // Create valid compressed data within limits
+        let original = vec![42u8; 1000];
+        let compressed = zstd::encode_all(original.as_slice(), 3).unwrap();
+
+        let result = super::decompress_bounded(&compressed, 10000);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), original);
+    }
+
+    #[test]
+    fn test_bounded_decompression_rejects_oversized_output() {
+        // Create data that decompresses to more than the limit
+        let original = vec![42u8; 5000]; // 5KB of same byte compresses well
+        let compressed = zstd::encode_all(original.as_slice(), 3).unwrap();
+
+        // Try to decompress with a 1KB limit - should fail
+        let result = super::decompress_bounded(&compressed, 1000);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("Decompressed message too large"),
+            "Expected 'too large' error, got: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_bounded_decompression_exact_limit() {
+        // Create data that decompresses to exactly the limit
+        let original = vec![42u8; 1000];
+        let compressed = zstd::encode_all(original.as_slice(), 3).unwrap();
+
+        // Decompress with limit equal to data size - should succeed
+        let result = super::decompress_bounded(&compressed, 1000);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().len(), 1000);
+    }
+
+    #[test]
+    fn test_bounded_decompression_invalid_data() {
+        // Invalid zstd data should fail gracefully
+        let garbage = vec![0xDE, 0xAD, 0xBE, 0xEF];
+        let result = super::decompress_bounded(&garbage, MAX_MESSAGE_SIZE);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_from_bytes_compressed_large_valid_message() {
+        // Test that large (but valid) compressed messages decompress correctly.
+        // Rejection of oversized decompression is tested in
+        // `test_bounded_decompression_rejects_oversized_output` above.
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        // Create a message with large payload
+        let mut clock = VectorClock::new();
+        clock.increment(&alice);
+
+        let large_data = vec![42u8; 50000]; // 50KB - within limits
+        let gossip_msg = GossipMessage::Response {
+            entry: icn_gossip::types::GossipEntry {
+                hash: [1u8; 32],
+                author: alice.clone(),
+                clock,
+                topic: "test".to_string(),
+                data: large_data,
+                compressed: false,
+                timestamp: 0,
+                replica_offered: None,
+            },
+        };
+
+        let msg = NetworkMessage::gossip(alice, Some(bob), gossip_msg);
+
+        // Compress the message
+        let bytes = msg.to_bytes_compressed(true).unwrap();
+        assert_eq!(bytes[0], 1, "Should be zstd compressed");
+
+        // Decompression should succeed since it's within MAX_MESSAGE_SIZE
+        let decoded = NetworkMessage::from_bytes_compressed(&bytes).unwrap();
+        assert!(matches!(decoded.payload, MessagePayload::Gossip(_)));
+    }
+
+    #[test]
+    fn test_from_bytes_negotiated_large_valid_message() {
+        // Test that large (but valid) negotiated messages decompress correctly.
+        // Rejection of oversized decompression is tested in
+        // `test_bounded_decompression_rejects_oversized_output` above.
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        let mut clock = VectorClock::new();
+        clock.increment(&alice);
+
+        let large_data = vec![42u8; 50000]; // 50KB - within limits
+        let gossip_msg = GossipMessage::Response {
+            entry: icn_gossip::types::GossipEntry {
+                hash: [1u8; 32],
+                author: alice.clone(),
+                clock,
+                topic: "test".to_string(),
+                data: large_data,
+                compressed: false,
+                timestamp: 0,
+                replica_offered: None,
+            },
+        };
+
+        let msg = NetworkMessage::gossip(alice, Some(bob), gossip_msg);
+
+        // Compress with postcard + zstd
+        let bytes = msg.to_bytes_negotiated(true, true).unwrap();
+        assert_eq!(bytes[0], 0x11, "Should be postcard + zstd");
+
+        // Decompression should succeed since it's within MAX_MESSAGE_SIZE
+        let decoded = NetworkMessage::from_bytes_negotiated(&bytes).unwrap();
         assert!(matches!(decoded.payload, MessagePayload::Gossip(_)));
     }
 }
