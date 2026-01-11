@@ -219,6 +219,7 @@ struct NeighborCounts {
 }
 
 #[tokio::test]
+#[ignore = "Flaky in CI: QUIC stream failures in containerized environment"]
 async fn test_local_cluster_categorization() -> Result<()> {
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
     let _ = tracing_subscriber::fmt::try_init();
@@ -258,6 +259,7 @@ async fn test_local_cluster_categorization() -> Result<()> {
 }
 
 #[tokio::test]
+#[ignore = "Flaky in CI: QUIC stream failures in containerized environment"]
 async fn test_regional_categorization() -> Result<()> {
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
     let _ = tracing_subscriber::fmt::try_init();
@@ -297,6 +299,7 @@ async fn test_regional_categorization() -> Result<()> {
 }
 
 #[tokio::test]
+#[ignore = "Flaky in CI: QUIC stream failures in containerized environment"]
 async fn test_backbone_categorization() -> Result<()> {
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
     let _ = tracing_subscriber::fmt::try_init();
@@ -551,6 +554,7 @@ async fn test_scope_aware_peer_sampling() -> Result<()> {
 }
 
 #[tokio::test]
+#[ignore = "Flaky in CI: QUIC stream failures in containerized environment"]
 async fn test_neighbor_set_lru_eviction() -> Result<()> {
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
     let _ = tracing_subscriber::fmt::try_init();

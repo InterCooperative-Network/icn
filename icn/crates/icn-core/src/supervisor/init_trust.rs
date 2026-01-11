@@ -21,6 +21,8 @@ pub struct TrustServices {
     pub misbehavior_detector: Arc<RwLock<MisbehaviorDetector>>,
     /// Store for social recovery events
     pub recovery_store: Arc<dyn icn_store::Store>,
+    /// Store for security/reputation state (misbehavior detector persistence)
+    pub security_store: Arc<dyn icn_store::Store>,
 }
 
 /// Trust lookup closure type for gossip actor
@@ -53,9 +55,27 @@ pub async fn init_trust_services(config: &Config, did: Did) -> anyhow::Result<Tr
         recovery_store_path.display()
     );
 
+    // Create security store for misbehavior detector persistence
+    let security_store_path = config.store_path().join("security");
+    let security_store: Arc<dyn icn_store::Store> =
+        Arc::new(SledStore::open(&security_store_path)?);
+    info!(
+        "Security store initialized at {}",
+        security_store_path.display()
+    );
+
     // Create shared MisbehaviorDetector for Byzantine fault detection (Phase 18)
     // This is shared between NetworkActor and GossipActor to ensure unified tracking
-    let mut detector = MisbehaviorDetector::new(MisbehaviorThresholds::default());
+    // Load persisted reputation/ban state from previous session
+    let mut detector =
+        MisbehaviorDetector::with_store(MisbehaviorThresholds::default(), security_store.as_ref())
+            .unwrap_or_else(|e| {
+                warn!(
+                    "Failed to load persisted misbehavior state, starting fresh: {}",
+                    e
+                );
+                MisbehaviorDetector::new(MisbehaviorThresholds::default())
+            });
 
     // Set up trust penalty callback to update trust graph (Phase 18)
     let trust_penalty_callback = create_trust_penalty_callback(trust_graph_handle.clone(), did);
@@ -68,6 +88,7 @@ pub async fn init_trust_services(config: &Config, did: Did) -> anyhow::Result<Tr
         trust_graph: trust_graph_handle,
         misbehavior_detector,
         recovery_store,
+        security_store,
     })
 }
 
