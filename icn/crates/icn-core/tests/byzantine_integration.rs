@@ -392,6 +392,167 @@ async fn test_quarantine_threshold_enforcement() -> Result<()> {
     Ok(())
 }
 
+/// Test that validates issue #496: reputation scores persist across restarts
+#[tokio::test(flavor = "multi_thread")]
+async fn test_reputation_persistence_across_restart() -> Result<()> {
+    info!("=== Test: Reputation Persistence Across Restart (Issue #496) ===");
+
+    let temp_dir = TempDir::new()?;
+    let security_store_path = temp_dir.path().join("security");
+    let security_store: Arc<dyn icn_store::Store> =
+        Arc::new(SledStore::open(&security_store_path)?);
+
+    // Create keypairs for test nodes
+    let honest_keypair = KeyPair::generate()?;
+    let honest_did = honest_keypair.did().clone();
+    let attacker_keypair = KeyPair::generate()?;
+    let attacker_did = attacker_keypair.did().clone();
+
+    // === PHASE 1: Record violations and save state ===
+    info!("Phase 1: Recording violations and saving state");
+
+    {
+        // Create detector and load any existing state
+        let mut detector =
+            MisbehaviorDetector::with_store(MisbehaviorThresholds::default(), security_store.as_ref())
+                .unwrap_or_else(|_| MisbehaviorDetector::new(MisbehaviorThresholds::default()));
+
+        // Record a critical violation that should result in a ban
+        let violation = Violation::ConflictingLedgerEntries {
+            entry1: [0u8; 32],
+            entry2: [1u8; 32],
+        };
+        detector.record_violation(&attacker_did, violation, vec![]);
+
+        // Verify the attacker is banned
+        assert!(
+            detector.is_banned(&attacker_did),
+            "Attacker should be banned after critical violation"
+        );
+
+        // Verify the attacker's reputation is zero
+        let reputation = detector.get_reputation(&attacker_did);
+        assert_eq!(
+            reputation.map(|r| r.score),
+            Some(0.0),
+            "Banned peer should have zero reputation"
+        );
+
+        // Save state to store (simulating shutdown)
+        detector.save_to_store(security_store.as_ref())?;
+        info!("State saved to store");
+
+        // Detector goes out of scope here (simulating shutdown)
+    }
+
+    // === PHASE 2: Create new detector and verify state persisted ===
+    info!("Phase 2: Creating new detector and verifying persisted state");
+
+    {
+        // Create a new detector from the same store (simulating restart)
+        let detector =
+            MisbehaviorDetector::with_store(MisbehaviorThresholds::default(), security_store.as_ref())?;
+
+        // Verify ban status persisted
+        assert!(
+            detector.is_banned(&attacker_did),
+            "Ban status should persist across restart"
+        );
+
+        // Verify reputation score persisted
+        let reputation = detector.get_reputation(&attacker_did);
+        assert_eq!(
+            reputation.map(|r| r.score),
+            Some(0.0),
+            "Reputation score should persist across restart"
+        );
+
+        // Verify honest node is not affected
+        assert!(
+            !detector.is_banned(&honest_did),
+            "Honest node should not be banned"
+        );
+
+        info!("✅ Ban status and reputation persisted correctly");
+    }
+
+    info!("✅ Reputation persistence across restart validated (Issue #496)");
+    Ok(())
+}
+
+/// Test that quarantine status also persists across restarts
+#[tokio::test(flavor = "multi_thread")]
+async fn test_quarantine_persistence_across_restart() -> Result<()> {
+    info!("=== Test: Quarantine Persistence Across Restart ===");
+
+    let temp_dir = TempDir::new()?;
+    let security_store_path = temp_dir.path().join("security");
+    let security_store: Arc<dyn icn_store::Store> =
+        Arc::new(SledStore::open(&security_store_path)?);
+
+    let attacker_keypair = KeyPair::generate()?;
+    let attacker_did = attacker_keypair.did().clone();
+
+    // === PHASE 1: Get peer quarantined ===
+    {
+        let mut detector =
+            MisbehaviorDetector::with_store(MisbehaviorThresholds::default(), security_store.as_ref())
+                .unwrap_or_else(|_| MisbehaviorDetector::new(MisbehaviorThresholds::default()));
+
+        // Record enough violations to get quarantined (but not banned)
+        // InvalidSignature has severity 5, penalty 0.25
+        // After 3 violations: 1.0 - 0.75 = 0.25 (below quarantine threshold of 0.5)
+        for _ in 0..3 {
+            let violation = Violation::InvalidSignature {
+                message_hash: [0u8; 32],
+            };
+            detector.record_violation(&attacker_did, violation, vec![]);
+        }
+
+        // Verify quarantined but not banned
+        assert!(
+            detector.is_quarantined(&attacker_did),
+            "Peer should be quarantined"
+        );
+        assert!(
+            !detector.is_banned(&attacker_did),
+            "Peer should NOT be banned yet"
+        );
+
+        // Save state
+        detector.save_to_store(security_store.as_ref())?;
+    }
+
+    // === PHASE 2: Verify quarantine persisted ===
+    {
+        let detector =
+            MisbehaviorDetector::with_store(MisbehaviorThresholds::default(), security_store.as_ref())?;
+
+        // Verify quarantine status persisted
+        assert!(
+            detector.is_quarantined(&attacker_did),
+            "Quarantine status should persist across restart"
+        );
+        assert!(
+            !detector.is_banned(&attacker_did),
+            "Peer should still not be banned"
+        );
+
+        // Verify reputation score is low but not zero
+        let reputation = detector.get_reputation(&attacker_did);
+        let score = reputation.map(|r| r.score).unwrap_or(1.0);
+        assert!(
+            score < 0.5 && score > 0.0,
+            "Reputation should be low but not zero: {score}"
+        );
+
+        info!("✅ Quarantine status persisted correctly (score: {:.2})", score);
+    }
+
+    info!("✅ Quarantine persistence across restart validated");
+    Ok(())
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn test_detector_statistics() -> Result<()> {
     info!("=== Test: Detector Statistics ===");

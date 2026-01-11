@@ -12,6 +12,7 @@ use tracing::{info, warn};
 
 use icn_gossip::GossipActor;
 use icn_net::NetworkHandle;
+use icn_security::MisbehaviorDetector;
 use icn_snapshot::StateSnapshot;
 
 /// Save state snapshot during shutdown
@@ -162,5 +163,33 @@ pub fn log_actor_shutdown_status(
     }
     if ledger_handle {
         info!("Ledger will be dropped when all references are released");
+    }
+}
+
+/// Save misbehavior detector state during shutdown
+///
+/// Persists reputation scores, ban list, quarantine status, and violation history
+/// to the security store. This enables restoring state across restarts.
+pub async fn save_misbehavior_state(
+    misbehavior_detector: &Arc<RwLock<MisbehaviorDetector>>,
+    security_store: &Arc<dyn icn_store::Store>,
+) {
+    info!("Saving misbehavior detector state before shutdown");
+
+    let save_start = std::time::Instant::now();
+    let detector = misbehavior_detector.read().await;
+
+    match detector.save_to_store(security_store.as_ref()) {
+        Ok(()) => {
+            let duration = save_start.elapsed();
+            info!(
+                "✅ Misbehavior state saved in {:.3}s (reputation scores, bans, quarantine status)",
+                duration.as_secs_f64()
+            );
+        }
+        Err(e) => {
+            warn!("Failed to save misbehavior state: {}", e);
+            // Continue with shutdown even if save failed
+        }
     }
 }

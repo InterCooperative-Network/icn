@@ -278,6 +278,10 @@ impl Supervisor {
         let governance_event_subscription: Option<crate::events::SubscriptionHandle>;
         let policy_governance_subscription: Option<crate::events::SubscriptionHandle>;
 
+        // Misbehavior detector and security store for shutdown persistence
+        let misbehavior_detector_for_shutdown: Option<Arc<tokio::sync::RwLock<icn_security::MisbehaviorDetector>>>;
+        let security_store_for_shutdown: Option<Arc<dyn icn_store::Store>>;
+
         // Spawn actors (requires identity bundle from unlocked keystore)
         let (network_handle, gossip_handle, ledger_handle) = if let Some(identity_bundle) =
             &self.identity_bundle
@@ -308,6 +312,7 @@ impl Supervisor {
             let trust_graph_handle = trust_services.trust_graph.clone();
             let misbehavior_detector = trust_services.misbehavior_detector.clone();
             let recovery_store = trust_services.recovery_store.clone();
+            let security_store = trust_services.security_store.clone();
 
             // Initialize snapshot coordinator
             let snapshot_coordinator =
@@ -981,6 +986,10 @@ impl Supervisor {
             // Assign broadcaster to outer scope for gateway use
             event_broadcaster = Some(broadcaster);
 
+            // Assign misbehavior detector and security store for shutdown persistence
+            misbehavior_detector_for_shutdown = Some(misbehavior_detector);
+            security_store_for_shutdown = Some(security_store);
+
             (
                 Some(network_handle),
                 Some(gossip_handle),
@@ -1030,6 +1039,10 @@ impl Supervisor {
             treasury_handle_for_gateway = None;
             ledger_handle_for_gateway = None;
             entity_handle_for_gateway = None;
+
+            // No misbehavior detector without identity
+            misbehavior_detector_for_shutdown = None;
+            security_store_for_shutdown = None;
 
             (None, None, None)
         };
@@ -1102,6 +1115,13 @@ impl Supervisor {
             &self.config.store_path(),
         )
         .await;
+
+        // Save misbehavior detector state (reputation scores, bans, quarantine)
+        if let (Some(detector), Some(store)) =
+            (&misbehavior_detector_for_shutdown, &security_store_for_shutdown)
+        {
+            shutdown::save_misbehavior_state(detector, store).await;
+        }
 
         // Log actor shutdown status
         shutdown::log_actor_shutdown_status(
