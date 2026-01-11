@@ -413,9 +413,11 @@ async fn test_reputation_persistence_across_restart() -> Result<()> {
 
     {
         // Create detector and load any existing state
-        let mut detector =
-            MisbehaviorDetector::with_store(MisbehaviorThresholds::default(), security_store.as_ref())
-                .unwrap_or_else(|_| MisbehaviorDetector::new(MisbehaviorThresholds::default()));
+        let mut detector = MisbehaviorDetector::with_store(
+            MisbehaviorThresholds::default(),
+            security_store.as_ref(),
+        )
+        .unwrap_or_else(|_| MisbehaviorDetector::new(MisbehaviorThresholds::default()));
 
         // Record a critical violation that should result in a ban
         let violation = Violation::ConflictingLedgerEntries {
@@ -450,8 +452,10 @@ async fn test_reputation_persistence_across_restart() -> Result<()> {
 
     {
         // Create a new detector from the same store (simulating restart)
-        let detector =
-            MisbehaviorDetector::with_store(MisbehaviorThresholds::default(), security_store.as_ref())?;
+        let detector = MisbehaviorDetector::with_store(
+            MisbehaviorThresholds::default(),
+            security_store.as_ref(),
+        )?;
 
         // Verify ban status persisted
         assert!(
@@ -495,9 +499,11 @@ async fn test_quarantine_persistence_across_restart() -> Result<()> {
 
     // === PHASE 1: Get peer quarantined ===
     {
-        let mut detector =
-            MisbehaviorDetector::with_store(MisbehaviorThresholds::default(), security_store.as_ref())
-                .unwrap_or_else(|_| MisbehaviorDetector::new(MisbehaviorThresholds::default()));
+        let mut detector = MisbehaviorDetector::with_store(
+            MisbehaviorThresholds::default(),
+            security_store.as_ref(),
+        )
+        .unwrap_or_else(|_| MisbehaviorDetector::new(MisbehaviorThresholds::default()));
 
         // Record enough violations to get quarantined (but not banned)
         // InvalidSignature has severity 5, penalty 0.25
@@ -525,8 +531,10 @@ async fn test_quarantine_persistence_across_restart() -> Result<()> {
 
     // === PHASE 2: Verify quarantine persisted ===
     {
-        let detector =
-            MisbehaviorDetector::with_store(MisbehaviorThresholds::default(), security_store.as_ref())?;
+        let detector = MisbehaviorDetector::with_store(
+            MisbehaviorThresholds::default(),
+            security_store.as_ref(),
+        )?;
 
         // Verify quarantine status persisted
         assert!(
@@ -546,7 +554,10 @@ async fn test_quarantine_persistence_across_restart() -> Result<()> {
             "Reputation should be low but not zero: {score}"
         );
 
-        info!("✅ Quarantine status persisted correctly (score: {:.2})", score);
+        info!(
+            "✅ Quarantine status persisted correctly (score: {:.2})",
+            score
+        );
     }
 
     info!("✅ Quarantine persistence across restart validated");

@@ -279,7 +279,9 @@ impl Supervisor {
         let policy_governance_subscription: Option<crate::events::SubscriptionHandle>;
 
         // Misbehavior detector and security store for shutdown persistence
-        let misbehavior_detector_for_shutdown: Option<Arc<tokio::sync::RwLock<icn_security::MisbehaviorDetector>>>;
+        let misbehavior_detector_for_shutdown: Option<
+            Arc<tokio::sync::RwLock<icn_security::MisbehaviorDetector>>,
+        >;
         let security_store_for_shutdown: Option<Arc<dyn icn_store::Store>>;
 
         // Spawn actors (requires identity bundle from unlocked keystore)
@@ -1117,9 +1119,10 @@ impl Supervisor {
         .await;
 
         // Save misbehavior detector state (reputation scores, bans, quarantine)
-        if let (Some(detector), Some(store)) =
-            (&misbehavior_detector_for_shutdown, &security_store_for_shutdown)
-        {
+        if let (Some(detector), Some(store)) = (
+            &misbehavior_detector_for_shutdown,
+            &security_store_for_shutdown,
+        ) {
             shutdown::save_misbehavior_state(detector, store).await;
         }
 
