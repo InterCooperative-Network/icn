@@ -65,18 +65,6 @@ pub enum CoopError {
 
 pub type Result<T> = std::result::Result<T, CoopError>;
 
-impl From<bincode::error::EncodeError> for CoopError {
-    fn from(e: bincode::error::EncodeError) -> Self {
-        CoopError::Serialization(e.to_string())
-    }
-}
-
-impl From<bincode::error::DecodeError> for CoopError {
-    fn from(e: bincode::error::DecodeError) -> Self {
-        CoopError::Serialization(e.to_string())
-    }
-}
-
 impl From<icn_encoding::Error> for CoopError {
     fn from(e: icn_encoding::Error) -> Self {
         CoopError::Serialization(e.to_string())

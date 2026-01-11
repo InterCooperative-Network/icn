@@ -410,7 +410,7 @@ impl CoopActor {
     async fn announce_coop_update(&self, coop: &Cooperative) {
         if let Some(gossip) = &self.gossip {
             // Serialize the cooperative for gossip
-            match bincode::serde::encode_to_vec(coop, bincode::config::legacy()) {
+            match icn_encoding::encode_bincode_legacy(coop) {
                 Ok(data) => {
                     // Publish to gossip topic
                     let mut gossip_actor = gossip.write().await;
