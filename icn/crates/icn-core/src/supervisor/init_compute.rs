@@ -98,82 +98,82 @@ pub fn create_send_callback(gossip_handle: GossipHandle) -> icn_compute::SendCal
 /// Get the topic and serialized data for a compute message
 fn get_message_topic_and_data(
     compute_msg: &icn_compute::ComputeMessage,
-) -> (&'static str, Result<Vec<u8>, bincode::error::EncodeError>) {
+) -> (&'static str, Result<Vec<u8>, icn_encoding::Error>) {
     use icn_compute::ComputeMessage;
 
     match compute_msg {
         ComputeMessage::TaskSubmitted(_) => (
             icn_compute::TOPIC_SUBMIT,
-            bincode::serde::encode_to_vec(compute_msg, bincode::config::legacy()),
+            icn_encoding::encode_bincode_legacy(compute_msg),
         ),
         ComputeMessage::TaskClaimed { .. } => (
             icn_compute::TOPIC_CLAIM,
-            bincode::serde::encode_to_vec(compute_msg, bincode::config::legacy()),
+            icn_encoding::encode_bincode_legacy(compute_msg),
         ),
         ComputeMessage::TaskResult(_) => (
             icn_compute::TOPIC_RESULT,
-            bincode::serde::encode_to_vec(compute_msg, bincode::config::legacy()),
+            icn_encoding::encode_bincode_legacy(compute_msg),
         ),
         ComputeMessage::TaskCancelled { .. } => (
             icn_compute::TOPIC_CANCEL,
-            bincode::serde::encode_to_vec(compute_msg, bincode::config::legacy()),
+            icn_encoding::encode_bincode_legacy(compute_msg),
         ),
         ComputeMessage::ExecutorAnnounce { .. } => (
             icn_compute::TOPIC_SUBMIT,
-            bincode::serde::encode_to_vec(compute_msg, bincode::config::legacy()),
+            icn_encoding::encode_bincode_legacy(compute_msg),
         ),
         ComputeMessage::PlacementRequest { .. } => (
             icn_compute::TOPIC_SUBMIT,
-            bincode::serde::encode_to_vec(compute_msg, bincode::config::legacy()),
+            icn_encoding::encode_bincode_legacy(compute_msg),
         ),
         ComputeMessage::PlacementOffer { .. } => (
             icn_compute::TOPIC_CLAIM,
-            bincode::serde::encode_to_vec(compute_msg, bincode::config::legacy()),
+            icn_encoding::encode_bincode_legacy(compute_msg),
         ),
         ComputeMessage::NodeCapacityAnnounce { .. } => (
             icn_compute::TOPIC_SUBMIT,
-            bincode::serde::encode_to_vec(compute_msg, bincode::config::legacy()),
+            icn_encoding::encode_bincode_legacy(compute_msg),
         ),
         ComputeMessage::CheckpointQuery { .. } => (
             icn_compute::TOPIC_CHECKPOINT,
-            bincode::serde::encode_to_vec(compute_msg, bincode::config::legacy()),
+            icn_encoding::encode_bincode_legacy(compute_msg),
         ),
         ComputeMessage::CheckpointResponse { .. } => (
             icn_compute::TOPIC_CHECKPOINT,
-            bincode::serde::encode_to_vec(compute_msg, bincode::config::legacy()),
+            icn_encoding::encode_bincode_legacy(compute_msg),
         ),
         ComputeMessage::MigrationRequest { .. } => (
             icn_compute::TOPIC_MIGRATION,
-            bincode::serde::encode_to_vec(compute_msg, bincode::config::legacy()),
+            icn_encoding::encode_bincode_legacy(compute_msg),
         ),
         ComputeMessage::MigrationAccept { .. } => (
             icn_compute::TOPIC_MIGRATION,
-            bincode::serde::encode_to_vec(compute_msg, bincode::config::legacy()),
+            icn_encoding::encode_bincode_legacy(compute_msg),
         ),
         ComputeMessage::CheckpointAnnounce { .. } => (
             icn_compute::TOPIC_CHECKPOINT,
-            bincode::serde::encode_to_vec(compute_msg, bincode::config::legacy()),
+            icn_encoding::encode_bincode_legacy(compute_msg),
         ),
         ComputeMessage::MigrationReject { .. } => (
             icn_compute::TOPIC_MIGRATION,
-            bincode::serde::encode_to_vec(compute_msg, bincode::config::legacy()),
+            icn_encoding::encode_bincode_legacy(compute_msg),
         ),
         ComputeMessage::MigrationComplete { .. } => (
             icn_compute::TOPIC_MIGRATION,
-            bincode::serde::encode_to_vec(compute_msg, bincode::config::legacy()),
+            icn_encoding::encode_bincode_legacy(compute_msg),
         ),
         // Phase 21: Cross-cooperative federation messages
         ComputeMessage::FederatedExecutorAnnounce { .. } => (
             icn_compute::TOPIC_FEDERATION,
-            bincode::serde::encode_to_vec(compute_msg, bincode::config::legacy()),
+            icn_encoding::encode_bincode_legacy(compute_msg),
         ),
         ComputeMessage::FederatedTaskRequest { .. } => (
             icn_compute::TOPIC_FEDERATION,
-            bincode::serde::encode_to_vec(compute_msg, bincode::config::legacy()),
+            icn_encoding::encode_bincode_legacy(compute_msg),
         ),
         ComputeMessage::FederatedTaskResult { .. } => (
             icn_compute::TOPIC_FEDERATION,
-            bincode::serde::encode_to_vec(compute_msg, bincode::config::legacy()),
+            icn_encoding::encode_bincode_legacy(compute_msg),
         ),
     }
 }

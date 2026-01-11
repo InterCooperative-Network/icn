@@ -212,7 +212,7 @@ impl UpgradeActor {
             did: self.own_did.clone(),
         };
 
-        let payload = bincode::serde::encode_to_vec(&msg, bincode::config::legacy())?;
+        let payload = icn_encoding::encode_bincode_legacy(&msg)?;
 
         let mut gossip = self.gossip_handle.write().await;
         gossip
@@ -243,7 +243,7 @@ impl UpgradeActor {
             activation_time,
         };
 
-        let payload = bincode::serde::encode_to_vec(&msg, bincode::config::legacy())?;
+        let payload = icn_encoding::encode_bincode_legacy(&msg)?;
 
         let mut gossip = self.gossip_handle.write().await;
         gossip
@@ -290,7 +290,7 @@ impl UpgradeActor {
                 did: self.own_did.clone(),
             };
 
-            let payload = bincode::serde::encode_to_vec(&msg, bincode::config::legacy())?;
+            let payload = icn_encoding::encode_bincode_legacy(&msg)?;
 
             let mut gossip = self.gossip_handle.write().await;
             gossip

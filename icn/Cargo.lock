@@ -2947,7 +2947,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "bincode",
  "dirs",
  "ed25519-dalek",
  "futures",
@@ -2956,6 +2955,7 @@ dependencies = [
  "icn-community",
  "icn-compute",
  "icn-coop",
+ "icn-encoding",
  "icn-entity",
  "icn-federation",
  "icn-gateway",

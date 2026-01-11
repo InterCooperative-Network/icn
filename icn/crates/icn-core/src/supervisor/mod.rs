@@ -158,7 +158,7 @@ async fn try_encrypt_envelope(
     let recipient_x25519_public = x25519_dalek::PublicKey::from(recipient_x25519_bytes);
 
     // Serialize inner envelope (validates it's serializable before committing sequence)
-    let inner_bytes = bincode::serde::encode_to_vec(inner_envelope, bincode::config::legacy())
+    let inner_bytes = icn_encoding::encode_bincode_legacy(inner_envelope)
         .context("Failed to serialize inner envelope")?;
 
     // Phase 2: Sequence allocation - point of no return
@@ -179,7 +179,7 @@ async fn try_encrypt_envelope(
     .context("Failed to encrypt envelope")?;
 
     // Serialize encrypted envelope
-    let encrypted_bytes = bincode::serde::encode_to_vec(&encrypted, bincode::config::legacy())
+    let encrypted_bytes = icn_encoding::encode_bincode_legacy(&encrypted)
         .context("Failed to serialize encrypted envelope")?;
 
     // Create outer signed envelope with PayloadType::Encrypted

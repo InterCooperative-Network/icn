@@ -52,8 +52,7 @@ fn create_send_callback(gossip_handle: GossipHandle) -> icn_steward::actor::Send
             };
 
             // Serialize message
-            let data = match bincode::serde::encode_to_vec(&steward_msg, bincode::config::legacy())
-            {
+            let data = match icn_encoding::encode_bincode_legacy(&steward_msg) {
                 Ok(d) => d,
                 Err(e) => {
                     warn!("Failed to serialize steward message: {}", e);
@@ -111,12 +110,7 @@ fn setup_steward_notification_callback(
             }
 
             // Parse steward message
-            match bincode::serde::decode_from_slice::<icn_steward::StewardMessage, _>(
-                &data,
-                bincode::config::legacy(),
-            )
-            .map(|(v, _)| v)
-            {
+            match icn_encoding::decode_bincode_legacy::<icn_steward::StewardMessage>(&data) {
                 Ok(msg) => {
                     debug!(
                         "Received steward message on topic {}: {:?}",
