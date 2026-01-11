@@ -212,7 +212,7 @@ mod tests {
     use super::*;
     use serde::{Deserialize, Serialize};
 
-    #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, bincode::Encode, bincode::Decode)]
+    #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
     struct TestData {
         name: String,
         value: u64,
