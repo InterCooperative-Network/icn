@@ -5,8 +5,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-/// Default suspicious rate threshold for unconfigured pairs
-pub const DEFAULT_SUSPICIOUS_RATE_THRESHOLD: f64 = 1000.0;
+// Re-export from icn-ledger to maintain single source of truth
+pub use icn_ledger::oracle::DEFAULT_SUSPICIOUS_RATE_THRESHOLD;
 
 /// Configuration for the ledger subsystem
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -113,23 +113,14 @@ impl Default for OracleNodeConfig {
 impl OracleNodeConfig {
     /// Convert to the icn-ledger OracleConfig type
     pub fn to_oracle_config(&self) -> icn_ledger::oracle::OracleConfig {
-        let mut config = icn_ledger::oracle::OracleConfig {
+        icn_ledger::oracle::OracleConfig {
             default_ttl_secs: self.default_ttl_secs,
             min_sources_for_consensus: self.min_sources_for_consensus,
             outlier_threshold: self.outlier_threshold,
             staleness_threshold_secs: self.staleness_threshold_secs,
             default_suspicious_rate_threshold: self.default_suspicious_rate_threshold,
             suspicious_rate_thresholds: self.suspicious_rate_thresholds.clone(),
-        };
-
-        // Ensure per-pair thresholds are set
-        for (pair, threshold) in &self.suspicious_rate_thresholds {
-            config
-                .suspicious_rate_thresholds
-                .insert(pair.clone(), *threshold);
         }
-
-        config
     }
 }
 
@@ -191,11 +182,14 @@ default_suspicious_rate_threshold = 500.0
 
     #[test]
     fn test_to_oracle_config() {
-        let mut node_config = OracleNodeConfig::default();
-        node_config.default_suspicious_rate_threshold = 500.0;
-        node_config
-            .suspicious_rate_thresholds
-            .insert("USD:JPY".to_string(), 200.0);
+        let mut thresholds = std::collections::HashMap::new();
+        thresholds.insert("USD:JPY".to_string(), 200.0);
+
+        let node_config = OracleNodeConfig {
+            default_suspicious_rate_threshold: 500.0,
+            suspicious_rate_thresholds: thresholds,
+            ..Default::default()
+        };
 
         let oracle_config = node_config.to_oracle_config();
 
