@@ -39,8 +39,8 @@ pub const COMPRESSION_THRESHOLD: usize = 1024;
 fn decompress_bounded(compressed: &[u8], max_size: usize) -> Result<Vec<u8>> {
     use std::io::Read;
 
-    let mut decoder = zstd::stream::read::Decoder::new(compressed)
-        .context("Failed to create zstd decoder")?;
+    let mut decoder =
+        zstd::stream::read::Decoder::new(compressed).context("Failed to create zstd decoder")?;
 
     // Allocate buffer with reasonable initial capacity, but cap at max_size
     let initial_capacity = std::cmp::min(compressed.len().saturating_mul(4), max_size);
@@ -2244,11 +2244,10 @@ mod tests {
     }
 
     #[test]
-    fn test_from_bytes_compressed_rejects_oversized_decompression() {
-        // Create a valid NetworkMessage, compress it, then try to decompress
-        // with a simulated oversized scenario
-        //
-        // This test verifies the integration with from_bytes_compressed
+    fn test_from_bytes_compressed_large_valid_message() {
+        // Test that large (but valid) compressed messages decompress correctly.
+        // Rejection of oversized decompression is tested in
+        // `test_bounded_decompression_rejects_oversized_output` above.
         let alice = KeyPair::generate().unwrap().did().clone();
         let bob = KeyPair::generate().unwrap().did().clone();
 
@@ -2256,7 +2255,7 @@ mod tests {
         let mut clock = VectorClock::new();
         clock.increment(&alice);
 
-        let large_data = vec![42u8; 50000]; // 50KB
+        let large_data = vec![42u8; 50000]; // 50KB - within limits
         let gossip_msg = GossipMessage::Response {
             entry: icn_gossip::types::GossipEntry {
                 hash: [1u8; 32],
@@ -2272,7 +2271,7 @@ mod tests {
 
         let msg = NetworkMessage::gossip(alice, Some(bob), gossip_msg);
 
-        // Compress the message - this should work fine
+        // Compress the message
         let bytes = msg.to_bytes_compressed(true).unwrap();
         assert_eq!(bytes[0], 1, "Should be zstd compressed");
 
@@ -2282,15 +2281,17 @@ mod tests {
     }
 
     #[test]
-    fn test_from_bytes_negotiated_rejects_oversized_decompression() {
-        // Similar test for the negotiated format
+    fn test_from_bytes_negotiated_large_valid_message() {
+        // Test that large (but valid) negotiated messages decompress correctly.
+        // Rejection of oversized decompression is tested in
+        // `test_bounded_decompression_rejects_oversized_output` above.
         let alice = KeyPair::generate().unwrap().did().clone();
         let bob = KeyPair::generate().unwrap().did().clone();
 
         let mut clock = VectorClock::new();
         clock.increment(&alice);
 
-        let large_data = vec![42u8; 50000]; // 50KB
+        let large_data = vec![42u8; 50000]; // 50KB - within limits
         let gossip_msg = GossipMessage::Response {
             entry: icn_gossip::types::GossipEntry {
                 hash: [1u8; 32],
