@@ -169,7 +169,7 @@ impl OnionRouter {
         let final_content = LayerContent::Final {
             payload: payload.to_vec(),
         };
-        let final_bytes = bincode::serde::encode_to_vec(&final_content, bincode::config::legacy())
+        let final_bytes = icn_encoding::encode_bincode_legacy(&final_content)
             .map_err(|e| PrivacyError::OnionRoutingError(format!("Serialization failed: {e}")))?;
 
         // Get recipient's public key
@@ -197,10 +197,9 @@ impl OnionRouter {
                 inner_layer: Box::new(current_layer),
             };
 
-            let relay_bytes =
-                bincode::serde::encode_to_vec(&relay_content, bincode::config::legacy()).map_err(
-                    |e| PrivacyError::OnionRoutingError(format!("Serialization failed: {e}")),
-                )?;
+            let relay_bytes = icn_encoding::encode_bincode_legacy(&relay_content).map_err(|e| {
+                PrivacyError::OnionRoutingError(format!("Serialization failed: {e}"))
+            })?;
 
             // Get relay's public key
             let relay_pk = self.peer_public_keys.get(relay_did).ok_or_else(|| {
@@ -239,12 +238,8 @@ impl OnionRouter {
         let decrypted = self.decrypt_layer(current_layer)?;
 
         // Deserialize to determine if relay or final
-        let content: LayerContent =
-            bincode::serde::decode_from_slice(&decrypted, bincode::config::legacy())
-                .map(|(v, _)| v)
-                .map_err(|e| {
-                    PrivacyError::OnionRoutingError(format!("Deserialization failed: {e}"))
-                })?;
+        let content: LayerContent = icn_encoding::decode_bincode_legacy(&decrypted)
+            .map_err(|e| PrivacyError::OnionRoutingError(format!("Deserialization failed: {e}")))?;
 
         icn_obs::metrics::privacy::onion_hops_forwarded_inc();
 
@@ -277,12 +272,8 @@ impl OnionRouter {
         let current_layer = &onion.layers[0];
         let decrypted = self.decrypt_layer(current_layer)?;
 
-        let content: LayerContent =
-            bincode::serde::decode_from_slice(&decrypted, bincode::config::legacy())
-                .map(|(v, _)| v)
-                .map_err(|e| {
-                    PrivacyError::OnionRoutingError(format!("Deserialization failed: {e}"))
-                })?;
+        let content: LayerContent = icn_encoding::decode_bincode_legacy(&decrypted)
+            .map_err(|e| PrivacyError::OnionRoutingError(format!("Deserialization failed: {e}")))?;
 
         match content {
             LayerContent::Final { payload } => Ok(payload),

@@ -3086,7 +3086,6 @@ dependencies = [
  "actix-web-prom",
  "anyhow",
  "base64 0.22.1",
- "bincode",
  "chrono",
  "criterion",
  "dashmap 6.1.0",
@@ -3098,6 +3097,7 @@ dependencies = [
  "icn-compute",
  "icn-coop",
  "icn-crypto-pq",
+ "icn-encoding",
  "icn-entity",
  "icn-federation",
  "icn-governance",
@@ -3264,6 +3264,7 @@ dependencies = [
  "futures",
  "hostname",
  "icn-crypto-pq",
+ "icn-encoding",
  "icn-gossip",
  "icn-identity",
  "icn-ledger",
@@ -3323,8 +3324,8 @@ name = "icn-privacy"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bincode",
  "chacha20poly1305",
+ "icn-encoding",
  "icn-identity",
  "icn-obs",
  "rand 0.8.5",
@@ -3394,9 +3395,9 @@ name = "icn-snapshot"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bincode",
  "getrandom 0.2.16",
  "hex",
+ "icn-encoding",
  "icn-identity",
  "icn-time",
  "proptest",
@@ -3503,11 +3504,11 @@ name = "icn-zkp"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bincode",
  "blake3",
  "criterion",
  "hex",
  "icn-crypto-pq",
+ "icn-encoding",
  "icn-identity",
  "num-bigint",
  "num-integer",
