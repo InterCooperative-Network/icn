@@ -18,8 +18,10 @@ ed25519-dalek.workspace = true
 x25519-dalek.workspace = true
 async-trait = "0.1"
 hex = "0.4"
-bincode = { version = "2.0", features = ["serde"] }
 sled.workspace = true
+
+# Encoding
+icn-encoding = { path = "../icn-encoding" }
 
 # ICN crates
 icn-entity = { path = "../icn-entity" }

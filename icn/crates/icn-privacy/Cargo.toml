@@ -17,7 +17,7 @@ rand_core.workspace = true
 
 # Serialization
 serde.workspace = true
-bincode.workspace = true
+icn-encoding = { path = "../icn-encoding" }
 
 # Error handling
 anyhow.workspace = true

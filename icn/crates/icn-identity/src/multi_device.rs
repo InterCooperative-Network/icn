@@ -596,7 +596,7 @@ impl RotationEvent {
         let mut event_copy = self.clone();
         event_copy.proof = vec![]; // Clear proof for signing
 
-        bincode::serde::encode_to_vec(&event_copy, bincode::config::legacy())
+        icn_encoding::encode_bincode_legacy(&event_copy)
             .map_err(|e| anyhow::anyhow!("Failed to serialize event: {e}"))
     }
 }

@@ -65,13 +65,13 @@ pub enum ContractRegistryMessage {
 
 impl ContractRegistryMessage {
     /// Serialize message to bytes
-    pub fn to_bytes(&self) -> Result<Vec<u8>, bincode::error::EncodeError> {
-        bincode::serde::encode_to_vec(self, bincode::config::legacy())
+    pub fn to_bytes(&self) -> Result<Vec<u8>, icn_encoding::Error> {
+        icn_encoding::encode_bincode_legacy(self)
     }
 
     /// Deserialize message from bytes
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, bincode::error::DecodeError> {
-        bincode::serde::decode_from_slice(bytes, bincode::config::legacy()).map(|(msg, _)| msg)
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, icn_encoding::Error> {
+        icn_encoding::decode_bincode_legacy(bytes)
     }
 
     /// Get the message type name for logging

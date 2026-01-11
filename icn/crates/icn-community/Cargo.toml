@@ -11,7 +11,7 @@ icn-governance = { path = "../icn-governance" }
 icn-gossip = { path = "../icn-gossip" }
 icn-ledger = { path = "../icn-ledger" }
 icn-store = { path = "../icn-store" }
-bincode = { version = "2.0", features = ["serde"] }
+icn-encoding = { path = "../icn-encoding" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"

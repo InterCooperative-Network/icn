@@ -220,11 +220,10 @@ mod tests {
             timestamp: 1735862400,
         };
 
-        // Use bincode for binary serialization (gossip messages are binary)
-        let config = bincode::config::standard();
-        let serialized = bincode::serde::encode_to_vec(&msg, config).expect("serialize");
-        let (deserialized, _): (LaborShareMessage, _) =
-            bincode::serde::decode_from_slice(&serialized, config).expect("deserialize");
+        // Use binary serialization (gossip messages are binary)
+        let serialized = icn_encoding::encode_bincode_legacy(&msg).expect("serialize");
+        let deserialized: LaborShareMessage =
+            icn_encoding::decode_bincode_legacy(&serialized).expect("deserialize");
 
         assert_eq!(msg, deserialized);
     }
@@ -245,10 +244,9 @@ mod tests {
             collateral_description: Some("Equipment lien".to_string()),
         };
 
-        let config = bincode::config::standard();
-        let serialized = bincode::serde::encode_to_vec(&msg, config).expect("serialize");
-        let (deserialized, _): (BondMessage, _) =
-            bincode::serde::decode_from_slice(&serialized, config).expect("deserialize");
+        let serialized = icn_encoding::encode_bincode_legacy(&msg).expect("serialize");
+        let deserialized: BondMessage =
+            icn_encoding::decode_bincode_legacy(&serialized).expect("deserialize");
 
         assert_eq!(msg, deserialized);
     }
@@ -265,10 +263,9 @@ mod tests {
             timestamp: 1736467100,
         };
 
-        let config = bincode::config::standard();
-        let serialized = bincode::serde::encode_to_vec(&msg, config).expect("serialize");
-        let (deserialized, _): (BondMessage, _) =
-            bincode::serde::decode_from_slice(&serialized, config).expect("deserialize");
+        let serialized = icn_encoding::encode_bincode_legacy(&msg).expect("serialize");
+        let deserialized: BondMessage =
+            icn_encoding::decode_bincode_legacy(&serialized).expect("deserialize");
 
         assert_eq!(msg, deserialized);
     }

@@ -47,8 +47,8 @@ impl ConnectionContext {
 
         // 1. Deserialize EncryptedEnvelope from the signed payload
         let encrypted: EncryptedEnvelope =
-            match bincode::serde::decode_from_slice(&envelope.payload, bincode::config::legacy()) {
-                Ok((enc, _)) => enc,
+            match icn_encoding::decode_bincode_legacy(&envelope.payload) {
+                Ok(enc) => enc,
                 Err(e) => {
                     warn!(
                         trace_id = %trace_id,
@@ -120,11 +120,8 @@ impl ConnectionContext {
 
         // 5. Try to deserialize as inner SignedEnvelope (sign-encrypt-sign pattern)
         // If that fails, treat plaintext as raw application data
-        match bincode::serde::decode_from_slice::<SignedEnvelope, _>(
-            &plaintext,
-            bincode::config::legacy(),
-        ) {
-            Ok((inner_envelope, _)) => {
+        match icn_encoding::decode_bincode_legacy::<SignedEnvelope>(&plaintext) {
+            Ok(inner_envelope) => {
                 // Inner envelope found - verify and forward via signed handler
                 debug!(
                     "Decrypted inner SignedEnvelope from {} (inner_seq={})",
@@ -260,8 +257,7 @@ mod tests {
         .unwrap();
 
         // Serialize the inner envelope
-        let inner_bytes =
-            bincode::serde::encode_to_vec(&inner_envelope, bincode::config::legacy()).unwrap();
+        let inner_bytes = icn_encoding::encode_bincode_legacy(&inner_envelope).unwrap();
 
         // Encrypt for the receiver
         let receiver_x25519_public =
@@ -278,8 +274,7 @@ mod tests {
         .unwrap();
 
         // Create outer signed envelope
-        let encrypted_bytes =
-            bincode::serde::encode_to_vec(&encrypted, bincode::config::legacy()).unwrap();
+        let encrypted_bytes = icn_encoding::encode_bincode_legacy(&encrypted).unwrap();
         let outer_envelope = SignedEnvelope::new(
             sender_bundle.did(),
             sender_bundle.keypair(),
@@ -328,8 +323,7 @@ mod tests {
         )
         .unwrap();
 
-        let encrypted_bytes =
-            bincode::serde::encode_to_vec(&encrypted, bincode::config::legacy()).unwrap();
+        let encrypted_bytes = icn_encoding::encode_bincode_legacy(&encrypted).unwrap();
         let outer_envelope = SignedEnvelope::new(
             sender_bundle.did(),
             sender_bundle.keypair(),
@@ -399,8 +393,7 @@ mod tests {
         )
         .unwrap();
 
-        let encrypted_bytes =
-            bincode::serde::encode_to_vec(&encrypted, bincode::config::legacy()).unwrap();
+        let encrypted_bytes = icn_encoding::encode_bincode_legacy(&encrypted).unwrap();
         let outer_envelope = SignedEnvelope::new(
             sender_bundle.did(),
             sender_bundle.keypair(),
@@ -472,8 +465,7 @@ mod tests {
         .unwrap();
 
         // Serialize the inner envelope
-        let inner_bytes =
-            bincode::serde::encode_to_vec(&inner_envelope, bincode::config::legacy()).unwrap();
+        let inner_bytes = icn_encoding::encode_bincode_legacy(&inner_envelope).unwrap();
 
         // Encrypt for the receiver
         let receiver_x25519_public =
@@ -495,8 +487,7 @@ mod tests {
         }
 
         // Create outer signed envelope with tampered ciphertext
-        let encrypted_bytes =
-            bincode::serde::encode_to_vec(&encrypted, bincode::config::legacy()).unwrap();
+        let encrypted_bytes = icn_encoding::encode_bincode_legacy(&encrypted).unwrap();
         let outer_envelope = SignedEnvelope::new(
             sender_bundle.did(),
             sender_bundle.keypair(),
@@ -549,8 +540,7 @@ mod tests {
         )
         .unwrap();
 
-        let mut valid_bytes =
-            bincode::serde::encode_to_vec(&valid_encrypted, bincode::config::legacy()).unwrap();
+        let mut valid_bytes = icn_encoding::encode_bincode_legacy(&valid_encrypted).unwrap();
 
         // Truncate the bytes to make it invalid
         valid_bytes.truncate(10);

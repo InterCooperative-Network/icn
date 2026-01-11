@@ -30,8 +30,8 @@ futures-util = "0.3"
 # Serialization
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-bincode = { version = "2.0", features = ["serde"] }
 serde_bytes = "0.11"
+icn-encoding = { path = "../icn-encoding" }
 
 # Logging and distributed tracing
 tracing = "0.1"

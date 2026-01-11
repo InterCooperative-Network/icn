@@ -5,6 +5,7 @@ edition.workspace = true
 
 [dependencies]
 tokio.workspace = true
+icn-encoding = { path = "../icn-encoding" }
 icn-identity.workspace = true
 icn-trust.workspace = true
 icn-obs.workspace = true
@@ -22,12 +23,12 @@ sha2 = "0.10"
 hex = "0.4"
 zstd = "0.13"
 blake3 = "1.5"
-bincode = { version = "2.0", features = ["serde"] }
 ed25519-dalek = { version = "2.1", features = ["rand_core"] }
 
 [dev-dependencies]
 icn-store.workspace = true
 criterion = "0.5"
+bincode = { version = "2.0", features = ["serde"] }  # For benchmark comparisons
 
 [[bench]]
 name = "gossip_bench"

@@ -10,7 +10,7 @@ anyhow.workspace = true
 icn-time = { path = "../icn-time" }
 sha2 = "0.10"
 hex = "0.4"
-bincode = { version = "2.0", features = ["serde"] }
+icn-encoding = { path = "../icn-encoding" }
 getrandom = "0.2"
 icn-identity = { path = "../icn-identity" }
 tokio = { version = "1", features = ["sync"] }

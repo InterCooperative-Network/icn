@@ -461,15 +461,12 @@ impl RecoveryMessage {
 
     /// Serialize to bytes for gossip
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
-        Ok(bincode::serde::encode_to_vec(
-            self,
-            bincode::config::legacy(),
-        )?)
+        Ok(icn_encoding::encode_bincode_legacy(self)?)
     }
 
     /// Deserialize from bytes
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        Ok(bincode::serde::decode_from_slice(bytes, bincode::config::legacy()).map(|(v, _)| v)?)
+        Ok(icn_encoding::decode_bincode_legacy(bytes)?)
     }
 
     /// Get a human-readable summary of this message

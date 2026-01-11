@@ -474,7 +474,7 @@ impl GossipActor {
         );
 
         // Serialize and publish to the key:rotation topic
-        let data = bincode::serde::encode_to_vec(&rotation_msg, bincode::config::standard())
+        let data = icn_encoding::encode_bincode_legacy(&rotation_msg)
             .map_err(|e| anyhow::anyhow!("Failed to serialize rotation message: {e}"))?;
 
         self.publish(TOPIC_KEY_ROTATION, data).await?;
@@ -493,9 +493,8 @@ impl GossipActor {
     pub fn handle_rotation_message(&mut self, data: &[u8]) -> Result<bool> {
         use crate::key_rotation::KeyRotationMessage;
 
-        let (msg, _): (KeyRotationMessage, _) =
-            bincode::serde::decode_from_slice(data, bincode::config::standard())
-                .map_err(|e| anyhow::anyhow!("Failed to deserialize rotation message: {e}"))?;
+        let msg: KeyRotationMessage = icn_encoding::decode_bincode_legacy(data)
+            .map_err(|e| anyhow::anyhow!("Failed to deserialize rotation message: {e}"))?;
 
         match msg {
             KeyRotationMessage::RotationAnnouncement {
@@ -554,9 +553,8 @@ impl GossipActor {
                 // Send response
                 let response =
                     KeyRotationMessage::response(queried_did, current_did, last_rotation);
-                let response_data =
-                    bincode::serde::encode_to_vec(&response, bincode::config::standard())
-                        .map_err(|e| anyhow::anyhow!("Failed to serialize response: {e}"))?;
+                let response_data = icn_encoding::encode_bincode_legacy(&response)
+                    .map_err(|e| anyhow::anyhow!("Failed to serialize response: {e}"))?;
 
                 self.send_message(
                     Some(requester),

@@ -224,7 +224,7 @@ impl NetworkHandle {
             sender_keypair,
             sequence,
             crate::PayloadType::Encrypted,
-            bincode::serde::encode_to_vec(&encrypted, bincode::config::legacy())?,
+            icn_encoding::encode_bincode_legacy(&encrypted)?,
         )?;
 
         // Send via network
@@ -755,7 +755,7 @@ impl NetworkHandle {
             .map_err(|e| anyhow::anyhow!("Failed to create onion circuit: {e}"))?;
 
         // Serialize the payload
-        let payload_bytes = bincode::serde::encode_to_vec(payload, bincode::config::legacy())
+        let payload_bytes = icn_encoding::encode_bincode_legacy(payload)
             .context("Failed to serialize onion payload")?;
 
         // Wrap message in onion layers

@@ -151,14 +151,13 @@ pub mod steward {
                 };
 
                 // Serialize message
-                let data =
-                    match bincode::serde::encode_to_vec(&steward_msg, bincode::config::legacy()) {
-                        Ok(d) => d,
-                        Err(e) => {
-                            warn!("Failed to serialize steward message: {}", e);
-                            return;
-                        }
-                    };
+                let data = match icn_encoding::encode_bincode_legacy(&steward_msg) {
+                    Ok(d) => d,
+                    Err(e) => {
+                        warn!("Failed to serialize steward message: {}", e);
+                        return;
+                    }
+                };
 
                 // Publish via gossip
                 {
@@ -209,12 +208,7 @@ pub mod steward {
                 }
 
                 // Parse steward message
-                match bincode::serde::decode_from_slice::<StewardMessage, _>(
-                    &data,
-                    bincode::config::legacy(),
-                )
-                .map(|(v, _)| v)
-                {
+                match icn_encoding::decode_bincode_legacy::<StewardMessage>(&data) {
                     Ok(msg) => {
                         debug!(
                             "Received steward message on topic {}: {:?}",

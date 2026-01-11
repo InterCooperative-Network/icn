@@ -429,12 +429,11 @@ mod tests {
         clock.increment(&node_a);
         clock.increment(&node_b);
 
-        // Serialize to bincode
-        let bytes = bincode::serde::encode_to_vec(&clock, bincode::config::standard()).unwrap();
+        // Serialize
+        let bytes = icn_encoding::encode_bincode_legacy(&clock).unwrap();
 
         // Deserialize back
-        let (restored, _): (VectorClock, _) =
-            bincode::serde::decode_from_slice(&bytes, bincode::config::standard()).unwrap();
+        let restored: VectorClock = icn_encoding::decode_bincode_legacy(&bytes).unwrap();
 
         // Verify equality (compares counts, not last_seen)
         assert_eq!(clock, restored);

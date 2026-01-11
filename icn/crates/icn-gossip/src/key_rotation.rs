@@ -239,7 +239,6 @@ mod tests {
 
     #[test]
     fn test_rotation_message_serialization() {
-        let config = bincode::config::standard();
         let old_keypair = KeyPair::generate().unwrap();
         let new_keypair = KeyPair::generate().unwrap();
 
@@ -253,9 +252,9 @@ mod tests {
             signature_new: vec![9, 10, 11, 12],
         };
 
-        let serialized = bincode::serde::encode_to_vec(&msg, config).expect("serialize");
-        let (deserialized, _): (KeyRotationMessage, _) =
-            bincode::serde::decode_from_slice(&serialized, config).expect("deserialize");
+        let serialized = icn_encoding::encode_bincode_legacy(&msg).expect("serialize");
+        let deserialized: KeyRotationMessage =
+            icn_encoding::decode_bincode_legacy(&serialized).expect("deserialize");
         assert_eq!(msg, deserialized);
     }
 

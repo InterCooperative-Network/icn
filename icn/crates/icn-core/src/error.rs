@@ -67,14 +67,8 @@ impl From<serde_json::Error> for CoreError {
     }
 }
 
-impl From<bincode::error::EncodeError> for CoreError {
-    fn from(e: bincode::error::EncodeError) -> Self {
-        CoreError::Serialization(e.to_string())
-    }
-}
-
-impl From<bincode::error::DecodeError> for CoreError {
-    fn from(e: bincode::error::DecodeError) -> Self {
+impl From<icn_encoding::Error> for CoreError {
+    fn from(e: icn_encoding::Error) -> Self {
         CoreError::Serialization(e.to_string())
     }
 }
