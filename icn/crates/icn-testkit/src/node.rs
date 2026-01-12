@@ -17,6 +17,9 @@ use tracing::{debug, info};
 
 use crate::util::pick_port;
 
+/// Type alias for notification storage: topic -> [(hash, subscriber_did)]
+type NotificationMap = HashMap<String, Vec<([u8; 32], Did)>>;
+
 /// Configuration for spawning a test node
 #[derive(Debug, Clone)]
 pub struct NodeConfig {
@@ -64,7 +67,7 @@ pub struct TestNode {
     /// Shutdown signal sender
     shutdown_tx: broadcast::Sender<()>,
     /// Received notifications: topic -> [(hash, from_did)]
-    notifications: Arc<Mutex<HashMap<String, Vec<([u8; 32], Did)>>>>,
+    notifications: Arc<Mutex<NotificationMap>>,
     /// Node index (for cluster identification)
     pub index: usize,
 }
@@ -99,7 +102,7 @@ impl TestNode {
         let gossip = GossipActor::spawn(did.clone(), trust_lookup);
 
         // Set up notification tracking
-        let notifications = Arc::new(Mutex::new(HashMap::<String, Vec<([u8; 32], Did)>>::new()));
+        let notifications = Arc::new(Mutex::new(NotificationMap::new()));
         let notifications_clone = notifications.clone();
 
         // Configure notification callback
@@ -364,7 +367,7 @@ impl TestNode {
             }
             tokio::time::sleep(Duration::from_millis(50)).await;
         }
-        anyhow::bail!("Timeout waiting for connection to {}", did)
+        anyhow::bail!("Timeout waiting for connection to {did}")
     }
 }
 

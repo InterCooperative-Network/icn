@@ -65,7 +65,7 @@ impl NetworkCondition {
         Self {
             latency: Duration::from_millis(200),
             packet_loss: 0.05,
-            bandwidth_limit: Some(1 * 1024 * 1024), // 1 MB/s
+            bandwidth_limit: Some(1024 * 1024), // 1 MB/s
             jitter: 0.5,
         }
     }

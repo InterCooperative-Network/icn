@@ -41,6 +41,7 @@ pub fn pick_port() -> u16 {
 ///
 /// Note: Requires tracing-subscriber as a dev-dependency.
 #[cfg(test)]
+#[allow(dead_code)]
 pub fn init_test_tracing() {
     use tracing_subscriber::EnvFilter;
 
@@ -63,7 +64,7 @@ mod tests {
         let mut ports = HashSet::new();
         for _ in 0..10 {
             let port = pick_port();
-            assert!(port > 1024, "Port {} should be > 1024", port);
+            assert!(port > 1024, "Port {port} should be > 1024");
             ports.insert(port);
         }
         // Should have gotten multiple unique ports (may not be all 10 due to race conditions)
