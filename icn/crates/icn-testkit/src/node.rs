@@ -15,7 +15,7 @@ use std::time::Duration;
 use tokio::sync::{broadcast, watch, Mutex, RwLock};
 use tracing::{debug, info, warn};
 
-use crate::util::pick_port;
+use crate::util::{pick_port, BackoffConfig};
 
 /// Guard that triggers shutdown on drop unless disarmed
 ///
@@ -400,15 +400,30 @@ impl TestNode {
     }
 
     /// Wait for connection to a specific peer
+    ///
+    /// Uses exponential backoff starting at 10ms, capped at 100ms between checks.
     pub async fn wait_connected(&self, did: &Did, timeout: Duration) -> Result<()> {
         let start = std::time::Instant::now();
-        while start.elapsed() < timeout {
+        let backoff = BackoffConfig::new(
+            Duration::from_millis(10),  // Start checking quickly
+            Duration::from_millis(100), // Cap at 100ms between checks
+        );
+        let mut delay = backoff.initial_delay;
+
+        loop {
             if self.network.is_peer_connected(did).await.unwrap_or(false) {
                 return Ok(());
             }
-            tokio::time::sleep(Duration::from_millis(50)).await;
+
+            if start.elapsed() >= timeout {
+                anyhow::bail!("Timeout waiting for connection to {did}");
+            }
+
+            let remaining = timeout.saturating_sub(start.elapsed());
+            tokio::time::sleep(delay.min(remaining)).await;
+            delay = Duration::from_secs_f64(delay.as_secs_f64() * backoff.multiplier)
+                .min(backoff.max_delay);
         }
-        anyhow::bail!("Timeout waiting for connection to {did}")
     }
 
     /// Disconnect from a specific peer
@@ -429,11 +444,18 @@ impl TestNode {
     /// Wait for disconnection from a specific peer
     ///
     /// Waits until the peer is no longer connected or the timeout expires.
+    /// Uses exponential backoff starting at 10ms, capped at 100ms between checks.
     /// If the connection state cannot be determined (error), treats as disconnected
     /// since the peer handle may have been cleaned up.
     pub async fn wait_disconnected(&self, did: &Did, timeout: Duration) -> Result<()> {
         let start = std::time::Instant::now();
-        while start.elapsed() < timeout {
+        let backoff = BackoffConfig::new(
+            Duration::from_millis(10),  // Start checking quickly
+            Duration::from_millis(100), // Cap at 100ms between checks
+        );
+        let mut delay = backoff.initial_delay;
+
+        loop {
             match self.network.is_peer_connected(did).await {
                 Ok(false) => return Ok(()), // Confirmed disconnected
                 Ok(true) => {}              // Still connected, keep waiting
@@ -443,9 +465,16 @@ impl TestNode {
                     return Ok(());
                 }
             }
-            tokio::time::sleep(Duration::from_millis(50)).await;
+
+            if start.elapsed() >= timeout {
+                anyhow::bail!("Timeout waiting for disconnection from {did}");
+            }
+
+            let remaining = timeout.saturating_sub(start.elapsed());
+            tokio::time::sleep(delay.min(remaining)).await;
+            delay = Duration::from_secs_f64(delay.as_secs_f64() * backoff.multiplier)
+                .min(backoff.max_delay);
         }
-        anyhow::bail!("Timeout waiting for disconnection from {did}")
     }
 }
 

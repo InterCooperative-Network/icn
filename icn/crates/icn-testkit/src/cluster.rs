@@ -1,11 +1,12 @@
 //! Multi-node test cluster management
 
 use anyhow::{Context, Result};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tracing::info;
 
 use crate::node::{NodeConfig, TestNode};
 use crate::simulation::PartitionConfig;
+use crate::util::BackoffConfig;
 
 /// A cluster of test nodes for multi-node integration tests
 ///
@@ -131,16 +132,22 @@ impl TestCluster {
     /// Wait for gossip to converge on a specific topic
     ///
     /// Waits until all nodes have the same number of entries for the topic,
-    /// or the timeout expires.
+    /// or the timeout expires. Uses exponential backoff to balance responsiveness
+    /// with CPU efficiency.
     pub async fn await_gossip_convergence(
         &self,
         topic: &str,
         expected_count: usize,
         timeout: Duration,
     ) -> Result<()> {
-        let start = std::time::Instant::now();
+        let start = Instant::now();
+        let backoff = BackoffConfig::new(
+            Duration::from_millis(10),  // Start checking quickly
+            Duration::from_millis(100), // Cap at 100ms between checks
+        );
+        let mut delay = backoff.initial_delay;
 
-        while start.elapsed() < timeout {
+        loop {
             let mut all_converged = true;
             for node in &self.nodes {
                 if node.entry_count(topic).await != expected_count {
@@ -151,33 +158,42 @@ impl TestCluster {
 
             if all_converged {
                 info!(
-                    "Gossip converged: all {} nodes have {} entries for topic '{}'",
+                    "Gossip converged: all {} nodes have {} entries for topic '{}' in {:?}",
                     self.nodes.len(),
                     expected_count,
-                    topic
+                    topic,
+                    start.elapsed()
                 );
                 return Ok(());
             }
 
-            tokio::time::sleep(Duration::from_millis(50)).await;
-        }
+            if start.elapsed() >= timeout {
+                // Build detailed error message
+                let mut counts = Vec::new();
+                for node in &self.nodes {
+                    counts.push(format!(
+                        "node {}: {}",
+                        node.index,
+                        node.entry_count(topic).await
+                    ));
+                }
 
-        // Build detailed error message
-        let mut counts = Vec::new();
-        for node in &self.nodes {
-            counts.push(format!(
-                "node {}: {}",
-                node.index,
-                node.entry_count(topic).await
-            ));
-        }
+                anyhow::bail!(
+                    "Gossip did not converge within {:?}. Expected {} entries. Counts: {}",
+                    timeout,
+                    expected_count,
+                    counts.join(", ")
+                );
+            }
 
-        anyhow::bail!(
-            "Gossip did not converge within {:?}. Expected {} entries. Counts: {}",
-            timeout,
-            expected_count,
-            counts.join(", ")
-        )
+            // Sleep with exponential backoff
+            let remaining = timeout.saturating_sub(start.elapsed());
+            tokio::time::sleep(delay.min(remaining)).await;
+
+            // Increase delay, capped at max
+            delay = Duration::from_secs_f64(delay.as_secs_f64() * backoff.multiplier)
+                .min(backoff.max_delay);
+        }
     }
 
     /// Create a network partition by disconnecting nodes across groups
