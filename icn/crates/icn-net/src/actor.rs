@@ -1628,6 +1628,9 @@ impl NetworkActor {
                                 // Track rate limiting metric
                                 icn_obs::metrics::network::messages_rate_limited_inc();
 
+                                // Close stream before continuing to avoid resource leak
+                                let _ = send.finish();
+
                                 // Drop the message (don't call handler)
                                 continue;
                             }
@@ -1773,7 +1776,9 @@ impl NetworkActor {
                     }
 
                     // Close the stream
-                    let _ = send.finish();
+                    if let Err(e) = send.finish() {
+                        tracing::debug!("Stream finish error (normal during disconnect): {}", e);
+                    }
                 }
                 Err(quinn::ConnectionError::ApplicationClosed(_)) => {
                     info!("Connection closed by peer");
