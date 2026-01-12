@@ -1629,7 +1629,9 @@ impl NetworkActor {
                                 icn_obs::metrics::network::messages_rate_limited_inc();
 
                                 // Close stream before continuing to avoid resource leak
-                                let _ = send.finish();
+                                if let Err(e) = send.finish() {
+                                    tracing::debug!("Stream finish error during rate limit: {}", e);
+                                }
 
                                 // Drop the message (don't call handler)
                                 continue;
