@@ -1,4 +1,17 @@
 //! Network simulation utilities for testing
+//!
+//! This module provides configuration types for network simulation.
+//! Currently, these types define simulation parameters but are not yet
+//! integrated into the actual network layer. They serve as:
+//!
+//! 1. Documentation of intended simulation capabilities
+//! 2. Configuration types for future implementation
+//! 3. Test fixtures for partition configuration validation
+//!
+//! # Future Work
+//!
+//! Full network simulation would require integration with NetworkActor
+//! to intercept and modify message delivery based on these conditions.
 
 use std::time::Duration;
 

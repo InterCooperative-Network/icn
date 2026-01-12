@@ -179,23 +179,24 @@ impl TestCluster {
         )
     }
 
-    /// Simulate a network partition
+    /// Validate a network partition configuration
     ///
-    /// Splits the cluster into isolated groups. Nodes within a group can
-    /// still communicate, but nodes in different groups cannot.
+    /// This method validates that a partition configuration is valid for this
+    /// cluster (all nodes are accounted for). The actual network partitioning
+    /// is not yet implemented.
     ///
-    /// Note: This is a simple simulation that doesn't actually block network
-    /// traffic. For real partition testing, nodes should be disconnected.
-    pub async fn partition(&self, config: PartitionConfig) -> Result<()> {
-        info!("Simulating partition: {:?}", config);
+    /// # Future Work
+    ///
+    /// Full partition simulation would require:
+    /// 1. Tracking which groups each node belongs to
+    /// 2. Filtering messages between groups at the network layer
+    /// 3. Optionally dropping connections between groups
+    ///
+    /// For now, tests requiring partition behavior should manually disconnect
+    /// nodes or use separate clusters.
+    pub async fn validate_partition(&self, config: &PartitionConfig) -> Result<()> {
+        info!("Validating partition config: {:?}", config);
 
-        // This is a placeholder for actual partition implementation
-        // In practice, you'd need to:
-        // 1. Track which groups each node belongs to
-        // 2. Filter messages between groups
-        // 3. Optionally drop connections between groups
-
-        // For now, we just validate the partition config
         let total_nodes: usize = config.groups.iter().map(|g| g.len()).sum();
         if total_nodes != self.nodes.len() {
             anyhow::bail!(

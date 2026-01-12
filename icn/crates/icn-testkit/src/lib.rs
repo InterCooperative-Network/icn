@@ -8,6 +8,7 @@
 //!
 //! ```rust,ignore
 //! use icn_testkit::{TestNode, TestCluster};
+//! use std::time::Duration;
 //!
 //! #[tokio::test]
 //! async fn test_gossip_propagation() -> anyhow::Result<()> {
@@ -17,7 +18,7 @@
 //!
 //!     // Publish on node 0, verify on all nodes
 //!     let hash = cluster.nodes[0].publish("test:topic", b"hello").await?;
-//!     cluster.await_gossip_convergence(Duration::from_secs(5)).await?;
+//!     cluster.await_gossip_convergence("test:topic", 1, Duration::from_secs(5)).await?;
 //!
 //!     for node in &cluster.nodes {
 //!         assert!(node.has_entry("test:topic", &hash).await);

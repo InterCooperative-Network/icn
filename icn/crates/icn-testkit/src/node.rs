@@ -22,8 +22,6 @@ pub struct NodeConfig {
     pub port: Option<u16>,
     /// Default trust class for unknown peers
     pub default_trust_class: TrustClass,
-    /// Enable persistence (if false, uses in-memory storage)
-    pub persistent: bool,
 }
 
 impl Default for NodeConfig {
@@ -31,7 +29,6 @@ impl Default for NodeConfig {
         Self {
             port: None,
             default_trust_class: TrustClass::Partner,
-            persistent: false,
         }
     }
 }
