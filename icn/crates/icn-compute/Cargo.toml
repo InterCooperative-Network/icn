@@ -52,7 +52,6 @@ wat = "1.219"
 criterion = "0.5"
 tempfile = "3.24"
 icn-identity = { path = "../icn-identity" }
-bincode = { version = "2.0", features = ["serde"] }  # For benchmark comparisons
 
 [[bench]]
 name = "compute_bench"
