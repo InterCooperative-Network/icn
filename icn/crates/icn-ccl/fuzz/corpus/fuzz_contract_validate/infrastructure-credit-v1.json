@@ -1,0 +1,296 @@
+{
+  "name": "InfrastructureCreditProtocol",
+  "participants": [
+    "did:icn:z8SFqwqnq4whPhs8icwHA2hQg3hUoN1qrCLK1SBx3WKwe"
+  ],
+  "currency": "hours",
+  "state_vars": [
+    {
+      "name": "compute_rate",
+      "initial_value": { "Int": 100 }
+    },
+    {
+      "name": "storage_rate",
+      "initial_value": { "Int": 10 }
+    },
+    {
+      "name": "bandwidth_rate",
+      "initial_value": { "Int": 2 }
+    },
+    {
+      "name": "uptime_rate",
+      "initial_value": { "Int": 5 }
+    },
+    {
+      "name": "network_treasury",
+      "initial_value": { "Did": "did:icn:z8SFqwqnq4whPhs8icwHA2hQg3hUoN1qrCLK1SBx3WKwe" }
+    }
+  ],
+  "rules": [
+    {
+      "name": "calculate_credits",
+      "params": [
+        { "name": "compute_hours" },
+        { "name": "storage_gb_months" },
+        { "name": "bandwidth_gb" },
+        { "name": "uptime_hours" }
+      ],
+      "requires": [],
+      "body": [
+        {
+          "Assign": {
+            "name": "compute_credits",
+            "value": {
+              "BinOp": {
+                "op": "Div",
+                "left": {
+                  "BinOp": {
+                    "op": "Mul",
+                    "left": { "Var": "compute_hours" },
+                    "right": { "Var": "compute_rate" }
+                  }
+                },
+                "right": { "Literal": { "Int": 100 } }
+              }
+            }
+          }
+        },
+        {
+          "Assign": {
+            "name": "storage_credits",
+            "value": {
+              "BinOp": {
+                "op": "Div",
+                "left": {
+                  "BinOp": {
+                    "op": "Mul",
+                    "left": { "Var": "storage_gb_months" },
+                    "right": { "Var": "storage_rate" }
+                  }
+                },
+                "right": { "Literal": { "Int": 100 } }
+              }
+            }
+          }
+        },
+        {
+          "Assign": {
+            "name": "bandwidth_credits",
+            "value": {
+              "BinOp": {
+                "op": "Div",
+                "left": {
+                  "BinOp": {
+                    "op": "Mul",
+                    "left": { "Var": "bandwidth_gb" },
+                    "right": { "Var": "bandwidth_rate" }
+                  }
+                },
+                "right": { "Literal": { "Int": 100 } }
+              }
+            }
+          }
+        },
+        {
+          "Assign": {
+            "name": "uptime_credits",
+            "value": {
+              "BinOp": {
+                "op": "Div",
+                "left": {
+                  "BinOp": {
+                    "op": "Mul",
+                    "left": { "Var": "uptime_hours" },
+                    "right": { "Var": "uptime_rate" }
+                  }
+                },
+                "right": { "Literal": { "Int": 100 } }
+              }
+            }
+          }
+        },
+        {
+          "Return": {
+            "value": {
+              "BinOp": {
+                "op": "Add",
+                "left": {
+                  "BinOp": {
+                    "op": "Add",
+                    "left": {
+                      "BinOp": {
+                        "op": "Add",
+                        "left": { "Var": "compute_credits" },
+                        "right": { "Var": "storage_credits" }
+                      }
+                    },
+                    "right": { "Var": "bandwidth_credits" }
+                  }
+                },
+                "right": { "Var": "uptime_credits" }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "issue_credits",
+      "params": [
+        { "name": "contributor" },
+        { "name": "amount" }
+      ],
+      "requires": [],
+      "body": [
+        {
+          "LedgerTransfer": {
+            "from": { "Var": "network_treasury" },
+            "to": { "Var": "contributor" },
+            "amount": { "Var": "amount" },
+            "currency": { "Literal": { "String": "hours" } }
+          }
+        }
+      ]
+    },
+    {
+      "name": "update_compute_rate",
+      "params": [
+        { "name": "new_rate" }
+      ],
+      "requires": [
+        {
+          "BinOp": {
+            "op": "Gt",
+            "left": { "Var": "new_rate" },
+            "right": { "Literal": { "Int": 0 } }
+          }
+        },
+        {
+          "BinOp": {
+            "op": "Le",
+            "left": { "Var": "new_rate" },
+            "right": { "Literal": { "Int": 1000 } }
+          }
+        }
+      ],
+      "body": [
+        {
+          "Assign": {
+            "name": "compute_rate",
+            "value": { "Var": "new_rate" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "update_storage_rate",
+      "params": [
+        { "name": "new_rate" }
+      ],
+      "requires": [
+        {
+          "BinOp": {
+            "op": "Gt",
+            "left": { "Var": "new_rate" },
+            "right": { "Literal": { "Int": 0 } }
+          }
+        },
+        {
+          "BinOp": {
+            "op": "Le",
+            "left": { "Var": "new_rate" },
+            "right": { "Literal": { "Int": 1000 } }
+          }
+        }
+      ],
+      "body": [
+        {
+          "Assign": {
+            "name": "storage_rate",
+            "value": { "Var": "new_rate" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "update_bandwidth_rate",
+      "params": [
+        { "name": "new_rate" }
+      ],
+      "requires": [
+        {
+          "BinOp": {
+            "op": "Gt",
+            "left": { "Var": "new_rate" },
+            "right": { "Literal": { "Int": 0 } }
+          }
+        },
+        {
+          "BinOp": {
+            "op": "Le",
+            "left": { "Var": "new_rate" },
+            "right": { "Literal": { "Int": 1000 } }
+          }
+        }
+      ],
+      "body": [
+        {
+          "Assign": {
+            "name": "bandwidth_rate",
+            "value": { "Var": "new_rate" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "update_uptime_rate",
+      "params": [
+        { "name": "new_rate" }
+      ],
+      "requires": [
+        {
+          "BinOp": {
+            "op": "Gt",
+            "left": { "Var": "new_rate" },
+            "right": { "Literal": { "Int": 0 } }
+          }
+        },
+        {
+          "BinOp": {
+            "op": "Le",
+            "left": { "Var": "new_rate" },
+            "right": { "Literal": { "Int": 1000 } }
+          }
+        }
+      ],
+      "body": [
+        {
+          "Assign": {
+            "name": "uptime_rate",
+            "value": { "Var": "new_rate" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "get_rates",
+      "params": [],
+      "requires": [],
+      "body": [
+        {
+          "Return": {
+            "value": {
+              "Map": [
+                ["compute_rate", { "Var": "compute_rate" }],
+                ["storage_rate", { "Var": "storage_rate" }],
+                ["bandwidth_rate", { "Var": "bandwidth_rate" }],
+                ["uptime_rate", { "Var": "uptime_rate" }]
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "triggers": []
+}
