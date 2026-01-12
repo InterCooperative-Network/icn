@@ -70,7 +70,8 @@ mod tests {
         // Should have gotten multiple unique ports (may not be all 10 due to race conditions)
         assert!(
             ports.len() >= 5,
-            "Should get at least 5 unique ports, got {}", ports.len()
+            "Should get at least 5 unique ports, got {}",
+            ports.len()
         );
     }
 
