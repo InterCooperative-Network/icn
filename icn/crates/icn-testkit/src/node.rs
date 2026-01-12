@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::{broadcast, Mutex, RwLock};
+use tokio::sync::{broadcast, watch, Mutex, RwLock};
 use tracing::{debug, info};
 
 use crate::util::pick_port;
@@ -119,9 +119,11 @@ impl TestNode {
         }
 
         // Set up network message handler
+        // Use watch channel to safely share network handle with message handler
+        // This eliminates the race condition where messages could arrive before
+        // the handle is stored in the RwLock
         let gossip_clone = gossip.clone();
-        let network_holder = Arc::new(RwLock::new(None::<NetworkHandle>));
-        let network_holder_clone = network_holder.clone();
+        let (network_tx, network_rx) = watch::channel(None::<NetworkHandle>);
         let own_did = did.clone();
 
         let incoming_handler: IncomingMessageHandler = Arc::new(move |net_msg| {
@@ -142,7 +144,7 @@ impl TestNode {
                 MessagePayload::Subscribe { topics } => {
                     let gossip = gossip_clone.clone();
                     let sender = sender.clone();
-                    let net_holder = network_holder_clone.clone();
+                    let mut net_rx = network_rx.clone();
                     let own = own_did.clone();
                     tokio::spawn(async move {
                         let mut g = gossip.write().await;
@@ -153,11 +155,35 @@ impl TestNode {
                             }
                         }
                         if !acked.is_empty() {
-                            tokio::time::sleep(Duration::from_millis(10)).await;
-                            if let Some(net) = net_holder.read().await.as_ref() {
-                                let ack = NetworkMessage::subscribe_ack(own, sender.clone(), acked);
-                                if let Err(e) = net.send_message(sender, ack).await {
-                                    debug!("Failed to send SubscribeAck: {}", e);
+                            // Wait for network handle to be available (fixes race condition)
+                            // Timeout after 1 second to avoid hanging forever
+                            let net = tokio::time::timeout(Duration::from_secs(1), async {
+                                loop {
+                                    if let Some(net) = net_rx.borrow().clone() {
+                                        return Some(net);
+                                    }
+                                    if net_rx.changed().await.is_err() {
+                                        break;
+                                    }
+                                }
+                                // Channel closed, return current value if any
+                                net_rx.borrow().clone()
+                            })
+                            .await;
+
+                            match net {
+                                Ok(Some(net)) => {
+                                    let ack =
+                                        NetworkMessage::subscribe_ack(own, sender.clone(), acked);
+                                    if let Err(e) = net.send_message(sender, ack).await {
+                                        debug!("Failed to send SubscribeAck: {}", e);
+                                    }
+                                }
+                                Ok(None) => {
+                                    debug!("Network handle not available for SubscribeAck");
+                                }
+                                Err(_) => {
+                                    debug!("Timeout waiting for network handle");
                                 }
                             }
                         }
@@ -205,8 +231,8 @@ impl TestNode {
         )
         .await?;
 
-        // Store network handle for message handler
-        *network_holder.write().await = Some(network.clone());
+        // Send network handle to message handler (fixes race condition)
+        let _ = network_tx.send(Some(network.clone()));
 
         // Set up gossip send callback
         {
