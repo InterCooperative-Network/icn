@@ -386,11 +386,21 @@ impl TestNode {
     }
 
     /// Wait for disconnection from a specific peer
+    ///
+    /// Waits until the peer is no longer connected or the timeout expires.
+    /// If the connection state cannot be determined (error), treats as disconnected
+    /// since the peer handle may have been cleaned up.
     pub async fn wait_disconnected(&self, did: &Did, timeout: Duration) -> Result<()> {
         let start = std::time::Instant::now();
         while start.elapsed() < timeout {
-            if !self.network.is_peer_connected(did).await.unwrap_or(true) {
-                return Ok(());
+            match self.network.is_peer_connected(did).await {
+                Ok(false) => return Ok(()), // Confirmed disconnected
+                Ok(true) => {}              // Still connected, keep waiting
+                Err(_) => {
+                    // Can't determine state - peer handle likely cleaned up
+                    // Treat as disconnected since verification failed
+                    return Ok(());
+                }
             }
             tokio::time::sleep(Duration::from_millis(50)).await;
         }

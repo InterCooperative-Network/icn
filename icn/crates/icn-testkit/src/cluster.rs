@@ -228,22 +228,37 @@ impl TestCluster {
         }
 
         // Disconnect nodes that are in different groups
+        let mut successful_disconnections: usize = 0;
         for i in 0..self.nodes.len() {
             for j in (i + 1)..self.nodes.len() {
-                let group_i = node_group.get(&i).copied().unwrap_or(0);
-                let group_j = node_group.get(&j).copied().unwrap_or(0);
+                // Validation above ensures all nodes are in groups, so these should always succeed
+                let group_i = node_group.get(&i).copied().ok_or_else(|| {
+                    anyhow::anyhow!("Partition validation error: node {i} missing from groups")
+                })?;
+                let group_j = node_group.get(&j).copied().ok_or_else(|| {
+                    anyhow::anyhow!("Partition validation error: node {j} missing from groups")
+                })?;
 
                 if group_i != group_j {
-                    // Disconnect in both directions
-                    self.nodes[i].disconnect(&self.nodes[j]).await;
-                    self.nodes[j].disconnect(&self.nodes[i]).await;
+                    // Disconnect in both directions, track which succeeded
+                    let disconnected_ij = self.nodes[i].disconnect(&self.nodes[j]).await;
+                    let disconnected_ji = self.nodes[j].disconnect(&self.nodes[i]).await;
+                    let pair_count = (disconnected_ij as usize) + (disconnected_ji as usize);
+                    successful_disconnections += pair_count;
+
                     info!(
-                        "Partitioned: node {} (group {}) <-> node {} (group {})",
-                        i, group_i, j, group_j
+                        "Partitioned: node {} (group {}) <-> node {} (group {}), disconnections: {}",
+                        i, group_i, j, group_j, pair_count
                     );
                 }
             }
         }
+
+        info!(
+            "Partition complete: {} total disconnections across {} groups",
+            successful_disconnections,
+            config.groups.len()
+        );
 
         // Allow time for disconnections to take effect
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;

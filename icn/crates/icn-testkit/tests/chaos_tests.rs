@@ -232,13 +232,13 @@ async fn test_connection_flapping() -> Result<()> {
     Ok(())
 }
 
-/// Test handling of node restart (storage persistence)
+/// Test that TestNode uses temporary storage (no persistence)
 ///
-/// This test verifies that gossip state survives node restart.
-/// Note: Currently TestNode uses temporary storage, so this tests
-/// the basic restart flow rather than persistence.
+/// This test verifies that TestNode creates fresh state on each spawn,
+/// which is the expected behavior for isolated test environments.
+/// A "restarted" node gets a new identity and empty storage.
 #[tokio::test]
-async fn test_node_restart_basic() -> Result<()> {
+async fn test_node_temporary_storage() -> Result<()> {
     // Create initial node
     let node1 = TestNode::spawn(NodeConfig::default()).await?;
     node1
@@ -354,6 +354,9 @@ mod disconnect_tests {
     use super::*;
 
     /// Test basic disconnect functionality
+    ///
+    /// Verifies that disconnect_peer correctly closes connections and
+    /// updates tracking state.
     #[tokio::test]
     async fn test_disconnect_basic() -> Result<()> {
         let node1 = TestNode::spawn(NodeConfig::default()).await?;
@@ -364,17 +367,28 @@ mod disconnect_tests {
         tokio::time::sleep(Duration::from_millis(200)).await;
 
         // Verify connected
-        assert!(node1.is_connected_to(&node2.did).await);
+        assert!(
+            node1.is_connected_to(&node2.did).await,
+            "node1 should be connected to node2 after connect()"
+        );
 
-        // Disconnect
+        // Disconnect and verify return value
         let disconnected = node1.disconnect(&node2).await;
-        assert!(disconnected, "disconnect should return true");
+        assert!(
+            disconnected,
+            "disconnect should return true for connected peer"
+        );
 
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        // Wait for disconnection to complete with timeout
+        node1
+            .wait_disconnected(&node2.did, Duration::from_secs(2))
+            .await?;
 
-        // Verify disconnected (may take a moment for QUIC to fully close)
-        // Note: The connection state might not update immediately
-        // This test primarily verifies the API works
+        // Verify actually disconnected
+        assert!(
+            !node1.is_connected_to(&node2.did).await,
+            "node1 should not be connected after disconnect"
+        );
 
         node1.shutdown().await;
         node2.shutdown().await;
