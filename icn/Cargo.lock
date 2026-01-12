@@ -3455,11 +3455,21 @@ name = "icn-testkit"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "futures",
+ "hex",
  "icn-core",
+ "icn-gossip",
  "icn-identity",
+ "icn-ledger",
  "icn-net",
+ "icn-store",
+ "icn-trust",
+ "portpicker",
+ "rustls",
+ "thiserror 2.0.17",
  "tokio",
  "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
