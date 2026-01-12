@@ -140,29 +140,39 @@ impl TestNode {
         let notifications = Arc::new(Mutex::new(NotificationMap::new()));
         let notifications_clone = notifications.clone();
 
-        // Configure notification callback
+        // Configure notification callback with shutdown handling
         {
             let mut gossip_guard = gossip.write().await;
+            let shutdown = shutdown_tx.clone();
             let callback = Arc::new(
                 move |topic: String, entry: GossipEntry, subscriber_did: Did| {
                     let hash = entry.hash;
                     let notifs = notifications_clone.clone();
+                    let mut shutdown_rx = shutdown.subscribe();
                     tokio::spawn(async move {
-                        let mut map = notifs.lock().await;
-                        map.entry(topic).or_default().push((hash, subscriber_did));
+                        tokio::select! {
+                            _ = shutdown_rx.recv() => {
+                                // Node shutting down, abort notification storage
+                            }
+                            _ = async {
+                                let mut map = notifs.lock().await;
+                                map.entry(topic).or_default().push((hash, subscriber_did));
+                            } => {}
+                        }
                     });
                 },
             );
             gossip_guard.set_notification_callback(callback);
         }
 
-        // Set up network message handler
+        // Set up network message handler with shutdown handling
         // Use watch channel to safely share network handle with message handler
         // This eliminates the race condition where messages could arrive before
         // the handle is stored in the RwLock
         let gossip_clone = gossip.clone();
         let (network_tx, network_rx) = watch::channel(None::<NetworkHandle>);
         let own_did = did.clone();
+        let handler_shutdown = shutdown_tx.clone();
 
         let incoming_handler: IncomingMessageHandler = Arc::new(move |net_msg| {
             let sender = net_msg.from.clone();
@@ -171,10 +181,20 @@ impl TestNode {
                 MessagePayload::Gossip(gossip_msg) => {
                     let gossip = gossip_clone.clone();
                     let sender = sender.clone();
+                    let mut shutdown_rx = handler_shutdown.subscribe();
                     tokio::spawn(async move {
-                        let mut g = gossip.write().await;
-                        if let Err(e) = g.handle_message(&sender, gossip_msg).await {
-                            debug!("Gossip message handling error: {}", e);
+                        tokio::select! {
+                            _ = shutdown_rx.recv() => {
+                                // Node shutting down, abort gossip handling
+                            }
+                            result = async {
+                                let mut g = gossip.write().await;
+                                g.handle_message(&sender, gossip_msg).await
+                            } => {
+                                if let Err(e) = result {
+                                    debug!("Gossip message handling error: {}", e);
+                                }
+                            }
                         }
                     });
                 }
@@ -184,46 +204,54 @@ impl TestNode {
                     let sender = sender.clone();
                     let mut net_rx = network_rx.clone();
                     let own = own_did.clone();
+                    let mut shutdown_rx = handler_shutdown.subscribe();
                     tokio::spawn(async move {
-                        let mut g = gossip.write().await;
-                        let mut acked = Vec::new();
-                        for topic in &topics {
-                            if g.subscribe(topic, sender.clone()).await.is_ok() {
-                                acked.push(topic.clone());
+                        tokio::select! {
+                            _ = shutdown_rx.recv() => {
+                                // Node shutting down, abort subscribe handling
                             }
-                        }
-                        if !acked.is_empty() {
-                            // Wait for network handle to be available (fixes race condition)
-                            // Timeout after 1 second to avoid hanging forever
-                            let net = tokio::time::timeout(Duration::from_secs(1), async {
-                                loop {
-                                    if let Some(net) = net_rx.borrow().clone() {
-                                        return Some(net);
-                                    }
-                                    if net_rx.changed().await.is_err() {
-                                        break;
+                            _ = async {
+                                let mut g = gossip.write().await;
+                                let mut acked = Vec::new();
+                                for topic in &topics {
+                                    if g.subscribe(topic, sender.clone()).await.is_ok() {
+                                        acked.push(topic.clone());
                                     }
                                 }
-                                // Channel closed, return current value if any
-                                net_rx.borrow().clone()
-                            })
-                            .await;
+                                if !acked.is_empty() {
+                                    // Wait for network handle to be available (fixes race condition)
+                                    // Timeout after 1 second to avoid hanging forever
+                                    let net = tokio::time::timeout(Duration::from_secs(1), async {
+                                        loop {
+                                            if let Some(net) = net_rx.borrow().clone() {
+                                                return Some(net);
+                                            }
+                                            if net_rx.changed().await.is_err() {
+                                                break;
+                                            }
+                                        }
+                                        // Channel closed, return current value if any
+                                        net_rx.borrow().clone()
+                                    })
+                                    .await;
 
-                            match net {
-                                Ok(Some(net)) => {
-                                    let ack =
-                                        NetworkMessage::subscribe_ack(own, sender.clone(), acked);
-                                    if let Err(e) = net.send_message(sender, ack).await {
-                                        debug!("Failed to send SubscribeAck: {}", e);
+                                    match net {
+                                        Ok(Some(net)) => {
+                                            let ack =
+                                                NetworkMessage::subscribe_ack(own, sender.clone(), acked);
+                                            if let Err(e) = net.send_message(sender, ack).await {
+                                                debug!("Failed to send SubscribeAck: {}", e);
+                                            }
+                                        }
+                                        Ok(None) => {
+                                            debug!("Network handle not available for SubscribeAck");
+                                        }
+                                        Err(_) => {
+                                            debug!("Timeout waiting for network handle");
+                                        }
                                     }
                                 }
-                                Ok(None) => {
-                                    debug!("Network handle not available for SubscribeAck");
-                                }
-                                Err(_) => {
-                                    debug!("Timeout waiting for network handle");
-                                }
-                            }
+                            } => {}
                         }
                     });
                 }
@@ -231,12 +259,20 @@ impl TestNode {
                 MessagePayload::Unsubscribe { topics } => {
                     let gossip = gossip_clone.clone();
                     let sender = sender.clone();
+                    let mut shutdown_rx = handler_shutdown.subscribe();
                     tokio::spawn(async move {
-                        let mut g = gossip.write().await;
-                        for topic in &topics {
-                            if let Err(e) = g.unsubscribe(topic, &sender) {
-                                debug!("Failed to unsubscribe {} from {}: {}", sender, topic, e);
+                        tokio::select! {
+                            _ = shutdown_rx.recv() => {
+                                // Node shutting down, abort unsubscribe handling
                             }
+                            _ = async {
+                                let mut g = gossip.write().await;
+                                for topic in &topics {
+                                    if let Err(e) = g.unsubscribe(topic, &sender) {
+                                        debug!("Failed to unsubscribe {} from {}: {}", sender, topic, e);
+                                    }
+                                }
+                            } => {}
                         }
                     });
                 }
@@ -275,24 +311,34 @@ impl TestNode {
         // Send network handle to message handler (fixes race condition)
         let _ = network_tx.send(Some(network.clone()));
 
-        // Set up gossip send callback
+        // Set up gossip send callback with shutdown handling
         {
             let mut g = gossip.write().await;
             let net = network.clone();
             let from = did.clone();
+            let send_shutdown = shutdown_tx.clone();
 
             let send_callback = Arc::new(move |recipient: Option<Did>, msg: GossipMessage| {
                 let net = net.clone();
                 let from = from.clone();
+                let mut shutdown_rx = send_shutdown.subscribe();
                 tokio::spawn(async move {
-                    let net_msg = NetworkMessage::gossip(from, recipient.clone(), msg);
-                    let result = if let Some(to) = recipient {
-                        net.send_message(to, net_msg).await
-                    } else {
-                        net.broadcast(net_msg).await
-                    };
-                    if let Err(e) = result {
-                        debug!("Failed to send gossip: {}", e);
+                    tokio::select! {
+                        _ = shutdown_rx.recv() => {
+                            // Node shutting down, abort send
+                        }
+                        result = async {
+                            let net_msg = NetworkMessage::gossip(from, recipient.clone(), msg);
+                            if let Some(to) = recipient {
+                                net.send_message(to, net_msg).await
+                            } else {
+                                net.broadcast(net_msg).await
+                            }
+                        } => {
+                            if let Err(e) = result {
+                                debug!("Failed to send gossip: {}", e);
+                            }
+                        }
                     }
                 });
             });
