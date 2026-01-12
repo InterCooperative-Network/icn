@@ -51,6 +51,10 @@ pub fn init_descriptions() {
         "Total number of peer trust class changes affecting rate limits"
     );
     describe_counter!(
+        "icn_network_trust_class_toctou_mismatches_total",
+        "Total number of TOCTOU mismatches where trust class changed during rate limit check"
+    );
+    describe_counter!(
         "icn_network_connections_rejected_untrusted_total",
         "Total number of connections rejected due to insufficient trust"
     );
@@ -182,6 +186,15 @@ pub fn messages_rate_limited_inc() {
 
 pub fn trust_class_changes_inc() {
     counter!("icn_network_trust_class_changes_total").increment(1);
+}
+
+/// Increment TOCTOU mismatch counter (Issue #426)
+///
+/// Called when trust class changes between initial lookup and bucket update
+/// during rate limit check. This is a low-severity race condition that is
+/// self-correcting on the next check.
+pub fn trust_class_toctou_mismatches_inc() {
+    counter!("icn_network_trust_class_toctou_mismatches_total").increment(1);
 }
 
 pub fn protocol_version_mismatch_inc() {
