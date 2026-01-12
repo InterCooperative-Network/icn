@@ -26,6 +26,14 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Validate duration input
+        run: |
+          # Ensure duration is a positive integer to prevent injection
+          if ! echo "$FUZZ_DURATION" | grep -qE '^[0-9]+$'; then
+            echo "::error::Invalid duration: must be a positive integer"
+            exit 1
+          fi
+
       - name: Free disk space
         uses: ./.github/actions/free-disk-space
 
@@ -86,9 +94,9 @@ jobs:
       - name: Check for crashes
         working-directory: ./icn/crates/icn-ccl
         run: |
-          if [ -d "fuzz/artifacts" ] && [ "$(find fuzz/artifacts -name 'crash-*' -o -name 'timeout-*' 2>/dev/null | wc -l)" -gt 0 ]; then
+          if [ -d "fuzz/artifacts" ] && [ "$(find fuzz/artifacts \( -name 'crash-*' -o -name 'timeout-*' \) 2>/dev/null | wc -l)" -gt 0 ]; then
             echo "::error::Fuzz testing found crashes!"
-            find fuzz/artifacts -type f -name 'crash-*' -o -name 'timeout-*' | head -20
+            find fuzz/artifacts -type f \( -name 'crash-*' -o -name 'timeout-*' \) | head -20
             exit 1
           fi
           echo "No crashes found during fuzzing"

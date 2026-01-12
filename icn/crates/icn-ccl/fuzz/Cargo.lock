@@ -1390,6 +1390,7 @@ version = "0.0.0"
 dependencies = [
  "arbitrary",
  "icn-ccl",
+ "icn-identity",
  "libfuzzer-sys",
  "serde_json",
 ]
