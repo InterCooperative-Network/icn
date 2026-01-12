@@ -43,7 +43,7 @@ impl TestCluster {
         for i in 0..size {
             let node = TestNode::spawn_with_index(config.clone(), i)
                 .await
-                .with_context(|| format!("Failed to spawn node {}", i))?;
+                .with_context(|| format!("Failed to spawn node {i}"))?;
             nodes.push(node);
         }
 
@@ -75,7 +75,7 @@ impl TestCluster {
                 self.nodes[i]
                     .connect(&self.nodes[j])
                     .await
-                    .with_context(|| format!("Failed to connect node {} to node {}", i, j))?;
+                    .with_context(|| format!("Failed to connect node {i} to node {j}"))?;
             }
         }
 
@@ -97,7 +97,7 @@ impl TestCluster {
             self.nodes[i]
                 .connect(&self.nodes[j])
                 .await
-                .with_context(|| format!("Failed to connect node {} to node {}", i, j))?;
+                .with_context(|| format!("Failed to connect node {i} to node {j}"))?;
         }
 
         tokio::time::sleep(Duration::from_millis(100)).await;
