@@ -105,6 +105,7 @@ pub fn init_metrics() -> Result<()> {
     metrics::gateway::init_descriptions();
     metrics::network::init_descriptions();
     metrics::rpc::init_descriptions();
+    metrics::storage::init_descriptions();
     tracing::info!("Metrics descriptions initialized");
     Ok(())
 }

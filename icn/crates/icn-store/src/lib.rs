@@ -289,7 +289,11 @@ impl SledStore {
     /// This ensures data durability by syncing all buffered writes.
     /// Returns the number of bytes flushed.
     pub fn flush(&self) -> Result<usize> {
+        let start = std::time::Instant::now();
         let flushed = self.db.flush()?;
+        icn_obs::metrics::storage::flush_total_inc();
+        icn_obs::metrics::storage::flush_bytes_add(flushed as u64);
+        icn_obs::metrics::storage::flush_duration_set(start.elapsed().as_secs_f64());
         Ok(flushed)
     }
 
@@ -298,13 +302,18 @@ impl SledStore {
     /// Non-blocking version of flush() that returns immediately.
     /// The actual flush happens in the background.
     pub async fn flush_async(&self) -> Result<usize> {
+        let start = std::time::Instant::now();
         let flushed = self.db.flush_async().await?;
+        icn_obs::metrics::storage::flush_total_inc();
+        icn_obs::metrics::storage::flush_bytes_add(flushed as u64);
+        icn_obs::metrics::storage::flush_duration_set(start.elapsed().as_secs_f64());
         Ok(flushed)
     }
 
     /// Get storage statistics for monitoring
     ///
     /// Returns disk usage and space amplification metrics.
+    /// Also updates the storage metrics gauges for Prometheus.
     /// Useful for deciding when maintenance is needed.
     pub fn stats(&self) -> Result<StorageStats> {
         let size_on_disk_bytes = self.db.size_on_disk()?;
@@ -313,6 +322,10 @@ impl SledStore {
         // Values close to 1.0 indicate efficient storage
         // Higher values may indicate fragmentation or pending garbage collection
         let space_amplification = self.db.space_amplification()?;
+
+        // Update Prometheus metrics
+        icn_obs::metrics::storage::size_bytes_set(size_on_disk_bytes);
+        icn_obs::metrics::storage::space_amplification_set(space_amplification);
 
         Ok(StorageStats {
             size_on_disk_bytes,

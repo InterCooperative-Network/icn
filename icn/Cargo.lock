@@ -3440,6 +3440,7 @@ dependencies = [
  "anyhow",
  "bytes",
  "icn-identity",
+ "icn-obs",
  "icn-time",
  "serde",
  "serde_json",
