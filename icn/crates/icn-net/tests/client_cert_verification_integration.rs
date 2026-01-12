@@ -17,6 +17,11 @@ use std::time::Duration;
 use tokio::sync::{broadcast, mpsc, RwLock};
 use tracing::info;
 
+/// Get an available port to avoid conflicts when tests run in parallel
+fn pick_port() -> u16 {
+    portpicker::pick_unused_port().expect("No available ports")
+}
+
 /// Test helper for spawning nodes with configurable trust settings
 #[allow(dead_code)]
 struct SecureTestNode {
@@ -187,7 +192,7 @@ impl SecureTestNode {
 /// This test passes consistently locally but intermittently fails in CI.
 /// The actual functionality is well-tested by other integration tests.
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "Flaky on CI runners - mDNS timing issues"]
+#[ignore = "QUIC deserialization issue - see issue for tracking"]
 async fn test_client_cert_verification_allows_trusted_peer() -> Result<()> {
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
     let _ = tracing_subscriber::fmt()
@@ -224,7 +229,7 @@ async fn test_client_cert_verification_allows_trusted_peer() -> Result<()> {
     });
 
     let alice_identity = IdentityBundle::from_keypair(alice_keypair)?;
-    let alice_addr: SocketAddr = "127.0.0.1:25000".parse()?;
+    let alice_addr: SocketAddr = format!("127.0.0.1:{}", pick_port()).parse()?;
     let _alice_handle = NetworkActor::spawn(
         alice_identity,
         alice_addr,
@@ -250,7 +255,7 @@ async fn test_client_cert_verification_allows_trusted_peer() -> Result<()> {
     // Create Bob (no trust graph needed for client role)
     let (bob_shutdown_tx, _) = broadcast::channel(1);
     let bob_identity = IdentityBundle::from_keypair(bob_keypair)?;
-    let bob_addr: SocketAddr = "127.0.0.1:25001".parse()?;
+    let bob_addr: SocketAddr = format!("127.0.0.1:{}", pick_port()).parse()?;
     let bob_handle = NetworkActor::spawn(
         bob_identity,
         bob_addr,
@@ -303,7 +308,7 @@ async fn test_client_cert_verification_allows_trusted_peer() -> Result<()> {
 
 /// Test that untrusted peer is REJECTED when client cert verification is enabled
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "Flaky in CI: QUIC stream failures in containerized environment"]
+#[ignore = "QUIC deserialization issue - see issue for tracking"]
 async fn test_client_cert_verification_rejects_untrusted_peer() -> Result<()> {
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
     let _ = tracing_subscriber::fmt()
@@ -326,7 +331,7 @@ async fn test_client_cert_verification_rejects_untrusted_peer() -> Result<()> {
 
     let (alice_shutdown_tx, _) = broadcast::channel(1);
     let alice_identity = IdentityBundle::from_keypair(alice_keypair)?;
-    let alice_addr: SocketAddr = "127.0.0.1:25100".parse()?;
+    let alice_addr: SocketAddr = format!("127.0.0.1:{}", pick_port()).parse()?;
     let _alice_handle = NetworkActor::spawn(
         alice_identity,
         alice_addr,
@@ -352,7 +357,7 @@ async fn test_client_cert_verification_rejects_untrusted_peer() -> Result<()> {
     // Create Mallory
     let (mallory_shutdown_tx, _) = broadcast::channel(1);
     let mallory_identity = IdentityBundle::from_keypair(mallory_keypair)?;
-    let mallory_addr: SocketAddr = "127.0.0.1:25101".parse()?;
+    let mallory_addr: SocketAddr = format!("127.0.0.1:{}", pick_port()).parse()?;
     let mallory_handle = NetworkActor::spawn(
         mallory_identity,
         mallory_addr,
@@ -409,13 +414,13 @@ async fn test_dev_mode_no_client_cert_verification() -> Result<()> {
     info!("=== Test: Dev mode without client cert verification ===");
 
     // Create node WITHOUT trust graph (dev mode)
-    let alice = SecureTestNode::spawn_no_trust(25200).await?;
+    let alice = SecureTestNode::spawn_no_trust(pick_port()).await?;
     info!("Alice started in dev mode (no client cert verification)");
 
     tokio::time::sleep(Duration::from_millis(500)).await;
 
     // Create Bob (also no trust graph)
-    let bob = SecureTestNode::spawn_no_trust(25201).await?;
+    let bob = SecureTestNode::spawn_no_trust(pick_port()).await?;
     info!("Bob started in dev mode");
 
     // Bob should be able to connect (no verification)
@@ -474,7 +479,7 @@ async fn test_did_tls_binding_verified_on_hello() -> Result<()> {
 
     let (alice_shutdown_tx, _) = broadcast::channel(1);
     let alice_identity = IdentityBundle::from_keypair(alice_keypair)?;
-    let alice_addr: SocketAddr = "127.0.0.1:25300".parse()?;
+    let alice_addr: SocketAddr = format!("127.0.0.1:{}", pick_port()).parse()?;
     let _alice_handle = NetworkActor::spawn(
         alice_identity,
         alice_addr,
@@ -501,7 +506,7 @@ async fn test_did_tls_binding_verified_on_hello() -> Result<()> {
 
     let (bob_shutdown_tx, _) = broadcast::channel(1);
     let bob_identity = IdentityBundle::from_keypair(bob_keypair)?;
-    let bob_addr: SocketAddr = "127.0.0.1:25301".parse()?;
+    let bob_addr: SocketAddr = format!("127.0.0.1:{}", pick_port()).parse()?;
     let bob_handle = NetworkActor::spawn(
         bob_identity,
         bob_addr,

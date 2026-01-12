@@ -16,6 +16,11 @@ use std::time::Duration;
 use tokio::sync::{broadcast, mpsc, RwLock};
 use tracing::info;
 
+/// Get an available port to avoid conflicts when tests run in parallel
+fn pick_port() -> u16 {
+    portpicker::pick_unused_port().expect("No available ports")
+}
+
 /// Test node helper
 struct TestNode {
     did: icn_identity::Did,
@@ -109,7 +114,7 @@ impl TestNode {
 }
 
 #[tokio::test]
-#[ignore = "Flaky in CI: QUIC stream failures in containerized environment"]
+#[ignore = "QUIC deserialization issue - see issue for tracking"]
 async fn test_successful_did_tls_binding_verification() -> Result<()> {
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
     let _ = tracing_subscriber::fmt::try_init();
@@ -117,8 +122,8 @@ async fn test_successful_did_tls_binding_verification() -> Result<()> {
     info!("=== Testing successful DID-TLS binding verification ===");
 
     // Spawn two nodes with valid identity bundles
-    let node_a = TestNode::spawn(24000).await?;
-    let node_b = TestNode::spawn(24001).await?;
+    let node_a = TestNode::spawn(pick_port()).await?;
+    let node_b = TestNode::spawn(pick_port()).await?;
 
     info!("Node A: {}", node_a.did);
     info!("Node B: {}", node_b.did);
@@ -151,15 +156,15 @@ async fn test_successful_did_tls_binding_verification() -> Result<()> {
 }
 
 #[tokio::test]
-#[ignore = "Flaky in CI: QUIC stream failures in containerized environment"]
+#[ignore = "QUIC deserialization issue - see issue for tracking"]
 async fn test_bidirectional_hello_exchange() -> Result<()> {
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
     let _ = tracing_subscriber::fmt::try_init();
 
     info!("=== Testing bidirectional Hello message exchange ===");
 
-    let node_a = TestNode::spawn(24100).await?;
-    let node_b = TestNode::spawn(24101).await?;
+    let node_a = TestNode::spawn(pick_port()).await?;
+    let node_b = TestNode::spawn(pick_port()).await?;
 
     info!("Node A: {} on {}", node_a.did, node_a.listen_addr);
     info!("Node B: {} on {}", node_b.did, node_b.listen_addr);
@@ -212,11 +217,11 @@ async fn test_multiple_connections_with_binding_verification() -> Result<()> {
     info!("=== Testing multiple connections with DID-TLS binding ===");
 
     // Create a hub node that will receive connections from multiple peers
-    let hub = TestNode::spawn(24200).await?;
+    let hub = TestNode::spawn(pick_port()).await?;
 
     // Create peer nodes (reduced to 2 for stability)
-    let peer1 = TestNode::spawn(24201).await?;
-    let peer2 = TestNode::spawn(24202).await?;
+    let peer1 = TestNode::spawn(pick_port()).await?;
+    let peer2 = TestNode::spawn(pick_port()).await?;
 
     info!("Hub: {}", hub.did);
     info!("Peer 1: {}", peer1.did);
@@ -375,8 +380,8 @@ async fn test_connection_resilience() -> Result<()> {
 
     info!("=== Testing connection resilience with DID-TLS binding ===");
 
-    let node_a = TestNode::spawn(24300).await?;
-    let node_b = TestNode::spawn(24301).await?;
+    let node_a = TestNode::spawn(pick_port()).await?;
+    let node_b = TestNode::spawn(pick_port()).await?;
 
     // Establish connection
     node_a.dial(&node_b).await?;

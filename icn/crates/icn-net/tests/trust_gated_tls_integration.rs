@@ -9,10 +9,16 @@ use icn_identity::{IdentityBundle, KeyPair};
 use icn_net::NetworkActor;
 use icn_store::SledStore;
 use icn_trust::{TrustEdge, TrustGraph};
+use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
 use tracing::info;
+
+/// Get an available port to avoid conflicts when tests run in parallel
+fn pick_port() -> u16 {
+    portpicker::pick_unused_port().expect("No available ports")
+}
 
 /// Test that connections from trusted peers are accepted
 #[tokio::test]
@@ -53,11 +59,12 @@ async fn test_trusted_peer_connection_accepted() -> Result<()> {
 
     // Create IdentityBundle for Alice
     let alice_identity_bundle = IdentityBundle::from_keypair(alice_keypair).unwrap();
+    let alice_addr: SocketAddr = format!("127.0.0.1:{}", pick_port()).parse()?;
 
     // Spawn Alice's network actor with trust-gated TLS (min threshold 0.4 = Partner)
     let _alice_handle = NetworkActor::spawn(
         alice_identity_bundle,
-        "127.0.0.1:15400".parse()?,
+        alice_addr,
         alice_shutdown_tx.clone(),
         None,
         Some(alice_trust.clone()),
@@ -79,9 +86,10 @@ async fn test_trusted_peer_connection_accepted() -> Result<()> {
     // Bob dials Alice - should succeed because Alice trusts Bob with score 0.8
     let bob_shutdown_tx = tokio::sync::broadcast::channel(16).0;
     let bob_identity_bundle = IdentityBundle::from_keypair(bob_keypair).unwrap();
+    let bob_addr: SocketAddr = format!("127.0.0.1:{}", pick_port()).parse()?;
     let bob_handle = NetworkActor::spawn(
         bob_identity_bundle,
-        "127.0.0.1:15401".parse()?,
+        bob_addr,
         bob_shutdown_tx.clone(),
         None,
         None, // Bob has no trust graph (doesn't need to verify Alice)
@@ -98,9 +106,7 @@ async fn test_trusted_peer_connection_accepted() -> Result<()> {
     info!("Bob network actor started, attempting to dial Alice...");
 
     // Bob dials Alice
-    let result = bob_handle
-        .dial("127.0.0.1:15400".parse()?, alice_did.clone())
-        .await;
+    let result = bob_handle.dial(alice_addr, alice_did.clone()).await;
 
     assert!(
         result.is_ok(),
@@ -152,9 +158,10 @@ async fn test_untrusted_peer_connection_rejected() -> Result<()> {
     // Spawn Alice with trust-gated TLS (min threshold 0.1 = Known)
     use icn_net::rate_limit::TrustGatedRateLimitConfig;
     let alice_identity_bundle = IdentityBundle::from_keypair(alice_keypair).unwrap();
+    let alice_addr: SocketAddr = format!("127.0.0.1:{}", pick_port()).parse()?;
     let _alice_handle = NetworkActor::spawn(
         alice_identity_bundle,
-        "127.0.0.1:15500".parse()?,
+        alice_addr,
         alice_shutdown_tx.clone(),
         None,
         Some(alice_trust.clone()),
@@ -179,9 +186,10 @@ async fn test_untrusted_peer_connection_rejected() -> Result<()> {
     // Mallory dials Alice - should FAIL because Alice doesn't trust Mallory
     let mallory_shutdown_tx = tokio::sync::broadcast::channel(16).0;
     let mallory_identity_bundle = IdentityBundle::from_keypair(mallory_keypair).unwrap();
+    let mallory_addr: SocketAddr = format!("127.0.0.1:{}", pick_port()).parse()?;
     let mallory_handle = NetworkActor::spawn(
         mallory_identity_bundle,
-        "127.0.0.1:15501".parse()?,
+        mallory_addr,
         mallory_shutdown_tx.clone(),
         None,
         None,
@@ -198,9 +206,7 @@ async fn test_untrusted_peer_connection_rejected() -> Result<()> {
     info!("Mallory network actor started, attempting to dial Alice...");
 
     // Mallory attempts to dial Alice - should be rejected during TLS handshake
-    let result = mallory_handle
-        .dial("127.0.0.1:15500".parse()?, alice_did.clone())
-        .await;
+    let result = mallory_handle.dial(alice_addr, alice_did.clone()).await;
 
     // The connection should fail because Alice's TLS verifier rejects Mallory
     assert!(
@@ -256,9 +262,10 @@ async fn test_trust_threshold_boundary() -> Result<()> {
     let (alice_shutdown_tx, _) = tokio::sync::broadcast::channel(16);
     use icn_net::rate_limit::TrustGatedRateLimitConfig;
     let alice_identity_bundle = IdentityBundle::from_keypair(alice_keypair).unwrap();
+    let alice_addr: SocketAddr = format!("127.0.0.1:{}", pick_port()).parse()?;
     let _alice_handle = NetworkActor::spawn(
         alice_identity_bundle,
-        "127.0.0.1:15600".parse()?,
+        alice_addr,
         alice_shutdown_tx.clone(),
         None,
         Some(alice_trust.clone()),
@@ -280,9 +287,10 @@ async fn test_trust_threshold_boundary() -> Result<()> {
     // Bob dials Alice - should succeed at exact threshold
     let bob_shutdown_tx = tokio::sync::broadcast::channel(16).0;
     let bob_identity_bundle = IdentityBundle::from_keypair(bob_keypair).unwrap();
+    let bob_addr: SocketAddr = format!("127.0.0.1:{}", pick_port()).parse()?;
     let bob_handle = NetworkActor::spawn(
         bob_identity_bundle,
-        "127.0.0.1:15601".parse()?,
+        bob_addr,
         bob_shutdown_tx.clone(),
         None,
         None,
@@ -296,9 +304,7 @@ async fn test_trust_threshold_boundary() -> Result<()> {
     )
     .await?;
 
-    let result = bob_handle
-        .dial("127.0.0.1:15600".parse()?, alice_did.clone())
-        .await;
+    let result = bob_handle.dial(alice_addr, alice_did.clone()).await;
 
     assert!(
         result.is_ok(),

@@ -2218,8 +2218,7 @@ mod tests {
         let err = result.unwrap_err().to_string();
         assert!(
             err.contains("Decompressed message too large"),
-            "Expected 'too large' error, got: {}",
-            err
+            "Expected 'too large' error, got: {err}"
         );
     }
 

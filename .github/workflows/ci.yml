@@ -104,8 +104,12 @@ jobs:
         with:
           workspaces: "icn -> target"
 
-      - name: Run tests
-        run: cargo test --workspace
+      - name: Run unit tests (parallel)
+        run: cargo test --workspace --lib
+        working-directory: ./icn
+
+      - name: Run integration tests (serial to avoid port conflicts)
+        run: cargo test --workspace --test '*' -- --test-threads=1
         working-directory: ./icn
 
       - name: Run sled storage tests
