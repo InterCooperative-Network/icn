@@ -4,12 +4,31 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-tokio.workspace = true
+# ICN crates
 icn-core.workspace = true
 icn-identity.workspace = true
 icn-net.workspace = true
+icn-gossip.workspace = true
+icn-trust.workspace = true
+icn-ledger.workspace = true
+icn-store.workspace = true
+
+# Async runtime
+tokio.workspace = true
+futures.workspace = true
+
+# Utilities
 anyhow.workspace = true
+thiserror.workspace = true
 tracing.workspace = true
+portpicker.workspace = true
+
+# Crypto provider for TLS
+rustls.workspace = true
+
+[dev-dependencies]
+tracing-subscriber.workspace = true
+hex = "0.4"
 
 [lints]
 workspace = true
