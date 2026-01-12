@@ -31,3 +31,4 @@ pub mod gateway;
 pub mod nat;
 pub mod network;
 pub mod rpc;
+pub mod storage;
