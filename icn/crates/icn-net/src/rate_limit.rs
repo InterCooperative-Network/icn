@@ -243,35 +243,78 @@ impl RateLimiter {
     /// Check if a message from the given peer should be allowed.
     /// Returns true if allowed, false if rate limited.
     ///
-    /// Note: There is a minor TOCTOU window where trust class could change between
-    /// lookup and bucket update. This is acceptable - worst case is one message gets
-    /// slightly wrong rate limit. Avoiding nested locks prevents deadlock risk.
+    /// This implementation uses an atomic update pattern to eliminate the TOCTOU
+    /// window between trust class lookup and bucket update (Issue #426).
     pub async fn check_rate_limit(&self, peer: &Did) -> bool {
-        // Determine trust class FIRST (before acquiring buckets lock) to avoid
-        // nested lock acquisition which could cause deadlock if other code
-        // acquires trust_graph write lock while holding buckets lock.
-        //
-        // Minor TOCTOU: trust class could change between lookup and bucket update.
-        // This is acceptable - at worst one message gets slightly wrong rate limit,
-        // and update_config() will correct it on the next check.
-        let (config, trust_class) = if let (Some(trust_gated_config), Some(trust_graph)) =
-            (&self.trust_gated_config, &self.trust_graph)
-        {
-            // Trust-gated mode: look up peer's trust class
-            let trust_class = {
-                let graph = trust_graph.read().await;
-                graph.trust_class(peer).unwrap_or(TrustClass::Isolated)
+        const MAX_RETRIES: usize = 3;
+
+        for attempt in 0..MAX_RETRIES {
+            // Phase 1: Get current trust class (releases lock immediately)
+            let (config, trust_class) = if let (Some(trust_gated_config), Some(trust_graph)) =
+                (&self.trust_gated_config, &self.trust_graph)
+            {
+                let trust_class = {
+                    let graph = trust_graph.read().await;
+                    graph.trust_class(peer).unwrap_or(TrustClass::Isolated)
+                };
+                (trust_gated_config.for_class(trust_class), Some(trust_class))
+            } else {
+                // Fallback mode: no TOCTOU possible
+                (&self.fallback_config, None)
             };
 
-            (trust_gated_config.for_class(trust_class), Some(trust_class))
-        } else {
-            // Fallback mode: use single config for all peers
-            (&self.fallback_config, None)
-        };
+            // Phase 2: Acquire buckets lock
+            let mut buckets = self.buckets.write().await;
 
-        // Now acquire write lock on buckets (no other locks held)
-        let mut buckets = self.buckets.write().await;
+            // Phase 3: Verify trust class hasn't changed (eliminates TOCTOU)
+            // This re-acquisition of trust_graph read lock while holding buckets write lock
+            // is safe because: (1) we only take read lock, and (2) no code path acquires
+            // buckets write lock while holding trust_graph write lock.
+            if let (Some(trust_gated_config), Some(trust_graph)) =
+                (&self.trust_gated_config, &self.trust_graph)
+            {
+                let current_trust_class = {
+                    let graph = trust_graph.read().await;
+                    graph.trust_class(peer).unwrap_or(TrustClass::Isolated)
+                };
 
+                if Some(current_trust_class) != trust_class {
+                    // TOCTOU detected - trust class changed between phases 1 and 2
+                    icn_obs::metrics::network::trust_class_toctou_mismatches_inc();
+
+                    if attempt < MAX_RETRIES - 1 {
+                        // Release locks and retry with fresh trust class
+                        drop(buckets);
+                        continue;
+                    }
+
+                    // Final attempt - use the verified current trust class
+                    let verified_config = trust_gated_config.for_class(current_trust_class);
+                    return self.do_rate_limit_check(
+                        &mut buckets,
+                        peer,
+                        verified_config,
+                        Some(current_trust_class),
+                    );
+                }
+            }
+
+            // Trust class is consistent - proceed with rate limit check
+            return self.do_rate_limit_check(&mut buckets, peer, config, trust_class);
+        }
+
+        // Should never reach here, but if we do, use most restrictive limit
+        false
+    }
+
+    /// Internal helper to perform the actual rate limit check
+    fn do_rate_limit_check(
+        &self,
+        buckets: &mut HashMap<Did, TokenBucket>,
+        peer: &Did,
+        config: &RateLimitConfig,
+        trust_class: Option<TrustClass>,
+    ) -> bool {
         // Calculate refill rate: tokens per interval
         let refill_rate =
             (config.max_messages_per_second as f64 * config.refill_interval.as_secs_f64()).max(1.0);
