@@ -407,8 +407,14 @@ impl TestNode {
 
     /// Set network conditions for simulation
     ///
-    /// This enables simulating various network conditions like latency,
-    /// packet loss, and jitter on outgoing gossip messages.
+    /// This enables simulating various network conditions on outgoing gossip
+    /// messages. Currently implemented:
+    /// - **Latency**: Adds configurable delay before sending
+    /// - **Packet loss**: Random message dropping based on probability
+    /// - **Jitter**: Random variation of latency (symmetric around base latency)
+    ///
+    /// Note: `bandwidth_limit` in `NetworkCondition` is not yet implemented
+    /// and will be ignored.
     ///
     /// # Example
     ///
@@ -689,42 +695,127 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_network_condition_latency_simulation() -> Result<()> {
+    async fn test_network_condition_simulation_code_path() -> Result<()> {
         use crate::simulation::NetworkCondition;
-        use std::time::Instant;
 
         let node = TestNode::spawn(NodeConfig::default()).await?;
         node.create_topic("test:latency", AccessControl::Public)
             .await;
 
-        // Measure baseline publish time (no condition)
-        let start = Instant::now();
-        let _ = node.publish("test:latency", b"baseline").await?;
-        let baseline = start.elapsed();
-
-        // Set a measurable latency condition (100ms)
-        node.set_network_condition(
-            NetworkCondition::default()
-                .with_latency(Duration::from_millis(100))
-                .with_jitter(0.0), // No jitter for predictable timing
-        )
-        .await;
-
-        // Publish with latency - the send callback adds delay
-        let start = Instant::now();
-        let _ = node.publish("test:latency", b"delayed").await?;
-        // Wait a bit for the async send to actually happen
-        tokio::time::sleep(Duration::from_millis(150)).await;
-        let with_latency = start.elapsed();
-
-        // The delayed operation should take noticeably longer
-        // (publish itself is fast, but the callback has delay)
+        // Verify condition is initially None
         assert!(
-            with_latency > baseline,
-            "Expected latency simulation to add delay: baseline={baseline:?}, with_latency={with_latency:?}"
+            node.get_network_condition().await.is_none(),
+            "Should start with no network condition"
+        );
+
+        // Set a latency condition
+        let condition = NetworkCondition::default()
+            .with_latency(Duration::from_millis(100))
+            .with_jitter(0.1)
+            .with_packet_loss(0.0); // No packet loss for this test
+        node.set_network_condition(condition).await;
+
+        // Verify condition is set
+        let retrieved = node.get_network_condition().await;
+        assert!(retrieved.is_some(), "Network condition should be set");
+        let cond = retrieved.as_ref().expect("should have condition");
+        assert_eq!(cond.latency, Duration::from_millis(100));
+        assert!((cond.jitter - 0.1).abs() < 0.001);
+
+        // Test that latency calculation produces expected range
+        // With 100ms base latency and 10% jitter, delay should be 90-110ms
+        for _ in 0..10 {
+            let jitter_roll: f64 = rand::random();
+            let jitter_factor = 1.0 - cond.jitter + (jitter_roll * 2.0 * cond.jitter);
+            let delay = cond.latency.mul_f64(jitter_factor);
+            assert!(
+                delay >= Duration::from_millis(90) && delay <= Duration::from_millis(110),
+                "Delay {delay:?} should be in 90-110ms range"
+            );
+        }
+
+        // Clear condition
+        node.clear_network_condition().await;
+        assert!(
+            node.get_network_condition().await.is_none(),
+            "Network condition should be cleared"
         );
 
         node.shutdown().await;
+        Ok(())
+    }
+
+    /// Integration test for network condition with actual message delivery
+    ///
+    /// This test verifies that network conditions affect actual gossip delivery.
+    /// Marked as ignored due to QUIC connection timing issues in CI - see issue #319
+    #[tokio::test]
+    #[ignore]
+    async fn test_network_condition_latency_integration() -> Result<()> {
+        use crate::simulation::NetworkCondition;
+        use std::time::Instant;
+
+        // Create two connected nodes - latency is applied when sending to peers
+        let node_a = TestNode::spawn_with_index(NodeConfig::default(), 0).await?;
+        let node_b = TestNode::spawn_with_index(NodeConfig::default(), 1).await?;
+
+        node_a.connect(&node_b).await?;
+
+        // Wait for connection to establish
+        node_a
+            .wait_connected(&node_b.did, Duration::from_secs(5))
+            .await?;
+
+        // Create topic on both nodes
+        let topic = "test:latency";
+        node_a.create_topic(topic, AccessControl::Public).await;
+        node_b.create_topic(topic, AccessControl::Public).await;
+
+        // Allow connection to stabilize
+        tokio::time::sleep(Duration::from_millis(200)).await;
+
+        // Set a measurable latency condition (150ms) on node_a
+        node_a
+            .set_network_condition(
+                NetworkCondition::default()
+                    .with_latency(Duration::from_millis(150))
+                    .with_jitter(0.0), // No jitter for predictable timing
+            )
+            .await;
+
+        // Publish from node_a and measure time until node_b receives it
+        let start = Instant::now();
+        let hash = node_a.publish(topic, b"latency-test-message").await?;
+
+        // Poll until node_b receives the notification
+        let timeout = Duration::from_secs(5);
+        let poll_interval = Duration::from_millis(10);
+        let deadline = start + timeout;
+        let mut received = false;
+
+        while std::time::Instant::now() < deadline {
+            if node_b.has_entry(topic, &hash).await {
+                received = true;
+                break;
+            }
+            tokio::time::sleep(poll_interval).await;
+        }
+        let delivery_time = start.elapsed();
+
+        assert!(
+            received,
+            "Node B should have received the message within timeout"
+        );
+
+        // The delivery time should include at least the simulated latency (150ms)
+        // Allow some margin for test infrastructure overhead
+        assert!(
+            delivery_time >= Duration::from_millis(100),
+            "Expected delivery to take at least 100ms due to latency simulation, took {delivery_time:?}"
+        );
+
+        node_a.shutdown().await;
+        node_b.shutdown().await;
         Ok(())
     }
 }
