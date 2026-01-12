@@ -1,0 +1,466 @@
+{
+  "name": "SociocracyConsent",
+  "participants": [],
+  "currency": null,
+  "state_vars": [
+    {
+      "name": "proposal_period_hours",
+      "initial_value": { "Int": 168 }
+    },
+    {
+      "name": "objection_resolution_hours",
+      "initial_value": { "Int": 72 }
+    },
+    {
+      "name": "min_acknowledgment_pct",
+      "initial_value": { "Int": 50 }
+    },
+    {
+      "name": "max_objection_rounds",
+      "initial_value": { "Int": 3 }
+    }
+  ],
+  "rules": [
+    {
+      "name": "check_consent",
+      "params": [
+        { "name": "consents" },
+        { "name": "objections" },
+        { "name": "abstains" },
+        { "name": "total_members" }
+      ],
+      "requires": [
+        {
+          "BinOp": {
+            "op": "Gt",
+            "left": { "Var": "total_members" },
+            "right": { "Literal": { "Int": 0 } }
+          }
+        }
+      ],
+      "body": [
+        {
+          "Assign": {
+            "name": "total_responses",
+            "value": {
+              "BinOp": {
+                "op": "Add",
+                "left": {
+                  "BinOp": {
+                    "op": "Add",
+                    "left": { "Var": "consents" },
+                    "right": { "Var": "objections" }
+                  }
+                },
+                "right": { "Var": "abstains" }
+              }
+            }
+          }
+        },
+        {
+          "Assign": {
+            "name": "acknowledgment_pct",
+            "value": {
+              "BinOp": {
+                "op": "Div",
+                "left": {
+                  "BinOp": {
+                    "op": "Mul",
+                    "left": { "Var": "total_responses" },
+                    "right": { "Literal": { "Int": 100 } }
+                  }
+                },
+                "right": { "Var": "total_members" }
+              }
+            }
+          }
+        },
+        {
+          "Assign": {
+            "name": "min_acknowledgment_met",
+            "value": {
+              "BinOp": {
+                "op": "Ge",
+                "left": { "Var": "acknowledgment_pct" },
+                "right": { "Var": "min_acknowledgment_pct" }
+              }
+            }
+          }
+        },
+        {
+          "Assign": {
+            "name": "has_objection",
+            "value": {
+              "BinOp": {
+                "op": "Gt",
+                "left": { "Var": "objections" },
+                "right": { "Literal": { "Int": 0 } }
+              }
+            }
+          }
+        },
+        {
+          "Assign": {
+            "name": "consent_achieved",
+            "value": {
+              "BinOp": {
+                "op": "And",
+                "left": { "Var": "min_acknowledgment_met" },
+                "right": {
+                  "UnOp": {
+                    "op": "Not",
+                    "operand": { "Var": "has_objection" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "Return": {
+            "value": {
+              "Map": [
+                ["consent_achieved", { "Var": "consent_achieved" }],
+                ["has_objection", { "Var": "has_objection" }],
+                ["objection_count", { "Var": "objections" }],
+                ["acknowledgment_pct", { "Var": "acknowledgment_pct" }],
+                ["min_acknowledgment_met", { "Var": "min_acknowledgment_met" }]
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "evaluate_proposal",
+      "params": [
+        { "name": "consents" },
+        { "name": "objections" },
+        { "name": "abstains" },
+        { "name": "total_members" },
+        { "name": "hours_elapsed" },
+        { "name": "objection_round" }
+      ],
+      "requires": [
+        {
+          "BinOp": {
+            "op": "Gt",
+            "left": { "Var": "total_members" },
+            "right": { "Literal": { "Int": 0 } }
+          }
+        }
+      ],
+      "body": [
+        {
+          "Assign": {
+            "name": "total_responses",
+            "value": {
+              "BinOp": {
+                "op": "Add",
+                "left": {
+                  "BinOp": {
+                    "op": "Add",
+                    "left": { "Var": "consents" },
+                    "right": { "Var": "objections" }
+                  }
+                },
+                "right": { "Var": "abstains" }
+              }
+            }
+          }
+        },
+        {
+          "Assign": {
+            "name": "acknowledgment_pct",
+            "value": {
+              "BinOp": {
+                "op": "Div",
+                "left": {
+                  "BinOp": {
+                    "op": "Mul",
+                    "left": { "Var": "total_responses" },
+                    "right": { "Literal": { "Int": 100 } }
+                  }
+                },
+                "right": { "Var": "total_members" }
+              }
+            }
+          }
+        },
+        {
+          "Assign": {
+            "name": "min_acknowledgment_met",
+            "value": {
+              "BinOp": {
+                "op": "Ge",
+                "left": { "Var": "acknowledgment_pct" },
+                "right": { "Var": "min_acknowledgment_pct" }
+              }
+            }
+          }
+        },
+        {
+          "Assign": {
+            "name": "has_objection",
+            "value": {
+              "BinOp": {
+                "op": "Gt",
+                "left": { "Var": "objections" },
+                "right": { "Literal": { "Int": 0 } }
+              }
+            }
+          }
+        },
+        {
+          "Assign": {
+            "name": "period_ended",
+            "value": {
+              "BinOp": {
+                "op": "Ge",
+                "left": { "Var": "hours_elapsed" },
+                "right": { "Var": "proposal_period_hours" }
+              }
+            }
+          }
+        },
+        {
+          "If": {
+            "condition": {
+              "BinOp": {
+                "op": "And",
+                "left": { "Var": "min_acknowledgment_met" },
+                "right": {
+                  "UnOp": {
+                    "op": "Not",
+                    "operand": { "Var": "has_objection" }
+                  }
+                }
+              }
+            },
+            "then_block": [
+              {
+                "Return": {
+                  "value": {
+                    "Map": [
+                      ["outcome", { "Literal": { "String": "consent_achieved" } }],
+                      ["is_approved", { "Literal": { "Bool": true } }],
+                      ["method", { "Literal": { "String": "consent" } }],
+                      ["acknowledgment_pct", { "Var": "acknowledgment_pct" }]
+                    ]
+                  }
+                }
+              }
+            ],
+            "else_block": null
+          }
+        },
+        {
+          "If": {
+            "condition": { "Var": "has_objection" },
+            "then_block": [
+              {
+                "If": {
+                  "condition": {
+                    "BinOp": {
+                      "op": "Ge",
+                      "left": { "Var": "objection_round" },
+                      "right": { "Var": "max_objection_rounds" }
+                    }
+                  },
+                  "then_block": [
+                    {
+                      "Return": {
+                        "value": {
+                          "Map": [
+                            ["outcome", { "Literal": { "String": "blocked_max_rounds" } }],
+                            ["is_approved", { "Literal": { "Bool": false } }],
+                            ["method", { "Literal": { "String": "objection_unresolved" } }],
+                            ["objection_count", { "Var": "objections" }],
+                            ["objection_round", { "Var": "objection_round" }]
+                          ]
+                        }
+                      }
+                    }
+                  ],
+                  "else_block": [
+                    {
+                      "Return": {
+                        "value": {
+                          "Map": [
+                            ["outcome", { "Literal": { "String": "objection_raised" } }],
+                            ["is_approved", { "Literal": { "Bool": false } }],
+                            ["method", { "Literal": { "String": "deliberation_needed" } }],
+                            ["objection_count", { "Var": "objections" }],
+                            ["objection_round", { "Var": "objection_round" }],
+                            ["next_round", {
+                              "BinOp": {
+                                "op": "Add",
+                                "left": { "Var": "objection_round" },
+                                "right": { "Literal": { "Int": 1 } }
+                              }
+                            }]
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "else_block": null
+          }
+        },
+        {
+          "If": {
+            "condition": {
+              "UnOp": {
+                "op": "Not",
+                "operand": { "Var": "period_ended" }
+              }
+            },
+            "then_block": [
+              {
+                "Return": {
+                  "value": {
+                    "Map": [
+                      ["outcome", { "Literal": { "String": "pending" } }],
+                      ["is_approved", { "Literal": { "Bool": false } }],
+                      ["method", { "Literal": { "String": "awaiting_responses" } }],
+                      ["acknowledgment_pct", { "Var": "acknowledgment_pct" }],
+                      ["hours_remaining", {
+                        "BinOp": {
+                          "op": "Sub",
+                          "left": { "Var": "proposal_period_hours" },
+                          "right": { "Var": "hours_elapsed" }
+                        }
+                      }]
+                    ]
+                  }
+                }
+              }
+            ],
+            "else_block": null
+          }
+        },
+        {
+          "If": {
+            "condition": {
+              "UnOp": {
+                "op": "Not",
+                "operand": { "Var": "min_acknowledgment_met" }
+              }
+            },
+            "then_block": [
+              {
+                "Return": {
+                  "value": {
+                    "Map": [
+                      ["outcome", { "Literal": { "String": "expired_no_quorum" } }],
+                      ["is_approved", { "Literal": { "Bool": false } }],
+                      ["method", { "Literal": { "String": "insufficient_acknowledgment" } }],
+                      ["acknowledgment_pct", { "Var": "acknowledgment_pct" }],
+                      ["required_pct", { "Var": "min_acknowledgment_pct" }]
+                    ]
+                  }
+                }
+              }
+            ],
+            "else_block": null
+          }
+        },
+        {
+          "Return": {
+            "value": {
+              "Map": [
+                ["outcome", { "Literal": { "String": "consent_by_silence" } }],
+                ["is_approved", { "Literal": { "Bool": true } }],
+                ["method", { "Literal": { "String": "no_objection_period_ended" } }],
+                ["acknowledgment_pct", { "Var": "acknowledgment_pct" }]
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "update_proposal_period",
+      "params": [
+        { "name": "new_hours" }
+      ],
+      "requires": [
+        {
+          "BinOp": {
+            "op": "Ge",
+            "left": { "Var": "new_hours" },
+            "right": { "Literal": { "Int": 24 } }
+          }
+        },
+        {
+          "BinOp": {
+            "op": "Le",
+            "left": { "Var": "new_hours" },
+            "right": { "Literal": { "Int": 720 } }
+          }
+        }
+      ],
+      "body": [
+        {
+          "SetState": {
+            "key": "proposal_period_hours",
+            "value": { "Var": "new_hours" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "update_min_acknowledgment",
+      "params": [
+        { "name": "new_pct" }
+      ],
+      "requires": [
+        {
+          "BinOp": {
+            "op": "Ge",
+            "left": { "Var": "new_pct" },
+            "right": { "Literal": { "Int": 10 } }
+          }
+        },
+        {
+          "BinOp": {
+            "op": "Le",
+            "left": { "Var": "new_pct" },
+            "right": { "Literal": { "Int": 100 } }
+          }
+        }
+      ],
+      "body": [
+        {
+          "SetState": {
+            "key": "min_acknowledgment_pct",
+            "value": { "Var": "new_pct" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "get_config",
+      "params": [],
+      "requires": [],
+      "body": [
+        {
+          "Return": {
+            "value": {
+              "Map": [
+                ["proposal_period_hours", { "Var": "proposal_period_hours" }],
+                ["objection_resolution_hours", { "Var": "objection_resolution_hours" }],
+                ["min_acknowledgment_pct", { "Var": "min_acknowledgment_pct" }],
+                ["max_objection_rounds", { "Var": "max_objection_rounds" }]
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "triggers": []
+}
