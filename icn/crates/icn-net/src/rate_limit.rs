@@ -267,9 +267,10 @@ impl RateLimiter {
             let mut buckets = self.buckets.write().await;
 
             // Phase 3: Verify trust class hasn't changed (eliminates TOCTOU)
-            // This re-acquisition of trust_graph read lock while holding buckets write lock
-            // is safe because: (1) we only take read lock, and (2) no code path acquires
-            // buckets write lock while holding trust_graph write lock.
+            //
+            // SAFETY: This nested lock acquisition (trust_graph.read() while holding
+            // buckets.write()) is safe because no code path in the codebase acquires
+            // buckets.write() while holding trust_graph.write(). See issue #426.
             if let (Some(trust_gated_config), Some(trust_graph)) =
                 (&self.trust_gated_config, &self.trust_graph)
             {
@@ -285,6 +286,8 @@ impl RateLimiter {
                     if attempt < MAX_RETRIES - 1 {
                         // Release locks and retry with fresh trust class
                         drop(buckets);
+                        // Brief yield to prevent tight spinning if trust class is thrashing
+                        tokio::task::yield_now().await;
                         continue;
                     }
 
