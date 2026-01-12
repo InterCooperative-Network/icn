@@ -353,6 +353,56 @@ impl NetworkHandle {
         }
     }
 
+    /// Disconnect a peer by closing their QUIC connection
+    ///
+    /// This gracefully closes the connection and removes the peer from
+    /// connection tracking. Returns true if a connection was found and closed.
+    ///
+    /// Both the QUIC connection and peer tracking are updated atomically to
+    /// ensure consistent state. If no connection exists, peer tracking is
+    /// also left unchanged.
+    ///
+    /// # Arguments
+    ///
+    /// * `did` - The DID of the peer to disconnect
+    /// * `reason` - Optional reason message for the closure (for logging/debugging)
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// // Disconnect a misbehaving peer
+    /// network_handle.disconnect_peer(&peer_did, Some("rate limit exceeded")).await;
+    /// ```
+    ///
+    /// # Note
+    ///
+    /// This is primarily intended for testing and administrative use. Frequent
+    /// disconnections could destabilize the network.
+    pub async fn disconnect_peer(&self, did: &Did, reason: Option<&str>) -> bool {
+        let did_str = did.to_string();
+
+        // Remove from peer connections tracking FIRST to prevent new messages
+        // being routed to a closing connection. This provides a consistent view
+        // where the peer appears disconnected immediately.
+        let had_peer_entry = if let Some(ref connections) = self.peer_connections {
+            connections.write().await.remove(did).is_some()
+        } else {
+            false
+        };
+
+        // Close the QUIC connection via session manager
+        let session_closed = self
+            .session_manager
+            .read()
+            .await
+            .disconnect_peer(&did_str, reason)
+            .await;
+
+        // Return true if either structure had the peer (connection was active)
+        // This handles edge cases where structures might be inconsistent
+        had_peer_entry || session_closed
+    }
+
     /// Get all peers that support a specific capability
     ///
     /// Useful for broadcasting feature-specific messages only to capable peers

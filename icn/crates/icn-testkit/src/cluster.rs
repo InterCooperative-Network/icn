@@ -180,24 +180,32 @@ impl TestCluster {
         )
     }
 
-    /// Validate a network partition configuration
+    /// Create a network partition by disconnecting nodes across groups
     ///
-    /// This method validates that a partition configuration is valid for this
-    /// cluster (all nodes are accounted for). The actual network partitioning
-    /// is not yet implemented.
+    /// Nodes within each group remain connected, but connections between
+    /// groups are severed. This simulates a network partition scenario.
     ///
-    /// # Future Work
+    /// # Arguments
     ///
-    /// Full partition simulation would require:
-    /// 1. Tracking which groups each node belongs to
-    /// 2. Filtering messages between groups at the network layer
-    /// 3. Optionally dropping connections between groups
+    /// * `config` - The partition configuration specifying groups
     ///
-    /// For now, tests requiring partition behavior should manually disconnect
-    /// nodes or use separate clusters.
-    pub async fn validate_partition(&self, config: &PartitionConfig) -> Result<()> {
-        info!("Validating partition config: {:?}", config);
+    /// # Returns
+    ///
+    /// Returns `Ok(())` if the partition was successfully created.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// let cluster = TestCluster::new(4).await?;
+    /// cluster.fully_connect().await?;
+    ///
+    /// // Create partition: [0,1] | [2,3]
+    /// cluster.partition(&PartitionConfig::split_at(4, 2)).await?;
+    /// ```
+    pub async fn partition(&self, config: &PartitionConfig) -> Result<()> {
+        info!("Creating network partition: {:?}", config);
 
+        // Validate partition config
         let total_nodes: usize = config.groups.iter().map(|g| g.len()).sum();
         if total_nodes != self.nodes.len() {
             anyhow::bail!(
@@ -207,7 +215,70 @@ impl TestCluster {
             );
         }
 
+        // Build a map of node index -> group index
+        let mut node_group: std::collections::HashMap<usize, usize> =
+            std::collections::HashMap::new();
+        for (group_idx, group) in config.groups.iter().enumerate() {
+            for &node_idx in group {
+                if node_idx >= self.nodes.len() {
+                    anyhow::bail!("Invalid node index {node_idx} in partition config");
+                }
+                node_group.insert(node_idx, group_idx);
+            }
+        }
+
+        // Disconnect nodes that are in different groups
+        let mut successful_disconnections: usize = 0;
+        for i in 0..self.nodes.len() {
+            for j in (i + 1)..self.nodes.len() {
+                // Validation above ensures all nodes are in groups, so these should always succeed
+                let group_i = node_group.get(&i).copied().ok_or_else(|| {
+                    anyhow::anyhow!("Partition validation error: node {i} missing from groups")
+                })?;
+                let group_j = node_group.get(&j).copied().ok_or_else(|| {
+                    anyhow::anyhow!("Partition validation error: node {j} missing from groups")
+                })?;
+
+                if group_i != group_j {
+                    // Disconnect in both directions, track which succeeded
+                    let disconnected_ij = self.nodes[i].disconnect(&self.nodes[j]).await;
+                    let disconnected_ji = self.nodes[j].disconnect(&self.nodes[i]).await;
+                    let pair_count = (disconnected_ij as usize) + (disconnected_ji as usize);
+                    successful_disconnections += pair_count;
+
+                    info!(
+                        "Partitioned: node {} (group {}) <-> node {} (group {}), disconnections: {}",
+                        i, group_i, j, group_j, pair_count
+                    );
+                }
+            }
+        }
+
+        info!(
+            "Partition complete: {} total disconnections across {} groups",
+            successful_disconnections,
+            config.groups.len()
+        );
+
+        // Allow time for disconnections to take effect
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
         Ok(())
+    }
+
+    /// Check if two nodes are in the same partition group
+    pub fn same_partition_group(config: &PartitionConfig, node_a: usize, node_b: usize) -> bool {
+        for group in &config.groups {
+            let has_a = group.contains(&node_a);
+            let has_b = group.contains(&node_b);
+            if has_a && has_b {
+                return true;
+            }
+            if has_a || has_b {
+                return false;
+            }
+        }
+        false
     }
 
     /// Heal a network partition
