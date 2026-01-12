@@ -23,6 +23,7 @@ use crate::simulation::PartitionConfig;
 ///     assert!(node.peer_count().await >= 2);
 /// }
 /// ```
+#[derive(Debug)]
 pub struct TestCluster {
     /// The nodes in this cluster
     pub nodes: Vec<TestNode>,

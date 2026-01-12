@@ -156,7 +156,9 @@ impl TestNode {
                             tokio::time::sleep(Duration::from_millis(10)).await;
                             if let Some(net) = net_holder.read().await.as_ref() {
                                 let ack = NetworkMessage::subscribe_ack(own, sender.clone(), acked);
-                                let _ = net.send_message(sender, ack).await;
+                                if let Err(e) = net.send_message(sender, ack).await {
+                                    debug!("Failed to send SubscribeAck: {}", e);
+                                }
                             }
                         }
                     });
@@ -168,7 +170,9 @@ impl TestNode {
                     tokio::spawn(async move {
                         let mut g = gossip.write().await;
                         for topic in &topics {
-                            let _ = g.unsubscribe(topic, &sender);
+                            if let Err(e) = g.unsubscribe(topic, &sender) {
+                                debug!("Failed to unsubscribe {} from {}: {}", sender, topic, e);
+                            }
                         }
                     });
                 }
