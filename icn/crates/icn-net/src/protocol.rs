@@ -907,9 +907,8 @@ impl NetworkMessage {
         let msg: NetworkMessage = match encoding {
             EncodingFormat::Bincode => icn_encoding::decode_bincode_legacy(&decompressed)
                 .context("Failed to deserialize with bincode")?,
-            EncodingFormat::Postcard => {
-                icn_encoding::decode(&decompressed).context("Failed to deserialize with postcard")?
-            }
+            EncodingFormat::Postcard => icn_encoding::decode(&decompressed)
+                .context("Failed to deserialize with postcard")?,
         };
 
         Self::validate_version(msg.version)?;
