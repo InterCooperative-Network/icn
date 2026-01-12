@@ -3457,6 +3457,7 @@ dependencies = [
  "icn-store",
  "icn-trust",
  "portpicker",
+ "rand 0.8.5",
  "rustls",
  "thiserror 2.0.17",
  "tokio",
