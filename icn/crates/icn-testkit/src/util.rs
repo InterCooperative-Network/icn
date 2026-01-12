@@ -31,17 +31,35 @@ impl Default for BackoffConfig {
 }
 
 impl BackoffConfig {
-    /// Create a new backoff config with custom initial and max delays
+    /// Create a new backoff config with custom initial and max delays.
+    ///
+    /// If `initial` is greater than `max`, the values are swapped to ensure
+    /// `initial_delay <= max_delay`.
     pub fn new(initial: Duration, max: Duration) -> Self {
+        let (initial_delay, max_delay) = if initial <= max {
+            (initial, max)
+        } else {
+            (max, initial)
+        };
+
         Self {
-            initial_delay: initial,
-            max_delay: max,
+            initial_delay,
+            max_delay,
             multiplier: 2.0,
         }
     }
 
-    /// Set the multiplier for delay increase
+    /// Set the multiplier for delay increase.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `multiplier <= 1.0`. The multiplier must be greater than 1.0
+    /// to ensure exponential backoff behavior.
     pub fn with_multiplier(mut self, multiplier: f64) -> Self {
+        assert!(
+            multiplier > 1.0,
+            "BackoffConfig::with_multiplier requires multiplier > 1.0 (got {multiplier})"
+        );
         self.multiplier = multiplier;
         self
     }
@@ -205,6 +223,20 @@ mod tests {
         assert_eq!(config.initial_delay, Duration::from_millis(5));
         assert_eq!(config.max_delay, Duration::from_millis(50));
         assert!((config.multiplier - 1.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_backoff_config_swaps_inverted_delays() {
+        // When initial > max, values should be swapped
+        let config = BackoffConfig::new(Duration::from_millis(100), Duration::from_millis(10));
+        assert_eq!(config.initial_delay, Duration::from_millis(10));
+        assert_eq!(config.max_delay, Duration::from_millis(100));
+    }
+
+    #[test]
+    #[should_panic(expected = "requires multiplier > 1.0")]
+    fn test_backoff_config_panics_on_invalid_multiplier() {
+        BackoffConfig::default().with_multiplier(1.0);
     }
 
     #[tokio::test]

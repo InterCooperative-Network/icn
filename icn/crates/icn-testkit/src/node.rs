@@ -15,7 +15,7 @@ use std::time::Duration;
 use tokio::sync::{broadcast, watch, Mutex, RwLock};
 use tracing::{debug, info, warn};
 
-use crate::util::{pick_port, BackoffConfig};
+use crate::util::{pick_port, poll_with_backoff, BackoffConfig};
 
 /// Guard that triggers shutdown on drop unless disarmed
 ///
@@ -403,27 +403,20 @@ impl TestNode {
     ///
     /// Uses exponential backoff starting at 10ms, capped at 100ms between checks.
     pub async fn wait_connected(&self, did: &Did, timeout: Duration) -> Result<()> {
-        let start = std::time::Instant::now();
-        let backoff = BackoffConfig::new(
-            Duration::from_millis(10),  // Start checking quickly
-            Duration::from_millis(100), // Cap at 100ms between checks
-        );
-        let mut delay = backoff.initial_delay;
+        let network = self.network.clone();
+        let target_did = did.clone();
 
-        loop {
-            if self.network.is_peer_connected(did).await.unwrap_or(false) {
-                return Ok(());
-            }
-
-            if start.elapsed() >= timeout {
-                anyhow::bail!("Timeout waiting for connection to {did}");
-            }
-
-            let remaining = timeout.saturating_sub(start.elapsed());
-            tokio::time::sleep(delay.min(remaining)).await;
-            delay = Duration::from_secs_f64(delay.as_secs_f64() * backoff.multiplier)
-                .min(backoff.max_delay);
-        }
+        poll_with_backoff(
+            move || {
+                let net = network.clone();
+                let did = target_did.clone();
+                async move { net.is_peer_connected(&did).await.unwrap_or(false) }
+            },
+            BackoffConfig::new(Duration::from_millis(10), Duration::from_millis(100)),
+            timeout,
+        )
+        .await
+        .map_err(|_| anyhow::anyhow!("Timeout waiting for connection to {did}"))
     }
 
     /// Disconnect from a specific peer
@@ -448,33 +441,27 @@ impl TestNode {
     /// If the connection state cannot be determined (error), treats as disconnected
     /// since the peer handle may have been cleaned up.
     pub async fn wait_disconnected(&self, did: &Did, timeout: Duration) -> Result<()> {
-        let start = std::time::Instant::now();
-        let backoff = BackoffConfig::new(
-            Duration::from_millis(10),  // Start checking quickly
-            Duration::from_millis(100), // Cap at 100ms between checks
-        );
-        let mut delay = backoff.initial_delay;
+        let network = self.network.clone();
+        let target_did = did.clone();
 
-        loop {
-            match self.network.is_peer_connected(did).await {
-                Ok(false) => return Ok(()), // Confirmed disconnected
-                Ok(true) => {}              // Still connected, keep waiting
-                Err(_) => {
-                    // Can't determine state - peer handle likely cleaned up
-                    // Treat as disconnected since verification failed
-                    return Ok(());
+        poll_with_backoff(
+            move || {
+                let net = network.clone();
+                let did = target_did.clone();
+                async move {
+                    // Return true (done) if disconnected or if we can't determine state
+                    match net.is_peer_connected(&did).await {
+                        Ok(false) => true,  // Confirmed disconnected
+                        Ok(true) => false,  // Still connected, keep waiting
+                        Err(_) => true,     // Can't determine - treat as disconnected
+                    }
                 }
-            }
-
-            if start.elapsed() >= timeout {
-                anyhow::bail!("Timeout waiting for disconnection from {did}");
-            }
-
-            let remaining = timeout.saturating_sub(start.elapsed());
-            tokio::time::sleep(delay.min(remaining)).await;
-            delay = Duration::from_secs_f64(delay.as_secs_f64() * backoff.multiplier)
-                .min(backoff.max_delay);
-        }
+            },
+            BackoffConfig::new(Duration::from_millis(10), Duration::from_millis(100)),
+            timeout,
+        )
+        .await
+        .map_err(|_| anyhow::anyhow!("Timeout waiting for disconnection from {did}"))
     }
 }
 
