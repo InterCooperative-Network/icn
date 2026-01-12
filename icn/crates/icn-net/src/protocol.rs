@@ -667,7 +667,7 @@ impl NetworkMessage {
 
     /// Serialize to bytes using bincode (legacy format, no compression header)
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
-        let bytes = bincode::serde::encode_to_vec(self, bincode::config::legacy())
+        let bytes = icn_encoding::encode_bincode_legacy(self)
             .context("Failed to serialize network message")?;
 
         if bytes.len() > MAX_MESSAGE_SIZE {
@@ -689,7 +689,7 @@ impl NetworkMessage {
     ///
     /// Use this for peers that support MESSAGE_COMPRESSION capability.
     pub fn to_bytes_compressed(&self, enable_compression: bool) -> Result<Vec<u8>> {
-        let raw_bytes = bincode::serde::encode_to_vec(self, bincode::config::legacy())
+        let raw_bytes = icn_encoding::encode_bincode_legacy(self)
             .context("Failed to serialize network message")?;
 
         // Track bytes before compression for metrics
@@ -755,10 +755,8 @@ impl NetworkMessage {
             );
         }
 
-        let msg: NetworkMessage =
-            bincode::serde::decode_from_slice(bytes, bincode::config::legacy())
-                .map(|(v, _)| v)
-                .context("Failed to deserialize network message")?;
+        let msg: NetworkMessage = icn_encoding::decode_bincode_legacy(bytes)
+            .context("Failed to deserialize network message")?;
 
         // Validate protocol version
         Self::validate_version(msg.version)?;
@@ -793,10 +791,8 @@ impl NetworkMessage {
             CompressionFormat::Zstd => decompress_bounded(payload, MAX_MESSAGE_SIZE)?,
         };
 
-        let msg: NetworkMessage =
-            bincode::serde::decode_from_slice(&decompressed, bincode::config::legacy())
-                .map(|(v, _)| v)
-                .context("Failed to deserialize network message")?;
+        let msg: NetworkMessage = icn_encoding::decode_bincode_legacy(&decompressed)
+            .context("Failed to deserialize network message")?;
 
         Self::validate_version(msg.version)?;
         Ok(msg)
@@ -822,10 +818,9 @@ impl NetworkMessage {
         };
 
         let raw_bytes = if use_postcard {
-            postcard::to_allocvec(self).context("Failed to serialize with postcard")?
+            icn_encoding::encode(self).context("Failed to serialize with postcard")?
         } else {
-            bincode::serde::encode_to_vec(self, bincode::config::legacy())
-                .context("Failed to serialize with bincode")?
+            icn_encoding::encode_bincode_legacy(self).context("Failed to serialize with bincode")?
         };
 
         let bytes_before = raw_bytes.len();
@@ -910,12 +905,9 @@ impl NetworkMessage {
         };
 
         let msg: NetworkMessage = match encoding {
-            EncodingFormat::Bincode => {
-                bincode::serde::decode_from_slice(&decompressed, bincode::config::legacy())
-                    .map(|(v, _)| v)
-                    .context("Failed to deserialize with bincode")?
-            }
-            EncodingFormat::Postcard => postcard::from_bytes(&decompressed)
+            EncodingFormat::Bincode => icn_encoding::decode_bincode_legacy(&decompressed)
+                .context("Failed to deserialize with bincode")?,
+            EncodingFormat::Postcard => icn_encoding::decode(&decompressed)
                 .context("Failed to deserialize with postcard")?,
         };
 
@@ -1356,7 +1348,7 @@ mod tests {
         msg.version = MAX_SUPPORTED_VERSION + 1;
 
         // Serialize it
-        let bytes = bincode::serde::encode_to_vec(&msg, bincode::config::legacy()).unwrap();
+        let bytes = icn_encoding::encode_bincode_legacy(&msg).unwrap();
 
         // Deserialization should fail due to version check
         let result = NetworkMessage::from_bytes(&bytes);

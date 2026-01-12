@@ -100,24 +100,31 @@ fn bench_task_operations(c: &mut Criterion) {
         b.iter(|| task.hash());
     });
 
-    // Benchmark task serialization with bincode
-    group.bench_function("serialize_task_bincode", |b| {
+    // Benchmark postcard encoding (new default)
+    group.bench_function("serialize_task_postcard", |b| {
         let task = create_test_task(1);
-        b.iter(|| {
-            let config = bincode::config::standard();
-            bincode::serde::encode_to_vec(black_box(&task), config).unwrap()
-        });
+        b.iter(|| icn_encoding::encode(black_box(&task)).unwrap());
     });
 
-    group.bench_function("deserialize_task_bincode", |b| {
+    let task = create_test_task(1);
+    let serialized_postcard = icn_encoding::encode(&task).unwrap();
+
+    group.bench_function("deserialize_task_postcard", |b| {
+        b.iter(|| icn_encoding::decode::<ComputeTask>(black_box(&serialized_postcard)).unwrap());
+    });
+
+    // Benchmark bincode legacy encoding (backward compatibility)
+    group.bench_function("serialize_task_bincode_legacy", |b| {
         let task = create_test_task(1);
-        let config = bincode::config::standard();
-        let bytes = bincode::serde::encode_to_vec(&task, config).unwrap();
+        b.iter(|| icn_encoding::encode_bincode_legacy(black_box(&task)).unwrap());
+    });
+
+    let serialized_bincode = icn_encoding::encode_bincode_legacy(&task).unwrap();
+
+    group.bench_function("deserialize_task_bincode_legacy", |b| {
         b.iter(|| {
-            let config = bincode::config::standard();
-            let (decoded, _): (ComputeTask, _) =
-                bincode::serde::decode_from_slice(black_box(&bytes), config).unwrap();
-            decoded
+            icn_encoding::decode_bincode_legacy::<ComputeTask>(black_box(&serialized_bincode))
+                .unwrap()
         });
     });
 
@@ -126,6 +133,15 @@ fn bench_task_operations(c: &mut Criterion) {
         let task = create_test_task(1);
         b.iter(|| serde_json::to_vec(black_box(&task)).unwrap());
     });
+
+    // Log size comparison
+    let json_bytes = serde_json::to_vec(&task).unwrap();
+    println!(
+        "Postcard: {} bytes, Bincode: {} bytes, JSON: {} bytes",
+        serialized_postcard.len(),
+        serialized_bincode.len(),
+        json_bytes.len()
+    );
 
     group.finish();
 }

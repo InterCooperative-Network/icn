@@ -38,29 +38,36 @@ fn create_ping_message(from_seed: u8) -> NetworkMessage {
 fn bench_message_serialization(c: &mut Criterion) {
     let mut group = c.benchmark_group("message_serialization");
 
-    // Benchmark ping message serialization
-    group.bench_function("serialize_ping_bincode", |b| {
+    // Benchmark postcard encoding (new default)
+    group.bench_function("serialize_ping_postcard", |b| {
         let msg = create_ping_message(1);
-        b.iter(|| {
-            let config = bincode::config::standard();
-            bincode::serde::encode_to_vec(black_box(&msg), config).unwrap()
-        });
+        b.iter(|| icn_encoding::encode(black_box(&msg)).unwrap());
     });
 
-    group.bench_function("deserialize_ping_bincode", |b| {
+    let msg = create_ping_message(1);
+    let postcard_bytes = icn_encoding::encode(&msg).unwrap();
+
+    group.bench_function("deserialize_ping_postcard", |b| {
+        b.iter(|| icn_encoding::decode::<NetworkMessage>(black_box(&postcard_bytes)).unwrap());
+    });
+
+    // Benchmark bincode legacy encoding (backward compatibility)
+    group.bench_function("serialize_ping_bincode_legacy", |b| {
         let msg = create_ping_message(1);
-        let config = bincode::config::standard();
-        let bytes = bincode::serde::encode_to_vec(&msg, config).unwrap();
+        b.iter(|| icn_encoding::encode_bincode_legacy(black_box(&msg)).unwrap());
+    });
+
+    let bincode_bytes = icn_encoding::encode_bincode_legacy(&msg).unwrap();
+
+    group.bench_function("deserialize_ping_bincode_legacy", |b| {
         b.iter(|| {
-            let config = bincode::config::standard();
-            let (decoded, _): (NetworkMessage, _) =
-                bincode::serde::decode_from_slice(black_box(&bytes), config).unwrap();
-            decoded
+            icn_encoding::decode_bincode_legacy::<NetworkMessage>(black_box(&bincode_bytes))
+                .unwrap()
         });
     });
 
     // Benchmark subscribe message serialization
-    group.bench_function("serialize_subscribe", |b| {
+    group.bench_function("serialize_subscribe_postcard", |b| {
         let msg = NetworkMessage {
             version: 1,
             from: test_did(1),
@@ -74,14 +81,11 @@ fn bench_message_serialization(c: &mut Criterion) {
             },
             trace_context: None,
         };
-        b.iter(|| {
-            let config = bincode::config::standard();
-            bincode::serde::encode_to_vec(black_box(&msg), config).unwrap()
-        });
+        b.iter(|| icn_encoding::encode(black_box(&msg)).unwrap());
     });
 
     // Benchmark pong message
-    group.bench_function("serialize_pong", |b| {
+    group.bench_function("serialize_pong_postcard", |b| {
         let msg = NetworkMessage {
             version: 1,
             from: test_did(1),
@@ -92,10 +96,7 @@ fn bench_message_serialization(c: &mut Criterion) {
             },
             trace_context: None,
         };
-        b.iter(|| {
-            let config = bincode::config::standard();
-            bincode::serde::encode_to_vec(black_box(&msg), config).unwrap()
-        });
+        b.iter(|| icn_encoding::encode(black_box(&msg)).unwrap());
     });
 
     // Benchmark JSON serialization for comparison
@@ -103,6 +104,15 @@ fn bench_message_serialization(c: &mut Criterion) {
         let msg = create_ping_message(1);
         b.iter(|| serde_json::to_vec(black_box(&msg)).unwrap());
     });
+
+    // Log size comparison
+    let json_bytes = serde_json::to_vec(&msg).unwrap();
+    println!(
+        "Postcard: {} bytes, Bincode: {} bytes, JSON: {} bytes",
+        postcard_bytes.len(),
+        bincode_bytes.len(),
+        json_bytes.len()
+    );
 
     group.finish();
 }
@@ -201,16 +211,23 @@ fn bench_message_sizes(c: &mut Criterion) {
     let mut group = c.benchmark_group("message_sizes");
 
     // Measure serialized sizes for different message types
-    group.bench_function("measure_ping_size", |b| {
+    group.bench_function("measure_ping_size_postcard", |b| {
         let msg = create_ping_message(1);
         b.iter(|| {
-            let config = bincode::config::standard();
-            let bytes = bincode::serde::encode_to_vec(black_box(&msg), config).unwrap();
+            let bytes = icn_encoding::encode(black_box(&msg)).unwrap();
             bytes.len()
         });
     });
 
-    group.bench_function("measure_subscribe_size", |b| {
+    group.bench_function("measure_ping_size_bincode_legacy", |b| {
+        let msg = create_ping_message(1);
+        b.iter(|| {
+            let bytes = icn_encoding::encode_bincode_legacy(black_box(&msg)).unwrap();
+            bytes.len()
+        });
+    });
+
+    group.bench_function("measure_subscribe_size_postcard", |b| {
         let msg = NetworkMessage {
             version: 1,
             from: test_did(1),
@@ -221,8 +238,7 @@ fn bench_message_sizes(c: &mut Criterion) {
             trace_context: None,
         };
         b.iter(|| {
-            let config = bincode::config::standard();
-            let bytes = bincode::serde::encode_to_vec(black_box(&msg), config).unwrap();
+            let bytes = icn_encoding::encode(black_box(&msg)).unwrap();
             bytes.len()
         });
     });

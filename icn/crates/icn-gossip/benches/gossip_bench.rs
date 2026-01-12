@@ -71,23 +71,37 @@ fn bench_gossip_entry_serialization(c: &mut Criterion) {
         replica_offered: Some(true),
     };
 
-    group.bench_function("serialize", |b| {
+    // Benchmark postcard encoding (new default)
+    group.bench_function("serialize_postcard", |b| {
+        b.iter(|| icn_encoding::encode(black_box(&entry)).unwrap());
+    });
+
+    let serialized_postcard = icn_encoding::encode(&entry).unwrap();
+
+    group.bench_function("deserialize_postcard", |b| {
+        b.iter(|| icn_encoding::decode::<GossipEntry>(black_box(&serialized_postcard)).unwrap());
+    });
+
+    // Benchmark bincode legacy encoding (backward compatibility)
+    group.bench_function("serialize_bincode_legacy", |b| {
+        b.iter(|| icn_encoding::encode_bincode_legacy(black_box(&entry)).unwrap());
+    });
+
+    let serialized_bincode = icn_encoding::encode_bincode_legacy(&entry).unwrap();
+
+    group.bench_function("deserialize_bincode_legacy", |b| {
         b.iter(|| {
-            bincode::serde::encode_to_vec(black_box(&entry), bincode::config::legacy()).unwrap()
+            icn_encoding::decode_bincode_legacy::<GossipEntry>(black_box(&serialized_bincode))
+                .unwrap()
         });
     });
 
-    let serialized = bincode::serde::encode_to_vec(&entry, bincode::config::legacy()).unwrap();
-
-    group.bench_function("deserialize", |b| {
-        b.iter(|| {
-            bincode::serde::decode_from_slice::<GossipEntry, _>(
-                black_box(&serialized),
-                bincode::config::legacy(),
-            )
-            .unwrap()
-        });
-    });
+    // Log size comparison
+    println!(
+        "Postcard: {} bytes, Bincode: {} bytes",
+        serialized_postcard.len(),
+        serialized_bincode.len()
+    );
 
     group.finish();
 }

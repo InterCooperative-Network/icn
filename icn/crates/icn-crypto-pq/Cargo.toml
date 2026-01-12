@@ -36,7 +36,6 @@ rand_chacha = "0.3"  # Seeded RNG for deterministic key generation (must stay at
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
-bincode = { version = "2.0", features = ["serde"] }
 
 # Security
 zeroize = { version = "1.7", features = ["derive"] }

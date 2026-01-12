@@ -2871,7 +2871,6 @@ dependencies = [
 name = "icn-compute"
 version = "0.1.0"
 dependencies = [
- "bincode",
  "blake3",
  "chrono",
  "criterion",
@@ -2993,7 +2992,6 @@ name = "icn-crypto-pq"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bincode",
  "criterion",
  "curve25519-dalek",
  "ed25519-dalek",
@@ -3030,7 +3028,6 @@ name = "icn-entity"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bincode",
  "icn-encoding",
  "icn-identity",
  "icn-time",
@@ -3138,7 +3135,6 @@ name = "icn-gossip"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bincode",
  "blake3",
  "bytes",
  "criterion",
@@ -3226,7 +3222,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "bincode",
  "bytes",
  "criterion",
  "ed25519-dalek",
@@ -3255,7 +3250,6 @@ name = "icn-net"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bincode",
  "bitflags 2.10.0",
  "bytes",
  "chacha20poly1305",
@@ -3277,7 +3271,6 @@ dependencies = [
  "icn-trust",
  "mdns-sd",
  "portpicker",
- "postcard",
  "quinn",
  "rand 0.8.5",
  "rand_core 0.6.4",
@@ -3413,7 +3406,6 @@ name = "icn-steward"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bincode",
  "bloomfilter 3.0.1",
  "ed25519-dalek",
  "hex",
