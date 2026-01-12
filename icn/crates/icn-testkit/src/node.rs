@@ -369,6 +369,33 @@ impl TestNode {
         }
         anyhow::bail!("Timeout waiting for connection to {did}")
     }
+
+    /// Disconnect from a specific peer
+    ///
+    /// This closes the QUIC connection to the peer. Returns true if a
+    /// connection was found and closed.
+    pub async fn disconnect(&self, other: &TestNode) -> bool {
+        self.disconnect_did(&other.did).await
+    }
+
+    /// Disconnect from a peer by DID
+    pub async fn disconnect_did(&self, did: &Did) -> bool {
+        self.network
+            .disconnect_peer(did, Some("test disconnect"))
+            .await
+    }
+
+    /// Wait for disconnection from a specific peer
+    pub async fn wait_disconnected(&self, did: &Did, timeout: Duration) -> Result<()> {
+        let start = std::time::Instant::now();
+        while start.elapsed() < timeout {
+            if !self.network.is_peer_connected(did).await.unwrap_or(true) {
+                return Ok(());
+            }
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+        anyhow::bail!("Timeout waiting for disconnection from {did}")
+    }
 }
 
 impl std::fmt::Debug for TestNode {

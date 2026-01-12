@@ -353,6 +353,41 @@ impl NetworkHandle {
         }
     }
 
+    /// Disconnect a peer by closing their QUIC connection
+    ///
+    /// This gracefully closes the connection and removes the peer from
+    /// connection tracking. Returns true if a connection was found and closed.
+    ///
+    /// # Arguments
+    ///
+    /// * `did` - The DID of the peer to disconnect
+    /// * `reason` - Optional reason message for the closure (for logging/debugging)
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// // Disconnect a misbehaving peer
+    /// network_handle.disconnect_peer(&peer_did, Some("rate limit exceeded")).await;
+    /// ```
+    pub async fn disconnect_peer(&self, did: &Did, reason: Option<&str>) -> bool {
+        let did_str = did.to_string();
+
+        // Close the QUIC connection via session manager
+        let closed = self
+            .session_manager
+            .read()
+            .await
+            .disconnect_peer(&did_str, reason)
+            .await;
+
+        // Remove from peer connections tracking
+        if let Some(ref connections) = self.peer_connections {
+            connections.write().await.remove(did);
+        }
+
+        closed
+    }
+
     /// Get all peers that support a specific capability
     ///
     /// Useful for broadcasting feature-specific messages only to capable peers

@@ -405,6 +405,31 @@ impl SessionManager {
             .collect()
     }
 
+    /// Disconnect a peer by closing and removing their connection
+    ///
+    /// This closes the QUIC connection gracefully and removes it from the
+    /// connection map. Returns true if a connection was found and closed.
+    ///
+    /// # Arguments
+    ///
+    /// * `peer_did` - The DID string of the peer to disconnect
+    /// * `reason` - Optional reason message for the closure
+    pub async fn disconnect_peer(&self, peer_did: &str, reason: Option<&str>) -> bool {
+        let mut connections = self.connections.write().await;
+        if let Some(connection) = connections.remove(peer_did) {
+            let reason_bytes = reason.unwrap_or("disconnected").as_bytes();
+            connection.close(0u32.into(), reason_bytes);
+            info!(
+                "Disconnected peer {}: {}",
+                peer_did,
+                reason.unwrap_or("no reason")
+            );
+            true
+        } else {
+            false
+        }
+    }
+
     /// Get the discovered public endpoint (if NAT traversal was enabled)
     ///
     /// Returns None if NAT traversal is disabled or STUN discovery failed.
