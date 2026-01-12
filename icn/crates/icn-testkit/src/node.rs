@@ -13,9 +13,44 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{broadcast, watch, Mutex, RwLock};
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 use crate::util::pick_port;
+
+/// Guard that triggers shutdown on drop unless disarmed
+///
+/// This ensures that if spawn_with_index fails after NetworkActor starts,
+/// the network actor is properly cleaned up.
+struct ShutdownGuard {
+    shutdown_tx: Option<broadcast::Sender<()>>,
+    index: usize,
+}
+
+impl ShutdownGuard {
+    fn new(shutdown_tx: broadcast::Sender<()>, index: usize) -> Self {
+        Self {
+            shutdown_tx: Some(shutdown_tx),
+            index,
+        }
+    }
+
+    /// Disarm the guard - call this when spawn succeeds
+    fn disarm(&mut self) {
+        self.shutdown_tx = None;
+    }
+}
+
+impl Drop for ShutdownGuard {
+    fn drop(&mut self) {
+        if let Some(ref tx) = self.shutdown_tx {
+            warn!(
+                "TestNode {} spawn failed after NetworkActor started, triggering cleanup",
+                self.index
+            );
+            let _ = tx.send(());
+        }
+    }
+}
 
 /// Type alias for notification storage: topic -> [(hash, subscriber_did)]
 type NotificationMap = HashMap<String, Vec<([u8; 32], Did)>>;
@@ -234,6 +269,9 @@ impl TestNode {
         )
         .await?;
 
+        // Create cleanup guard - ensures NetworkActor is shut down if subsequent setup fails
+        let mut cleanup_guard = ShutdownGuard::new(shutdown_tx.clone(), index);
+
         // Send network handle to message handler (fixes race condition)
         let _ = network_tx.send(Some(network.clone()));
 
@@ -263,6 +301,9 @@ impl TestNode {
         }
 
         info!("Test node {} listening on {}", index, addr);
+
+        // Spawn succeeded - disarm the cleanup guard
+        cleanup_guard.disarm();
 
         Ok(TestNode {
             keypair,
@@ -421,6 +462,41 @@ impl std::fmt::Debug for TestNode {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_shutdown_guard_triggers_on_drop() {
+        let (tx, mut rx) = broadcast::channel(1);
+
+        // Create guard and let it drop without disarming
+        {
+            let _guard = ShutdownGuard::new(tx, 42);
+            // Guard drops here
+        }
+
+        // Should have received shutdown signal
+        assert!(
+            rx.try_recv().is_ok(),
+            "ShutdownGuard should send shutdown signal on drop"
+        );
+    }
+
+    #[test]
+    fn test_shutdown_guard_no_trigger_when_disarmed() {
+        let (tx, mut rx) = broadcast::channel(1);
+
+        // Create guard and disarm before drop
+        {
+            let mut guard = ShutdownGuard::new(tx, 42);
+            guard.disarm();
+            // Guard drops here
+        }
+
+        // Should NOT have received shutdown signal
+        assert!(
+            rx.try_recv().is_err(),
+            "Disarmed ShutdownGuard should not send shutdown signal"
+        );
+    }
 
     #[tokio::test]
     async fn test_spawn_node() -> Result<()> {
