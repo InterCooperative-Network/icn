@@ -2,7 +2,7 @@
 //!
 //! Metrics for monitoring storage backend health and performance.
 
-use metrics::{counter, describe_counter, describe_gauge, gauge};
+use metrics::{counter, describe_counter, describe_gauge, describe_histogram, gauge, histogram};
 
 /// Initialize storage metric descriptions
 pub fn init_descriptions() {
@@ -22,9 +22,9 @@ pub fn init_descriptions() {
         "icn_storage_flush_bytes_total",
         "Total bytes flushed to disk"
     );
-    describe_gauge!(
+    describe_histogram!(
         "icn_storage_flush_duration_seconds",
-        "Duration of the last flush operation in seconds"
+        "Duration of flush operations in seconds"
     );
     describe_counter!(
         "icn_storage_operations_total",
@@ -52,9 +52,9 @@ pub fn flush_bytes_add(bytes: u64) {
     counter!("icn_storage_flush_bytes_total").increment(bytes);
 }
 
-/// Set the duration of the last flush operation
-pub fn flush_duration_set(seconds: f64) {
-    gauge!("icn_storage_flush_duration_seconds").set(seconds);
+/// Record a flush duration observation
+pub fn flush_duration_record(seconds: f64) {
+    histogram!("icn_storage_flush_duration_seconds").record(seconds);
 }
 
 /// Increment storage operations counter by type

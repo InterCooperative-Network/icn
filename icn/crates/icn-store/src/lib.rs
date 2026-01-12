@@ -293,20 +293,20 @@ impl SledStore {
         let flushed = self.db.flush()?;
         icn_obs::metrics::storage::flush_total_inc();
         icn_obs::metrics::storage::flush_bytes_add(flushed as u64);
-        icn_obs::metrics::storage::flush_duration_set(start.elapsed().as_secs_f64());
+        icn_obs::metrics::storage::flush_duration_record(start.elapsed().as_secs_f64());
         Ok(flushed)
     }
 
     /// Asynchronously flush all pending writes to disk
     ///
-    /// Non-blocking version of flush() that returns immediately.
-    /// The actual flush happens in the background.
+    /// Async version of [`flush`] that does not block the current thread
+    /// while waiting for the I/O operation to complete.
     pub async fn flush_async(&self) -> Result<usize> {
         let start = std::time::Instant::now();
         let flushed = self.db.flush_async().await?;
         icn_obs::metrics::storage::flush_total_inc();
         icn_obs::metrics::storage::flush_bytes_add(flushed as u64);
-        icn_obs::metrics::storage::flush_duration_set(start.elapsed().as_secs_f64());
+        icn_obs::metrics::storage::flush_duration_record(start.elapsed().as_secs_f64());
         Ok(flushed)
     }
 
