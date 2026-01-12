@@ -246,6 +246,18 @@ pub trait Store: Send + Sync {
     }
 }
 
+/// Storage statistics for monitoring
+#[derive(Debug, Clone, Default)]
+pub struct StorageStats {
+    /// Size of the database on disk in bytes
+    pub size_on_disk_bytes: u64,
+    /// Space amplification factor (actual size / logical size)
+    /// Values close to 1.0 indicate efficient storage
+    pub space_amplification: f64,
+    /// Number of entries in the database (if available)
+    pub entry_count: Option<usize>,
+}
+
 /// Sled-based storage implementation
 pub struct SledStore {
     db: sled::Db,
@@ -270,6 +282,80 @@ impl SledStore {
     /// rather than the Store trait abstraction.
     pub fn db(&self) -> &sled::Db {
         &self.db
+    }
+
+    /// Flush all pending writes to disk
+    ///
+    /// This ensures data durability by syncing all buffered writes.
+    /// Returns the number of bytes flushed.
+    pub fn flush(&self) -> Result<usize> {
+        let start = std::time::Instant::now();
+        let flushed = self.db.flush()?;
+        icn_obs::metrics::storage::flush_total_inc();
+        icn_obs::metrics::storage::flush_bytes_add(flushed as u64);
+        icn_obs::metrics::storage::flush_duration_record(start.elapsed().as_secs_f64());
+        Ok(flushed)
+    }
+
+    /// Asynchronously flush all pending writes to disk
+    ///
+    /// Async version of [`flush`] that does not block the current thread
+    /// while waiting for the I/O operation to complete.
+    pub async fn flush_async(&self) -> Result<usize> {
+        let start = std::time::Instant::now();
+        let flushed = self.db.flush_async().await?;
+        icn_obs::metrics::storage::flush_total_inc();
+        icn_obs::metrics::storage::flush_bytes_add(flushed as u64);
+        icn_obs::metrics::storage::flush_duration_record(start.elapsed().as_secs_f64());
+        Ok(flushed)
+    }
+
+    /// Get storage statistics for monitoring
+    ///
+    /// Returns disk usage and space amplification metrics.
+    /// Also updates the storage metrics gauges for Prometheus.
+    /// Useful for deciding when maintenance is needed.
+    pub fn stats(&self) -> Result<StorageStats> {
+        let size_on_disk_bytes = self.db.size_on_disk()?;
+
+        // Space amplification: ratio of actual disk usage to logical data size
+        // Values close to 1.0 indicate efficient storage
+        // Higher values may indicate fragmentation or pending garbage collection
+        let space_amplification = self.db.space_amplification()?;
+
+        // Update Prometheus metrics
+        icn_obs::metrics::storage::size_bytes_set(size_on_disk_bytes);
+        icn_obs::metrics::storage::space_amplification_set(space_amplification);
+
+        Ok(StorageStats {
+            size_on_disk_bytes,
+            space_amplification,
+            entry_count: None, // Counting all entries is expensive
+        })
+    }
+
+    /// Get the size of the database on disk in bytes
+    pub fn size_on_disk(&self) -> Result<u64> {
+        Ok(self.db.size_on_disk()?)
+    }
+
+    /// Check if the database needs optimization
+    ///
+    /// Returns true if space amplification exceeds the threshold (default: 2.0)
+    /// indicating significant storage overhead that may benefit from maintenance.
+    ///
+    /// Note: Sled performs automatic garbage collection, so high amplification
+    /// may resolve naturally over time with normal operations.
+    pub fn needs_optimization(&self, threshold: f64) -> Result<bool> {
+        let amplification = self.db.space_amplification()?;
+        Ok(amplification > threshold)
+    }
+
+    /// Generate a unique ID
+    ///
+    /// Useful for creating unique keys without coordination.
+    pub fn generate_id(&self) -> Result<u64> {
+        Ok(self.db.generate_id()?)
     }
 }
 
@@ -784,6 +870,93 @@ mod tests {
 
         let parsed: ReplicaHealth = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed, healthy);
+    }
+
+    #[test]
+    fn test_storage_stats() -> Result<()> {
+        let store = SledStore::temporary()?;
+
+        // Get initial stats - temporary DB may start at 0
+        let stats = store.stats()?;
+        // Space amplification should be a valid ratio (may be 0 for empty DB)
+        assert!(stats.space_amplification >= 0.0);
+
+        // Add some data
+        for i in 0..100 {
+            store.put(format!("key:{i}").as_bytes(), b"test value")?;
+        }
+        store.flush()?;
+
+        // Stats should reflect the added data
+        let stats_after = store.stats()?;
+        assert!(stats_after.size_on_disk_bytes >= stats.size_on_disk_bytes);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_flush() -> Result<()> {
+        let store = SledStore::temporary()?;
+
+        // Add some data
+        store.put(b"test:key", b"test value")?;
+
+        // Flush should succeed and return bytes flushed
+        let _flushed = store.flush()?;
+        // flushed may be 0 if already flushed - just verify it doesn't error
+
+        // Data should still be readable after flush
+        let value = store.get(b"test:key")?;
+        assert_eq!(value.as_deref(), Some(b"test value".as_slice()));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_size_on_disk() -> Result<()> {
+        let store = SledStore::temporary()?;
+
+        let initial_size = store.size_on_disk()?;
+
+        // Add data
+        for i in 0..50 {
+            store.put(format!("data:{i}").as_bytes(), &vec![0u8; 1000])?;
+        }
+        store.flush()?;
+
+        let final_size = store.size_on_disk()?;
+        // Size should have grown (may not be linear due to compression/overhead)
+        assert!(final_size >= initial_size);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_needs_optimization() -> Result<()> {
+        let store = SledStore::temporary()?;
+
+        // Fresh database should not need optimization
+        // (space amplification should be close to 1.0)
+        let needs_opt = store.needs_optimization(10.0)?;
+        assert!(!needs_opt, "Fresh database should not need optimization");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_generate_id() -> Result<()> {
+        let store = SledStore::temporary()?;
+
+        // Generate IDs should be unique
+        let id1 = store.generate_id()?;
+        let id2 = store.generate_id()?;
+        let id3 = store.generate_id()?;
+
+        assert_ne!(id1, id2);
+        assert_ne!(id2, id3);
+        assert_ne!(id1, id3);
+
+        Ok(())
     }
 
     #[test]

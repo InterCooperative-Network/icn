@@ -10,6 +10,7 @@ openapi = ["utoipa"]
 [dependencies]
 icn-identity.workspace = true
 icn-time = { path = "../icn-time" }
+icn-obs = { path = "../icn-obs" }
 sled.workspace = true
 serde.workspace = true
 serde_json.workspace = true
