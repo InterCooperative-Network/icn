@@ -28,7 +28,8 @@ async fn example_gossip_publish() -> Result<()> {
     let node = TestNode::spawn(NodeConfig::default()).await?;
 
     // Create a topic
-    node.create_topic("events:test", AccessControl::Public).await;
+    node.create_topic("events:test", AccessControl::Public)
+        .await;
 
     // Publish some data
     let hash1 = node.publish("events:test", b"first event").await?;

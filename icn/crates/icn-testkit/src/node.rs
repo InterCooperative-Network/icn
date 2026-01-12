@@ -3,7 +3,9 @@
 use anyhow::{Context, Result};
 use icn_gossip::{AccessControl, GossipActor, GossipEntry, GossipMessage, Topic};
 use icn_identity::{Did, IdentityBundle, KeyPair};
-use icn_net::{IncomingMessageHandler, MessagePayload, NetworkActor, NetworkHandle, NetworkMessage};
+use icn_net::{
+    IncomingMessageHandler, MessagePayload, NetworkActor, NetworkHandle, NetworkMessage,
+};
 use icn_store::SledStore;
 use icn_trust::TrustClass;
 use std::collections::HashMap;
@@ -103,15 +105,16 @@ impl TestNode {
         // Configure notification callback
         {
             let mut gossip_guard = gossip.write().await;
-            let callback =
-                Arc::new(move |topic: String, entry: GossipEntry, subscriber_did: Did| {
+            let callback = Arc::new(
+                move |topic: String, entry: GossipEntry, subscriber_did: Did| {
                     let hash = entry.hash;
                     let notifs = notifications_clone.clone();
                     tokio::spawn(async move {
                         let mut map = notifs.lock().await;
                         map.entry(topic).or_default().push((hash, subscriber_did));
                     });
-                });
+                },
+            );
             gossip_guard.set_notification_callback(callback);
         }
 
@@ -314,19 +317,12 @@ impl TestNode {
 
     /// Get the number of connected peers
     pub async fn peer_count(&self) -> usize {
-        self.network
-            .get_peers()
-            .await
-            .map(|p| p.len())
-            .unwrap_or(0)
+        self.network.get_peers().await.map(|p| p.len()).unwrap_or(0)
     }
 
     /// Check if connected to a specific peer
     pub async fn is_connected_to(&self, did: &Did) -> bool {
-        self.network
-            .is_peer_connected(did)
-            .await
-            .unwrap_or(false)
+        self.network.is_peer_connected(did).await.unwrap_or(false)
     }
 
     /// Wait for connection to a specific peer
@@ -367,7 +363,8 @@ mod tests {
     #[tokio::test]
     async fn test_create_topic_and_publish() -> Result<()> {
         let node = TestNode::spawn(NodeConfig::default()).await?;
-        node.create_topic("test:events", AccessControl::Public).await;
+        node.create_topic("test:events", AccessControl::Public)
+            .await;
 
         let hash = node.publish("test:events", b"hello").await?;
         assert!(node.has_entry("test:events", &hash).await);
