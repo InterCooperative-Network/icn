@@ -48,7 +48,7 @@ wasmtime = { version = "40", optional = true }
 
 [dev-dependencies]
 tokio = { version = "1.49", features = ["rt-multi-thread", "macros"] }
-wat = "1.219"
+wat = "1.244"
 criterion = "0.5"
 tempfile = "3.24"
 icn-identity = { path = "../icn-identity" }
