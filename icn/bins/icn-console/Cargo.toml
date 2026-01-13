@@ -16,7 +16,7 @@ icn-store = { path = "../../crates/icn-store" }
 
 # TUI
 ratatui = "0.30"
-crossterm = "0.28"
+crossterm = "0.29"
 
 # Async
 tokio = { version = "1", features = ["full"] }
