@@ -109,6 +109,13 @@ export async function loadLocale(locale) {
 
 /**
  * Get a translated string
+ *
+ * SECURITY NOTE: This function returns raw strings from locale files.
+ * When using the result in DOM manipulation:
+ * - Use textContent instead of innerHTML when possible
+ * - If innerHTML is required, sanitize the output first
+ * - Locale files are trusted, but interpolated params could be user input
+ *
  * @param {string} key - Dot-notation key (e.g., 'nav.overview', 'common.loading')
  * @param {Object} params - Optional parameters for interpolation
  * @returns {string} Translated string, or key if not found
@@ -133,8 +140,9 @@ export function t(key, params = {}) {
   }
 
   // Perform variable interpolation: {{variable}} -> value
+  // Note: Params are inserted as-is. If using innerHTML, sanitize params externally.
   return value.replace(/\{\{(\w+)\}\}/g, (match, name) => {
-    return params[name] !== undefined ? params[name] : match;
+    return params[name] !== undefined ? String(params[name]) : match;
   });
 }
 

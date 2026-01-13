@@ -70,8 +70,24 @@ i18n.use(initReactI18next).init({
 /**
  * Change the app's language at runtime
  * @param languageCode - ISO 639-1 language code (e.g., 'en', 'es', 'fr')
+ * @throws {Error} If the language code is not supported
  */
 export const changeLanguage = async (languageCode: string): Promise<void> => {
+  // Validate language code format (ISO 639-1: 2-3 lowercase letters)
+  if (!/^[a-z]{2,3}$/.test(languageCode)) {
+    throw new Error(
+      `Invalid language code: "${languageCode}". Expected ISO 639-1 format (e.g., 'en', 'es').`
+    );
+  }
+
+  // Check if the language is available
+  if (!(languageCode in resources)) {
+    console.warn(
+      `Language "${languageCode}" is not available. Available: ${Object.keys(resources).join(', ')}. ` +
+        'The app will fall back to English for missing translations.'
+    );
+  }
+
   await i18n.changeLanguage(languageCode);
 };
 

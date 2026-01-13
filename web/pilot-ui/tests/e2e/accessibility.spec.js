@@ -133,8 +133,10 @@ test.describe('Accessibility - Keyboard Navigation', () => {
   test('focus order is logical', async ({ page }) => {
     // Tab through elements and verify focus order
     const focusOrder = [];
+    const maxTabs = 15;
+    let consecutiveBodyFocusCount = 0;
 
-    for (let i = 0; i < 15; i++) {
+    for (let i = 0; i < maxTabs; i++) {
       await page.keyboard.press('Tab');
 
       const focused = await page.evaluate(() => ({
@@ -144,19 +146,32 @@ test.describe('Accessibility - Keyboard Navigation', () => {
         role: document.activeElement?.getAttribute('role'),
       }));
 
-      focusOrder.push(focused);
+      // Track if focus has cycled back to body (end of focusable elements)
+      if (focused.tag === 'body') {
+        consecutiveBodyFocusCount++;
+        // If we've hit body twice in a row, we've cycled through all elements
+        if (consecutiveBodyFocusCount >= 2) {
+          break;
+        }
+      } else {
+        consecutiveBodyFocusCount = 0;
+        focusOrder.push(focused);
+      }
     }
 
-    // Verify no elements have negative tabindex in focus order
-    // (negative tabindex removes element from natural tab order)
-    const invalidTabIndex = focusOrder.filter(
-      (el) => el.tabIndex !== undefined && el.tabIndex < 0
-    );
+    // Only verify if we found focusable elements
+    if (focusOrder.length > 0) {
+      // Verify no elements have negative tabindex in focus order
+      // (negative tabindex removes element from natural tab order)
+      const invalidTabIndex = focusOrder.filter(
+        (el) => el.tabIndex !== undefined && el.tabIndex < 0
+      );
 
-    expect(
-      invalidTabIndex,
-      'Elements with negative tabindex found in focus order'
-    ).toHaveLength(0);
+      expect(
+        invalidTabIndex,
+        'Elements with negative tabindex found in focus order'
+      ).toHaveLength(0);
+    }
   });
 
   test('focus is visible on interactive elements', async ({ page }) => {
