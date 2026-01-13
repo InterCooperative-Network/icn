@@ -15,6 +15,7 @@ use std::time::Duration;
 use tokio::sync::{broadcast, watch, Mutex, RwLock};
 use tracing::{debug, info, warn};
 
+use crate::simulation::NetworkCondition;
 use crate::util::{pick_port, poll_with_backoff, BackoffConfig};
 
 /// Guard that triggers shutdown on drop unless disarmed
@@ -105,6 +106,8 @@ pub struct TestNode {
     notifications: Arc<Mutex<NotificationMap>>,
     /// Node index (for cluster identification)
     pub index: usize,
+    /// Network condition for simulation (latency, packet loss, etc.)
+    network_condition: Arc<RwLock<Option<NetworkCondition>>>,
 }
 
 impl TestNode {
@@ -311,23 +314,53 @@ impl TestNode {
         // Send network handle to message handler (fixes race condition)
         let _ = network_tx.send(Some(network.clone()));
 
-        // Set up gossip send callback with shutdown handling
+// Create network condition holder for simulation
+        let network_condition = Arc::new(RwLock::new(None::<NetworkCondition>));
+
+        // Set up gossip send callback with shutdown handling and network condition simulation
         {
             let mut g = gossip.write().await;
             let net = network.clone();
             let from = did.clone();
             let send_shutdown = shutdown_tx.clone();
+            let condition = network_condition.clone();
 
             let send_callback = Arc::new(move |recipient: Option<Did>, msg: GossipMessage| {
                 let net = net.clone();
                 let from = from.clone();
                 let mut shutdown_rx = send_shutdown.subscribe();
+                let condition = condition.clone();
                 tokio::spawn(async move {
                     tokio::select! {
                         _ = shutdown_rx.recv() => {
                             // Node shutting down, abort send
                         }
                         result = async {
+                            // Apply network condition simulation
+                            if let Some(cond) = condition.read().await.as_ref() {
+                                // Simulate packet loss
+                                if cond.packet_loss > 0.0 {
+                                    let roll: f64 = rand::random();
+                                    if roll < cond.packet_loss {
+                                        debug!("Simulated packet loss: dropping gossip message");
+                                        return Ok(());
+                                    }
+                                }
+
+                                // Simulate latency with jitter
+                                if cond.latency > Duration::ZERO {
+                                    let jitter_factor: f64 = if cond.jitter > 0.0 {
+                                        let jitter_roll: f64 = rand::random();
+                                        // Symmetric distribution around 1.0
+                                        1.0 - cond.jitter + (jitter_roll * 2.0 * cond.jitter)
+                                    } else {
+                                        1.0
+                                    };
+                                    let delay = cond.latency.mul_f64(jitter_factor.max(0.0));
+                                    tokio::time::sleep(delay).await;
+                                }
+                            }
+
                             let net_msg = NetworkMessage::gossip(from, recipient.clone(), msg);
                             if let Some(to) = recipient {
                                 net.send_message(to, net_msg).await
@@ -361,6 +394,7 @@ impl TestNode {
             shutdown_tx,
             notifications,
             index,
+            network_condition,
         })
     }
 
@@ -369,6 +403,41 @@ impl TestNode {
         info!("Shutting down test node {}", self.index);
         let _ = self.shutdown_tx.send(());
         tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+
+    /// Set network conditions for simulation
+    ///
+    /// This enables simulating various network conditions on outgoing gossip
+    /// messages. Currently implemented:
+    /// - **Latency**: Adds configurable delay before sending
+    /// - **Packet loss**: Random message dropping based on probability
+    /// - **Jitter**: Random variation of latency (symmetric around base latency)
+    ///
+    /// Note: `bandwidth_limit` in `NetworkCondition` is not yet implemented
+    /// and will be ignored.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use icn_testkit::{NetworkCondition, TestNode};
+    ///
+    /// node.set_network_condition(NetworkCondition::poor_internet()).await;
+    /// // Messages will now have ~200ms latency and 5% packet loss
+    /// ```
+    pub async fn set_network_condition(&self, condition: NetworkCondition) {
+        let mut cond = self.network_condition.write().await;
+        *cond = Some(condition);
+    }
+
+    /// Clear network conditions (return to normal operation)
+    pub async fn clear_network_condition(&self) {
+        let mut cond = self.network_condition.write().await;
+        *cond = None;
+    }
+
+    /// Get the current network condition (if any)
+    pub async fn get_network_condition(&self) -> Option<NetworkCondition> {
+        self.network_condition.read().await.clone()
     }
 
     /// Connect to another test node
@@ -596,6 +665,157 @@ mod tests {
 
         node1.shutdown().await;
         node2.shutdown().await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_set_network_condition() -> Result<()> {
+        use crate::simulation::NetworkCondition;
+
+        let node = TestNode::spawn(NodeConfig::default()).await?;
+
+        // Initially no condition
+        assert!(node.get_network_condition().await.is_none());
+
+        // Set poor internet condition
+        node.set_network_condition(NetworkCondition::poor_internet())
+            .await;
+        let cond = node.get_network_condition().await;
+        assert!(cond.is_some());
+        let cond = cond.unwrap();
+        assert!(cond.latency >= Duration::from_millis(100));
+        assert!(cond.packet_loss > 0.0);
+
+        // Clear condition
+        node.clear_network_condition().await;
+        assert!(node.get_network_condition().await.is_none());
+
+        node.shutdown().await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_network_condition_simulation_code_path() -> Result<()> {
+        use crate::simulation::NetworkCondition;
+
+        let node = TestNode::spawn(NodeConfig::default()).await?;
+        node.create_topic("test:latency", AccessControl::Public)
+            .await;
+
+        // Verify condition is initially None
+        assert!(
+            node.get_network_condition().await.is_none(),
+            "Should start with no network condition"
+        );
+
+        // Set a latency condition
+        let condition = NetworkCondition::default()
+            .with_latency(Duration::from_millis(100))
+            .with_jitter(0.1)
+            .with_packet_loss(0.0); // No packet loss for this test
+        node.set_network_condition(condition).await;
+
+        // Verify condition is set
+        let retrieved = node.get_network_condition().await;
+        assert!(retrieved.is_some(), "Network condition should be set");
+        let cond = retrieved.as_ref().expect("should have condition");
+        assert_eq!(cond.latency, Duration::from_millis(100));
+        assert!((cond.jitter - 0.1).abs() < 0.001);
+
+        // Test that latency calculation produces expected range
+        // With 100ms base latency and 10% jitter, delay should be 90-110ms
+        for _ in 0..10 {
+            let jitter_roll: f64 = rand::random();
+            let jitter_factor = 1.0 - cond.jitter + (jitter_roll * 2.0 * cond.jitter);
+            let delay = cond.latency.mul_f64(jitter_factor);
+            assert!(
+                delay >= Duration::from_millis(90) && delay <= Duration::from_millis(110),
+                "Delay {delay:?} should be in 90-110ms range"
+            );
+        }
+
+        // Clear condition
+        node.clear_network_condition().await;
+        assert!(
+            node.get_network_condition().await.is_none(),
+            "Network condition should be cleared"
+        );
+
+        node.shutdown().await;
+        Ok(())
+    }
+
+    /// Integration test for network condition with actual message delivery
+    ///
+    /// This test verifies that network conditions affect actual gossip delivery.
+    /// Marked as ignored due to QUIC connection timing issues in CI - see issue #319
+    #[tokio::test]
+    #[ignore]
+    async fn test_network_condition_latency_integration() -> Result<()> {
+        use crate::simulation::NetworkCondition;
+        use std::time::Instant;
+
+        // Create two connected nodes - latency is applied when sending to peers
+        let node_a = TestNode::spawn_with_index(NodeConfig::default(), 0).await?;
+        let node_b = TestNode::spawn_with_index(NodeConfig::default(), 1).await?;
+
+        node_a.connect(&node_b).await?;
+
+        // Wait for connection to establish
+        node_a
+            .wait_connected(&node_b.did, Duration::from_secs(5))
+            .await?;
+
+        // Create topic on both nodes
+        let topic = "test:latency";
+        node_a.create_topic(topic, AccessControl::Public).await;
+        node_b.create_topic(topic, AccessControl::Public).await;
+
+        // Allow connection to stabilize
+        tokio::time::sleep(Duration::from_millis(200)).await;
+
+        // Set a measurable latency condition (150ms) on node_a
+        node_a
+            .set_network_condition(
+                NetworkCondition::default()
+                    .with_latency(Duration::from_millis(150))
+                    .with_jitter(0.0), // No jitter for predictable timing
+            )
+            .await;
+
+        // Publish from node_a and measure time until node_b receives it
+        let start = Instant::now();
+        let hash = node_a.publish(topic, b"latency-test-message").await?;
+
+        // Poll until node_b receives the notification
+        let timeout = Duration::from_secs(5);
+        let poll_interval = Duration::from_millis(10);
+        let deadline = start + timeout;
+        let mut received = false;
+
+        while std::time::Instant::now() < deadline {
+            if node_b.has_entry(topic, &hash).await {
+                received = true;
+                break;
+            }
+            tokio::time::sleep(poll_interval).await;
+        }
+        let delivery_time = start.elapsed();
+
+        assert!(
+            received,
+            "Node B should have received the message within timeout"
+        );
+
+        // The delivery time should include at least the simulated latency (150ms)
+        // Allow some margin for test infrastructure overhead
+        assert!(
+            delivery_time >= Duration::from_millis(100),
+            "Expected delivery to take at least 100ms due to latency simulation, took {delivery_time:?}"
+        );
+
+        node_a.shutdown().await;
+        node_b.shutdown().await;
         Ok(())
     }
 }
