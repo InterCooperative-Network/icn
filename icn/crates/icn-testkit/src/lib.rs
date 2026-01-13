@@ -50,13 +50,13 @@ mod util;
 pub use cluster::TestCluster;
 pub use node::{NodeConfig, TestNode};
 pub use simulation::{NetworkCondition, PartitionConfig};
-pub use util::{install_crypto_provider, pick_port, TestResult};
+pub use util::{install_crypto_provider, pick_port, poll_with_backoff, BackoffConfig, TestResult};
 
 /// Re-export common types for convenience
 pub mod prelude {
     pub use crate::{
-        install_crypto_provider, pick_port, NetworkCondition, NodeConfig, PartitionConfig,
-        TestCluster, TestNode, TestResult,
+        install_crypto_provider, pick_port, poll_with_backoff, BackoffConfig, NetworkCondition,
+        NodeConfig, PartitionConfig, TestCluster, TestNode, TestResult,
     };
     pub use anyhow::Result;
     pub use std::time::Duration;

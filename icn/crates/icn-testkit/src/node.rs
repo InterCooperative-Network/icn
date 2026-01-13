@@ -15,7 +15,7 @@ use std::time::Duration;
 use tokio::sync::{broadcast, watch, Mutex, RwLock};
 use tracing::{debug, info, warn};
 
-use crate::util::pick_port;
+use crate::util::{pick_port, poll_with_backoff, BackoffConfig};
 
 /// Guard that triggers shutdown on drop unless disarmed
 ///
@@ -400,15 +400,23 @@ impl TestNode {
     }
 
     /// Wait for connection to a specific peer
+    ///
+    /// Uses exponential backoff starting at 10ms, capped at 100ms between checks.
     pub async fn wait_connected(&self, did: &Did, timeout: Duration) -> Result<()> {
-        let start = std::time::Instant::now();
-        while start.elapsed() < timeout {
-            if self.network.is_peer_connected(did).await.unwrap_or(false) {
-                return Ok(());
-            }
-            tokio::time::sleep(Duration::from_millis(50)).await;
-        }
-        anyhow::bail!("Timeout waiting for connection to {did}")
+        let network = self.network.clone();
+        let target_did = did.clone();
+
+        poll_with_backoff(
+            move || {
+                let net = network.clone();
+                let did = target_did.clone();
+                async move { net.is_peer_connected(&did).await.unwrap_or(false) }
+            },
+            BackoffConfig::new(Duration::from_millis(10), Duration::from_millis(100)),
+            timeout,
+        )
+        .await
+        .map_err(|_| anyhow::anyhow!("Timeout waiting for connection to {did}"))
     }
 
     /// Disconnect from a specific peer
@@ -429,23 +437,31 @@ impl TestNode {
     /// Wait for disconnection from a specific peer
     ///
     /// Waits until the peer is no longer connected or the timeout expires.
+    /// Uses exponential backoff starting at 10ms, capped at 100ms between checks.
     /// If the connection state cannot be determined (error), treats as disconnected
     /// since the peer handle may have been cleaned up.
     pub async fn wait_disconnected(&self, did: &Did, timeout: Duration) -> Result<()> {
-        let start = std::time::Instant::now();
-        while start.elapsed() < timeout {
-            match self.network.is_peer_connected(did).await {
-                Ok(false) => return Ok(()), // Confirmed disconnected
-                Ok(true) => {}              // Still connected, keep waiting
-                Err(_) => {
-                    // Can't determine state - peer handle likely cleaned up
-                    // Treat as disconnected since verification failed
-                    return Ok(());
+        let network = self.network.clone();
+        let target_did = did.clone();
+
+        poll_with_backoff(
+            move || {
+                let net = network.clone();
+                let did = target_did.clone();
+                async move {
+                    // Return true (done) if disconnected or if we can't determine state
+                    match net.is_peer_connected(&did).await {
+                        Ok(false) => true,  // Confirmed disconnected
+                        Ok(true) => false,  // Still connected, keep waiting
+                        Err(_) => true,     // Can't determine - treat as disconnected
+                    }
                 }
-            }
-            tokio::time::sleep(Duration::from_millis(50)).await;
-        }
-        anyhow::bail!("Timeout waiting for disconnection from {did}")
+            },
+            BackoffConfig::new(Duration::from_millis(10), Duration::from_millis(100)),
+            timeout,
+        )
+        .await
+        .map_err(|_| anyhow::anyhow!("Timeout waiting for disconnection from {did}"))
     }
 }
 
