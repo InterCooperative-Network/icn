@@ -9,6 +9,8 @@
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:debug": "playwright test --debug",
+    "test:a11y": "playwright test tests/e2e/accessibility.spec.js",
+    "test:a11y:headed": "playwright test tests/e2e/accessibility.spec.js --headed",
     "test:all": "npm run test && npm run test:e2e"
   },
   "keywords": [
@@ -20,6 +22,7 @@
   "author": "ICN Project",
   "license": "MIT",
   "devDependencies": {
+    "@axe-core/playwright": "^4.10.0",
     "@playwright/test": "^1.40.0",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.1.5",

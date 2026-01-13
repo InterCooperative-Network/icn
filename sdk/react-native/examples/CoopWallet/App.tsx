@@ -12,6 +12,9 @@
 // Crypto polyfill for React Native (must be before any crypto imports)
 import 'react-native-get-random-values';
 
+// Initialize internationalization (must be early, before components render)
+import './src/i18n';
+
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
