@@ -1,0 +1,42 @@
+# ICN CLI Translations - English
+# Format: {command}.{subcommand}.{message_type}
+# Variables: {var_name} for interpolation
+#
+# TODO(i18n): This file currently only contains keys for the identity commands
+# (id init, id show, id rotate). Additional commands will be migrated gradually.
+# See the tracking issue for the complete CLI i18n migration plan.
+
+cli:
+  # Common messages
+  common:
+    no_identity: "No identity found. Run 'icnctl id init' to create one."
+
+  # Prompts
+  prompts:
+    enter_passphrase: "Enter passphrase: "
+
+  # Identity commands
+  id:
+    init:
+      starting: "Initializing new ICN identity..."
+      generating: "Generating Ed25519 keypair"
+      success: "Identity created successfully!"
+      did_label: "DID"
+      keystore_label: "Keystore"
+      important: "IMPORTANT: Store your passphrase securely. It cannot be recovered."
+      already_exists: "Identity already exists at {path}."
+
+    show:
+      title: "Identity:"
+      did_label: "  DID:"
+      keystore_label: "  Keystore:"
+
+    rotate:
+      starting: "Rotating identity key..."
+      generating: "Generating new Ed25519 keypair"
+      success: "Key rotation successful!"
+      old_did: "Old DID"
+      new_did: "New DID"
+      reason: "Reason"
+      important: "IMPORTANT: Publish the rotation proof to maintain identity continuity."
+      timestamp: "Timestamp"

@@ -17,6 +17,12 @@
 //!
 //! This is NOT an app runtime. Apps run externally and call this API.
 
+// Initialize i18n with locale files from the locales directory.
+// TODO(i18n): Integrate t!() macro into error.rs for user-facing API error messages.
+// The locale file (locales/en.yaml) is ready; integration requires updating GatewayError
+// to use translation keys instead of hardcoded strings. See issue tracking this work.
+rust_i18n::i18n!("locales", fallback = "en");
+
 pub mod api;
 pub mod audit;
 pub mod auth;

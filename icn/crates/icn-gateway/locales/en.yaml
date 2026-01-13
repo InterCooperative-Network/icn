@@ -1,0 +1,56 @@
+# ICN Gateway API Translations - English
+# Format: {category}.{error_type}.{variant}
+# Variables: {var_name} for interpolation
+
+gateway:
+  errors:
+    # Authentication errors
+    auth_failed: "Authentication failed: {reason}"
+    auth_required: "Authentication required"
+    token_expired: "Authentication token has expired"
+    invalid_token: "Invalid authentication token"
+
+    # Authorization errors
+    authz_failed: "Authorization failed: {reason}"
+    forbidden: "Access forbidden: {reason}"
+    insufficient_permissions: "Insufficient permissions for this operation"
+
+    # Resource errors
+    not_found: "Resource not found: {resource}"
+    already_exists: "Resource already exists: {resource}"
+
+    # Request errors
+    bad_request: "Invalid request: {reason}"
+    validation_failed: "Validation failed: {reason}"
+
+    # Rate limiting
+    rate_limit_exceeded: "Rate limit exceeded"
+    rate_limit_did: "Rate limit exceeded for DID: {did}"
+    budget_exceeded: "Budget exceeded: {reason}"
+
+    # Server errors
+    internal: "Internal server error"
+    service_unavailable: "Service temporarily unavailable"
+
+  # Health check messages
+  health:
+    status_ok: "Service is healthy"
+    status_degraded: "Service is degraded"
+    status_unavailable: "Service is unavailable"
+    component_available: "Available"
+    component_unavailable: "Unavailable"
+
+  # API responses
+  responses:
+    success: "Operation completed successfully"
+    created: "Resource created successfully"
+    updated: "Resource updated successfully"
+    deleted: "Resource deleted successfully"
+
+  # Validation messages
+  validation:
+    required_field: "{field} is required"
+    invalid_format: "Invalid format for {field}"
+    invalid_did: "Invalid DID format"
+    invalid_amount: "Invalid amount: must be positive"
+    amount_too_large: "Amount exceeds maximum allowed"

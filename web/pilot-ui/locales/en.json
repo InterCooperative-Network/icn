@@ -1,0 +1,197 @@
+{
+  "app": {
+    "title": "ICN Timebank",
+    "subtitle": "Cooperative Time Banking"
+  },
+
+  "nav": {
+    "overview": "Overview",
+    "network": "Network",
+    "ledger": "Ledger",
+    "governance": "Governance",
+    "compute": "Compute Tasks",
+    "federation": "Federation",
+    "metrics": "System Metrics",
+    "logs": "System Logs",
+    "settings": "Settings"
+  },
+
+  "status": {
+    "online": "Online",
+    "offline": "Offline",
+    "connecting": "Connecting...",
+    "syncing": "Syncing...",
+    "error": "Error"
+  },
+
+  "common": {
+    "loading": "Loading...",
+    "noData": "No data available",
+    "error": "An error occurred",
+    "retry": "Retry",
+    "refresh": "Refresh",
+    "save": "Save",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "delete": "Delete",
+    "edit": "Edit",
+    "close": "Close",
+    "search": "Search",
+    "filter": "Filter",
+    "all": "All",
+    "none": "None",
+    "yes": "Yes",
+    "no": "No"
+  },
+
+  "auth": {
+    "title": "Authentication",
+    "signIn": "Sign In",
+    "signOut": "Sign Out",
+    "challenge": "Authentication Challenge",
+    "verify": "Verify",
+    "enterDid": "Enter your DID",
+    "enterSignature": "Enter signature",
+    "help": {
+      "title": "Authentication Help",
+      "step1": "1. Copy the challenge below",
+      "step2": "2. Sign it with your ICN identity",
+      "step3": "3. Paste the signature to authenticate"
+    },
+    "errors": {
+      "invalidDid": "Invalid DID format",
+      "invalidSignature": "Invalid signature",
+      "expired": "Challenge expired, please refresh",
+      "failed": "Authentication failed"
+    }
+  },
+
+  "overview": {
+    "title": "Dashboard Overview",
+    "nodeInfo": "Node Information",
+    "did": "Node DID",
+    "version": "Version",
+    "uptime": "Uptime",
+    "recentActivity": "Recent Activity",
+    "noActivity": "No recent activity"
+  },
+
+  "network": {
+    "title": "Network Status",
+    "connectedPeers": "Connected Peers",
+    "noPeers": "No connected peers",
+    "peerDid": "Peer DID",
+    "address": "Address",
+    "latency": "Latency",
+    "lastSeen": "Last Seen",
+    "errors": {
+      "loadFailed": "Failed to load peers"
+    }
+  },
+
+  "ledger": {
+    "title": "Ledger",
+    "entries": "Entries",
+    "balance": "Balance",
+    "transactions": "Transactions",
+    "filter": {
+      "all": "All Entries",
+      "today": "Today",
+      "week": "This Week",
+      "month": "This Month"
+    },
+    "columns": {
+      "date": "Date",
+      "from": "From",
+      "to": "To",
+      "amount": "Amount",
+      "currency": "Currency",
+      "memo": "Memo"
+    },
+    "noEntries": "No ledger entries found",
+    "errors": {
+      "loadFailed": "Failed to load ledger entries"
+    }
+  },
+
+  "governance": {
+    "title": "Governance",
+    "proposals": "Proposals",
+    "voting": "Voting",
+    "domains": "Domains",
+    "noProposals": "No active proposals"
+  },
+
+  "compute": {
+    "title": "Compute Tasks",
+    "filter": {
+      "all": "All Tasks",
+      "queued": "Queued",
+      "running": "Running",
+      "completed": "Completed",
+      "failed": "Failed"
+    },
+    "columns": {
+      "taskId": "Task ID",
+      "status": "Status",
+      "submitted": "Submitted",
+      "duration": "Duration"
+    },
+    "noTasks": "No compute tasks"
+  },
+
+  "federation": {
+    "title": "Federation",
+    "networks": "Federated Networks",
+    "noNetworks": "No federated networks"
+  },
+
+  "metrics": {
+    "title": "System Metrics",
+    "noMetrics": "No metrics available"
+  },
+
+  "logs": {
+    "title": "System Logs",
+    "level": {
+      "all": "All Levels",
+      "error": "Error",
+      "warn": "Warning",
+      "info": "Info",
+      "debug": "Debug"
+    },
+    "noLogs": "No log entries"
+  },
+
+  "settings": {
+    "title": "Settings",
+    "gateway": {
+      "title": "Gateway Configuration",
+      "apiEndpoint": "Gateway API Endpoint",
+      "wsEndpoint": "WebSocket Endpoint",
+      "refreshInterval": "Refresh Interval (seconds)"
+    },
+    "appearance": {
+      "title": "Appearance",
+      "theme": "Theme",
+      "darkMode": "Dark Mode",
+      "lightMode": "Light Mode"
+    },
+    "save": "Save Settings",
+    "reset": "Reset to Defaults"
+  },
+
+  "errors": {
+    "connectionFailed": "Failed to connect to node",
+    "fetchFailed": "Failed to fetch data",
+    "saveFailed": "Failed to save changes",
+    "unknownError": "An unknown error occurred"
+  },
+
+  "accessibility": {
+    "skipToContent": "Skip to main content",
+    "toggleTheme": "Toggle dark/light mode",
+    "openMenu": "Open navigation menu",
+    "closeMenu": "Close navigation menu"
+  }
+}

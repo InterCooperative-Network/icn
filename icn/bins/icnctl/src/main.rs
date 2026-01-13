@@ -2,6 +2,10 @@
 #![deny(clippy::unwrap_used, clippy::expect_used)]
 
 use anyhow::{bail, Context, Result};
+use rust_i18n::t;
+
+// Initialize i18n with locale files from the locales directory
+rust_i18n::i18n!("locales", fallback = "en");
 use clap::{CommandFactory, Parser, Subcommand};
 use clap_complete::generate;
 // Governance types no longer needed - using RPC instead
@@ -1861,6 +1865,13 @@ fn confirm_passphrase() -> Result<Vec<u8>> {
 async fn main() -> Result<()> {
     let args = Args::parse();
 
+    // Initialize locale from environment or system
+    let locale = std::env::var("ICN_LOCALE")
+        .ok()
+        .or_else(sys_locale::get_locale)
+        .unwrap_or_else(|| "en".to_string());
+    rust_i18n::set_locale(&locale);
+
     // Initialize simple logging
     icn_obs::init()?;
 
@@ -1973,12 +1984,16 @@ fn handle_id_command(cmd: IdCommands, data_dir: &Path) -> Result<()> {
             // Check if keystore already exists
             if keystore_path.exists() {
                 bail!(
-                    "Identity already exists at {}. Use 'id show' to view it.",
-                    keystore_path.display()
+                    "{} {}",
+                    t!(
+                        "cli.id.init.already_exists",
+                        path = keystore_path.display().to_string()
+                    ),
+                    "Use 'id show' to view it."
                 );
             }
 
-            println!("Initializing new ICN identity...\n");
+            println!("{}\n", t!("cli.id.init.starting"));
 
             // Get passphrase
             let passphrase = confirm_passphrase()?;
@@ -1987,44 +2002,56 @@ fn handle_id_command(cmd: IdCommands, data_dir: &Path) -> Result<()> {
             std::fs::create_dir_all(data_dir).context("Failed to create data directory")?;
 
             // Initialize keystore (generates keypair internally)
-            println!("\nGenerating Ed25519 keypair...");
+            println!("\n{}...", t!("cli.id.init.generating"));
             let keystore = AgeKeyStore::init(&keystore_path, &passphrase)?;
 
-            println!("\n✓ Identity created successfully!");
-            println!("  DID: {}", keystore.get_keypair()?.did());
-            println!("  Keystore: {}", keystore_path.display());
-            println!("\nIMPORTANT: Store your passphrase securely. It cannot be recovered.");
+            println!("\n✓ {}", t!("cli.id.init.success"));
+            println!(
+                "  {}: {}",
+                t!("cli.id.init.did_label"),
+                keystore.get_keypair()?.did()
+            );
+            println!(
+                "  {}: {}",
+                t!("cli.id.init.keystore_label"),
+                keystore_path.display()
+            );
+            println!("\n{}", t!("cli.id.init.important"));
         }
 
         IdCommands::Show => {
             // Check if keystore exists
             if !keystore_path.exists() {
-                bail!("No identity found. Run 'icnctl id init' to create one.");
+                bail!("{}", t!("cli.common.no_identity"));
             }
 
             // Get passphrase
-            let passphrase = read_passphrase("Enter passphrase: ")?;
+            let passphrase = read_passphrase(&t!("cli.prompts.enter_passphrase"))?;
 
             // Open and unlock keystore
             let mut keystore = AgeKeyStore::open(&keystore_path)?;
             keystore.unlock(&passphrase)?;
 
             let keypair = keystore.get_keypair()?;
-            println!("Identity:");
-            println!("  DID: {}", keypair.did());
-            println!("  Keystore: {}", keystore_path.display());
+            println!("{}", t!("cli.id.show.title"));
+            println!("{} {}", t!("cli.id.show.did_label"), keypair.did());
+            println!(
+                "{} {}",
+                t!("cli.id.show.keystore_label"),
+                keystore_path.display()
+            );
         }
 
         IdCommands::Rotate { reason } => {
             // Check if keystore exists
             if !keystore_path.exists() {
-                bail!("No identity found. Run 'icnctl id init' to create one.");
+                bail!("{}", t!("cli.common.no_identity"));
             }
 
-            println!("Rotating identity key...\n");
+            println!("{}\n", t!("cli.id.rotate.starting"));
 
             // Get passphrase
-            let passphrase = read_passphrase("Enter passphrase: ")?;
+            let passphrase = read_passphrase(&t!("cli.prompts.enter_passphrase"))?;
 
             // Open and unlock keystore
             let mut keystore = AgeKeyStore::open(&keystore_path)?;
@@ -2033,23 +2060,27 @@ fn handle_id_command(cmd: IdCommands, data_dir: &Path) -> Result<()> {
             let old_did = keystore.get_keypair()?.did().clone();
 
             // Generate new keypair
-            println!("Generating new Ed25519 keypair...");
+            println!("{}...", t!("cli.id.rotate.generating"));
             let new_keypair = KeyPair::generate()?;
             let new_did = new_keypair.did().clone();
 
             // Perform rotation
             let rotation = keystore.rotate(new_keypair)?;
 
-            println!("\n✓ Key rotation successful!");
-            println!("  Old DID: {old_did}");
-            println!("  New DID: {new_did}");
+            println!("\n✓ {}", t!("cli.id.rotate.success"));
+            println!("  {}: {old_did}", t!("cli.id.rotate.old_did"));
+            println!("  {}: {new_did}", t!("cli.id.rotate.new_did"));
             if let Some(r) = reason {
-                println!("  Reason: {r}");
+                println!("  {}: {r}", t!("cli.id.rotate.reason"));
             } else {
-                println!("  Reason: {:?}", rotation.reason);
+                println!("  {}: {:?}", t!("cli.id.rotate.reason"), rotation.reason);
             }
-            println!("\nIMPORTANT: Publish the rotation proof to maintain identity continuity.");
-            println!("  Timestamp: {}", rotation.timestamp);
+            println!("\n{}", t!("cli.id.rotate.important"));
+            println!(
+                "  {}: {}",
+                t!("cli.id.rotate.timestamp"),
+                rotation.timestamp
+            );
         }
 
         #[cfg(feature = "post-quantum")]
