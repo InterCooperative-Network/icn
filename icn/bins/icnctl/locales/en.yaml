@@ -1,41 +1,30 @@
 # ICN CLI Translations - English
 # Format: {command}.{subcommand}.{message_type}
 # Variables: {var_name} for interpolation
+#
+# TODO(i18n): This file currently only contains keys for the identity commands
+# (id init, id show, id rotate). Additional commands will be migrated gradually.
+# See the tracking issue for the complete CLI i18n migration plan.
 
 cli:
   # Common messages
   common:
     no_identity: "No identity found. Run 'icnctl id init' to create one."
-    auth_required: "Authentication required but no identity found. Run 'icnctl id init' first."
-    passphrase_mismatch: "Passphrases do not match"
-    cancelled: "Operation cancelled."
 
   # Prompts
   prompts:
     enter_passphrase: "Enter passphrase: "
-    confirm_passphrase: "Confirm passphrase: "
-    overwrite_confirm: "File exists. Overwrite? (y/N): "
-    continue_confirm: "Continue? (y/N): "
-
-  # Status command
-  status:
-    title: "ICN Daemon Status"
-    connected: "Connected"
-    offline: "Offline"
-    version: "Version"
-    uptime: "Uptime"
-    peers: "Peers"
 
   # Identity commands
   id:
     init:
       starting: "Initializing new ICN identity..."
-      generating: "Generating Ed25519 keypair..."
+      generating: "Generating Ed25519 keypair"
       success: "Identity created successfully!"
       did_label: "DID"
       keystore_label: "Keystore"
       important: "IMPORTANT: Store your passphrase securely. It cannot be recovered."
-      already_exists: "Identity already exists at {path}. Overwrite?"
+      already_exists: "Identity already exists at {path}."
 
     show:
       title: "Identity:"
@@ -44,279 +33,10 @@ cli:
 
     rotate:
       starting: "Rotating identity key..."
-      generating: "Generating new Ed25519 keypair..."
+      generating: "Generating new Ed25519 keypair"
       success: "Key rotation successful!"
       old_did: "Old DID"
       new_did: "New DID"
       reason: "Reason"
       important: "IMPORTANT: Publish the rotation proof to maintain identity continuity."
       timestamp: "Timestamp"
-
-    upgrade_pq:
-      starting: "Upgrading identity to post-quantum security..."
-      description: "This will add ML-DSA (Dilithium3) signing keys and ML-KEM (Kyber768) encryption keys."
-      did_unchanged: "Your DID will remain the same, but cryptography will be hybrid:"
-      sig_hybrid: "Signatures: Ed25519 + ML-DSA (both required)"
-      enc_hybrid: "Encryption: X25519 + ML-KEM (combined via HKDF)"
-      generating: "Generating post-quantum keys (this may take a moment)..."
-      success: "Post-quantum upgrade successful!"
-      did_label: "DID"
-      sig_info: "Signatures: Ed25519 (64B) + ML-DSA-65 (~3.3KB)"
-      enc_info: "Encryption: X25519 (32B) + ML-KEM-768 (~1.1KB ciphertext)"
-      security_info: "Security: Hybrid (both algorithms required)"
-      future_ops: "All future operations will use hybrid cryptography."
-      backup_reminder: "IMPORTANT: Backup your upgraded keystore!"
-
-    export:
-      success: "Identity exported successfully!"
-      did_label: "DID"
-      from_label: "From"
-      to_label: "To"
-      important_title: "IMPORTANT:"
-      store_securely: "Store this file securely"
-      encrypted_note: "The file is encrypted with your passphrase"
-      import_note: "You'll need the same passphrase to import it"
-
-    import:
-      cancelled: "Import cancelled."
-      overwriting: "Overwriting existing identity..."
-      success: "Identity imported successfully!"
-      from_label: "From"
-      to_label: "To"
-      did_label: "DID"
-      not_found: "Input file not found: {path}"
-
-  # Device commands
-  device:
-    list:
-      title: "Registered Devices ({count}):"
-      name: "Name"
-      did: "DID"
-      added: "Added"
-      last_seen: "Last Seen"
-      no_devices: "No devices registered."
-
-    add:
-      success: "Device added successfully!"
-      label: "Device name/label"
-
-    remove:
-      success: "Device removed successfully!"
-      confirm: "Remove device '{name}'? This cannot be undone."
-
-  # Recovery commands
-  recovery:
-    config:
-      success: "Recovery configuration saved!"
-      trustees_title: "Recovery trustees ({count}):"
-      threshold: "Threshold"
-      delay: "Delay period"
-      seconds: "{delay} seconds ({hours} hours)"
-
-    initiate:
-      starting: "Initiating recovery process..."
-      request_sent: "Recovery request sent to trustees."
-      waiting: "Waiting for {threshold} of {total} approvals."
-
-    approve:
-      success: "Recovery approved!"
-      pending: "Recovery pending ({approved}/{threshold} approvals)."
-
-  # Trust commands
-  trust:
-    score_invalid: "Trust score must be between 0.0 and 1.0"
-
-    add:
-      success: "Trust edge added successfully!"
-      from: "From"
-      to: "To"
-      score: "Score"
-      reason: "Reason"
-
-    remove:
-      success: "Trust edge removed."
-
-    show:
-      title: "Trust Graph for {did}:"
-      outgoing: "Outgoing edges ({count}):"
-      incoming: "Incoming edges ({count}):"
-      score_label: "Score"
-      context_label: "Context"
-      no_edges: "No trust edges found."
-
-    compute:
-      title: "Computed Trust Path"
-      from: "From"
-      to: "To"
-      total_score: "Total Score"
-      path: "Path"
-      no_path: "No trust path found."
-
-  # Ledger commands
-  ledger:
-    send:
-      success: "Transaction submitted!"
-      tx_id: "Transaction ID"
-      from: "From"
-      to: "To"
-      amount: "Amount"
-      currency: "Currency"
-
-    balance:
-      title: "Balances for {did}:"
-      currency: "Currency"
-      available: "Available"
-      pending: "Pending"
-
-    history:
-      title: "Transaction History ({count} entries):"
-      no_entries: "No transactions found."
-
-  # Network commands
-  network:
-    peer_url_invalid: "Invalid peer URL format. Expected: icn://did:icn:PUBKEY@IP:PORT"
-
-    discover:
-      starting: "Discovering peers via mDNS..."
-      found: "Found {count} peers:"
-      no_peers: "No peers found."
-
-    connect:
-      success: "Connected to peer!"
-      did: "DID"
-      address: "Address"
-
-    status:
-      title: "Network Status"
-      connected_peers: "Connected Peers"
-      pending_connections: "Pending Connections"
-
-  # Federation commands
-  federation:
-    config_not_found: "No configuration file found at {path}"
-    unknown_key: "Unknown configuration key: {key}"
-    valid_keys: "Valid keys:"
-
-    enable:
-      success: "Federation enabled."
-
-    disable:
-      success: "Federation disabled."
-
-    status:
-      title: "Federation Status"
-      enabled: "Enabled"
-      network_name: "Network Name"
-      federations: "Active Federations"
-
-  # Governance commands
-  gov:
-    domain:
-      created: "Domain created!"
-      domain_id: "Domain ID"
-
-    proposal:
-      created: "Proposal created!"
-      proposal_id: "Proposal ID"
-
-    vote:
-      success: "Vote recorded!"
-      proposal: "Proposal"
-      vote_label: "Vote"
-
-  # Compute commands
-  compute:
-    submit:
-      success: "Task submitted!"
-      task_id: "Task ID"
-      status: "Status"
-
-    status:
-      title: "Task Status"
-      task_id: "Task ID"
-      status: "Status"
-      result: "Result"
-      queued: "Queued"
-      running: "Running"
-      completed: "Completed"
-      failed: "Failed"
-
-  # Backup commands
-  backup:
-    creating: "Creating backup..."
-    success: "Backup created successfully!"
-    output: "Output"
-    size: "Size"
-
-  restore:
-    starting: "Restoring from backup..."
-    success: "Restore completed successfully!"
-    input: "Input"
-
-  verify_backup:
-    starting: "Verifying backup integrity..."
-    success: "Backup verified successfully!"
-    failed: "Backup verification failed!"
-
-  # Contract commands
-  contract:
-    deploy:
-      success: "Contract deployed!"
-      contract_id: "Contract ID"
-
-    execute:
-      success: "Contract executed!"
-      result: "Result"
-      not_participant: "You ({did}) are not a participant in this contract"
-
-    status:
-      title: "Contract Status"
-      contract_id: "Contract ID"
-      state: "State"
-
-  # Steward commands
-  steward:
-    register:
-      success: "Steward registered!"
-      did: "DID"
-
-    vouch:
-      success: "Vouch submitted!"
-      for: "For"
-      score: "Score"
-
-  # Auth commands
-  auth:
-    token:
-      success: "Authentication successful!"
-      token_label: "Token"
-      expires: "Expires"
-
-  # Init coop wizard
-  init_coop:
-    welcome: "Welcome to ICN Cooperative Setup!"
-    name_prompt: "Enter cooperative name: "
-    members_prompt: "Enter initial member DIDs (comma-separated): "
-    confirm: "Create cooperative '{name}' with {count} members?"
-    creating: "Creating cooperative..."
-    success: "Cooperative created successfully!"
-
-  # API commands
-  api:
-    export_openapi:
-      success: "OpenAPI schema exported!"
-      output: "Output"
-
-  # Shell completions
-  completions:
-    generated: "Shell completions generated for {shell}."
-
-# Error messages
-errors:
-  file_not_found: "File not found: {path}"
-  invalid_input: "Invalid input: {message}"
-  connection_failed: "Connection failed: {reason}"
-  timeout: "Operation timed out"
-  permission_denied: "Permission denied: {reason}"
-  already_exists: "Already exists: {item}"
-  not_found: "Not found: {item}"

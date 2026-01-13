@@ -1985,7 +1985,10 @@ fn handle_id_command(cmd: IdCommands, data_dir: &Path) -> Result<()> {
             if keystore_path.exists() {
                 bail!(
                     "{} {}",
-                    t!("cli.id.init.already_exists", path = keystore_path.display().to_string()),
+                    t!(
+                        "cli.id.init.already_exists",
+                        path = keystore_path.display().to_string()
+                    ),
                     "Use 'id show' to view it."
                 );
             }
@@ -2003,8 +2006,16 @@ fn handle_id_command(cmd: IdCommands, data_dir: &Path) -> Result<()> {
             let keystore = AgeKeyStore::init(&keystore_path, &passphrase)?;
 
             println!("\n✓ {}", t!("cli.id.init.success"));
-            println!("  {}: {}", t!("cli.id.init.did_label"), keystore.get_keypair()?.did());
-            println!("  {}: {}", t!("cli.id.init.keystore_label"), keystore_path.display());
+            println!(
+                "  {}: {}",
+                t!("cli.id.init.did_label"),
+                keystore.get_keypair()?.did()
+            );
+            println!(
+                "  {}: {}",
+                t!("cli.id.init.keystore_label"),
+                keystore_path.display()
+            );
             println!("\n{}", t!("cli.id.init.important"));
         }
 
@@ -2024,7 +2035,11 @@ fn handle_id_command(cmd: IdCommands, data_dir: &Path) -> Result<()> {
             let keypair = keystore.get_keypair()?;
             println!("{}", t!("cli.id.show.title"));
             println!("{} {}", t!("cli.id.show.did_label"), keypair.did());
-            println!("{} {}", t!("cli.id.show.keystore_label"), keystore_path.display());
+            println!(
+                "{} {}",
+                t!("cli.id.show.keystore_label"),
+                keystore_path.display()
+            );
         }
 
         IdCommands::Rotate { reason } => {
@@ -2061,7 +2076,11 @@ fn handle_id_command(cmd: IdCommands, data_dir: &Path) -> Result<()> {
                 println!("  {}: {:?}", t!("cli.id.rotate.reason"), rotation.reason);
             }
             println!("\n{}", t!("cli.id.rotate.important"));
-            println!("  {}: {}", t!("cli.id.rotate.timestamp"), rotation.timestamp);
+            println!(
+                "  {}: {}",
+                t!("cli.id.rotate.timestamp"),
+                rotation.timestamp
+            );
         }
 
         #[cfg(feature = "post-quantum")]

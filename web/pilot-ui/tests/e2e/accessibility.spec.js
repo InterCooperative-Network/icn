@@ -160,8 +160,9 @@ test.describe('Accessibility - Keyboard Navigation', () => {
   });
 
   test('focus is visible on interactive elements', async ({ page }) => {
+    // Test that focusable elements have accessible names
     const results = await new AxeBuilder({ page })
-      .withRules(['focus-order-semantics'])
+      .withRules(['focusable-no-name'])
       .analyze();
 
     // Log any focus-related issues as warnings
@@ -181,8 +182,13 @@ test.describe('Accessibility - Dark Mode', () => {
     if ((await themeToggle.count()) > 0) {
       await themeToggle.click();
 
-      // Wait for theme transition
-      await page.waitForTimeout(300);
+      // Wait for theme transition by checking for theme attribute change
+      await page.waitForFunction(() => {
+        const html = document.documentElement;
+        return html.hasAttribute('data-theme') || html.classList.contains('dark');
+      }, { timeout: 1000 }).catch(() => {
+        // Theme may already be applied or use different mechanism
+      });
 
       // Re-run accessibility scan
       const results = await new AxeBuilder({ page }).withTags(WCAG_TAGS).analyze();
@@ -203,7 +209,12 @@ test.describe('Accessibility - Dark Mode', () => {
     const themeToggle = page.locator('#theme-toggle, [data-theme-toggle]');
     if ((await themeToggle.count()) > 0) {
       await themeToggle.click();
-      await page.waitForTimeout(300);
+
+      // Wait for theme transition
+      await page.waitForFunction(() => {
+        const html = document.documentElement;
+        return html.hasAttribute('data-theme') || html.classList.contains('dark');
+      }, { timeout: 1000 }).catch(() => {});
 
       const results = await new AxeBuilder({ page })
         .withRules(['color-contrast'])
@@ -277,15 +288,19 @@ test.describe('Accessibility - Modal and Dialog', () => {
 
     // Try to open the help modal
     const helpButton = page.locator('#show-auth-help, [data-help-trigger]');
+    const modal = page.locator('[role="dialog"], .modal, #auth-help-modal');
+
     if ((await helpButton.count()) > 0) {
       await helpButton.click();
 
-      // Wait for modal to appear
-      await page.waitForTimeout(200);
+      // Wait for modal to be visible instead of using fixed timeout
+      try {
+        await modal.first().waitFor({ state: 'visible', timeout: 1000 });
+      } catch {
+        // Modal may not appear or use different selectors
+      }
 
-      // Scan just the modal
-      const modal = page.locator('[role="dialog"], .modal, #auth-help-modal');
-      if ((await modal.count()) > 0) {
+      if ((await modal.count()) > 0 && (await modal.first().isVisible())) {
         const results = await new AxeBuilder({ page })
           .include('[role="dialog"], .modal, #auth-help-modal')
           .withTags(WCAG_TAGS)

@@ -125,8 +125,8 @@ where
         tokio::time::sleep(sleep_time).await;
 
         // Increase delay with exponential backoff, capped at max
-        delay = Duration::from_secs_f64(delay.as_secs_f64() * config.multiplier)
-            .min(config.max_delay);
+        delay =
+            Duration::from_secs_f64(delay.as_secs_f64() * config.multiplier).min(config.max_delay);
     }
 }
 
@@ -286,6 +286,9 @@ mod tests {
 
         assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();
-        assert!(err_msg.contains("Timeout"), "Expected timeout error: {err_msg}");
+        assert!(
+            err_msg.contains("Timeout"),
+            "Expected timeout error: {err_msg}"
+        );
     }
 }

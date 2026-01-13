@@ -314,7 +314,7 @@ impl TestNode {
         // Send network handle to message handler (fixes race condition)
         let _ = network_tx.send(Some(network.clone()));
 
-// Create network condition holder for simulation
+        // Create network condition holder for simulation
         let network_condition = Arc::new(RwLock::new(None::<NetworkCondition>));
 
         // Set up gossip send callback with shutdown handling and network condition simulation
@@ -566,9 +566,9 @@ impl TestNode {
                 async move {
                     // Return true (done) if disconnected or if we can't determine state
                     match net.is_peer_connected(&did).await {
-                        Ok(false) => true,  // Confirmed disconnected
-                        Ok(true) => false,  // Still connected, keep waiting
-                        Err(_) => true,     // Can't determine - treat as disconnected
+                        Ok(false) => true, // Confirmed disconnected
+                        Ok(true) => false, // Still connected, keep waiting
+                        Err(_) => true,    // Can't determine - treat as disconnected
                     }
                 }
             },
