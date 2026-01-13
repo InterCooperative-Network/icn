@@ -22,7 +22,7 @@ rand.workspace = true
 sha2 = "0.10"
 hex = "0.4"
 zstd = "0.13"
-blake3 = "1.5"
+blake3 = "1.8"
 ed25519-dalek = { version = "2.1", features = ["rand_core"] }
 
 [dev-dependencies]
