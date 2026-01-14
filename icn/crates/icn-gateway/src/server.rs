@@ -1011,6 +1011,7 @@ impl GatewayServer {
                                 .service(api::federation::trigger_settlement)
                                 .service(api::federation::process_scheduled_settlements)
                                 .service(api::federation::perform_multilateral_netting)
+                                .service(api::federation::apply_multilateral_netting)
                                 .wrap(middleware::from_fn(
                                     crate::rate_limit::rate_limit_middleware,
                                 ))

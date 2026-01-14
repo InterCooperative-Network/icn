@@ -408,7 +408,9 @@ impl ClearingManager {
     }
 
     /// Perform multilateral netting across all agreements for a given currency
-    /// This finds cycles in the debt graph and cancels them
+    /// This computes which cycles could be canceled and returns the results.
+    /// NOTE: This is informational only - it does NOT modify positions.
+    /// Use apply_multilateral_netting() to actually update positions.
     pub fn perform_multilateral_netting(
         &self,
         currency: &str,
@@ -463,6 +465,74 @@ impl ClearingManager {
         }
 
         Ok(result)
+    }
+
+    /// Apply multilateral netting results to positions
+    /// This actually modifies the stored positions based on netting results
+    pub fn apply_multilateral_netting(
+        &self,
+        result: &crate::netting::NettingResult,
+    ) -> Result<()> {
+        let mut positions = self.positions.write().unwrap_or_else(|poisoned| {
+            warn!("Positions lock poisoned, recovering");
+            poisoned.into_inner()
+        });
+        let agreements = self.agreements.read().unwrap_or_else(|poisoned| {
+            warn!("Agreements lock poisoned, recovering");
+            poisoned.into_inner()
+        });
+
+        // First, zero out all positions that were netted
+        for obligation in &result.original {
+            // Find the agreement between these parties
+            for (agreement_id, agreement) in agreements.iter() {
+                let is_match = (agreement.coop_a == obligation.from && agreement.coop_b == obligation.to)
+                    || (agreement.coop_a == obligation.to && agreement.coop_b == obligation.from);
+
+                if is_match {
+                    if let Some(position) = positions.get_mut(agreement_id) {
+                        // Reset to zero - we'll rebuild from netted obligations
+                        position.coop_a_owes_b = 0;
+                        position.coop_b_owes_a = 0;
+                    }
+                }
+            }
+        }
+
+        // Now apply the netted obligations
+        for obligation in &result.netted {
+            for (agreement_id, agreement) in agreements.iter() {
+                let forward_match = agreement.coop_a == obligation.from && agreement.coop_b == obligation.to;
+                let reverse_match = agreement.coop_a == obligation.to && agreement.coop_b == obligation.from;
+
+                if forward_match {
+                    if let Some(position) = positions.get_mut(agreement_id) {
+                        position.coop_a_owes_b = obligation.amount;
+                        let pos_key = Self::position_key(agreement_id);
+                        let pos_value = serde_json::to_vec(position)?;
+                        self.store.put(&pos_key, &pos_value)?;
+                    }
+                } else if reverse_match {
+                    if let Some(position) = positions.get_mut(agreement_id) {
+                        position.coop_b_owes_a = obligation.amount;
+                        let pos_key = Self::position_key(agreement_id);
+                        let pos_value = serde_json::to_vec(position)?;
+                        self.store.put(&pos_key, &pos_value)?;
+                    }
+                }
+            }
+        }
+
+        drop(agreements);
+        drop(positions);
+
+        info!(
+            "Applied netting: reduced {} obligations to {}",
+            result.original.len(),
+            result.netted.len()
+        );
+
+        Ok(())
     }
 
     /// Check for agreements that are due for settlement

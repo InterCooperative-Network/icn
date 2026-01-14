@@ -533,7 +533,7 @@ pub struct NettingResultResponse {
         ("currency" = String, Path, description = "Currency code (e.g., USD, hours)")
     ),
     responses(
-        (status = 200, description = "Netting completed", body = NettingResultResponse),
+        (status = 200, description = "Netting analysis completed (positions NOT modified)", body = NettingResultResponse),
         (status = 401, description = "Unauthorized"),
         (status = 500, description = "Internal server error")
     ),
@@ -545,10 +545,51 @@ pub async fn perform_multilateral_netting(
     fed_mgr: web::Data<Arc<FederationManager>>,
     path: web::Path<String>,
 ) -> Result<HttpResponse> {
-    require_scope(&http_req, "federation:write")?;
+    require_scope(&http_req, "federation:read")?; // Read-only analysis
 
     let currency = path.into_inner();
     let result = fed_mgr.perform_multilateral_netting(&currency).await?;
+
+    let response = NettingResultResponse {
+        cycles_canceled: result.cycles_canceled.len(),
+        amount_reduced: result.amount_reduced,
+        original_obligations: result.original.len(),
+        netted_obligations: result.netted.len(),
+    };
+
+    Ok(HttpResponse::Ok().json(response))
+}
+
+/// POST /federation/clearing/netting/{currency}/apply - Apply multilateral netting to positions
+#[utoipa::path(
+    post,
+    path = "/federation/clearing/netting/{currency}/apply",
+    tag = "Federation",
+    params(
+        ("currency" = String, Path, description = "Currency code (e.g., USD, hours)")
+    ),
+    responses(
+        (status = 200, description = "Netting applied and positions updated", body = NettingResultResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(("bearer_auth" = []))
+)]
+#[post("/clearing/netting/{currency}/apply")]
+pub async fn apply_multilateral_netting(
+    http_req: HttpRequest,
+    fed_mgr: web::Data<Arc<FederationManager>>,
+    path: web::Path<String>,
+) -> Result<HttpResponse> {
+    require_scope(&http_req, "federation:write")?; // Write permission required
+
+    let currency = path.into_inner();
+    
+    // First compute netting
+    let result = fed_mgr.perform_multilateral_netting(&currency).await?;
+    
+    // Then apply it
+    fed_mgr.apply_multilateral_netting(&result).await?;
 
     let response = NettingResultResponse {
         cycles_canceled: result.cycles_canceled.len(),

@@ -107,13 +107,24 @@ impl NettingEngine {
         participants
     }
 
+    /// Build adjacency list for efficient neighbor lookup
+    fn build_adjacency_list(&self) -> HashMap<String, Vec<String>> {
+        let mut adj_list: HashMap<String, Vec<String>> = HashMap::new();
+        for ((from, to), amount) in &self.graph {
+            if *amount > 0 {
+                adj_list.entry(from.clone()).or_default().push(to.clone());
+            }
+        }
+        adj_list
+    }
+
     /// Find a cycle starting from a given node using DFS
-    fn find_cycle(&self, start: &str) -> Option<Vec<String>> {
+    fn find_cycle(&self, start: &str, adj_list: &HashMap<String, Vec<String>>) -> Option<Vec<String>> {
         let mut visited = HashSet::new();
         let mut path = Vec::new();
         let mut path_set = HashSet::new();
 
-        self.dfs_find_cycle(start, &mut visited, &mut path, &mut path_set)
+        self.dfs_find_cycle(start, &mut visited, &mut path, &mut path_set, adj_list)
     }
 
     fn dfs_find_cycle(
@@ -122,6 +133,7 @@ impl NettingEngine {
         visited: &mut HashSet<String>,
         path: &mut Vec<String>,
         path_set: &mut HashSet<String>,
+        adj_list: &HashMap<String, Vec<String>>,
     ) -> Option<Vec<String>> {
         if path_set.contains(current) {
             // Found a cycle
@@ -139,10 +151,10 @@ impl NettingEngine {
         path.push(current.to_string());
         path_set.insert(current.to_string());
 
-        // Find all neighbors (people current owes money to)
-        for ((from, to), amount) in &self.graph {
-            if from == current && *amount > 0 {
-                if let Some(cycle) = self.dfs_find_cycle(to, visited, path, path_set) {
+        // Find all neighbors using adjacency list (O(1) lookup instead of O(E))
+        if let Some(neighbors) = adj_list.get(current) {
+            for neighbor in neighbors {
+                if let Some(cycle) = self.dfs_find_cycle(neighbor, visited, path, path_set, adj_list) {
                     return Some(cycle);
                 }
             }
@@ -229,15 +241,22 @@ impl NettingEngine {
         let mut cycles = Vec::new();
         let participants = self.get_participants();
 
+        // Build adjacency list once for efficient neighbor lookup
         // Try to find cycles starting from each participant
         for start in &participants {
-            while let Some(cycle) = self.find_cycle(start) {
-                let debt_cycle = self.cancel_cycle(&cycle);
-                total_reduced += debt_cycle.amount;
-                cycles.push(debt_cycle);
+            loop {
+                // Rebuild adjacency list after each cycle cancellation
+                let adj_list = self.build_adjacency_list();
+                if let Some(cycle) = self.find_cycle(start, &adj_list) {
+                    let debt_cycle = self.cancel_cycle(&cycle);
+                    total_reduced += debt_cycle.amount;
+                    cycles.push(debt_cycle);
 
-                // Refresh participants after cycle cancellation
-                if self.graph.is_empty() {
+                    // Check if graph is empty after cycle cancellation
+                    if self.graph.is_empty() {
+                        break;
+                    }
+                } else {
                     break;
                 }
             }

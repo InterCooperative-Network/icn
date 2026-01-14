@@ -269,7 +269,7 @@ impl FederationManager {
         Ok(clearing.process_scheduled_settlements())
     }
 
-    /// Perform multilateral netting for a currency
+    /// Perform multilateral netting for a currency (read-only analysis)
     pub async fn perform_multilateral_netting(
         &self,
         currency: &str,
@@ -281,6 +281,21 @@ impl FederationManager {
 
         clearing
             .perform_multilateral_netting(currency)
+            .map_err(|e| GatewayError::InternalError(e.to_string()))
+    }
+
+    /// Apply multilateral netting results to positions
+    pub async fn apply_multilateral_netting(
+        &self,
+        result: &icn_federation::netting::NettingResult,
+    ) -> Result<()> {
+        let clearing = self.clearing_manager.read().await;
+        let clearing = clearing
+            .as_ref()
+            .ok_or_else(|| GatewayError::BadRequest("Federation not initialized".to_string()))?;
+
+        clearing
+            .apply_multilateral_netting(result)
             .map_err(|e| GatewayError::InternalError(e.to_string()))
     }
 }
