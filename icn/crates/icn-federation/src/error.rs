@@ -116,6 +116,22 @@ pub enum FederationError {
     #[error("Identity error: {0}")]
     IdentityError(String),
 
+    // Agreement errors
+    #[error("Agreement not found: {0}")]
+    AgreementNotFound(String),
+
+    #[error("Invalid state: {0}")]
+    InvalidState(String),
+
+    #[error("Unauthorized: {0}")]
+    Unauthorized(String),
+
+    #[error("Resource not found: {0}")]
+    NotFound(String),
+
+    #[error("Configuration error: {0}")]
+    Config(String),
+
     // Internal errors
     #[error("Internal error: {0}")]
     Internal(String),
@@ -142,6 +158,12 @@ impl From<ed25519_dalek::SignatureError> for FederationError {
 impl From<anyhow::Error> for FederationError {
     fn from(err: anyhow::Error) -> Self {
         FederationError::Internal(err.to_string())
+    }
+}
+
+impl From<String> for FederationError {
+    fn from(err: String) -> Self {
+        FederationError::Internal(err)
     }
 }
 
