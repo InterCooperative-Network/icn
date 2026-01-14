@@ -37,7 +37,7 @@ pub struct GatewayHandles {
     /// Steward handle for SDIS ceremonies
     pub steward: Option<icn_steward::StewardHandle>,
     /// Agreement manager for inter-cooperative agreements
-    pub agreement_manager: Option<Arc<icn_federation::agreement::AgreementManager<icn_federation::agreement::InMemoryAgreementStore>>>,
+    pub agreement_manager: Option<icn_federation::agreement::AgreementManagerHandle>,
 }
 
 /// Spawn the Gateway API server if enabled

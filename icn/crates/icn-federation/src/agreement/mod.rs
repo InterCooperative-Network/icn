@@ -45,6 +45,8 @@
 //! .with_party(tech_coop_did, "tech-coop", PartyRole::Counterparty);
 //! ```
 
+use std::sync::Arc;
+
 mod gossip;
 mod manager;
 mod store;
@@ -54,3 +56,9 @@ pub use gossip::{AgreementGossipCallback, AgreementGossipHandler, AgreementMessa
 pub use manager::{AgreementEvent, AgreementEventCallback, AgreementManager};
 pub use store::{AgreementStore, AgreementStoreOps, InMemoryAgreementStore};
 pub use types::*;
+
+/// Type alias for AgreementManager handle with InMemoryAgreementStore
+///
+/// This is the default manager type used during wiring through supervisor.
+/// Can be replaced with persistent storage (SledAgreementStore) in future.
+pub type AgreementManagerHandle = Arc<AgreementManager<InMemoryAgreementStore>>;

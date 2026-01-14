@@ -274,7 +274,7 @@ impl Supervisor {
         let steward_handle_for_gateway: Option<icn_steward::StewardHandle>;
 
         // Agreement manager for gateway integration
-        let agreement_manager_for_gateway: Option<Arc<icn_federation::agreement::AgreementManager<icn_federation::agreement::InMemoryAgreementStore>>>;
+        let agreement_manager_for_gateway: Option<icn_federation::agreement::AgreementManagerHandle>;
 
         // Governance event subscription handles - MUST persist for daemon lifetime
         // Stored at function scope to prevent premature Drop (which would unsubscribe)
