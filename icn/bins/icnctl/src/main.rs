@@ -4673,7 +4673,7 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &Path) -> Result<()> {
             let request: DeviceAddRequest = serde_json::from_str(&request_json)
                 .context("Failed to parse device-add request")?;
 
-            println!("Approving device-add request...\n");
+            println!("{}\n", t!("cli.device.approve.approving"));
             println!("  Label: {}", request.label);
             println!("  DID: {}", request.did);
             println!("  Requested at: {}", request.created_at);
@@ -4681,7 +4681,7 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &Path) -> Result<()> {
 
             // Check if keystore exists
             if !keystore_path.exists() {
-                bail!("No identity found. Run 'icnctl id init' to create one.");
+                bail!("{}", t!("cli.common.no_identity"));
             }
 
             // Get passphrase and unlock
@@ -4801,8 +4801,8 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &Path) -> Result<()> {
                 &passphrase,
             )?;
 
-            println!("✓ Device approved and added to DID document");
-            println!("  Device ID: {new_device_id}");
+            println!("✓ {}", t!("cli.device.approve.success"));
+            println!("  {}: {new_device_id}", t!("cli.device.approve.device_id"));
             println!("  Label: {}", request.label);
             println!();
             println!("DID document updated:");
@@ -4814,12 +4814,12 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &Path) -> Result<()> {
         DeviceCommands::Revoke { device_id, reason } => {
             // Check if keystore exists
             if !keystore_path.exists() {
-                bail!("No identity found. Run 'icnctl id init' to create one.");
+                bail!("{}", t!("cli.common.no_identity"));
             }
 
-            println!("Revoking device: {device_id}");
+            println!("{} {device_id}", t!("cli.device.revoke.revoking"));
             if let Some(r) = &reason {
-                println!("Reason: {r}");
+                println!("{}: {r}", t!("cli.device.revoke.reason_label"));
             }
             println!();
 
@@ -4892,10 +4892,10 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &Path) -> Result<()> {
                 &passphrase,
             )?;
 
-            println!("✓ Device revoked");
+            println!("✓ {}", t!("cli.device.revoke.success"));
             println!("  Device: {device_id}");
             if let Some(r) = reason {
-                println!("  Reason: {r}");
+                println!("  {}: {r}", t!("cli.device.revoke.reason_label"));
             }
             println!();
             println!("DID document updated:");
@@ -6548,9 +6548,9 @@ async fn handle_compute_command(
                 .get("task_hash")
                 .and_then(|v| v.as_str())
                 .unwrap_or("unknown");
-            println!("Task submitted successfully!");
-            println!("Task ID:   {task_id}");
-            println!("Task hash: {task_hash}");
+            println!("✓ {}", t!("cli.compute.submit.success"));
+            println!("{}: {task_id}", t!("cli.compute.submit.task_id"));
+            println!("{}: {task_hash}", t!("cli.compute.submit.task_hash"));
             println!();
             println!("Check status with:");
             println!("  icnctl compute status {task_hash}");
@@ -6602,9 +6602,9 @@ async fn handle_compute_command(
                 .get("task_hash")
                 .and_then(|v| v.as_str())
                 .unwrap_or("unknown");
-            println!("WASM task submitted successfully!");
-            println!("Task ID:   {task_id}");
-            println!("Task hash: {task_hash}");
+            println!("✓ WASM {}", t!("cli.compute.submit.success"));
+            println!("{}: {task_id}", t!("cli.compute.submit.task_id"));
+            println!("{}: {task_hash}", t!("cli.compute.submit.task_hash"));
             println!("WASM size: {} bytes", wasm_bytes.len());
             println!();
             println!("Check status with:");
@@ -6620,7 +6620,7 @@ async fn handle_compute_command(
                 .and_then(|v| v.as_str())
                 .unwrap_or("unknown");
             println!("Task:   {task_hash}");
-            println!("Status: {status}");
+            println!("{}: {status}", t!("cli.compute.status.state_label"));
 
             if let Some(executor) = result.get("executor").and_then(|v| v.as_str()) {
                 println!("Executor: {executor}");
@@ -6641,9 +6641,9 @@ async fn handle_compute_command(
                     .unwrap_or(0);
 
                 println!();
-                println!("Result:");
+                println!("{}:", t!("cli.compute.status.result_label"));
                 println!("  Outcome:     {outcome}");
-                println!("  Fuel used:   {fuel_used}");
+                println!("  {}:   {fuel_used}", t!("cli.compute.status.fuel_used"));
                 println!("  Duration:    {duration_ms}ms");
 
                 if let Some(output) = task_result.get("output") {
@@ -6669,9 +6669,9 @@ async fn handle_compute_command(
                 .get("status")
                 .and_then(|v| v.as_str())
                 .unwrap_or("unknown");
-            println!("Task cancelled successfully!");
+            println!("✓ {}", t!("cli.compute.cancel.success"));
             println!("Task hash: {task_hash}");
-            println!("Status:    {status}");
+            println!("{}: {status}", t!("cli.compute.status.state_label"));
             println!("Reason:    {reason}");
         }
     }
