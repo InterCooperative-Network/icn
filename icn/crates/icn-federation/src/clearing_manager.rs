@@ -433,18 +433,10 @@ impl ClearingManager {
                 let net = position.net_position();
                 if net > 0 {
                     // coop_a owes coop_b
-                    engine.add_obligation(
-                        agreement.coop_a.clone(),
-                        agreement.coop_b.clone(),
-                        net,
-                    );
+                    engine.add_obligation(agreement.coop_a.clone(), agreement.coop_b.clone(), net);
                 } else if net < 0 {
                     // coop_b owes coop_a
-                    engine.add_obligation(
-                        agreement.coop_b.clone(),
-                        agreement.coop_a.clone(),
-                        -net,
-                    );
+                    engine.add_obligation(agreement.coop_b.clone(), agreement.coop_a.clone(), -net);
                 }
             }
         }
@@ -493,7 +485,7 @@ impl ClearingManager {
             if let Some(interval_secs) = agreement.settlement_interval.seconds() {
                 if let Some(position) = positions.get(agreement_id) {
                     let time_since_last = now.saturating_sub(position.last_settlement);
-                    
+
                     // Check if settlement is due
                     if time_since_last >= interval_secs {
                         due.push(agreement_id.clone());
@@ -669,7 +661,7 @@ mod tests {
     #[test]
     fn test_scheduled_settlements() {
         use crate::clearing::SettlementInterval;
-        
+
         let store = Arc::new(SledStore::temporary().unwrap()) as Arc<dyn Store>;
         let manager = ClearingManager::new(store, "food-coop".to_string()).unwrap();
 
@@ -690,7 +682,8 @@ mod tests {
         {
             let mut positions = manager.positions.write().unwrap();
             let position = positions.get_mut("agreement-1").unwrap();
-            position.last_settlement = current_timestamp() - (2 * 24 * 60 * 60); // 2 days ago
+            position.last_settlement = current_timestamp() - (2 * 24 * 60 * 60);
+            // 2 days ago
         }
 
         // Check that settlement is due

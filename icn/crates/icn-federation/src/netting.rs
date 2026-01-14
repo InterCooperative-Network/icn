@@ -72,8 +72,16 @@ impl NettingEngine {
         let keys: Vec<_> = self.graph.keys().cloned().collect();
 
         for (from, to) in keys {
-            let forward = self.graph.get(&(from.clone(), to.clone())).copied().unwrap_or(0);
-            let reverse = self.graph.get(&(to.clone(), from.clone())).copied().unwrap_or(0);
+            let forward = self
+                .graph
+                .get(&(from.clone(), to.clone()))
+                .copied()
+                .unwrap_or(0);
+            let reverse = self
+                .graph
+                .get(&(to.clone(), from.clone()))
+                .copied()
+                .unwrap_or(0);
 
             if forward > 0 && reverse > 0 {
                 let net = forward - reverse;
@@ -161,7 +169,11 @@ impl NettingEngine {
         for i in 0..cycle.len() - 1 {
             let from = &cycle[i];
             let to = &cycle[i + 1];
-            let amount = self.graph.get(&(from.clone(), to.clone())).copied().unwrap_or(0);
+            let amount = self
+                .graph
+                .get(&(from.clone(), to.clone()))
+                .copied()
+                .unwrap_or(0);
             min_amount = min_amount.min(amount);
         }
 
@@ -186,10 +198,7 @@ impl NettingEngine {
             }
         }
 
-        debug!(
-            "Canceled cycle {:?} with amount {}",
-            cycle, min_amount
-        );
+        debug!("Canceled cycle {:?} with amount {}", cycle, min_amount);
 
         DebtCycle {
             participants: cycle.to_vec(),
