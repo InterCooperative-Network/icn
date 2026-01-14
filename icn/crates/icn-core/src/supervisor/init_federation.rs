@@ -28,6 +28,8 @@ pub struct FederationServices {
     pub clearing_manager: Arc<icn_federation::ClearingManager>,
     /// The attestation store for trust attestations
     pub attestation_store: Arc<icn_federation::AttestationStore>,
+    /// The agreement manager for inter-cooperative agreements
+    pub agreement_manager: Arc<icn_federation::agreement::AgreementManager<icn_federation::agreement::InMemoryAgreementStore>>,
 }
 
 /// Dependencies for federation initialization
@@ -145,6 +147,17 @@ pub async fn init_federation_services(
         });
     federation_handler.set_send_callback(federation_send_callback);
 
+    // Create agreement manager
+    let agreement_store = Arc::new(icn_federation::agreement::InMemoryAgreementStore::new());
+    let agreement_manager = Arc::new(
+        icn_federation::agreement::AgreementManager::new(
+            agreement_store.clone(),
+            coop_id.clone(),
+            deps.did.clone(),
+        )
+    );
+    info!("✓ Agreement manager initialized");
+
     info!(
         "✓ Federation enabled: coop_id={}, coop_name={}, store={}",
         coop_id,
@@ -157,6 +170,7 @@ pub async fn init_federation_services(
         registry,
         clearing_manager,
         attestation_store,
+        agreement_manager,
     }))
 }
 

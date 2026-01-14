@@ -36,6 +36,8 @@ pub struct GatewayHandles {
     pub entity: Option<super::init_entity::EntityHandle>,
     /// Steward handle for SDIS ceremonies
     pub steward: Option<icn_steward::StewardHandle>,
+    /// Agreement manager for inter-cooperative agreements
+    pub agreement_manager: Option<Arc<icn_federation::agreement::AgreementManager<icn_federation::agreement::InMemoryAgreementStore>>>,
 }
 
 /// Spawn the Gateway API server if enabled
@@ -94,6 +96,7 @@ pub fn spawn_gateway(config: &GatewayConfig, data_dir: PathBuf, handles: Gateway
     let ledger_handle = handles.ledger;
     let entity_handle = handles.entity;
     let steward_handle = handles.steward;
+    let agreement_manager_handle = handles.agreement_manager;
 
     // Spawn gateway in a dedicated thread (actix-web has its own runtime)
     std::thread::spawn(move || {
@@ -147,6 +150,10 @@ pub fn spawn_gateway(config: &GatewayConfig, data_dir: PathBuf, handles: Gateway
 
             if let Some(handle) = steward_handle {
                 gateway_server = gateway_server.with_steward_handle(handle);
+            }
+
+            if let Some(handle) = agreement_manager_handle {
+                gateway_server = gateway_server.with_agreement_manager_handle(handle);
             }
 
             if let Err(e) = gateway_server.run().await {
