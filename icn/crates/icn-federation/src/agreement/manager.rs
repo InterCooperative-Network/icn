@@ -136,8 +136,11 @@ impl<S: AgreementStoreOps> AgreementManager<S> {
         description: impl Into<String>,
         agreement_type: AgreementType,
     ) -> Result<Agreement> {
-        let agreement = Agreement::new(title, description, agreement_type)
-            .with_party(self.own_did.clone(), &self.own_coop_id, PartyRole::Proposer);
+        let agreement = Agreement::new(title, description, agreement_type).with_party(
+            self.own_did.clone(),
+            &self.own_coop_id,
+            PartyRole::Proposer,
+        );
 
         self.store.store_agreement(&agreement)?;
 
@@ -269,10 +272,9 @@ impl<S: AgreementStoreOps> AgreementManager<S> {
         }
 
         // Sign the agreement
-        let keypair = self
-            .keypair
-            .as_ref()
-            .ok_or_else(|| FederationError::Config("No keypair configured for signing".to_string()))?;
+        let keypair = self.keypair.as_ref().ok_or_else(|| {
+            FederationError::Config("No keypair configured for signing".to_string())
+        })?;
 
         agreement.sign(keypair, &self.own_coop_id);
         let remaining = agreement.pending_signers();
@@ -366,7 +368,11 @@ impl<S: AgreementStoreOps> AgreementManager<S> {
     }
 
     /// Suspend an active agreement
-    pub fn suspend(&self, agreement_id: &AgreementId, reason: impl Into<String>) -> Result<Agreement> {
+    pub fn suspend(
+        &self,
+        agreement_id: &AgreementId,
+        reason: impl Into<String>,
+    ) -> Result<Agreement> {
         let mut agreement = self.get_agreement_required(agreement_id)?;
 
         // Verify caller is a party
@@ -413,7 +419,11 @@ impl<S: AgreementStoreOps> AgreementManager<S> {
     }
 
     /// Terminate an agreement
-    pub fn terminate(&self, agreement_id: &AgreementId, reason: TerminationReason) -> Result<Agreement> {
+    pub fn terminate(
+        &self,
+        agreement_id: &AgreementId,
+        reason: TerminationReason,
+    ) -> Result<Agreement> {
         let mut agreement = self.get_agreement_required(agreement_id)?;
 
         // Verify caller is a party
@@ -492,9 +502,9 @@ impl<S: AgreementStoreOps> AgreementManager<S> {
 
     /// Get an agreement by ID, returning an error if not found
     fn get_agreement_required(&self, id: &AgreementId) -> Result<Agreement> {
-        self.store.get_agreement(id)?.ok_or_else(|| {
-            FederationError::NotFound(format!("Agreement not found: {id}"))
-        })
+        self.store
+            .get_agreement(id)?
+            .ok_or_else(|| FederationError::NotFound(format!("Agreement not found: {id}")))
     }
 
     /// List all agreements
@@ -517,9 +527,7 @@ impl<S: AgreementStoreOps> AgreementManager<S> {
         let agreements = self.list_my_agreements()?;
         Ok(agreements
             .into_iter()
-            .filter(|a| {
-                a.status.is_proposed() && !a.has_signed(&self.own_did)
-            })
+            .filter(|a| a.status.is_proposed() && !a.has_signed(&self.own_did))
             .collect())
     }
 
@@ -548,11 +556,7 @@ impl<S: AgreementStoreOps> AgreementManager<S> {
             ));
         }
 
-        let mut amendment = Amendment::new(
-            agreement_id.clone(),
-            description,
-            self.own_did.clone(),
-        );
+        let mut amendment = Amendment::new(agreement_id.clone(), description, self.own_did.clone());
 
         for change in changes {
             amendment.changes.push(change);
@@ -585,7 +589,9 @@ impl<S: AgreementStoreOps> AgreementManager<S> {
         let amendment = amendments
             .iter_mut()
             .find(|a| a.id == amendment_id)
-            .ok_or_else(|| FederationError::NotFound(format!("Amendment not found: {amendment_id}")))?;
+            .ok_or_else(|| {
+                FederationError::NotFound(format!("Amendment not found: {amendment_id}"))
+            })?;
 
         if amendment.status != AmendmentStatus::Proposed {
             return Err(FederationError::InvalidState(
@@ -601,7 +607,11 @@ impl<S: AgreementStoreOps> AgreementManager<S> {
         }
 
         // Check if already signed
-        if amendment.signatures.iter().any(|s| s.signer == self.own_did) {
+        if amendment
+            .signatures
+            .iter()
+            .any(|s| s.signer == self.own_did)
+        {
             return Err(FederationError::InvalidState(
                 "Already signed this amendment".to_string(),
             ));
@@ -630,7 +640,12 @@ impl<S: AgreementStoreOps> AgreementManager<S> {
             .map(|p| &p.did)
             .collect();
 
-        if amendment.is_fully_signed(&required_signers.iter().map(|d| (*d).clone()).collect::<Vec<_>>()) {
+        if amendment.is_fully_signed(
+            &required_signers
+                .iter()
+                .map(|d| (*d).clone())
+                .collect::<Vec<_>>(),
+        ) {
             amendment.status = AmendmentStatus::Ratified;
 
             // Apply the amendment to the agreement
@@ -747,12 +762,9 @@ mod tests {
         // Manager 2 for the counterparty
         let store2 = Arc::new(InMemoryAgreementStore::new());
         let kp2 = Arc::new(KeyPair::generate().unwrap());
-        let manager2 = AgreementManager::new(
-            store2.clone(),
-            "other-coop".to_string(),
-            kp2.did().clone(),
-        )
-        .with_keypair(kp2.clone());
+        let manager2 =
+            AgreementManager::new(store2.clone(), "other-coop".to_string(), kp2.did().clone())
+                .with_keypair(kp2.clone());
 
         // Manager 1 creates and proposes
         let agreement = manager1
@@ -811,7 +823,11 @@ mod tests {
         let agreement = manager
             .add_party(
                 &agreement.id,
-                AgreementParty::new(counterparty_kp.did().clone(), "other-coop", PartyRole::Counterparty),
+                AgreementParty::new(
+                    counterparty_kp.did().clone(),
+                    "other-coop",
+                    PartyRole::Counterparty,
+                ),
             )
             .unwrap();
 
@@ -833,7 +849,9 @@ mod tests {
         manager.store.store_agreement(&agreement).unwrap();
 
         // Suspend
-        let agreement = manager.suspend(&agreement.id, "Testing suspension").unwrap();
+        let agreement = manager
+            .suspend(&agreement.id, "Testing suspension")
+            .unwrap();
         assert!(agreement.status.is_suspended());
 
         // Resume

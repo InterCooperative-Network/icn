@@ -187,10 +187,7 @@ impl<S: AgreementStoreOps> AgreementGossipHandler<S> {
     fn handle_proposed(&self, agreement: Agreement) -> Result<()> {
         // Only store if we're a party to this agreement
         if !self.is_party_to(&agreement) {
-            debug!(
-                "Ignoring proposed agreement {} - not a party",
-                agreement.id
-            );
+            debug!("Ignoring proposed agreement {} - not a party", agreement.id);
             return Ok(());
         }
 
@@ -209,23 +206,21 @@ impl<S: AgreementStoreOps> AgreementGossipHandler<S> {
         }
 
         self.store.store_agreement(&agreement)?;
-        info!(
-            "Stored proposed agreement {} from gossip",
-            agreement.id
-        );
+        info!("Stored proposed agreement {} from gossip", agreement.id);
         Ok(())
     }
 
     /// Handle a signature message
-    fn handle_signed(&self, agreement_id: AgreementId, signature: AgreementSignature) -> Result<()> {
+    fn handle_signed(
+        &self,
+        agreement_id: AgreementId,
+        signature: AgreementSignature,
+    ) -> Result<()> {
         // Get the agreement
         let mut agreement = match self.store.get_agreement(&agreement_id)? {
             Some(a) => a,
             None => {
-                debug!(
-                    "Received signature for unknown agreement {}",
-                    agreement_id
-                );
+                debug!("Received signature for unknown agreement {}", agreement_id);
                 return Ok(());
             }
         };
@@ -305,10 +300,7 @@ impl<S: AgreementStoreOps> AgreementGossipHandler<S> {
         agreement.status = new_status;
         self.store.store_agreement(&agreement)?;
 
-        info!(
-            "Updated status of agreement {} via gossip",
-            agreement_id
-        );
+        info!("Updated status of agreement {} via gossip", agreement_id);
         Ok(())
     }
 
@@ -318,10 +310,7 @@ impl<S: AgreementStoreOps> AgreementGossipHandler<S> {
         let agreement = match self.store.get_agreement(&amendment.agreement_id)? {
             Some(a) => a,
             None => {
-                debug!(
-                    "Amendment for unknown agreement {}",
-                    amendment.agreement_id
-                );
+                debug!("Amendment for unknown agreement {}", amendment.agreement_id);
                 return Ok(());
             }
         };
@@ -331,7 +320,11 @@ impl<S: AgreementStoreOps> AgreementGossipHandler<S> {
         }
 
         // Verify the proposer is a party
-        if !agreement.parties.iter().any(|p| p.did == amendment.proposed_by) {
+        if !agreement
+            .parties
+            .iter()
+            .any(|p| p.did == amendment.proposed_by)
+        {
             warn!(
                 "Amendment from non-party {} for agreement {}",
                 amendment.proposed_by, amendment.agreement_id
@@ -370,18 +363,29 @@ impl<S: AgreementStoreOps> AgreementGossipHandler<S> {
         let amendment = match amendments.iter_mut().find(|a| a.id == amendment_id) {
             Some(a) => a,
             None => {
-                debug!("Amendment {} not found for agreement {}", amendment_id, agreement_id);
+                debug!(
+                    "Amendment {} not found for agreement {}",
+                    amendment_id, agreement_id
+                );
                 return Ok(());
             }
         };
 
         // Add signature if not duplicate
-        if !amendment.signatures.iter().any(|s| s.signer == signature.signer) {
+        if !amendment
+            .signatures
+            .iter()
+            .any(|s| s.signer == signature.signer)
+        {
             amendment.add_signature(signature);
             self.store.store_amendment(amendment)?;
             debug!(
                 "Recorded amendment signature from {} for {}",
-                amendment.signatures.last().map(|s| s.signer.to_string()).unwrap_or_default(),
+                amendment
+                    .signatures
+                    .last()
+                    .map(|s| s.signer.to_string())
+                    .unwrap_or_default(),
                 amendment_id
             );
         }
@@ -504,7 +508,11 @@ mod tests {
             },
         )
         .with_party(proposer.did().clone(), "coop-a", PartyRole::Proposer)
-        .with_party(counterparty.did().clone(), "coop-b", PartyRole::Counterparty)
+        .with_party(
+            counterparty.did().clone(),
+            "coop-b",
+            PartyRole::Counterparty,
+        )
     }
 
     #[test]
@@ -519,7 +527,9 @@ mod tests {
         let decoded = AgreementMessage::from_bytes(&bytes).unwrap();
 
         match decoded {
-            AgreementMessage::Proposed { agreement: decoded_agreement } => {
+            AgreementMessage::Proposed {
+                agreement: decoded_agreement,
+            } => {
                 assert_eq!(decoded_agreement.id, agreement.id);
             }
             _ => panic!("Wrong message type"),
@@ -543,7 +553,9 @@ mod tests {
         let message = AgreementMessage::Proposed {
             agreement: Box::new(agreement.clone()),
         };
-        handler.handle_message(&message.to_bytes().unwrap()).unwrap();
+        handler
+            .handle_message(&message.to_bytes().unwrap())
+            .unwrap();
 
         // Should not be stored since we're not a party
         assert!(store.get_agreement(&agreement.id).unwrap().is_none());
@@ -572,12 +584,18 @@ mod tests {
             },
         )
         .with_party(own_kp.did().clone(), "our-coop", PartyRole::Proposer)
-        .with_party(counterparty.did().clone(), "other-coop", PartyRole::Counterparty);
+        .with_party(
+            counterparty.did().clone(),
+            "other-coop",
+            PartyRole::Counterparty,
+        );
 
         let message = AgreementMessage::Proposed {
             agreement: Box::new(agreement.clone()),
         };
-        handler.handle_message(&message.to_bytes().unwrap()).unwrap();
+        handler
+            .handle_message(&message.to_bytes().unwrap())
+            .unwrap();
 
         // Should be stored since we're a party
         let stored = store.get_agreement(&agreement.id).unwrap();
@@ -589,11 +607,8 @@ mod tests {
     fn test_publish_with_callback() {
         let store = Arc::new(InMemoryAgreementStore::new());
         let own_kp = KeyPair::generate().unwrap();
-        let mut handler = AgreementGossipHandler::new(
-            store,
-            own_kp.did().clone(),
-            "our-coop".to_string(),
-        );
+        let mut handler =
+            AgreementGossipHandler::new(store, own_kp.did().clone(), "our-coop".to_string());
 
         let publish_count = Arc::new(AtomicUsize::new(0));
         let count_clone = publish_count.clone();

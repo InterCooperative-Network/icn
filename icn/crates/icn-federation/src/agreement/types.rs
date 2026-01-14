@@ -324,7 +324,10 @@ impl AgreementStatus {
     /// Check if the agreement has expired
     pub fn is_expired(&self, current_time: u64) -> bool {
         match self {
-            AgreementStatus::Active { expires_at: Some(exp), .. } => current_time >= *exp,
+            AgreementStatus::Active {
+                expires_at: Some(exp),
+                ..
+            } => current_time >= *exp,
             _ => false,
         }
     }
@@ -383,7 +386,10 @@ pub enum PartyRole {
 impl PartyRole {
     /// Check if this role requires a signature
     pub fn requires_signature(&self) -> bool {
-        matches!(self, PartyRole::Proposer | PartyRole::Counterparty | PartyRole::Guarantor)
+        matches!(
+            self,
+            PartyRole::Proposer | PartyRole::Counterparty | PartyRole::Guarantor
+        )
     }
 }
 
@@ -584,9 +590,9 @@ impl Amendment {
 
     /// Check if all required parties have signed
     pub fn is_fully_signed(&self, required_signers: &[Did]) -> bool {
-        required_signers.iter().all(|did| {
-            self.signatures.iter().any(|sig| sig.signer == *did)
-        })
+        required_signers
+            .iter()
+            .all(|did| self.signatures.iter().any(|sig| sig.signer == *did))
     }
 
     /// Add a signature
@@ -753,7 +759,9 @@ impl Agreement {
 
     /// Check if all required parties have signed
     pub fn is_fully_signed(&self) -> bool {
-        self.required_signers().iter().all(|did| self.has_signed(did))
+        self.required_signers()
+            .iter()
+            .all(|did| self.has_signed(did))
     }
 
     /// Get the DIDs of parties who still need to sign
@@ -812,18 +820,24 @@ impl Agreement {
             // Find the party with this DID
             let party = self.parties.iter().find(|p| p.did == sig.signer);
             if party.is_none() {
-                return Err(format!("Signer {} is not a party to this agreement", sig.signer));
+                return Err(format!(
+                    "Signer {} is not a party to this agreement",
+                    sig.signer
+                ));
             }
 
             // Verify the signature
-            let public_key = sig.signer.to_verifying_key()
+            let public_key = sig
+                .signer
+                .to_verifying_key()
                 .map_err(|e| format!("Invalid public key for {}: {e}", sig.signer))?;
 
             let signature = ed25519_dalek::Signature::from_slice(&sig.signature)
                 .map_err(|e| format!("Invalid signature format: {e}"))?;
 
             use ed25519_dalek::Verifier;
-            public_key.verify(&bytes, &signature)
+            public_key
+                .verify(&bytes, &signature)
                 .map_err(|e| format!("Signature verification failed for {}: {e}", sig.signer))?;
         }
 
@@ -861,8 +875,15 @@ impl Agreement {
         }
 
         if !self.is_fully_signed() {
-            let pending: Vec<_> = self.pending_signers().iter().map(|d| d.to_string()).collect();
-            return Err(format!("Not all parties have signed. Pending: {}", pending.join(", ")));
+            let pending: Vec<_> = self
+                .pending_signers()
+                .iter()
+                .map(|d| d.to_string())
+                .collect();
+            return Err(format!(
+                "Not all parties have signed. Pending: {}",
+                pending.join(", ")
+            ));
         }
 
         // Verify all signatures before activation
@@ -1078,7 +1099,11 @@ mod tests {
             },
         )
         .with_party(proposer_kp.did().clone(), "coop-a", PartyRole::Proposer)
-        .with_party(counterparty_kp.did().clone(), "coop-b", PartyRole::Counterparty);
+        .with_party(
+            counterparty_kp.did().clone(),
+            "coop-b",
+            PartyRole::Counterparty,
+        );
 
         // Draft -> Proposed
         assert!(agreement.propose().is_ok());
@@ -1098,7 +1123,9 @@ mod tests {
         assert!(agreement.status.is_active());
 
         // Active -> Suspended
-        assert!(agreement.suspend("Need review", proposer_kp.did().clone()).is_ok());
+        assert!(agreement
+            .suspend("Need review", proposer_kp.did().clone())
+            .is_ok());
         assert!(agreement.status.is_suspended());
 
         // Suspended -> Active
@@ -1106,9 +1133,11 @@ mod tests {
         assert!(agreement.status.is_active());
 
         // Active -> Terminated
-        assert!(agreement.terminate(TerminationReason::MutualConsent {
-            explanation: Some("Agreement fulfilled".to_string()),
-        }).is_ok());
+        assert!(agreement
+            .terminate(TerminationReason::MutualConsent {
+                explanation: Some("Agreement fulfilled".to_string()),
+            })
+            .is_ok());
         assert!(agreement.status.is_terminated());
     }
 
@@ -1126,7 +1155,11 @@ mod tests {
             },
         )
         .with_party(proposer_kp.did().clone(), "coop-a", PartyRole::Proposer)
-        .with_party(counterparty_kp.did().clone(), "coop-b", PartyRole::Counterparty);
+        .with_party(
+            counterparty_kp.did().clone(),
+            "coop-b",
+            PartyRole::Counterparty,
+        );
 
         agreement.sign(&proposer_kp, "coop-a");
         agreement.sign(&counterparty_kp, "coop-b");
@@ -1174,7 +1207,11 @@ mod tests {
             },
         )
         .with_party(proposer_kp.did().clone(), "coop-a", PartyRole::Proposer)
-        .with_party(counterparty_kp.did().clone(), "coop-b", PartyRole::Counterparty);
+        .with_party(
+            counterparty_kp.did().clone(),
+            "coop-b",
+            PartyRole::Counterparty,
+        );
 
         agreement.propose().unwrap();
 
@@ -1238,7 +1275,11 @@ mod tests {
             },
         )
         .with_party(proposer_kp.did().clone(), "coop-a", PartyRole::Proposer)
-        .with_party(counterparty_kp.did().clone(), "coop-b", PartyRole::Counterparty);
+        .with_party(
+            counterparty_kp.did().clone(),
+            "coop-b",
+            PartyRole::Counterparty,
+        );
 
         agreement.propose().unwrap();
         agreement.sign(&proposer_kp, "coop-a");

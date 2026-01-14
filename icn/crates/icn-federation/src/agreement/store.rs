@@ -143,7 +143,8 @@ impl AgreementStore {
         // Add index entry for each party
         for party in &agreement.parties {
             let index_key = Self::party_index_key(&party.did, &agreement.id);
-            self.store.put(&index_key, agreement.id.as_str().as_bytes())?;
+            self.store
+                .put(&index_key, agreement.id.as_str().as_bytes())?;
         }
         Ok(())
     }
@@ -183,7 +184,10 @@ impl AgreementStoreOps for AgreementStore {
         // Update cache
         self.update_cache(agreement);
 
-        debug!("Stored agreement {} (status: {:?})", agreement.id, agreement.status);
+        debug!(
+            "Stored agreement {} (status: {:?})",
+            agreement.id, agreement.status
+        );
         Ok(())
     }
 
@@ -581,16 +585,8 @@ mod tests {
         store.store_agreement(&agreement).unwrap();
 
         // Create amendments
-        let amendment1 = Amendment::new(
-            agreement_id.clone(),
-            "First amendment",
-            test_did(),
-        );
-        let amendment2 = Amendment::new(
-            agreement_id.clone(),
-            "Second amendment",
-            test_did(),
-        );
+        let amendment1 = Amendment::new(agreement_id.clone(), "First amendment", test_did());
+        let amendment2 = Amendment::new(agreement_id.clone(), "Second amendment", test_did());
 
         store.store_amendment(&amendment1).unwrap();
         store.store_amendment(&amendment2).unwrap();

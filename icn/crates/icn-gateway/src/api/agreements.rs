@@ -124,10 +124,21 @@ pub struct ProposeAmendmentRequest {
 #[derive(Debug, Deserialize, ToSchema)]
 #[serde(tag = "change_type", rename_all = "snake_case")]
 pub enum AmendmentChangeRequest {
-    ExtendDuration { new_expiration: u64 },
-    UpdateTerm { field: String, new_value: String },
-    AddParty { did: String, coop_id: String, role: String },
-    RemoveParty { party_did: String },
+    ExtendDuration {
+        new_expiration: u64,
+    },
+    UpdateTerm {
+        field: String,
+        new_value: String,
+    },
+    AddParty {
+        did: String,
+        coop_id: String,
+        role: String,
+    },
+    RemoveParty {
+        party_did: String,
+    },
 }
 
 /// Agreement list response
@@ -293,10 +304,7 @@ pub async fn create_agreement(
     security(("bearer_auth" = []))
 )]
 #[get("/{id}")]
-pub async fn get_agreement(
-    http_req: HttpRequest,
-    path: web::Path<String>,
-) -> Result<HttpResponse> {
+pub async fn get_agreement(http_req: HttpRequest, path: web::Path<String>) -> Result<HttpResponse> {
     require_scope(&http_req, "agreements:read")?;
 
     let _agreement_id = path.into_inner();
