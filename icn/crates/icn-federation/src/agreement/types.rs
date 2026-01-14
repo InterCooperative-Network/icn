@@ -624,7 +624,7 @@ impl Amendment {
 
         // Parse the signature
         let signature = ed25519_dalek::Signature::from_slice(&sig.signature)
-            .map_err(|e| format!("Invalid signature format: {}", e))?;
+            .map_err(|e| format!("Invalid signature format: {e}"))?;
 
         // Verify
         use ed25519_dalek::Verifier;
@@ -1071,8 +1071,7 @@ impl Agreement {
                 }
                 AmendmentChange::UpdateTerm { .. } | AmendmentChange::ModifyType { .. } => {
                     return Err(format!(
-                        "Amendment change type {:?} not yet supported",
-                        change
+                        "Amendment change type {change:?} not yet supported"
                     ));
                 }
             }
