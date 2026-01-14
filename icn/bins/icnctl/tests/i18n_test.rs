@@ -69,8 +69,7 @@ fn test_translation_keys_exist() {
 
 #[test]
 fn test_string_interpolation() {
-    // Note: rust-i18n uses %{} syntax for interpolation, not just {}
-    // Check if interpolation works or if we need to update locale file format
+    // rust-i18n v3 uses {var} syntax for interpolation (e.g., {count})
     
     let result = t!("cli.ledger.history.showing", count = 5);
     // For now, just verify the key exists and returns something
@@ -121,8 +120,7 @@ fn test_device_labels() {
 
 #[test]
 fn test_snapshot_interpolation() {
-    // Note: Check interpolation format in locale file
-    // rust-i18n may use %{count} instead of {count}
+    // rust-i18n v3 uses {var} syntax for interpolation (e.g., {count})
     
     let result = t!("cli.snapshot.cleanup.deleted_count", count = 3);
     assert!(!result.is_empty(), "Should return non-empty translation");
