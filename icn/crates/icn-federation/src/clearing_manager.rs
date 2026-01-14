@@ -407,6 +407,72 @@ impl ClearingManager {
         })
     }
 
+    /// Perform multilateral netting across all agreements for a given currency
+    /// This finds cycles in the debt graph and cancels them
+    pub fn perform_multilateral_netting(
+        &self,
+        currency: &str,
+    ) -> Result<crate::netting::NettingResult> {
+        use crate::netting::NettingEngine;
+
+        let mut engine = NettingEngine::new(currency.to_string());
+
+        // Build the debt graph from all positions
+        let positions = self.positions.read().unwrap_or_else(|poisoned| {
+            warn!("Positions lock poisoned, recovering");
+            poisoned.into_inner()
+        });
+        let agreements = self.agreements.read().unwrap_or_else(|poisoned| {
+            warn!("Agreements lock poisoned, recovering");
+            poisoned.into_inner()
+        });
+
+        for (agreement_id, position) in positions.iter() {
+            if let Some(agreement) = agreements.get(agreement_id) {
+                // Add edges to the graph based on net positions
+                let net = position.net_position();
+                if net > 0 {
+                    // coop_a owes coop_b
+                    engine.add_obligation(
+                        agreement.coop_a.clone(),
+                        agreement.coop_b.clone(),
+                        net,
+                    );
+                } else if net < 0 {
+                    // coop_b owes coop_a
+                    engine.add_obligation(
+                        agreement.coop_b.clone(),
+                        agreement.coop_a.clone(),
+                        -net,
+                    );
+                }
+            }
+        }
+
+        drop(positions);
+        drop(agreements);
+
+        // Perform netting
+        let result = engine.net();
+
+        // Log the results
+        info!(
+            "Multilateral netting for {}: {} cycles canceled, {} total reduced",
+            currency,
+            result.cycles_canceled.len(),
+            result.amount_reduced
+        );
+
+        for cycle in &result.cycles_canceled {
+            debug!(
+                "Canceled cycle {:?} with amount {}",
+                cycle.participants, cycle.amount
+            );
+        }
+
+        Ok(result)
+    }
+
     /// Find agreement between two cooperatives
     fn find_agreement(&self, coop_a: &str, coop_b: &str) -> Result<String> {
         let agreements = self.agreements.read().unwrap_or_else(|poisoned| {
@@ -488,5 +554,62 @@ mod tests {
 
         let position = manager.calculate_position("agreement-1").unwrap();
         assert_eq!(position.net_position(), 0);
+    }
+
+    #[test]
+    fn test_multilateral_netting() {
+        let store = Arc::new(SledStore::temporary().unwrap()) as Arc<dyn Store>;
+        let manager = ClearingManager::new(store, "food-coop".to_string()).unwrap();
+
+        // Create a cycle: food -> tech -> arts -> food
+        let agreement1 = BilateralClearingAgreement::new(
+            "food-tech".to_string(),
+            "food-coop".to_string(),
+            test_did(),
+            "tech-coop".to_string(),
+            test_did(),
+        )
+        .with_rate("USD", "USD", 1.0);
+
+        let agreement2 = BilateralClearingAgreement::new(
+            "tech-arts".to_string(),
+            "tech-coop".to_string(),
+            test_did(),
+            "arts-coop".to_string(),
+            test_did(),
+        )
+        .with_rate("USD", "USD", 1.0);
+
+        let agreement3 = BilateralClearingAgreement::new(
+            "arts-food".to_string(),
+            "arts-coop".to_string(),
+            test_did(),
+            "food-coop".to_string(),
+            test_did(),
+        )
+        .with_rate("USD", "USD", 1.0);
+
+        manager.create_agreement(agreement1).unwrap();
+        manager.create_agreement(agreement2).unwrap();
+        manager.create_agreement(agreement3).unwrap();
+
+        // Set up positions to create a cycle
+        // food owes tech 100, tech owes arts 80, arts owes food 60
+        {
+            let mut positions = manager.positions.write().unwrap();
+            positions.get_mut("food-tech").unwrap().coop_a_owes_b = 100;
+            positions.get_mut("tech-arts").unwrap().coop_a_owes_b = 80;
+            positions.get_mut("arts-food").unwrap().coop_a_owes_b = 60;
+        }
+
+        // Perform multilateral netting
+        let result = manager.perform_multilateral_netting("USD").unwrap();
+
+        // Should find and cancel the cycle
+        assert_eq!(result.cycles_canceled.len(), 1);
+        assert_eq!(result.cycles_canceled[0].amount, 60);
+
+        // After netting: food owes tech 40, tech owes arts 20, arts owes food 0
+        assert_eq!(result.netted.len(), 2);
     }
 }
