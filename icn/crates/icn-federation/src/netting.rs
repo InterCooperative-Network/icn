@@ -366,7 +366,7 @@ mod tests {
         let result = engine.net();
 
         // Minimum is 70, so that gets canceled from the cycle
-        assert!(result.cycles_canceled.len() >= 1);
+        assert!(!result.cycles_canceled.is_empty());
         assert_eq!(result.amount_reduced, 70);
     }
 

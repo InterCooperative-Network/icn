@@ -430,13 +430,11 @@ fn test_verify_backup_command() -> Result<()> {
     let stdout = String::from_utf8_lossy(&verify_output.stdout);
     assert!(
         stdout.contains("BACKUP VERIFICATION PASSED"),
-        "Expected success message. Output:\n{}",
-        stdout
+        "Expected success message. Output:\n{stdout}"
     );
     assert!(
         stdout.contains("identity.age present"),
-        "Should report identity.age present. Output:\n{}",
-        stdout
+        "Should report identity.age present. Output:\n{stdout}"
     );
 
     Ok(())
