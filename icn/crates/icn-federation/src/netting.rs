@@ -100,7 +100,7 @@ impl NettingEngine {
     /// Find all participants in the graph
     fn get_participants(&self) -> HashSet<String> {
         let mut participants = HashSet::new();
-        for ((from, to), _) in &self.graph {
+        for (from, to) in self.graph.keys() {
             participants.insert(from.clone());
             participants.insert(to.clone());
         }
@@ -131,6 +131,7 @@ impl NettingEngine {
         self.dfs_find_cycle(start, &mut visited, &mut path, &mut path_set, adj_list)
     }
 
+    #[allow(clippy::only_used_in_recursion)]
     fn dfs_find_cycle(
         &self,
         current: &str,

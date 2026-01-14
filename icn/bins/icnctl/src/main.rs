@@ -2616,13 +2616,13 @@ async fn handle_trust_command(cmd: TrustCommands, data_dir: &Path, endpoint: &st
 
             // Determine trust class based on score
             let class = if score < 0.1 {
-                "Isolated"
+                t!("cli.trust.show.class_isolated")
             } else if score < 0.4 {
-                "Known"
+                t!("cli.trust.show.class_known")
             } else if score < 0.7 {
-                "Partner"
+                t!("cli.trust.show.class_partner")
             } else {
-                "Federated"
+                t!("cli.trust.show.class_federated")
             };
 
             println!("{} {did}:", t!("cli.trust.show.title"));
@@ -3880,14 +3880,14 @@ async fn handle_ledger_command(cmd: LedgerCommands, endpoint: &str) -> Result<()
                     println!("{}: {}", t!("cli.ledger.history.hash"), entry.hash);
                     println!("{}: {}", t!("cli.ledger.head.timestamp"), entry.timestamp);
                     println!("{}: {}", t!("cli.ledger.history.author"), entry.author);
-                    println!("Accounts:");
+                    println!("{}:", t!("cli.ledger.history.accounts_label"));
                     for delta in entry.accounts {
                         print!("  • {} ({}): ", delta.account_id, delta.currency);
                         if let Some(debit) = delta.debit {
-                            print!("debit {debit} ");
+                            print!("{} {debit} ", t!("cli.ledger.history.debit_label"));
                         }
                         if let Some(credit) = delta.credit {
-                            print!("credit {credit} ");
+                            print!("{} {credit} ", t!("cli.ledger.history.credit_label"));
                         }
                         println!();
                     }
@@ -5275,14 +5275,13 @@ fn verify_ledger_in_backup(restore_dir: &Path) -> Result<()> {
                             let net =
                                 (debit as i128).checked_sub(credit as i128).ok_or_else(|| {
                                     anyhow::anyhow!(
-                                        "Arithmetic overflow computing net for currency {}",
-                                        currency
+                                        "Arithmetic overflow computing net for currency {currency}"
                                     )
                                 })?;
 
                             let sum = currency_sums.entry(currency.to_string()).or_insert(0);
                             *sum = sum.checked_add(net).ok_or_else(|| {
-                                anyhow::anyhow!("Arithmetic overflow summing currency {}", currency)
+                                anyhow::anyhow!("Arithmetic overflow summing currency {currency}")
                             })?;
                         }
                     }
@@ -5295,14 +5294,14 @@ fn verify_ledger_in_backup(restore_dir: &Path) -> Result<()> {
     }
 
     if parse_errors > 0 {
-        println!("  ⚠ {} entries could not be parsed", parse_errors);
+        println!("  ⚠ {parse_errors} entries could not be parsed");
     }
 
     // Check invariant
     let mut all_balanced = true;
     for (currency, sum) in &currency_sums {
         if *sum != 0 {
-            println!("  ✗ Currency {} has imbalance: {}", currency, sum);
+            println!("  ✗ Currency {currency} has imbalance: {sum}");
             all_balanced = false;
         }
     }

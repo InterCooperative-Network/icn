@@ -67,6 +67,10 @@ cli:
       direct_score: "Direct trust score"
       transitive: "Transitive trust"
       class_label: "Class"
+      class_isolated: "Isolated"
+      class_known: "Known"
+      class_partner: "Partner"
+      class_federated: "Federated"
 
     remove:
       success: "Trust edge removed"
@@ -94,6 +98,9 @@ cli:
       header: "Hash                             Timestamp            Type"
       hash: "Hash"
       author: "Author"
+      accounts_label: "Accounts"
+      debit_label: "debit"
+      credit_label: "credit"
 
   # Backup commands
   backup:
