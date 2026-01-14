@@ -2574,11 +2574,11 @@ async fn handle_trust_command(cmd: TrustCommands, data_dir: &Path, endpoint: &st
                 .await
                 .context("Failed to add trust edge. Is icnd running?")?;
 
-            println!("✓ Added trust edge");
-            println!("  Target: {did}");
-            println!("  Score: {score:.2}");
+            println!("✓ {}", t!("cli.trust.add.success"));
+            println!("  {}: {did}", t!("cli.trust.add.did_label"));
+            println!("  {}: {score:.2}", t!("cli.trust.add.score_label"));
             if let Some(l) = label {
-                println!("  Label: {l}");
+                println!("  {}: {l}", t!("cli.trust.add.label_label"));
             }
         }
 
@@ -2589,14 +2589,14 @@ async fn handle_trust_command(cmd: TrustCommands, data_dir: &Path, endpoint: &st
                 .context("Failed to list trust edges. Is icnd running?")?;
 
             if edges.is_empty() {
-                println!("No trust edges found.");
+                println!("{}", t!("cli.trust.list.no_edges"));
             } else {
-                println!("Trust edges:\n");
+                println!("{}:\n", t!("cli.trust.list.title"));
                 for edge in edges {
                     println!("  → {}", edge.target_did);
-                    println!("    Score: {:.2}", edge.score);
+                    println!("    {}: {:.2}", t!("cli.trust.add.score_label"), edge.score);
                     if !edge.labels.is_empty() {
-                        println!("    Labels: {}", edge.labels.join(", "));
+                        println!("    {}: {}", t!("cli.trust.add.label_label"), edge.labels.join(", "));
                     }
                     println!();
                 }
@@ -2621,8 +2621,8 @@ async fn handle_trust_command(cmd: TrustCommands, data_dir: &Path, endpoint: &st
                 "Federated"
             };
 
-            println!("Trust score for {did}:");
-            println!("  Score: {score:.4}");
+            println!("{} {did}:", t!("cli.trust.show.title"));
+            println!("  {}: {score:.4}", t!("cli.trust.add.score_label"));
             println!("  Class: {class}");
         }
 
@@ -2632,7 +2632,7 @@ async fn handle_trust_command(cmd: TrustCommands, data_dir: &Path, endpoint: &st
                 .await
                 .context("Failed to remove trust edge. Is icnd running?")?;
 
-            println!("✓ Removed trust edge to {did}");
+            println!("✓ {} {did}", t!("cli.trust.remove.success"));
         }
     }
 
@@ -4499,11 +4499,11 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &Path) -> Result<()> {
         DeviceCommands::List => {
             // Check if keystore exists
             if !keystore_path.exists() {
-                bail!("No identity found. Run 'icnctl id init' to create one.");
+                bail!("{}", t!("cli.common.no_identity"));
             }
 
             // Get passphrase and unlock
-            let passphrase = read_passphrase("Enter passphrase: ")?;
+            let passphrase = read_passphrase(&t!("cli.prompts.enter_passphrase"))?;
             let mut keystore = AgeKeyStore::open(&keystore_path)?;
             keystore.unlock(&passphrase)?;
 
@@ -4514,7 +4514,7 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &Path) -> Result<()> {
             println!("Identity: {}", did_doc.id);
             println!("Version: {}", did_doc.version);
             println!("Updated: {}", did_doc.updated_at);
-            println!("\nDevices ({}):", did_doc.verification_method.len() / 2); // Ed25519 + X25519 per device
+            println!("\n{} ({}):", t!("cli.device.list.title"), did_doc.verification_method.len() / 2); // Ed25519 + X25519 per device
             println!();
 
             // Group verification methods by device (Ed25519 + X25519 pairs)
@@ -4548,7 +4548,7 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &Path) -> Result<()> {
 
                 if let Some(vm) = signing_vm {
                     let current_marker = if dev_id == device_id {
-                        " (current device)"
+                        &format!(" {}", t!("cli.device.list.current"))
                     } else {
                         ""
                     };
@@ -4583,7 +4583,7 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &Path) -> Result<()> {
         }
 
         DeviceCommands::Add { name } => {
-            println!("Creating device-add request for '{name}'...\n");
+            println!("{} '{name}'...\n", t!("cli.device.add.creating"));
 
             // Prompt for the target DID (the identity to add this device to)
             print!("Enter the DID to add this device to: ");
@@ -4928,7 +4928,7 @@ fn handle_backup_command(data_dir: &Path, output: &Path) -> Result<()> {
         bail!("Data directory does not exist: {}", data_dir.display());
     }
 
-    println!("Creating backup of {}...", data_dir.display());
+    println!("{} {}...", t!("cli.backup.creating"), data_dir.display());
 
     // Create output file
     let output_file = File::create(output)
@@ -4970,12 +4970,12 @@ fn handle_backup_command(data_dir: &Path, output: &Path) -> Result<()> {
     // Finish the tarball
     tar_builder.finish().context("Failed to finalize backup")?;
 
-    println!("✓ Backup created successfully");
-    println!("  Output: {}", output.display());
+    println!("✓ {}", t!("cli.backup.success"));
+    println!("  {}: {}", t!("cli.backup.output_label"), output.display());
     println!("  ICN version: {}", metadata.icn_version);
     println!("  Checksum: {checksum}");
     println!();
-    println!("IMPORTANT: Store this backup securely. It contains your identity keystore.");
+    println!("IMPORTANT: {}", t!("cli.backup.includes"));
 
     Ok(())
 }
