@@ -2786,11 +2786,11 @@ async fn handle_network_command(cmd: NetworkCommands, endpoint: &str) -> Result<
                 .context("Failed to get peers from daemon. Is icnd running?")?;
 
             if peers.is_empty() {
-                println!("No peers discovered yet.");
+                println!("{}", t!("cli.network.peers.no_peers"));
                 println!("\nTip: Ensure other ICN nodes are running on the network.");
             } else {
-                println!("Discovered Peers:\n");
-                println!("{:<50} {:<22} Version", "DID", "Address");
+                println!("{}:\n", t!("cli.network.peers.title"));
+                println!("{}", t!("cli.network.peers.header"));
                 println!("{}", "-".repeat(80));
                 for peer in peers {
                     println!("{:<50} {:<22} {}", peer.did, peer.addr, peer.version);
@@ -2800,7 +2800,7 @@ async fn handle_network_command(cmd: NetworkCommands, endpoint: &str) -> Result<
 
         NetworkCommands::Dial { did, addr } => {
             let addr_str = addr.unwrap_or_else(|| "auto-discover".to_string());
-            println!("Dialing peer...");
+            println!("{}", t!("cli.network.dial.connecting"));
             println!("  Target DID: {did}");
             println!("  Address: {addr_str}\n");
 
@@ -2809,7 +2809,7 @@ async fn handle_network_command(cmd: NetworkCommands, endpoint: &str) -> Result<
                 .await
                 .context("Failed to dial peer. Is icnd running?")?;
 
-            println!("✓ Successfully established connection to {did}");
+            println!("✓ {} {did}", t!("cli.network.dial.success"));
         }
 
         NetworkCommands::Stats => {
@@ -2818,9 +2818,9 @@ async fn handle_network_command(cmd: NetworkCommands, endpoint: &str) -> Result<
                 .await
                 .context("Failed to get network stats from daemon. Is icnd running?")?;
 
-            println!("Network Statistics:\n");
-            println!("  Peers discovered:      {}", stats.peers_discovered);
-            println!("  Active connections:    {}", stats.connections_active);
+            println!("{}:\n", t!("cli.network.stats.title"));
+            println!("  {}:      {}", t!("cli.network.stats.active_connections"), stats.peers_discovered);
+            println!("  {}:    {}", t!("cli.network.stats.active_connections"), stats.connections_active);
             println!("  Total connections:     {}", stats.connections_total);
         }
 
@@ -2830,9 +2830,9 @@ async fn handle_network_command(cmd: NetworkCommands, endpoint: &str) -> Result<
                 .await
                 .context("Failed to get network status from daemon. Is icnd running?")?;
 
-            println!("Network Actor Status:\n");
+            println!("{}:\n", t!("cli.network.status.title"));
             println!("  Running:               {}", status.running);
-            println!("  Listener address:      {}", status.listen_addr);
+            println!("  {}:      {}", t!("cli.network.status.listening"), status.listen_addr);
         }
     }
 
@@ -3779,14 +3779,14 @@ async fn handle_ledger_command(cmd: LedgerCommands, endpoint: &str) -> Result<()
                 .context("Failed to get ledger head from daemon. Is icnd running?")?
             {
                 Some(entry) => {
-                    println!("Most recent ledger entry:\n");
-                    println!("  Hash:      {}", entry.hash);
-                    println!("  Timestamp: {}", entry.timestamp);
+                    println!("{}:\n", t!("cli.ledger.head.title"));
+                    println!("  {}:      {}", t!("cli.ledger.head.entry_hash"), entry.hash);
+                    println!("  {}:      {}", t!("cli.ledger.head.timestamp"), entry.timestamp);
                     println!("  Author:    {}", entry.author);
                     println!("\n  Account deltas:");
                     for delta in entry.accounts {
                         println!("    • {}", delta.account_id);
-                        println!("      Currency: {}", delta.currency);
+                        println!("      {}: {}", t!("cli.ledger.balance.currency_label"), delta.currency);
                         if let Some(debit) = delta.debit {
                             println!("      Debit:    {debit}");
                         }
@@ -3796,7 +3796,7 @@ async fn handle_ledger_command(cmd: LedgerCommands, endpoint: &str) -> Result<()
                     }
                 }
                 None => {
-                    println!("Ledger is empty.");
+                    println!("{}", t!("cli.ledger.head.no_entries"));
                 }
             }
         }
@@ -3811,14 +3811,14 @@ async fn handle_ledger_command(cmd: LedgerCommands, endpoint: &str) -> Result<()
                 .context("Failed to get balance from daemon. Is icnd running?")?;
 
             if balances.is_empty() {
-                println!("No balances found for account: {account_id}");
+                println!("{}", t!("cli.ledger.balance.no_balance"));
             } else if balances.len() == 1 && currency.is_some() {
                 let balance = &balances[0];
-                println!("Balance for {account_id}:\n");
-                println!("  Currency: {}", balance.currency);
-                println!("  Amount:   {}", balance.amount);
+                println!("{} {account_id}:\n", t!("cli.ledger.balance.title"));
+                println!("  {}: {}", t!("cli.ledger.balance.currency_label"), balance.currency);
+                println!("  {}: {}", t!("cli.ledger.balance.balance_label"), balance.amount);
             } else {
-                println!("Balances for {account_id}:\n");
+                println!("{} {account_id}:\n", t!("cli.ledger.balance.title"));
                 for balance in balances {
                     println!("  {:<10} {}", balance.currency, balance.amount);
                 }
@@ -3832,13 +3832,17 @@ async fn handle_ledger_command(cmd: LedgerCommands, endpoint: &str) -> Result<()
                 .context("Failed to get ledger history from daemon. Is icnd running?")?;
 
             if entries.is_empty() {
-                println!("Ledger is empty.");
+                println!("{}", t!("cli.ledger.history.no_entries"));
             } else {
-                println!("Recent ledger entries (showing {}):\n", entries.len());
+                println!("{} ({} {}):\n", 
+                    t!("cli.ledger.history.title"),
+                    t!("cli.ledger.history.showing", count = entries.len()),
+                    entries.len()
+                );
 
                 for entry in entries {
                     println!("Hash:      {}", entry.hash);
-                    println!("Timestamp: {}", entry.timestamp);
+                    println!("{}: {}", t!("cli.ledger.head.timestamp"), entry.timestamp);
                     println!("Author:    {}", entry.author);
                     println!("Accounts:");
                     for delta in entry.accounts {
@@ -4012,7 +4016,7 @@ async fn handle_contract_command(
                 format!("Failed to read contract file: {}", contract_file.display())
             })?;
 
-            println!("Deploying contract from {}...\n", contract_file.display());
+            println!("{} {}...\n", t!("cli.contract.deploy.deploying"), contract_file.display());
 
             // Parse contract to validate
             let contract: icn_ccl::Contract =
@@ -4030,7 +4034,7 @@ async fn handle_contract_command(
             // Load keystore to sign deployment
             let keystore_path = get_keystore_path(data_dir);
             if !keystore_path.exists() {
-                bail!("No identity found. Run 'icnctl id init' to create one first.");
+                bail!("{}", t!("cli.common.no_identity"));
             }
 
             let passphrase = read_passphrase("Enter passphrase to sign deployment: ")?;
@@ -4092,8 +4096,8 @@ async fn handle_contract_command(
                 .deploy_contract(deployment_json)
                 .await
                 .context("Failed to deploy contract to daemon. Is icnd running?")?;
-            println!("✓ Contract deployed successfully!");
-            println!("  Code Hash: {code_hash}");
+            println!("✓ {}", t!("cli.contract.deploy.success"));
+            println!("  {}: {code_hash}", t!("cli.contract.deploy.code_hash"));
             println!("\nYou can now call contract rules using:");
             println!("  icnctl contract call {code_hash} <rule_name> <caller_did> --args '{{}}'")
         }
@@ -4111,7 +4115,7 @@ async fn handle_contract_command(
                 serde_json::json!({})
             };
 
-            println!("Calling contract {code_hash}...");
+            println!("{} {code_hash}...", t!("cli.contract.call.calling"));
             println!("  Rule: {rule_name}");
             println!("  Caller: {caller}");
             println!("  Args: {args_value}\n");
@@ -4126,9 +4130,9 @@ async fn handle_contract_command(
                 .await
                 .context("Failed to call contract. Is icnd running?")?;
             if response.success {
-                println!("✓ Contract execution successful!");
-                println!("  Fuel consumed: {}", response.fuel_consumed);
-                println!("  Return value: {}", response.return_value);
+                println!("✓ {}", t!("cli.contract.call.success"));
+                println!("  {}: {}", t!("cli.contract.call.fuel_used"), response.fuel_consumed);
+                println!("  {}: {}", t!("cli.contract.call.result"), response.return_value);
             } else {
                 println!("✗ Contract execution failed!");
             }
@@ -4155,11 +4159,11 @@ async fn handle_contract_command(
         ContractCommands::List => match client.list_contracts().await {
             Ok(contracts) => {
                 if contracts.is_empty() {
-                    println!("No contracts deployed.");
+                    println!("{}", t!("cli.contract.list.no_contracts"));
                 } else {
-                    println!("Deployed contracts:\n");
+                    println!("{}:\n", t!("cli.contract.list.title"));
                     for contract in contracts {
-                        println!("Code Hash: {}", contract.code_hash);
+                        println!("{}: {}", t!("cli.contract.deploy.code_hash"), contract.code_hash);
                         println!("  Name: {}", contract.name);
                         println!("  Participants: {}", contract.participants.join(", "));
                         if let Some(currency) = contract.currency {
