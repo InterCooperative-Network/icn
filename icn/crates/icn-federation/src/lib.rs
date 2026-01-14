@@ -52,6 +52,9 @@ pub mod router;
 // Phase F5: DID Resolution
 pub mod resolver;
 
+// Inter-Cooperative Agreements (Issue #317)
+pub mod agreement;
+
 // Re-exports
 pub use attestation::{EvidenceSummary, FederatedTrustAttestation, TrustContext};
 pub use attestation_store::AttestationStore;
@@ -73,10 +76,20 @@ pub use types::{
     SigningScope, Vouch,
 };
 
+// Agreement re-exports
+pub use agreement::{
+    Agreement, AgreementEvent, AgreementEventCallback, AgreementGossipCallback,
+    AgreementGossipHandler, AgreementId, AgreementManager, AgreementMessage, AgreementParty,
+    AgreementSignature, AgreementStatus, AgreementStore, AgreementStoreOps, AgreementTerms,
+    AgreementType, Amendment, AmendmentChange, AmendmentStatus, AutoRenewal, CompensationModel,
+    InMemoryAgreementStore, PartyRole, ResourceType, TerminationReason, TradeItem,
+};
+
 /// Topic constants for federation gossip (re-exported at crate level)
 pub const TOPIC_FEDERATION_REGISTRY: &str = "federation:registry";
 pub const TOPIC_FEDERATION_TRUST: &str = "federation:trust";
 pub const TOPIC_FEDERATION_CLEARING: &str = "federation:clearing";
+pub const TOPIC_FEDERATION_AGREEMENTS: &str = "federation:agreements";
 
 /// Federation gossip topics
 pub mod topics {

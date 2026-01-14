@@ -39,6 +39,9 @@ metrics.workspace = true
 ed25519-dalek.workspace = true
 sha2.workspace = true
 
+# UUID generation
+uuid = { version = "1", features = ["v4"] }
+
 # HTTP client for remote DID resolution
 reqwest = { version = "0.12", features = ["json"] }
 urlencoding = "2.1"

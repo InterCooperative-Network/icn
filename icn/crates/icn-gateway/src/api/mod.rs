@@ -1,5 +1,6 @@
 //! API endpoint modules
 
+pub mod agreements;
 pub mod auth;
 pub mod budgets;
 pub mod charter;
