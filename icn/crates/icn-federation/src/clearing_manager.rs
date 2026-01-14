@@ -473,6 +473,59 @@ impl ClearingManager {
         Ok(result)
     }
 
+    /// Check for agreements that are due for settlement
+    /// Returns list of agreement IDs that should be settled
+    pub fn get_due_settlements(&self) -> Vec<String> {
+        let now = current_timestamp();
+        let mut due = Vec::new();
+
+        let agreements = self.agreements.read().unwrap_or_else(|poisoned| {
+            warn!("Agreements lock poisoned, recovering");
+            poisoned.into_inner()
+        });
+        let positions = self.positions.read().unwrap_or_else(|poisoned| {
+            warn!("Positions lock poisoned, recovering");
+            poisoned.into_inner()
+        });
+
+        for (agreement_id, agreement) in agreements.iter() {
+            // Skip manual settlement agreements
+            if let Some(interval_secs) = agreement.settlement_interval.seconds() {
+                if let Some(position) = positions.get(agreement_id) {
+                    let time_since_last = now.saturating_sub(position.last_settlement);
+                    
+                    // Check if settlement is due
+                    if time_since_last >= interval_secs {
+                        due.push(agreement_id.clone());
+                    }
+                }
+            }
+        }
+
+        due
+    }
+
+    /// Trigger settlements for all agreements that are due
+    /// Returns list of settlement reports
+    pub fn process_scheduled_settlements(&self) -> Vec<SettlementReport> {
+        let due_agreements = self.get_due_settlements();
+        let mut reports = Vec::new();
+
+        for agreement_id in due_agreements {
+            match self.trigger_settlement(&agreement_id) {
+                Ok(report) => {
+                    info!("Scheduled settlement completed for {}", agreement_id);
+                    reports.push(report);
+                }
+                Err(e) => {
+                    warn!("Scheduled settlement failed for {}: {}", agreement_id, e);
+                }
+            }
+        }
+
+        reports
+    }
+
     /// Find agreement between two cooperatives
     fn find_agreement(&self, coop_a: &str, coop_b: &str) -> Result<String> {
         let agreements = self.agreements.read().unwrap_or_else(|poisoned| {
@@ -611,5 +664,47 @@ mod tests {
 
         // After netting: food owes tech 40, tech owes arts 20, arts owes food 0
         assert_eq!(result.netted.len(), 2);
+    }
+
+    #[test]
+    fn test_scheduled_settlements() {
+        use crate::clearing::SettlementInterval;
+        
+        let store = Arc::new(SledStore::temporary().unwrap()) as Arc<dyn Store>;
+        let manager = ClearingManager::new(store, "food-coop".to_string()).unwrap();
+
+        // Create agreement with daily settlement
+        let agreement = BilateralClearingAgreement::new(
+            "agreement-1".to_string(),
+            "food-coop".to_string(),
+            test_did(),
+            "tech-coop".to_string(),
+            test_did(),
+        )
+        .with_rate("USD", "USD", 1.0)
+        .with_interval(SettlementInterval::Daily);
+
+        manager.create_agreement(agreement).unwrap();
+
+        // Modify last_settlement to be 2 days ago
+        {
+            let mut positions = manager.positions.write().unwrap();
+            let position = positions.get_mut("agreement-1").unwrap();
+            position.last_settlement = current_timestamp() - (2 * 24 * 60 * 60); // 2 days ago
+        }
+
+        // Check that settlement is due
+        let due = manager.get_due_settlements();
+        assert_eq!(due.len(), 1);
+        assert_eq!(due[0], "agreement-1");
+
+        // Process scheduled settlements
+        let reports = manager.process_scheduled_settlements();
+        assert_eq!(reports.len(), 1);
+        assert_eq!(reports[0].agreement_id, "agreement-1");
+
+        // After settlement, should not be due anymore
+        let due_after = manager.get_due_settlements();
+        assert_eq!(due_after.len(), 0);
     }
 }
