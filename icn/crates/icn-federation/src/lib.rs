@@ -65,9 +65,9 @@ pub use clearing::{
     TransferStatus,
 };
 pub use clearing_manager::{ClearingManager, SettlementReport};
-pub use netting::{DebtCycle, NettingEngine, NettingResult, Obligation};
 pub use error::{FederationError, Result};
 pub use gossip::FederationGossipHandler;
+pub use netting::{DebtCycle, NettingEngine, NettingResult, Obligation};
 pub use registry::CooperativeRegistry;
 pub use resolver::{CachedDidResolution, FederatedDidResolver};
 pub use router::FederatedGossipRouter;
