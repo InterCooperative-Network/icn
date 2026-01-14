@@ -29,6 +29,7 @@ cli:
       title: "Discovered Peers"
       no_peers: "No peers discovered yet"
       header: "DID                                          Address"
+      tip: "Tip: Ensure other ICN nodes are running on the network."
 
     dial:
       connecting: "Connecting to peer..."
@@ -65,6 +66,7 @@ cli:
       computed_score: "Computed trust score"
       direct_score: "Direct trust score"
       transitive: "Transitive trust"
+      class_label: "Class"
 
     remove:
       success: "Trust edge removed"
@@ -90,6 +92,8 @@ cli:
       no_entries: "No ledger entries found"
       showing: "Showing {count} most recent entries"
       header: "Hash                             Timestamp            Type"
+      hash: "Hash"
+      author: "Author"
 
   # Backup commands
   backup:

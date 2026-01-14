@@ -2627,7 +2627,7 @@ async fn handle_trust_command(cmd: TrustCommands, data_dir: &Path, endpoint: &st
 
             println!("{} {did}:", t!("cli.trust.show.title"));
             println!("  {}: {score:.4}", t!("cli.trust.add.score_label"));
-            println!("  Class: {class}");
+            println!("  {}: {class}", t!("cli.trust.show.class_label"));
         }
 
         TrustCommands::Remove { did } => {
@@ -2791,7 +2791,7 @@ async fn handle_network_command(cmd: NetworkCommands, endpoint: &str) -> Result<
 
             if peers.is_empty() {
                 println!("{}", t!("cli.network.peers.no_peers"));
-                println!("\nTip: Ensure other ICN nodes are running on the network.");
+                println!("\n{}", t!("cli.network.peers.tip"));
             } else {
                 println!("{}:\n", t!("cli.network.peers.title"));
                 println!("{}", t!("cli.network.peers.header"));
@@ -3871,16 +3871,15 @@ async fn handle_ledger_command(cmd: LedgerCommands, endpoint: &str) -> Result<()
                 println!("{}", t!("cli.ledger.history.no_entries"));
             } else {
                 println!(
-                    "{} ({} {}):\n",
+                    "{} ({}):\n",
                     t!("cli.ledger.history.title"),
-                    t!("cli.ledger.history.showing", count = entries.len()),
-                    entries.len()
+                    t!("cli.ledger.history.showing", count = entries.len())
                 );
 
                 for entry in entries {
-                    println!("Hash:      {}", entry.hash);
+                    println!("{}: {}", t!("cli.ledger.history.hash"), entry.hash);
                     println!("{}: {}", t!("cli.ledger.head.timestamp"), entry.timestamp);
-                    println!("Author:    {}", entry.author);
+                    println!("{}: {}", t!("cli.ledger.history.author"), entry.author);
                     println!("Accounts:");
                     for delta in entry.accounts {
                         print!("  • {} ({}): ", delta.account_id, delta.currency);
