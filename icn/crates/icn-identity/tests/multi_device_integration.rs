@@ -125,8 +125,9 @@ fn test_multi_device_workflow() -> Result<()> {
 }
 
 #[test]
-fn test_rotation_event_propagation() -> Result<()> {
-    // Simulate two nodes with synchronized DID documents
+fn test_did_document_synchronization() -> Result<()> {
+    // Test that DID documents can be kept in sync across nodes
+    // (In production, this sync happens via gossip with signed rotation events)
     let device1 = TestDevice::new("device-1", "Node A");
     let device2 = TestDevice::new("device-2", "Node B");
 
