@@ -469,10 +469,7 @@ impl ClearingManager {
 
     /// Apply multilateral netting results to positions
     /// This actually modifies the stored positions based on netting results
-    pub fn apply_multilateral_netting(
-        &self,
-        result: &crate::netting::NettingResult,
-    ) -> Result<()> {
+    pub fn apply_multilateral_netting(&self, result: &crate::netting::NettingResult) -> Result<()> {
         let mut positions = self.positions.write().unwrap_or_else(|poisoned| {
             warn!("Positions lock poisoned, recovering");
             poisoned.into_inner()
@@ -486,7 +483,8 @@ impl ClearingManager {
         for obligation in &result.original {
             // Find the agreement between these parties
             for (agreement_id, agreement) in agreements.iter() {
-                let is_match = (agreement.coop_a == obligation.from && agreement.coop_b == obligation.to)
+                let is_match = (agreement.coop_a == obligation.from
+                    && agreement.coop_b == obligation.to)
                     || (agreement.coop_a == obligation.to && agreement.coop_b == obligation.from);
 
                 if is_match {
@@ -502,8 +500,10 @@ impl ClearingManager {
         // Now apply the netted obligations
         for obligation in &result.netted {
             for (agreement_id, agreement) in agreements.iter() {
-                let forward_match = agreement.coop_a == obligation.from && agreement.coop_b == obligation.to;
-                let reverse_match = agreement.coop_a == obligation.to && agreement.coop_b == obligation.from;
+                let forward_match =
+                    agreement.coop_a == obligation.from && agreement.coop_b == obligation.to;
+                let reverse_match =
+                    agreement.coop_a == obligation.to && agreement.coop_b == obligation.from;
 
                 if forward_match {
                     if let Some(position) = positions.get_mut(agreement_id) {

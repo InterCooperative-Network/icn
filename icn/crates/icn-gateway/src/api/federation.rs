@@ -584,10 +584,10 @@ pub async fn apply_multilateral_netting(
     require_scope(&http_req, "federation:write")?; // Write permission required
 
     let currency = path.into_inner();
-    
+
     // First compute netting
     let result = fed_mgr.perform_multilateral_netting(&currency).await?;
-    
+
     // Then apply it
     fed_mgr.apply_multilateral_netting(&result).await?;
 

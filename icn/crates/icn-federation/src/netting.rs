@@ -119,7 +119,11 @@ impl NettingEngine {
     }
 
     /// Find a cycle starting from a given node using DFS
-    fn find_cycle(&self, start: &str, adj_list: &HashMap<String, Vec<String>>) -> Option<Vec<String>> {
+    fn find_cycle(
+        &self,
+        start: &str,
+        adj_list: &HashMap<String, Vec<String>>,
+    ) -> Option<Vec<String>> {
         let mut visited = HashSet::new();
         let mut path = Vec::new();
         let mut path_set = HashSet::new();
@@ -154,7 +158,9 @@ impl NettingEngine {
         // Find all neighbors using adjacency list (O(1) lookup instead of O(E))
         if let Some(neighbors) = adj_list.get(current) {
             for neighbor in neighbors {
-                if let Some(cycle) = self.dfs_find_cycle(neighbor, visited, path, path_set, adj_list) {
+                if let Some(cycle) =
+                    self.dfs_find_cycle(neighbor, visited, path, path_set, adj_list)
+                {
                     return Some(cycle);
                 }
             }
