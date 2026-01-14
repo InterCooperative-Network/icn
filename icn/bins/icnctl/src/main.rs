@@ -2596,7 +2596,11 @@ async fn handle_trust_command(cmd: TrustCommands, data_dir: &Path, endpoint: &st
                     println!("  → {}", edge.target_did);
                     println!("    {}: {:.2}", t!("cli.trust.add.score_label"), edge.score);
                     if !edge.labels.is_empty() {
-                        println!("    {}: {}", t!("cli.trust.add.label_label"), edge.labels.join(", "));
+                        println!(
+                            "    {}: {}",
+                            t!("cli.trust.add.label_label"),
+                            edge.labels.join(", ")
+                        );
                     }
                     println!();
                 }
@@ -2819,8 +2823,16 @@ async fn handle_network_command(cmd: NetworkCommands, endpoint: &str) -> Result<
                 .context("Failed to get network stats from daemon. Is icnd running?")?;
 
             println!("{}:\n", t!("cli.network.stats.title"));
-            println!("  {}:      {}", t!("cli.network.stats.active_connections"), stats.peers_discovered);
-            println!("  {}:    {}", t!("cli.network.stats.active_connections"), stats.connections_active);
+            println!(
+                "  {}:      {}",
+                t!("cli.network.stats.active_connections"),
+                stats.peers_discovered
+            );
+            println!(
+                "  {}:    {}",
+                t!("cli.network.stats.active_connections"),
+                stats.connections_active
+            );
             println!("  Total connections:     {}", stats.connections_total);
         }
 
@@ -2832,7 +2844,11 @@ async fn handle_network_command(cmd: NetworkCommands, endpoint: &str) -> Result<
 
             println!("{}:\n", t!("cli.network.status.title"));
             println!("  Running:               {}", status.running);
-            println!("  {}:      {}", t!("cli.network.status.listening"), status.listen_addr);
+            println!(
+                "  {}:      {}",
+                t!("cli.network.status.listening"),
+                status.listen_addr
+            );
         }
     }
 
@@ -3780,13 +3796,25 @@ async fn handle_ledger_command(cmd: LedgerCommands, endpoint: &str) -> Result<()
             {
                 Some(entry) => {
                     println!("{}:\n", t!("cli.ledger.head.title"));
-                    println!("  {}:      {}", t!("cli.ledger.head.entry_hash"), entry.hash);
-                    println!("  {}:      {}", t!("cli.ledger.head.timestamp"), entry.timestamp);
+                    println!(
+                        "  {}:      {}",
+                        t!("cli.ledger.head.entry_hash"),
+                        entry.hash
+                    );
+                    println!(
+                        "  {}:      {}",
+                        t!("cli.ledger.head.timestamp"),
+                        entry.timestamp
+                    );
                     println!("  Author:    {}", entry.author);
                     println!("\n  Account deltas:");
                     for delta in entry.accounts {
                         println!("    • {}", delta.account_id);
-                        println!("      {}: {}", t!("cli.ledger.balance.currency_label"), delta.currency);
+                        println!(
+                            "      {}: {}",
+                            t!("cli.ledger.balance.currency_label"),
+                            delta.currency
+                        );
                         if let Some(debit) = delta.debit {
                             println!("      Debit:    {debit}");
                         }
@@ -3815,8 +3843,16 @@ async fn handle_ledger_command(cmd: LedgerCommands, endpoint: &str) -> Result<()
             } else if balances.len() == 1 && currency.is_some() {
                 let balance = &balances[0];
                 println!("{} {account_id}:\n", t!("cli.ledger.balance.title"));
-                println!("  {}: {}", t!("cli.ledger.balance.currency_label"), balance.currency);
-                println!("  {}: {}", t!("cli.ledger.balance.balance_label"), balance.amount);
+                println!(
+                    "  {}: {}",
+                    t!("cli.ledger.balance.currency_label"),
+                    balance.currency
+                );
+                println!(
+                    "  {}: {}",
+                    t!("cli.ledger.balance.balance_label"),
+                    balance.amount
+                );
             } else {
                 println!("{} {account_id}:\n", t!("cli.ledger.balance.title"));
                 for balance in balances {
@@ -3834,7 +3870,8 @@ async fn handle_ledger_command(cmd: LedgerCommands, endpoint: &str) -> Result<()
             if entries.is_empty() {
                 println!("{}", t!("cli.ledger.history.no_entries"));
             } else {
-                println!("{} ({} {}):\n", 
+                println!(
+                    "{} ({} {}):\n",
                     t!("cli.ledger.history.title"),
                     t!("cli.ledger.history.showing", count = entries.len()),
                     entries.len()
@@ -4016,7 +4053,11 @@ async fn handle_contract_command(
                 format!("Failed to read contract file: {}", contract_file.display())
             })?;
 
-            println!("{} {}...\n", t!("cli.contract.deploy.deploying"), contract_file.display());
+            println!(
+                "{} {}...\n",
+                t!("cli.contract.deploy.deploying"),
+                contract_file.display()
+            );
 
             // Parse contract to validate
             let contract: icn_ccl::Contract =
@@ -4131,8 +4172,16 @@ async fn handle_contract_command(
                 .context("Failed to call contract. Is icnd running?")?;
             if response.success {
                 println!("✓ {}", t!("cli.contract.call.success"));
-                println!("  {}: {}", t!("cli.contract.call.fuel_used"), response.fuel_consumed);
-                println!("  {}: {}", t!("cli.contract.call.result"), response.return_value);
+                println!(
+                    "  {}: {}",
+                    t!("cli.contract.call.fuel_used"),
+                    response.fuel_consumed
+                );
+                println!(
+                    "  {}: {}",
+                    t!("cli.contract.call.result"),
+                    response.return_value
+                );
             } else {
                 println!("✗ Contract execution failed!");
             }
@@ -4163,7 +4212,11 @@ async fn handle_contract_command(
                 } else {
                     println!("{}:\n", t!("cli.contract.list.title"));
                     for contract in contracts {
-                        println!("{}: {}", t!("cli.contract.deploy.code_hash"), contract.code_hash);
+                        println!(
+                            "{}: {}",
+                            t!("cli.contract.deploy.code_hash"),
+                            contract.code_hash
+                        );
                         println!("  Name: {}", contract.name);
                         println!("  Participants: {}", contract.participants.join(", "));
                         if let Some(currency) = contract.currency {
@@ -4518,7 +4571,11 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &Path) -> Result<()> {
             println!("Identity: {}", did_doc.id);
             println!("Version: {}", did_doc.version);
             println!("Updated: {}", did_doc.updated_at);
-            println!("\n{} ({}):", t!("cli.device.list.title"), did_doc.verification_method.len() / 2); // Ed25519 + X25519 per device
+            println!(
+                "\n{} ({}):",
+                t!("cli.device.list.title"),
+                did_doc.verification_method.len() / 2
+            ); // Ed25519 + X25519 per device
             println!();
 
             // Group verification methods by device (Ed25519 + X25519 pairs)
@@ -6035,7 +6092,10 @@ fn handle_snapshot_command(cmd: SnapshotCommands, data_dir: &Path) -> Result<()>
             match icn_snapshot::cleanup_old_snapshots(&store_dir, keep) {
                 Ok(deleted) => {
                     if deleted > 0 {
-                        println!("✓ {}", t!("cli.snapshot.cleanup.deleted_count", count = deleted));
+                        println!(
+                            "✓ {}",
+                            t!("cli.snapshot.cleanup.deleted_count", count = deleted)
+                        );
                     } else {
                         println!("{}", t!("cli.snapshot.cleanup.kept_count", count = keep));
                     }

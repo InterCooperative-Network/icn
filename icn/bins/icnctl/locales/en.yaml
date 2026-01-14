@@ -29,19 +29,19 @@ cli:
       title: "Discovered Peers"
       no_peers: "No peers discovered yet"
       header: "DID                                          Address"
-    
+
     dial:
       connecting: "Connecting to peer..."
       success: "Connection established"
       failed: "Connection failed"
-    
+
     stats:
       title: "Network Statistics"
       active_connections: "Active connections"
       bytes_sent: "Bytes sent"
       bytes_received: "Bytes received"
       uptime: "Uptime"
-    
+
     status:
       title: "Network Actor Status"
       listening: "Listening on"
@@ -54,18 +54,18 @@ cli:
       did_label: "Target DID"
       score_label: "Trust score"
       label_label: "Label"
-    
+
     list:
       title: "Trust Edges"
       no_edges: "No trust edges found"
       header: "DID                                          Score  Label"
-    
+
     show:
       title: "Trust Score"
       computed_score: "Computed trust score"
       direct_score: "Direct trust score"
       transitive: "Transitive trust"
-    
+
     remove:
       success: "Trust edge removed"
       not_found: "Trust edge not found"
@@ -77,14 +77,14 @@ cli:
       no_entries: "Ledger is empty"
       entry_hash: "Entry hash"
       timestamp: "Timestamp"
-    
+
     balance:
       title: "Account Balance"
       account_label: "Account"
       currency_label: "Currency"
       balance_label: "Balance"
       no_balance: "No balance found for this account"
-    
+
     history:
       title: "Ledger History"
       no_entries: "No ledger entries found"
@@ -97,7 +97,7 @@ cli:
     success: "Backup created successfully"
     output_label: "Backup file"
     includes: "Backup includes: keystore, trust graph, ledger, governance state"
-  
+
   restore:
     checking: "Checking backup integrity..."
     restoring: "Restoring from backup..."
@@ -106,7 +106,7 @@ cli:
     created_at: "Created"
     node_did: "Node DID"
     warning_overwrite: "WARNING: This will overwrite existing data in {path}"
-    
+
   verify_backup:
     verifying: "Verifying backup..."
     valid: "Backup is valid"
@@ -139,12 +139,12 @@ cli:
       reason: "Reason"
       important: "IMPORTANT: Publish the rotation proof to maintain identity continuity."
       timestamp: "Timestamp"
-    
+
     export:
       exporting: "Exporting identity..."
       success: "Identity exported successfully"
       output_label: "Export file"
-    
+
     import:
       importing: "Importing identity..."
       success: "Identity imported successfully"
@@ -157,19 +157,19 @@ cli:
       no_devices: "No devices found"
       header: "ID                 Label              Status      Added"
       current: "(current device)"
-    
+
     add:
       creating: "Creating device-add request..."
       success: "Device-add request created"
       file_saved: "Request saved to"
       instructions: "Transfer this file to your primary device and approve it with: icnctl device approve {file}"
-    
+
     approve:
       approving: "Approving device..."
       success: "Device approved successfully"
       device_label: "Device"
       device_id: "Device ID"
-    
+
     revoke:
       revoking: "Revoking device..."
       success: "Device revoked successfully"
@@ -181,13 +181,13 @@ cli:
       deploying: "Deploying contract..."
       success: "Contract deployed successfully"
       code_hash: "Code hash"
-    
+
     call:
       calling: "Calling contract..."
       success: "Contract executed successfully"
       result: "Result"
       fuel_used: "Fuel used"
-    
+
     list:
       title: "Deployed Contracts"
       no_contracts: "No contracts deployed"
@@ -200,36 +200,36 @@ cli:
         creating: "Creating governance domain..."
         success: "Domain created successfully"
         domain_id: "Domain ID"
-      
+
       show:
         title: "Domain Details"
         members_label: "Members"
         quorum_label: "Quorum"
         approval_label: "Approval threshold"
-      
+
       list:
         title: "Governance Domains"
         no_domains: "No domains found"
         header: "ID                    Name                 Members  Quorum"
-    
+
     proposal:
       create:
         creating: "Creating proposal..."
         success: "Proposal created successfully"
         proposal_id: "Proposal ID"
-      
+
       list:
         title: "Proposals"
         no_proposals: "No proposals found"
         header: "ID            Title                    State      Votes"
-      
+
       show:
         title: "Proposal Details"
         state_label: "State"
         votes_for: "Votes for"
         votes_against: "Votes against"
         quorum_reached: "Quorum reached"
-    
+
     vote:
       cast:
         casting: "Casting vote..."
@@ -243,13 +243,13 @@ cli:
       success: "Task submitted successfully"
       task_id: "Task ID"
       task_hash: "Task hash"
-    
+
     status:
       title: "Task Status"
       state_label: "State"
       result_label: "Result"
       fuel_used: "Fuel used"
-    
+
     cancel:
       cancelling: "Cancelling task..."
       success: "Task cancelled successfully"
@@ -260,21 +260,21 @@ cli:
       creating: "Creating snapshot..."
       success: "Snapshot created successfully"
       filename: "Snapshot file"
-    
+
     list:
       title: "Available Snapshots"
       no_snapshots: "No snapshots found"
       header: "Filename              Created              Size"
-    
+
     verify:
       verifying: "Verifying snapshot..."
       valid: "Snapshot is valid"
       invalid: "Snapshot is invalid"
-    
+
     delete:
       deleting: "Deleting snapshot..."
       success: "Snapshot deleted successfully"
-    
+
     cleanup:
       cleaning: "Cleaning up old snapshots..."
       deleted_count: "Deleted {count} old snapshot(s)"
