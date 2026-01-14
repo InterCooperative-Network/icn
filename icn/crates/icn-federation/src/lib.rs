@@ -44,6 +44,7 @@ pub mod attestation_store;
 // Phase F3: Credit Settlement
 pub mod clearing;
 pub mod clearing_manager;
+pub mod netting;
 
 // Phase F4: Scoped Gossip
 pub mod channel;
@@ -64,6 +65,7 @@ pub use clearing::{
     TransferStatus,
 };
 pub use clearing_manager::{ClearingManager, SettlementReport};
+pub use netting::{DebtCycle, NettingEngine, NettingResult, Obligation};
 pub use error::{FederationError, Result};
 pub use gossip::FederationGossipHandler;
 pub use registry::CooperativeRegistry;
