@@ -138,8 +138,16 @@ impl TradeItem {
     }
 
     /// Calculate total value
-    pub fn total_value(&self) -> i64 {
-        self.unit_price * i64::from(self.quantity)
+    /// Returns None if multiplication would overflow
+    pub fn total_value(&self) -> Result<i64, String> {
+        self.unit_price
+            .checked_mul(i64::from(self.quantity))
+            .ok_or_else(|| {
+                format!(
+                    "Integer overflow: {} * {} exceeds i64::MAX",
+                    self.unit_price, self.quantity
+                )
+            })
     }
 }
 
@@ -602,6 +610,38 @@ impl Amendment {
             self.signatures.push(signature);
         }
     }
+
+    /// Verify a single signature for this amendment
+    pub fn verify_signature(&self, sig: &AgreementSignature) -> Result<(), String> {
+        // Get the amendment bytes to verify
+        let bytes = self.signing_bytes();
+
+        // Get the public key from the DID
+        let public_key = sig
+            .signer
+            .to_verifying_key()
+            .map_err(|e| format!("Invalid public key for {}: {}", sig.signer, e))?;
+
+        // Parse the signature
+        let signature = ed25519_dalek::Signature::from_slice(&sig.signature)
+            .map_err(|e| format!("Invalid signature format: {}", e))?;
+
+        // Verify
+        use ed25519_dalek::Verifier;
+        public_key
+            .verify(&bytes, &signature)
+            .map_err(|e| format!("Signature verification failed for {}: {}", sig.signer, e))
+    }
+
+    /// Get the canonical bytes for signing
+    fn signing_bytes(&self) -> Vec<u8> {
+        // Use a deterministic encoding
+        format!(
+            "{}:{}:{}:{}",
+            self.id, self.agreement_id, self.description, self.proposed_at
+        )
+        .into_bytes()
+    }
 }
 
 /// A specific change in an amendment
@@ -858,6 +898,19 @@ impl Agreement {
             return Err("Agreement must have a proposer".to_string());
         }
 
+        // Validate timestamps
+        let now = current_timestamp();
+        if let Some(effective) = self.terms.effective_date {
+            if effective < now {
+                return Err("Effective date must be in the future".to_string());
+            }
+            if let Some(expiration) = self.terms.expiration_date {
+                if expiration <= effective {
+                    return Err("Expiration date must be after effective date".to_string());
+                }
+            }
+        }
+
         let awaiting = self.pending_signers();
         self.status = AgreementStatus::Proposed {
             proposed_at: current_timestamp(),
@@ -1016,8 +1069,11 @@ impl Agreement {
                     self.parties.retain(|p| p.did != *party_did);
                     self.signatures.retain(|s| s.signer != *party_did);
                 }
-                _ => {
-                    // Other changes require custom handling
+                AmendmentChange::UpdateTerm { .. } | AmendmentChange::ModifyType { .. } => {
+                    return Err(format!(
+                        "Amendment change type {:?} not yet supported",
+                        change
+                    ));
                 }
             }
         }
@@ -1226,7 +1282,11 @@ mod tests {
     #[test]
     fn test_trade_item_total_value() {
         let item = TradeItem::new("widgets", 10, "units", 100, "USD");
-        assert_eq!(item.total_value(), 1000);
+        assert_eq!(item.total_value().unwrap(), 1000);
+
+        // Test overflow
+        let overflow_item = TradeItem::new("widgets", 1_000_000, "units", i64::MAX / 100, "USD");
+        assert!(overflow_item.total_value().is_err());
     }
 
     #[test]

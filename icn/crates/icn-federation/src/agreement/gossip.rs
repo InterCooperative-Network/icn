@@ -254,11 +254,19 @@ impl<S: AgreementStoreOps> AgreementGossipHandler<S> {
         agreement.signatures.push(signature.clone());
 
         // Check if all signatures are collected - auto-activate
-        if agreement.status.is_proposed()
-            && agreement.is_fully_signed()
-            && agreement.activate().is_ok()
-        {
-            info!("Agreement {} activated via gossip signatures", agreement_id);
+        if agreement.status.is_proposed() && agreement.is_fully_signed() {
+            match agreement.activate() {
+                Ok(()) => {
+                    info!("Agreement {} activated via gossip signatures", agreement_id);
+                }
+                Err(e) => {
+                    warn!(
+                        "Failed to activate agreement {} despite full signatures: {}",
+                        agreement_id, e
+                    );
+                    // Don't propagate error - just log it and continue
+                }
+            }
         }
 
         self.store.store_agreement(&agreement)?;
@@ -371,12 +379,21 @@ impl<S: AgreementStoreOps> AgreementGossipHandler<S> {
             }
         };
 
-        // Add signature if not duplicate
+        // Add signature if not duplicate and valid
         if !amendment
             .signatures
             .iter()
             .any(|s| s.signer == signature.signer)
         {
+            // Verify signature before adding
+            if let Err(e) = amendment.verify_signature(&signature) {
+                warn!(
+                    "Invalid amendment signature from {}: {}",
+                    signature.signer, e
+                );
+                return Ok(());
+            }
+
             amendment.add_signature(signature);
             self.store.store_amendment(amendment)?;
             debug!(
