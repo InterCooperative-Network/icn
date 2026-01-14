@@ -5849,7 +5849,7 @@ fn handle_snapshot_command(cmd: SnapshotCommands, data_dir: &Path) -> Result<()>
 
     match cmd {
         SnapshotCommands::Create => {
-            println!("Creating manual snapshot...");
+            println!("{}", t!("cli.snapshot.create.creating"));
 
             // Check if store directory exists
             if !store_dir.exists() {
@@ -5870,9 +5870,10 @@ fn handle_snapshot_command(cmd: SnapshotCommands, data_dir: &Path) -> Result<()>
                     icn_snapshot::save_snapshot(&snapshot, &store_dir)
                         .context("Failed to save snapshot with checksum")?;
 
-                    println!("✓ Snapshot created successfully");
+                    println!("✓ {}", t!("cli.snapshot.create.success"));
                     println!(
-                        "  Location: {}/state.snapshot.{}",
+                        "  {}: {}/state.snapshot.{}",
+                        t!("cli.snapshot.create.filename"),
                         store_dir.display(),
                         snapshot.created_at
                     );
@@ -5902,15 +5903,15 @@ fn handle_snapshot_command(cmd: SnapshotCommands, data_dir: &Path) -> Result<()>
         }
 
         SnapshotCommands::List => {
-            println!("Available snapshots in {}:", store_dir.display());
+            println!("{}", t!("cli.snapshot.list.title"));
             println!();
 
             match icn_snapshot::list_snapshots(&store_dir) {
                 Ok(snapshots) => {
                     if snapshots.is_empty() {
-                        println!("No snapshots found.");
+                        println!("{}", t!("cli.snapshot.list.no_snapshots"));
                     } else {
-                        println!("{:<30} {:<20} {:<15}", "Snapshot", "Created", "Size");
+                        println!("{}", t!("cli.snapshot.list.header"));
                         println!("{}", "-".repeat(65));
 
                         for (filename, timestamp, size) in snapshots {
@@ -5948,7 +5949,7 @@ fn handle_snapshot_command(cmd: SnapshotCommands, data_dir: &Path) -> Result<()>
 
         SnapshotCommands::Verify { snapshot } => {
             let snapshot_name = snapshot.unwrap_or_else(|| "state.snapshot".to_string());
-            println!("Verifying snapshot: {snapshot_name}");
+            println!("{} {snapshot_name}", t!("cli.snapshot.verify.verifying"));
 
             // Verify the snapshot (main or timestamped)
             let verify_result = if snapshot_name == "state.snapshot" {
@@ -5959,7 +5960,7 @@ fn handle_snapshot_command(cmd: SnapshotCommands, data_dir: &Path) -> Result<()>
 
             match verify_result {
                 Ok(()) => {
-                    println!("✓ Snapshot checksum verified successfully");
+                    println!("✓ {}", t!("cli.snapshot.verify.valid"));
 
                     // Load and display info
                     let load_result = if snapshot_name == "state.snapshot" {
@@ -5993,14 +5994,14 @@ fn handle_snapshot_command(cmd: SnapshotCommands, data_dir: &Path) -> Result<()>
                     }
                 }
                 Err(e) => {
-                    println!("✗ Snapshot verification failed!");
+                    println!("✗ {}", t!("cli.snapshot.verify.invalid"));
                     bail!("{e}");
                 }
             }
         }
 
         SnapshotCommands::Delete { snapshot } => {
-            println!("Deleting snapshot: {snapshot}");
+            println!("{} {snapshot}", t!("cli.snapshot.delete.deleting"));
 
             let snapshot_path = store_dir.join(&snapshot);
             let checksum_path = store_dir.join(format!("{snapshot}.sha256"));
@@ -6021,18 +6022,18 @@ fn handle_snapshot_command(cmd: SnapshotCommands, data_dir: &Path) -> Result<()>
                 })?;
             }
 
-            println!("✓ Snapshot deleted successfully");
+            println!("✓ {}", t!("cli.snapshot.delete.success"));
         }
 
         SnapshotCommands::Cleanup { keep } => {
-            println!("Cleaning up old snapshots (keeping {keep} most recent)...");
+            println!("{}", t!("cli.snapshot.cleanup.cleaning"));
 
             match icn_snapshot::cleanup_old_snapshots(&store_dir, keep) {
                 Ok(deleted) => {
                     if deleted > 0 {
-                        println!("✓ Deleted {deleted} old snapshot(s)");
+                        println!("✓ {}", t!("cli.snapshot.cleanup.deleted_count", count = deleted));
                     } else {
-                        println!("No snapshots to delete (under retention limit)");
+                        println!("{}", t!("cli.snapshot.cleanup.kept_count", count = keep));
                     }
                 }
                 Err(e) => {
