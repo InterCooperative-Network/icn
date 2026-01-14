@@ -94,7 +94,7 @@ pub struct GatewayServer {
     /// Optional handle to daemon's StewardActor (for SDIS ceremonies)
     steward_handle: Option<icn_steward::StewardHandle>,
     /// Optional handle to daemon's AgreementManager (for inter-cooperative agreements)
-    agreement_manager_handle: Option<Arc<icn_federation::agreement::AgreementManager<icn_federation::agreement::InMemoryAgreementStore>>>,
+    agreement_manager_handle: Option<icn_federation::agreement::AgreementManagerHandle>,
     /// Audit pruning configuration
     audit_prune_config: Option<AuditPruneConfig>,
 }
@@ -287,7 +287,7 @@ impl GatewayServer {
     /// AgreementManager for managing formal agreements between cooperatives.
     pub fn with_agreement_manager_handle(
         mut self,
-        handle: Arc<icn_federation::agreement::AgreementManager<icn_federation::agreement::InMemoryAgreementStore>>,
+        handle: icn_federation::agreement::AgreementManagerHandle,
     ) -> Self {
         self.agreement_manager_handle = Some(handle);
         self
@@ -399,7 +399,7 @@ impl GatewayServer {
         let commons_manager = Arc::new(CommonsManager::new());
 
         // Setup agreement manager if provided (for inter-cooperative agreements)
-        let agreement_manager: Option<Arc<icn_federation::agreement::AgreementManager<icn_federation::agreement::InMemoryAgreementStore>>> =
+        let agreement_manager: Option<icn_federation::agreement::AgreementManagerHandle> =
             if let Some(handle) = self.agreement_manager_handle {
                 info!("Agreement manager connected to daemon");
                 Some(handle)
