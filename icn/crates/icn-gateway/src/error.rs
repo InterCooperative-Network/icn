@@ -2,6 +2,7 @@
 
 use actix_web::{http::StatusCode, HttpResponse, ResponseError};
 use icn_ledger::fx::FxError;
+use rust_i18n::t;
 
 /// Gateway result type
 pub type Result<T> = std::result::Result<T, GatewayError>;
@@ -96,19 +97,57 @@ impl ResponseError for GatewayError {
         }
     }
 
+    /// Generate HTTP error response with i18n support.
+    ///
+    /// Locale is determined by rust-i18n (defaults to "en").
+    /// Falls back to English if the requested locale is unavailable
+    /// or if a translation key is missing.
+    ///
+    /// # Security
+    /// Internal errors (InternalError, SubstrateError, IoError) are
+    /// sanitized to prevent information leakage. Full details are logged
+    /// but only generic messages are returned to clients.
     fn error_response(&self) -> HttpResponse {
         // Sanitize error messages to prevent information leakage
         // Internal errors should not expose implementation details to clients
+        // Use i18n translations for user-facing messages
         let error_message = match self {
-            // User-facing errors - safe to expose
-            GatewayError::AuthenticationFailed(msg) => msg.clone(),
-            GatewayError::AuthorizationFailed(msg) => msg.clone(),
-            GatewayError::Forbidden(msg) => msg.clone(),
-            GatewayError::NotFound(msg) => msg.clone(),
-            GatewayError::BadRequest(msg) => msg.clone(),
-            GatewayError::RateLimitExceeded(msg) => format!("Rate limit exceeded for DID: {msg}"),
-            GatewayError::BudgetExceeded(msg) => msg.clone(),
-            GatewayError::ServiceUnavailable(msg) => msg.clone(),
+            // User-facing errors - safe to expose with i18n
+            GatewayError::AuthenticationFailed(reason) => {
+                format!("{}: {}", t!("gateway.errors.auth_failed_prefix"), reason)
+            }
+            GatewayError::AuthorizationFailed(reason) => {
+                format!("{}: {}", t!("gateway.errors.authz_failed_prefix"), reason)
+            }
+            GatewayError::Forbidden(reason) => {
+                format!("{}: {}", t!("gateway.errors.forbidden_prefix"), reason)
+            }
+            GatewayError::NotFound(resource) => {
+                format!("{}: {}", t!("gateway.errors.not_found_prefix"), resource)
+            }
+            GatewayError::BadRequest(reason) => {
+                format!("{}: {}", t!("gateway.errors.bad_request_prefix"), reason)
+            }
+            GatewayError::RateLimitExceeded(did) => {
+                format!(
+                    "{}: {}",
+                    t!("gateway.errors.rate_limit_exceeded_prefix"),
+                    did
+                )
+            }
+            GatewayError::BudgetExceeded(reason) => {
+                format!(
+                    "{}: {}",
+                    t!("gateway.errors.budget_exceeded_prefix"),
+                    reason
+                )
+            }
+            GatewayError::ServiceUnavailable(reason) => {
+                // Log the reason for debugging but return generic message to avoid
+                // exposing potentially sensitive service state information
+                tracing::warn!("Service unavailable: {}", reason);
+                t!("gateway.errors.service_unavailable").to_string()
+            }
 
             // FX errors - user-facing with structured codes
             GatewayError::Fx(fx_err) => fx_err.to_string(),
@@ -117,15 +156,15 @@ impl ResponseError for GatewayError {
             // Log the full error for debugging but return generic message to client
             GatewayError::InternalError(details) => {
                 tracing::error!("Internal error: {}", details);
-                "Internal server error".to_string()
+                t!("gateway.errors.internal").to_string()
             }
             GatewayError::SubstrateError(err) => {
                 tracing::error!("Substrate error: {:?}", err);
-                "Internal server error".to_string()
+                t!("gateway.errors.internal").to_string()
             }
             GatewayError::IoError(err) => {
                 tracing::error!("I/O error: {:?}", err);
-                "Internal server error".to_string()
+                t!("gateway.errors.internal").to_string()
             }
         };
 

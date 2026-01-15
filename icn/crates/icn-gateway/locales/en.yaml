@@ -1,32 +1,36 @@
 # ICN Gateway API Translations - English
 # Format: {category}.{error_type}.{variant}
 # Variables: {var_name} for interpolation
+#
+# Note: Some keys (auth_required, token_expired, etc.) are defined for future
+# use when more specific error variants are added. Currently, the *_prefix keys
+# are used with dynamic content appended via Rust's format!() macro.
 
 gateway:
   errors:
     # Authentication errors
-    auth_failed: "Authentication failed: {reason}"
+    auth_failed_prefix: "Authentication failed"
     auth_required: "Authentication required"
     token_expired: "Authentication token has expired"
     invalid_token: "Invalid authentication token"
 
     # Authorization errors
-    authz_failed: "Authorization failed: {reason}"
-    forbidden: "Access forbidden: {reason}"
+    authz_failed_prefix: "Authorization failed"
+    forbidden_prefix: "Access forbidden"
     insufficient_permissions: "Insufficient permissions for this operation"
 
     # Resource errors
-    not_found: "Resource not found: {resource}"
+    not_found_prefix: "Resource not found"
     already_exists: "Resource already exists: {resource}"
 
     # Request errors
-    bad_request: "Invalid request: {reason}"
+    bad_request_prefix: "Invalid request"
     validation_failed: "Validation failed: {reason}"
 
     # Rate limiting
     rate_limit_exceeded: "Rate limit exceeded"
-    rate_limit_did: "Rate limit exceeded for DID: {did}"
-    budget_exceeded: "Budget exceeded: {reason}"
+    rate_limit_exceeded_prefix: "Rate limit exceeded for DID"
+    budget_exceeded_prefix: "Budget exceeded"
 
     # Server errors
     internal: "Internal server error"
