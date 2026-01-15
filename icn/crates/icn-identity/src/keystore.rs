@@ -11,10 +11,11 @@ use crate::anchor::Anchor;
 use crate::keybundle::KeyBundle;
 use crate::{Did, DidDocument, IdentityBundle, KeyPair, RotationEvent};
 use anyhow::{Context, Result};
-use secrecy::{Secret, Zeroize};
+use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use tracing::{info, warn};
+use zeroize::Zeroize;
 use zeroize::Zeroizing;
 
 /// Trait for secure key storage backends
@@ -536,8 +537,10 @@ impl AgeKeyStore {
     fn encrypt_and_save_v4(path: &Path, stored: &StoredKeyV4, passphrase: &[u8]) -> Result<()> {
         let json = Zeroizing::new(serde_json::to_vec(stored)?);
 
-        let encryptor = age::Encryptor::with_user_passphrase(Secret::new(
-            String::from_utf8(passphrase.to_vec()).context("Passphrase must be valid UTF-8")?,
+        let encryptor = age::Encryptor::with_user_passphrase(SecretString::new(
+            String::from_utf8(passphrase.to_vec())
+                .context("Passphrase must be valid UTF-8")?
+                .into_boxed_str(),
         ));
 
         let mut encrypted = Vec::new();
@@ -564,18 +567,20 @@ impl AgeKeyStore {
         let encrypted = std::fs::read(path).context("Failed to read keystore file")?;
 
         // Create age decryptor
-        let decryptor = match age::Decryptor::new(encrypted.as_slice())? {
-            age::Decryptor::Passphrase(d) => d,
-            _ => anyhow::bail!("Unsupported age encryption type"),
-        };
+        let decryptor = age::Decryptor::new(encrypted.as_slice())?;
+        if !decryptor.is_scrypt() {
+            anyhow::bail!("Unsupported age encryption type");
+        }
 
-        // Decrypt
+        // Decrypt with scrypt identity
         let passphrase_str =
             String::from_utf8(passphrase.to_vec()).context("Passphrase must be valid UTF-8")?;
+        let identity =
+            age::scrypt::Identity::new(SecretString::new(passphrase_str.into_boxed_str()));
 
         let mut decrypted = Vec::new();
         let mut reader = decryptor
-            .decrypt(&Secret::new(passphrase_str), None)
+            .decrypt(std::iter::once(&identity as &dyn age::Identity))
             .context("Failed to decrypt (wrong passphrase?)")?;
 
         std::io::copy(&mut reader, &mut decrypted).context("Failed to read decrypted data")?;
@@ -773,8 +778,10 @@ impl AgeKeyStore {
         let json = Zeroizing::new(serde_json::to_vec(stored)?);
 
         // Create age encryptor with passphrase
-        let encryptor = age::Encryptor::with_user_passphrase(Secret::new(
-            String::from_utf8(passphrase.to_vec()).context("Passphrase must be valid UTF-8")?,
+        let encryptor = age::Encryptor::with_user_passphrase(SecretString::new(
+            String::from_utf8(passphrase.to_vec())
+                .context("Passphrase must be valid UTF-8")?
+                .into_boxed_str(),
         ));
 
         // Encrypt
@@ -804,18 +811,20 @@ impl AgeKeyStore {
         let encrypted = std::fs::read(path).context("Failed to read keystore file")?;
 
         // Create age decryptor
-        let decryptor = match age::Decryptor::new(encrypted.as_slice())? {
-            age::Decryptor::Passphrase(d) => d,
-            _ => anyhow::bail!("Unsupported age encryption type"),
-        };
+        let decryptor = age::Decryptor::new(encrypted.as_slice())?;
+        if !decryptor.is_scrypt() {
+            anyhow::bail!("Unsupported age encryption type");
+        }
 
-        // Decrypt
+        // Decrypt with scrypt identity
         let passphrase_str =
             String::from_utf8(passphrase.to_vec()).context("Passphrase must be valid UTF-8")?;
+        let identity =
+            age::scrypt::Identity::new(SecretString::new(passphrase_str.into_boxed_str()));
 
         let mut decrypted = Vec::new();
         let mut reader = decryptor
-            .decrypt(&Secret::new(passphrase_str), None)
+            .decrypt(std::iter::once(&identity as &dyn age::Identity))
             .context("Failed to decrypt (wrong passphrase?)")?;
 
         std::io::copy(&mut reader, &mut decrypted).context("Failed to read decrypted data")?;
@@ -833,8 +842,10 @@ impl AgeKeyStore {
         let json = Zeroizing::new(serde_json::to_vec(stored)?);
 
         // Create age encryptor with passphrase
-        let encryptor = age::Encryptor::with_user_passphrase(Secret::new(
-            String::from_utf8(passphrase.to_vec()).context("Passphrase must be valid UTF-8")?,
+        let encryptor = age::Encryptor::with_user_passphrase(SecretString::new(
+            String::from_utf8(passphrase.to_vec())
+                .context("Passphrase must be valid UTF-8")?
+                .into_boxed_str(),
         ));
 
         // Encrypt
@@ -864,18 +875,20 @@ impl AgeKeyStore {
         let encrypted = std::fs::read(path).context("Failed to read keystore file")?;
 
         // Create age decryptor
-        let decryptor = match age::Decryptor::new(encrypted.as_slice())? {
-            age::Decryptor::Passphrase(d) => d,
-            _ => anyhow::bail!("Unsupported age encryption type"),
-        };
+        let decryptor = age::Decryptor::new(encrypted.as_slice())?;
+        if !decryptor.is_scrypt() {
+            anyhow::bail!("Unsupported age encryption type");
+        }
 
-        // Decrypt
+        // Decrypt with scrypt identity
         let passphrase_str =
             String::from_utf8(passphrase.to_vec()).context("Passphrase must be valid UTF-8")?;
+        let identity =
+            age::scrypt::Identity::new(SecretString::new(passphrase_str.into_boxed_str()));
 
         let mut decrypted = Vec::new();
         let mut reader = decryptor
-            .decrypt(&Secret::new(passphrase_str), None)
+            .decrypt(std::iter::once(&identity as &dyn age::Identity))
             .context("Failed to decrypt (wrong passphrase?)")?;
 
         std::io::copy(&mut reader, &mut decrypted).context("Failed to read decrypted data")?;
