@@ -97,6 +97,16 @@ impl ResponseError for GatewayError {
         }
     }
 
+    /// Generate HTTP error response with i18n support.
+    ///
+    /// Locale is determined by rust-i18n (defaults to "en").
+    /// Falls back to English if the requested locale is unavailable
+    /// or if a translation key is missing.
+    ///
+    /// # Security
+    /// Internal errors (InternalError, SubstrateError, IoError) are
+    /// sanitized to prevent information leakage. Full details are logged
+    /// but only generic messages are returned to clients.
     fn error_response(&self) -> HttpResponse {
         // Sanitize error messages to prevent information leakage
         // Internal errors should not expose implementation details to clients
@@ -132,7 +142,10 @@ impl ResponseError for GatewayError {
                     reason
                 )
             }
-            GatewayError::ServiceUnavailable(_) => {
+            GatewayError::ServiceUnavailable(reason) => {
+                // Log the reason for debugging but return generic message to avoid
+                // exposing potentially sensitive service state information
+                tracing::warn!("Service unavailable: {}", reason);
                 t!("gateway.errors.service_unavailable").to_string()
             }
 

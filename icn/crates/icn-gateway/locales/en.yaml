@@ -1,6 +1,10 @@
 # ICN Gateway API Translations - English
 # Format: {category}.{error_type}.{variant}
 # Variables: {var_name} for interpolation
+#
+# Note: Some keys (auth_required, token_expired, etc.) are defined for future
+# use when more specific error variants are added. Currently, the *_prefix keys
+# are used with dynamic content appended via Rust's format!() macro.
 
 gateway:
   errors:
