@@ -260,12 +260,9 @@ fn to_domain_agreement_type(req_type: AgreementTypeRequest) -> Result<AgreementT
                 "facility" => ResourceType::Facility,
                 "compute" => ResourceType::Compute,
                 "storage" => ResourceType::Storage,
-                _ => {
-                    return Err(GatewayError::BadRequest(format!(
-                        "Invalid resource_type '{}'. Expected one of: equipment, facility, compute, storage",
-                        resource_type
-                    )))
-                }
+                "labor" => ResourceType::Labor,
+                "intellectual_property" => ResourceType::IntellectualProperty,
+                other => ResourceType::Other(other.to_string()),
             };
 
             // Use fixed rate compensation model (simplified for MVP)
@@ -391,9 +388,12 @@ fn to_domain_amendment_changes(
             AmendmentChangeRequest::UpdateTerm { field, new_value } => {
                 Ok(AmendmentChange::UpdateTerm {
                     field: field.clone(),
-                    // NOTE: Ideally old_value should be populated from the current agreement terms.
-                    // At this API layer we don't have access to that state yet, so we record
-                    // that the previous value was unavailable for this field.
+                    // LIMITATION: The old_value field cannot be accurately populated at the API layer
+                    // because we don't have access to the current agreement state during request
+                    // deserialization. A future enhancement would be to either:
+                    // 1. Fetch the agreement and populate old_value from actual current terms
+                    // 2. Make old_value optional and populate it server-side during amendment proposal
+                    // For now, we use a placeholder to indicate the value was not captured.
                     old_value: format!("<unavailable: previous value for field '{}'>", field),
                     new_value,
                 })
@@ -431,6 +431,15 @@ fn get_manager(
         .as_ref()
         .as_ref()
         .ok_or_else(|| GatewayError::ServiceUnavailable("Agreement manager not configured".into()))
+}
+
+/// Calculate required signatures for an agreement based on party roles
+fn calculate_required_signatures(agreement: &Agreement) -> usize {
+    agreement
+        .parties
+        .iter()
+        .filter(|p| p.role.requires_signature())
+        .count()
 }
 
 // ============================================================================
@@ -960,6 +969,14 @@ pub async fn list_amendments(
 
     let manager = get_manager(&agreement_mgr)?;
 
+    // Get the agreement to calculate required signatures
+    let agreement = manager
+        .get_agreement(&AgreementId(agreement_id.clone()))
+        .map_err(|e| GatewayError::NotFound(format!("Agreement not found: {}", e)))?
+        .ok_or_else(|| GatewayError::NotFound("Agreement not found".into()))?;
+
+    let required_sigs = calculate_required_signatures(&agreement);
+
     let amendments = manager
         .get_amendments(&AgreementId(agreement_id.clone()))
         .map_err(|e| GatewayError::InternalError(format!("Failed to list amendments: {}", e)))?;
@@ -974,7 +991,7 @@ pub async fn list_amendments(
             proposed_by: amendment.proposed_by.to_string(),
             proposed_at: amendment.proposed_at,
             signatures_count: amendment.signatures.len(),
-            required_signatures: 0, // TODO: Calculate based on agreement parties
+            required_signatures: required_sigs,
         })
         .collect();
 
@@ -1009,6 +1026,14 @@ pub async fn propose_amendment(
 
     let manager = get_manager(&agreement_mgr)?;
 
+    // Get the agreement to calculate required signatures
+    let agreement = manager
+        .get_agreement(&AgreementId(agreement_id.clone()))
+        .map_err(|e| GatewayError::NotFound(format!("Agreement not found: {}", e)))?
+        .ok_or_else(|| GatewayError::NotFound("Agreement not found".into()))?;
+
+    let required_sigs = calculate_required_signatures(&agreement);
+
     // Convert changes
     let changes = to_domain_amendment_changes(req.changes.clone())?;
 
@@ -1028,7 +1053,7 @@ pub async fn propose_amendment(
         proposed_by: amendment.proposed_by.to_string(),
         proposed_at: amendment.proposed_at,
         signatures_count: amendment.signatures.len(),
-        required_signatures: 0, // TODO: Calculate
+        required_signatures: required_sigs,
     };
 
     Ok(HttpResponse::Created().json(response))
@@ -1061,6 +1086,14 @@ pub async fn sign_amendment(
 
     let manager = get_manager(&agreement_mgr)?;
 
+    // Get the agreement to calculate required signatures
+    let agreement = manager
+        .get_agreement(&AgreementId(agreement_id.clone()))
+        .map_err(|e| GatewayError::NotFound(format!("Agreement not found: {}", e)))?
+        .ok_or_else(|| GatewayError::NotFound("Agreement not found".into()))?;
+
+    let required_sigs = calculate_required_signatures(&agreement);
+
     let amendment = manager
         .sign_amendment(&AgreementId(agreement_id.clone()), &amendment_id)
         .map_err(|e| GatewayError::BadRequest(format!("Failed to sign amendment: {}", e)))?;
@@ -1073,7 +1106,7 @@ pub async fn sign_amendment(
         proposed_by: amendment.proposed_by.to_string(),
         proposed_at: amendment.proposed_at,
         signatures_count: amendment.signatures.len(),
-        required_signatures: 0, // TODO: Calculate
+        required_signatures: required_sigs,
     };
 
     Ok(HttpResponse::Ok().json(response))

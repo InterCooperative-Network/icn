@@ -153,11 +153,14 @@ pub async fn init_federation_services(
 
     // Create agreement manager
     let agreement_store = Arc::new(icn_federation::agreement::InMemoryAgreementStore::new());
-    let agreement_manager = Arc::new(icn_federation::agreement::AgreementManager::new(
-        agreement_store.clone(),
-        coop_id.clone(),
-        deps.did.clone(),
-    ));
+    let agreement_manager = Arc::new(
+        icn_federation::agreement::AgreementManager::new(
+            agreement_store.clone(),
+            coop_id.clone(),
+            deps.did.clone(),
+        )
+        .with_keypair(deps.identity_bundle.keypair()),
+    );
     info!("✓ Agreement manager initialized");
 
     info!(
