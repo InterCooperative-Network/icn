@@ -23,6 +23,25 @@
 //! - Status changes follow a state machine with defined transitions
 //! - Conflict resolution: terminate > suspend (terminate always wins)
 //!
+//! ## Test Design Philosophy
+//!
+//! These tests use two approaches:
+//!
+//! ### Shared Store Tests (`*_shared_store`)
+//! Multiple managers share a single `InMemoryAgreementStore`. This simulates a
+//! "pre-synced" scenario where all nodes have identical state. These tests verify
+//! the agreement manager logic works correctly when state is consistent.
+//!
+//! **Note**: The `InMemoryAgreementStore` performs non-transactional read-modify-write
+//! operations. Under heavy concurrent load, lost updates are theoretically possible.
+//! In practice, Tokio's cooperative scheduling means these tests reliably pass.
+//! If flakiness is observed, it would indicate a need for transactional store operations.
+//!
+//! ### Separate Store Tests (`*_with_gossip_sync`)
+//! Each node has its own store, and state is synchronized via gossip messages.
+//! This more accurately simulates real distributed operation where nodes have
+//! independent storage and must coordinate through message passing.
+//!
 //! ## Running Tests
 //! ```sh
 //! cargo test -p icn-federation --test agreement_concurrent_ops
@@ -144,6 +163,11 @@ fn sync_agreement(
 
 /// Tests that two parties can sign an agreement simultaneously when they share
 /// state (simulating a pre-synced scenario via gossip).
+///
+/// **Note**: This test uses a shared store which performs non-transactional
+/// read-modify-write operations. Under Tokio's cooperative scheduling, the
+/// operations serialize naturally. For true distributed concurrent signing,
+/// see `test_concurrent_signing_with_gossip_sync`.
 #[tokio::test]
 async fn test_concurrent_signing_two_parties_shared_store() {
     // Setup: Two coops share a store (simulating pre-synced state via gossip)
