@@ -540,7 +540,7 @@ export interface MemberAddedEvent {
   type: 'MemberAdded';
   coop_id: string;
   did: string;
-  role: string;
+  role: CanonicalRole;
 }
 
 export interface MemberRemovedEvent {
@@ -553,7 +553,7 @@ export interface RoleUpdatedEvent {
   type: 'RoleUpdated';
   coop_id: string;
   did: string;
-  new_role: string;
+  new_role: CanonicalRole;
 }
 
 export interface SettingsUpdatedEvent {
