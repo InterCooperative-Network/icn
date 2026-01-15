@@ -1,86 +1,121 @@
 # Module 4: Identity and Trust
 
+## Overview
+This module teaches you ICN's foundational identity and trust systems. Identity
+proves who you are; trust determines how much the system trusts you. Together,
+they enable secure, socially-aware coordination without central authorities.
+
 ## Objectives
-- Understand ICN DID format and keystore usage
-- Understand trust graph concepts and policy usage
+- Understand DIDs (Decentralized Identifiers) and why ICN uses them
+- Master the keystore lifecycle: creation, encryption, rotation
+- Learn how trust graphs model social relationships
+- Understand trust computation: direct, transitive, and multi-dimensional
+- Know how trust influences access control and rate limiting
 
 ## Prerequisites
-- Module 3
+- Module 3 (Runtime & Actors)
+- Module 1 (Rust Fundamentals)
 
-## Key reading
-- `icn/crates/icn-identity/`
-- `icn/crates/icn-trust/`
-- `docs/ARCHITECTURE.md` (Identity, Trust sections)
-- `docs/multi-device-identity-design.md`
+## Key Reading
+- `icn/crates/icn-identity/src/keystore.rs` - Key storage
+- `icn/crates/icn-trust/src/lib.rs` - Trust graph
+- `docs/ARCHITECTURE.md` - Sections 1 and 2
 
-## Walkthrough
-Identity in ICN is DID-based and uses Ed25519 keys. Trust derives from social
-edges and is used for access control and rate limiting.
+---
 
-## Concepts (textbook style)
+## Core Concepts
 
-### Identity
-Identity is the root of accountability and authentication. ICN uses DID-style
-identifiers derived from Ed25519 keys. This makes identity self-certifying: the
-public key is the identity.
+### 1. What is a DID?
 
-### Key storage
-Private keys are stored in an encrypted keystore. The keystore is unlocked at
-startup to obtain an `IdentityBundle`, which is then used for signing and TLS
-binding.
+A **DID** (Decentralized Identifier) is a globally unique identifier that:
+- Is **self-certifying**: The identifier itself proves ownership
+- Requires **no registry**: No central authority needed
+- Enables **cryptographic verification**: Anyone can verify signatures
 
-### Trust graph
-Trust is modeled as a weighted graph of social edges. Trust scores influence
-rate limits, access control, and other policy decisions. This aligns system
-behavior with community relationships rather than global consensus.
-
-### Identity and trust flow (diagram)
-```mermaid
-flowchart TD
-  keystore[KeyStore] --> bundle[IdentityBundle]
-  bundle --> sign[Signing]
-  bundle --> tls[DidTlsBinding]
-  trustEdges[TrustEdges] --> trustGraph[TrustGraph]
-  trustGraph --> policies[PolicyDecisions]
+**ICN's DID format:**
+```
+did:icn:5KQwrPbwdL6PhXujxW37FSSQZ1JiwsST4cqQzDeyXtP
+├──┼──┼──────────────────────────────────────────────
+│  │  └─ Base58-encoded Ed25519 public key
+│  └──── ICN method (our DID scheme)
+└─────── DID scheme prefix
 ```
 
-## Detailed walkthrough (identity lifecycle)
+**Why this format?**
+- **Simple**: DID = public key (no lookup needed)
+- **Verifiable**: Anyone can verify signatures
+- **Portable**: Works offline, no network required
+- **Deterministic**: Same key = same DID always
 
-### 1) Identity creation
-An operator initializes identity via `icnctl id init`, which generates a keypair
-and writes an encrypted keystore.
+### 2. Ed25519 Cryptography
 
-### 2) Keystore unlock at startup
-`icnd` loads the keystore from the data directory and unlocks it using a
-passphrase. The result is an `IdentityBundle` (DID + keypair + metadata).
+ICN uses **Ed25519** for all identity operations:
 
-### 3) Identity usage
-The identity bundle is used for:
-- signing messages
-- DID‑TLS binding for transport
-- authoring ledger entries and contracts
+| Property | Value |
+|----------|-------|
+| Key type | EdDSA (Edwards curve) |
+| Public key | 32 bytes |
+| Private key | 32 bytes |
+| Signature | 64 bytes |
+| Security | ~128-bit equivalent |
 
-## Detailed walkthrough (trust usage)
+**Why Ed25519?**
+- **Fast**: Signing and verification are quick
+- **Secure**: No known practical attacks
+- **Deterministic**: Same key + message = same signature
+- **Small**: Compact keys and signatures
+- **Audited**: Well-studied, widely deployed
 
-### 1) Trust graph maintenance
-Trust edges are stored and updated through trust services. They may be modified
-via governance or operator tools.
+```rust
+// DID from public key
+pub struct Did(String);
 
-### 2) Trust in enforcement
-Trust scores are consulted by subsystems for:
-- rate limiting and admission control
-- topic subscription policies
-- ledger acceptance thresholds (optional)
+impl Did {
+    pub fn from_public_key(pubkey: &[u8; 32]) -> Self {
+        let encoded = bs58::encode(pubkey).into_string();
+        Did(format!("did:icn:{}", encoded))
+    }
 
-## Failure modes and safeguards
-- **Missing keystore**: daemon starts in limited mode and logs warnings.
-- **Invalid passphrase**: keystore remains locked and identity is unavailable.
-- **Low trust**: peers may be rate‑limited or denied access to topics.
+    pub fn to_public_key(&self) -> Result<[u8; 32]> {
+        let encoded = self.0.strip_prefix("did:icn:")
+            .ok_or(anyhow!("Invalid DID format"))?;
+        let bytes = bs58::decode(encoded).into_vec()?;
+        Ok(bytes.try_into()?)
+    }
+}
+```
 
-## Annotated code excerpts
+---
 
-### Keystore interface defines the security boundary
-Source: `icn/crates/icn-identity/src/keystore.rs`
+## The Keystore
+
+### 3. Keystore Architecture
+
+The **keystore** securely stores private keys:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                      KEYSTORE                            │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  ~/.icn/keystore.age                                    │
+│                                                         │
+│  ┌─────────────────────────────────────────────────┐   │
+│  │  Encrypted with Age (passphrase or YubiKey)     │   │
+│  │                                                  │   │
+│  │  Contents:                                       │   │
+│  │  - Ed25519 signing key (32 bytes)               │   │
+│  │  - X25519 encryption key (32 bytes)             │   │
+│  │  - TLS certificate (self-signed)                │   │
+│  │  - Metadata (version, created_at)               │   │
+│  │                                                  │   │
+│  └─────────────────────────────────────────────────┘   │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+### 4. Keystore Lifecycle
+
 ```rust
 pub trait KeyStore: Send + Sync {
     /// Unlock the keystore with a passphrase
@@ -89,61 +124,500 @@ pub trait KeyStore: Send + Sync {
     /// Lock the keystore (clear in-memory keys)
     fn lock(&mut self);
 
+    /// Check if the keystore is locked
+    fn is_locked(&self) -> bool;
+
     /// Get the keypair (fails if locked)
     fn get_keypair(&self) -> Result<&KeyPair>;
+
+    /// Rotate to a new keypair
+    fn rotate(&mut self, new_keypair: KeyPair) -> Result<KeyRotation>;
 }
 ```
-This trait marks the boundary between encrypted storage and runtime use.
 
-### IdentityBundle binds DID to TLS
-Source: `icn/crates/icn-identity/src/bundle.rs`
+**Lifecycle stages:**
+
+1. **Creation**: `icnctl id init` generates keypair, encrypts with Age
+2. **Storage**: Written to `~/.icn/keystore.age`
+3. **Unlock**: At daemon startup, passphrase decrypts keys
+4. **Usage**: IdentityBundle available for signing, TLS, etc.
+5. **Lock**: On shutdown or explicit lock, keys cleared from memory
+6. **Rotation**: Create new keypair, publish rotation record
+
+### 5. The Identity Bundle
+
+When the keystore is unlocked, it produces an **IdentityBundle**:
+
 ```rust
 pub struct IdentityBundle {
     /// The DID for this identity
     did: Did,
-    /// Ed25519 keypair for DID operations
+    /// Ed25519 keypair for signing
     did_keypair: KeyPair,
+    /// X25519 secret for encryption
+    x25519_secret: x25519_dalek::StaticSecret,
     /// Self-signed TLS certificate
     tls_cert: CertificateDer<'static>,
-    /// Binding signature proving ownership
-    /// Signature = Sign_did_key(SHA256(tls_cert))
+    /// TLS private key
+    tls_key: PrivateKeyDer<'static>,
+    /// Binding signature: Sign_did(SHA256(tls_cert))
     tls_binding_sig: Vec<u8>,
 }
-```
-This struct ensures the node’s DID and TLS identity are cryptographically tied.
 
-### Trust dimensions are explicit and separate
-Source: `icn/crates/icn-trust/src/types.rs`
+impl IdentityBundle {
+    /// Get the DID
+    pub fn did(&self) -> &Did {
+        &self.did
+    }
+
+    /// Sign a message
+    pub fn sign(&self, message: &[u8]) -> Signature {
+        self.did_keypair.sign(message)
+    }
+
+    /// Get TLS config for network connections
+    pub fn tls_config(&self) -> TlsConfig {
+        TlsConfig {
+            cert: self.tls_cert.clone(),
+            key: self.tls_key.clone(),
+            binding_sig: self.tls_binding_sig.clone(),
+        }
+    }
+}
+```
+
+### 6. DID-TLS Binding
+
+The TLS certificate is cryptographically bound to the DID:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    DID-TLS BINDING                       │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  1. Generate self-signed TLS certificate                │
+│                                                         │
+│  2. Hash the certificate:                               │
+│     cert_hash = SHA256(tls_certificate)                 │
+│                                                         │
+│  3. Sign with DID key:                                  │
+│     binding_sig = Sign_did_key(cert_hash)               │
+│                                                         │
+│  4. Verification (by peer):                             │
+│     a. Receive certificate during TLS handshake         │
+│     b. Extract DID from certificate                     │
+│     c. Compute cert_hash                                │
+│     d. Verify: Verify_did_pubkey(cert_hash, binding_sig)│
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+**This proves:** "The entity with this DID controls this TLS connection."
+
+### 7. Key Rotation
+
+Keys can be rotated without losing identity (with caveats):
+
+```rust
+pub struct KeyRotation {
+    /// Old DID (being rotated from)
+    old_did: Did,
+    /// New DID (being rotated to)
+    new_did: Did,
+    /// When rotation occurred
+    timestamp: u64,
+    /// Why rotation happened
+    reason: RotationReason,
+    /// Signature from old key
+    old_signature: Signature,
+    /// Signature from new key
+    new_signature: Signature,
+}
+
+pub enum RotationReason {
+    /// Scheduled key refresh
+    Scheduled,
+    /// Key suspected compromised
+    Compromised,
+    /// Upgrading key algorithm
+    Upgrade,
+    /// Device lost/replaced
+    DeviceLost,
+}
+```
+
+**Rotation protocol:**
+1. Generate new keypair
+2. Create rotation record signed by BOTH old and new keys
+3. Publish rotation record (gossip)
+4. Old key enters grace period
+5. After grace period, old key is invalid
+
+---
+
+## The Trust Graph
+
+### 8. What is Trust in ICN?
+
+**Trust** models social relationships between identities:
+
+```
+       Alice ────0.8───► Bob
+         │                 │
+        0.6               0.5
+         │                 │
+         ▼                 ▼
+      Charlie ◄───0.4─── David
+```
+
+- **Edges** represent trust relationships
+- **Weights** (0.0 to 1.0) represent trust level
+- **Directed**: Alice trusting Bob ≠ Bob trusting Alice
+
+### 9. Trust Dimensions
+
+ICN models trust across multiple **dimensions**:
+
 ```rust
 pub enum TrustGraphType {
+    /// Social relationships (friendship, community membership)
     Social,
+    /// Economic reliability (payment history, credit worthiness)
     EconomicReliability,
+    /// Technical reliability (uptime, correct behavior)
     TechnicalReliability,
 }
 ```
-ICN prevents a single trust dimension from dominating by modeling them
-independently.
 
-## Code map
-- `icn/crates/icn-identity/src/keystore.rs`:
-  keystore persistence and unlock flow.
-- `icn/crates/icn-identity/src/bundle.rs`:
-  `IdentityBundle` aggregates DID, keypair, and metadata.
-- `icn/crates/icn-trust/src/types.rs` and `icn/crates/icn-trust/src/lib.rs`:
-  trust graph types and public API.
+**Why separate dimensions?**
+- Someone can be socially trusted but technically unreliable
+- Someone can pay reliably but be new to the community
+- Prevents gaming: can't boost economic trust through social manipulation
 
-## Reference files (follow-up)
-- `icn/crates/icn-identity/src/keystore.rs`
-- `icn/crates/icn-identity/src/bundle.rs`
-- `icn/crates/icn-identity/src/multi_device.rs`
-- `icn/crates/icn-trust/src/lib.rs`
-- `icn/crates/icn-trust/src/types.rs`
-- `docs/multi-device-identity-design.md`
+### 10. Trust Storage
+
+```rust
+pub struct TrustEdge {
+    /// Who is granting trust
+    pub from: Did,
+    /// Who is receiving trust
+    pub to: Did,
+    /// Trust level (0.0 to 1.0)
+    pub weight: f64,
+    /// Which dimension
+    pub graph_type: TrustGraphType,
+    /// When this edge was created/updated
+    pub timestamp: u64,
+    /// Optional expiration
+    pub expires_at: Option<u64>,
+    /// Signature from grantor
+    pub signature: Signature,
+}
+
+pub struct TrustGraph {
+    /// Stored edges by (from, to, type)
+    edges: HashMap<(Did, Did, TrustGraphType), TrustEdge>,
+    /// Our identity for self-trust
+    our_did: Did,
+    /// Persistent storage
+    store: Arc<dyn Store>,
+}
+```
+
+### 11. Computing Trust Scores
+
+**Direct trust:** Explicitly stated edges
+```rust
+pub fn get_direct_trust(&self, from: &Did, to: &Did, graph_type: TrustGraphType) -> Option<f64> {
+    self.edges.get(&(from.clone(), to.clone(), graph_type))
+        .map(|edge| edge.weight)
+}
+```
+
+**Transitive trust:** Trust through intermediaries
+```rust
+pub fn compute_trust_score(&self, target: &Did) -> Result<f64> {
+    // Start from our perspective
+    let from = &self.our_did;
+
+    // Direct trust (if exists)
+    if let Some(direct) = self.get_direct_trust(from, target, TrustGraphType::Social) {
+        return Ok(direct);
+    }
+
+    // Transitive trust via graph traversal
+    self.compute_transitive_trust(from, target, MAX_DEPTH, DECAY_FACTOR)
+}
+
+fn compute_transitive_trust(
+    &self,
+    from: &Did,
+    to: &Did,
+    max_depth: usize,
+    decay: f64,
+) -> Result<f64> {
+    // BFS/DFS with decay per hop
+    // Combine multiple paths (max, average, or custom)
+    // Return 0.0 if no path found
+}
+```
+
+**Example calculation:**
+```
+Alice trusts Bob: 0.8
+Bob trusts Carol: 0.6
+Decay per hop: 0.5
+
+Alice's transitive trust of Carol:
+= Alice→Bob × Bob→Carol × decay
+= 0.8 × 0.6 × 0.5
+= 0.24
+```
+
+### 12. Trust Classes
+
+Trust scores map to **trust classes** for policy decisions:
+
+```rust
+pub enum TrustClass {
+    /// Trust < 0.1 - Unknown or untrusted
+    Isolated,
+    /// Trust 0.1 - 0.4 - Recognized but not trusted
+    Known,
+    /// Trust 0.4 - 0.7 - Regular collaborators
+    Partner,
+    /// Trust > 0.7 - Highly trusted (federation partners)
+    Federated,
+}
+
+impl TrustClass {
+    pub fn from_score(score: f64) -> Self {
+        match score {
+            s if s < 0.1 => TrustClass::Isolated,
+            s if s < 0.4 => TrustClass::Known,
+            s if s < 0.7 => TrustClass::Partner,
+            _ => TrustClass::Federated,
+        }
+    }
+
+    pub fn rate_limit(&self) -> u32 {
+        match self {
+            TrustClass::Isolated => 10,    // messages per second
+            TrustClass::Known => 50,
+            TrustClass::Partner => 100,
+            TrustClass::Federated => 200,
+        }
+    }
+}
+```
+
+---
+
+## Trust in Action
+
+### 13. Trust-Based Rate Limiting
+
+Network traffic is limited based on trust:
+
+```rust
+pub struct TrustRateLimiter {
+    /// Remaining tokens per peer
+    tokens: HashMap<Did, u32>,
+    /// Trust graph for score lookup
+    trust_graph: Arc<RwLock<TrustGraph>>,
+}
+
+impl TrustRateLimiter {
+    pub fn allow(&mut self, peer: &Did) -> bool {
+        let trust_score = self.trust_graph.read()
+            .unwrap()
+            .compute_trust_score(peer)
+            .unwrap_or(0.0);
+
+        let class = TrustClass::from_score(trust_score);
+        let limit = class.rate_limit();
+
+        let tokens = self.tokens.entry(peer.clone()).or_insert(limit);
+        if *tokens > 0 {
+            *tokens -= 1;
+            true
+        } else {
+            false
+        }
+    }
+}
+```
+
+### 14. Trust-Gated Topic Access
+
+Gossip topics can require minimum trust:
+
+```rust
+pub fn check_topic_access(&self, peer: &Did, topic: &str) -> Result<()> {
+    let policy = self.get_topic_policy(topic);
+
+    match policy {
+        AccessControl::Public => Ok(()),
+
+        AccessControl::TrustGated { min_trust } => {
+            let score = self.trust_graph.compute_trust_score(peer)?;
+            if score < min_trust {
+                bail!("Insufficient trust for topic: {:.2} < {:.2}", score, min_trust);
+            }
+            Ok(())
+        }
+
+        AccessControl::CoopMembers { coop_did } => {
+            // Check membership through coop registry
+            if !self.is_coop_member(peer, &coop_did)? {
+                bail!("Not a member of cooperative");
+            }
+            Ok(())
+        }
+    }
+}
+```
+
+### 15. Trust in Ledger Operations
+
+Ledger entries can require author trust:
+
+```rust
+impl Ledger {
+    fn validate_entry(&self, entry: &JournalEntry) -> Result<()> {
+        // ... other validation ...
+
+        // Optional trust validation
+        if let Some(min_trust) = self.config.min_author_trust {
+            let trust = self.trust_graph
+                .read().await
+                .compute_trust_score(&entry.author)?;
+
+            if trust < min_trust {
+                bail!("Entry author has insufficient trust: {:.2}", trust);
+            }
+        }
+
+        Ok(())
+    }
+}
+```
+
+---
+
+## Diagrams
+
+### Identity Flow
+
+```mermaid
+flowchart TB
+    subgraph Creation
+        Init[icnctl id init]
+        Gen[Generate Ed25519 keypair]
+        Enc[Encrypt with Age]
+        Save[Save to ~/.icn/keystore.age]
+    end
+
+    subgraph Runtime
+        Load[Load keystore]
+        Unlock[Unlock with passphrase]
+        Bundle[Create IdentityBundle]
+    end
+
+    subgraph Usage
+        Sign[Sign messages]
+        TLS[TLS connections]
+        Author[Author entries]
+    end
+
+    Init --> Gen --> Enc --> Save
+    Save --> Load --> Unlock --> Bundle
+    Bundle --> Sign
+    Bundle --> TLS
+    Bundle --> Author
+```
+
+### Trust Computation
+
+```mermaid
+flowchart LR
+    subgraph Input
+        Edges[(Trust Edges)]
+        Target[Target DID]
+    end
+
+    subgraph Computation
+        Direct{Direct Trust?}
+        Trans[Transitive Search]
+        Combine[Combine Paths]
+    end
+
+    subgraph Output
+        Score[Trust Score]
+        Class[Trust Class]
+    end
+
+    Edges --> Direct
+    Target --> Direct
+    Direct -->|Yes| Score
+    Direct -->|No| Trans
+    Trans --> Combine --> Score
+    Score --> Class
+```
+
+---
 
 ## Exercises
-- Locate the DID type and key storage in `icn-identity`
-- Find where trust scores are used to gate behavior
+
+1. **DID Parsing**: Write a function that extracts the public key bytes from
+   a DID string `did:icn:5KQwrPbwdL6PhXujxW37...`.
+
+2. **Trust Calculation**: Given these edges, compute Alice's trust of Eve:
+   - Alice → Bob: 0.8
+   - Bob → Carol: 0.6
+   - Carol → David: 0.7
+   - David → Eve: 0.5
+   - Decay per hop: 0.5
+
+3. **Trust Classes**: Find where trust classes are used for rate limiting in
+   the codebase. What are the rate limits for each class?
+
+4. **Key Rotation**: Trace the key rotation code path. What signatures are
+   required in a KeyRotation record?
+
+5. **Multi-Graph**: ICN supports multiple trust graph types. Find where
+   `TrustGraphType` is used differently for different purposes.
+
+---
 
 ## Checkpoints
-- You can explain DID format and key storage
-- You can describe how trust influences system behavior
+
+- [ ] You can explain the DID format and why it's self-certifying
+- [ ] You understand the keystore lifecycle (create, unlock, rotate)
+- [ ] You know what the IdentityBundle contains
+- [ ] You can explain DID-TLS binding
+- [ ] You understand trust dimensions (social, economic, technical)
+- [ ] You can compute transitive trust with decay
+- [ ] You know how trust classes affect rate limiting
+
+---
+
+## Quick Reference
+
+| Concept | Definition |
+|---------|------------|
+| DID | Decentralized Identifier - `did:icn:<base58-pubkey>` |
+| Keystore | Age-encrypted file storing private keys |
+| IdentityBundle | Runtime identity (DID + keys + TLS binding) |
+| Trust Edge | Directed, weighted relationship between DIDs |
+| Trust Dimension | Category of trust (social, economic, technical) |
+| Transitive Trust | Trust computed through graph traversal |
+| Trust Class | Category based on trust score (Isolated → Federated) |
+| Key Rotation | Protocol for changing keys while preserving identity |
+
+---
+
+## Next Steps
+
+Proceed to **Module 5: Network & Gossip** to understand how identities connect
+and how trust enables secure peer-to-peer communication.
