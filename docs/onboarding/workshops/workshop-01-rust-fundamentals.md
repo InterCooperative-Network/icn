@@ -15,7 +15,7 @@ and writing small exercises.
 
 ### Steps
 1. Open `icn/bins/icnd/src/main.rs`
-2. Find the `run()` function and locate all uses of `?`
+2. Find the `main()` function and locate all uses of `?`
 3. For each `?`, identify:
    - What type is being propagated?
    - Where does the error eventually get handled?

@@ -42,7 +42,7 @@ through the stack.
 
 ### Steps
 1. Open `web/pilot-ui/app.js`
-2. Find the `handleLogin` or similar function
+2. Find the `login` function
 3. Trace the login sequence:
    - Input validation
    - Health check
