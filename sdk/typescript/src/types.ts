@@ -89,13 +89,26 @@ export interface CoopStatsResponse {
   created_at: number;
 }
 
+/**
+ * Canonical role type used across the ICN system.
+ * These map to the governance roles in cooperatives.
+ */
+export type CanonicalRole = 'steward' | 'facilitator' | 'participant';
+
+/**
+ * Legacy role type for backwards compatibility.
+ * @deprecated Use CanonicalRole instead
+ */
 export type MemberRole = 'owner' | 'admin' | 'member';
 
-export interface Member {
-  did: string;
-  role: MemberRole;
-  joined_at: number;
-}
+/**
+ * Maps legacy roles to canonical roles
+ */
+export const ROLE_MAP: Record<MemberRole, CanonicalRole> = {
+  owner: 'steward',
+  admin: 'facilitator',
+  member: 'participant',
+};
 
 export interface Member {
   did: string;
@@ -106,7 +119,8 @@ export interface Member {
 export interface MemberProfile {
   did: string;
   name?: string;
-  role: 'Steward' | 'Facilitator' | 'Participant';
+  /** Role in canonical format */
+  role: CanonicalRole;
   joined_at: number;
   balance: number;
   transaction_count: number;
@@ -495,28 +509,156 @@ export interface WsShutdownMessage {
   reconnect_after_ms: number | null;
 }
 
-export type CoopEventType =
-  | 'PaymentCreated'
-  | 'MemberAdded'
-  | 'MemberRemoved'
-  | 'RoleUpdated'
-  | 'SettingsUpdated'
-  | 'GovernanceDomainCreated'
-  | 'GovernanceProposalCreated'
-  | 'GovernanceProposalOpened'
-  | 'GovernanceProposalClosed'
-  | 'GovernanceVoteCast'
-  | 'ComputeTaskSubmitted'
-  | 'ComputeTaskClaimed'
-  | 'ComputeTaskCompleted'
-  | 'ComputeTaskCancelled'
-  | 'Shutdown';
+// ============================================================================
+// Gateway Event Payloads (Discriminated Union)
+// ============================================================================
 
-/** GatewayEvent payload with its type tag */
-export interface GatewayEventPayload {
-  type: CoopEventType;
-  [key: string]: unknown;
+export interface PaymentCreatedEvent {
+  type: 'PaymentCreated';
+  coop_id: string;
+  hash: string;
+  from: string;
+  to: string;
+  amount: number;
+  currency: string;
 }
+
+export interface CrossPaymentCreatedEvent {
+  type: 'CrossPaymentCreated';
+  coop_id: string;
+  hash: string;
+  from: string;
+  to: string;
+  source_amount: number;
+  from_currency: string;
+  target_amount: number;
+  to_currency: string;
+  rate: number;
+}
+
+export interface MemberAddedEvent {
+  type: 'MemberAdded';
+  coop_id: string;
+  did: string;
+  role: CanonicalRole;
+}
+
+export interface MemberRemovedEvent {
+  type: 'MemberRemoved';
+  coop_id: string;
+  did: string;
+}
+
+export interface RoleUpdatedEvent {
+  type: 'RoleUpdated';
+  coop_id: string;
+  did: string;
+  new_role: CanonicalRole;
+}
+
+export interface SettingsUpdatedEvent {
+  type: 'SettingsUpdated';
+  coop_id: string;
+}
+
+export interface GovernanceDomainCreatedEvent {
+  type: 'GovernanceDomainCreated';
+  domain_id: string;
+  name: string;
+  creator: string;
+}
+
+export interface GovernanceProposalCreatedEvent {
+  type: 'GovernanceProposalCreated';
+  proposal_id: string;
+  domain_id: string;
+  proposer: string;
+  title: string;
+  payload_type: 'text' | 'budget' | 'membership' | 'config_change';
+}
+
+export interface GovernanceProposalOpenedEvent {
+  type: 'GovernanceProposalOpened';
+  proposal_id: string;
+  domain_id: string;
+  closes_at: number;
+}
+
+export interface GovernanceProposalClosedEvent {
+  type: 'GovernanceProposalClosed';
+  proposal_id: string;
+  domain_id: string;
+  outcome: 'accepted' | 'rejected' | 'no_quorum';
+}
+
+export interface GovernanceVoteCastEvent {
+  type: 'GovernanceVoteCast';
+  proposal_id: string;
+  domain_id: string;
+  voter: string;
+  choice: 'for' | 'against' | 'abstain';
+}
+
+export interface ComputeTaskSubmittedEvent {
+  type: 'ComputeTaskSubmitted';
+  task_id: string;
+  task_hash: string;
+  submitter: string;
+  fuel_limit: number;
+}
+
+export interface ComputeTaskClaimedEvent {
+  type: 'ComputeTaskClaimed';
+  task_hash: string;
+  executor: string;
+}
+
+export interface ComputeTaskCompletedEvent {
+  type: 'ComputeTaskCompleted';
+  task_hash: string;
+  executor: string;
+  outcome: 'success' | 'failed' | 'out_of_fuel' | 'timeout';
+  fuel_used: number;
+  duration_ms: number;
+}
+
+export interface ComputeTaskCancelledEvent {
+  type: 'ComputeTaskCancelled';
+  task_hash: string;
+  submitter: string;
+  reason: string;
+}
+
+export interface ShutdownEvent {
+  type: 'Shutdown';
+}
+
+/**
+ * Discriminated union of all gateway event payloads.
+ * Use the `type` field to narrow the type in event handlers.
+ */
+export type GatewayEventPayload =
+  | PaymentCreatedEvent
+  | CrossPaymentCreatedEvent
+  | MemberAddedEvent
+  | MemberRemovedEvent
+  | RoleUpdatedEvent
+  | SettingsUpdatedEvent
+  | GovernanceDomainCreatedEvent
+  | GovernanceProposalCreatedEvent
+  | GovernanceProposalOpenedEvent
+  | GovernanceProposalClosedEvent
+  | GovernanceVoteCastEvent
+  | ComputeTaskSubmittedEvent
+  | ComputeTaskClaimedEvent
+  | ComputeTaskCompletedEvent
+  | ComputeTaskCancelledEvent
+  | ShutdownEvent;
+
+/**
+ * Extract the type string from GatewayEventPayload
+ */
+export type CoopEventType = GatewayEventPayload['type'];
 
 export interface WsEventMessage {
   type: 'Event';
