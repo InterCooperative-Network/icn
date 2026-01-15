@@ -57,8 +57,8 @@ pub use manager::{AgreementEvent, AgreementEventCallback, AgreementManager};
 pub use store::{AgreementStore, AgreementStoreOps, InMemoryAgreementStore};
 pub use types::*;
 
-/// Type alias for AgreementManager handle with InMemoryAgreementStore
+/// Type alias for AgreementManager handle with persistent AgreementStore
 ///
 /// This is the default manager type used during wiring through supervisor.
-/// Can be replaced with persistent storage (SledAgreementStore) in future.
-pub type AgreementManagerHandle = Arc<AgreementManager<InMemoryAgreementStore>>;
+/// Uses Sled-backed storage for persistence across daemon restarts.
+pub type AgreementManagerHandle = Arc<AgreementManager<AgreementStore>>;
