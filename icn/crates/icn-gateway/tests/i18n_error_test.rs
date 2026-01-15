@@ -133,3 +133,72 @@ fn test_error_code_stability() {
         None
     );
 }
+
+#[tokio::test]
+async fn test_forbidden_translation() {
+    let err = GatewayError::Forbidden("admin access required".to_string());
+    let response = err.error_response();
+    let body = actix_web::body::to_bytes(response.into_body())
+        .await
+        .unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    
+    assert!(json["error"].as_str().unwrap().contains("Access forbidden"));
+    assert!(json["error"].as_str().unwrap().contains("admin access required"));
+    assert_eq!(json["code"], "FORBIDDEN");
+}
+
+#[tokio::test]
+async fn test_budget_exceeded_translation() {
+    let err = GatewayError::BudgetExceeded("compute budget exhausted".to_string());
+    let response = err.error_response();
+    let body = actix_web::body::to_bytes(response.into_body())
+        .await
+        .unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    
+    assert!(json["error"].as_str().unwrap().contains("Budget exceeded"));
+    assert!(json["error"].as_str().unwrap().contains("compute budget exhausted"));
+    assert_eq!(json["code"], "BUDGET_EXCEEDED");
+}
+
+#[tokio::test]
+async fn test_substrate_error_sanitization() {
+    // SubstrateError should NOT expose implementation details
+    let err = GatewayError::SubstrateError(anyhow::anyhow!(
+        "trust graph computation failed at node xyz123"
+    ));
+    let response = err.error_response();
+    let body = actix_web::body::to_bytes(response.into_body())
+        .await
+        .unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    
+    // Should show generic message, NOT the internal details
+    assert_eq!(json["error"], "Internal server error");
+    assert!(!json["error"].as_str().unwrap().contains("trust graph"));
+    assert!(!json["error"].as_str().unwrap().contains("xyz123"));
+    // Substrate errors don't have error codes
+    assert!(json.get("code").is_none());
+}
+
+#[tokio::test]
+async fn test_io_error_sanitization() {
+    // IoError should NOT expose implementation details
+    let err = GatewayError::IoError(std::io::Error::new(
+        std::io::ErrorKind::PermissionDenied,
+        "failed to read /etc/secret/config.toml"
+    ));
+    let response = err.error_response();
+    let body = actix_web::body::to_bytes(response.into_body())
+        .await
+        .unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    
+    // Should show generic message, NOT the file paths or details
+    assert_eq!(json["error"], "Internal server error");
+    assert!(!json["error"].as_str().unwrap().contains("/etc"));
+    assert!(!json["error"].as_str().unwrap().contains("config.toml"));
+    // I/O errors don't have error codes
+    assert!(json.get("code").is_none());
+}
