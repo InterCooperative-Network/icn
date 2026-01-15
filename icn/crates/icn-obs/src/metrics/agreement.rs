@@ -33,6 +33,10 @@ pub fn init_descriptions() {
         "Total number of amendments ratified"
     );
     describe_counter!(
+        "icn_agreement_amendments_rejected_total",
+        "Total number of amendments rejected"
+    );
+    describe_counter!(
         "icn_agreement_suspended_total",
         "Total number of agreements suspended"
     );
