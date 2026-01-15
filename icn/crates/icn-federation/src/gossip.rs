@@ -5,15 +5,22 @@
 //! - Vouch messages for policy enforcement
 //! - Federation requests and responses
 
+use crate::agreement::{AgreementGossipHandler, AgreementStoreOps};
 use crate::error::{FederationError, Result};
 use crate::metrics;
 use crate::registry::CooperativeRegistry;
 use crate::types::{current_timestamp, CooperativeInfo, FederationMessage, Vouch};
-use crate::{TOPIC_FEDERATION_CLEARING, TOPIC_FEDERATION_REGISTRY, TOPIC_FEDERATION_TRUST};
+use crate::{
+    TOPIC_FEDERATION_AGREEMENTS, TOPIC_FEDERATION_CLEARING, TOPIC_FEDERATION_REGISTRY,
+    TOPIC_FEDERATION_TRUST,
+};
 use icn_identity::{Did, KeyPair};
 use std::sync::Arc;
 use std::sync::RwLock;
 use tracing::{debug, info, warn};
+
+/// Type-erased callback for handling agreement gossip messages
+pub type AgreementMessageHandler = Arc<dyn Fn(&[u8]) -> Result<()> + Send + Sync>;
 
 /// Callback for sending gossip messages to the network
 pub type GossipSendCallback = Arc<dyn Fn(&str, Vec<u8>) -> Result<()> + Send + Sync>;
@@ -31,6 +38,9 @@ pub struct FederationGossipHandler {
 
     /// Callback to send messages via gossip
     send_callback: RwLock<Option<GossipSendCallback>>,
+
+    /// Handler for agreement gossip messages (type-erased for flexibility)
+    agreement_handler: RwLock<Option<AgreementMessageHandler>>,
 }
 
 impl FederationGossipHandler {
@@ -41,7 +51,24 @@ impl FederationGossipHandler {
             own_coop: RwLock::new(None),
             keypair: RwLock::new(None),
             send_callback: RwLock::new(None),
+            agreement_handler: RwLock::new(None),
         }
+    }
+
+    /// Register an agreement gossip handler for routing agreement messages
+    ///
+    /// The handler receives raw message bytes and is responsible for deserialization.
+    pub fn register_agreement_handler<S: AgreementStoreOps + 'static>(
+        &self,
+        handler: Arc<AgreementGossipHandler<S>>,
+    ) {
+        let handler_fn: AgreementMessageHandler =
+            Arc::new(move |data: &[u8]| handler.handle_message(data));
+        *self.agreement_handler.write().unwrap_or_else(|poisoned| {
+            warn!("Agreement handler lock poisoned, recovering");
+            poisoned.into_inner()
+        }) = Some(handler_fn);
+        info!("Registered agreement gossip handler");
     }
 
     /// Set the send callback for gossip messages
@@ -82,6 +109,12 @@ impl FederationGossipHandler {
 
     /// Handle an incoming federation message
     pub fn handle_message(&self, topic: &str, data: &[u8]) -> Result<()> {
+        // Route agreement messages to the dedicated handler
+        if topic == TOPIC_FEDERATION_AGREEMENTS {
+            return self.handle_agreement_message(data);
+        }
+
+        // Parse as FederationMessage for other topics
         let message: FederationMessage = serde_json::from_slice(data)
             .map_err(|e| FederationError::DeserializationError(e.to_string()))?;
 
@@ -93,6 +126,21 @@ impl FederationGossipHandler {
                 debug!("Ignoring message on unknown federation topic: {}", topic);
                 Ok(())
             }
+        }
+    }
+
+    /// Route agreement messages to the registered handler
+    fn handle_agreement_message(&self, data: &[u8]) -> Result<()> {
+        let handler = self.agreement_handler.read().unwrap_or_else(|poisoned| {
+            warn!("Agreement handler lock poisoned, recovering");
+            poisoned.into_inner()
+        });
+
+        if let Some(ref handler_fn) = *handler {
+            handler_fn(data)
+        } else {
+            debug!("No agreement handler registered, ignoring agreement message");
+            Ok(())
         }
     }
 
@@ -877,6 +925,76 @@ mod tests {
         // Should be silently rejected (signature won't verify against accepter's DID)
         handler
             .handle_message("federation:registry", &forged_data)
+            .unwrap();
+    }
+
+    #[test]
+    fn test_agreement_message_routing() {
+        use crate::agreement::{
+            AgreementGossipHandler, AgreementMessage, AgreementStoreOps, AgreementType,
+            InMemoryAgreementStore, PartyRole, TradeItem,
+        };
+
+        let registry = create_test_registry();
+        let handler = FederationGossipHandler::new(registry);
+
+        // Create agreement store and gossip handler
+        let agreement_store = Arc::new(InMemoryAgreementStore::new());
+        let own_kp = test_keypair();
+        let counterparty_kp = test_keypair();
+
+        let agreement_handler = Arc::new(AgreementGossipHandler::new(
+            agreement_store.clone(),
+            own_kp.did().clone(),
+            "our-coop".to_string(),
+        ));
+
+        // Register agreement handler
+        handler.register_agreement_handler(agreement_handler);
+
+        // Create a test agreement where we're a party
+        let agreement = crate::agreement::Agreement::new(
+            "Test Agreement",
+            "For routing test",
+            AgreementType::Trade {
+                items: vec![TradeItem::new("widgets", 10, "units", 100, "USD")],
+                currency: "USD".to_string(),
+            },
+        )
+        .with_party(own_kp.did().clone(), "our-coop", PartyRole::Proposer)
+        .with_party(
+            counterparty_kp.did().clone(),
+            "other-coop",
+            PartyRole::Counterparty,
+        );
+
+        // Serialize agreement message
+        let message = AgreementMessage::Proposed {
+            agreement: Box::new(agreement.clone()),
+        };
+        let data = message.to_bytes().unwrap();
+
+        // Route through federation handler
+        handler
+            .handle_message("federation:agreements", &data)
+            .unwrap();
+
+        // Verify agreement was stored
+        let stored = agreement_store.get_agreement(&agreement.id).unwrap();
+        assert!(stored.is_some());
+        assert_eq!(stored.unwrap().title, "Test Agreement");
+    }
+
+    #[test]
+    fn test_agreement_routing_without_handler() {
+        let registry = create_test_registry();
+        let handler = FederationGossipHandler::new(registry);
+
+        // Don't register any agreement handler
+
+        // Should not panic, just ignore the message
+        handler
+            .handle_message("federation:agreements", b"invalid")
             .unwrap();
     }
 }
