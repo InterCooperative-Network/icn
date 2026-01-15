@@ -58,5 +58,5 @@ This map links each module to the highest-signal files and docs.
 
 ## Module 10: Contributor workflow
 - `CONTRIBUTING.md`
-- `docs/CI_ALL_GREEN_REPORT.md`
+- `docs/ci/CI_ALL_GREEN_REPORT.md`
 - `docs/testing/`
