@@ -54,10 +54,7 @@ pub fn init_descriptions() {
         "icn_agreement_suspended",
         "Current number of suspended agreements"
     );
-    describe_gauge!(
-        "icn_agreement_draft",
-        "Current number of draft agreements"
-    );
+    describe_gauge!("icn_agreement_draft", "Current number of draft agreements");
 
     // Histogram metrics
     describe_histogram!(
