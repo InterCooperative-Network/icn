@@ -394,7 +394,7 @@ fn to_domain_amendment_changes(
                     // 1. Fetch the agreement and populate old_value from actual current terms
                     // 2. Make old_value optional and populate it server-side during amendment proposal
                     // For now, we use a placeholder to indicate the value was not captured.
-                    old_value: format!("<unavailable: previous value for field '{}'>", field),
+                    old_value: format!("<unavailable: previous value for field '{field}'>"),
                     new_value,
                 })
             }
@@ -404,11 +404,11 @@ fn to_domain_amendment_changes(
                     "counterparty" => PartyRole::Counterparty,
                     "witness" => PartyRole::Witness,
                     "guarantor" => PartyRole::Guarantor,
-                    _ => return Err(GatewayError::BadRequest(format!("Invalid role: {}", role))),
+                    _ => return Err(GatewayError::BadRequest(format!("Invalid role: {role}"))),
                 };
                 let party = AgreementParty {
                     did: Did::from_str(&did)
-                        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID: {}", e)))?,
+                        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID: {e}")))?,
                     coop_id,
                     role: role_enum,
                     display_name: None,
@@ -417,7 +417,7 @@ fn to_domain_amendment_changes(
             }
             AmendmentChangeRequest::RemoveParty { party_did } => Ok(AmendmentChange::RemoveParty {
                 party_did: Did::from_str(&party_did)
-                    .map_err(|e| GatewayError::BadRequest(format!("Invalid DID: {}", e)))?,
+                    .map_err(|e| GatewayError::BadRequest(format!("Invalid DID: {e}")))?,
             }),
         })
         .collect()
@@ -479,17 +479,17 @@ pub async fn list_agreements(
     let agreements = if let Some(status) = &query.status {
         manager
             .list_by_status(status)
-            .map_err(|e| GatewayError::InternalError(format!("Failed to list agreements: {}", e)))?
+            .map_err(|e| GatewayError::InternalError(format!("Failed to list agreements: {e}")))?
     } else {
         manager
             .list_agreements()
-            .map_err(|e| GatewayError::InternalError(format!("Failed to list agreements: {}", e)))?
+            .map_err(|e| GatewayError::InternalError(format!("Failed to list agreements: {e}")))?
     };
 
     // Filter by party if requested
     let filtered_agreements: Vec<_> = if let Some(party_did_str) = &query.party {
         let party_did = Did::from_str(party_did_str)
-            .map_err(|e| GatewayError::BadRequest(format!("Invalid party DID: {}", e)))?;
+            .map_err(|e| GatewayError::BadRequest(format!("Invalid party DID: {e}")))?;
         agreements
             .into_iter()
             .filter(|a| a.parties.iter().any(|p| p.did == party_did))
@@ -547,7 +547,7 @@ pub async fn create_agreement(
     // Create the agreement draft
     let agreement = manager
         .create_draft(req.title.clone(), req.description.clone(), agreement_type)
-        .map_err(|e| GatewayError::InternalError(format!("Failed to create agreement: {}", e)))?;
+        .map_err(|e| GatewayError::InternalError(format!("Failed to create agreement: {e}")))?;
 
     let response = to_api_agreement(&agreement);
     Ok(HttpResponse::Created().json(response))
@@ -582,8 +582,8 @@ pub async fn get_agreement(
 
     let agreement = manager
         .get_agreement(&AgreementId(agreement_id.clone()))
-        .map_err(|e| GatewayError::InternalError(format!("Failed to get agreement: {}", e)))?
-        .ok_or_else(|| GatewayError::NotFound(format!("Agreement not found: {}", agreement_id)))?;
+        .map_err(|e| GatewayError::InternalError(format!("Failed to get agreement: {e}")))?
+        .ok_or_else(|| GatewayError::NotFound(format!("Agreement not found: {agreement_id}")))?;
 
     let response = to_api_agreement(&agreement);
     Ok(HttpResponse::Ok().json(response))
@@ -618,7 +618,7 @@ pub async fn delete_agreement(
 
     manager
         .delete_draft(&AgreementId(agreement_id.clone()))
-        .map_err(|e| GatewayError::BadRequest(format!("Failed to delete agreement: {}", e)))?;
+        .map_err(|e| GatewayError::BadRequest(format!("Failed to delete agreement: {e}")))?;
 
     Ok(HttpResponse::NoContent().finish())
 }
@@ -668,7 +668,7 @@ pub async fn add_party(
 
     // Parse DID
     let did = Did::from_str(&req.did)
-        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID: {}", e)))?;
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
 
     // Create party
     let party = AgreementParty {
@@ -680,7 +680,7 @@ pub async fn add_party(
 
     let agreement = manager
         .add_party(&AgreementId(agreement_id.clone()), party)
-        .map_err(|e| GatewayError::BadRequest(format!("Failed to add party: {}", e)))?;
+        .map_err(|e| GatewayError::BadRequest(format!("Failed to add party: {e}")))?;
 
     let response = to_api_agreement(&agreement);
     Ok(HttpResponse::Ok().json(response))
@@ -727,7 +727,7 @@ pub async fn set_terms(
 
     let agreement = manager
         .set_terms(&AgreementId(agreement_id.clone()), terms)
-        .map_err(|e| GatewayError::BadRequest(format!("Failed to set terms: {}", e)))?;
+        .map_err(|e| GatewayError::BadRequest(format!("Failed to set terms: {e}")))?;
 
     let response = to_api_agreement(&agreement);
     Ok(HttpResponse::Ok().json(response))
@@ -761,7 +761,7 @@ pub async fn propose_agreement(
 
     let agreement = manager
         .propose(&AgreementId(agreement_id.clone()))
-        .map_err(|e| GatewayError::BadRequest(format!("Failed to propose agreement: {}", e)))?;
+        .map_err(|e| GatewayError::BadRequest(format!("Failed to propose agreement: {e}")))?;
 
     let response = to_api_agreement(&agreement);
     Ok(HttpResponse::Ok().json(response))
@@ -795,7 +795,7 @@ pub async fn sign_agreement(
 
     let agreement = manager
         .sign(&AgreementId(agreement_id.clone()))
-        .map_err(|e| GatewayError::BadRequest(format!("Failed to sign agreement: {}", e)))?;
+        .map_err(|e| GatewayError::BadRequest(format!("Failed to sign agreement: {e}")))?;
 
     let response = to_api_agreement(&agreement);
     Ok(HttpResponse::Ok().json(response))
@@ -831,7 +831,7 @@ pub async fn suspend_agreement(
 
     let agreement = manager
         .suspend(&AgreementId(agreement_id.clone()), req.reason.clone())
-        .map_err(|e| GatewayError::BadRequest(format!("Failed to suspend agreement: {}", e)))?;
+        .map_err(|e| GatewayError::BadRequest(format!("Failed to suspend agreement: {e}")))?;
 
     let response = to_api_agreement(&agreement);
     Ok(HttpResponse::Ok().json(response))
@@ -865,7 +865,7 @@ pub async fn resume_agreement(
 
     let agreement = manager
         .resume(&AgreementId(agreement_id.clone()))
-        .map_err(|e| GatewayError::BadRequest(format!("Failed to resume agreement: {}", e)))?;
+        .map_err(|e| GatewayError::BadRequest(format!("Failed to resume agreement: {e}")))?;
 
     let response = to_api_agreement(&agreement);
     Ok(HttpResponse::Ok().json(response))
@@ -934,7 +934,7 @@ pub async fn terminate_agreement(
 
     let agreement = manager
         .terminate(&AgreementId(agreement_id.clone()), reason)
-        .map_err(|e| GatewayError::BadRequest(format!("Failed to terminate agreement: {}", e)))?;
+        .map_err(|e| GatewayError::BadRequest(format!("Failed to terminate agreement: {e}")))?;
 
     let response = to_api_agreement(&agreement);
     Ok(HttpResponse::Ok().json(response))
@@ -972,14 +972,14 @@ pub async fn list_amendments(
     // Get the agreement to calculate required signatures
     let agreement = manager
         .get_agreement(&AgreementId(agreement_id.clone()))
-        .map_err(|e| GatewayError::NotFound(format!("Agreement not found: {}", e)))?
+        .map_err(|e| GatewayError::NotFound(format!("Agreement not found: {e}")))?
         .ok_or_else(|| GatewayError::NotFound("Agreement not found".into()))?;
 
     let required_sigs = calculate_required_signatures(&agreement);
 
     let amendments = manager
         .get_amendments(&AgreementId(agreement_id.clone()))
-        .map_err(|e| GatewayError::InternalError(format!("Failed to list amendments: {}", e)))?;
+        .map_err(|e| GatewayError::InternalError(format!("Failed to list amendments: {e}")))?;
 
     let responses: Vec<AmendmentResponse> = amendments
         .iter()
@@ -1029,7 +1029,7 @@ pub async fn propose_amendment(
     // Get the agreement to calculate required signatures
     let agreement = manager
         .get_agreement(&AgreementId(agreement_id.clone()))
-        .map_err(|e| GatewayError::NotFound(format!("Agreement not found: {}", e)))?
+        .map_err(|e| GatewayError::NotFound(format!("Agreement not found: {e}")))?
         .ok_or_else(|| GatewayError::NotFound("Agreement not found".into()))?;
 
     let required_sigs = calculate_required_signatures(&agreement);
@@ -1043,7 +1043,7 @@ pub async fn propose_amendment(
             req.description.clone(),
             changes,
         )
-        .map_err(|e| GatewayError::BadRequest(format!("Failed to propose amendment: {}", e)))?;
+        .map_err(|e| GatewayError::BadRequest(format!("Failed to propose amendment: {e}")))?;
 
     let response = AmendmentResponse {
         id: amendment.id.clone(),
@@ -1089,14 +1089,14 @@ pub async fn sign_amendment(
     // Get the agreement to calculate required signatures
     let agreement = manager
         .get_agreement(&AgreementId(agreement_id.clone()))
-        .map_err(|e| GatewayError::NotFound(format!("Agreement not found: {}", e)))?
+        .map_err(|e| GatewayError::NotFound(format!("Agreement not found: {e}")))?
         .ok_or_else(|| GatewayError::NotFound("Agreement not found".into()))?;
 
     let required_sigs = calculate_required_signatures(&agreement);
 
     let amendment = manager
         .sign_amendment(&AgreementId(agreement_id.clone()), &amendment_id)
-        .map_err(|e| GatewayError::BadRequest(format!("Failed to sign amendment: {}", e)))?;
+        .map_err(|e| GatewayError::BadRequest(format!("Failed to sign amendment: {e}")))?;
 
     let response = AmendmentResponse {
         id: amendment.id.clone(),

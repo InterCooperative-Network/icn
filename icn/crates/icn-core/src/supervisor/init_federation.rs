@@ -13,7 +13,7 @@ use tokio::sync::RwLock;
 use tracing::info;
 
 use icn_gossip::GossipActor;
-use icn_identity::Did;
+use icn_identity::{Did, KeyPair};
 use icn_store::SledStore;
 
 use crate::config::FederationConfig;
@@ -42,6 +42,8 @@ pub struct FederationDeps {
     pub gossip_handle: Arc<RwLock<GossipActor>>,
     /// Node's DID
     pub did: Did,
+    /// Node's keypair for signing operations
+    pub keypair: Arc<KeyPair>,
     /// Base store path for federation data
     pub store_path: std::path::PathBuf,
 }
@@ -159,7 +161,7 @@ pub async fn init_federation_services(
             coop_id.clone(),
             deps.did.clone(),
         )
-        .with_keypair(deps.identity_bundle.keypair()),
+        .with_keypair(deps.keypair.clone()),
     );
     info!("✓ Agreement manager initialized");
 

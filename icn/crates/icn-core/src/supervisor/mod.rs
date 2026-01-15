@@ -604,6 +604,7 @@ impl Supervisor {
                     init_federation::FederationDeps {
                         gossip_handle: gossip_handle.clone(),
                         did: did.clone(),
+                        keypair: Arc::new(identity_bundle.keypair().clone()),
                         store_path: self.config.store_path(),
                     },
                 )
