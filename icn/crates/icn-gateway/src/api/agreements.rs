@@ -29,7 +29,7 @@ pub struct CreateAgreementRequest {
 }
 
 /// Agreement type configuration
-#[derive(Debug, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Deserialize, ToSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum AgreementTypeRequest {
     Trade {
@@ -58,7 +58,7 @@ pub enum AgreementTypeRequest {
 }
 
 /// Trade item in a trade agreement
-#[derive(Debug, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Deserialize, ToSchema)]
 pub struct TradeItemRequest {
     pub description: String,
     pub quantity: u32,
@@ -121,7 +121,7 @@ pub struct ProposeAmendmentRequest {
 }
 
 /// Amendment change specification
-#[derive(Debug, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Deserialize, ToSchema)]
 #[serde(tag = "change_type", rename_all = "snake_case")]
 pub enum AmendmentChangeRequest {
     ExtendDuration {
@@ -211,6 +211,215 @@ pub struct AmendmentResponse {
 }
 
 // ============================================================================
+// Helper Functions
+// ============================================================================
+
+use icn_federation::agreement::{
+    Agreement, AgreementId, AgreementParty, AgreementTerms, AgreementType, AmendmentChange,
+    CompensationModel, DataSharingLevel, FederationMembershipTerms, PartyRole, ResourceType,
+    TerminationReason, TradeItem,
+};
+use icn_identity::Did;
+
+/// Convert API agreement type to domain type
+fn to_domain_agreement_type(req_type: AgreementTypeRequest) -> Result<AgreementType> {
+    match req_type {
+        AgreementTypeRequest::Trade { items, currency } => {
+            let trade_items: Vec<TradeItem> = items
+                .into_iter()
+                .map(|item| TradeItem {
+                    description: item.description,
+                    quantity: item.quantity,
+                    unit: item.unit,
+                    unit_price: item.unit_price,
+                    currency: item.currency,
+                })
+                .collect();
+            Ok(AgreementType::Trade {
+                items: trade_items,
+                currency,
+            })
+        }
+        AgreementTypeRequest::Credit {
+            credit_limit,
+            interest_rate_bps,
+            currency,
+        } => Ok(AgreementType::Credit {
+            credit_limit,
+            interest_rate_bps,
+            currency,
+        }),
+        AgreementTypeRequest::ResourceSharing {
+            resource_type,
+            duration_days,
+            compensation_model: _,  // TODO: Parse compensation model
+        } => {
+            // Parse resource_type string to enum
+            let resource_type_enum = match resource_type.as_str() {
+                "equipment" => ResourceType::Equipment,
+                "facility" => ResourceType::Facility,
+                "compute" => ResourceType::Compute,
+                "storage" => ResourceType::Storage,
+                _ => ResourceType::Equipment, // Default
+            };
+            
+            // Use fixed rate compensation model (simplified)
+            let compensation = CompensationModel::FixedRate {
+                amount: 0, // TODO: Extract from compensation_model string
+                currency: "USD".to_string(),
+                period_days: 30,
+            };
+
+            Ok(AgreementType::ResourceSharing {
+                resource_type: resource_type_enum,
+                duration_days,
+                compensation,
+            })
+        }
+        AgreementTypeRequest::FederationMembership {
+            federation_id,
+            min_trust_threshold,
+            governance_binding,
+        } => {
+            let terms = FederationMembershipTerms {
+                min_trust_threshold,
+                governance_binding,
+                data_sharing_level: DataSharingLevel::MetadataOnly, // Default
+                contribution_requirements: None,
+            };
+            Ok(AgreementType::FederationMembership {
+                federation_id,
+                terms,
+            })
+        }
+        AgreementTypeRequest::Custom {
+            agreement_type_name,
+            terms_json,
+        } => Ok(AgreementType::Custom {
+            agreement_type_name,
+            terms_json,
+        }),
+    }
+}
+
+/// Convert domain agreement to API response
+fn to_api_agreement(agreement: &Agreement) -> AgreementDetailResponse {
+    let parties: Vec<PartyInfo> = agreement
+        .parties
+        .iter()
+        .map(|party| {
+            let has_signed = agreement
+                .signatures
+                .iter()
+                .any(|sig| sig.signer == party.did);
+            PartyInfo {
+                did: party.did.to_string(),
+                coop_id: party.coop_id.clone(),
+                role: format!("{:?}", party.role),
+                display_name: party.display_name.clone(),
+                has_signed,
+            }
+        })
+        .collect();
+
+    let signatures: Vec<SignatureInfo> = agreement
+        .signatures
+        .iter()
+        .map(|sig| SignatureInfo {
+            signer_did: sig.signer.to_string(),
+            coop_id: sig.coop_id.clone(),
+            signed_at: sig.signed_at,
+            version_signed: sig.version_signed,
+        })
+        .collect();
+
+    AgreementDetailResponse {
+        id: agreement.id.0.clone(),
+        title: agreement.title.clone(),
+        description: agreement.description.clone(),
+        status: format!("{:?}", agreement.status),
+        status_details: serde_json::to_value(&agreement.status).unwrap_or(serde_json::Value::Null),
+        agreement_type: format!("{:?}", agreement.agreement_type),
+        agreement_type_details: serde_json::to_value(&agreement.agreement_type)
+            .unwrap_or(serde_json::Value::Null),
+        parties,
+        signatures,
+        terms: serde_json::to_value(&agreement.terms).unwrap_or(serde_json::Value::Null),
+        version: agreement.version,
+        created_at: agreement.created_at,
+        updated_at: agreement.updated_at,
+    }
+}
+
+/// Convert domain agreement to API summary
+fn to_api_summary(agreement: &Agreement) -> AgreementSummary {
+    let agreement_type_str = match &agreement.agreement_type {
+        AgreementType::Trade { .. } => "Trade",
+        AgreementType::Credit { .. } => "Credit",
+        AgreementType::ResourceSharing { .. } => "ResourceSharing",
+        AgreementType::FederationMembership { .. } => "FederationMembership",
+        AgreementType::Custom { .. } => "Custom",
+    };
+
+    AgreementSummary {
+        id: agreement.id.0.clone(),
+        title: agreement.title.clone(),
+        status: format!("{:?}", agreement.status),
+        agreement_type: agreement_type_str.to_string(),
+        parties_count: agreement.parties.len(),
+        created_at: agreement.created_at,
+        updated_at: agreement.updated_at,
+    }
+}
+
+/// Convert amendment changes from API to domain
+fn to_domain_amendment_changes(changes: Vec<AmendmentChangeRequest>) -> Result<Vec<AmendmentChange>> {
+    changes
+        .into_iter()
+        .map(|change| match change {
+            AmendmentChangeRequest::ExtendDuration { new_expiration } => {
+                Ok(AmendmentChange::ExtendDuration { new_expiration })
+            }
+            AmendmentChangeRequest::UpdateTerm { field, new_value } => {
+                Ok(AmendmentChange::UpdateTerm {
+                    field,
+                    old_value: String::new(), // TODO: Fetch from current agreement
+                    new_value,
+                })
+            }
+            AmendmentChangeRequest::AddParty { did, coop_id, role } => {
+                let role_enum = match role.as_str() {
+                    "proposer" => PartyRole::Proposer,
+                    "counterparty" => PartyRole::Counterparty,
+                    "witness" => PartyRole::Witness,
+                    "guarantor" => PartyRole::Guarantor,
+                    _ => {
+                        return Err(GatewayError::BadRequest(format!(
+                            "Invalid role: {}",
+                            role
+                        )))
+                    }
+                };
+                let party = AgreementParty {
+                    did: Did::from_str(&did)
+                        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID: {}", e)))?,
+                    coop_id,
+                    role: role_enum,
+                    display_name: None,
+                };
+                Ok(AmendmentChange::AddParty { party })
+            }
+            AmendmentChangeRequest::RemoveParty { party_did } => {
+                Ok(AmendmentChange::RemoveParty {
+                    party_did: Did::from_str(&party_did)
+                        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID: {}", e)))?,
+                })
+            }
+        })
+        .collect()
+}
+
+// ============================================================================
 // API Endpoints
 // ============================================================================
 
@@ -233,19 +442,50 @@ pub struct AmendmentResponse {
 #[get("")]
 pub async fn list_agreements(
     http_req: HttpRequest,
-    _query: web::Query<ListAgreementsQuery>,
+    agreement_mgr: web::Data<Option<icn_federation::agreement::AgreementManagerHandle>>,
+    query: web::Query<ListAgreementsQuery>,
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "agreements:read")?;
 
     let _claims = get_claims(&http_req)
         .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
 
-    // TODO: Get agreements from AgreementManager
-    // For now, return empty list as placeholder
+    let manager = agreement_mgr
+        .as_ref()
+        .as_ref()
+        .ok_or_else(|| GatewayError::ServiceUnavailable("Agreement manager not configured".into()))?;
+
+    // Get agreements based on query filters
+    let agreements = if let Some(status) = &query.status {
+        manager
+            .list_by_status(status)
+            .map_err(|e| GatewayError::InternalError(format!("Failed to list agreements: {}", e)))?
+    } else {
+        manager
+            .list_agreements()
+            .map_err(|e| GatewayError::InternalError(format!("Failed to list agreements: {}", e)))?
+    };
+
+    // Filter by party if requested
+    let filtered_agreements: Vec<_> = if let Some(party_did_str) = &query.party {
+        let party_did = Did::from_str(party_did_str)
+            .map_err(|e| GatewayError::BadRequest(format!("Invalid party DID: {}", e)))?;
+        agreements
+            .into_iter()
+            .filter(|a| a.parties.iter().any(|p| p.did == party_did))
+            .collect()
+    } else {
+        agreements
+    };
+
+    let summaries: Vec<AgreementSummary> = filtered_agreements
+        .iter()
+        .map(to_api_summary)
+        .collect();
 
     let response = AgreementListResponse {
-        agreements: vec![],
-        total: 0,
+        total: summaries.len(),
+        agreements: summaries,
     };
 
     Ok(HttpResponse::Ok().json(response))
@@ -274,18 +514,29 @@ pub struct ListAgreementsQuery {
 #[post("")]
 pub async fn create_agreement(
     http_req: HttpRequest,
-    _req: web::Json<CreateAgreementRequest>,
+    agreement_mgr: web::Data<Option<icn_federation::agreement::AgreementManagerHandle>>,
+    req: web::Json<CreateAgreementRequest>,
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "agreements:write")?;
 
     let _claims = get_claims(&http_req)
         .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
 
-    // TODO: Create agreement using AgreementManager
+    let manager = agreement_mgr
+        .as_ref()
+        .as_ref()
+        .ok_or_else(|| GatewayError::ServiceUnavailable("Agreement manager not configured".into()))?;
 
-    Err(GatewayError::InternalError(
-        "Agreement creation not yet integrated".to_string(),
-    ))
+    // Convert API types to domain types
+    let agreement_type = to_domain_agreement_type(req.agreement_type.clone())?;
+
+    // Create the agreement draft
+    let agreement = manager
+        .create_draft(req.title.clone(), req.description.clone(), agreement_type)
+        .map_err(|e| GatewayError::InternalError(format!("Failed to create agreement: {}", e)))?;
+
+    let response = to_api_agreement(&agreement);
+    Ok(HttpResponse::Created().json(response))
 }
 
 /// GET /agreements/{id} - Get agreement details
@@ -304,16 +555,27 @@ pub async fn create_agreement(
     security(("bearer_auth" = []))
 )]
 #[get("/{id}")]
-pub async fn get_agreement(http_req: HttpRequest, path: web::Path<String>) -> Result<HttpResponse> {
+pub async fn get_agreement(
+    http_req: HttpRequest,
+    agreement_mgr: web::Data<Option<icn_federation::agreement::AgreementManagerHandle>>,
+    path: web::Path<String>,
+) -> Result<HttpResponse> {
     require_scope(&http_req, "agreements:read")?;
 
-    let _agreement_id = path.into_inner();
+    let agreement_id = path.into_inner();
 
-    // TODO: Get agreement from AgreementManager
+    let manager = agreement_mgr
+        .as_ref()
+        .as_ref()
+        .ok_or_else(|| GatewayError::ServiceUnavailable("Agreement manager not configured".into()))?;
 
-    Err(GatewayError::InternalError(
-        "Agreement retrieval not yet integrated".to_string(),
-    ))
+    let agreement = manager
+        .get_agreement(&AgreementId(agreement_id.clone()))
+        .map_err(|e| GatewayError::InternalError(format!("Failed to get agreement: {}", e)))?
+        .ok_or_else(|| GatewayError::NotFound(format!("Agreement not found: {}", agreement_id)))?;
+
+    let response = to_api_agreement(&agreement);
+    Ok(HttpResponse::Ok().json(response))
 }
 
 /// DELETE /agreements/{id} - Delete a draft agreement
@@ -334,17 +596,23 @@ pub async fn get_agreement(http_req: HttpRequest, path: web::Path<String>) -> Re
 #[delete("/{id}")]
 pub async fn delete_agreement(
     http_req: HttpRequest,
+    agreement_mgr: web::Data<Option<icn_federation::agreement::AgreementManagerHandle>>,
     path: web::Path<String>,
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "agreements:write")?;
 
-    let _agreement_id = path.into_inner();
+    let agreement_id = path.into_inner();
 
-    // TODO: Delete draft agreement
+    let manager = agreement_mgr
+        .as_ref()
+        .as_ref()
+        .ok_or_else(|| GatewayError::ServiceUnavailable("Agreement manager not configured".into()))?;
 
-    Err(GatewayError::InternalError(
-        "Agreement deletion not yet integrated".to_string(),
-    ))
+    manager
+        .delete_draft(&AgreementId(agreement_id.clone()))
+        .map_err(|e| GatewayError::BadRequest(format!("Failed to delete agreement: {}", e)))?;
+
+    Ok(HttpResponse::NoContent().finish())
 }
 
 /// POST /agreements/{id}/parties - Add a party to draft agreement
@@ -366,16 +634,46 @@ pub async fn delete_agreement(
 #[post("/{id}/parties")]
 pub async fn add_party(
     http_req: HttpRequest,
+    agreement_mgr: web::Data<Option<icn_federation::agreement::AgreementManagerHandle>>,
     path: web::Path<String>,
-    _req: web::Json<AddPartyRequest>,
+    req: web::Json<AddPartyRequest>,
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "agreements:write")?;
 
-    let _agreement_id = path.into_inner();
+    let agreement_id = path.into_inner();
 
-    Err(GatewayError::InternalError(
-        "Add party not yet integrated".to_string(),
-    ))
+    let manager = agreement_mgr
+        .as_ref()
+        .as_ref()
+        .ok_or_else(|| GatewayError::ServiceUnavailable("Agreement manager not configured".into()))?;
+
+    // Parse role
+    let role = match req.role.as_str() {
+        "proposer" => PartyRole::Proposer,
+        "counterparty" => PartyRole::Counterparty,
+        "witness" => PartyRole::Witness,
+        "guarantor" => PartyRole::Guarantor,
+        _ => return Err(GatewayError::BadRequest(format!("Invalid role: {}", req.role))),
+    };
+
+    // Parse DID
+    let did = Did::from_str(&req.did)
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID: {}", e)))?;
+
+    // Create party
+    let party = AgreementParty {
+        did,
+        coop_id: req.coop_id.clone(),
+        role,
+        display_name: req.display_name.clone(),
+    };
+
+    let agreement = manager
+        .add_party(&AgreementId(agreement_id.clone()), party)
+        .map_err(|e| GatewayError::BadRequest(format!("Failed to add party: {}", e)))?;
+
+    let response = to_api_agreement(&agreement);
+    Ok(HttpResponse::Ok().json(response))
 }
 
 /// PUT /agreements/{id}/terms - Set agreement terms
@@ -396,16 +694,36 @@ pub async fn add_party(
 #[put("/{id}/terms")]
 pub async fn set_terms(
     http_req: HttpRequest,
+    agreement_mgr: web::Data<Option<icn_federation::agreement::AgreementManagerHandle>>,
     path: web::Path<String>,
-    _req: web::Json<SetTermsRequest>,
+    req: web::Json<SetTermsRequest>,
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "agreements:write")?;
 
-    let _agreement_id = path.into_inner();
+    let agreement_id = path.into_inner();
 
-    Err(GatewayError::InternalError(
-        "Set terms not yet integrated".to_string(),
-    ))
+    let manager = agreement_mgr
+        .as_ref()
+        .as_ref()
+        .ok_or_else(|| GatewayError::ServiceUnavailable("Agreement manager not configured".into()))?;
+
+    // Build terms object
+    let terms = AgreementTerms {
+        effective_date: req.effective_date,
+        expiration_date: req.expiration_date,
+        auto_renewal: None, // TODO: Add to API request if needed
+        termination_notice_days: req.termination_notice_days,
+        dispute_resolution: req.dispute_resolution.clone(),
+        governing_law: None, // TODO: Add to API request if needed
+        additional_terms: req.additional_terms.clone(),
+    };
+
+    let agreement = manager
+        .set_terms(&AgreementId(agreement_id.clone()), terms)
+        .map_err(|e| GatewayError::BadRequest(format!("Failed to set terms: {}", e)))?;
+
+    let response = to_api_agreement(&agreement);
+    Ok(HttpResponse::Ok().json(response))
 }
 
 /// POST /agreements/{id}/propose - Propose the agreement
@@ -425,15 +743,24 @@ pub async fn set_terms(
 #[post("/{id}/propose")]
 pub async fn propose_agreement(
     http_req: HttpRequest,
+    agreement_mgr: web::Data<Option<icn_federation::agreement::AgreementManagerHandle>>,
     path: web::Path<String>,
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "agreements:write")?;
 
-    let _agreement_id = path.into_inner();
+    let agreement_id = path.into_inner();
 
-    Err(GatewayError::InternalError(
-        "Propose agreement not yet integrated".to_string(),
-    ))
+    let manager = agreement_mgr
+        .as_ref()
+        .as_ref()
+        .ok_or_else(|| GatewayError::ServiceUnavailable("Agreement manager not configured".into()))?;
+
+    let agreement = manager
+        .propose(&AgreementId(agreement_id.clone()))
+        .map_err(|e| GatewayError::BadRequest(format!("Failed to propose agreement: {}", e)))?;
+
+    let response = to_api_agreement(&agreement);
+    Ok(HttpResponse::Ok().json(response))
 }
 
 /// POST /agreements/{id}/sign - Sign the agreement
@@ -453,15 +780,24 @@ pub async fn propose_agreement(
 #[post("/{id}/sign")]
 pub async fn sign_agreement(
     http_req: HttpRequest,
+    agreement_mgr: web::Data<Option<icn_federation::agreement::AgreementManagerHandle>>,
     path: web::Path<String>,
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "agreements:write")?;
 
-    let _agreement_id = path.into_inner();
+    let agreement_id = path.into_inner();
 
-    Err(GatewayError::InternalError(
-        "Sign agreement not yet integrated".to_string(),
-    ))
+    let manager = agreement_mgr
+        .as_ref()
+        .as_ref()
+        .ok_or_else(|| GatewayError::ServiceUnavailable("Agreement manager not configured".into()))?;
+
+    let agreement = manager
+        .sign(&AgreementId(agreement_id.clone()))
+        .map_err(|e| GatewayError::BadRequest(format!("Failed to sign agreement: {}", e)))?;
+
+    let response = to_api_agreement(&agreement);
+    Ok(HttpResponse::Ok().json(response))
 }
 
 /// POST /agreements/{id}/suspend - Suspend an active agreement
@@ -482,16 +818,25 @@ pub async fn sign_agreement(
 #[post("/{id}/suspend")]
 pub async fn suspend_agreement(
     http_req: HttpRequest,
+    agreement_mgr: web::Data<Option<icn_federation::agreement::AgreementManagerHandle>>,
     path: web::Path<String>,
-    _req: web::Json<SuspendRequest>,
+    req: web::Json<SuspendRequest>,
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "agreements:admin")?;
 
-    let _agreement_id = path.into_inner();
+    let agreement_id = path.into_inner();
 
-    Err(GatewayError::InternalError(
-        "Suspend agreement not yet integrated".to_string(),
-    ))
+    let manager = agreement_mgr
+        .as_ref()
+        .as_ref()
+        .ok_or_else(|| GatewayError::ServiceUnavailable("Agreement manager not configured".into()))?;
+
+    let agreement = manager
+        .suspend(&AgreementId(agreement_id.clone()), req.reason.clone())
+        .map_err(|e| GatewayError::BadRequest(format!("Failed to suspend agreement: {}", e)))?;
+
+    let response = to_api_agreement(&agreement);
+    Ok(HttpResponse::Ok().json(response))
 }
 
 /// POST /agreements/{id}/resume - Resume a suspended agreement
@@ -511,15 +856,24 @@ pub async fn suspend_agreement(
 #[post("/{id}/resume")]
 pub async fn resume_agreement(
     http_req: HttpRequest,
+    agreement_mgr: web::Data<Option<icn_federation::agreement::AgreementManagerHandle>>,
     path: web::Path<String>,
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "agreements:admin")?;
 
-    let _agreement_id = path.into_inner();
+    let agreement_id = path.into_inner();
 
-    Err(GatewayError::InternalError(
-        "Resume agreement not yet integrated".to_string(),
-    ))
+    let manager = agreement_mgr
+        .as_ref()
+        .as_ref()
+        .ok_or_else(|| GatewayError::ServiceUnavailable("Agreement manager not configured".into()))?;
+
+    let agreement = manager
+        .resume(&AgreementId(agreement_id.clone()))
+        .map_err(|e| GatewayError::BadRequest(format!("Failed to resume agreement: {}", e)))?;
+
+    let response = to_api_agreement(&agreement);
+    Ok(HttpResponse::Ok().json(response))
 }
 
 /// POST /agreements/{id}/terminate - Terminate an agreement
@@ -540,16 +894,52 @@ pub async fn resume_agreement(
 #[post("/{id}/terminate")]
 pub async fn terminate_agreement(
     http_req: HttpRequest,
+    agreement_mgr: web::Data<Option<icn_federation::agreement::AgreementManagerHandle>>,
     path: web::Path<String>,
-    _req: web::Json<TerminateRequest>,
+    req: web::Json<TerminateRequest>,
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "agreements:admin")?;
 
-    let _agreement_id = path.into_inner();
+    let agreement_id = path.into_inner();
 
-    Err(GatewayError::InternalError(
-        "Terminate agreement not yet integrated".to_string(),
-    ))
+    let manager = agreement_mgr
+        .as_ref()
+        .as_ref()
+        .ok_or_else(|| GatewayError::ServiceUnavailable("Agreement manager not configured".into()))?;
+
+    // Parse termination reason
+    let reason = match req.reason_type.as_str() {
+        "expired" => TerminationReason::Expired,
+        "mutual_consent" => TerminationReason::MutualConsent {
+            explanation: req.details.clone(),
+        },
+        "breach" => TerminationReason::Breach {
+            breaching_party: Did::from_str("did:icn:placeholder")
+                .map_err(|e| GatewayError::InternalError(format!("Invalid DID: {}", e)))?,  // TODO: Get from request
+            breach_description: req.details.clone().unwrap_or_default(),
+        },
+        "withdrawal" => TerminationReason::Withdrawal {
+            withdrawing_party: Did::from_str("did:icn:placeholder")
+                .map_err(|e| GatewayError::InternalError(format!("Invalid DID: {}", e)))?, // TODO: Get from claims
+            notice_days: 0, // TODO: Extract from request
+        },
+        "force_majeure" => TerminationReason::ForceMajeure {
+            description: req.details.clone().unwrap_or_default(),
+        },
+        _ => {
+            return Err(GatewayError::BadRequest(format!(
+                "Invalid termination reason: {}",
+                req.reason_type
+            )))
+        }
+    };
+
+    let agreement = manager
+        .terminate(&AgreementId(agreement_id.clone()), reason)
+        .map_err(|e| GatewayError::BadRequest(format!("Failed to terminate agreement: {}", e)))?;
+
+    let response = to_api_agreement(&agreement);
+    Ok(HttpResponse::Ok().json(response))
 }
 
 // ============================================================================
@@ -572,13 +962,37 @@ pub async fn terminate_agreement(
 #[get("/{id}/amendments")]
 pub async fn list_amendments(
     http_req: HttpRequest,
+    agreement_mgr: web::Data<Option<icn_federation::agreement::AgreementManagerHandle>>,
     path: web::Path<String>,
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "agreements:read")?;
 
-    let _agreement_id = path.into_inner();
+    let agreement_id = path.into_inner();
 
-    Ok(HttpResponse::Ok().json(Vec::<AmendmentResponse>::new()))
+    let manager = agreement_mgr
+        .as_ref()
+        .as_ref()
+        .ok_or_else(|| GatewayError::ServiceUnavailable("Agreement manager not configured".into()))?;
+
+    let amendments = manager
+        .get_amendments(&AgreementId(agreement_id.clone()))
+        .map_err(|e| GatewayError::InternalError(format!("Failed to list amendments: {}", e)))?;
+
+    let responses: Vec<AmendmentResponse> = amendments
+        .iter()
+        .map(|amendment| AmendmentResponse {
+            id: amendment.id.clone(),
+            agreement_id: amendment.agreement_id.0.clone(),
+            description: amendment.description.clone(),
+            status: format!("{:?}", amendment.status),
+            proposed_by: amendment.proposed_by.to_string(),
+            proposed_at: amendment.proposed_at,
+            signatures_count: amendment.signatures.len(),
+            required_signatures: 0, // TODO: Calculate based on agreement parties
+        })
+        .collect();
+
+    Ok(HttpResponse::Ok().json(responses))
 }
 
 /// POST /agreements/{id}/amendments - Propose an amendment
@@ -599,16 +1013,38 @@ pub async fn list_amendments(
 #[post("/{id}/amendments")]
 pub async fn propose_amendment(
     http_req: HttpRequest,
+    agreement_mgr: web::Data<Option<icn_federation::agreement::AgreementManagerHandle>>,
     path: web::Path<String>,
-    _req: web::Json<ProposeAmendmentRequest>,
+    req: web::Json<ProposeAmendmentRequest>,
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "agreements:write")?;
 
-    let _agreement_id = path.into_inner();
+    let agreement_id = path.into_inner();
 
-    Err(GatewayError::InternalError(
-        "Propose amendment not yet integrated".to_string(),
-    ))
+    let manager = agreement_mgr
+        .as_ref()
+        .as_ref()
+        .ok_or_else(|| GatewayError::ServiceUnavailable("Agreement manager not configured".into()))?;
+
+    // Convert changes
+    let changes = to_domain_amendment_changes(req.changes.clone())?;
+
+    let amendment = manager
+        .propose_amendment(&AgreementId(agreement_id.clone()), req.description.clone(), changes)
+        .map_err(|e| GatewayError::BadRequest(format!("Failed to propose amendment: {}", e)))?;
+
+    let response = AmendmentResponse {
+        id: amendment.id.clone(),
+        agreement_id: amendment.agreement_id.0.clone(),
+        description: amendment.description.clone(),
+        status: format!("{:?}", amendment.status),
+        proposed_by: amendment.proposed_by.to_string(),
+        proposed_at: amendment.proposed_at,
+        signatures_count: amendment.signatures.len(),
+        required_signatures: 0, // TODO: Calculate
+    };
+
+    Ok(HttpResponse::Created().json(response))
 }
 
 /// POST /agreements/{id}/amendments/{amendment_id}/sign - Sign an amendment
@@ -629,15 +1065,34 @@ pub async fn propose_amendment(
 #[post("/{id}/amendments/{amendment_id}/sign")]
 pub async fn sign_amendment(
     http_req: HttpRequest,
+    agreement_mgr: web::Data<Option<icn_federation::agreement::AgreementManagerHandle>>,
     path: web::Path<(String, String)>,
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "agreements:write")?;
 
-    let (_agreement_id, _amendment_id) = path.into_inner();
+    let (agreement_id, amendment_id) = path.into_inner();
 
-    Err(GatewayError::InternalError(
-        "Sign amendment not yet integrated".to_string(),
-    ))
+    let manager = agreement_mgr
+        .as_ref()
+        .as_ref()
+        .ok_or_else(|| GatewayError::ServiceUnavailable("Agreement manager not configured".into()))?;
+
+    let amendment = manager
+        .sign_amendment(&AgreementId(agreement_id.clone()), &amendment_id)
+        .map_err(|e| GatewayError::BadRequest(format!("Failed to sign amendment: {}", e)))?;
+
+    let response = AmendmentResponse {
+        id: amendment.id.clone(),
+        agreement_id: amendment.agreement_id.0.clone(),
+        description: amendment.description.clone(),
+        status: format!("{:?}", amendment.status),
+        proposed_by: amendment.proposed_by.to_string(),
+        proposed_at: amendment.proposed_at,
+        signatures_count: amendment.signatures.len(),
+        required_signatures: 0, // TODO: Calculate
+    };
+
+    Ok(HttpResponse::Ok().json(response))
 }
 
 // ============================================================================
