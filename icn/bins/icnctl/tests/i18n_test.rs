@@ -16,52 +16,52 @@ rust_i18n::i18n!("locales", fallback = "en");
 #[test]
 fn test_translation_keys_exist() {
     // Test that commonly used translation keys exist and return expected strings
-    
+
     // Identity command keys
     assert!(!t!("cli.id.init.success").is_empty());
     assert!(!t!("cli.id.show.title").is_empty());
-    
+
     // Trust command keys
     assert!(!t!("cli.trust.add.success").is_empty());
     assert!(!t!("cli.trust.list.title").is_empty());
     assert!(!t!("cli.trust.show.title").is_empty());
     assert!(!t!("cli.trust.remove.success").is_empty());
-    
+
     // Device command keys
     assert!(!t!("cli.device.list.title").is_empty());
     assert!(!t!("cli.device.add.creating").is_empty());
     assert!(!t!("cli.device.approve.success").is_empty());
     assert!(!t!("cli.device.revoke.success").is_empty());
-    
+
     // Network command keys
     assert!(!t!("cli.network.peers.title").is_empty());
     assert!(!t!("cli.network.dial.connecting").is_empty());
     assert!(!t!("cli.network.stats.title").is_empty());
-    
+
     // Ledger command keys
     assert!(!t!("cli.ledger.head.title").is_empty());
     assert!(!t!("cli.ledger.balance.title").is_empty());
     assert!(!t!("cli.ledger.history.title").is_empty());
-    
+
     // Contract command keys
     assert!(!t!("cli.contract.deploy.success").is_empty());
     assert!(!t!("cli.contract.call.calling").is_empty());
     assert!(!t!("cli.contract.list.title").is_empty());
-    
+
     // Compute command keys
     assert!(!t!("cli.compute.submit.success").is_empty());
     assert!(!t!("cli.compute.status.state_label").is_empty());
     assert!(!t!("cli.compute.cancel.success").is_empty());
-    
+
     // Snapshot command keys
     assert!(!t!("cli.snapshot.create.success").is_empty());
     assert!(!t!("cli.snapshot.list.title").is_empty());
     assert!(!t!("cli.snapshot.verify.valid").is_empty());
-    
+
     // Backup command keys
     assert!(!t!("cli.backup.success").is_empty());
     assert!(!t!("cli.backup.creating").is_empty());
-    
+
     // Common keys
     assert!(!t!("cli.common.no_identity").is_empty());
     assert!(!t!("cli.prompts.enter_passphrase").is_empty());
@@ -70,12 +70,15 @@ fn test_translation_keys_exist() {
 #[test]
 fn test_string_interpolation() {
     // rust-i18n v3 uses {var} syntax for interpolation (e.g., {count})
-    
+
     let result = t!("cli.ledger.history.showing", count = 5);
     // For now, just verify the key exists and returns something
     assert!(!result.is_empty(), "Should return non-empty translation");
-    assert!(result.contains("entries") || result.contains("Showing") || result.contains("count"), 
-            "Should contain translation text: {}", result);
+    assert!(
+        result.contains("entries") || result.contains("Showing") || result.contains("count"),
+        "Should contain translation text: {}",
+        result
+    );
 }
 
 #[test]
@@ -85,11 +88,14 @@ fn test_trust_class_translations() {
     assert!(!t!("cli.trust.show.class_known").is_empty());
     assert!(!t!("cli.trust.show.class_partner").is_empty());
     assert!(!t!("cli.trust.show.class_federated").is_empty());
-    
+
     // Verify they're different values
     let isolated = t!("cli.trust.show.class_isolated");
     let known = t!("cli.trust.show.class_known");
-    assert_ne!(isolated, known, "Trust classes should have different translations");
+    assert_ne!(
+        isolated, known,
+        "Trust classes should have different translations"
+    );
 }
 
 #[test]
@@ -100,7 +106,7 @@ fn test_ledger_labels() {
     assert!(!t!("cli.ledger.history.accounts_label").is_empty());
     assert!(!t!("cli.ledger.history.debit_label").is_empty());
     assert!(!t!("cli.ledger.history.credit_label").is_empty());
-    
+
     // Verify English translations
     assert_eq!(t!("cli.ledger.history.hash"), "Hash");
     assert_eq!(t!("cli.ledger.history.author"), "Author");
@@ -121,12 +127,15 @@ fn test_device_labels() {
 #[test]
 fn test_snapshot_interpolation() {
     // rust-i18n v3 uses {var} syntax for interpolation (e.g., {count})
-    
+
     let result = t!("cli.snapshot.cleanup.deleted_count", count = 3);
     assert!(!result.is_empty(), "Should return non-empty translation");
-    
+
     let result_kept = t!("cli.snapshot.cleanup.kept_count", count = 5);
-    assert!(!result_kept.is_empty(), "Should return non-empty translation");
+    assert!(
+        !result_kept.is_empty(),
+        "Should return non-empty translation"
+    );
 }
 
 #[test]
@@ -135,11 +144,14 @@ fn test_network_peer_messages() {
     assert!(!t!("cli.network.peers.no_peers").is_empty());
     assert!(!t!("cli.network.peers.tip").is_empty());
     assert!(!t!("cli.network.peers.header").is_empty());
-    
+
     // Verify no_peers message makes sense
     let no_peers = t!("cli.network.peers.no_peers");
-    assert!(no_peers.to_lowercase().contains("no") || no_peers.to_lowercase().contains("not"),
-            "No peers message should indicate absence: {}", no_peers);
+    assert!(
+        no_peers.to_lowercase().contains("no") || no_peers.to_lowercase().contains("not"),
+        "No peers message should indicate absence: {}",
+        no_peers
+    );
 }
 
 #[test]
@@ -149,13 +161,16 @@ fn test_backup_messages() {
     assert!(!t!("cli.backup.success").is_empty());
     assert!(!t!("cli.backup.output_label").is_empty());
     assert!(!t!("cli.backup.includes").is_empty());
-    
+
     // Verify the important security message exists
     let includes = t!("cli.backup.includes");
-    assert!(includes.to_lowercase().contains("keystore") || 
-            includes.to_lowercase().contains("identity") ||
-            includes.to_lowercase().contains("secure"),
-            "Backup includes message should mention security: {}", includes);
+    assert!(
+        includes.to_lowercase().contains("keystore")
+            || includes.to_lowercase().contains("identity")
+            || includes.to_lowercase().contains("secure"),
+        "Backup includes message should mention security: {}",
+        includes
+    );
 }
 
 #[test]
@@ -181,25 +196,28 @@ fn test_compute_task_messages() {
 fn test_missing_key_behavior() {
     // Test that missing keys return the key itself (rust-i18n default behavior)
     let missing = t!("cli.nonexistent.key.that.does.not.exist");
-    assert!(missing.contains("nonexistent") || missing.contains("cli"),
-            "Missing key should return key itself: {}", missing);
+    assert!(
+        missing.contains("nonexistent") || missing.contains("cli"),
+        "Missing key should return key itself: {}",
+        missing
+    );
 }
 
 #[test]
 fn test_fallback_to_english() {
     // rust-i18n falls back to English by default
     // This test verifies the fallback mechanism works
-    
+
     // Save current locale
     let original_locale = rust_i18n::locale();
-    
+
     // Try to set to unsupported locale
     rust_i18n::set_locale("xx-XX");
-    
+
     // Should still get English translations
     let result = t!("cli.trust.add.success");
     assert!(!result.is_empty(), "Should fall back to English");
-    
+
     // Restore original locale
     rust_i18n::set_locale(&original_locale);
 }
@@ -208,14 +226,14 @@ fn test_fallback_to_english() {
 fn test_locale_switching() {
     // Test that we can switch locales (even if only English exists now)
     let original_locale = rust_i18n::locale();
-    
+
     // Set to English explicitly
     rust_i18n::set_locale("en");
     assert_eq!(&*rust_i18n::locale(), "en");
-    
+
     let en_result = t!("cli.trust.add.success");
     assert!(!en_result.is_empty());
-    
+
     // Restore
     rust_i18n::set_locale(&original_locale);
 }
@@ -237,7 +255,7 @@ fn test_all_snapshot_keys() {
         "cli.snapshot.delete.success",
         "cli.snapshot.cleanup.cleaning",
     ];
-    
+
     for key in keys {
         let result = t!(key);
         assert!(!result.is_empty(), "Key {} should not be empty", key);
@@ -249,18 +267,21 @@ fn test_common_prompts() {
     // Test common prompts that appear across multiple commands
     assert!(!t!("cli.prompts.enter_passphrase").is_empty());
     assert!(!t!("cli.common.no_identity").is_empty());
-    
+
     // Verify passphrase prompt makes sense
     let passphrase = t!("cli.prompts.enter_passphrase");
-    assert!(passphrase.to_lowercase().contains("passphrase") ||
-            passphrase.to_lowercase().contains("password"),
-            "Passphrase prompt should mention passphrase: {}", passphrase);
+    assert!(
+        passphrase.to_lowercase().contains("passphrase")
+            || passphrase.to_lowercase().contains("password"),
+        "Passphrase prompt should mention passphrase: {}",
+        passphrase
+    );
 }
 
 #[test]
 fn test_translation_consistency() {
     // Test that similar operations use consistent terminology
-    
+
     // "Success" messages should all indicate success
     let success_keys = vec![
         t!("cli.trust.add.success"),
@@ -272,11 +293,15 @@ fn test_translation_consistency() {
         t!("cli.compute.submit.success"),
         t!("cli.compute.cancel.success"),
     ];
-    
+
     for msg in success_keys {
         assert!(!msg.is_empty(), "Success message should not be empty");
         // Success messages typically are short and positive
-        assert!(msg.len() < 100, "Success message should be concise: {}", msg);
+        assert!(
+            msg.len() < 100,
+            "Success message should be concise: {}",
+            msg
+        );
     }
 }
 
@@ -293,7 +318,7 @@ fn test_label_keys() {
         t!("cli.snapshot.create.filename"),
         t!("cli.backup.output_label"),
     ];
-    
+
     for label in labels {
         assert!(!label.is_empty(), "Label should not be empty: {}", label);
     }

@@ -119,10 +119,18 @@ impl ResponseError for GatewayError {
                 format!("{}: {}", t!("gateway.errors.bad_request_prefix"), reason)
             }
             GatewayError::RateLimitExceeded(did) => {
-                format!("{}: {}", t!("gateway.errors.rate_limit_exceeded_prefix"), did)
+                format!(
+                    "{}: {}",
+                    t!("gateway.errors.rate_limit_exceeded_prefix"),
+                    did
+                )
             }
             GatewayError::BudgetExceeded(reason) => {
-                format!("{}: {}", t!("gateway.errors.budget_exceeded_prefix"), reason)
+                format!(
+                    "{}: {}",
+                    t!("gateway.errors.budget_exceeded_prefix"),
+                    reason
+                )
             }
             GatewayError::ServiceUnavailable(_) => {
                 t!("gateway.errors.service_unavailable").to_string()

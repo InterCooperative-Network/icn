@@ -17,9 +17,12 @@ async fn test_error_messages_use_i18n() {
         .await
         .unwrap();
     let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-    
+
     // Should contain translated message
-    assert!(json["error"].as_str().unwrap().contains("Authentication failed"));
+    assert!(json["error"]
+        .as_str()
+        .unwrap()
+        .contains("Authentication failed"));
     assert!(json["error"].as_str().unwrap().contains("invalid token"));
     assert_eq!(json["code"], "AUTHENTICATION_FAILED");
 }
@@ -32,9 +35,15 @@ async fn test_authorization_failed_translation() {
         .await
         .unwrap();
     let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-    
-    assert!(json["error"].as_str().unwrap().contains("Authorization failed"));
-    assert!(json["error"].as_str().unwrap().contains("insufficient permissions"));
+
+    assert!(json["error"]
+        .as_str()
+        .unwrap()
+        .contains("Authorization failed"));
+    assert!(json["error"]
+        .as_str()
+        .unwrap()
+        .contains("insufficient permissions"));
     assert_eq!(json["code"], "AUTHORIZATION_FAILED");
 }
 
@@ -46,8 +55,11 @@ async fn test_not_found_translation() {
         .await
         .unwrap();
     let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-    
-    assert!(json["error"].as_str().unwrap().contains("Resource not found"));
+
+    assert!(json["error"]
+        .as_str()
+        .unwrap()
+        .contains("Resource not found"));
     assert!(json["error"].as_str().unwrap().contains("user:123"));
     assert_eq!(json["code"], "NOT_FOUND");
 }
@@ -60,8 +72,11 @@ async fn test_rate_limit_translation() {
         .await
         .unwrap();
     let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-    
-    assert!(json["error"].as_str().unwrap().contains("Rate limit exceeded"));
+
+    assert!(json["error"]
+        .as_str()
+        .unwrap()
+        .contains("Rate limit exceeded"));
     assert!(json["error"].as_str().unwrap().contains("did:icn:abc123"));
     assert_eq!(json["code"], "RATE_LIMIT_EXCEEDED");
 }
@@ -75,7 +90,7 @@ async fn test_internal_error_sanitization() {
         .await
         .unwrap();
     let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-    
+
     // Should show generic message, NOT the internal details
     assert_eq!(json["error"], "Internal server error");
     assert!(!json["error"].as_str().unwrap().contains("database"));
@@ -92,7 +107,7 @@ async fn test_service_unavailable_translation() {
         .await
         .unwrap();
     let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-    
+
     assert_eq!(json["error"], "Service temporarily unavailable");
     assert_eq!(json["code"], "SERVICE_UNAVAILABLE");
 }
@@ -105,9 +120,12 @@ async fn test_bad_request_translation() {
         .await
         .unwrap();
     let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-    
+
     assert!(json["error"].as_str().unwrap().contains("Invalid request"));
-    assert!(json["error"].as_str().unwrap().contains("missing field: amount"));
+    assert!(json["error"]
+        .as_str()
+        .unwrap()
+        .contains("missing field: amount"));
     assert_eq!(json["code"], "BAD_REQUEST");
 }
 
@@ -142,9 +160,12 @@ async fn test_forbidden_translation() {
         .await
         .unwrap();
     let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-    
+
     assert!(json["error"].as_str().unwrap().contains("Access forbidden"));
-    assert!(json["error"].as_str().unwrap().contains("admin access required"));
+    assert!(json["error"]
+        .as_str()
+        .unwrap()
+        .contains("admin access required"));
     assert_eq!(json["code"], "FORBIDDEN");
 }
 
@@ -156,9 +177,12 @@ async fn test_budget_exceeded_translation() {
         .await
         .unwrap();
     let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-    
+
     assert!(json["error"].as_str().unwrap().contains("Budget exceeded"));
-    assert!(json["error"].as_str().unwrap().contains("compute budget exhausted"));
+    assert!(json["error"]
+        .as_str()
+        .unwrap()
+        .contains("compute budget exhausted"));
     assert_eq!(json["code"], "BUDGET_EXCEEDED");
 }
 
@@ -173,7 +197,7 @@ async fn test_substrate_error_sanitization() {
         .await
         .unwrap();
     let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-    
+
     // Should show generic message, NOT the internal details
     assert_eq!(json["error"], "Internal server error");
     assert!(!json["error"].as_str().unwrap().contains("trust graph"));
@@ -187,14 +211,14 @@ async fn test_io_error_sanitization() {
     // IoError should NOT expose implementation details
     let err = GatewayError::IoError(std::io::Error::new(
         std::io::ErrorKind::PermissionDenied,
-        "failed to read /etc/secret/config.toml"
+        "failed to read /etc/secret/config.toml",
     ));
     let response = err.error_response();
     let body = actix_web::body::to_bytes(response.into_body())
         .await
         .unwrap();
     let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-    
+
     // Should show generic message, NOT the file paths or details
     assert_eq!(json["error"], "Internal server error");
     assert!(!json["error"].as_str().unwrap().contains("/etc"));
