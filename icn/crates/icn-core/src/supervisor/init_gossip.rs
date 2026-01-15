@@ -267,6 +267,15 @@ pub async fn subscribe_standard_topics(
         } else {
             info!("Subscribed to federation:clearing topic");
         }
+
+        if let Err(e) = gossip
+            .subscribe(icn_federation::TOPIC_FEDERATION_AGREEMENTS, did.clone())
+            .await
+        {
+            warn!("Failed to subscribe to federation:agreements topic: {}", e);
+        } else {
+            info!("Subscribed to federation:agreements topic");
+        }
     }
 }
 
