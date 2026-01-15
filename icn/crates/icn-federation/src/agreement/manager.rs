@@ -85,6 +85,14 @@ pub enum AgreementEvent {
         amendment_id: String,
         new_version: u32,
     },
+
+    /// An amendment was rejected
+    AmendmentRejected {
+        agreement_id: AgreementId,
+        amendment_id: String,
+        rejected_by: Did,
+        reason: Option<String>,
+    },
 }
 
 /// Manager for inter-cooperative agreements
@@ -698,6 +706,64 @@ impl<S: AgreementStoreOps> AgreementManager<S> {
         }
 
         self.store.store_amendment(amendment)?;
+        Ok(amendment.clone())
+    }
+
+    /// Reject an amendment
+    ///
+    /// Any party to the agreement can reject a proposed amendment.
+    /// Once rejected, the amendment cannot be signed or ratified.
+    pub fn reject_amendment(
+        &self,
+        agreement_id: &AgreementId,
+        amendment_id: &str,
+        reason: Option<String>,
+    ) -> Result<Amendment> {
+        let agreement = self.get_agreement_required(agreement_id)?;
+        let mut amendments = self.store.get_amendments(agreement_id)?;
+
+        let amendment = amendments
+            .iter_mut()
+            .find(|a| a.id == amendment_id)
+            .ok_or_else(|| {
+                FederationError::NotFound(format!("Amendment not found: {amendment_id}"))
+            })?;
+
+        if amendment.status != AmendmentStatus::Proposed {
+            return Err(FederationError::InvalidState(
+                "Can only reject proposed amendments".to_string(),
+            ));
+        }
+
+        // Verify caller is a party
+        if !agreement.parties.iter().any(|p| p.did == self.own_did) {
+            return Err(FederationError::Unauthorized(
+                "Only parties can reject amendments".to_string(),
+            ));
+        }
+
+        // Update status to rejected
+        amendment.status = AmendmentStatus::Rejected {
+            rejected_by: self.own_did.clone(),
+            reason: reason.clone(),
+        };
+
+        self.store.store_amendment(amendment)?;
+
+        // Record rejection metric
+        metrics::amendments_rejected_inc();
+
+        self.emit_event(AgreementEvent::AmendmentRejected {
+            agreement_id: agreement_id.clone(),
+            amendment_id: amendment_id.to_string(),
+            rejected_by: self.own_did.clone(),
+            reason,
+        });
+
+        info!(
+            "Rejected amendment {} for agreement {}",
+            amendment_id, agreement_id
+        );
         Ok(amendment.clone())
     }
 

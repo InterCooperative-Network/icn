@@ -107,6 +107,11 @@ pub fn amendments_ratified_inc() {
     counter!("icn_agreement_amendments_ratified_total").increment(1);
 }
 
+/// Increment amendments rejected counter
+pub fn amendments_rejected_inc() {
+    counter!("icn_agreement_amendments_rejected_total").increment(1);
+}
+
 /// Increment agreements suspended counter
 pub fn agreements_suspended_inc() {
     counter!("icn_agreement_suspended_total").increment(1);
