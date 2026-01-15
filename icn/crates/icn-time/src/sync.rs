@@ -542,7 +542,7 @@ mod tests {
     fn test_invalid_timestamp_error() {
         // Test that InvalidTimestamp error can be created and displays correctly
         let err = TimeError::InvalidTimestamp(u64::MAX);
-        let msg = format!("{}", err);
+        let msg = format!("{err}");
         assert!(msg.contains("exceeds safe range"));
         assert!(msg.contains(&u64::MAX.to_string()));
     }
