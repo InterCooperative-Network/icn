@@ -11,6 +11,7 @@ use super::types::{
 use crate::error::{FederationError, Result};
 use crate::types::current_timestamp;
 use icn_identity::{Did, KeyPair};
+use icn_obs::metrics::agreement as metrics;
 use std::sync::Arc;
 use tracing::{debug, info};
 
@@ -143,6 +144,9 @@ impl<S: AgreementStoreOps> AgreementManager<S> {
         );
 
         self.store.store_agreement(&agreement)?;
+
+        // Record metrics
+        metrics::agreements_created_inc(agreement.agreement_type.type_name());
 
         self.emit_event(AgreementEvent::Created {
             agreement_id: agreement.id.clone(),
@@ -279,6 +283,9 @@ impl<S: AgreementStoreOps> AgreementManager<S> {
         agreement.sign(keypair, &self.own_coop_id);
         let remaining = agreement.pending_signers();
 
+        // Record signature metric
+        metrics::agreement_signatures_inc();
+
         self.emit_event(AgreementEvent::Signed {
             agreement_id: agreement.id.clone(),
             signer: self.own_did.clone(),
@@ -288,6 +295,9 @@ impl<S: AgreementStoreOps> AgreementManager<S> {
         // Check if we should auto-activate
         if agreement.try_auto_activate() {
             if let AgreementStatus::Active { activated_at, .. } = &agreement.status {
+                // Record activation metric
+                metrics::agreements_activated_inc();
+
                 self.emit_event(AgreementEvent::Activated {
                     agreement_id: agreement.id.clone(),
                     activated_at: *activated_at,
@@ -346,6 +356,9 @@ impl<S: AgreementStoreOps> AgreementManager<S> {
         agreement.signatures.push(signature.clone());
         let remaining = agreement.pending_signers();
 
+        // Record signature metric
+        metrics::agreement_signatures_inc();
+
         self.emit_event(AgreementEvent::Signed {
             agreement_id: agreement.id.clone(),
             signer: signature.signer.clone(),
@@ -355,6 +368,9 @@ impl<S: AgreementStoreOps> AgreementManager<S> {
         // Check for auto-activation
         if agreement.try_auto_activate() {
             if let AgreementStatus::Active { activated_at, .. } = &agreement.status {
+                // Record activation metric
+                metrics::agreements_activated_inc();
+
                 self.emit_event(AgreementEvent::Activated {
                     agreement_id: agreement.id.clone(),
                     activated_at: *activated_at,
@@ -389,6 +405,9 @@ impl<S: AgreementStoreOps> AgreementManager<S> {
 
         self.store.store_agreement(&agreement)?;
 
+        // Record suspension metric
+        metrics::agreements_suspended_inc();
+
         self.emit_event(AgreementEvent::Suspended {
             agreement_id: agreement.id.clone(),
             suspended_by: self.own_did.clone(),
@@ -408,6 +427,9 @@ impl<S: AgreementStoreOps> AgreementManager<S> {
             .map_err(|e| FederationError::InvalidState(e.to_string()))?;
 
         self.store.store_agreement(&agreement)?;
+
+        // Record resume metric
+        metrics::agreements_resumed_inc();
 
         self.emit_event(AgreementEvent::Resumed {
             agreement_id: agreement.id.clone(),
@@ -438,6 +460,9 @@ impl<S: AgreementStoreOps> AgreementManager<S> {
             .map_err(|e| FederationError::InvalidState(e.to_string()))?;
 
         self.store.store_agreement(&agreement)?;
+
+        // Record termination metric with reason
+        metrics::agreements_terminated_inc(reason.as_str());
 
         self.emit_event(AgreementEvent::Terminated {
             agreement_id: agreement.id.clone(),
@@ -564,6 +589,9 @@ impl<S: AgreementStoreOps> AgreementManager<S> {
 
         self.store.store_amendment(&amendment)?;
 
+        // Record amendment proposed metric
+        metrics::amendments_proposed_inc();
+
         self.emit_event(AgreementEvent::AmendmentProposed {
             agreement_id: agreement_id.clone(),
             amendment_id: amendment.id.clone(),
@@ -654,6 +682,9 @@ impl<S: AgreementStoreOps> AgreementManager<S> {
             updated_agreement.apply_amendment(amendment_clone)?;
             self.store.store_agreement(&updated_agreement)?;
 
+            // Record amendment ratification metric
+            metrics::amendments_ratified_inc();
+
             self.emit_event(AgreementEvent::AmendmentRatified {
                 agreement_id: agreement_id.clone(),
                 amendment_id: amendment_id.to_string(),
@@ -686,6 +717,9 @@ impl<S: AgreementStoreOps> AgreementManager<S> {
                 let mut updated = agreement;
                 if updated.terminate(TerminationReason::Expired).is_ok() {
                     self.store.store_agreement(&updated)?;
+
+                    // Record expiration metric
+                    metrics::agreements_terminated_inc("expired");
 
                     self.emit_event(AgreementEvent::Terminated {
                         agreement_id: updated.id.clone(),
