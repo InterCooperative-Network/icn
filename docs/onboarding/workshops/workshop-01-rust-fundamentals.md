@@ -84,10 +84,12 @@ use anyhow::{Context, Result};
 
 /// Load a config value from environment or return a default
 fn get_config_value(key: &str, default: &str) -> Result<String> {
-    // TODO: Use std::env::var and handle the error
-    // If the var is missing, return the default
-    // If the var exists but is empty, return an error
-    todo!()
+    // EXERCISE: Implement this function (intentional TODO for learners)
+    // Hints:
+    // - Use std::env::var and handle the error
+    // - If the var is missing, return the default
+    // - If the var exists but is empty, return an error
+    todo!("Implement this function")
 }
 
 #[cfg(test)]

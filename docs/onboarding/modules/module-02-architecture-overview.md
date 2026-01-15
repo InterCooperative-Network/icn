@@ -617,7 +617,6 @@ impl Supervisor {
 |--------|---------|
 | `icnd` | The daemon - runs a network node |
 | `icnctl` | CLI - manage identity, interact with node |
-| `icn-console` | Interactive debugging console |
 
 ---
 

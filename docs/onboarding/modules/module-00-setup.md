@@ -57,7 +57,9 @@ web UI for cooperative members.
 |--------|---------|
 | `icnd` | The ICN daemon - runs a node in the network |
 | `icnctl` | CLI tool for managing identity and interacting with nodes |
-| `icn-console` | Interactive console for debugging and exploration |
+
+> **Note**: The workspace also builds `icn-console` (interactive debugging console),
+> but it's not required for normal development.
 
 ## Step-by-Step Setup
 
@@ -97,7 +99,7 @@ cargo test --workspace --lib
 
 ### Step 6: Verify Binaries Exist
 ```bash
-ls -la target/debug/icnd target/debug/icnctl target/debug/icn-console
+ls -la target/debug/icnd target/debug/icnctl
 ```
 
 ### Step 7: Initialize an Identity (Optional)
@@ -115,8 +117,7 @@ icn/                          # Root directory
 │   ├── Cargo.toml            # Workspace manifest
 │   ├── bins/                 # Binary crates
 │   │   ├── icnd/             # Daemon binary
-│   │   ├── icnctl/           # CLI tool
-│   │   └── icn-console/      # Interactive console
+│   │   └── icnctl/           # CLI tool
 │   └── crates/               # Library crates
 │       ├── icn-core/         # Runtime, supervisor, orchestration
 │       ├── icn-identity/     # DID, keystore, key management
