@@ -252,7 +252,7 @@ fn to_domain_agreement_type(req_type: AgreementTypeRequest) -> Result<AgreementT
         AgreementTypeRequest::ResourceSharing {
             resource_type,
             duration_days,
-            compensation_model: _,  // TODO: Parse compensation model from request
+            compensation_model: _, // TODO: Parse compensation model from request
         } => {
             // Parse resource_type string to enum, returning error for unknown values
             let resource_type_enum = match resource_type.as_str() {
@@ -267,7 +267,7 @@ fn to_domain_agreement_type(req_type: AgreementTypeRequest) -> Result<AgreementT
                     )))
                 }
             };
-            
+
             // Use fixed rate compensation model (simplified for MVP)
             // TODO: Parse compensation_model from request once API schema is finalized
             let compensation = CompensationModel::FixedRate {
@@ -379,7 +379,9 @@ fn to_api_summary(agreement: &Agreement) -> AgreementSummary {
 }
 
 /// Convert amendment changes from API to domain
-fn to_domain_amendment_changes(changes: Vec<AmendmentChangeRequest>) -> Result<Vec<AmendmentChange>> {
+fn to_domain_amendment_changes(
+    changes: Vec<AmendmentChangeRequest>,
+) -> Result<Vec<AmendmentChange>> {
     changes
         .into_iter()
         .map(|change| match change {
@@ -402,12 +404,7 @@ fn to_domain_amendment_changes(changes: Vec<AmendmentChangeRequest>) -> Result<V
                     "counterparty" => PartyRole::Counterparty,
                     "witness" => PartyRole::Witness,
                     "guarantor" => PartyRole::Guarantor,
-                    _ => {
-                        return Err(GatewayError::BadRequest(format!(
-                            "Invalid role: {}",
-                            role
-                        )))
-                    }
+                    _ => return Err(GatewayError::BadRequest(format!("Invalid role: {}", role))),
                 };
                 let party = AgreementParty {
                     did: Did::from_str(&did)
@@ -418,12 +415,10 @@ fn to_domain_amendment_changes(changes: Vec<AmendmentChangeRequest>) -> Result<V
                 };
                 Ok(AmendmentChange::AddParty { party })
             }
-            AmendmentChangeRequest::RemoveParty { party_did } => {
-                Ok(AmendmentChange::RemoveParty {
-                    party_did: Did::from_str(&party_did)
-                        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID: {}", e)))?,
-                })
-            }
+            AmendmentChangeRequest::RemoveParty { party_did } => Ok(AmendmentChange::RemoveParty {
+                party_did: Did::from_str(&party_did)
+                    .map_err(|e| GatewayError::BadRequest(format!("Invalid DID: {}", e)))?,
+            }),
         })
         .collect()
 }
@@ -494,10 +489,7 @@ pub async fn list_agreements(
         agreements
     };
 
-    let summaries: Vec<AgreementSummary> = filtered_agreements
-        .iter()
-        .map(to_api_summary)
-        .collect();
+    let summaries: Vec<AgreementSummary> = filtered_agreements.iter().map(to_api_summary).collect();
 
     let response = AgreementListResponse {
         total: summaries.len(),
@@ -657,7 +649,12 @@ pub async fn add_party(
         "counterparty" => PartyRole::Counterparty,
         "witness" => PartyRole::Witness,
         "guarantor" => PartyRole::Guarantor,
-        _ => return Err(GatewayError::BadRequest(format!("Invalid role: {}", req.role))),
+        _ => {
+            return Err(GatewayError::BadRequest(format!(
+                "Invalid role: {}",
+                req.role
+            )))
+        }
     };
 
     // Parse DID
@@ -1016,7 +1013,11 @@ pub async fn propose_amendment(
     let changes = to_domain_amendment_changes(req.changes.clone())?;
 
     let amendment = manager
-        .propose_amendment(&AgreementId(agreement_id.clone()), req.description.clone(), changes)
+        .propose_amendment(
+            &AgreementId(agreement_id.clone()),
+            req.description.clone(),
+            changes,
+        )
         .map_err(|e| GatewayError::BadRequest(format!("Failed to propose amendment: {}", e)))?;
 
     let response = AmendmentResponse {
