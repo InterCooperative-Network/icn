@@ -595,4 +595,138 @@ mod tests {
         let amendments = store.get_amendments(&agreement_id).unwrap();
         assert_eq!(amendments.len(), 2);
     }
+
+    #[test]
+    fn test_persistent_store_crud() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let store_path = temp_dir.path().join("agreements");
+
+        let sled_store: Arc<dyn Store> = Arc::new(icn_store::SledStore::open(&store_path).unwrap());
+        let store = AgreementStore::new(sled_store);
+
+        // Create
+        let agreement = create_test_agreement();
+        let id = agreement.id.clone();
+        store.store_agreement(&agreement).unwrap();
+
+        // Read
+        let loaded = store.get_agreement(&id).unwrap();
+        assert!(loaded.is_some());
+        assert_eq!(loaded.unwrap().title, "Test Agreement");
+
+        // List
+        let all = store.list_agreements().unwrap();
+        assert_eq!(all.len(), 1);
+
+        // Delete
+        store.delete_agreement(&id).unwrap();
+        assert!(store.get_agreement(&id).unwrap().is_none());
+    }
+
+    #[test]
+    fn test_persistent_store_survives_restart() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let store_path = temp_dir.path().join("agreements");
+
+        // First "session" - create and store agreement
+        let agreement_id;
+        let party_did;
+        {
+            let sled_store: Arc<dyn Store> =
+                Arc::new(icn_store::SledStore::open(&store_path).unwrap());
+            let store = AgreementStore::new(sled_store);
+
+            let proposer = test_did();
+            party_did = proposer.clone();
+            let counterparty = test_did();
+
+            let agreement = Agreement::new(
+                "Persistent Agreement",
+                "This should survive restart",
+                AgreementType::Credit {
+                    credit_limit: 10000,
+                    interest_rate_bps: 500,
+                    currency: "ICN".to_string(),
+                },
+            )
+            .with_party(proposer, "coop-persisted", PartyRole::Proposer)
+            .with_party(counterparty, "coop-other", PartyRole::Counterparty);
+
+            agreement_id = agreement.id.clone();
+            store.store_agreement(&agreement).unwrap();
+
+            // Verify it's stored
+            assert!(store.get_agreement(&agreement_id).unwrap().is_some());
+        }
+        // Store is dropped here, simulating daemon shutdown
+
+        // Second "session" - reopen and verify data persists
+        {
+            let sled_store: Arc<dyn Store> =
+                Arc::new(icn_store::SledStore::open(&store_path).unwrap());
+            let store = AgreementStore::new(sled_store);
+
+            // Agreement should still exist
+            let loaded = store.get_agreement(&agreement_id).unwrap();
+            assert!(loaded.is_some(), "Agreement should persist across restart");
+
+            let agreement = loaded.unwrap();
+            assert_eq!(agreement.title, "Persistent Agreement");
+            assert_eq!(agreement.description, "This should survive restart");
+
+            // Party index should also persist
+            let party_agreements = store.list_agreements_for_party(&party_did).unwrap();
+            assert_eq!(party_agreements.len(), 1);
+            assert_eq!(party_agreements[0].id, agreement_id);
+
+            // List should return the agreement
+            let all = store.list_agreements().unwrap();
+            assert_eq!(all.len(), 1);
+        }
+    }
+
+    #[test]
+    fn test_persistent_store_amendments_survive_restart() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let store_path = temp_dir.path().join("agreements");
+
+        let agreement_id;
+        let amendment_id;
+
+        // First session - create agreement and amendment
+        {
+            let sled_store: Arc<dyn Store> =
+                Arc::new(icn_store::SledStore::open(&store_path).unwrap());
+            let store = AgreementStore::new(sled_store);
+
+            let agreement = create_test_agreement();
+            agreement_id = agreement.id.clone();
+            store.store_agreement(&agreement).unwrap();
+
+            let amendment =
+                Amendment::new(agreement_id.clone(), "Persistent amendment", test_did());
+            amendment_id = amendment.id.clone();
+            store.store_amendment(&amendment).unwrap();
+
+            // Verify
+            let amendments = store.get_amendments(&agreement_id).unwrap();
+            assert_eq!(amendments.len(), 1);
+        }
+
+        // Second session - verify amendments persist
+        {
+            let sled_store: Arc<dyn Store> =
+                Arc::new(icn_store::SledStore::open(&store_path).unwrap());
+            let store = AgreementStore::new(sled_store);
+
+            let amendments = store.get_amendments(&agreement_id).unwrap();
+            assert_eq!(
+                amendments.len(),
+                1,
+                "Amendment should persist across restart"
+            );
+            assert_eq!(amendments[0].id, amendment_id);
+            assert_eq!(amendments[0].description, "Persistent amendment");
+        }
+    }
 }
