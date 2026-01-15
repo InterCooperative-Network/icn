@@ -1,4 +1,3 @@
-#![allow(unused_variables)]
 #![allow(clippy::unwrap_used)]
 //! Integration tests for agreement workflows
 //!
@@ -11,7 +10,15 @@
 //! - Multi-party: 3+ cooperatives must all sign
 //! - Permission checks: unauthorized operations fail
 //!
-//! Note: Cross-node gossip sync tests are blocked on #655 (AgreementGossipHandler wiring)
+//! ## Running Tests
+//! ```sh
+//! cargo test -p icn-federation --test agreement_integration
+//! cargo test -p icn-federation test_trade_agreement_happy_path
+//! ```
+//!
+//! ## Related Issues
+//! - Closes #656
+//! - Cross-node gossip sync tests blocked on #655 (AgreementGossipHandler wiring)
 
 use icn_federation::agreement::{
     AgreementManager, AgreementParty, AgreementStatus, AgreementType, AmendmentChange,
@@ -113,7 +120,7 @@ fn test_trade_agreement_happy_path() {
 
 #[test]
 fn test_credit_line_agreement_happy_path() {
-    let (lender, lender_keypair, store) = create_manager("lender-coop");
+    let (lender, _lender_keypair, store) = create_manager("lender-coop");
     let (borrower, borrower_keypair) = create_manager_with_store("borrower-coop", store);
 
     // Create credit line agreement
@@ -211,7 +218,7 @@ fn test_agreement_rejection() {
 
 #[test]
 fn test_reject_after_partial_signatures() {
-    let (coop_a, keypair_a, store) = create_manager("coop-a");
+    let (coop_a, _keypair_a, store) = create_manager("coop-a");
     let (coop_b, keypair_b) = create_manager_with_store("coop-b", store.clone());
     let (coop_c, keypair_c) = create_manager_with_store("coop-c", store);
 
@@ -261,7 +268,7 @@ fn test_reject_after_partial_signatures() {
 
 #[test]
 fn test_agreement_amendment() {
-    let (coop_a, keypair_a, store) = create_manager("coop-a");
+    let (coop_a, _keypair_a, store) = create_manager("coop-a");
     let (coop_b, keypair_b) = create_manager_with_store("coop-b", store);
 
     // Create and activate agreement
@@ -332,7 +339,7 @@ fn test_agreement_amendment() {
 
 #[test]
 fn test_agreement_suspension_and_resumption() {
-    let (coop_a, keypair_a, store) = create_manager("coop-a");
+    let (coop_a, _keypair_a, store) = create_manager("coop-a");
     let (coop_b, keypair_b) = create_manager_with_store("coop-b", store);
 
     // Create and activate agreement
@@ -387,7 +394,7 @@ fn test_agreement_suspension_and_resumption() {
 
 #[test]
 fn test_agreement_termination() {
-    let (coop_a, keypair_a, store) = create_manager("coop-a");
+    let (coop_a, _keypair_a, store) = create_manager("coop-a");
     let (coop_b, keypair_b) = create_manager_with_store("coop-b", store);
 
     // Create and activate
@@ -440,14 +447,14 @@ fn test_termination_reasons() {
     let (coop_a, keypair_a, store) = create_manager("coop-a");
     let (coop_b, keypair_b) = create_manager_with_store("coop-b", store);
 
-    // Create keypairs for breach test
-    let breach_did = keypair_a.did().clone();
+    // Use coop-a's DID as the breaching party for the breach termination test
+    let breaching_party_did = keypair_a.did().clone();
 
-    // Test different termination reasons
+    // Test different termination reasons (creates a new agreement for each)
     let reasons = vec![
         TerminationReason::MutualConsent { explanation: None },
         TerminationReason::Breach {
-            breaching_party: breach_did.clone(),
+            breaching_party: breaching_party_did.clone(),
             breach_description: "Contract violation".to_string(),
         },
         TerminationReason::Expired,
@@ -515,7 +522,7 @@ fn test_termination_reasons() {
 
 #[test]
 fn test_three_party_agreement() {
-    let (coop_a, keypair_a, store) = create_manager("coop-a");
+    let (coop_a, _keypair_a, store) = create_manager("coop-a");
     let (coop_b, keypair_b) = create_manager_with_store("coop-b", store.clone());
     let (coop_c, keypair_c) = create_manager_with_store("coop-c", store);
 
@@ -582,7 +589,7 @@ fn test_three_party_agreement() {
 #[test]
 fn test_only_parties_can_sign() {
     let (proposer, _, store) = create_manager("proposer-coop");
-    let (counterparty, counterparty_keypair) =
+    let (_counterparty, counterparty_keypair) =
         create_manager_with_store("counterparty-coop", store.clone());
     let (outsider, _) = create_manager_with_store("outsider-coop", store);
 
@@ -650,8 +657,8 @@ fn test_only_proposer_can_propose() {
 
 #[test]
 fn test_cannot_sign_twice() {
-    let (coop_a, keypair_a, store) = create_manager("coop-a");
-    let (coop_b, keypair_b) = create_manager_with_store("coop-b", store);
+    let (coop_a, _keypair_a, store) = create_manager("coop-a");
+    let (_coop_b, keypair_b) = create_manager_with_store("coop-b", store);
 
     let agreement = coop_a
         .create_draft(
@@ -681,7 +688,7 @@ fn test_cannot_sign_twice() {
 
 #[test]
 fn test_only_parties_can_suspend() {
-    let (coop_a, keypair_a, store) = create_manager("coop-a");
+    let (coop_a, _keypair_a, store) = create_manager("coop-a");
     let (coop_b, keypair_b) = create_manager_with_store("coop-b", store.clone());
     let (outsider, _) = create_manager_with_store("outsider-coop", store);
 
@@ -714,7 +721,7 @@ fn test_only_parties_can_suspend() {
 
 #[test]
 fn test_only_parties_can_terminate() {
-    let (coop_a, keypair_a, store) = create_manager("coop-a");
+    let (coop_a, _keypair_a, store) = create_manager("coop-a");
     let (coop_b, keypair_b) = create_manager_with_store("coop-b", store.clone());
     let (outsider, _) = create_manager_with_store("outsider-coop", store);
 
@@ -754,8 +761,8 @@ fn test_only_parties_can_terminate() {
 
 #[test]
 fn test_cannot_sign_draft() {
-    let (coop_a, keypair_a, store) = create_manager("coop-a");
-    let (coop_b, keypair_b) = create_manager_with_store("coop-b", store);
+    let (coop_a, _keypair_a, store) = create_manager("coop-a");
+    let (_coop_b, keypair_b) = create_manager_with_store("coop-b", store);
 
     let agreement = coop_a
         .create_draft(
