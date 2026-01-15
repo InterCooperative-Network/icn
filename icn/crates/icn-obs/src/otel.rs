@@ -7,8 +7,8 @@ use anyhow::{Context, Result};
 use opentelemetry::trace::TracerProvider as _;
 use opentelemetry::KeyValue;
 use opentelemetry_otlp::WithExportConfig;
-use opentelemetry_sdk::trace::{RandomIdGenerator, Sampler, TracerProvider};
-use opentelemetry_sdk::{runtime, Resource};
+use opentelemetry_sdk::trace::{RandomIdGenerator, Sampler, SdkTracerProvider};
+use opentelemetry_sdk::Resource;
 use serde::{Deserialize, Serialize};
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::layer::SubscriberExt;
@@ -70,7 +70,7 @@ impl Default for TracingConfig {
 }
 
 /// Global tracer provider handle for shutdown
-static TRACER_PROVIDER: std::sync::OnceLock<TracerProvider> = std::sync::OnceLock::new();
+static TRACER_PROVIDER: std::sync::OnceLock<SdkTracerProvider> = std::sync::OnceLock::new();
 
 /// Initialize distributed tracing with OpenTelemetry
 ///
@@ -102,9 +102,9 @@ pub fn init_tracing(config: &TracingConfig) -> Result<()> {
         resource_attrs.push(KeyValue::new("node.did", did.clone()));
     }
 
-    let resource = Resource::new(resource_attrs);
+    let resource = Resource::builder().with_attributes(resource_attrs).build();
 
-    // Configure the OTLP exporter
+    // Configure the OTLP exporter with tonic transport
     let exporter = opentelemetry_otlp::SpanExporter::builder()
         .with_tonic()
         .with_endpoint(&config.otlp_endpoint)
@@ -120,8 +120,8 @@ pub fn init_tracing(config: &TracingConfig) -> Result<()> {
         Sampler::TraceIdRatioBased(config.sampling_rate)
     };
 
-    let provider = TracerProvider::builder()
-        .with_batch_exporter(exporter, runtime::Tokio)
+    let provider = SdkTracerProvider::builder()
+        .with_batch_exporter(exporter)
         .with_sampler(sampler)
         .with_id_generator(RandomIdGenerator::default())
         .with_resource(resource)
