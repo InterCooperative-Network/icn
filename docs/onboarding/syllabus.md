@@ -19,6 +19,7 @@ Time estimates are per module. Total target: 3-6 weeks.
 | 8 | Web UI integration | 1 day | 0.5 day |
 | 9 | Operations and deployment | 1-2 days | 1 day |
 | 10 | Contributor workflow | 1 day | 0.5 day |
+| 11 | Federation (advanced) | 2 days | 1 day |
 
 ## Weekly pacing examples
 

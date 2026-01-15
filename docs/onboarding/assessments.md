@@ -47,3 +47,8 @@ and practical. Use them as self-checks or as review prompts.
 ## Module 10
 - Describe the test strategy and when to run which tests.
 - Outline the PR checklist for contributors.
+
+## Module 11 (Advanced)
+- Explain the agreement lifecycle states and transitions.
+- Describe how bilateral clearing reduces settlement transactions.
+- List three types of inter-cooperative agreements and their purposes.
