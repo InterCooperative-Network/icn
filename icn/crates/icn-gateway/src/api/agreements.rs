@@ -252,20 +252,26 @@ fn to_domain_agreement_type(req_type: AgreementTypeRequest) -> Result<AgreementT
         AgreementTypeRequest::ResourceSharing {
             resource_type,
             duration_days,
-            compensation_model: _,  // TODO: Parse compensation model
+            compensation_model: _,  // TODO: Parse compensation model from request
         } => {
-            // Parse resource_type string to enum
+            // Parse resource_type string to enum, returning error for unknown values
             let resource_type_enum = match resource_type.as_str() {
                 "equipment" => ResourceType::Equipment,
                 "facility" => ResourceType::Facility,
                 "compute" => ResourceType::Compute,
                 "storage" => ResourceType::Storage,
-                _ => ResourceType::Equipment, // Default
+                _ => {
+                    return Err(GatewayError::BadRequest(format!(
+                        "Invalid resource_type '{}'. Expected one of: equipment, facility, compute, storage",
+                        resource_type
+                    )))
+                }
             };
             
-            // Use fixed rate compensation model (simplified)
+            // Use fixed rate compensation model (simplified for MVP)
+            // TODO: Parse compensation_model from request once API schema is finalized
             let compensation = CompensationModel::FixedRate {
-                amount: 0, // TODO: Extract from compensation_model string
+                amount: 0,
                 currency: "USD".to_string(),
                 period_days: 30,
             };
@@ -382,8 +388,11 @@ fn to_domain_amendment_changes(changes: Vec<AmendmentChangeRequest>) -> Result<V
             }
             AmendmentChangeRequest::UpdateTerm { field, new_value } => {
                 Ok(AmendmentChange::UpdateTerm {
-                    field,
-                    old_value: String::new(), // TODO: Fetch from current agreement
+                    field: field.clone(),
+                    // NOTE: Ideally old_value should be populated from the current agreement terms.
+                    // At this API layer we don't have access to that state yet, so we record
+                    // that the previous value was unavailable for this field.
+                    old_value: format!("<unavailable: previous value for field '{}'>", field),
                     new_value,
                 })
             }
@@ -419,6 +428,16 @@ fn to_domain_amendment_changes(changes: Vec<AmendmentChangeRequest>) -> Result<V
         .collect()
 }
 
+/// Helper to extract AgreementManager from web::Data
+fn get_manager(
+    agreement_mgr: &web::Data<Option<icn_federation::agreement::AgreementManagerHandle>>,
+) -> Result<&icn_federation::agreement::AgreementManagerHandle> {
+    agreement_mgr
+        .as_ref()
+        .as_ref()
+        .ok_or_else(|| GatewayError::ServiceUnavailable("Agreement manager not configured".into()))
+}
+
 // ============================================================================
 // API Endpoints
 // ============================================================================
@@ -450,10 +469,7 @@ pub async fn list_agreements(
     let _claims = get_claims(&http_req)
         .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
 
-    let manager = agreement_mgr
-        .as_ref()
-        .as_ref()
-        .ok_or_else(|| GatewayError::ServiceUnavailable("Agreement manager not configured".into()))?;
+    let manager = get_manager(&agreement_mgr)?;
 
     // Get agreements based on query filters
     let agreements = if let Some(status) = &query.status {
@@ -522,10 +538,7 @@ pub async fn create_agreement(
     let _claims = get_claims(&http_req)
         .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
 
-    let manager = agreement_mgr
-        .as_ref()
-        .as_ref()
-        .ok_or_else(|| GatewayError::ServiceUnavailable("Agreement manager not configured".into()))?;
+    let manager = get_manager(&agreement_mgr)?;
 
     // Convert API types to domain types
     let agreement_type = to_domain_agreement_type(req.agreement_type.clone())?;
@@ -564,10 +577,7 @@ pub async fn get_agreement(
 
     let agreement_id = path.into_inner();
 
-    let manager = agreement_mgr
-        .as_ref()
-        .as_ref()
-        .ok_or_else(|| GatewayError::ServiceUnavailable("Agreement manager not configured".into()))?;
+    let manager = get_manager(&agreement_mgr)?;
 
     let agreement = manager
         .get_agreement(&AgreementId(agreement_id.clone()))
@@ -603,10 +613,7 @@ pub async fn delete_agreement(
 
     let agreement_id = path.into_inner();
 
-    let manager = agreement_mgr
-        .as_ref()
-        .as_ref()
-        .ok_or_else(|| GatewayError::ServiceUnavailable("Agreement manager not configured".into()))?;
+    let manager = get_manager(&agreement_mgr)?;
 
     manager
         .delete_draft(&AgreementId(agreement_id.clone()))
@@ -642,10 +649,7 @@ pub async fn add_party(
 
     let agreement_id = path.into_inner();
 
-    let manager = agreement_mgr
-        .as_ref()
-        .as_ref()
-        .ok_or_else(|| GatewayError::ServiceUnavailable("Agreement manager not configured".into()))?;
+    let manager = get_manager(&agreement_mgr)?;
 
     // Parse role
     let role = match req.role.as_str() {
@@ -702,10 +706,7 @@ pub async fn set_terms(
 
     let agreement_id = path.into_inner();
 
-    let manager = agreement_mgr
-        .as_ref()
-        .as_ref()
-        .ok_or_else(|| GatewayError::ServiceUnavailable("Agreement manager not configured".into()))?;
+    let manager = get_manager(&agreement_mgr)?;
 
     // Build terms object
     let terms = AgreementTerms {
@@ -750,10 +751,7 @@ pub async fn propose_agreement(
 
     let agreement_id = path.into_inner();
 
-    let manager = agreement_mgr
-        .as_ref()
-        .as_ref()
-        .ok_or_else(|| GatewayError::ServiceUnavailable("Agreement manager not configured".into()))?;
+    let manager = get_manager(&agreement_mgr)?;
 
     let agreement = manager
         .propose(&AgreementId(agreement_id.clone()))
@@ -787,10 +785,7 @@ pub async fn sign_agreement(
 
     let agreement_id = path.into_inner();
 
-    let manager = agreement_mgr
-        .as_ref()
-        .as_ref()
-        .ok_or_else(|| GatewayError::ServiceUnavailable("Agreement manager not configured".into()))?;
+    let manager = get_manager(&agreement_mgr)?;
 
     let agreement = manager
         .sign(&AgreementId(agreement_id.clone()))
@@ -826,10 +821,7 @@ pub async fn suspend_agreement(
 
     let agreement_id = path.into_inner();
 
-    let manager = agreement_mgr
-        .as_ref()
-        .as_ref()
-        .ok_or_else(|| GatewayError::ServiceUnavailable("Agreement manager not configured".into()))?;
+    let manager = get_manager(&agreement_mgr)?;
 
     let agreement = manager
         .suspend(&AgreementId(agreement_id.clone()), req.reason.clone())
@@ -863,10 +855,7 @@ pub async fn resume_agreement(
 
     let agreement_id = path.into_inner();
 
-    let manager = agreement_mgr
-        .as_ref()
-        .as_ref()
-        .ok_or_else(|| GatewayError::ServiceUnavailable("Agreement manager not configured".into()))?;
+    let manager = get_manager(&agreement_mgr)?;
 
     let agreement = manager
         .resume(&AgreementId(agreement_id.clone()))
@@ -902,10 +891,7 @@ pub async fn terminate_agreement(
 
     let agreement_id = path.into_inner();
 
-    let manager = agreement_mgr
-        .as_ref()
-        .as_ref()
-        .ok_or_else(|| GatewayError::ServiceUnavailable("Agreement manager not configured".into()))?;
+    let manager = get_manager(&agreement_mgr)?;
 
     // Parse termination reason
     let reason = match req.reason_type.as_str() {
@@ -913,16 +899,22 @@ pub async fn terminate_agreement(
         "mutual_consent" => TerminationReason::MutualConsent {
             explanation: req.details.clone(),
         },
-        "breach" => TerminationReason::Breach {
-            breaching_party: Did::from_str("did:icn:placeholder")
-                .map_err(|e| GatewayError::InternalError(format!("Invalid DID: {}", e)))?,  // TODO: Get from request
-            breach_description: req.details.clone().unwrap_or_default(),
-        },
-        "withdrawal" => TerminationReason::Withdrawal {
-            withdrawing_party: Did::from_str("did:icn:placeholder")
-                .map_err(|e| GatewayError::InternalError(format!("Invalid DID: {}", e)))?, // TODO: Get from claims
-            notice_days: 0, // TODO: Extract from request
-        },
+        "breach" => {
+            // Breach termination requires breaching_party DID which isn't yet part of the API
+            return Err(GatewayError::BadRequest(
+                "Breach termination requires an explicit breaching_party DID; \
+                 this is not yet supported. Please add breaching_party to TerminateRequest."
+                    .into(),
+            ));
+        }
+        "withdrawal" => {
+            // Withdrawal requires withdrawing_party DID (from claims) and notice_days
+            return Err(GatewayError::BadRequest(
+                "Withdrawal termination requires withdrawing_party DID and notice terms; \
+                 this is not yet supported. Please add notice_days to TerminateRequest."
+                    .into(),
+            ));
+        }
         "force_majeure" => TerminationReason::ForceMajeure {
             description: req.details.clone().unwrap_or_default(),
         },
@@ -969,10 +961,7 @@ pub async fn list_amendments(
 
     let agreement_id = path.into_inner();
 
-    let manager = agreement_mgr
-        .as_ref()
-        .as_ref()
-        .ok_or_else(|| GatewayError::ServiceUnavailable("Agreement manager not configured".into()))?;
+    let manager = get_manager(&agreement_mgr)?;
 
     let amendments = manager
         .get_amendments(&AgreementId(agreement_id.clone()))
@@ -1021,10 +1010,7 @@ pub async fn propose_amendment(
 
     let agreement_id = path.into_inner();
 
-    let manager = agreement_mgr
-        .as_ref()
-        .as_ref()
-        .ok_or_else(|| GatewayError::ServiceUnavailable("Agreement manager not configured".into()))?;
+    let manager = get_manager(&agreement_mgr)?;
 
     // Convert changes
     let changes = to_domain_amendment_changes(req.changes.clone())?;
@@ -1072,10 +1058,7 @@ pub async fn sign_amendment(
 
     let (agreement_id, amendment_id) = path.into_inner();
 
-    let manager = agreement_mgr
-        .as_ref()
-        .as_ref()
-        .ok_or_else(|| GatewayError::ServiceUnavailable("Agreement manager not configured".into()))?;
+    let manager = get_manager(&agreement_mgr)?;
 
     let amendment = manager
         .sign_amendment(&AgreementId(agreement_id.clone()), &amendment_id)
