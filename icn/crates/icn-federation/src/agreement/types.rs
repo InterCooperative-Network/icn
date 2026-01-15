@@ -377,6 +377,19 @@ pub enum TerminationReason {
     },
 }
 
+impl TerminationReason {
+    /// Get the reason as a string for metrics/logging
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            TerminationReason::Expired => "expired",
+            TerminationReason::MutualConsent { .. } => "mutual_consent",
+            TerminationReason::Breach { .. } => "breach",
+            TerminationReason::Withdrawal { .. } => "withdrawal",
+            TerminationReason::ForceMajeure { .. } => "force_majeure",
+        }
+    }
+}
+
 /// Role of a party in an agreement
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
