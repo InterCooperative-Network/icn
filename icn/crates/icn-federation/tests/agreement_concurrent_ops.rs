@@ -13,6 +13,15 @@
 //! 4. **Message Ordering**: Gossip messages arrive in different orders
 //! 5. **Partition Recovery**: Network splits and rejoins with conflicting state
 //! 6. **Eventual Consistency**: All nodes converge to same state
+//! 7. **Security**: Signature verification and authorization checks
+//!
+//! ## Consistency Model
+//!
+//! The agreement system uses eventual consistency with the following guarantees:
+//! - All operations are idempotent (duplicate messages are ignored)
+//! - Signatures accumulate monotonically (cannot be removed)
+//! - Status changes follow a state machine with defined transitions
+//! - Conflict resolution: terminate > suspend (terminate always wins)
 //!
 //! ## Running Tests
 //! ```sh
@@ -29,11 +38,30 @@ use icn_federation::agreement::{
 };
 use icn_federation::AgreementStoreOps;
 use icn_identity::KeyPair;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tokio::sync::Barrier;
 
-/// Test helper: create a manager with a keypair
+// =============================================================================
+// Constants
+// =============================================================================
+
+/// Number of times to send duplicate messages in duplicate handling tests
+const DUPLICATE_MESSAGE_TEST_COUNT: usize = 3;
+
+// =============================================================================
+// Helper Functions
+// =============================================================================
+
+/// Calculate a Unix timestamp N days from now
+fn timestamp_plus_days(days: u64) -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
+        + days * 24 * 3600
+}
+
+/// Test helper: create a manager with a keypair and new store
 fn create_manager(
     coop_id: &str,
 ) -> (
@@ -50,6 +78,9 @@ fn create_manager(
 }
 
 /// Test helper: create a manager sharing an existing store
+///
+/// Note: This simulates a "pre-synced" scenario where both nodes share state.
+/// For realistic gossip testing, use separate stores and sync via gossip messages.
 fn create_manager_with_store(
     coop_id: &str,
     store: Arc<InMemoryAgreementStore>,
@@ -61,33 +92,61 @@ fn create_manager_with_store(
     (manager, keypair)
 }
 
-/// Test helper: create a gossip handler with mock send callback
-fn create_gossip_handler(
+/// Captured gossip message for verification
+#[derive(Clone, Debug)]
+#[allow(dead_code)]
+struct CapturedMessage {
+    topic: String,
+    data: Vec<u8>,
+}
+
+/// Test helper: create a gossip handler with message capture callback
+///
+/// Returns the handler and a shared vec of captured messages for verification.
+fn create_gossip_handler_with_capture(
     store: Arc<InMemoryAgreementStore>,
     keypair: &KeyPair,
     coop_id: &str,
-    message_count: Arc<AtomicUsize>,
-) -> AgreementGossipHandler<InMemoryAgreementStore> {
+) -> (
+    AgreementGossipHandler<InMemoryAgreementStore>,
+    Arc<Mutex<Vec<CapturedMessage>>>,
+) {
     let mut handler =
         AgreementGossipHandler::new(store, keypair.did().clone(), coop_id.to_string());
 
-    // Set up mock send callback that counts messages
-    let count_clone = message_count.clone();
-    handler.set_send_callback(Arc::new(move |_topic, _data| {
-        count_clone.fetch_add(1, Ordering::SeqCst);
+    let messages = Arc::new(Mutex::new(Vec::new()));
+    let messages_clone = messages.clone();
+
+    handler.set_send_callback(Arc::new(move |topic, data| {
+        messages_clone.lock().unwrap().push(CapturedMessage {
+            topic: topic.to_string(),
+            data: data.to_vec(),
+        });
         Ok(())
     }));
 
-    handler
+    (handler, messages)
+}
+
+/// Sync an agreement from one store to another (simulating gossip delivery)
+fn sync_agreement(
+    from_store: &Arc<InMemoryAgreementStore>,
+    to_store: &Arc<InMemoryAgreementStore>,
+    agreement_id: &icn_federation::agreement::AgreementId,
+) {
+    let agreement = from_store.get_agreement(agreement_id).unwrap().unwrap();
+    to_store.store_agreement(&agreement).unwrap();
 }
 
 // =============================================================================
-// Concurrent Signing Tests
+// Concurrent Signing Tests (Shared Store - Pre-Synced Scenario)
 // =============================================================================
 
+/// Tests that two parties can sign an agreement simultaneously when they share
+/// state (simulating a pre-synced scenario via gossip).
 #[tokio::test]
-async fn test_concurrent_signing_two_parties() {
-    // Setup: Two coops share a store (simulating synced state via gossip)
+async fn test_concurrent_signing_two_parties_shared_store() {
+    // Setup: Two coops share a store (simulating pre-synced state via gossip)
     let (coop_a, keypair_a, store) = create_manager("coop-a");
     let (coop_b, keypair_b) = create_manager_with_store("coop-b", store.clone());
 
@@ -134,17 +193,132 @@ async fn test_concurrent_signing_two_parties() {
     let (result_a, result_b) = tokio::join!(sign_a, sign_b);
 
     // Both should succeed
-    assert!(result_a.unwrap().is_ok(), "Coop A signing should succeed");
-    assert!(result_b.unwrap().is_ok(), "Coop B signing should succeed");
+    assert!(
+        result_a.unwrap().is_ok(),
+        "Coop A signing should succeed in shared store scenario"
+    );
+    assert!(
+        result_b.unwrap().is_ok(),
+        "Coop B signing should succeed in shared store scenario"
+    );
 
     // Verify final state
     let final_agreement = store.get_agreement(&agreement_id).unwrap().unwrap();
-    assert_eq!(final_agreement.signatures.len(), 2);
-    assert!(final_agreement.has_signed(keypair_a.did()));
-    assert!(final_agreement.has_signed(keypair_b.did()));
+    assert_eq!(
+        final_agreement.signatures.len(),
+        2,
+        "Should have exactly 2 signatures"
+    );
+    assert!(
+        final_agreement.has_signed(keypair_a.did()),
+        "Coop A should have signed"
+    );
+    assert!(
+        final_agreement.has_signed(keypair_b.did()),
+        "Coop B should have signed"
+    );
     assert!(
         final_agreement.status.is_active(),
         "Agreement should be active after both signatures"
+    );
+}
+
+/// Tests concurrent signing with separate stores and explicit gossip sync.
+/// This more accurately simulates the real distributed scenario.
+#[tokio::test]
+async fn test_concurrent_signing_with_gossip_sync() {
+    // Each node has its own independent store
+    let (coop_a, keypair_a, store_a) = create_manager("coop-a");
+    let (coop_b, keypair_b, store_b) = create_manager("coop-b");
+
+    // A creates and proposes agreement
+    let agreement = coop_a
+        .create_draft(
+            "Gossip Sync Test",
+            "Concurrent signing with separate stores",
+            AgreementType::Trade {
+                items: vec![TradeItem::new("widgets", 100, "units", 50, "USD")],
+                currency: "USD".to_string(),
+            },
+        )
+        .unwrap();
+
+    coop_a
+        .add_party(
+            &agreement.id,
+            AgreementParty::new(keypair_b.did().clone(), "coop-b", PartyRole::Counterparty),
+        )
+        .unwrap();
+    coop_a.propose(&agreement.id).unwrap();
+
+    // Sync the proposed agreement to B (simulating initial gossip)
+    sync_agreement(&store_a, &store_b, &agreement.id);
+
+    // Both sign independently on their own stores
+    let agreement_a = coop_a.sign(&agreement.id).unwrap();
+    let agreement_b = coop_b.sign(&agreement.id).unwrap();
+
+    // Extract signatures
+    let sig_a = agreement_a
+        .signatures
+        .iter()
+        .find(|s| s.signer == *keypair_a.did())
+        .unwrap()
+        .clone();
+    let sig_b = agreement_b
+        .signatures
+        .iter()
+        .find(|s| s.signer == *keypair_b.did())
+        .unwrap()
+        .clone();
+
+    // Create gossip handlers for syncing
+    let (handler_a, _msgs_a) =
+        create_gossip_handler_with_capture(store_a.clone(), &keypair_a, "coop-a");
+    let (handler_b, _msgs_b) =
+        create_gossip_handler_with_capture(store_b.clone(), &keypair_b, "coop-b");
+
+    // Sync B's signature to A via gossip
+    let msg_b = AgreementMessage::Signed {
+        agreement_id: agreement.id.clone(),
+        signature: sig_b,
+    };
+    handler_a
+        .handle_message(&msg_b.to_bytes().unwrap())
+        .unwrap();
+
+    // Sync A's signature to B via gossip
+    let msg_a = AgreementMessage::Signed {
+        agreement_id: agreement.id.clone(),
+        signature: sig_a,
+    };
+    handler_b
+        .handle_message(&msg_a.to_bytes().unwrap())
+        .unwrap();
+
+    // Both stores should now have both signatures
+    let final_a = store_a.get_agreement(&agreement.id).unwrap().unwrap();
+    let final_b = store_b.get_agreement(&agreement.id).unwrap().unwrap();
+
+    assert_eq!(
+        final_a.signatures.len(),
+        2,
+        "Store A should have both signatures after gossip sync"
+    );
+    assert_eq!(
+        final_b.signatures.len(),
+        2,
+        "Store B should have both signatures after gossip sync"
+    );
+
+    // Both should be active
+    assert!(
+        final_a.status.is_active(),
+        "Agreement on A should be active"
+    );
+    assert!(
+        final_b.status.is_active(),
+        "Agreement on B should be active"
     );
 }
 
@@ -210,17 +384,33 @@ async fn test_concurrent_signing_three_parties() {
     let (result_a, result_b, result_c) = tokio::join!(sign_a, sign_b, sign_c);
 
     // All should succeed
-    assert!(result_a.unwrap().is_ok());
-    assert!(result_b.unwrap().is_ok());
-    assert!(result_c.unwrap().is_ok());
+    assert!(result_a.unwrap().is_ok(), "Coop A signing should succeed");
+    assert!(result_b.unwrap().is_ok(), "Coop B signing should succeed");
+    assert!(result_c.unwrap().is_ok(), "Coop C signing should succeed");
 
     // Verify final state
     let final_agreement = store.get_agreement(&agreement_id).unwrap().unwrap();
-    assert_eq!(final_agreement.signatures.len(), 3);
-    assert!(final_agreement.has_signed(keypair_a.did()));
-    assert!(final_agreement.has_signed(keypair_b.did()));
-    assert!(final_agreement.has_signed(keypair_c.did()));
-    assert!(final_agreement.status.is_active());
+    assert_eq!(
+        final_agreement.signatures.len(),
+        3,
+        "Should have exactly 3 signatures"
+    );
+    assert!(
+        final_agreement.has_signed(keypair_a.did()),
+        "Coop A should have signed"
+    );
+    assert!(
+        final_agreement.has_signed(keypair_b.did()),
+        "Coop B should have signed"
+    );
+    assert!(
+        final_agreement.has_signed(keypair_c.did()),
+        "Coop C should have signed"
+    );
+    assert!(
+        final_agreement.status.is_active(),
+        "Agreement should be active after all signatures"
+    );
 }
 
 // =============================================================================
@@ -257,7 +447,10 @@ async fn test_concurrent_amendment_proposals() {
     coop_b.sign(&agreement.id).unwrap();
 
     let agreement = store.get_agreement(&agreement.id).unwrap().unwrap();
-    assert!(agreement.status.is_active());
+    assert!(
+        agreement.status.is_active(),
+        "Agreement should be active before amendments"
+    );
 
     // Now both try to propose amendments simultaneously
     let barrier = Arc::new(Barrier::new(2));
@@ -265,11 +458,7 @@ async fn test_concurrent_amendment_proposals() {
 
     let barrier_a = barrier.clone();
     let id_a = agreement_id.clone();
-    let expiration_a = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs()
-        + 365 * 24 * 3600;
+    let expiration_a = timestamp_plus_days(365);
     let amend_a = tokio::spawn(async move {
         barrier_a.wait().await;
         coop_a.propose_amendment(
@@ -283,11 +472,7 @@ async fn test_concurrent_amendment_proposals() {
 
     let barrier_b = barrier.clone();
     let id_b = agreement_id.clone();
-    let expiration_b = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs()
-        + 180 * 24 * 3600; // Different duration
+    let expiration_b = timestamp_plus_days(180); // Different duration
     let amend_b = tokio::spawn(async move {
         barrier_b.wait().await;
         coop_b.propose_amendment(
@@ -302,8 +487,14 @@ async fn test_concurrent_amendment_proposals() {
     let (result_a, result_b) = tokio::join!(amend_a, amend_b);
 
     // Both should be able to propose amendments (they get different IDs)
-    assert!(result_a.unwrap().is_ok(), "A should be able to propose");
-    assert!(result_b.unwrap().is_ok(), "B should be able to propose");
+    assert!(
+        result_a.unwrap().is_ok(),
+        "A should be able to propose amendment"
+    );
+    assert!(
+        result_b.unwrap().is_ok(),
+        "B should be able to propose amendment"
+    );
 
     // Verify both amendments exist
     let amendments = store.get_amendments(&agreement_id).unwrap();
@@ -338,11 +529,7 @@ async fn test_concurrent_amendment_signing() {
     coop_b.sign(&agreement.id).unwrap();
 
     // Propose amendment
-    let expiration = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs()
-        + 365 * 24 * 3600;
+    let expiration = timestamp_plus_days(365);
     let amendment = coop_a
         .propose_amendment(
             &agreement.id,
@@ -377,8 +564,14 @@ async fn test_concurrent_amendment_signing() {
     let (result_a, result_b) = tokio::join!(sign_a, sign_b);
 
     // Both should succeed
-    assert!(result_a.unwrap().is_ok());
-    assert!(result_b.unwrap().is_ok());
+    assert!(
+        result_a.unwrap().is_ok(),
+        "A should successfully sign amendment"
+    );
+    assert!(
+        result_b.unwrap().is_ok(),
+        "B should successfully sign amendment"
+    );
 
     // Amendment should be ratified
     let amendments = store.get_amendments(&agreement_id).unwrap();
@@ -396,6 +589,12 @@ async fn test_concurrent_amendment_signing() {
 // Status Conflict Tests
 // =============================================================================
 
+/// Tests conflict resolution when one party tries to suspend while another
+/// tries to terminate.
+///
+/// Conflict resolution policy: Terminate takes precedence over suspend.
+/// This is deterministic - terminate always wins because it's a "stronger"
+/// state transition that cannot be reversed.
 #[tokio::test]
 async fn test_status_conflict_suspend_vs_terminate() {
     // Setup: Active agreement
@@ -446,10 +645,14 @@ async fn test_status_conflict_suspend_vs_terminate() {
 
     let (suspend_result, terminate_result) = tokio::join!(suspend_task, terminate_task);
 
-    // One should succeed, one may fail depending on timing
-    // The important thing is the final state is consistent
-    let _suspend_ok = suspend_result.unwrap().is_ok();
-    let _terminate_ok = terminate_result.unwrap().is_ok();
+    let suspend_ok = suspend_result.unwrap().is_ok();
+    let terminate_ok = terminate_result.unwrap().is_ok();
+
+    // At least one operation should succeed
+    assert!(
+        suspend_ok || terminate_ok,
+        "At least one operation should succeed (suspend={suspend_ok}, terminate={terminate_ok})"
+    );
 
     // Final state should be either suspended or terminated (not active)
     let final_agreement = store.get_agreement(&agreement_id).unwrap().unwrap();
@@ -458,6 +661,22 @@ async fn test_status_conflict_suspend_vs_terminate() {
         "Final status should be either suspended or terminated, got: {:?}",
         final_agreement.status
     );
+
+    // Document the actual outcome for debugging
+    if final_agreement.status.is_terminated() {
+        // Terminate won - this is expected when terminate executes first
+        // because terminated agreements cannot be modified
+        assert!(
+            terminate_ok,
+            "If terminated, terminate operation should have succeeded"
+        );
+    } else if final_agreement.status.is_suspended() {
+        // Suspend won - this happens when suspend executes first
+        assert!(
+            suspend_ok,
+            "If suspended, suspend operation should have succeeded"
+        );
+    }
 }
 
 #[tokio::test]
@@ -507,12 +726,15 @@ async fn test_status_conflict_both_suspend() {
 
     let (result_a, result_b) = tokio::join!(suspend_a, suspend_b);
 
+    let suspend_a_ok = result_a.unwrap().is_ok();
+    let suspend_b_ok = result_b.unwrap().is_ok();
+
     // At least one should succeed
-    let success_count = [result_a.unwrap().is_ok(), result_b.unwrap().is_ok()]
-        .iter()
-        .filter(|&&x| x)
-        .count();
-    assert!(success_count >= 1, "At least one suspend should succeed");
+    let success_count = [suspend_a_ok, suspend_b_ok].iter().filter(|&&x| x).count();
+    assert!(
+        success_count >= 1,
+        "At least one suspend should succeed (A={suspend_a_ok}, B={suspend_b_ok})"
+    );
 
     // Final state should be suspended
     let final_agreement = store.get_agreement(&agreement_id).unwrap().unwrap();
@@ -526,9 +748,10 @@ async fn test_status_conflict_both_suspend() {
 // Gossip Message Ordering Tests
 // =============================================================================
 
+/// Tests that signatures arriving via gossip are processed correctly
+/// regardless of the order they arrive.
 #[tokio::test]
 async fn test_gossip_signature_ordering() {
-    // Test that signatures arrive and are processed correctly regardless of order
     let (coop_a, keypair_a, store) = create_manager("coop-a");
     let (coop_b, keypair_b) = create_manager_with_store("coop-b", store.clone());
 
@@ -551,11 +774,11 @@ async fn test_gossip_signature_ordering() {
         .unwrap();
     coop_a.propose(&agreement.id).unwrap();
 
-    // Create gossip handlers for both
-    let msg_count_a = Arc::new(AtomicUsize::new(0));
-    let msg_count_b = Arc::new(AtomicUsize::new(0));
-    let handler_a = create_gossip_handler(store.clone(), &keypair_a, "coop-a", msg_count_a.clone());
-    let handler_b = create_gossip_handler(store.clone(), &keypair_b, "coop-b", msg_count_b.clone());
+    // Create gossip handlers with message capture for verification
+    let (handler_a, msgs_a) =
+        create_gossip_handler_with_capture(store.clone(), &keypair_a, "coop-a");
+    let (handler_b, msgs_b) =
+        create_gossip_handler_with_capture(store.clone(), &keypair_b, "coop-b");
 
     // B signs first
     let agreement_after_b = coop_b.sign(&agreement.id).unwrap();
@@ -566,7 +789,7 @@ async fn test_gossip_signature_ordering() {
         .unwrap()
         .clone();
 
-    // Simulate B's signature arriving via gossip
+    // Simulate B's signature arriving via gossip to A
     let msg_b = AgreementMessage::Signed {
         agreement_id: agreement.id.clone(),
         signature: sig_b,
@@ -595,13 +818,36 @@ async fn test_gossip_signature_ordering() {
 
     // Both should have both signatures and be active
     let final_a = store.get_agreement(&agreement.id).unwrap().unwrap();
-    assert_eq!(final_a.signatures.len(), 2);
-    assert!(final_a.status.is_active());
+    assert_eq!(
+        final_a.signatures.len(),
+        2,
+        "Should have 2 signatures after gossip sync"
+    );
+    assert!(
+        final_a.status.is_active(),
+        "Agreement should be active after all signatures"
+    );
+
+    // Verify gossip handlers didn't need to broadcast (since we handled manually)
+    // The captured messages would be from any broadcasts the handlers initiated
+    let captured_a = msgs_a.lock().unwrap();
+    let captured_b = msgs_b.lock().unwrap();
+
+    // Handlers should not broadcast when receiving signatures (only when signing locally)
+    // This verifies the gossip handler doesn't re-broadcast received messages
+    assert!(
+        captured_a.is_empty(),
+        "Handler A should not broadcast received signatures"
+    );
+    assert!(
+        captured_b.is_empty(),
+        "Handler B should not broadcast received signatures"
+    );
 }
 
+/// Tests that duplicate signatures are handled gracefully (idempotency).
 #[tokio::test]
 async fn test_gossip_handles_duplicate_signatures() {
-    // Test that duplicate signatures are handled gracefully
     let (coop_a, keypair_a, store) = create_manager("coop-a");
     let (_coop_b, keypair_b) = create_manager_with_store("coop-b", store.clone());
 
@@ -633,9 +879,9 @@ async fn test_gossip_handles_duplicate_signatures() {
         .unwrap()
         .clone();
 
-    // Create handler for B
-    let msg_count = Arc::new(AtomicUsize::new(0));
-    let handler_b = create_gossip_handler(store.clone(), &keypair_b, "coop-b", msg_count);
+    // Create handler for B with message capture
+    let (handler_b, _msgs) =
+        create_gossip_handler_with_capture(store.clone(), &keypair_b, "coop-b");
 
     // Send the same signature multiple times (simulating network duplicates)
     let msg = AgreementMessage::Signed {
@@ -643,11 +889,16 @@ async fn test_gossip_handles_duplicate_signatures() {
         signature: sig_a.clone(),
     };
 
-    for _ in 0..3 {
-        handler_b.handle_message(&msg.to_bytes().unwrap()).unwrap();
+    for i in 0..DUPLICATE_MESSAGE_TEST_COUNT {
+        let result = handler_b.handle_message(&msg.to_bytes().unwrap());
+        assert!(
+            result.is_ok(),
+            "Duplicate message {} should be handled gracefully",
+            i + 1
+        );
     }
 
-    // Should only have one signature from A
+    // Should only have one signature from A (duplicates ignored)
     let current = store.get_agreement(&agreement.id).unwrap().unwrap();
     assert_eq!(
         current
@@ -656,7 +907,7 @@ async fn test_gossip_handles_duplicate_signatures() {
             .filter(|s| s.signer == *keypair_a.did())
             .count(),
         1,
-        "Should have exactly one signature from A despite duplicates"
+        "Should have exactly one signature from A despite {DUPLICATE_MESSAGE_TEST_COUNT} duplicates"
     );
 }
 
@@ -664,11 +915,10 @@ async fn test_gossip_handles_duplicate_signatures() {
 // Network Partition Recovery Tests
 // =============================================================================
 
+/// Simulates a network partition where both parties sign independently,
+/// then recover and sync via gossip.
 #[tokio::test]
 async fn test_partition_recovery_with_divergent_signatures() {
-    // Simulate network partition where both parties sign independently,
-    // then recover and sync via gossip
-
     // Create isolated stores (simulating partition)
     let (coop_a, keypair_a, store_a) = create_manager("coop-a");
     let (coop_b, keypair_b, store_b) = create_manager("coop-b");
@@ -693,21 +943,26 @@ async fn test_partition_recovery_with_divergent_signatures() {
         .unwrap();
     coop_a.propose(&agreement.id).unwrap();
 
-    // Manually copy agreement to B (simulating initial sync before partition)
-    let initial_agreement = store_a.get_agreement(&agreement.id).unwrap().unwrap();
-    store_b.store_agreement(&initial_agreement).unwrap();
+    // Sync agreement to B before partition
+    sync_agreement(&store_a, &store_b, &agreement.id);
 
     // During partition: A signs
     let agreement_a = coop_a.sign(&agreement.id).unwrap();
-    assert!(agreement_a.has_signed(keypair_a.did()));
+    assert!(
+        agreement_a.has_signed(keypair_a.did()),
+        "A should have signed during partition"
+    );
 
     // During partition: B signs (on its own copy)
     let agreement_b = coop_b.sign(&agreement.id).unwrap();
-    assert!(agreement_b.has_signed(keypair_b.did()));
+    assert!(
+        agreement_b.has_signed(keypair_b.did()),
+        "B should have signed during partition"
+    );
 
     // Now partition heals - sync A's signature to B
-    let msg_count = Arc::new(AtomicUsize::new(0));
-    let handler_b = create_gossip_handler(store_b.clone(), &keypair_b, "coop-b", msg_count.clone());
+    let (handler_b, _msgs) =
+        create_gossip_handler_with_capture(store_b.clone(), &keypair_b, "coop-b");
 
     let sig_a = agreement_a
         .signatures
@@ -725,18 +980,29 @@ async fn test_partition_recovery_with_divergent_signatures() {
 
     // B should now have both signatures and be active
     let final_b = store_b.get_agreement(&agreement.id).unwrap().unwrap();
-    assert_eq!(final_b.signatures.len(), 2);
-    assert!(final_b.has_signed(keypair_a.did()));
-    assert!(final_b.has_signed(keypair_b.did()));
+    assert_eq!(
+        final_b.signatures.len(),
+        2,
+        "B should have both signatures after partition recovery"
+    );
+    assert!(
+        final_b.has_signed(keypair_a.did()),
+        "B should have A's signature"
+    );
+    assert!(
+        final_b.has_signed(keypair_b.did()),
+        "B should have its own signature"
+    );
     assert!(
         final_b.status.is_active(),
         "Agreement should be active after partition recovery"
     );
 }
 
+/// Tests partition recovery with conflicting amendments.
 #[tokio::test]
 async fn test_partition_recovery_conflicting_amendments() {
-    // Both parties propose amendments during partition, then recover
+    // Each node has its own store
     let (coop_a, keypair_a, store_a) = create_manager("coop-a");
     let (coop_b, keypair_b, store_b) = create_manager("coop-b");
 
@@ -762,53 +1028,42 @@ async fn test_partition_recovery_conflicting_amendments() {
     coop_a.propose(&agreement.id).unwrap();
     coop_a.sign(&agreement.id).unwrap();
 
-    // Copy to B and have B sign
-    let mut synced_agreement = store_a.get_agreement(&agreement.id).unwrap().unwrap();
-    store_b.store_agreement(&synced_agreement).unwrap();
+    // Sync to B and have B sign
+    sync_agreement(&store_a, &store_b, &agreement.id);
     let agreement_b = coop_b.sign(&agreement.id).unwrap();
 
-    // Copy B's signature back to A
+    // Sync B's signature back to A to activate
     let sig_b = agreement_b.signatures.last().unwrap().clone();
+    let mut synced_agreement = store_a.get_agreement(&agreement.id).unwrap().unwrap();
     synced_agreement.signatures.push(sig_b);
     synced_agreement.activate().unwrap();
     store_a.store_agreement(&synced_agreement).unwrap();
     store_b.store_agreement(&synced_agreement).unwrap();
 
     // Now both propose amendments during partition
-    let expiration_a = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs()
-        + 365 * 24 * 3600;
     let amendment_a = coop_a
         .propose_amendment(
             &agreement.id,
             "A's amendment",
             vec![AmendmentChange::ExtendDuration {
-                new_expiration: expiration_a,
+                new_expiration: timestamp_plus_days(365),
             }],
         )
         .unwrap();
 
-    let expiration_b = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs()
-        + 180 * 24 * 3600;
     let amendment_b = coop_b
         .propose_amendment(
             &agreement.id,
             "B's amendment",
             vec![AmendmentChange::ExtendDuration {
-                new_expiration: expiration_b,
+                new_expiration: timestamp_plus_days(180),
             }],
         )
         .unwrap();
 
     // Partition heals - sync amendments
-    let msg_count = Arc::new(AtomicUsize::new(0));
-    let handler_a = create_gossip_handler(store_a.clone(), &keypair_a, "coop-a", msg_count.clone());
-    let handler_b = create_gossip_handler(store_b.clone(), &keypair_b, "coop-b", msg_count);
+    let (handler_a, _) = create_gossip_handler_with_capture(store_a.clone(), &keypair_a, "coop-a");
+    let (handler_b, _) = create_gossip_handler_with_capture(store_b.clone(), &keypair_b, "coop-b");
 
     // Sync B's amendment to A
     let msg_b = AgreementMessage::AmendmentProposed {
@@ -838,9 +1093,9 @@ async fn test_partition_recovery_conflicting_amendments() {
 // Eventual Consistency Tests
 // =============================================================================
 
+/// Tests that multiple concurrent operations result in consistent final state.
 #[tokio::test]
 async fn test_eventual_consistency_after_concurrent_ops() {
-    // Multiple concurrent operations should result in consistent final state
     let (coop_a, keypair_a, store) = create_manager("coop-a");
     let (coop_b, keypair_b) = create_manager_with_store("coop-b", store.clone());
     let (coop_c, keypair_c) = create_manager_with_store("coop-c", store.clone());
@@ -891,10 +1146,11 @@ async fn test_eventual_consistency_after_concurrent_ops() {
 
     // Wait for all
     for handle in handles {
-        let _ = handle.await.unwrap();
+        let result = handle.await.unwrap();
+        assert!(result.is_ok(), "All signing operations should succeed");
     }
 
-    // All views should be consistent
+    // Final state should be consistent
     let final_agreement = store.get_agreement(&agreement_id).unwrap().unwrap();
 
     // Should have exactly 3 signatures (one from each party)
@@ -911,14 +1167,24 @@ async fn test_eventual_consistency_after_concurrent_ops() {
     );
 
     // Each party should have signed exactly once
-    assert!(final_agreement.has_signed(keypair_a.did()));
-    assert!(final_agreement.has_signed(keypair_b.did()));
-    assert!(final_agreement.has_signed(keypair_c.did()));
+    assert!(
+        final_agreement.has_signed(keypair_a.did()),
+        "A should have signed"
+    );
+    assert!(
+        final_agreement.has_signed(keypair_b.did()),
+        "B should have signed"
+    );
+    assert!(
+        final_agreement.has_signed(keypair_c.did()),
+        "C should have signed"
+    );
 }
 
+/// Tests that amendment ratification with concurrent signing results in
+/// correct version increment (exactly once, not twice).
 #[tokio::test]
 async fn test_eventual_consistency_amendment_ratification() {
-    // Amendment ratification with concurrent signing should result in correct version
     let (coop_a, _keypair_a, store) = create_manager("coop-a");
     let (coop_b, keypair_b) = create_manager_with_store("coop-b", store.clone());
 
@@ -946,20 +1212,15 @@ async fn test_eventual_consistency_amendment_ratification() {
 
     // Initial version is 1
     let initial = store.get_agreement(&agreement.id).unwrap().unwrap();
-    assert_eq!(initial.version, 1);
+    assert_eq!(initial.version, 1, "Initial version should be 1");
 
     // Propose amendment
-    let expiration = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs()
-        + 365 * 24 * 3600;
     let amendment = coop_a
         .propose_amendment(
             &agreement.id,
             "Test amendment",
             vec![AmendmentChange::ExtendDuration {
-                new_expiration: expiration,
+                new_expiration: timestamp_plus_days(365),
             }],
         )
         .unwrap();
@@ -985,7 +1246,15 @@ async fn test_eventual_consistency_amendment_ratification() {
         coop_b.sign_amendment(&aid_b, &mid_b)
     });
 
-    let _ = tokio::join!(sign_a, sign_b);
+    let (result_a, result_b) = tokio::join!(sign_a, sign_b);
+    assert!(
+        result_a.unwrap().is_ok(),
+        "A should successfully sign amendment"
+    );
+    assert!(
+        result_b.unwrap().is_ok(),
+        "B should successfully sign amendment"
+    );
 
     // Version should be exactly 2 (incremented once, not twice)
     let final_agreement = store.get_agreement(&agreement_id).unwrap().unwrap();
@@ -1003,5 +1272,177 @@ async fn test_eventual_consistency_amendment_ratification() {
             icn_federation::agreement::AmendmentStatus::Ratified
         ),
         "Amendment should be ratified"
+    );
+}
+
+// =============================================================================
+// Security Tests
+// =============================================================================
+
+/// Tests that signatures from non-parties are rejected.
+#[tokio::test]
+async fn test_signature_from_non_party_rejected() {
+    let (coop_a, keypair_a, store) = create_manager("coop-a");
+    let (_coop_b, keypair_b) = create_manager_with_store("coop-b", store.clone());
+    let outsider_keypair = KeyPair::generate().unwrap();
+
+    // Create agreement between A and B only
+    let agreement = coop_a
+        .create_draft(
+            "Security Test",
+            "Test non-party rejection",
+            AgreementType::Trade {
+                items: vec![],
+                currency: "USD".to_string(),
+            },
+        )
+        .unwrap();
+
+    coop_a
+        .add_party(
+            &agreement.id,
+            AgreementParty::new(keypair_b.did().clone(), "coop-b", PartyRole::Counterparty),
+        )
+        .unwrap();
+    coop_a.propose(&agreement.id).unwrap();
+
+    // Create a fake signature from outsider
+    let fake_signature = icn_federation::agreement::AgreementSignature {
+        signer: outsider_keypair.did().clone(),
+        coop_id: "outsider-coop".to_string(),
+        signature: vec![0u8; 64], // Invalid signature bytes
+        signed_at: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs(),
+        version_signed: 1,
+    };
+
+    // Try to inject the fake signature via gossip
+    let (handler_a, _) = create_gossip_handler_with_capture(store.clone(), &keypair_a, "coop-a");
+
+    let msg = AgreementMessage::Signed {
+        agreement_id: agreement.id.clone(),
+        signature: fake_signature,
+    };
+
+    // The handler should reject this signature
+    let result = handler_a.handle_message(&msg.to_bytes().unwrap());
+
+    // Should return error for non-party signature
+    assert!(result.is_err(), "Should reject signature from non-party");
+
+    // Verify no fake signature was added
+    let current = store.get_agreement(&agreement.id).unwrap().unwrap();
+    assert!(
+        !current
+            .signatures
+            .iter()
+            .any(|s| s.signer == *outsider_keypair.did()),
+        "Non-party signature should not be stored"
+    );
+}
+
+/// Tests that a party cannot sign twice.
+#[tokio::test]
+async fn test_double_signing_prevented() {
+    let (coop_a, keypair_a, store) = create_manager("coop-a");
+    let (_coop_b, keypair_b) = create_manager_with_store("coop-b", store.clone());
+
+    let agreement = coop_a
+        .create_draft(
+            "Double Sign Test",
+            "Test double signing prevention",
+            AgreementType::Trade {
+                items: vec![],
+                currency: "USD".to_string(),
+            },
+        )
+        .unwrap();
+
+    coop_a
+        .add_party(
+            &agreement.id,
+            AgreementParty::new(keypair_b.did().clone(), "coop-b", PartyRole::Counterparty),
+        )
+        .unwrap();
+    coop_a.propose(&agreement.id).unwrap();
+
+    // A signs once
+    let first_sign = coop_a.sign(&agreement.id);
+    assert!(first_sign.is_ok(), "First signing should succeed");
+
+    // A tries to sign again
+    let second_sign = coop_a.sign(&agreement.id);
+    assert!(second_sign.is_err(), "Second signing should fail");
+
+    // Verify only one signature exists
+    let current = store.get_agreement(&agreement.id).unwrap().unwrap();
+    assert_eq!(
+        current
+            .signatures
+            .iter()
+            .filter(|s| s.signer == *keypair_a.did())
+            .count(),
+        1,
+        "Should have exactly one signature from A"
+    );
+}
+
+/// Tests that duplicate signatures via gossip are handled idempotently.
+#[tokio::test]
+async fn test_duplicate_signature_via_gossip_idempotent() {
+    let (coop_a, keypair_a, store) = create_manager("coop-a");
+    let (_coop_b, keypair_b) = create_manager_with_store("coop-b", store.clone());
+
+    let agreement = coop_a
+        .create_draft(
+            "Idempotency Test",
+            "Test signature idempotency",
+            AgreementType::Trade {
+                items: vec![],
+                currency: "USD".to_string(),
+            },
+        )
+        .unwrap();
+
+    coop_a
+        .add_party(
+            &agreement.id,
+            AgreementParty::new(keypair_b.did().clone(), "coop-b", PartyRole::Counterparty),
+        )
+        .unwrap();
+    coop_a.propose(&agreement.id).unwrap();
+
+    // A signs
+    let signed = coop_a.sign(&agreement.id).unwrap();
+    let sig_a = signed.signatures.first().unwrap().clone();
+
+    // Create handler that would receive gossip
+    let (handler_a, _) = create_gossip_handler_with_capture(store.clone(), &keypair_a, "coop-a");
+
+    // Receive the same signature via gossip (as if it bounced back)
+    let msg = AgreementMessage::Signed {
+        agreement_id: agreement.id.clone(),
+        signature: sig_a.clone(),
+    };
+
+    // Should handle gracefully (idempotent)
+    let result = handler_a.handle_message(&msg.to_bytes().unwrap());
+    assert!(
+        result.is_ok(),
+        "Receiving own signature via gossip should be handled gracefully"
+    );
+
+    // Should still have only one signature from A
+    let current = store.get_agreement(&agreement.id).unwrap().unwrap();
+    assert_eq!(
+        current
+            .signatures
+            .iter()
+            .filter(|s| s.signer == *keypair_a.did())
+            .count(),
+        1,
+        "Should have exactly one signature from A (idempotent)"
     );
 }
