@@ -22,8 +22,8 @@
 
 use icn_federation::agreement::{
     AgreementManager, AgreementParty, AgreementStatus, AgreementType, AmendmentChange,
-    AmendmentStatus, CompensationModel, FederationMembershipTerms, InMemoryAgreementStore,
-    PartyRole, ResourceType, TerminationReason, TradeItem,
+    AmendmentStatus, CompensationModel, DataSharingLevel, FederationMembershipTerms,
+    InMemoryAgreementStore, PartyRole, ResourceType, TerminationReason, TradeItem,
 };
 use icn_identity::KeyPair;
 use std::sync::Arc;
@@ -826,4 +826,426 @@ fn test_cannot_amend_draft() {
 
     let result = coop_a.propose_amendment(&agreement.id, "Invalid", vec![]);
     assert!(result.is_err(), "Should not be able to amend draft");
+}
+
+// =============================================================================
+// Amendment Rejection Tests (Issue #663)
+// =============================================================================
+
+/// Test amendment rejection by counterparty before signing
+#[test]
+fn test_amendment_rejection_before_signing() {
+    let (coop_a, _keypair_a, store) = create_manager("coop-a");
+    let (coop_b, keypair_b) = create_manager_with_store("coop-b", store);
+
+    // Create and activate agreement
+    let agreement = coop_a
+        .create_draft(
+            "Credit Agreement",
+            "To be amended then rejected",
+            AgreementType::Credit {
+                credit_limit: 10000,
+                interest_rate_bps: 500,
+                currency: "USD".to_string(),
+            },
+        )
+        .unwrap();
+
+    coop_a
+        .add_party(
+            &agreement.id,
+            AgreementParty::new(keypair_b.did().clone(), "coop-b", PartyRole::Counterparty),
+        )
+        .unwrap();
+
+    coop_a.propose(&agreement.id).unwrap();
+    coop_a.sign(&agreement.id).unwrap();
+    let agreement = coop_b.sign(&agreement.id).unwrap();
+    assert!(agreement.status.is_active());
+    let original_version = agreement.version;
+
+    // Propose amendment
+    let amendment = coop_a
+        .propose_amendment(
+            &agreement.id,
+            "Increase credit limit",
+            vec![AmendmentChange::UpdateTerm {
+                field: "credit_limit".to_string(),
+                old_value: "10000".to_string(),
+                new_value: "20000".to_string(),
+            }],
+        )
+        .unwrap();
+
+    assert_eq!(amendment.status, AmendmentStatus::Proposed);
+
+    // Counterparty rejects BEFORE signing
+    let rejected = coop_b
+        .reject_amendment(
+            &agreement.id,
+            &amendment.id,
+            Some("Credit limit increase not approved".to_string()),
+        )
+        .unwrap();
+
+    // Verify rejection
+    match rejected.status {
+        AmendmentStatus::Rejected {
+            rejected_by,
+            reason,
+        } => {
+            assert_eq!(rejected_by, *keypair_b.did());
+            assert_eq!(
+                reason,
+                Some("Credit limit increase not approved".to_string())
+            );
+        }
+        _ => panic!("Expected Rejected status"),
+    }
+
+    // Verify agreement remains in original state
+    let agreement = coop_a.get_agreement(&agreement.id).unwrap().unwrap();
+    assert!(agreement.status.is_active());
+    assert_eq!(agreement.version, original_version);
+}
+
+/// Test amendment rejection after partial signing
+#[test]
+fn test_amendment_rejection_after_partial_signing() {
+    let (coop_a, _keypair_a, store) = create_manager("coop-a");
+    let (coop_b, keypair_b) = create_manager_with_store("coop-b", store.clone());
+    let (coop_c, keypair_c) = create_manager_with_store("coop-c", store);
+
+    // Create 3-party agreement
+    let agreement = coop_a
+        .create_draft(
+            "Multi-Party Agreement",
+            "Three party trade",
+            AgreementType::FederationMembership {
+                federation_id: "regional-fed".to_string(),
+                terms: FederationMembershipTerms {
+                    min_trust_threshold: 0.5,
+                    governance_binding: true,
+                    data_sharing_level: DataSharingLevel::Full,
+                    contribution_requirements: Some("Monthly dues".to_string()),
+                },
+            },
+        )
+        .unwrap();
+
+    coop_a
+        .add_party(
+            &agreement.id,
+            AgreementParty::new(keypair_b.did().clone(), "coop-b", PartyRole::Counterparty),
+        )
+        .unwrap();
+    coop_a
+        .add_party(
+            &agreement.id,
+            AgreementParty::new(keypair_c.did().clone(), "coop-c", PartyRole::Counterparty),
+        )
+        .unwrap();
+
+    // Activate agreement
+    coop_a.propose(&agreement.id).unwrap();
+    coop_a.sign(&agreement.id).unwrap();
+    coop_b.sign(&agreement.id).unwrap();
+    let agreement = coop_c.sign(&agreement.id).unwrap();
+    assert!(agreement.status.is_active());
+    let original_version = agreement.version;
+
+    // Propose amendment
+    let amendment = coop_a
+        .propose_amendment(
+            &agreement.id,
+            "Update governance weight",
+            vec![AmendmentChange::UpdateTerm {
+                field: "governance_weight".to_string(),
+                old_value: "1.0".to_string(),
+                new_value: "2.0".to_string(),
+            }],
+        )
+        .unwrap();
+
+    // Coop A signs the amendment
+    let amendment = coop_a.sign_amendment(&agreement.id, &amendment.id).unwrap();
+    assert_eq!(amendment.signatures.len(), 1);
+    assert_eq!(amendment.status, AmendmentStatus::Proposed);
+
+    // Coop B rejects despite partial signing
+    let rejected = coop_b
+        .reject_amendment(
+            &agreement.id,
+            &amendment.id,
+            Some("Disagree with weight change".to_string()),
+        )
+        .unwrap();
+
+    match rejected.status {
+        AmendmentStatus::Rejected {
+            rejected_by,
+            reason,
+        } => {
+            assert_eq!(rejected_by, *keypair_b.did());
+            assert_eq!(reason, Some("Disagree with weight change".to_string()));
+        }
+        _ => panic!("Expected Rejected status"),
+    }
+
+    // Verify agreement remains in original state (version unchanged)
+    let agreement = coop_a.get_agreement(&agreement.id).unwrap().unwrap();
+    assert!(agreement.status.is_active());
+    assert_eq!(
+        agreement.version, original_version,
+        "Version should not change after rejection"
+    );
+
+    // Verify coop_c cannot sign the rejected amendment
+    let result = coop_c.sign_amendment(&agreement.id, &rejected.id);
+    assert!(
+        result.is_err(),
+        "Should not be able to sign rejected amendment"
+    );
+}
+
+/// Test that rejection reason is properly recorded
+#[test]
+fn test_amendment_rejection_reason_recorded() {
+    let (coop_a, _keypair_a, store) = create_manager("coop-a");
+    let (coop_b, keypair_b) = create_manager_with_store("coop-b", store);
+
+    // Create and activate agreement
+    let agreement = coop_a
+        .create_draft(
+            "Test Agreement",
+            "Testing rejection reason",
+            AgreementType::Trade {
+                items: vec![TradeItem::new("goods", 50, "units", 100, "USD")],
+                currency: "USD".to_string(),
+            },
+        )
+        .unwrap();
+
+    coop_a
+        .add_party(
+            &agreement.id,
+            AgreementParty::new(keypair_b.did().clone(), "coop-b", PartyRole::Counterparty),
+        )
+        .unwrap();
+
+    coop_a.propose(&agreement.id).unwrap();
+    coop_a.sign(&agreement.id).unwrap();
+    coop_b.sign(&agreement.id).unwrap();
+
+    // Propose and reject with detailed reason
+    let amendment = coop_a
+        .propose_amendment(&agreement.id, "Add new party", vec![])
+        .unwrap();
+
+    let detailed_reason =
+        "This change violates our cooperative bylaws section 4.2 regarding member additions";
+    let rejected = coop_b
+        .reject_amendment(
+            &agreement.id,
+            &amendment.id,
+            Some(detailed_reason.to_string()),
+        )
+        .unwrap();
+
+    // Verify reason is fully preserved
+    match rejected.status {
+        AmendmentStatus::Rejected { reason, .. } => {
+            assert_eq!(reason.unwrap(), detailed_reason);
+        }
+        _ => panic!("Expected Rejected status"),
+    }
+
+    // Test rejection without reason
+    let amendment2 = coop_a
+        .propose_amendment(&agreement.id, "Another change", vec![])
+        .unwrap();
+    let rejected2 = coop_b
+        .reject_amendment(&agreement.id, &amendment2.id, None)
+        .unwrap();
+
+    match rejected2.status {
+        AmendmentStatus::Rejected { reason, .. } => {
+            assert!(
+                reason.is_none(),
+                "Rejection without reason should have None"
+            );
+        }
+        _ => panic!("Expected Rejected status"),
+    }
+}
+
+/// Test that only parties can reject amendments
+#[test]
+fn test_only_parties_can_reject_amendment() {
+    let (coop_a, _keypair_a, store) = create_manager("coop-a");
+    let (coop_b, keypair_b) = create_manager_with_store("coop-b", store.clone());
+    let (outsider, _) = create_manager_with_store("outsider-coop", store);
+
+    // Create and activate 2-party agreement
+    let agreement = coop_a
+        .create_draft(
+            "Two Party Agreement",
+            "Test unauthorized rejection",
+            AgreementType::Trade {
+                items: vec![],
+                currency: "USD".to_string(),
+            },
+        )
+        .unwrap();
+
+    coop_a
+        .add_party(
+            &agreement.id,
+            AgreementParty::new(keypair_b.did().clone(), "coop-b", PartyRole::Counterparty),
+        )
+        .unwrap();
+
+    coop_a.propose(&agreement.id).unwrap();
+    coop_a.sign(&agreement.id).unwrap();
+    coop_b.sign(&agreement.id).unwrap();
+
+    // Propose amendment
+    let amendment = coop_a
+        .propose_amendment(&agreement.id, "Some change", vec![])
+        .unwrap();
+
+    // Non-party cannot reject
+    let result = outsider.reject_amendment(&agreement.id, &amendment.id, None);
+    assert!(result.is_err(), "Non-party should not be able to reject");
+
+    // Verify amendment is still proposed
+    let amendments = coop_a.get_amendments(&agreement.id).unwrap();
+    let current = amendments.iter().find(|a| a.id == amendment.id).unwrap();
+    assert_eq!(current.status, AmendmentStatus::Proposed);
+}
+
+/// Test that rejected amendments cannot be signed
+#[test]
+fn test_cannot_sign_rejected_amendment() {
+    let (coop_a, _keypair_a, store) = create_manager("coop-a");
+    let (coop_b, keypair_b) = create_manager_with_store("coop-b", store);
+
+    // Create and activate agreement
+    let agreement = coop_a
+        .create_draft(
+            "Test Agreement",
+            "Test signing rejected amendment",
+            AgreementType::Trade {
+                items: vec![],
+                currency: "USD".to_string(),
+            },
+        )
+        .unwrap();
+
+    coop_a
+        .add_party(
+            &agreement.id,
+            AgreementParty::new(keypair_b.did().clone(), "coop-b", PartyRole::Counterparty),
+        )
+        .unwrap();
+
+    coop_a.propose(&agreement.id).unwrap();
+    coop_a.sign(&agreement.id).unwrap();
+    coop_b.sign(&agreement.id).unwrap();
+
+    // Propose and reject
+    let amendment = coop_a
+        .propose_amendment(&agreement.id, "Rejected change", vec![])
+        .unwrap();
+
+    coop_b
+        .reject_amendment(&agreement.id, &amendment.id, None)
+        .unwrap();
+
+    // Try to sign rejected amendment
+    let result = coop_a.sign_amendment(&agreement.id, &amendment.id);
+    assert!(
+        result.is_err(),
+        "Should not be able to sign rejected amendment"
+    );
+}
+
+/// Test amendment rejection event notification
+#[test]
+fn test_amendment_rejection_event() {
+    use icn_federation::agreement::AgreementEvent;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    let store = Arc::new(InMemoryAgreementStore::new());
+    let keypair_a = Arc::new(KeyPair::generate().unwrap());
+    let keypair_b = Arc::new(KeyPair::generate().unwrap());
+
+    let rejection_count = Arc::new(AtomicUsize::new(0));
+    let count_clone = rejection_count.clone();
+    let rejected_by_clone = Arc::new(std::sync::Mutex::new(None));
+    let rejected_by_setter = rejected_by_clone.clone();
+
+    // Create manager with event callback
+    let coop_b =
+        AgreementManager::new(store.clone(), "coop-b".to_string(), keypair_b.did().clone())
+            .with_keypair(keypair_b.clone())
+            .with_event_callback(Box::new(move |event| {
+                if let AgreementEvent::AmendmentRejected {
+                    rejected_by,
+                    reason,
+                    ..
+                } = event
+                {
+                    count_clone.fetch_add(1, Ordering::SeqCst);
+                    *rejected_by_setter.lock().unwrap() = Some((rejected_by, reason));
+                }
+            }));
+
+    let coop_a = AgreementManager::new(store, "coop-a".to_string(), keypair_a.did().clone())
+        .with_keypair(keypair_a.clone());
+
+    // Create and activate agreement
+    let agreement = coop_a
+        .create_draft(
+            "Event Test Agreement",
+            "Testing rejection events",
+            AgreementType::Trade {
+                items: vec![],
+                currency: "USD".to_string(),
+            },
+        )
+        .unwrap();
+
+    coop_a
+        .add_party(
+            &agreement.id,
+            AgreementParty::new(keypair_b.did().clone(), "coop-b", PartyRole::Counterparty),
+        )
+        .unwrap();
+
+    coop_a.propose(&agreement.id).unwrap();
+    coop_a.sign(&agreement.id).unwrap();
+    coop_b.sign(&agreement.id).unwrap();
+
+    // Propose amendment
+    let amendment = coop_a
+        .propose_amendment(&agreement.id, "Test amendment", vec![])
+        .unwrap();
+
+    assert_eq!(rejection_count.load(Ordering::SeqCst), 0);
+
+    // Reject - should trigger event
+    coop_b
+        .reject_amendment(
+            &agreement.id,
+            &amendment.id,
+            Some("Event test reason".to_string()),
+        )
+        .unwrap();
+
+    // Verify event was fired
+    assert_eq!(rejection_count.load(Ordering::SeqCst), 1);
+    let (rejected_by, reason) = rejected_by_clone.lock().unwrap().clone().unwrap();
+    assert_eq!(rejected_by, *keypair_b.did());
+    assert_eq!(reason, Some("Event test reason".to_string()));
 }

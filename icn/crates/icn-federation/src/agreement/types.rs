@@ -704,8 +704,13 @@ pub enum AmendmentStatus {
     Proposed,
     /// Ratified (all parties signed)
     Ratified,
-    /// Rejected by one or more parties
-    Rejected,
+    /// Rejected by a party
+    Rejected {
+        /// Who rejected the amendment
+        rejected_by: Did,
+        /// Optional reason for rejection
+        reason: Option<String>,
+    },
     /// Withdrawn by the proposer
     Withdrawn,
 }

@@ -33,6 +33,10 @@ pub fn init_descriptions() {
         "Total number of amendments ratified"
     );
     describe_counter!(
+        "icn_agreement_amendments_rejected_total",
+        "Total number of amendments rejected"
+    );
+    describe_counter!(
         "icn_agreement_suspended_total",
         "Total number of agreements suspended"
     );
@@ -105,6 +109,11 @@ pub fn amendments_proposed_inc() {
 /// Increment amendments ratified counter
 pub fn amendments_ratified_inc() {
     counter!("icn_agreement_amendments_ratified_total").increment(1);
+}
+
+/// Increment amendments rejected counter
+pub fn amendments_rejected_inc() {
+    counter!("icn_agreement_amendments_rejected_total").increment(1);
 }
 
 /// Increment agreements suspended counter
