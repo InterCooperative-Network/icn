@@ -273,6 +273,11 @@ impl Supervisor {
         // Steward handle for gateway integration
         let steward_handle_for_gateway: Option<icn_steward::StewardHandle>;
 
+        // Agreement manager for gateway integration
+        let agreement_manager_for_gateway: Option<
+            icn_federation::agreement::AgreementManagerHandle,
+        >;
+
         // Governance event subscription handles - MUST persist for daemon lifetime
         // Stored at function scope to prevent premature Drop (which would unsubscribe)
         let governance_event_subscription: Option<crate::events::SubscriptionHandle>;
@@ -614,11 +619,13 @@ impl Supervisor {
                     attestation_store_for_governance = Some(services.attestation_store.clone());
                     federation_handler_for_notifications =
                         Some(services.federation_handler.clone());
+                    agreement_manager_for_gateway = Some(services.agreement_manager.clone());
                 } else {
                     federation_registry_for_rpc = None;
                     clearing_manager_for_governance = None;
                     attestation_store_for_governance = None;
                     federation_handler_for_notifications = None;
+                    agreement_manager_for_gateway = None;
                 };
 
                 // Clone federation handler for announcement task (before it's moved into notification callback)
@@ -1041,6 +1048,7 @@ impl Supervisor {
             treasury_handle_for_gateway = None;
             ledger_handle_for_gateway = None;
             entity_handle_for_gateway = None;
+            agreement_manager_for_gateway = None;
 
             // No misbehavior detector without identity
             misbehavior_detector_for_shutdown = None;
@@ -1064,6 +1072,7 @@ impl Supervisor {
                 ledger: ledger_handle_for_gateway,
                 entity: entity_handle_for_gateway,
                 steward: steward_handle_for_gateway,
+                agreement_manager: agreement_manager_for_gateway,
             },
         );
 
