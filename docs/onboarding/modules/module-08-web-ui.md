@@ -63,6 +63,34 @@ WebSocket for real‑time events.
 - **Auth failure**: login fails and displays a user‑friendly message.
 - **Expired token**: UI warns and requires re‑authentication.
 
+## Annotated code excerpts
+
+### Login validates inputs and persists session
+Source: `web/pilot-ui/app.js`
+```javascript
+state.gatewayUrl = elements.gatewayUrl.value.trim().replace(/\/$/, '');
+state.coopId = elements.coopId.value.trim();
+state.did = elements.did.value.trim();
+state.token = elements.token.value.trim();
+
+if (!state.gatewayUrl || !state.coopId || !state.did || !state.token) {
+    showError(elements.loginError, 'Please fill in all fields');
+    return;
+}
+
+await apiRequest('GET', '/health');
+await apiRequest('GET', `/ledger/${state.coopId}/balance/${encodeURIComponent(state.did)}`);
+
+state.tokenExpiry = Date.now() + (24 * 60 * 60 * 1000);
+localStorage.setItem('icn-gateway', state.gatewayUrl);
+localStorage.setItem('icn-coop', state.coopId);
+localStorage.setItem('icn-did', state.did);
+localStorage.setItem('icn-token', state.token);
+localStorage.setItem('icn-token-expiry', state.tokenExpiry.toString());
+```
+The UI performs a health check and a balance check to confirm auth before
+persisting session data.
+
 ## Code map
 - `web/pilot-ui/index.html`: app entry and layout.
 - `web/pilot-ui/app.js`: gateway interaction and core UI logic.

@@ -116,6 +116,53 @@ Executes contracts and bridges interpreter outputs into ledger entries.
 - **Policy violations** (credit limits, freezes) are enforced by ledger managers.
 - **Forks** are detected and resolved through fork detectors and resolvers.
 
+## Annotated code excerpts
+
+### JournalEntryBuilder enforces double-entry invariants
+Source: `icn/crates/icn-ledger/src/entry.rs`
+```rust
+pub fn build(self) -> Result<JournalEntry> {
+    // Validate double-entry invariant: Σ debits == Σ credits per currency
+    validate_double_entry(&self.accounts)?;
+    // Validate that amounts are positive
+    validate_positive_amounts(&self.accounts)?;
+    // Get current timestamp in milliseconds
+    let timestamp = icn_time::try_current_timestamp_millis()
+        .map_err(|e| anyhow::anyhow!("Cannot create journal entry: {e}"))?;
+    let mut entry = JournalEntry {
+        id: None,
+        timestamp,
+        author: self.author,
+        contract_ref: self.contract_ref,
+        accounts: self.accounts,
+        parents: self.parents,
+        signature: None,
+    };
+    entry.compute_hash()?;
+    Ok(entry)
+}
+```
+This guarantees all ledger entries are balanced and timestamped before acceptance.
+
+### Contract runtime applies ledger operations
+Source: `icn/crates/icn-ccl/src/runtime.rs`
+```rust
+match op {
+    LedgerOperation::Transfer { from, to, amount, currency } => {
+        let entry = JournalEntryBuilder::new(from.clone())
+            .debit(to.clone(), currency.clone(), *amount)
+            .credit(from.clone(), currency.clone(), *amount)
+            .build()?;
+        ledger.append_entry(entry).await?;
+    }
+    LedgerOperation::SetCreditLimit { .. } => {
+        // Credit limit updates are recorded separately
+    }
+}
+```
+Contract outputs are converted into the same journal entry format as direct API
+payments, keeping the ledger path consistent.
+
 ### Flow breakdown
 1. Ledger API or contract runtime builds a `JournalEntry`
 2. Entry validation enforces double-entry invariants

@@ -54,14 +54,44 @@ materials (see `docs/onboarding/update-process.md`).
 Follow the PR checklist in `CONTRIBUTING.md`, including test results and
 motivation.
 
+## Annotated code excerpts
+
+### Local quality gates before pushing
+Source: `CONTRIBUTING.md`
+```bash
+# Run tests
+cargo test --workspace
+
+# Run clippy (linter)
+cargo clippy --workspace --all-targets
+
+# Check formatting
+cargo fmt --all -- --check
+```
+These commands are the minimum expected checks before submitting a PR.
+
+### Quick verification for security-critical areas
+Source: `docs/testing/TESTING_SUMMARY.md`
+```bash
+# Test scope allowlist
+cargo test -p icn-gateway --test scope_validation_integration
+
+# Test TLS config
+cargo test -p icn-net --lib test_create
+
+# Verify build
+cargo check --release
+```
+This is a fast path for validating key security invariants.
+
 ## Code map
 - `CONTRIBUTING.md`: contribution process and expectations.
-- `docs/testing/TESTING_QUICKSTART.md`: test suite guidance.
+- `docs/testing/TESTING_SUMMARY.md`: test suite guidance.
 - `docs/ci/`: CI status and reports.
 
 ## Reference files (follow-up)
 - `CONTRIBUTING.md`
-- `docs/testing/TESTING_QUICKSTART.md`
+- `docs/testing/TESTING_SUMMARY.md`
 - `docs/testing/`
 - `docs/ci/`
 - `docs/onboarding/update-process.md`

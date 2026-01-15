@@ -64,6 +64,51 @@ From `icn/`, run `cargo build --release`. This produces `icnd` and `icnctl` in
 Use the demo configs (`config/icn-alpha.toml`, `config/icn-beta.toml`) to run a
 two‑node network and verify discovery.
 
+## Annotated code excerpts
+
+### Pre-commit checks enforce formatting and linting
+Source: `scripts/dev-setup.sh`
+```bash
+# Check formatting
+echo "Checking Rust formatting..."
+cd icn
+if ! cargo fmt --all -- --check; then
+    echo "❌ Formatting check failed. Run 'cargo fmt --all' to fix."
+    exit 1
+fi
+
+# Run clippy
+echo "Running clippy..."
+if ! cargo clippy --workspace --all-targets -- -D warnings; then
+    echo "❌ Clippy check failed. Fix warnings before committing."
+    exit 1
+fi
+```
+This shows the project’s baseline quality gates. The hook prevents commits when
+formatting or linting fails, keeping the workspace consistent.
+
+### Workspace members declare the subsystem crates
+Source: `icn/Cargo.toml`
+```toml
+[workspace]
+resolver = "2"
+members = [
+    "crates/icn-core",
+    "crates/icn-identity",
+    "crates/icn-trust",
+    "crates/icn-net",
+    "crates/icn-gossip",
+    "crates/icn-ledger",
+    "crates/icn-ccl",
+    "crates/icn-store",
+    "crates/icn-rpc",
+    "crates/icn-obs",
+    "bins/icnd",
+    "bins/icnctl",
+]
+```
+The workspace list is the authoritative map of Rust crates and binaries.
+
 ## Reference files (follow-up)
 - `scripts/dev-setup.sh`
 - `icn/Cargo.toml`

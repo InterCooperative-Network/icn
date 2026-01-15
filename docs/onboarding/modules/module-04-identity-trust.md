@@ -77,6 +77,53 @@ Trust scores are consulted by subsystems for:
 - **Invalid passphrase**: keystore remains locked and identity is unavailable.
 - **Low trust**: peers may be rate‑limited or denied access to topics.
 
+## Annotated code excerpts
+
+### Keystore interface defines the security boundary
+Source: `icn/crates/icn-identity/src/keystore.rs`
+```rust
+pub trait KeyStore: Send + Sync {
+    /// Unlock the keystore with a passphrase
+    fn unlock(&mut self, passphrase: &[u8]) -> Result<()>;
+
+    /// Lock the keystore (clear in-memory keys)
+    fn lock(&mut self);
+
+    /// Get the keypair (fails if locked)
+    fn get_keypair(&self) -> Result<&KeyPair>;
+}
+```
+This trait marks the boundary between encrypted storage and runtime use.
+
+### IdentityBundle binds DID to TLS
+Source: `icn/crates/icn-identity/src/bundle.rs`
+```rust
+pub struct IdentityBundle {
+    /// The DID for this identity
+    did: Did,
+    /// Ed25519 keypair for DID operations
+    did_keypair: KeyPair,
+    /// Self-signed TLS certificate
+    tls_cert: CertificateDer<'static>,
+    /// Binding signature proving ownership
+    /// Signature = Sign_did_key(SHA256(tls_cert))
+    tls_binding_sig: Vec<u8>,
+}
+```
+This struct ensures the node’s DID and TLS identity are cryptographically tied.
+
+### Trust dimensions are explicit and separate
+Source: `icn/crates/icn-trust/src/types.rs`
+```rust
+pub enum TrustGraphType {
+    Social,
+    EconomicReliability,
+    TechnicalReliability,
+}
+```
+ICN prevents a single trust dimension from dominating by modeling them
+independently.
+
 ## Code map
 - `icn/crates/icn-identity/src/keystore.rs`:
   keystore persistence and unlock flow.

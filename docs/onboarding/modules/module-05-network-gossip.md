@@ -77,6 +77,52 @@ nodes converge even after temporary disconnects or partitions.
 - **Invalid payloads** are dropped or logged.
 - **Partition detection** triggers healing strategies when enabled.
 
+## Annotated code excerpts
+
+### Incoming handler routes network payloads
+Source: `icn/crates/icn-core/src/supervisor/init_network.rs`
+```rust
+match net_msg.payload {
+    icn_net::MessagePayload::Gossip(gossip_msg) => {
+        let gossip = gossip_handle.clone();
+        let sender = sender_did.clone();
+        tokio::spawn(async move {
+            let mut gossip = gossip.write().await;
+            if let Err(e) = gossip.handle_message(&sender, gossip_msg).await {
+                warn!("Failed to handle gossip message: {}", e);
+            }
+        });
+    }
+    icn_net::MessagePayload::Subscribe { topics } => {
+        // Subscribe peers to topics
+    }
+    icn_net::MessagePayload::Unsubscribe { topics } => {
+        // Remove topic subscriptions
+    }
+    _ => { /* other payloads */ }
+}
+```
+This is the routing hub between transport and gossip.
+
+### Gossip validates trust before processing messages
+Source: `icn/crates/icn-gossip/src/gossip.rs`
+```rust
+const MIN_TRUST_FOR_MESSAGE: f64 = 0.1; // Known trust class minimum
+
+if let Some(ref trust_graph) = self.trust_graph {
+    if let Ok(tg) = trust_graph.try_read() {
+        match tg.compute_trust_score(sender) {
+            Ok(score) if score < MIN_TRUST_FOR_MESSAGE => {
+                anyhow::bail!("Message sender {sender} has insufficient trust ({score:.3} < {MIN_TRUST_FOR_MESSAGE:.3})");
+            }
+            Ok(_) => { /* Trust validated */ }
+            Err(e) => { anyhow::bail!("Cannot verify trust for message sender {sender}: {e}"); }
+        }
+    }
+}
+```
+Trust gating makes gossip traffic depend on social/economic/technical trust.
+
 ### Flow breakdown
 1. Network actor receives a `NetworkMessage`
 2. Incoming handler routes payloads to gossip

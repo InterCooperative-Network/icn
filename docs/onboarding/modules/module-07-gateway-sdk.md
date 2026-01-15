@@ -76,6 +76,42 @@ notifications.
 - **Cross‑coop access**: blocked at request validation.
 - **Self‑payment**: explicitly rejected in the ledger API.
 
+## Annotated code excerpts
+
+### Challenge endpoint creates a nonce and enforces rate limits
+Source: `icn/crates/icn-gateway/src/api/auth.rs`
+```rust
+let client_ip = get_client_ip(&http_req);
+ip_limiter.check_rate_limit(&client_ip)?;
+
+let did = req
+    .did
+    .parse()
+    .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
+
+let nonce = auth.create_challenge(&did)?;
+```
+Unauthenticated auth endpoints are guarded with IP‑based rate limiting.
+
+### Payment endpoint enforces identity and scope
+Source: `icn/crates/icn-gateway/src/api/ledger.rs`
+```rust
+require_scope(&http_req, "ledger:write")?;
+require_coop_access(&http_req, &coop_id)?;
+
+let claims = get_claims(&http_req).ok_or_else(|| {
+    crate::error::GatewayError::AuthenticationFailed("No claims found".to_string())
+})?;
+
+if claims.sub != req.from {
+    return Err(crate::error::GatewayError::AuthorizationFailed(
+        format!("Cannot create payments from other accounts (authenticated as {}, attempted to send from {})",
+            claims.sub, req.from)
+    ));
+}
+```
+The gateway ensures only the authenticated DID can create payments from itself.
+
 ### Flow breakdown
 1. Client calls `/auth/challenge` to receive a nonce
 2. Client signs nonce with Ed25519 private key
@@ -93,6 +129,13 @@ notifications.
   `LedgerManager::create_payment` bridges API to ledger.
 - `sdk/typescript/README.md`:
   `ICNClient` auth and request patterns.
+
+## Reference files (follow-up)
+- `icn/crates/icn-gateway/src/server.rs`
+- `icn/crates/icn-gateway/src/api/auth.rs`
+- `icn/crates/icn-gateway/src/api/ledger.rs`
+- `icn/crates/icn-gateway/src/ledger_mgr.rs`
+- `sdk/typescript/README.md`
 
 ## Exercises
 - Describe the auth flow from challenge to JWT

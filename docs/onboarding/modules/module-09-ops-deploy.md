@@ -63,6 +63,33 @@ Run `icnd` with `--config` and check logs for initialization warnings.
 ### 4) Verify health and metrics
 Check `/health` and `/metrics` endpoints to confirm liveness and observability.
 
+## Annotated code excerpts
+
+### Config precedence is explicit
+Source: `config/README.md`
+```md
+ICN reads configuration in this order (later sources override earlier):
+1. Built-in defaults
+2. Config file (if specified with `--config`)
+3. `~/.icn/icn.toml` (if exists and no `--config`)
+4. Environment variables
+5. CLI flags
+```
+This ordering guarantees predictable overrides across environments.
+
+### Runtime validation blocks unsafe configs
+Source: `icn/bins/icnd/src/main.rs`
+```rust
+if args.validate_config {
+    println!("Validating configuration...\n");
+    match config.validate() {
+        Ok(warnings) => { /* print warnings, exit 0 */ }
+        Err(errors) => { /* print errors, exit 1 */ }
+    }
+}
+```
+Operators can verify configuration before startup to avoid unsafe runtime states.
+
 ## Code map
 - `deploy/README.md`: deployment options and quickstart.
 - `deploy/docker-compose.yml`: local stack composition.

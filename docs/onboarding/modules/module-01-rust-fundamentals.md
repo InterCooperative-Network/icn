@@ -68,6 +68,40 @@ These `Arc<RwLock<T>>` types allow concurrent read access and controlled writes.
 Locate `tokio::spawn` in network/gossip code. These spawns handle IO without
 blocking the core actor loop.
 
+## Annotated code excerpts
+
+### Error propagation via `Result` and `?`
+Source: `icn/bins/icnd/src/main.rs`
+```rust
+let mut config = if let Some(config_path) = &args.config {
+    Config::from_file(config_path).context("Failed to load config file")?
+} else {
+    Config::default()
+};
+```
+This shows how `?` propagates errors from config loading back to `main`,
+preserving context for diagnostics.
+
+### Runtime handoff to the Supervisor
+Source: `icn/crates/icn-core/src/runtime.rs`
+```rust
+pub async fn run(self) -> Result<()> {
+    info!("ICNd runtime starting");
+
+    let supervisor = crate::supervisor::Supervisor::new(
+        self.config.clone(),
+        self.identity_bundle,
+        self.shutdown_tx.clone(),
+    );
+
+    supervisor.run().await?;
+    info!("ICNd runtime stopped");
+    Ok(())
+}
+```
+This is the core async flow: the runtime constructs the Supervisor and awaits
+its lifecycle, returning `Result` to the caller.
+
 ## Reference files (follow-up)
 - `icn/bins/icnd/src/main.rs`
 - `icn/crates/icn-core/src/runtime.rs`

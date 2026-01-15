@@ -59,6 +59,25 @@ identity → `icn-identity`, trust → `icn-trust`, ledger → `icn-ledger`).
 Look for crates that bridge layers (e.g., `icn-core` for runtime orchestration,
 `icn-gateway` for external API integration).
 
+## Annotated code excerpts
+
+### Workspace members encode the subsystem map
+Source: `icn/Cargo.toml`
+```toml
+members = [
+    "crates/icn-core",
+    "crates/icn-identity",
+    "crates/icn-trust",
+    "crates/icn-net",
+    "crates/icn-gossip",
+    "crates/icn-ledger",
+    "crates/icn-ccl",
+    "crates/icn-gateway",
+]
+```
+This list is a practical architecture index: each entry maps to a layer or
+integration boundary in the ICN stack.
+
 ## Reference files (follow-up)
 - `docs/ARCHITECTURE.md`
 - `docs/architecture/`

@@ -87,6 +87,43 @@ missing identity to the operator.
 5. **Identity actor**: provides signing and DID context
 6. **Network actor**: transport is started after routing and trust are ready
 
+## Annotated code excerpts
+
+### Supervisor initializes trust, gossip, ledger, and network in order
+Source: `icn/crates/icn-core/src/supervisor/mod.rs`
+```rust
+// Initialize trust graph, recovery store, and misbehavior detector
+let trust_services = init_trust::init_trust_services(&self.config, did.clone()).await?;
+let trust_graph_handle = trust_services.trust_graph.clone();
+
+// Initialize gossip services
+let gossip_services = init_gossip::init_gossip_services(
+    &self.config,
+    did.clone(),
+    init_gossip::GossipDeps {
+        trust_graph: trust_graph_handle.clone(),
+        trust_lookup,
+        misbehavior_detector: misbehavior_detector.clone(),
+        identity_bundle: identity_bundle.clone(),
+    },
+)
+.await?;
+
+// Initialize ledger and contract services
+let ledger_services = init_ledger::init_ledger_services(
+    &self.config,
+    did.clone(),
+    init_ledger::LedgerDeps {
+        gossip_handle: gossip_handle.clone(),
+        misbehavior_detector: misbehavior_detector.clone(),
+        trust_graph: trust_graph_handle.clone(),
+    },
+)
+.await?;
+```
+This excerpt shows the dependency‑aware order: trust → gossip → ledger. Each
+step produces handles used by the next layer.
+
 ## Code map
 - `icn/bins/icnd/src/main.rs`: `main` loads config, initializes tracing, opens
   keystore, constructs `Runtime`, handles shutdown signals.
