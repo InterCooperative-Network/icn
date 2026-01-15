@@ -8,13 +8,15 @@ if ! git rev-parse --verify "$BASE_REF" >/dev/null 2>&1; then
   exit 2
 fi
 
+export BASE_REF
+
 python3 - <<'PY'
 import os
 import re
 import subprocess
 import sys
 
-base_ref = sys.argv[1]
+base_ref = os.environ.get('BASE_REF', 'HEAD~1')
 
 def run(cmd):
     return subprocess.check_output(cmd, text=True).strip()
@@ -41,7 +43,7 @@ if missing:
         print(f"  - {p}")
     sys.exit(1)
 
-changed = run(["git", "diff", "--name-only", f"{base_ref}...HEAD"]).splitlines()
+changed = run(["git", "diff", "--name-only", f"{base_ref}..HEAD"]).splitlines()
 changed_set = set(changed)
 
 impacted = sorted([p for p in paths if p in changed_set])
@@ -52,4 +54,4 @@ if impacted:
     sys.exit(1)
 
 print("Onboarding mapping check passed.")
-PY "$BASE_REF"
+PY
