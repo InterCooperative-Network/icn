@@ -93,6 +93,8 @@ pub struct GatewayServer {
     community_handle: Option<icn_community::CommunityHandle>,
     /// Optional handle to daemon's StewardActor (for SDIS ceremonies)
     steward_handle: Option<icn_steward::StewardHandle>,
+    /// Optional handle to daemon's AgreementManager (for inter-cooperative agreements)
+    agreement_manager_handle: Option<icn_federation::agreement::AgreementManagerHandle>,
     /// Audit pruning configuration
     audit_prune_config: Option<AuditPruneConfig>,
 }
@@ -117,6 +119,7 @@ impl GatewayServer {
             entity_handle: None,
             community_handle: None,
             steward_handle: None,
+            agreement_manager_handle: None,
             audit_prune_config: None,
         }
     }
@@ -144,6 +147,7 @@ impl GatewayServer {
             entity_handle: None,
             community_handle: None,
             steward_handle: None,
+            agreement_manager_handle: None,
             audit_prune_config: None,
         }
     }
@@ -172,6 +176,7 @@ impl GatewayServer {
             entity_handle: None,
             community_handle: None,
             steward_handle: None,
+            agreement_manager_handle: None,
             audit_prune_config: None,
         }
     }
@@ -273,6 +278,18 @@ impl GatewayServer {
     /// EntityRegistry, ensuring persistence and consistent state.
     pub fn with_entity_handle(mut self, handle: EntityHandle) -> Self {
         self.entity_handle = Some(handle);
+        self
+    }
+
+    /// Set agreement manager handle for inter-cooperative agreements
+    ///
+    /// When set, the agreement API endpoints will use the daemon's
+    /// AgreementManager for managing formal agreements between cooperatives.
+    pub fn with_agreement_manager_handle(
+        mut self,
+        handle: icn_federation::agreement::AgreementManagerHandle,
+    ) -> Self {
+        self.agreement_manager_handle = Some(handle);
         self
     }
 
@@ -380,6 +397,16 @@ impl GatewayServer {
 
         let federation_manager = Arc::new(FederationManager::new());
         let commons_manager = Arc::new(CommonsManager::new());
+
+        // Setup agreement manager if provided (for inter-cooperative agreements)
+        let agreement_manager: Option<icn_federation::agreement::AgreementManagerHandle> =
+            if let Some(handle) = self.agreement_manager_handle {
+                info!("Agreement manager connected to daemon");
+                Some(handle)
+            } else {
+                info!("Agreement manager not configured (agreements API will return stubs)");
+                None
+            };
 
         // Create entity manager (uses actor if handle available, otherwise in-memory)
         let entity_manager: Arc<EntityManager> = if let Some(handle) = self.entity_handle {
@@ -768,6 +795,8 @@ impl GatewayServer {
                 .app_data(web::Data::new(velocity_limiter.clone()))
                 // Contract registry (optional - for contract management API)
                 .app_data(web::Data::new(contract_registry.clone()))
+                // Agreement manager (optional - for inter-cooperative agreements)
+                .app_data(web::Data::new(agreement_manager.clone()))
                 // JSON payload size limit (256KB - we're not handling file uploads)
                 .app_data(web::JsonConfig::default().limit(262_144))
                 // Middleware (order: last wrapped runs first for REQUEST, first runs last for RESPONSE)
