@@ -153,6 +153,23 @@ pub fn init_descriptions() {
         "icn_network_blob_rejected_total",
         "Total number of blob announcements rejected"
     );
+    // Sybil resistance metrics (Issue #675)
+    describe_counter!(
+        "icn_network_messages_rate_limited_by_anchor_total",
+        "Total number of messages rate limited due to per-person (per-anchor) limit"
+    );
+    describe_counter!(
+        "icn_sybil_detection_total",
+        "Total number of Sybil attack mitigations by detection type"
+    );
+    describe_counter!(
+        "icn_personhood_required_rejections_total",
+        "Total number of messages rejected due to RequirePersonhood enforcement"
+    );
+    describe_gauge!(
+        "icn_personhood_anchors_active",
+        "Number of unique personhood anchors with active rate limit buckets"
+    );
     describe_counter!(
         "icn_network_blob_evicted_total",
         "Total number of blob entries evicted due to capacity limits"
@@ -478,4 +495,60 @@ pub fn blob_registry_size_set(bytes: u64) {
 /// Set the current number of blob location entries in the registry
 pub fn blob_registry_entries_set(count: usize) {
     gauge!("icn_network_blob_registry_entries").set(count as f64);
+}
+
+// Sybil resistance metrics (Issue #675)
+
+/// Type of Sybil detection event
+#[derive(Debug, Clone, Copy)]
+pub enum SybilDetectionType {
+    /// Per-person (per-anchor) rate limit exceeded
+    PerPersonLimit,
+    /// DID has no personhood anchor and RequirePersonhood is enabled
+    NoPersonhoodRequired,
+    /// Multiple DIDs detected sharing same anchor (informational)
+    MultipleDidsSameAnchor,
+}
+
+impl SybilDetectionType {
+    fn as_str(&self) -> &'static str {
+        match self {
+            Self::PerPersonLimit => "per_person_limit",
+            Self::NoPersonhoodRequired => "no_personhood_required",
+            Self::MultipleDidsSameAnchor => "multiple_dids_same_anchor",
+        }
+    }
+}
+
+/// Increment per-anchor rate limited counter
+///
+/// Called when a message is rate limited due to per-person (per-anchor) limit.
+/// This indicates Sybil resistance is working - multiple DIDs from the same
+/// person are being aggregated.
+pub fn messages_rate_limited_by_anchor_inc() {
+    counter!("icn_network_messages_rate_limited_by_anchor_total").increment(1);
+}
+
+/// Increment Sybil detection counter with detection type
+///
+/// Called when a Sybil attack mitigation is triggered.
+pub fn sybil_detection_inc(detection_type: SybilDetectionType) {
+    counter!(
+        "icn_sybil_detection_total",
+        "type" => detection_type.as_str()
+    )
+    .increment(1);
+}
+
+/// Increment personhood required rejections counter
+///
+/// Called when a message is rejected because the sender has no personhood
+/// anchor and RequirePersonhood enforcement mode is enabled.
+pub fn personhood_required_rejections_inc() {
+    counter!("icn_personhood_required_rejections_total").increment(1);
+}
+
+/// Set the number of unique personhood anchors with active rate limit buckets
+pub fn personhood_anchors_active_set(count: usize) {
+    gauge!("icn_personhood_anchors_active").set(count as f64);
 }

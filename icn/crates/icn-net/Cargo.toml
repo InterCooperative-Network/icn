@@ -44,6 +44,7 @@ x509-parser = "0.18"
 rand = "0.8"
 bitflags = "2.4"
 zstd = "0.13"
+hex = "0.4"
 
 [dev-dependencies]
 icn-store.workspace = true

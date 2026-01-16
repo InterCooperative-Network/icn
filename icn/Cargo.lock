@@ -3145,6 +3145,7 @@ dependencies = [
  "criterion",
  "ed25519-dalek",
  "futures",
+ "hex",
  "hostname",
  "icn-crypto-pq",
  "icn-encoding",

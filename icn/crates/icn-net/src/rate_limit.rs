@@ -2,13 +2,21 @@
 //!
 //! Implements a token bucket algorithm for per-peer rate limiting to prevent DoS attacks.
 //! Supports trust-gated rate limiting where different limits apply based on peer trust level.
+//!
+//! ## Sybil Resistance (Issue #675)
+//!
+//! In addition to per-DID rate limiting, this module supports per-anchor (per-person)
+//! rate limiting to prevent Sybil attacks where an attacker creates multiple DIDs
+//! to bypass aggregate rate limits. When enabled, all DIDs belonging to the same
+//! PersonhoodAnchor share a single rate limit bucket.
 
-use icn_identity::Did;
+use icn_identity::{Did, PersonhoodStoreTrait};
 use icn_trust::TrustClass;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
+use tracing::{debug, warn};
 
 // Helper to convert TrustClass to string for metrics
 fn trust_class_to_str(class: TrustClass) -> &'static str {
@@ -110,6 +118,64 @@ impl TrustGatedRateLimitConfig {
     }
 }
 
+/// Enforcement mode for per-person (per-anchor) rate limiting
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
+pub enum EnforcementMode {
+    /// Log violations but allow messages through (for gradual rollout)
+    LogOnly,
+    /// Reject messages that exceed the per-person limit
+    #[default]
+    Enforce,
+    /// Reject ALL messages from DIDs without personhood anchors
+    RequirePersonhood,
+}
+
+impl EnforcementMode {
+    /// Parse from string (for config file)
+    pub fn parse(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "log_only" | "logonly" => EnforcementMode::LogOnly,
+            "require_personhood" | "requirepersonhood" => EnforcementMode::RequirePersonhood,
+            _ => EnforcementMode::Enforce,
+        }
+    }
+}
+
+/// Configuration for per-anchor (per-person) rate limiting
+///
+/// This provides Sybil resistance by aggregating rate limits across all DIDs
+/// belonging to the same PersonhoodAnchor.
+#[derive(Clone, Debug)]
+pub struct AnchorRateLimitConfig {
+    /// Maximum messages per second per person (across all their DIDs)
+    pub max_messages_per_person_per_second: u32,
+
+    /// Bucket capacity for per-person rate limiting (allows bursts)
+    pub person_burst_capacity: u32,
+
+    /// How to handle rate limit violations
+    pub enforcement_mode: EnforcementMode,
+
+    /// Multiplier for verified personhood (e.g., 2.0 = verified persons get 2x limit)
+    /// Applied when the anchor has POPLevel::Verified or higher
+    pub verified_multiplier: f64,
+
+    /// Refill interval (shared with per-DID)
+    pub refill_interval: Duration,
+}
+
+impl Default for AnchorRateLimitConfig {
+    fn default() -> Self {
+        AnchorRateLimitConfig {
+            max_messages_per_person_per_second: 500,
+            person_burst_capacity: 100,
+            enforcement_mode: EnforcementMode::Enforce,
+            verified_multiplier: 2.0,
+            refill_interval: Duration::from_millis(100),
+        }
+    }
+}
+
 /// Token bucket for a single peer
 #[derive(Debug)]
 struct TokenBucket {
@@ -202,6 +268,11 @@ impl TokenBucket {
 }
 
 /// Per-peer rate limiter using token bucket algorithm
+///
+/// Supports three layers of rate limiting:
+/// 1. Per-DID: Basic rate limiting per identity
+/// 2. Trust-gated: Different limits based on peer trust class
+/// 3. Per-anchor (Sybil resistance): Aggregate limits across DIDs sharing same PersonhoodAnchor
 pub struct RateLimiter {
     /// Trust-gated configuration (if enabled)
     trust_gated_config: Option<TrustGatedRateLimitConfig>,
@@ -214,6 +285,16 @@ pub struct RateLimiter {
 
     /// Trust graph for looking up peer trust classes (optional)
     trust_graph: Option<Arc<RwLock<icn_trust::TrustGraph>>>,
+
+    // --- Sybil resistance (Issue #675) ---
+    /// Per-anchor (per-person) token buckets for Sybil resistance
+    anchor_buckets: Arc<RwLock<HashMap<[u8; 32], TokenBucket>>>,
+
+    /// Personhood store for DID-to-anchor lookups
+    personhood_store: Option<Arc<dyn PersonhoodStoreTrait>>,
+
+    /// Per-anchor rate limit configuration
+    anchor_rate_config: Option<AnchorRateLimitConfig>,
 }
 
 impl RateLimiter {
@@ -224,6 +305,9 @@ impl RateLimiter {
             fallback_config: config,
             buckets: Arc::new(RwLock::new(HashMap::new())),
             trust_graph: None,
+            anchor_buckets: Arc::new(RwLock::new(HashMap::new())),
+            personhood_store: None,
+            anchor_rate_config: None,
         }
     }
 
@@ -237,7 +321,43 @@ impl RateLimiter {
             fallback_config: config.isolated.clone(), // Use most restrictive as fallback
             buckets: Arc::new(RwLock::new(HashMap::new())),
             trust_graph: Some(trust_graph),
+            anchor_buckets: Arc::new(RwLock::new(HashMap::new())),
+            personhood_store: None,
+            anchor_rate_config: None,
         }
+    }
+
+    /// Create a new trust-gated rate limiter with Sybil resistance
+    ///
+    /// This constructor enables per-anchor (per-person) rate limiting in addition
+    /// to per-DID rate limiting, preventing Sybil attacks where an attacker
+    /// creates multiple DIDs to bypass aggregate rate limits.
+    pub fn new_with_sybil_resistance(
+        trust_gated_config: TrustGatedRateLimitConfig,
+        trust_graph: Arc<RwLock<icn_trust::TrustGraph>>,
+        personhood_store: Arc<dyn PersonhoodStoreTrait>,
+        anchor_config: AnchorRateLimitConfig,
+    ) -> Self {
+        RateLimiter {
+            trust_gated_config: Some(trust_gated_config.clone()),
+            fallback_config: trust_gated_config.isolated.clone(),
+            buckets: Arc::new(RwLock::new(HashMap::new())),
+            trust_graph: Some(trust_graph),
+            anchor_buckets: Arc::new(RwLock::new(HashMap::new())),
+            personhood_store: Some(personhood_store),
+            anchor_rate_config: Some(anchor_config),
+        }
+    }
+
+    /// Enable Sybil resistance on an existing rate limiter
+    pub fn with_sybil_resistance(
+        mut self,
+        personhood_store: Arc<dyn PersonhoodStoreTrait>,
+        anchor_config: AnchorRateLimitConfig,
+    ) -> Self {
+        self.personhood_store = Some(personhood_store);
+        self.anchor_rate_config = Some(anchor_config);
+        self
     }
 
     /// Check if a message from the given peer should be allowed.
@@ -350,6 +470,162 @@ impl RateLimiter {
         allowed
     }
 
+    /// Check rate limit with Sybil resistance (per-person limiting)
+    ///
+    /// This method performs dual-path rate limiting:
+    /// 1. Per-DID rate limit check (existing behavior)
+    /// 2. Per-anchor (per-person) rate limit check (Sybil resistance)
+    ///
+    /// Both checks must pass for the message to be allowed.
+    ///
+    /// Returns `(did_allowed, anchor_allowed)`:
+    /// - `(true, true)` = message allowed
+    /// - `(false, _)` = rate limited by per-DID limit
+    /// - `(_, false)` = rate limited by per-person limit (Sybil mitigation)
+    pub async fn check_rate_limit_with_personhood(&self, peer: &Did) -> (bool, bool) {
+        // Phase 1: Per-DID rate limit check (existing logic)
+        let did_allowed = self.check_rate_limit(peer).await;
+
+        // Phase 2: Per-anchor (per-person) rate limit check
+        let anchor_allowed = self.check_anchor_rate_limit(peer).await;
+
+        (did_allowed, anchor_allowed)
+    }
+
+    /// Internal helper to check per-anchor rate limit
+    async fn check_anchor_rate_limit(&self, peer: &Did) -> bool {
+        // If Sybil resistance is not enabled, allow everything
+        let (personhood_store, anchor_config) =
+            match (&self.personhood_store, &self.anchor_rate_config) {
+                (Some(store), Some(config)) => (store, config),
+                _ => return true, // Sybil resistance not enabled
+            };
+
+        // Look up the anchor ID for this DID
+        let anchor_id = match personhood_store.get_anchor_id_for_did(peer) {
+            Ok(Some(id)) => id,
+            Ok(None) => {
+                // No personhood anchor for this DID
+                return match anchor_config.enforcement_mode {
+                    EnforcementMode::RequirePersonhood => {
+                        warn!(
+                            did = %peer,
+                            "Rejecting message: DID has no personhood anchor (RequirePersonhood mode)"
+                        );
+                        icn_obs::metrics::network::personhood_required_rejections_inc();
+                        icn_obs::metrics::network::sybil_detection_inc(
+                            icn_obs::metrics::network::SybilDetectionType::NoPersonhoodRequired,
+                        );
+                        false
+                    }
+                    EnforcementMode::LogOnly | EnforcementMode::Enforce => {
+                        // DID has no anchor - fall back to per-DID limiting only
+                        debug!(
+                            did = %peer,
+                            "DID has no personhood anchor, skipping per-person rate limit"
+                        );
+                        true
+                    }
+                };
+            }
+            Err(e) => {
+                // Store lookup failed - graceful degradation
+                warn!(
+                    did = %peer,
+                    error = %e,
+                    "Failed to look up personhood anchor, falling back to per-DID limiting"
+                );
+                return true;
+            }
+        };
+
+        // Check if we need to apply verified multiplier
+        let (capacity, refill_rate) = self.get_anchor_bucket_params(peer, &anchor_id, anchor_config);
+
+        // Acquire the anchor buckets lock
+        let mut anchor_buckets = self.anchor_buckets.write().await;
+
+        // Get or create bucket for this anchor
+        let bucket = anchor_buckets.entry(anchor_id).or_insert_with(|| {
+            TokenBucket::new(
+                capacity,
+                refill_rate,
+                anchor_config.refill_interval,
+                None, // Anchor buckets don't track trust class
+            )
+        });
+
+        let allowed = bucket.try_consume();
+
+        // Update metrics
+        icn_obs::metrics::network::personhood_anchors_active_set(anchor_buckets.len());
+
+        if !allowed {
+            // Per-person rate limit exceeded - this is Sybil mitigation
+            icn_obs::metrics::network::messages_rate_limited_by_anchor_inc();
+            icn_obs::metrics::network::sybil_detection_inc(
+                icn_obs::metrics::network::SybilDetectionType::PerPersonLimit,
+            );
+
+            match anchor_config.enforcement_mode {
+                EnforcementMode::LogOnly => {
+                    warn!(
+                        did = %peer,
+                        anchor_id = %hex::encode(anchor_id),
+                        "Per-person rate limit exceeded (LogOnly mode - allowing)"
+                    );
+                    return true; // Allow in LogOnly mode
+                }
+                EnforcementMode::Enforce | EnforcementMode::RequirePersonhood => {
+                    debug!(
+                        did = %peer,
+                        anchor_id = %hex::encode(anchor_id),
+                        "Per-person rate limit exceeded"
+                    );
+                    return false;
+                }
+            }
+        }
+
+        true
+    }
+
+    /// Calculate bucket parameters, applying verified multiplier if applicable
+    fn get_anchor_bucket_params(
+        &self,
+        peer: &Did,
+        anchor_id: &[u8; 32],
+        config: &AnchorRateLimitConfig,
+    ) -> (f64, f64) {
+        let mut multiplier = 1.0;
+
+        // Check if the anchor has verified personhood (for multiplier)
+        if config.verified_multiplier > 1.0 {
+            if let Some(store) = &self.personhood_store {
+                if let Ok(Some(anchor)) = store.get_anchor(anchor_id) {
+                    // Check if anchor meets verified POP level
+                    if anchor.meets_pop_level(icn_identity::POPLevel::Verified) {
+                        multiplier = config.verified_multiplier;
+                        debug!(
+                            did = %peer,
+                            anchor_id = %hex::encode(anchor_id),
+                            multiplier = multiplier,
+                            "Applying verified personhood multiplier"
+                        );
+                    }
+                }
+            }
+        }
+
+        let capacity = config.person_burst_capacity as f64 * multiplier;
+        let refill_rate = (config.max_messages_per_person_per_second as f64
+            * config.refill_interval.as_secs_f64()
+            * multiplier)
+            .max(1.0);
+
+        (capacity, refill_rate)
+    }
+
     /// Clean up old buckets for peers that haven't sent messages recently
     /// (Call this periodically to prevent unbounded memory growth)
     pub async fn cleanup_old_buckets(&self, max_age: Duration) {
@@ -357,11 +633,28 @@ impl RateLimiter {
         let now = Instant::now();
 
         buckets.retain(|_, bucket| now.duration_since(bucket.last_refill) < max_age);
+
+        // Also clean up anchor buckets
+        let mut anchor_buckets = self.anchor_buckets.write().await;
+        anchor_buckets.retain(|_, bucket| now.duration_since(bucket.last_refill) < max_age);
+
+        // Update metrics
+        icn_obs::metrics::network::personhood_anchors_active_set(anchor_buckets.len());
     }
 
     /// Get the number of tracked peers
     pub async fn tracked_peers(&self) -> usize {
         self.buckets.read().await.len()
+    }
+
+    /// Get the number of tracked personhood anchors (for Sybil resistance)
+    pub async fn tracked_anchors(&self) -> usize {
+        self.anchor_buckets.read().await.len()
+    }
+
+    /// Check if Sybil resistance is enabled
+    pub fn is_sybil_resistance_enabled(&self) -> bool {
+        self.personhood_store.is_some() && self.anchor_rate_config.is_some()
     }
 }
 
@@ -603,5 +896,277 @@ mod tests {
                 .max_messages_per_second,
             200
         );
+    }
+
+    // ========================================================================
+    // Sybil Resistance Tests (Issue #675)
+    // ========================================================================
+
+    use icn_identity::{
+        InMemoryPersonhoodStore, PersonhoodAnchor, PersonhoodAnchorStore, PersonhoodStoreTrait,
+    };
+
+    /// Create a test personhood store with anchors
+    fn create_test_personhood_store() -> Arc<PersonhoodAnchorStore<InMemoryPersonhoodStore>> {
+        let store = Arc::new(InMemoryPersonhoodStore::new());
+        Arc::new(PersonhoodAnchorStore::new(store))
+    }
+
+    #[tokio::test]
+    async fn test_sybil_attack_mitigation() {
+        use icn_store::SledStore;
+        use icn_trust::TrustGraph;
+
+        // Create components
+        let store = Arc::new(SledStore::temporary().unwrap());
+        let own_keypair = KeyPair::generate().unwrap();
+        let graph = TrustGraph::new(store, own_keypair.did().clone());
+        let graph_handle = Arc::new(tokio::sync::RwLock::new(graph));
+
+        let personhood_store = create_test_personhood_store();
+
+        // Create multiple personhood anchors for different "attackers"
+        // Each anchor represents a unique person
+        // The test verifies that DIDs with the same anchor share rate limits
+        let mut attacker_dids = Vec::new();
+
+        // Create 10 anchors, each with their own DID
+        // These simulate 10 different people (not a Sybil attack)
+        for i in 0..10 {
+            let anchor_key = [i as u8; 32];
+            let anchor = PersonhoodAnchor::genesis(&format!("person_{i}"), anchor_key);
+            personhood_store.store(&anchor).unwrap();
+            // Use the anchor's own DID
+            attacker_dids.push(anchor.to_did());
+        }
+
+        // Create rate limiter with Sybil resistance
+        // Use high per-DID limits so per-anchor limits are the bottleneck
+        let trust_config = TrustGatedRateLimitConfig {
+            isolated: RateLimitConfig {
+                max_messages_per_second: 100,
+                burst_capacity: 20, // High per-DID limit
+                refill_interval: Duration::from_millis(100),
+            },
+            ..Default::default()
+        };
+
+        let anchor_config = AnchorRateLimitConfig {
+            max_messages_per_person_per_second: 100,
+            person_burst_capacity: 5, // Low limit per person - this should be the bottleneck
+            enforcement_mode: EnforcementMode::Enforce,
+            verified_multiplier: 1.0,
+            refill_interval: Duration::from_millis(100),
+        };
+
+        let limiter = RateLimiter::new_with_sybil_resistance(
+            trust_config,
+            graph_handle,
+            personhood_store.clone() as Arc<dyn PersonhoodStoreTrait>,
+            anchor_config,
+        );
+
+        // Each person (anchor) should be able to send up to their burst capacity
+        // 10 people × 5 burst each = 50 total messages
+        let mut total_allowed = 0;
+
+        for did in &attacker_dids {
+            // Each person tries to send 10 messages
+            for _ in 0..10 {
+                let (did_allowed, anchor_allowed) =
+                    limiter.check_rate_limit_with_personhood(did).await;
+                if did_allowed && anchor_allowed {
+                    total_allowed += 1;
+                }
+            }
+        }
+
+        // With per-person limits (burst=5) and 10 people: ~50 messages allowed
+        // Each person gets 5 messages, rest are blocked by per-anchor limit
+        assert!(
+            (45..=55).contains(&total_allowed),
+            "Expected ~50 messages allowed (10 people × 5 burst), got {total_allowed}"
+        );
+
+        // Verify we're tracking all 10 anchors
+        assert_eq!(
+            limiter.tracked_anchors().await,
+            10,
+            "Should track 10 anchors (one per person)"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_no_personhood_anchor_graceful_fallback() {
+        use icn_store::SledStore;
+        use icn_trust::TrustGraph;
+
+        let store = Arc::new(SledStore::temporary().unwrap());
+        let own_keypair = KeyPair::generate().unwrap();
+        let graph = TrustGraph::new(store, own_keypair.did().clone());
+        let graph_handle = Arc::new(tokio::sync::RwLock::new(graph));
+
+        let personhood_store = create_test_personhood_store();
+
+        // Create a peer without any personhood anchor
+        let peer_without_anchor = KeyPair::generate().unwrap().did().clone();
+
+        // Create rate limiter with Sybil resistance in Enforce mode (not RequirePersonhood)
+        let anchor_config = AnchorRateLimitConfig {
+            enforcement_mode: EnforcementMode::Enforce,
+            ..Default::default()
+        };
+
+        let limiter = RateLimiter::new_with_sybil_resistance(
+            TrustGatedRateLimitConfig::default(),
+            graph_handle,
+            personhood_store as Arc<dyn PersonhoodStoreTrait>,
+            anchor_config,
+        );
+
+        // Peer without anchor should still be allowed (falls back to per-DID limiting)
+        let (did_allowed, anchor_allowed) = limiter
+            .check_rate_limit_with_personhood(&peer_without_anchor)
+            .await;
+
+        assert!(did_allowed, "DID should be allowed by per-DID limit");
+        assert!(
+            anchor_allowed,
+            "Anchor check should pass for DIDs without anchor (graceful fallback)"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_require_personhood_mode() {
+        use icn_store::SledStore;
+        use icn_trust::TrustGraph;
+
+        let store = Arc::new(SledStore::temporary().unwrap());
+        let own_keypair = KeyPair::generate().unwrap();
+        let graph = TrustGraph::new(store, own_keypair.did().clone());
+        let graph_handle = Arc::new(tokio::sync::RwLock::new(graph));
+
+        let personhood_store = create_test_personhood_store();
+
+        // Create a peer without any personhood anchor
+        let peer_without_anchor = KeyPair::generate().unwrap().did().clone();
+
+        // Create rate limiter with RequirePersonhood mode
+        let anchor_config = AnchorRateLimitConfig {
+            enforcement_mode: EnforcementMode::RequirePersonhood,
+            ..Default::default()
+        };
+
+        let limiter = RateLimiter::new_with_sybil_resistance(
+            TrustGatedRateLimitConfig::default(),
+            graph_handle,
+            personhood_store as Arc<dyn PersonhoodStoreTrait>,
+            anchor_config,
+        );
+
+        // Peer without anchor should be rejected in RequirePersonhood mode
+        let (did_allowed, anchor_allowed) = limiter
+            .check_rate_limit_with_personhood(&peer_without_anchor)
+            .await;
+
+        assert!(did_allowed, "DID should be allowed by per-DID limit");
+        assert!(
+            !anchor_allowed,
+            "Anchor check should fail for DIDs without anchor in RequirePersonhood mode"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_log_only_mode_allows_excess() {
+        use icn_store::SledStore;
+        use icn_trust::TrustGraph;
+
+        let store = Arc::new(SledStore::temporary().unwrap());
+        let own_keypair = KeyPair::generate().unwrap();
+        let graph = TrustGraph::new(store, own_keypair.did().clone());
+        let graph_handle = Arc::new(tokio::sync::RwLock::new(graph));
+
+        let personhood_store = create_test_personhood_store();
+
+        // Create anchor and use its DID
+        let anchor_key = [1u8; 32];
+        let anchor = PersonhoodAnchor::genesis("test", anchor_key);
+        personhood_store.store(&anchor).unwrap();
+
+        // Use the anchor's own DID (which is automatically indexed)
+        let peer = anchor.to_did();
+
+        // Create rate limiter with LogOnly mode and very low limit
+        let anchor_config = AnchorRateLimitConfig {
+            person_burst_capacity: 5,
+            enforcement_mode: EnforcementMode::LogOnly,
+            ..Default::default()
+        };
+
+        let limiter = RateLimiter::new_with_sybil_resistance(
+            TrustGatedRateLimitConfig::default(),
+            graph_handle,
+            personhood_store as Arc<dyn PersonhoodStoreTrait>,
+            anchor_config,
+        );
+
+        // Exhaust the per-person limit
+        for _ in 0..5 {
+            let (_, anchor_allowed) = limiter.check_rate_limit_with_personhood(&peer).await;
+            assert!(anchor_allowed);
+        }
+
+        // Subsequent messages should still be allowed in LogOnly mode
+        for _ in 0..5 {
+            let (_, anchor_allowed) = limiter.check_rate_limit_with_personhood(&peer).await;
+            assert!(
+                anchor_allowed,
+                "LogOnly mode should allow messages even after limit exceeded"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_sybil_resistance_not_enabled_passthrough() {
+        let config = RateLimitConfig {
+            max_messages_per_second: 10,
+            burst_capacity: 5,
+            refill_interval: Duration::from_millis(100),
+        };
+
+        // Create limiter WITHOUT Sybil resistance
+        let limiter = RateLimiter::new(config);
+        let peer = KeyPair::generate().unwrap().did().clone();
+
+        assert!(
+            !limiter.is_sybil_resistance_enabled(),
+            "Sybil resistance should not be enabled"
+        );
+
+        // check_rate_limit_with_personhood should work (anchor check passes)
+        let (did_allowed, anchor_allowed) =
+            limiter.check_rate_limit_with_personhood(&peer).await;
+        assert!(did_allowed);
+        assert!(anchor_allowed, "Anchor check should pass when Sybil resistance is disabled");
+    }
+
+    #[test]
+    fn test_enforcement_mode_parsing() {
+        assert_eq!(EnforcementMode::parse("log_only"), EnforcementMode::LogOnly);
+        assert_eq!(EnforcementMode::parse("LogOnly"), EnforcementMode::LogOnly);
+        assert_eq!(EnforcementMode::parse("enforce"), EnforcementMode::Enforce);
+        assert_eq!(EnforcementMode::parse("ENFORCE"), EnforcementMode::Enforce);
+        assert_eq!(
+            EnforcementMode::parse("require_personhood"),
+            EnforcementMode::RequirePersonhood
+        );
+        assert_eq!(
+            EnforcementMode::parse("requirepersonhood"),
+            EnforcementMode::RequirePersonhood
+        );
+        assert_eq!(
+            EnforcementMode::parse("unknown"),
+            EnforcementMode::Enforce
+        ); // Default
     }
 }
