@@ -60,6 +60,10 @@ const CLEARED_VOLUME_PREFIX: &str = "ledger:cleared_volume:";
 /// Key prefix for archived entries (from rollback operations)
 const ARCHIVE_PREFIX: &str = "ledger:archive:";
 
+/// Key prefix for witness signatures (for fork resolution)
+/// Format: ledger:witnesses:{entry_hash_hex}
+const WITNESS_PREFIX: &str = "ledger:witnesses:";
+
 /// Record of an archived entry (from rollback operations)
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ArchiveRecord {
@@ -172,6 +176,9 @@ impl Ledger {
         // Load journal version from storage (or default to 0)
         let journal_version = Self::load_journal_version_from_store(&store)?;
 
+        // Clone store ref for fork resolver before moving into ledger
+        let store_for_fork_resolver = store.clone();
+
         let mut ledger = Ledger {
             store,
             cached_balances: HashMap::new(),
@@ -197,6 +204,9 @@ impl Ledger {
             fx_config: None,                 // Set via set_fx_config()
             witness_config: None,            // Set via set_witness_config()
         };
+
+        // Set store on fork resolver for witness signature lookups (Issue #688)
+        ledger.fork_resolver.set_store(store_for_fork_resolver);
 
         // Load cached balances from storage
         ledger.load_cached_balances()?;
@@ -995,8 +1005,17 @@ impl Ledger {
         // Record witness count metric
         let witness_count = witnessed.witness_signatures.len() as u64;
 
+        // Clone witness signatures before consuming the entry (for persistence)
+        let witness_signatures = witnessed.witness_signatures.clone();
+
         // Append the underlying entry
         let hash = self.append_entry_internal(witnessed.entry, true).await?;
+
+        // Persist witness signatures for fork resolution (Issue #688)
+        // This allows count_signers() to retrieve witness count when resolving forks
+        if !witness_signatures.is_empty() {
+            self.store_witness_signatures(&hash, &witness_signatures)?;
+        }
 
         // Record success metrics
         icn_obs::metrics::ledger::witnessed_entries_accepted_inc();
@@ -1037,6 +1056,72 @@ impl Ledger {
         }
 
         Ok(())
+    }
+
+    /// Store witness signatures for an entry (for fork resolution)
+    ///
+    /// Persists witness signatures alongside entries so that fork resolution
+    /// can count co-signers when comparing conflicting entries.
+    fn store_witness_signatures(
+        &self,
+        entry_hash: &ContentHash,
+        witnesses: &[crate::types::WitnessSignature],
+    ) -> Result<()> {
+        let key = format!("{}{}", WITNESS_PREFIX, entry_hash.to_hex());
+        let value = serde_json::to_vec(witnesses)?;
+        self.store.put(key.as_bytes(), &value)?;
+        debug!(
+            entry_hash = %entry_hash,
+            witness_count = witnesses.len(),
+            "Persisted witness signatures for fork resolution"
+        );
+        Ok(())
+    }
+
+    /// Load witness signatures for an entry (for fork resolution)
+    ///
+    /// Returns the stored witness signatures, or an empty vec if none exist.
+    pub fn load_witness_signatures(
+        &self,
+        entry_hash: &ContentHash,
+    ) -> Result<Vec<crate::types::WitnessSignature>> {
+        let key = format!("{}{}", WITNESS_PREFIX, entry_hash.to_hex());
+        match self.store.get(key.as_bytes())? {
+            Some(data) => {
+                let witnesses: Vec<crate::types::WitnessSignature> = serde_json::from_slice(&data)
+                    .context("Failed to deserialize witness signatures")?;
+                Ok(witnesses)
+            }
+            None => Ok(Vec::new()),
+        }
+    }
+
+    /// Count unique signers for an entry (author + witnesses)
+    ///
+    /// Loads witness signatures from storage and counts unique DIDs.
+    /// Returns 1 (author only) if no witness signatures are stored.
+    pub fn count_entry_signers(&self, entry: &JournalEntry) -> usize {
+        let entry_hash = match &entry.id {
+            Some(h) => h,
+            None => return 1, // No hash, just count author
+        };
+
+        match self.load_witness_signatures(entry_hash) {
+            Ok(witnesses) => {
+                // Count unique witness DIDs + 1 for the author
+                let unique_witnesses: std::collections::HashSet<_> =
+                    witnesses.iter().map(|w| &w.witness).collect();
+                unique_witnesses.len() + 1
+            }
+            Err(e) => {
+                debug!(
+                    entry_hash = %entry_hash,
+                    error = %e,
+                    "Failed to load witness signatures, counting author only"
+                );
+                1
+            }
+        }
     }
 
     /// Calculate the total absolute value of an entry (for threshold comparison)

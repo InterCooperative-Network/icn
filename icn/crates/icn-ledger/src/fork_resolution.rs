@@ -7,8 +7,9 @@
 //! network partition or concurrent operations. This module provides multiple resolution
 //! strategies based on trust, timestamps, and participant consensus.
 
-use crate::types::{ContentHash, JournalEntry};
+use crate::types::{ContentHash, JournalEntry, WitnessSignature};
 use anyhow::{anyhow, Result};
+use icn_store::Store;
 use icn_trust::TrustGraph;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -66,10 +67,14 @@ pub enum ForkResolution {
     RequiresManual { reason: String },
 }
 
+/// Key prefix for witness signatures in storage (matches ledger.rs)
+const WITNESS_PREFIX: &str = "ledger:witnesses:";
+
 /// Fork resolution system
 pub struct ForkResolver {
     strategy: ForkResolutionStrategy,
     trust_graph: Option<Arc<tokio::sync::RwLock<TrustGraph>>>,
+    store: Option<Arc<dyn Store>>,
 }
 
 impl ForkResolver {
@@ -78,12 +83,18 @@ impl ForkResolver {
         Self {
             strategy,
             trust_graph: None,
+            store: None,
         }
     }
 
     /// Set the trust graph for trust-weighted resolution
     pub fn set_trust_graph(&mut self, trust_graph: Arc<tokio::sync::RwLock<TrustGraph>>) {
         self.trust_graph = Some(trust_graph);
+    }
+
+    /// Set the store for loading witness signatures (Issue #688)
+    pub fn set_store(&mut self, store: Arc<dyn Store>) {
+        self.store = Some(store);
     }
 
     /// Detect if two entries form a fork (same parents, different hashes)
@@ -282,16 +293,59 @@ impl ForkResolver {
         Ok(score)
     }
 
-    /// Count unique signers for an entry
+    /// Count unique signers for an entry (author + witnesses)
     ///
-    /// Currently always returns 1 (counting the author). Future work (Issue #676)
-    /// will add witness signature storage to enable counting co-signers for
-    /// fork resolution. This requires persisting witness signatures alongside
-    /// entries rather than just validating them at append time.
-    fn count_signers(&self, _entry: &JournalEntry) -> usize {
-        // TODO(#676): Look up witness signatures from storage once implemented
-        // For now, always count the author as 1 signer (with or without explicit signature)
-        1
+    /// Loads witness signatures from storage and counts unique DIDs.
+    /// Returns 1 (author only) if no store is configured or no witnesses found.
+    fn count_signers(&self, entry: &JournalEntry) -> usize {
+        // If no store configured, just count the author
+        let store = match &self.store {
+            Some(s) => s,
+            None => return 1,
+        };
+
+        // Get entry hash
+        let entry_hash = match &entry.id {
+            Some(h) => h,
+            None => return 1,
+        };
+
+        // Load witness signatures from storage
+        let key = format!("{}{}", WITNESS_PREFIX, entry_hash.to_hex());
+        match store.get(key.as_bytes()) {
+            Ok(Some(data)) => {
+                match serde_json::from_slice::<Vec<WitnessSignature>>(&data) {
+                    Ok(witnesses) => {
+                        // Count unique witness DIDs + 1 for the author
+                        let unique_witnesses: HashSet<_> =
+                            witnesses.iter().map(|w| &w.witness).collect();
+                        debug!(
+                            entry_hash = %entry_hash,
+                            witness_count = unique_witnesses.len(),
+                            "Loaded witness signatures for fork resolution"
+                        );
+                        unique_witnesses.len() + 1
+                    }
+                    Err(e) => {
+                        debug!(
+                            entry_hash = %entry_hash,
+                            error = %e,
+                            "Failed to deserialize witness signatures"
+                        );
+                        1
+                    }
+                }
+            }
+            Ok(None) => 1, // No witness signatures stored
+            Err(e) => {
+                debug!(
+                    entry_hash = %entry_hash,
+                    error = %e,
+                    "Failed to load witness signatures from store"
+                );
+                1
+            }
+        }
     }
 }
 
@@ -595,5 +649,111 @@ mod tests {
         assert_eq!(resolution2, ForkResolution::KeepSecond); // entry3 wins (earliest)
 
         // Final result: entry3 is the overall winner
+    }
+
+    #[test]
+    fn test_signature_resolution_with_witnesses() {
+        use icn_store::SledStore;
+        use tempfile::TempDir;
+
+        // Create a store and populate it with witness signatures
+        let temp_dir = TempDir::new().unwrap();
+        let store: Arc<dyn Store> = Arc::new(SledStore::open(temp_dir.path()).unwrap());
+
+        // Create two entries - entry1 has earlier timestamp but fewer signers
+        // entry2 has later timestamp but more signers
+        // With MajoritySignatures strategy, entry2 should win on signature count
+        let parent = ContentHash([0u8; 32]);
+        let author1 = make_test_did();
+        let author2 = make_test_did();
+
+        let entry1 = make_test_entry(author1.clone(), vec![parent.clone()], 1000);
+        let entry2 = make_test_entry(author2.clone(), vec![parent.clone()], 2000); // Later timestamp
+
+        // Store 2 witness signatures for entry2 (making it 3 signers total)
+        let witness1 = make_test_did();
+        let witness2 = make_test_did();
+        let witnesses = vec![
+            WitnessSignature {
+                witness: witness1,
+                signature: vec![0u8; 64], // Dummy signature
+                signed_at: 1000,
+            },
+            WitnessSignature {
+                witness: witness2,
+                signature: vec![0u8; 64],
+                signed_at: 1000,
+            },
+        ];
+
+        // Store witnesses for entry2
+        let entry2_hash = entry2.id.as_ref().unwrap();
+        let key = format!("{}{}", WITNESS_PREFIX, entry2_hash.to_hex());
+        store
+            .put(key.as_bytes(), &serde_json::to_vec(&witnesses).unwrap())
+            .unwrap();
+
+        // Verify the data was stored correctly
+        let stored = store.get(key.as_bytes()).unwrap();
+        assert!(stored.is_some(), "Witness data should be stored");
+
+        // Create resolver with store and use MajoritySignatures strategy
+        let mut resolver = ForkResolver::new(ForkResolutionStrategy::MajoritySignatures);
+        resolver.set_store(store.clone());
+
+        // Verify count_signers works correctly
+        let signers1 = resolver.count_signers(&entry1);
+        let signers2 = resolver.count_signers(&entry2);
+        assert_eq!(signers1, 1, "Entry1 should have 1 signer (author only)");
+        assert_eq!(signers2, 3, "Entry2 should have 3 signers (author + 2 witnesses)");
+
+        // Entry2 should win because it has more signers (3 vs 1)
+        // Even though entry1 has an earlier timestamp
+        let fork = Fork {
+            common_parents: vec![parent.clone()],
+            entry1: entry1.clone(),
+            entry2: entry2.clone(),
+            detected_at: SystemTime::now(),
+        };
+
+        let resolution = resolver.resolve_fork(&fork).unwrap();
+        assert_eq!(resolution, ForkResolution::KeepSecond);
+
+        // If we reverse the order, entry2 (now in position 1) should still win
+        let fork_reversed = Fork {
+            common_parents: vec![parent.clone()],
+            entry1: entry2,
+            entry2: entry1,
+            detected_at: SystemTime::now(),
+        };
+
+        let resolution_reversed = resolver.resolve_fork(&fork_reversed).unwrap();
+        assert_eq!(resolution_reversed, ForkResolution::KeepFirst);
+    }
+
+    #[test]
+    fn test_signature_resolution_no_store() {
+        // Without a store, both entries should have 1 signer (author only)
+        // In tie situations, it falls back to timestamp
+        let resolver = ForkResolver::new(ForkResolutionStrategy::MajoritySignatures);
+
+        let parent = ContentHash([0u8; 32]);
+        let author1 = make_test_did();
+        let author2 = make_test_did();
+
+        // Different timestamps - earlier wins
+        let entry1 = make_test_entry(author1.clone(), vec![parent.clone()], 1000);
+        let entry2 = make_test_entry(author2.clone(), vec![parent.clone()], 2000);
+
+        let fork = Fork {
+            common_parents: vec![parent.clone()],
+            entry1: entry1.clone(),
+            entry2: entry2.clone(),
+            detected_at: SystemTime::now(),
+        };
+
+        // Same signer count, so falls back to timestamp - entry1 wins
+        let resolution = resolver.resolve_fork(&fork).unwrap();
+        assert_eq!(resolution, ForkResolution::KeepFirst);
     }
 }
