@@ -170,12 +170,8 @@ impl EvidenceValidator {
         if valid_count == 0 {
             EvidenceValidationResult::invalid_multiple(all_errors)
         } else {
-            // Some evidence is valid, return success with adjustment
-            let avg_adjustment = if valid_count > 0 {
-                total_adjustment / valid_count as f64
-            } else {
-                0.0
-            };
+            // Some evidence is valid, return success with average adjustment
+            let avg_adjustment = total_adjustment / valid_count as f64;
             EvidenceValidationResult::valid_with_adjustment(avg_adjustment)
         }
     }
@@ -230,7 +226,9 @@ impl EvidenceValidator {
             }
             Err(e) => {
                 warn!("Error checking contract: {}", e);
-                EvidenceValidationResult::valid()
+                EvidenceValidationResult::invalid(EvidenceValidationError::StorageError {
+                    details: e.to_string(),
+                })
             }
         }
     }
@@ -268,7 +266,9 @@ impl EvidenceValidator {
             }
             Err(e) => {
                 warn!("Error checking ledger transaction: {}", e);
-                EvidenceValidationResult::valid()
+                EvidenceValidationResult::invalid(EvidenceValidationError::StorageError {
+                    details: e.to_string(),
+                })
             }
         }
     }
@@ -304,7 +304,9 @@ impl EvidenceValidator {
             }
             Err(e) => {
                 warn!("Error checking governance vote: {}", e);
-                EvidenceValidationResult::valid()
+                EvidenceValidationResult::invalid(EvidenceValidationError::StorageError {
+                    details: e.to_string(),
+                })
             }
         }
     }

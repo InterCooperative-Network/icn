@@ -232,6 +232,9 @@ pub enum EvidenceValidationError {
 
     #[error("Evidence expired")]
     EvidenceExpired,
+
+    #[error("Storage error during validation: {details}")]
+    StorageError { details: String },
 }
 
 /// Result of evidence validation

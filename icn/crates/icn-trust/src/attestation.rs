@@ -409,7 +409,13 @@ impl TrustAttestation {
             .iter()
             .filter_map(|e| match e {
                 TrustEvidence::Legacy { reference, .. } => Some(reference.clone()),
-                TrustEvidence::ContractExecution { agreement_id, .. } => agreement_id.clone(),
+                TrustEvidence::ContractExecution {
+                    contract_id,
+                    agreement_id,
+                    ..
+                } => agreement_id
+                    .clone()
+                    .or_else(|| Some(hex::encode(contract_id))),
                 TrustEvidence::LedgerTransaction { entry_hash, .. } => {
                     Some(hex::encode(entry_hash))
                 }
