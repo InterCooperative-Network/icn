@@ -1800,6 +1800,24 @@ pub fn init_descriptions() {
         "icn_ledger_entries_rejected_missing_parents_total",
         "Total local entries rejected due to missing parents"
     );
+
+    // Witness signature metrics (Issue #676)
+    describe_counter!(
+        "icn_ledger_witnessed_entries_accepted_total",
+        "Total witnessed entries successfully validated and stored"
+    );
+    describe_counter!(
+        "icn_ledger_witnessed_entries_rejected_invalid_signature_total",
+        "Total witnessed entries rejected due to invalid signature"
+    );
+    describe_counter!(
+        "icn_ledger_witnessed_entries_rejected_insufficient_total",
+        "Total witnessed entries rejected due to insufficient signatures"
+    );
+    describe_histogram!(
+        "icn_ledger_witness_signature_count",
+        "Number of witness signatures on accepted entries"
+    );
 }
 
 /// Network metrics
