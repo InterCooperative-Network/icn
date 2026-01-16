@@ -19,6 +19,8 @@ x25519-dalek.workspace = true
 async-trait = "0.1"
 hex = "0.4"
 sled.workspace = true
+sha2.workspace = true
+rand.workspace = true
 
 # Encoding
 icn-encoding = { path = "../icn-encoding" }

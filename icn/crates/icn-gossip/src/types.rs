@@ -2,6 +2,7 @@
 
 use crate::vector_clock::VectorClock;
 use icn_identity::Did;
+use icn_store::{StorageChallenge, StorageProof};
 use icn_trust::TrustClass;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
@@ -349,6 +350,18 @@ pub enum GossipMessage {
         /// Number of entries that need sync
         entries_behind: u64,
     },
+
+    /// Storage challenge from verifier (Proof-of-Storage)
+    StorageChallengeMsg {
+        /// The storage challenge
+        challenge: StorageChallenge,
+    },
+
+    /// Storage proof response from replica holder (Proof-of-Storage)
+    StorageProofMsg {
+        /// The storage proof
+        proof: StorageProof,
+    },
 }
 
 impl GossipMessage {
@@ -370,6 +383,8 @@ impl GossipMessage {
             GossipMessage::ReplicaStatus { .. } => "ReplicaStatus",
             GossipMessage::PartitionHealRequest { .. } => "PartitionHealRequest",
             GossipMessage::PartitionHealResponse { .. } => "PartitionHealResponse",
+            GossipMessage::StorageChallengeMsg { .. } => "StorageChallengeMsg",
+            GossipMessage::StorageProofMsg { .. } => "StorageProofMsg",
         }
     }
 }

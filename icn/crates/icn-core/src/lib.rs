@@ -19,6 +19,7 @@ pub mod policy;
 pub mod replication;
 pub mod restart;
 pub mod runtime;
+pub mod storage_challenge;
 pub mod supervisor;
 pub mod trust_propagation;
 pub mod upgrade;
@@ -39,6 +40,7 @@ pub use node::{
 pub use policy::{Capability, CapabilityQuota, DefaultPolicySource, PolicySource, TrustPolicy};
 pub use replication::{ReplicationConfig, ReplicationHandle, ReplicationManager};
 pub use runtime::Runtime;
+pub use storage_challenge::{ChallengeScheduler, ChallengeSchedulerHandle};
 pub use trust_propagation::{AttestationLimits, AttestationRateLimiter, TRUST_ATTESTATIONS_TOPIC};
 pub use upgrade::{
     proposal_to_pending_upgrade, PendingUpgrade, UpgradeAdoptionStats, UpgradeCoordinator,

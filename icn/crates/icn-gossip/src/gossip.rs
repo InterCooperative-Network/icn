@@ -28,6 +28,12 @@ pub type EntryNotificationCallback = Arc<dyn Fn(String, GossipEntry, Did) + Send
 /// Returns a list of peer DIDs to send messages to
 pub type PeerSamplingCallback = Arc<dyn Fn(crate::types::Scope, usize) -> Vec<Did> + Send + Sync>;
 
+/// Callback for handling received storage proofs
+/// Parameters: (proof)
+/// Called when a storage proof is received from a replica holder
+pub type StorageProofCallback =
+    Arc<dyn Fn(icn_store::StorageProof) -> anyhow::Result<()> + Send + Sync>;
+
 /// Trust lookup function for resource limits
 /// Parameters: (did) -> `Option<TrustClass>`
 /// Returns the trust class for a DID to determine resource limits
@@ -135,7 +141,7 @@ pub struct GossipActor {
     pub(crate) own_did: Did,
 
     /// Keypair for signing outgoing messages (optional for testing)
-    keypair: Option<KeyPair>,
+    pub(crate) keypair: Option<KeyPair>,
 
     /// Sequence counter for signed messages (monotonically increasing)
     #[allow(dead_code)]
@@ -174,6 +180,9 @@ pub struct GossipActor {
 
     /// Peer sampling callback (optional, for scope-aware peer selection)
     peer_sampling: Option<PeerSamplingCallback>,
+
+    /// Storage proof callback (optional, for forwarding proofs to ChallengeScheduler)
+    pub(crate) storage_proof_callback: Option<StorageProofCallback>,
 
     /// Per-peer sync state manager
     pub(crate) peer_sync: PeerSyncManager,
@@ -236,6 +245,7 @@ impl GossipActor {
             send_callback: None,
             notification_callback: None,
             peer_sampling: None,
+            storage_proof_callback: None,
             peer_sync: PeerSyncManager::new(300, 5000), // Default: 300-5000ms backoff
             store: None,                                // Phase 17: Set via set_store()
             misbehavior_detector: None, // Phase 18 Week 1-2: Set via set_misbehavior_detector()
@@ -330,6 +340,11 @@ impl GossipActor {
     /// Set the peer sampling callback for scope-aware peer selection
     pub fn set_peer_sampling(&mut self, callback: PeerSamplingCallback) {
         self.peer_sampling = Some(callback);
+    }
+
+    /// Set the storage proof callback for forwarding proofs to ChallengeScheduler
+    pub fn set_storage_proof_callback(&mut self, callback: StorageProofCallback) {
+        self.storage_proof_callback = Some(callback);
     }
 
     /// Set the store for replica metadata tracking (Phase 17)
@@ -701,6 +716,16 @@ impl GossipActor {
                 },
             );
         }
+    }
+
+    /// Send a storage challenge to a replica holder
+    ///
+    /// Public API for the ChallengeScheduler to send proof-of-storage challenges.
+    pub fn send_storage_challenge(&self, target: Did, challenge: icn_store::StorageChallenge) {
+        self.send_message(
+            Some(target),
+            GossipMessage::StorageChallengeMsg { challenge },
+        );
     }
 
     /// Get all known peers (Phase 17 Week 3 - ReplicationManager peer discovery)
@@ -1448,6 +1473,12 @@ impl GossipActor {
                 diverged_topics,
                 entries_behind,
             ),
+
+            GossipMessage::StorageChallengeMsg { challenge } => {
+                self.handle_storage_challenge(sender, challenge)
+            }
+
+            GossipMessage::StorageProofMsg { proof } => self.handle_storage_proof(sender, proof),
         }
     }
 

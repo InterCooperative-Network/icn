@@ -354,8 +354,8 @@ mod tests {
         // Add multiple peers
         for i in 0..5 {
             let peer = CachedPeer::new(
-                format!("did:icn:peer{}", i),
-                format!("192.168.1.{}:7777", i).parse().unwrap(),
+                format!("did:icn:peer{i}"),
+                format!("192.168.1.{i}:7777").parse().unwrap(),
                 PeerSource::PeerExchange,
             );
             cache.put(&peer).unwrap();
@@ -468,8 +468,8 @@ mod tests {
 
         for i in 0..3 {
             let peer = CachedPeer::new(
-                format!("did:icn:peer{}", i),
-                format!("192.168.1.{}:7777", i).parse().unwrap(),
+                format!("did:icn:peer{i}"),
+                format!("192.168.1.{i}:7777").parse().unwrap(),
                 PeerSource::Bootstrap,
             );
             cache.put(&peer).unwrap();
@@ -485,8 +485,8 @@ mod tests {
 
         for i in 0..5 {
             let peer = CachedPeer::new(
-                format!("did:icn:peer{}", i),
-                format!("192.168.1.{}:7777", i).parse().unwrap(),
+                format!("did:icn:peer{i}"),
+                format!("192.168.1.{i}:7777").parse().unwrap(),
                 PeerSource::Bootstrap,
             );
             cache.put(&peer).unwrap();

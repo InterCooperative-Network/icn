@@ -2978,6 +2978,60 @@ pub mod replication {
     }
 }
 
+/// Storage challenge metrics (Proof-of-Storage)
+pub mod storage_challenge {
+    use metrics::{counter, gauge, histogram};
+
+    /// Set number of pending challenges
+    pub fn pending_set(count: usize) {
+        gauge!("icn_storage_challenge_pending").set(count as f64);
+    }
+
+    /// Increment challenges sent counter
+    pub fn sent_inc() {
+        counter!("icn_storage_challenge_sent_total").increment(1);
+    }
+
+    /// Increment successful proofs counter
+    pub fn proofs_verified_inc() {
+        counter!("icn_storage_challenge_proofs_verified_total").increment(1);
+    }
+
+    /// Increment failed challenges counter
+    pub fn failures_inc(reason: &str) {
+        counter!("icn_storage_challenge_failures_total",
+                 "reason" => reason.to_string())
+        .increment(1);
+    }
+
+    /// Record challenge round duration
+    pub fn round_duration_record(duration_secs: f64) {
+        histogram!("icn_storage_challenge_round_duration_seconds").record(duration_secs);
+    }
+
+    /// Record proof verification duration
+    pub fn verify_duration_record(duration_secs: f64) {
+        histogram!("icn_storage_challenge_verify_duration_seconds").record(duration_secs);
+    }
+
+    /// Increment violations recorded counter
+    pub fn violations_inc(violation_type: &str) {
+        counter!("icn_storage_challenge_violations_total",
+                 "type" => violation_type.to_string())
+        .increment(1);
+    }
+
+    /// Set replicas checked gauge
+    pub fn replicas_checked_set(count: usize) {
+        gauge!("icn_storage_challenge_replicas_checked").set(count as f64);
+    }
+
+    /// Increment timeout counter
+    pub fn timeouts_inc() {
+        counter!("icn_storage_challenge_timeouts_total").increment(1);
+    }
+}
+
 /// Gateway API metrics
 pub mod gateway {
     use metrics::{counter, gauge, histogram};

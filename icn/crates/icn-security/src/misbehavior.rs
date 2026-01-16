@@ -63,6 +63,35 @@ pub enum Violation {
         message_hash: ContentHash,
         sequence: u64,
     },
+
+    /// Failed proof-of-storage challenge
+    FailedStorageChallenge {
+        /// Content hash that was challenged
+        content_hash: ContentHash,
+        /// Challenge ID
+        challenge_id: [u8; 32],
+        /// Reason for failure
+        reason: StorageFailureReason,
+    },
+}
+
+/// Reason for storage challenge failure
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum StorageFailureReason {
+    /// No response received within timeout
+    NoResponse,
+    /// Returned bytes don't match expected hash
+    DataMismatch,
+    /// Merkle proof doesn't verify against expected root
+    InvalidMerkleProof,
+    /// Prover reports content not found
+    ContentNotFound,
+    /// Signature verification failed
+    InvalidSignature,
+    /// Challenge ID mismatch
+    ChallengeMismatch,
+    /// Proof expired or challenge was already expired
+    Expired,
 }
 
 impl Violation {
@@ -82,9 +111,46 @@ impl Violation {
             // Minor violations (1 point) - might be accidental
             Violation::ExcessiveResourceUse { .. } => 1,
             Violation::TrustGraphSpam { .. } => 1,
+
+            // Storage violations (variable severity based on reason)
+            Violation::FailedStorageChallenge { reason, .. } => reason.severity(),
+        }
+    }
+}
+
+impl StorageFailureReason {
+    /// Get severity score for this failure type
+    pub fn severity(&self) -> u32 {
+        match self {
+            // Network/timing issues - might be temporary
+            StorageFailureReason::NoResponse => 1,
+            StorageFailureReason::Expired => 1,
+            // Data issues - concerning
+            StorageFailureReason::ContentNotFound => 3,
+            // Likely intentional misbehavior
+            StorageFailureReason::DataMismatch => 5,
+            StorageFailureReason::ChallengeMismatch => 5,
+            // Almost certainly malicious
+            StorageFailureReason::InvalidMerkleProof => 8,
+            StorageFailureReason::InvalidSignature => 8,
         }
     }
 
+    /// Human-readable description
+    pub fn description(&self) -> &'static str {
+        match self {
+            StorageFailureReason::NoResponse => "No response received within timeout",
+            StorageFailureReason::DataMismatch => "Returned bytes don't match expected hash",
+            StorageFailureReason::InvalidMerkleProof => "Merkle proof verification failed",
+            StorageFailureReason::ContentNotFound => "Prover reports content not found",
+            StorageFailureReason::InvalidSignature => "Proof signature verification failed",
+            StorageFailureReason::ChallengeMismatch => "Challenge ID mismatch in proof",
+            StorageFailureReason::Expired => "Proof or challenge has expired",
+        }
+    }
+}
+
+impl Violation {
     /// Get a human-readable description
     pub fn description(&self) -> String {
         match self {
@@ -122,6 +188,17 @@ impl Violation {
             }
             Violation::ReplayAttack { sequence, .. } => {
                 format!("Replay attack detected (sequence: {sequence})")
+            }
+            Violation::FailedStorageChallenge {
+                content_hash,
+                reason,
+                ..
+            } => {
+                format!(
+                    "Failed storage challenge for {}: {}",
+                    hex::encode(content_hash),
+                    reason.description()
+                )
             }
         }
     }
