@@ -216,7 +216,7 @@ fn test_attestation_sign_verify_store_cycle() {
         icn_trust::TrustEvidence::Legacy { reference, .. } => {
             assert_eq!(reference, "contract_123");
         }
-        other => panic!("Expected Legacy evidence, got {:?}", other),
+        other => panic!("Expected Legacy evidence, got {other:?}"),
     }
 }
 
