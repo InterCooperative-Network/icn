@@ -238,7 +238,9 @@ async fn test_trust_attestation_propagation() -> Result<()> {
     info!("Alice creating trust edge for Bob...");
     let edge = TrustEdge::new(alice.did.clone(), bob.did.clone(), 0.75)
         .with_label("test-partner")
-        .with_evidence(TrustEvidence::from_legacy_string("integration-test".to_string()));
+        .with_evidence(TrustEvidence::from_legacy_string(
+            "integration-test".to_string(),
+        ));
 
     // Add edge locally to Alice's graph
     {

@@ -954,10 +954,9 @@ fn test_add_edge_validated_with_legacy_evidence() {
     let validator = EvidenceValidator::with_config(store, config);
 
     // Create edge with legacy evidence
-    let edge = TrustEdge::new(alice.did().clone(), bob.did().clone(), 0.7)
-        .with_evidence(TrustEvidence::from_legacy_string(
-            "test-evidence".to_string(),
-        ));
+    let edge = TrustEdge::new(alice.did().clone(), bob.did().clone(), 0.7).with_evidence(
+        TrustEvidence::from_legacy_string("test-evidence".to_string()),
+    );
 
     // Add with validation
     let result = graph.add_edge_validated(edge, &validator).unwrap();
@@ -987,10 +986,9 @@ fn test_add_edge_validated_reject_legacy_evidence() {
     let validator = EvidenceValidator::with_config(store, config);
 
     // Create edge with legacy evidence
-    let edge = TrustEdge::new(alice.did().clone(), bob.did().clone(), 0.7)
-        .with_evidence(TrustEvidence::from_legacy_string(
-            "test-evidence".to_string(),
-        ));
+    let edge = TrustEdge::new(alice.did().clone(), bob.did().clone(), 0.7).with_evidence(
+        TrustEvidence::from_legacy_string("test-evidence".to_string()),
+    );
 
     // Add with validation
     let result = graph.add_edge_validated(edge, &validator).unwrap();

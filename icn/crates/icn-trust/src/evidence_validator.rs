@@ -207,11 +207,14 @@ impl EvidenceValidator {
                 // Contract not found, try agreement store if agreement_id provided
                 if let Some(aid) = agreement_id {
                     let agreement_key = format!("agreements/{}", aid);
-                    if self.store.get(agreement_key.as_bytes()).ok().flatten().is_some() {
-                        debug!(
-                            "Agreement {} found for edge {} -> {}",
-                            aid, source, target
-                        );
+                    if self
+                        .store
+                        .get(agreement_key.as_bytes())
+                        .ok()
+                        .flatten()
+                        .is_some()
+                    {
+                        debug!("Agreement {} found for edge {} -> {}", aid, source, target);
                         return EvidenceValidationResult::valid_with_adjustment(0.1);
                     }
                 }

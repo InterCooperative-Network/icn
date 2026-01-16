@@ -334,8 +334,7 @@ mod tests {
         assert!(valid.valid);
         assert!(valid.errors.is_empty());
 
-        let invalid =
-            EvidenceValidationResult::invalid(EvidenceValidationError::LegacyNotAccepted);
+        let invalid = EvidenceValidationResult::invalid(EvidenceValidationError::LegacyNotAccepted);
         assert!(!invalid.valid);
         assert_eq!(invalid.errors.len(), 1);
     }

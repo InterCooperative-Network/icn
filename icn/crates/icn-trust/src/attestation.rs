@@ -409,9 +409,7 @@ impl TrustAttestation {
             .iter()
             .filter_map(|e| match e {
                 TrustEvidence::Legacy { reference, .. } => Some(reference.clone()),
-                TrustEvidence::ContractExecution { agreement_id, .. } => {
-                    agreement_id.clone()
-                }
+                TrustEvidence::ContractExecution { agreement_id, .. } => agreement_id.clone(),
                 TrustEvidence::LedgerTransaction { entry_hash, .. } => {
                     Some(hex::encode(entry_hash))
                 }
@@ -420,9 +418,11 @@ impl TrustAttestation {
                     Some(attestation_id.clone())
                 }
                 TrustEvidence::PeerEndorsement { endorser, .. } => Some(endorser.to_string()),
-                TrustEvidence::TechnicalObservation { observer, metric_type, .. } => {
-                    Some(format!("{}:{}", observer, metric_type.as_str()))
-                }
+                TrustEvidence::TechnicalObservation {
+                    observer,
+                    metric_type,
+                    ..
+                } => Some(format!("{}:{}", observer, metric_type.as_str())),
             })
             .collect();
 

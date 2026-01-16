@@ -321,9 +321,7 @@ pub async fn handle_trust_attestation_entry(
         if !validation_result.valid {
             warn!(
                 "Rejecting trust attestation with invalid evidence: {} -> {} (errors: {:?})",
-                edge.source,
-                edge.target,
-                validation_result.errors
+                edge.source, edge.target, validation_result.errors
             );
             icn_obs::metrics::trust::attestations_rejected_invalid_evidence_inc();
             return Ok(()); // Don't propagate error, just log and ignore
