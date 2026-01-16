@@ -141,7 +141,7 @@ pub struct GossipActor {
     pub(crate) own_did: Did,
 
     /// Keypair for signing outgoing messages (optional for testing)
-    keypair: Option<KeyPair>,
+    pub(crate) keypair: Option<KeyPair>,
 
     /// Sequence counter for signed messages (monotonically increasing)
     #[allow(dead_code)]

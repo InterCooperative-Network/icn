@@ -726,6 +726,7 @@ impl Supervisor {
             // This verifies that replica holders actually store the data they claim
             let challenge_scheduler_handle = crate::storage_challenge::ChallengeScheduler::spawn(
                 did.clone(),
+                Arc::new(identity_bundle.keypair().clone()), // For signing challenges
                 icn_store::ChallengeConfig::default(),
                 gossip_store.clone(), // Uses the gossip store for content/replica access
                 trust_graph_handle.clone(),

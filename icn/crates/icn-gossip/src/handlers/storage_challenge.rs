@@ -52,7 +52,16 @@ impl GossipActor {
             return Ok(());
         }
 
-        // TODO: Validate challenger signature
+        // Verify challenger signature (required - prevents forgery)
+        if let Err(e) = challenge.verify_signature() {
+            warn!(
+                challenge_id = %hex::encode(challenge.id),
+                challenger = %challenge.challenger,
+                error = %e,
+                "Challenge signature verification failed"
+            );
+            return Ok(());
+        }
 
         // Look for the content in our entries
         let mut content_data: Option<Vec<u8>> = None;
@@ -97,7 +106,7 @@ impl GossipActor {
         };
 
         // Create proof response
-        let proof = StorageProof::new(
+        let mut proof = StorageProof::new(
             challenge.id,
             byte_data,
             merkle_proof.chunk_hash,
@@ -106,7 +115,26 @@ impl GossipActor {
             self.own_did.to_string(),
         );
 
-        // TODO: Sign the proof
+        // Sign the proof (required for verification by challenger)
+        match &self.keypair {
+            Some(kp) => {
+                if let Err(e) = proof.sign(kp) {
+                    warn!(
+                        challenge_id = %hex::encode(challenge.id),
+                        error = %e,
+                        "Failed to sign storage proof"
+                    );
+                    return Ok(());
+                }
+            }
+            None => {
+                warn!(
+                    challenge_id = %hex::encode(challenge.id),
+                    "Cannot sign storage proof - no keypair configured"
+                );
+                return Ok(());
+            }
+        }
 
         // Send proof back to challenger
         let challenger_did = match Did::from_str(&challenge.challenger) {

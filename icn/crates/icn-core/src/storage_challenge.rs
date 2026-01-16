@@ -2,6 +2,31 @@
 //!
 //! Background task that periodically verifies replica holders actually store the data they claim.
 //! Uses Merkle proofs and random byte challenges.
+//!
+//! # Protocol Flow
+//!
+//! 1. **Challenge Generation**: Challenger selects a random replica and generates a challenge
+//!    containing a random byte offset and Merkle chunk index. The challenge is signed with
+//!    the challenger's Ed25519 key.
+//!
+//! 2. **Challenge Delivery**: Challenge is sent via gossip to the target replica holder.
+//!
+//! 3. **Proof Generation**: Replica holder verifies challenge signature, rebuilds Merkle tree,
+//!    extracts requested bytes, generates Merkle proof, signs the response.
+//!
+//! 4. **Proof Verification**: Challenger verifies proof signature, byte data hash, and Merkle
+//!    path against expected values.
+//!
+//! 5. **Outcome**: On success, replica health is updated. On failure (after grace period),
+//!    a Byzantine violation is recorded against the replica holder.
+//!
+//! # Security Model
+//!
+//! - **Merkle proofs** prevent returning precomputed data without storing the full content
+//! - **Random byte challenges** force actual content access (not just metadata)
+//! - **Ed25519 signatures** prevent forgery of challenges and proofs
+//! - **Grace period** (3 failures) prevents false positives from network issues
+//! - **Graduated severity** distinguishes network issues from Byzantine behavior
 
 use anyhow::Result;
 use rand::Rng;
@@ -13,7 +38,7 @@ use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
 use icn_gossip::GossipActor;
-use icn_identity::Did;
+use icn_identity::{Did, KeyPair};
 use icn_security::{MisbehaviorDetector, StorageFailureReason, Violation};
 use icn_store::{
     ChallengeConfig, ContentChunkTree, ContentHash, MerkleProof, StorageChallenge, Store,
@@ -47,6 +72,9 @@ pub struct ChallengeScheduler {
     /// Own DID
     own_did: Did,
 
+    /// Own keypair for signing challenges
+    keypair: Arc<KeyPair>,
+
     /// Challenge configuration
     config: ChallengeConfig,
 
@@ -77,6 +105,7 @@ impl ChallengeScheduler {
     /// Create a new ChallengeScheduler
     pub fn new(
         own_did: Did,
+        keypair: Arc<KeyPair>,
         config: ChallengeConfig,
         store: Arc<dyn Store>,
         trust_graph: Arc<RwLock<TrustGraph>>,
@@ -85,6 +114,7 @@ impl ChallengeScheduler {
     ) -> Self {
         Self {
             own_did,
+            keypair,
             config,
             store,
             trust_graph,
@@ -98,6 +128,7 @@ impl ChallengeScheduler {
     /// Spawn the scheduler as a background task
     pub fn spawn(
         own_did: Did,
+        keypair: Arc<KeyPair>,
         config: ChallengeConfig,
         store: Arc<dyn Store>,
         trust_graph: Arc<RwLock<TrustGraph>>,
@@ -107,6 +138,7 @@ impl ChallengeScheduler {
     ) -> ChallengeSchedulerHandle {
         let scheduler = Self::new(
             own_did,
+            keypair,
             config.clone(),
             store,
             trust_graph,
@@ -279,11 +311,11 @@ impl ChallengeScheduler {
 
         // Random byte offset (using gen_range to avoid modulo bias)
         let byte_offset = rand::thread_rng().gen_range(0..content_size);
+        // Compute byte length: min of configured sample size and remaining content
         let byte_length = self
             .config
             .byte_sample_size
-            .min((content_size - byte_offset) as u32)
-            .min(self.config.byte_sample_size);
+            .min((content_size - byte_offset) as u32);
 
         // Random chunk index (using gen_range to avoid modulo bias)
         let num_chunks = tree.num_chunks();
@@ -304,8 +336,8 @@ impl ChallengeScheduler {
             .map(|(count, _)| *count)
             .unwrap_or(0);
 
-        // Create the challenge
-        let challenge = StorageChallenge::new(
+        // Create and sign the challenge
+        let mut challenge = StorageChallenge::new(
             *content_hash,
             target_peer.to_string(),
             byte_offset,
@@ -315,7 +347,8 @@ impl ChallengeScheduler {
             self.config.timeout_secs,
         );
 
-        // TODO: Sign the challenge with our keypair
+        // Sign the challenge with our keypair (required for verification by recipient)
+        challenge.sign(&self.keypair)?;
 
         // Track pending challenge
         let pending = PendingChallenge {
@@ -434,6 +467,18 @@ impl ChallengeScheduler {
             }
         };
 
+        // Check if proof was generated before challenge expired (prevents race condition
+        // where proof arrives after timeout but was generated in time)
+        if proof.generated_at > pending.challenge.expires_at {
+            warn!(
+                "Proof generated after challenge expired: {} > {}",
+                proof.generated_at, pending.challenge.expires_at
+            );
+            return self
+                .record_failure(&pending, StorageFailureReason::Expired)
+                .await;
+        }
+
         // Verify prover matches target
         if proof.prover != pending.challenge.target_peer {
             warn!(
@@ -441,7 +486,19 @@ impl ChallengeScheduler {
                 proof.prover, pending.challenge.target_peer
             );
             return self
-                .record_failure(&pending, StorageFailureReason::DataMismatch)
+                .record_failure(&pending, StorageFailureReason::ChallengeMismatch)
+                .await;
+        }
+
+        // Verify proof signature (required - prevents impersonation)
+        if let Err(e) = proof.verify_signature() {
+            warn!(
+                "Proof signature verification failed for challenge {}: {}",
+                hex::encode(&proof.challenge_id[..8]),
+                e
+            );
+            return self
+                .record_failure(&pending, StorageFailureReason::InvalidSignature)
                 .await;
         }
 
@@ -476,8 +533,6 @@ impl ChallengeScheduler {
                 .record_failure(&pending, StorageFailureReason::InvalidMerkleProof)
                 .await;
         }
-
-        // TODO: Verify proof signature
 
         // Success! Reset failure count
         let key = (
