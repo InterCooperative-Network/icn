@@ -139,12 +139,20 @@ pub struct TrustEdge {
     ///
     /// Each evidence item is a verifiable reference that can be validated
     /// against actual records in the system. See [`TrustEvidence`] for types.
+    ///
+    /// # Migration Note
+    ///
+    /// When deserializing edges from storage, this field defaults to an empty
+    /// vector if not present. Callers should call [`TrustEdge::migrate_legacy_evidence`]
+    /// after deserialization to convert `legacy_evidence` to typed evidence.
+    /// Otherwise, legacy evidence will be silently ignored.
     #[serde(default)]
     pub evidence: Vec<TrustEvidence>,
     /// Legacy string evidence (for backward compatibility during migration)
     ///
-    /// New edges should not use this field. Existing edges will have their
-    /// string evidence migrated to [`TrustEvidence::Legacy`] in the `evidence` field.
+    /// **Deprecated**: New edges should not use this field. Existing edges
+    /// will have their string evidence migrated to [`TrustEvidence::Legacy`]
+    /// in the `evidence` field when [`TrustEdge::migrate_legacy_evidence`] is called.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub legacy_evidence: Vec<String>,
     /// Optional expiration timestamp

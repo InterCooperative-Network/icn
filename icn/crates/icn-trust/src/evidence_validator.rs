@@ -325,8 +325,9 @@ impl EvidenceValidator {
             });
         }
 
-        // TODO: Verify signature against known provider public keys
-        // For now, accept if provider is known and signature is non-empty
+        // TODO(#680): Verify signature against known provider public keys
+        // For now, accept if provider is known and signature is non-empty.
+        // Cryptographic verification should be implemented before production.
         if signature.is_empty() {
             return EvidenceValidationResult::invalid(
                 EvidenceValidationError::InvalidAttestationSignature,
@@ -381,7 +382,8 @@ impl EvidenceValidator {
             }
         }
 
-        // TODO: Verify endorser signature
+        // TODO(#680): Verify endorser signature cryptographically against endorser's DID
+        // For now, only check that signature is non-empty.
         if signature.is_empty() {
             return EvidenceValidationResult::invalid(
                 EvidenceValidationError::InvalidEndorsementSignature {
@@ -457,10 +459,11 @@ impl EvidenceValidator {
             }
         }
 
-        // TODO: Verify observer signature
+        // TODO(#680): Verify observer signature cryptographically
+        // For now, unsigned observations are accepted during development.
+        // This should be tightened before production deployment.
         if signature.is_empty() {
-            // Allow unsigned for now during development
-            debug!("Technical observation without signature accepted");
+            debug!("Technical observation without signature accepted (see issue #680)");
         }
 
         // Validate value range based on metric type
