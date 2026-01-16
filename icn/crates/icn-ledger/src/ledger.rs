@@ -4928,4 +4928,332 @@ mod tests {
             "Future timestamps should be rejected even without witness_config"
         );
     }
+
+    // ============================================================================
+    // Witness Signature Edge Case Tests (Issue #689)
+    // ============================================================================
+
+    #[test]
+    fn test_duplicate_witness_signatures_deduplicated() {
+        // Test that duplicate signatures from the same witness are deduplicated
+        // when counting unique signers for fork resolution
+        let (_ledger, _temp) = create_test_ledger();
+        let alice_kp = KeyPair::generate().unwrap();
+        let alice = alice_kp.did().clone();
+        let bob_kp = KeyPair::generate().unwrap();
+        let bob = bob_kp.did().clone();
+
+        let entry = JournalEntryBuilder::new(alice.clone())
+            .debit(alice.clone(), "hours".to_string(), 10)
+            .credit(bob.clone(), "hours".to_string(), 10)
+            .build()
+            .unwrap();
+
+        let entry_hash = entry.id.clone().unwrap();
+        let current_time = icn_time::current_timestamp_secs();
+
+        // Create two signatures from the same witness (bob)
+        let signature1 = bob_kp.sign(entry_hash.as_bytes());
+        let signature2 = bob_kp.sign(entry_hash.as_bytes()); // Same signer, different signature bytes
+
+        let witnessed = crate::types::WitnessedEntry {
+            entry: entry.clone(),
+            witness_signatures: vec![
+                crate::types::WitnessSignature::new(
+                    bob.clone(),
+                    signature1.to_bytes().to_vec(),
+                    current_time,
+                ),
+                crate::types::WitnessSignature::new(
+                    bob.clone(),
+                    signature2.to_bytes().to_vec(),
+                    current_time + 1,
+                ),
+            ],
+            policy_applied: crate::types::WitnessPolicy::Counterparty,
+        };
+
+        // unique_witness_count should deduplicate based on DID
+        assert_eq!(
+            witnessed.unique_witness_count(),
+            1,
+            "Duplicate witnesses should be deduplicated"
+        );
+
+        // count_entry_signers should also deduplicate (author + 1 unique witness = 2)
+        // Note: Need to store witnesses first for count_entry_signers to work
+        // This test validates the deduplication logic in has_sufficient_signatures
+        assert!(
+            witnessed.has_sufficient_signatures(),
+            "Counterparty policy should be satisfied with one valid counterparty"
+        );
+    }
+
+    #[test]
+    fn test_quorum_required_zero() {
+        // Test that quorum with required = 0 doesn't require any signatures
+        let alice_kp = KeyPair::generate().unwrap();
+        let alice = alice_kp.did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        let entry = JournalEntryBuilder::new(alice.clone())
+            .debit(alice.clone(), "hours".to_string(), 10)
+            .credit(bob.clone(), "hours".to_string(), 10)
+            .build()
+            .unwrap();
+
+        let witnessed = crate::types::WitnessedEntry {
+            entry,
+            witness_signatures: vec![], // No signatures
+            policy_applied: crate::types::WitnessPolicy::Quorum {
+                required: 0,
+                witnesses: vec![bob],
+            },
+        };
+
+        // With required = 0, no signatures should be needed
+        assert!(
+            witnessed.has_sufficient_signatures(),
+            "Quorum with required=0 should pass with no signatures"
+        );
+    }
+
+    #[test]
+    fn test_quorum_required_exceeds_available() {
+        // Test that quorum fails when required > available witnesses
+        let alice_kp = KeyPair::generate().unwrap();
+        let alice = alice_kp.did().clone();
+        let bob_kp = KeyPair::generate().unwrap();
+        let bob = bob_kp.did().clone();
+
+        let entry = JournalEntryBuilder::new(alice.clone())
+            .debit(alice.clone(), "hours".to_string(), 10)
+            .credit(bob.clone(), "hours".to_string(), 10)
+            .build()
+            .unwrap();
+
+        let entry_hash = entry.id.clone().unwrap();
+        let current_time = icn_time::current_timestamp_secs();
+        let signature = bob_kp.sign(entry_hash.as_bytes());
+
+        let witnessed = crate::types::WitnessedEntry {
+            entry,
+            witness_signatures: vec![crate::types::WitnessSignature::new(
+                bob.clone(),
+                signature.to_bytes().to_vec(),
+                current_time,
+            )],
+            // Required 5 witnesses but only 1 in the authorized list
+            policy_applied: crate::types::WitnessPolicy::Quorum {
+                required: 5,
+                witnesses: vec![bob],
+            },
+        };
+
+        // Should fail because we can never reach 5 signatures with only 1 authorized witness
+        assert!(
+            !witnessed.has_sufficient_signatures(),
+            "Quorum requiring 5 should fail with only 1 signature"
+        );
+    }
+
+    #[test]
+    fn test_invalid_signature_format() {
+        // Test that invalid signature format (non-64-byte) is rejected
+        let (mut ledger, _temp) = create_test_ledger();
+        let alice_kp = KeyPair::generate().unwrap();
+        let alice = alice_kp.did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        ledger.set_witness_config(crate::types::WitnessConfig::counterparty_above(0));
+
+        let entry = JournalEntryBuilder::new(alice.clone())
+            .debit(alice.clone(), "hours".to_string(), 10)
+            .credit(bob.clone(), "hours".to_string(), 10)
+            .build()
+            .unwrap();
+
+        let current_time = icn_time::current_timestamp_secs();
+
+        // Create an invalid signature (wrong length)
+        let invalid_signature = vec![0u8; 32]; // Should be 64 bytes for Ed25519
+
+        let witnessed = crate::types::WitnessedEntry {
+            entry,
+            witness_signatures: vec![crate::types::WitnessSignature::new(
+                bob.clone(),
+                invalid_signature,
+                current_time,
+            )],
+            policy_applied: crate::types::WitnessPolicy::Counterparty,
+        };
+
+        let result = ledger.validate_witness_signatures(&witnessed);
+        assert!(
+            result.is_err(),
+            "Invalid signature format should be rejected"
+        );
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .to_lowercase()
+                .contains("signature"),
+            "Error should mention signature"
+        );
+    }
+
+    #[test]
+    fn test_witnessed_entry_without_hash() {
+        // Test that witnessed entry without hash is rejected
+        let (mut ledger, _temp) = create_test_ledger();
+        let alice_kp = KeyPair::generate().unwrap();
+        let alice = alice_kp.did().clone();
+        let bob_kp = KeyPair::generate().unwrap();
+        let bob = bob_kp.did().clone();
+
+        ledger.set_witness_config(crate::types::WitnessConfig::counterparty_above(0));
+
+        // Create entry without computing hash (id = None)
+        let entry = JournalEntry {
+            id: None, // No hash computed
+            timestamp: icn_time::current_timestamp_secs(),
+            author: alice.clone(),
+            contract_ref: None,
+            accounts: vec![
+                crate::types::AccountDelta::debit(alice.clone(), "hours".to_string(), 10),
+                crate::types::AccountDelta::credit(bob.clone(), "hours".to_string(), 10),
+            ],
+            parents: vec![],
+            signature: None,
+        };
+
+        let current_time = icn_time::current_timestamp_secs();
+        // Create a dummy signature (can't sign without a hash)
+        let dummy_signature = vec![0u8; 64];
+
+        let witnessed = crate::types::WitnessedEntry {
+            entry,
+            witness_signatures: vec![crate::types::WitnessSignature::new(
+                bob.clone(),
+                dummy_signature,
+                current_time,
+            )],
+            policy_applied: crate::types::WitnessPolicy::Counterparty,
+        };
+
+        let result = ledger.validate_witness_signatures(&witnessed);
+        assert!(result.is_err(), "Entry without hash should be rejected");
+        assert!(
+            result.unwrap_err().to_string().contains("hash"),
+            "Error should mention hash"
+        );
+    }
+
+    #[test]
+    fn test_author_as_witness_not_double_counted() {
+        // Test that if author appears in witness list, they're not double-counted
+        let alice_kp = KeyPair::generate().unwrap();
+        let alice = alice_kp.did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        let entry = JournalEntryBuilder::new(alice.clone())
+            .debit(alice.clone(), "hours".to_string(), 10)
+            .credit(bob.clone(), "hours".to_string(), 10)
+            .build()
+            .unwrap();
+
+        let entry_hash = entry.id.clone().unwrap();
+        let current_time = icn_time::current_timestamp_secs();
+
+        // Author (alice) signs as witness
+        let author_signature = alice_kp.sign(entry_hash.as_bytes());
+
+        let witnessed = crate::types::WitnessedEntry {
+            entry: entry.clone(),
+            witness_signatures: vec![crate::types::WitnessSignature::new(
+                alice.clone(), // Author is also a witness
+                author_signature.to_bytes().to_vec(),
+                current_time,
+            )],
+            policy_applied: crate::types::WitnessPolicy::AllParties,
+        };
+
+        // unique_witness_count counts all witnesses including author
+        // (the filtering happens in count_entry_signers, not here)
+        assert_eq!(witnessed.unique_witness_count(), 1);
+
+        // For AllParties policy with alice as author and only bob as other party,
+        // alice signing as witness shouldn't satisfy the requirement
+        // (bob needs to sign as counterparty)
+        assert!(
+            !witnessed.has_sufficient_signatures(),
+            "AllParties should require bob (non-author) to sign"
+        );
+    }
+
+    #[test]
+    fn test_all_parties_policy_requires_all_counterparties() {
+        // Test that AllParties policy requires all non-author accounts to sign
+        let alice_kp = KeyPair::generate().unwrap();
+        let alice = alice_kp.did().clone();
+        let bob_kp = KeyPair::generate().unwrap();
+        let bob = bob_kp.did().clone();
+        let charlie_kp = KeyPair::generate().unwrap();
+        let charlie = charlie_kp.did().clone();
+
+        // Entry involves alice (author), bob, and charlie - all credits/debits must balance
+        let entry = JournalEntryBuilder::new(alice.clone())
+            .debit(alice.clone(), "hours".to_string(), 20)
+            .credit(bob.clone(), "hours".to_string(), 10)
+            .credit(charlie.clone(), "hours".to_string(), 10)
+            .build()
+            .unwrap();
+
+        let entry_hash = entry.id.clone().unwrap();
+        let current_time = icn_time::current_timestamp_secs();
+
+        // Only bob signs (charlie hasn't signed)
+        let bob_signature = bob_kp.sign(entry_hash.as_bytes());
+
+        let witnessed_partial = crate::types::WitnessedEntry {
+            entry: entry.clone(),
+            witness_signatures: vec![crate::types::WitnessSignature::new(
+                bob.clone(),
+                bob_signature.to_bytes().to_vec(),
+                current_time,
+            )],
+            policy_applied: crate::types::WitnessPolicy::AllParties,
+        };
+
+        assert!(
+            !witnessed_partial.has_sufficient_signatures(),
+            "AllParties should fail when charlie hasn't signed"
+        );
+
+        // Now both bob and charlie sign
+        let charlie_signature = charlie_kp.sign(entry_hash.as_bytes());
+
+        let witnessed_complete = crate::types::WitnessedEntry {
+            entry,
+            witness_signatures: vec![
+                crate::types::WitnessSignature::new(
+                    bob.clone(),
+                    bob_signature.to_bytes().to_vec(),
+                    current_time,
+                ),
+                crate::types::WitnessSignature::new(
+                    charlie.clone(),
+                    charlie_signature.to_bytes().to_vec(),
+                    current_time,
+                ),
+            ],
+            policy_applied: crate::types::WitnessPolicy::AllParties,
+        };
+
+        assert!(
+            witnessed_complete.has_sufficient_signatures(),
+            "AllParties should pass when all counterparties have signed"
+        );
+    }
 }
