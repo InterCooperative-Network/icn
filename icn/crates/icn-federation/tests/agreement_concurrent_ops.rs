@@ -1370,7 +1370,10 @@ async fn test_eventual_consistency_amendment_ratification() {
             };
             amendments.iter().any(|a| {
                 a.id == amendment_id_for_check
-                    && matches!(a.status, icn_federation::agreement::AmendmentStatus::Ratified)
+                    && matches!(
+                        a.status,
+                        icn_federation::agreement::AmendmentStatus::Ratified
+                    )
             })
         },
         5,  // max 5 attempts
