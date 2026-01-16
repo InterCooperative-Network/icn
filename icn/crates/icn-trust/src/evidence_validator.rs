@@ -428,7 +428,10 @@ impl EvidenceValidator {
             };
 
             // Verify the signature
-            if verifying_key.verify_strict(message.as_bytes(), &sig).is_err() {
+            if verifying_key
+                .verify_strict(message.as_bytes(), &sig)
+                .is_err()
+            {
                 warn!(
                     "Attestation signature verification failed for provider {} (target: {})",
                     provider, target
@@ -957,7 +960,10 @@ mod tests {
 
         let result = validator.validate_all_evidence(&evidence, alice.did(), bob.did(), None);
         assert!(result.valid, "Valid signature should be accepted");
-        assert!(result.score_adjustment > 0.0, "Should have positive score adjustment");
+        assert!(
+            result.score_adjustment > 0.0,
+            "Should have positive score adjustment"
+        );
     }
 
     #[test]
@@ -1021,7 +1027,10 @@ mod tests {
         }];
 
         let result = validator.validate_all_evidence(&evidence, alice.did(), bob.did(), None);
-        assert!(result.valid, "Valid observation signature should be accepted");
+        assert!(
+            result.valid,
+            "Valid observation signature should be accepted"
+        );
     }
 
     #[test]
@@ -1052,7 +1061,10 @@ mod tests {
         }];
 
         let result = validator.validate_all_evidence(&evidence, alice.did(), bob.did(), None);
-        assert!(!result.valid, "Invalid observation signature should be rejected");
+        assert!(
+            !result.valid,
+            "Invalid observation signature should be rejected"
+        );
         assert!(matches!(
             &result.errors[0],
             EvidenceValidationError::InvalidObservationSignature { .. }
@@ -1084,7 +1096,10 @@ mod tests {
         }];
 
         let result = validator.validate_all_evidence(&evidence, alice.did(), bob.did(), None);
-        assert!(!result.valid, "Production config should reject unsigned observations");
+        assert!(
+            !result.valid,
+            "Production config should reject unsigned observations"
+        );
         assert!(matches!(
             &result.errors[0],
             EvidenceValidationError::MissingObservationSignature { .. }
@@ -1097,10 +1112,7 @@ mod tests {
 
         // Create a mock provider key
         let provider_keypair = KeyPair::generate().unwrap();
-        let provider_public_key: [u8; 32] = provider_keypair
-            .verifying_key()
-            .as_bytes()
-            .to_owned();
+        let provider_public_key: [u8; 32] = provider_keypair.verifying_key().as_bytes().to_owned();
 
         let config = EvidenceValidatorConfig::default()
             .with_provider_key("test_provider", provider_public_key);
@@ -1131,10 +1143,7 @@ mod tests {
         // Create a mock provider key
         let provider_keypair = KeyPair::generate().unwrap();
         let wrong_keypair = KeyPair::generate().unwrap();
-        let provider_public_key: [u8; 32] = provider_keypair
-            .verifying_key()
-            .as_bytes()
-            .to_owned();
+        let provider_public_key: [u8; 32] = provider_keypair.verifying_key().as_bytes().to_owned();
 
         let config = EvidenceValidatorConfig::default()
             .with_provider_key("test_provider", provider_public_key);
@@ -1155,7 +1164,10 @@ mod tests {
         }];
 
         let result = validator.validate_all_evidence(&evidence, alice.did(), bob.did(), None);
-        assert!(!result.valid, "Invalid provider signature should be rejected");
+        assert!(
+            !result.valid,
+            "Invalid provider signature should be rejected"
+        );
         assert!(matches!(
             &result.errors[0],
             EvidenceValidationError::InvalidAttestationSignature
