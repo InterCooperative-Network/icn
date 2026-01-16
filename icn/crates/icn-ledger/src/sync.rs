@@ -1,16 +1,25 @@
 //! Ledger synchronization via gossip
 
-use crate::types::{ContentHash, JournalEntry};
+use crate::types::{ContentHash, JournalEntry, WitnessedEntry};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
 /// Message types for ledger synchronization
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum LedgerSyncMessage {
-    /// Announce a new journal entry
+    /// Announce a new journal entry (without witness signatures)
     NewEntry {
         hash: ContentHash,
         entry: JournalEntry,
+    },
+
+    /// Announce a new witnessed entry with signatures (Issue #676)
+    ///
+    /// Used when the ledger requires witness signatures for entries above
+    /// a certain threshold. Receivers validate signatures before accepting.
+    NewWitnessedEntry {
+        hash: ContentHash,
+        witnessed: WitnessedEntry,
     },
 
     /// Request a journal entry by hash

@@ -102,6 +102,7 @@ pub use treasury::{
 pub use types::{
     AccountBalances, AccountDelta, ContentHash, CreditLimit, Currency, Dispute, DisputeOutcome,
     DisputeStatus, JournalEntry, QuarantineReason, QuarantinedEntry, Resolution, Signature,
+    WitnessConfig, WitnessPolicy, WitnessSignature, WitnessedEntry,
 };
 
 // Labor shares and cooperative bonds (Razeto integration)
