@@ -85,7 +85,7 @@ pub use registry_actor::{
 };
 pub use runtime::{ContractInfo, ContractRuntime};
 pub use types::{
-    Capability, ContractInstallation, ContractState, ExecutionContext, ExecutionResult,
+    Capability, ContractInstallation, ContractState, ExecutionContext, ExecutionResult, FuelConfig,
     LedgerOperation, Value,
 };
 
