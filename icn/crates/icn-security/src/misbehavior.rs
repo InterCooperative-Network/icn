@@ -88,6 +88,10 @@ pub enum StorageFailureReason {
     ContentNotFound,
     /// Signature verification failed
     InvalidSignature,
+    /// Challenge ID mismatch
+    ChallengeMismatch,
+    /// Proof expired or challenge was already expired
+    Expired,
 }
 
 impl Violation {
@@ -120,10 +124,12 @@ impl StorageFailureReason {
         match self {
             // Network/timing issues - might be temporary
             StorageFailureReason::NoResponse => 1,
+            StorageFailureReason::Expired => 1,
             // Data issues - concerning
             StorageFailureReason::ContentNotFound => 3,
             // Likely intentional misbehavior
             StorageFailureReason::DataMismatch => 5,
+            StorageFailureReason::ChallengeMismatch => 5,
             // Almost certainly malicious
             StorageFailureReason::InvalidMerkleProof => 8,
             StorageFailureReason::InvalidSignature => 8,
@@ -138,6 +144,8 @@ impl StorageFailureReason {
             StorageFailureReason::InvalidMerkleProof => "Merkle proof verification failed",
             StorageFailureReason::ContentNotFound => "Prover reports content not found",
             StorageFailureReason::InvalidSignature => "Proof signature verification failed",
+            StorageFailureReason::ChallengeMismatch => "Challenge ID mismatch in proof",
+            StorageFailureReason::Expired => "Proof or challenge has expired",
         }
     }
 }

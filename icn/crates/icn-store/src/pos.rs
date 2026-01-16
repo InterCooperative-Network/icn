@@ -71,10 +71,12 @@ impl StorageChallenge {
         challenger: String,
         timeout_secs: u64,
     ) -> Self {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
+        // Get current Unix timestamp. If system clock is before Unix epoch, use 0.
+        // This is extremely rare but could occur with misconfigured system clocks.
+        let now = match std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH) {
+            Ok(d) => d.as_secs(),
+            Err(_) => 0,
+        };
 
         let nonce = rand::random::<u64>();
 
@@ -130,10 +132,10 @@ impl StorageChallenge {
 
     /// Check if the challenge has expired
     pub fn is_expired(&self) -> bool {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
+        let now = match std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH) {
+            Ok(d) => d.as_secs(),
+            Err(_) => 0,
+        };
         now > self.expires_at
     }
 
@@ -233,10 +235,11 @@ impl StorageProof {
         merkle_path_bits: Vec<bool>,
         prover: String,
     ) -> Self {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
+        // Get current Unix timestamp. If system clock is before Unix epoch, use 0.
+        let now = match std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH) {
+            Ok(d) => d.as_secs(),
+            Err(_) => 0,
+        };
 
         Self {
             challenge_id,

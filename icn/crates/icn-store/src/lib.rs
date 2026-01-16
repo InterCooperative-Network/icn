@@ -83,10 +83,14 @@ pub struct ReplicaMetadata {
     /// Chunk size used for Merkle tree (default: 4KB)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub chunk_size: Option<u32>,
-    /// Last challenge timestamp per replica (peer_did -> Unix seconds)
+    /// Last challenge timestamp per replica (peer DID string in `did:icn:<base58-pubkey>` format -> Unix seconds).
+    ///
+    /// Callers are responsible for ensuring that the map keys are valid peer DIDs before insertion.
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub last_challenged: HashMap<String, u64>,
-    /// Last successful verification per replica (peer_did -> Unix seconds)
+    /// Last successful verification per replica (peer DID string in `did:icn:<base58-pubkey>` format -> Unix seconds).
+    ///
+    /// Callers are responsible for ensuring that the map keys are valid peer DIDs before insertion.
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub last_verified: HashMap<String, u64>,
 }

@@ -4,6 +4,7 @@
 //! Uses Merkle proofs and random byte challenges.
 
 use anyhow::Result;
+use rand::Rng;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -276,18 +277,18 @@ impl ChallengeScheduler {
         let tree = ContentChunkTree::new(content.clone(), self.config.chunk_size);
         let expected_merkle_root = tree.root();
 
-        // Random byte offset
-        let byte_offset = rand::random::<u64>() % content_size;
+        // Random byte offset (using gen_range to avoid modulo bias)
+        let byte_offset = rand::thread_rng().gen_range(0..content_size);
         let byte_length = self
             .config
             .byte_sample_size
             .min((content_size - byte_offset) as u32)
             .min(self.config.byte_sample_size);
 
-        // Random chunk index
+        // Random chunk index (using gen_range to avoid modulo bias)
         let num_chunks = tree.num_chunks();
         let chunk_index = if num_chunks > 0 {
-            rand::random::<u32>() % num_chunks
+            rand::thread_rng().gen_range(0..num_chunks)
         } else {
             0
         };
@@ -526,11 +527,13 @@ impl ChallengeScheduler {
 
         // Emit failure metric
         let reason_str = match reason {
+            StorageFailureReason::NoResponse => "no_response",
             StorageFailureReason::DataMismatch => "data_mismatch",
             StorageFailureReason::InvalidMerkleProof => "invalid_merkle_proof",
             StorageFailureReason::ContentNotFound => "content_not_found",
             StorageFailureReason::InvalidSignature => "invalid_signature",
-            _ => "other",
+            StorageFailureReason::ChallengeMismatch => "challenge_mismatch",
+            StorageFailureReason::Expired => "expired",
         };
         icn_obs::metrics::storage_challenge::failures_inc(reason_str);
 
