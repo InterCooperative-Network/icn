@@ -21,13 +21,25 @@ use tracing_subscriber::EnvFilter;
 ///
 /// # Priority Sampling
 ///
-/// ICN uses priority-based sampling to ensure important traces are always captured
-/// while reducing overhead for routine operations:
+/// ICN uses priority-based sampling to reduce overhead while capturing important traces:
 ///
-/// - **Errors**: Always sampled (set `always_sample_errors = true`)
-/// - **Slow requests**: Always sampled if slower than `slow_threshold_ms`
+/// ## Implemented (Head-Based)
+///
 /// - **Security events**: Always sampled (spans with "security" in name)
 /// - **Normal operations**: Sampled at `sampling_rate`
+///
+/// ## Requires Collector-Side Configuration (Tail-Based)
+///
+/// Error and slow request sampling require tail-based sampling decisions (after span
+/// completion). These config fields are reserved for:
+///
+/// 1. **Collector policy generation**: Export config for Tempo/Jaeger tail-based policies
+/// 2. **Full capture mode**: Set `sampling_rate = 1.0` and filter at the collector
+/// 3. **Future integration**: Native tail-based sampling support
+///
+/// - `always_sample_errors` - Reserved for error-based tail sampling
+/// - `always_sample_slow` - Reserved for latency-based tail sampling
+/// - `slow_threshold_ms` - Threshold for slow request detection
 ///
 /// # Example Configuration
 ///
@@ -36,9 +48,9 @@ use tracing_subscriber::EnvFilter;
 /// enabled = true
 /// otlp_endpoint = "http://tempo:4317"
 /// sampling_rate = 0.1          # 10% of normal traces
-/// always_sample_errors = true  # Always capture errors
-/// always_sample_slow = true    # Always capture slow requests
-/// slow_threshold_ms = 1000     # Requests > 1s are "slow"
+/// always_sample_errors = true  # Reserved for collector-side error sampling
+/// always_sample_slow = true    # Reserved for collector-side latency sampling
+/// slow_threshold_ms = 1000     # Threshold for "slow" classification
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TracingConfig {
@@ -53,23 +65,33 @@ pub struct TracingConfig {
     /// Base sampling rate (0.0 to 1.0) for normal operations.
     /// Default is 0.1 (10%) for production.
     ///
-    /// Note: Error and slow traces are sampled regardless of this rate
-    /// when `always_sample_errors` and `always_sample_slow` are enabled.
+    /// Security spans (names containing "security") are always sampled
+    /// regardless of this rate.
     #[serde(default = "default_sampling_rate")]
     pub sampling_rate: f64,
 
-    /// Always sample traces that contain errors.
-    /// This ensures debugging information is captured for all failures.
+    /// Reserved for collector-side error sampling configuration.
+    ///
+    /// This field does NOT enable head-based error sampling (which is impossible
+    /// since errors are unknown at span start). Instead, use this to:
+    /// - Generate collector tail-sampling policies
+    /// - Document intent for full-capture + collector filtering setups
     #[serde(default = "default_always_sample_errors")]
     pub always_sample_errors: bool,
 
-    /// Always sample traces that exceed `slow_threshold_ms`.
-    /// This ensures performance issues are captured.
+    /// Reserved for collector-side latency sampling configuration.
+    ///
+    /// This field does NOT enable head-based slow request sampling (which is
+    /// impossible since duration is unknown at span start). Instead, use this to:
+    /// - Generate collector tail-sampling policies
+    /// - Document intent for full-capture + collector filtering setups
     #[serde(default = "default_always_sample_slow")]
     pub always_sample_slow: bool,
 
-    /// Threshold (in milliseconds) for considering a request "slow".
-    /// Traces exceeding this duration are always sampled if `always_sample_slow` is true.
+    /// Threshold (in milliseconds) for classifying a request as "slow".
+    ///
+    /// Used with collector-side tail-based sampling policies. Has no effect
+    /// on head-based sampling decisions.
     #[serde(default = "default_slow_threshold_ms")]
     pub slow_threshold_ms: u64,
 

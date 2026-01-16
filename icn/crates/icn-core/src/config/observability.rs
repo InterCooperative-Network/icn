@@ -25,13 +25,21 @@ pub struct ObservabilityConfig {
 ///
 /// # Priority Sampling
 ///
-/// ICN uses priority-based sampling to ensure important traces are always captured
-/// while reducing overhead for routine operations:
+/// ICN uses priority-based sampling to reduce overhead while capturing important traces:
 ///
-/// - **Errors**: Always sampled (set `always_sample_errors = true`)
-/// - **Slow requests**: Always sampled if slower than `slow_threshold_ms`
+/// ## Implemented (Head-Based)
+///
 /// - **Security events**: Always sampled (spans with "security" in name)
 /// - **Normal operations**: Sampled at `sampling_rate`
+///
+/// ## Requires Collector-Side Configuration (Tail-Based)
+///
+/// Error and slow request sampling require tail-based sampling decisions
+/// (decisions made after span completion). These must be configured in your
+/// OpenTelemetry Collector using tail-based sampling processors.
+///
+/// The `always_sample_errors` and `always_sample_slow` fields are reserved
+/// for future collector policy generation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TracingConfig {
     /// Enable distributed tracing export
@@ -43,23 +51,26 @@ pub struct TracingConfig {
     pub otlp_endpoint: String,
 
     /// Sampling rate (0.0 to 1.0). Default is 0.1 (10%) for production.
-    /// Note: Error and slow traces are sampled regardless of this rate
-    /// when `always_sample_errors` and `always_sample_slow` are enabled.
+    /// Security spans (names containing "security") are always sampled.
+    /// Error/slow sampling requires collector-side tail-based configuration.
     #[serde(default = "default_sampling_rate")]
     pub sampling_rate: f64,
 
-    /// Always sample traces that contain errors.
-    /// This ensures debugging information is captured for all failures.
+    /// Reserved for collector-side tail-based sampling configuration.
+    /// Error sampling requires post-span analysis at the collector level.
+    /// Set to true to indicate intent for collector policy generation.
     #[serde(default = "default_always_sample_errors")]
     pub always_sample_errors: bool,
 
-    /// Always sample traces that exceed `slow_threshold_ms`.
-    /// This ensures performance issues are captured.
+    /// Reserved for collector-side tail-based sampling configuration.
+    /// Duration-based sampling requires post-span analysis at the collector level.
+    /// Set to true to indicate intent for collector policy generation.
     #[serde(default = "default_always_sample_slow")]
     pub always_sample_slow: bool,
 
+    /// Reserved for collector-side tail-based sampling configuration.
     /// Threshold (in milliseconds) for considering a request "slow".
-    /// Traces exceeding this duration are always sampled if `always_sample_slow` is true.
+    /// Used by collector tail-sampling processors, not enforced at SDK level.
     #[serde(default = "default_slow_threshold_ms")]
     pub slow_threshold_ms: u64,
 
