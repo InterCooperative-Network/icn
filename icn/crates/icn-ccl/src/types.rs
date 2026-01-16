@@ -310,7 +310,7 @@ impl FuelConfig {
 
     /// Create a permissive config for trusted/internal contracts
     ///
-    /// Halves costs and doubles loop limits compared to defaults.
+    /// Reduces call and loop iteration costs and doubles loop limits compared to defaults.
     pub fn permissive() -> Self {
         Self {
             stmt_cost: 1,
