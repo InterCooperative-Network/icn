@@ -1008,10 +1008,7 @@ impl Ledger {
     /// Validate witness signatures on a witnessed entry
     ///
     /// Verifies that all signatures are valid Ed25519 signatures over the entry hash.
-    fn validate_witness_signatures(
-        &self,
-        witnessed: &crate::types::WitnessedEntry,
-    ) -> Result<()> {
+    fn validate_witness_signatures(&self, witnessed: &crate::types::WitnessedEntry) -> Result<()> {
         use ed25519_dalek::{Signature, Verifier};
 
         let entry_hash = witnessed
@@ -1033,10 +1030,7 @@ impl Ledger {
             verifying_key
                 .verify(entry_hash.as_bytes(), &signature)
                 .with_context(|| {
-                    format!(
-                        "Witness signature verification failed for {}",
-                        sig.witness
-                    )
+                    format!("Witness signature verification failed for {}", sig.witness)
                 })?;
 
             debug!(witness = %sig.witness, "Witness signature verified");
@@ -1065,16 +1059,16 @@ impl Ledger {
             None => false,
             Some(config) => {
                 let value = self.calculate_entry_value(entry);
-                !matches!(config.effective_policy(value), crate::types::WitnessPolicy::None)
+                !matches!(
+                    config.effective_policy(value),
+                    crate::types::WitnessPolicy::None
+                )
             }
         }
     }
 
     /// Get the effective witness policy for an entry
-    pub fn effective_witness_policy(
-        &self,
-        entry: &JournalEntry,
-    ) -> crate::types::WitnessPolicy {
+    pub fn effective_witness_policy(&self, entry: &JournalEntry) -> crate::types::WitnessPolicy {
         match &self.witness_config {
             None => crate::types::WitnessPolicy::None,
             Some(config) => {
@@ -1618,7 +1612,10 @@ impl Ledger {
                 }
             }
 
-            LedgerSyncMessage::NewWitnessedEntry { hash, mut witnessed } => {
+            LedgerSyncMessage::NewWitnessedEntry {
+                hash,
+                mut witnessed,
+            } => {
                 observe_sync_lag(witnessed.entry.timestamp);
 
                 // Check if we already have this entry

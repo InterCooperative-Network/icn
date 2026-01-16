@@ -328,15 +328,21 @@ async fn test_witnessed_entry_insufficient_signatures() {
         .unwrap();
 
     // Create witnessed entry with only one signature (need 2)
-    let witnessed = WitnessedEntry::new(entry, WitnessPolicy::Quorum {
-        required: 2,
-        witnesses: vec![witness1, witness2, witness3],
-    });
+    let witnessed = WitnessedEntry::new(
+        entry,
+        WitnessPolicy::Quorum {
+            required: 2,
+            witnesses: vec![witness1, witness2, witness3],
+        },
+    );
     // No signatures added
 
     // Should fail due to insufficient signatures
     let result = ledger.append_witnessed_entry(witnessed).await;
-    assert!(result.is_err(), "Expected error for insufficient signatures");
+    assert!(
+        result.is_err(),
+        "Expected error for insufficient signatures"
+    );
 
     println!("Witnessed entry with insufficient signatures rejected");
 }
@@ -373,10 +379,7 @@ async fn test_witnessed_entry_sync_message() {
     witnessed.add_signature(witness_sig);
 
     // Append to ledger1 directly (without witness validation in this case)
-    ledger1
-        .append_entry(witnessed.entry.clone())
-        .await
-        .unwrap();
+    ledger1.append_entry(witnessed.entry.clone()).await.unwrap();
 
     // Create sync message for ledger2
     let sync_msg = LedgerSyncMessage::NewWitnessedEntry {

@@ -446,7 +446,10 @@ impl WitnessConfig {
     /// Create config requiring quorum for all entries
     pub fn quorum(required: u32, witnesses: Vec<Did>) -> Self {
         WitnessConfig {
-            default_policy: WitnessPolicy::Quorum { required, witnesses },
+            default_policy: WitnessPolicy::Quorum {
+                required,
+                witnesses,
+            },
             threshold: None,
             collection_timeout_secs: 300,
         }
@@ -540,7 +543,10 @@ impl WitnessedEntry {
                     .iter()
                     .any(|s| counterparties.contains(&s.witness))
             }
-            WitnessPolicy::Quorum { required, witnesses } => {
+            WitnessPolicy::Quorum {
+                required,
+                witnesses,
+            } => {
                 // Only count signatures from authorized witnesses (unique DIDs)
                 let allowed_witnesses: std::collections::HashSet<_> = witnesses.iter().collect();
                 let signed_authorized: std::collections::HashSet<_> = self

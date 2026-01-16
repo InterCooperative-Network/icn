@@ -284,19 +284,14 @@ impl ForkResolver {
 
     /// Count unique signers for an entry
     ///
-    /// Currently counts the author signature if present. Future work (Issue #676)
+    /// Currently always returns 1 (counting the author). Future work (Issue #676)
     /// will add witness signature storage to enable counting co-signers for
     /// fork resolution. This requires persisting witness signatures alongside
     /// entries rather than just validating them at append time.
-    fn count_signers(&self, entry: &JournalEntry) -> usize {
-        // Count 1 if author signature is present, 0 otherwise
+    fn count_signers(&self, _entry: &JournalEntry) -> usize {
         // TODO(#676): Look up witness signatures from storage once implemented
-        if entry.signature.is_some() {
-            1
-        } else {
-            // Entry without signature - still count author as implicit signer
-            1
-        }
+        // For now, always count the author as 1 signer (with or without explicit signature)
+        1
     }
 }
 
