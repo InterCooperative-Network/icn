@@ -37,7 +37,10 @@ COPY icn/crates ./crates
 COPY icn/bins ./bins
 
 # Build release binaries
-RUN cargo build --release --locked \
+# RUST_MIN_STACK: Increase rustc stack size to prevent SIGSEGV on complex crates
+# -j 2: Limit parallelism to reduce peak memory usage
+ENV RUST_MIN_STACK=33554432
+RUN cargo build --release --locked -j 2 \
     && strip target/release/icnd \
     && strip target/release/icnctl
 
