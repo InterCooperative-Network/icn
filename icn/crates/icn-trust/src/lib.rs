@@ -52,6 +52,7 @@
 pub mod anomaly;
 pub mod attestation;
 pub mod evidence;
+pub mod evidence_validator;
 pub mod facade;
 pub mod multi_graph;
 pub mod pathfinder;
@@ -67,6 +68,7 @@ pub use attestation::TrustAttestation;
 pub use evidence::{
     EvidenceValidationError, EvidenceValidationResult, TechnicalMetricType, TrustEvidence,
 };
+pub use evidence_validator::{EvidenceValidator, EvidenceValidatorConfig};
 pub use facade::TrustGraphFacade;
 pub use multi_graph::MultiTrustGraph;
 pub use pathfinder::{PathfinderConfig, TrustPathfinder};
