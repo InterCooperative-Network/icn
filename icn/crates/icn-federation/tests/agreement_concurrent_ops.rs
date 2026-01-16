@@ -227,6 +227,13 @@ async fn test_concurrent_signing_two_parties_shared_store() {
     );
 
     // Verify final state
+    //
+    // NOTE: Under true concurrent execution with a non-transactional store,
+    // these assertions could theoretically fail due to lost updates. Both parties
+    // would read the same initial state, add their own signature, and write back -
+    // causing the second write to overwrite the first party's signature.
+    // In practice, Tokio's cooperative scheduling serializes these operations.
+    // If this test becomes flaky, it indicates a need for transactional store operations.
     let final_agreement = store.get_agreement(&agreement_id).unwrap().unwrap();
     assert_eq!(
         final_agreement.signatures.len(),
@@ -413,6 +420,10 @@ async fn test_concurrent_signing_three_parties() {
     assert!(result_c.unwrap().is_ok(), "Coop C signing should succeed");
 
     // Verify final state
+    //
+    // NOTE: Same race condition caveat as test_concurrent_signing_two_parties_shared_store.
+    // With three parties, the lost update problem is even more likely under true concurrency.
+    // See module documentation for details.
     let final_agreement = store.get_agreement(&agreement_id).unwrap().unwrap();
     assert_eq!(
         final_agreement.signatures.len(),
@@ -521,6 +532,12 @@ async fn test_concurrent_amendment_proposals() {
     );
 
     // Verify both amendments exist
+    //
+    // NOTE: Amendments have unique IDs so they're less likely to conflict than
+    // signatures on the same agreement. However, there's still a race in the
+    // store operations when writing the amendments collection. Under true
+    // concurrency without transactional isolation, one amendment could theoretically
+    // be lost. In practice, Tokio's scheduling serializes these operations.
     let amendments = store.get_amendments(&agreement_id).unwrap();
     assert_eq!(amendments.len(), 2, "Both amendments should be stored");
 }
@@ -598,6 +615,12 @@ async fn test_concurrent_amendment_signing() {
     );
 
     // Amendment should be ratified
+    //
+    // NOTE: Same lost update caveat as concurrent agreement signing. Both parties
+    // read the amendment, add their signatures, and write back. Without transactional
+    // isolation, the second write could overwrite the first party's signature.
+    // The test expects ratification (both signatures present), which relies on
+    // Tokio's cooperative scheduling to serialize operations.
     let amendments = store.get_amendments(&agreement_id).unwrap();
     let final_amendment = amendments.iter().find(|a| a.id == amendment_id).unwrap();
     assert!(
@@ -1175,6 +1198,13 @@ async fn test_eventual_consistency_after_concurrent_ops() {
     }
 
     // Final state should be consistent
+    //
+    // NOTE: This "eventual consistency" test verifies the final state immediately
+    // after concurrent operations complete, without any retry logic or time-based
+    // waiting for convergence. True eventual consistency would imply temporary
+    // inconsistency that converges over time. This test relies on Tokio's cooperative
+    // scheduling to serialize operations, not on actual convergence mechanisms.
+    // For real distributed eventual consistency, use the `*_with_gossip_sync` tests.
     let final_agreement = store.get_agreement(&agreement_id).unwrap().unwrap();
 
     // Should have exactly 3 signatures (one from each party)
