@@ -38,8 +38,8 @@ pub use pos::{
     StorageChallenge, StorageFailureReason, StorageProof, DEFAULT_CHUNK_SIZE, MAX_BYTE_SAMPLE_SIZE,
 };
 
-// Note: StoreTransaction, TransactionalStore, and StoreTransactionError are defined in this file
-// and automatically exported at the crate level.
+// Note: StoreTransaction, TransactionalStore, and StoreTransactionError are publicly defined
+// in this file at the crate root (accessible as icn_store::TransactionalStore, etc.).
 
 /// Content hash type (32-byte SHA-256)
 pub type ContentHash = [u8; 32];
@@ -380,6 +380,17 @@ pub trait StoreTransaction {
 /// This trait is separate from `Store` to maintain dyn-compatibility of the base trait.
 /// Use this when you need atomic multi-key operations.
 ///
+/// # Retry Semantics
+///
+/// The closure is constrained to [`Fn`] (not [`FnOnce`]) because the underlying
+/// storage backend (Sled) may retry the transaction if it encounters conflicts
+/// with concurrent operations. This means:
+///
+/// - **The closure may be called multiple times** - design for idempotency
+/// - **Avoid side effects** that should not repeat (network calls, external state)
+/// - **Any non-transactional side effects** should happen AFTER the transaction
+///   returns `Ok`, based on the returned result
+///
 /// # Example
 /// ```ignore
 /// use icn_store::{SledStore, TransactionalStore};
@@ -405,6 +416,12 @@ pub trait TransactionalStore: Store {
     ///   If the closure returns `Ok`, all operations are committed.
     ///   If it returns `Err`, all operations are rolled back.
     ///
+    /// # Important: Retry Behavior
+    ///
+    /// The closure uses `Fn` (not `FnOnce`) because the transaction may be
+    /// retried on conflicts. Avoid side effects inside the closure that are
+    /// not safe to repeat.
+    ///
     /// # Use Cases
     /// - Ledger entry + index update
     /// - Trust edge + cache invalidation
@@ -422,6 +439,11 @@ pub enum StoreTransactionError {
     Aborted { reason: String },
 
     /// Transaction failed due to a conflict (e.g., concurrent modification)
+    ///
+    /// Note: Sled's current `TransactionError` type only exposes `Abort` and
+    /// `Storage` variants (conflicts are handled internally via retry). This
+    /// variant is reserved for future use if more detailed conflict information
+    /// becomes available from the storage backend.
     #[error("Transaction conflict: another operation modified the same keys")]
     Conflict,
 
