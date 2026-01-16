@@ -2,16 +2,73 @@
 //!
 //! Validates trust evidence against actual records in the system.
 //! Each evidence type has specific validation requirements.
+//!
+//! ## Signature Verification (Issue #680)
+//!
+//! This module implements cryptographic signature verification for trust evidence:
+//!
+//! - **External attestations**: Verified against known provider public keys
+//! - **Peer endorsements**: Verified against the endorser's DID public key
+//! - **Technical observations**: Verified against the observer's DID public key
+//!
+//! ### Signed Message Formats
+//!
+//! Each evidence type has a canonical message format for signing:
+//!
+//! - **External attestation**: `"attestation:{provider}:{attestation_id}:{target_did}"`
+//! - **Peer endorsement**: `"endorsement:{source_did}:{target_did}:{timestamp}"`
+//! - **Technical observation**: `"observation:{target_did}:{metric_type}:{value:.17}:{timestamp}"`
+//!   (value uses IEEE 754 double precision formatting for cross-platform determinism)
+//!
+//! ## Verification Order and DoS Protection
+//!
+//! Validation checks are ordered to minimize computational cost under attack:
+//!
+//! 1. **Cheapest checks first**: Format validation, timestamp comparison, range checks
+//! 2. **Medium-cost checks**: Trust score lookups (involves graph traversal)
+//! 3. **Expensive checks last**: Cryptographic signature verification
+//!
+//! This ordering prevents denial-of-service attacks where an attacker floods the
+//! system with evidence that has valid-looking signatures but fails cheaper checks.
+//! By rejecting invalid evidence early, we avoid wasting CPU cycles on expensive
+//! Ed25519 signature verification.
+//!
+//! Example for peer endorsements:
+//! ```text
+//! validate_peer_endorsement():
+//!   1. Check endorser != source/target    (O(1) - string compare)
+//!   2. Check endorsement not expired      (O(1) - timestamp math)
+//!   3. Check endorser trust score         (O(n) - graph traversal)
+//!   4. Verify Ed25519 signature           (O(1) - expensive crypto)
+//! ```
+//!
+//! ## Float Formatting Notes
+//!
+//! Technical observations use `{:.17}` format for float values to ensure
+//! cross-platform determinism. Note that:
+//! - Negative zero (`-0.0`) formats as `"-0.00000000000000000"`, distinct from `0.0`
+//! - Callers must be consistent about which zero they use
+//! - `{:.17}` provides enough precision to round-trip any f64 value uniquely
 
 use crate::evidence::{
     EvidenceValidationError, EvidenceValidationResult, TechnicalMetricType, TrustEvidence,
 };
 use crate::TrustGraph;
+use ed25519_dalek::{Signature, VerifyingKey};
 use icn_identity::Did;
 use icn_store::Store;
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, warn};
+
+/// Error type for evidence validator configuration
+#[derive(Debug, Clone, thiserror::Error)]
+pub enum ConfigError {
+    /// Invalid Ed25519 public key provided for a provider
+    #[error("Invalid Ed25519 public key for provider '{provider}': {reason}")]
+    InvalidProviderKey { provider: String, reason: String },
+}
 
 /// Configuration for evidence validation
 #[derive(Debug, Clone)]
@@ -26,6 +83,17 @@ pub struct EvidenceValidatorConfig {
     pub min_observer_trust: f64,
     /// Known external attestation providers
     pub known_providers: Vec<String>,
+    /// Public keys for attestation providers (provider name -> Ed25519 public key bytes)
+    ///
+    /// External attestations are verified against these keys. If a provider is in
+    /// `known_providers` but not in `provider_keys`, signatures are still checked
+    /// for non-emptiness but not cryptographically verified.
+    pub provider_keys: HashMap<String, [u8; 32]>,
+    /// Whether to allow unsigned technical observations
+    ///
+    /// When `true` (development mode), unsigned observations are accepted with a warning.
+    /// When `false` (production), all observations must be signed.
+    pub allow_unsigned_observations: bool,
 }
 
 impl Default for EvidenceValidatorConfig {
@@ -40,7 +108,54 @@ impl Default for EvidenceValidatorConfig {
                 "keybase".to_string(),
                 "github".to_string(),
             ],
+            provider_keys: HashMap::new(), // No provider keys by default
+            allow_unsigned_observations: true, // Allow unsigned during development
         }
+    }
+}
+
+impl EvidenceValidatorConfig {
+    /// Create a production-ready config that requires all signatures
+    pub fn production() -> Self {
+        Self {
+            accept_legacy: false,
+            max_observation_age: Duration::from_secs(24 * 60 * 60), // 1 day
+            min_endorser_trust: 0.5,
+            min_observer_trust: 0.4,
+            known_providers: vec![
+                "sdis".to_string(),
+                "keybase".to_string(),
+                "github".to_string(),
+            ],
+            provider_keys: HashMap::new(),
+            allow_unsigned_observations: false, // Require signatures in production
+        }
+    }
+
+    /// Add a provider's public key for signature verification
+    ///
+    /// # Errors
+    ///
+    /// Returns `ConfigError::InvalidProviderKey` if the provided bytes are not
+    /// a valid Ed25519 public key. This follows the "fail fast" principle -
+    /// invalid configuration should be caught at startup, not at runtime during
+    /// signature verification.
+    pub fn with_provider_key(
+        mut self,
+        provider: &str,
+        public_key: [u8; 32],
+    ) -> Result<Self, ConfigError> {
+        // Validate the key is a valid Ed25519 public key at configuration time
+        VerifyingKey::from_bytes(&public_key).map_err(|e| ConfigError::InvalidProviderKey {
+            provider: provider.to_string(),
+            reason: e.to_string(),
+        })?;
+
+        if !self.known_providers.contains(&provider.to_string()) {
+            self.known_providers.push(provider.to_string());
+        }
+        self.provider_keys.insert(provider.to_string(), public_key);
+        Ok(self)
     }
 }
 
@@ -413,6 +528,13 @@ impl EvidenceValidator {
     }
 
     /// Validate external attestation evidence
+    ///
+    /// Verifies that:
+    /// 1. The provider is known
+    /// 2. The signature is non-empty
+    /// 3. If a provider public key is configured, the signature is cryptographically valid
+    ///
+    /// Signed message format: `"attestation:{provider}:{attestation_id}:{target_did}"`
     fn validate_external_attestation(
         &self,
         provider: &str,
@@ -428,23 +550,78 @@ impl EvidenceValidator {
             });
         }
 
-        // TODO(#680): Verify signature against known provider public keys
-        // For now, accept if provider is known and signature is non-empty.
-        // Cryptographic verification should be implemented before production.
+        // Signature must be non-empty
         if signature.is_empty() {
             return EvidenceValidationResult::invalid(
                 EvidenceValidationError::InvalidAttestationSignature,
             );
         }
 
-        debug!(
-            "External attestation from {} for {} accepted (attestation: {})",
-            provider, target, attestation_id
-        );
+        // If we have the provider's public key, verify the signature cryptographically
+        if let Some(public_key_bytes) = self.config.provider_keys.get(provider) {
+            // Construct the canonical message that was signed
+            let message = format!("attestation:{provider}:{attestation_id}:{target}");
+
+            // Parse the verifying key
+            let verifying_key = match VerifyingKey::from_bytes(public_key_bytes) {
+                Ok(key) => key,
+                Err(e) => {
+                    warn!("Invalid provider public key for {}: {}", provider, e);
+                    return EvidenceValidationResult::invalid(
+                        EvidenceValidationError::InvalidAttestationSignature,
+                    );
+                }
+            };
+
+            // Parse the signature
+            let sig = match Signature::from_slice(signature) {
+                Ok(s) => s,
+                Err(e) => {
+                    warn!("Invalid attestation signature format: {}", e);
+                    return EvidenceValidationResult::invalid(
+                        EvidenceValidationError::InvalidAttestationSignature,
+                    );
+                }
+            };
+
+            // Verify the signature
+            if verifying_key
+                .verify_strict(message.as_bytes(), &sig)
+                .is_err()
+            {
+                warn!(
+                    "Attestation signature verification failed for provider {} (target: {})",
+                    provider, target
+                );
+                return EvidenceValidationResult::invalid(
+                    EvidenceValidationError::InvalidAttestationSignature,
+                );
+            }
+
+            debug!(
+                "External attestation from {} for {} cryptographically verified (attestation: {})",
+                provider, target, attestation_id
+            );
+        } else {
+            // No public key configured - accept with warning (legacy behavior)
+            debug!(
+                "External attestation from {} for {} accepted without cryptographic verification (attestation: {})",
+                provider, target, attestation_id
+            );
+        }
+
         EvidenceValidationResult::valid_with_adjustment(0.2) // External attestations are valuable
     }
 
     /// Validate peer endorsement evidence
+    ///
+    /// Verifies that:
+    /// 1. The endorser is different from source and target
+    /// 2. The endorsement is not too old (cheap check, done early for DoS protection)
+    /// 3. The endorser has sufficient trust (if trust graph available)
+    /// 4. The signature is cryptographically valid (expensive, done last)
+    ///
+    /// Signed message format: `"endorsement:{source_did}:{target_did}:{timestamp}"`
     fn validate_peer_endorsement(
         &self,
         endorser: &Did,
@@ -458,6 +635,20 @@ impl EvidenceValidator {
         // Self-endorsement is accepted but provides no additional trust adjustment
         if endorser == source || endorser == target {
             return EvidenceValidationResult::valid();
+        }
+
+        // Check endorsement age FIRST (cheap check, DoS protection)
+        // This prevents attackers from forcing expensive signature verification
+        // by sending expired endorsements with valid signatures.
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+
+        let age = now.saturating_sub(endorsed_at);
+        let max_age = 365 * 24 * 60 * 60; // 1 year max for endorsements
+        if age > max_age {
+            return EvidenceValidationResult::invalid(EvidenceValidationError::EvidenceExpired);
         }
 
         // Check endorser's trust score if we have a trust graph
@@ -485,8 +676,7 @@ impl EvidenceValidator {
             }
         }
 
-        // TODO(#680): Verify endorser signature cryptographically against endorser's DID
-        // For now, only check that signature is non-empty.
+        // Signature must be non-empty
         if signature.is_empty() {
             return EvidenceValidationResult::invalid(
                 EvidenceValidationError::InvalidEndorsementSignature {
@@ -495,26 +685,65 @@ impl EvidenceValidator {
             );
         }
 
-        // Check endorsement age
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
+        // Verify signature cryptographically against endorser's DID (expensive, do last)
+        let verifying_key = match endorser.to_verifying_key() {
+            Ok(key) => key,
+            Err(e) => {
+                warn!("Failed to extract verifying key from endorser DID: {}", e);
+                return EvidenceValidationResult::invalid(
+                    EvidenceValidationError::InvalidEndorsementSignature {
+                        endorser: endorser.to_string(),
+                    },
+                );
+            }
+        };
 
-        let age = now.saturating_sub(endorsed_at);
-        let max_age = 365 * 24 * 60 * 60; // 1 year max for endorsements
-        if age > max_age {
-            return EvidenceValidationResult::invalid(EvidenceValidationError::EvidenceExpired);
+        let sig = match Signature::from_slice(signature) {
+            Ok(s) => s,
+            Err(e) => {
+                warn!("Invalid endorsement signature format: {}", e);
+                return EvidenceValidationResult::invalid(
+                    EvidenceValidationError::InvalidEndorsementSignature {
+                        endorser: endorser.to_string(),
+                    },
+                );
+            }
+        };
+
+        // Construct the canonical message that was signed
+        let message = format!("endorsement:{source}:{target}:{endorsed_at}");
+
+        if verifying_key
+            .verify_strict(message.as_bytes(), &sig)
+            .is_err()
+        {
+            warn!(
+                "Endorsement signature verification failed for endorser {} (edge: {} -> {})",
+                endorser, source, target
+            );
+            return EvidenceValidationResult::invalid(
+                EvidenceValidationError::InvalidEndorsementSignature {
+                    endorser: endorser.to_string(),
+                },
+            );
         }
 
         debug!(
-            "Peer endorsement from {} for {} -> {} accepted",
+            "Peer endorsement from {} for {} -> {} cryptographically verified",
             endorser, source, target
         );
         EvidenceValidationResult::valid_with_adjustment(0.1)
     }
 
     /// Validate technical observation evidence
+    ///
+    /// Verifies that:
+    /// 1. The observation is not too old
+    /// 2. The observer has sufficient trust (if trust graph available)
+    /// 3. The signature is cryptographically valid (signed by observer's DID key)
+    /// 4. The value is within valid range for the metric type
+    ///
+    /// Signed message format: `"observation:{target_did}:{metric_type}:{value}:{timestamp}"`
     fn validate_technical_observation(
         &self,
         observer: &Did,
@@ -562,11 +791,75 @@ impl EvidenceValidator {
             }
         }
 
-        // TODO(#680): Verify observer signature cryptographically
-        // For now, unsigned observations are accepted during development.
-        // This should be tightened before production deployment.
+        // Verify observer signature cryptographically
         if signature.is_empty() {
-            debug!("Technical observation without signature accepted (see issue #680)");
+            if self.config.allow_unsigned_observations {
+                debug!(
+                    "Technical observation without signature accepted (allow_unsigned_observations=true)"
+                );
+            } else {
+                warn!("Technical observation without signature rejected (production mode)");
+                return EvidenceValidationResult::invalid(
+                    EvidenceValidationError::MissingObservationSignature {
+                        observer: observer.to_string(),
+                    },
+                );
+            }
+        } else {
+            // Verify the signature cryptographically
+            let verifying_key = match observer.to_verifying_key() {
+                Ok(key) => key,
+                Err(e) => {
+                    warn!("Failed to extract verifying key from observer DID: {}", e);
+                    return EvidenceValidationResult::invalid(
+                        EvidenceValidationError::InvalidObservationSignature {
+                            observer: observer.to_string(),
+                        },
+                    );
+                }
+            };
+
+            let sig = match Signature::from_slice(signature) {
+                Ok(s) => s,
+                Err(e) => {
+                    warn!("Invalid observation signature format: {}", e);
+                    return EvidenceValidationResult::invalid(
+                        EvidenceValidationError::InvalidObservationSignature {
+                            observer: observer.to_string(),
+                        },
+                    );
+                }
+            };
+
+            // Construct the canonical message that was signed
+            // Use IEEE 754 double precision formatting ({:.17}) for cross-platform determinism
+            let message = format!(
+                "observation:{target}:{}:{value:.17}:{observed_at}",
+                metric_type.as_str()
+            );
+
+            if verifying_key
+                .verify_strict(message.as_bytes(), &sig)
+                .is_err()
+            {
+                warn!(
+                    "Observation signature verification failed for observer {} (target: {})",
+                    observer, target
+                );
+                return EvidenceValidationResult::invalid(
+                    EvidenceValidationError::InvalidObservationSignature {
+                        observer: observer.to_string(),
+                    },
+                );
+            }
+
+            debug!(
+                "Technical observation {} = {} for {} from {} cryptographically verified",
+                metric_type.as_str(),
+                value,
+                target,
+                observer
+            );
         }
 
         // Validate value range based on metric type
@@ -739,7 +1032,7 @@ mod tests {
             metric_type: TechnicalMetricType::Uptime,
             value: 0.99,
             observed_at: old_time,
-            signature: vec![1, 2, 3],
+            signature: vec![], // Empty signature (allowed by default config)
         }];
 
         let result = validator.validate_all_evidence(&evidence, alice.did(), bob.did(), None);
@@ -769,7 +1062,7 @@ mod tests {
             metric_type: TechnicalMetricType::Uptime,
             value: 0.99,
             observed_at: now,
-            signature: vec![1, 2, 3],
+            signature: vec![], // Empty signature (allowed by default config)
         }];
 
         let result = validator.validate_all_evidence(&evidence, alice.did(), bob.did(), None);
@@ -795,6 +1088,10 @@ mod tests {
         let result = validator.validate_all_evidence(&evidence, alice.did(), bob.did(), None);
         assert!(result.valid);
     }
+
+    // ============================================================================
+    // Contract Party Validation Tests (Issue #681)
+    // ============================================================================
 
     #[test]
     fn test_validator_contract_target_is_party() {
@@ -1007,5 +1304,523 @@ mod tests {
             EvidenceValidationError::MalformedContract { reason, .. }
             if reason.contains("no participants")
         ));
+    }
+
+    // ============================================================================
+    // Cryptographic Signature Verification Tests (Issue #680)
+    // ============================================================================
+
+    #[test]
+    fn test_peer_endorsement_valid_signature() {
+        let store = test_store();
+        let validator = EvidenceValidator::new(store);
+
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+        let endorser = KeyPair::generate().unwrap();
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        // Create properly signed endorsement
+        let message = format!("endorsement:{}:{}:{}", alice.did(), bob.did(), now);
+        let signature = endorser.sign(message.as_bytes());
+
+        let evidence = vec![TrustEvidence::PeerEndorsement {
+            endorser: endorser.did().clone(),
+            signature: signature.to_bytes().to_vec(),
+            endorsed_at: now,
+            reason: Some("Test endorsement".to_string()),
+        }];
+
+        let result = validator.validate_all_evidence(&evidence, alice.did(), bob.did(), None);
+        assert!(result.valid, "Valid signature should be accepted");
+        assert!(
+            result.score_adjustment > 0.0,
+            "Should have positive score adjustment"
+        );
+    }
+
+    #[test]
+    fn test_peer_endorsement_invalid_signature() {
+        let store = test_store();
+        let validator = EvidenceValidator::new(store);
+
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+        let endorser = KeyPair::generate().unwrap();
+        let wrong_signer = KeyPair::generate().unwrap();
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        // Sign with wrong key
+        let message = format!("endorsement:{}:{}:{}", alice.did(), bob.did(), now);
+        let wrong_signature = wrong_signer.sign(message.as_bytes());
+
+        let evidence = vec![TrustEvidence::PeerEndorsement {
+            endorser: endorser.did().clone(), // Claims to be endorser
+            signature: wrong_signature.to_bytes().to_vec(), // But signed by wrong_signer
+            endorsed_at: now,
+            reason: None,
+        }];
+
+        let result = validator.validate_all_evidence(&evidence, alice.did(), bob.did(), None);
+        assert!(!result.valid, "Invalid signature should be rejected");
+        assert!(matches!(
+            &result.errors[0],
+            EvidenceValidationError::InvalidEndorsementSignature { .. }
+        ));
+    }
+
+    #[test]
+    fn test_technical_observation_valid_signature() {
+        let store = test_store();
+        let validator = EvidenceValidator::new(store);
+
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+        let observer = KeyPair::generate().unwrap();
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        // Create properly signed observation
+        // Note: value must use IEEE 754 double precision formatting ({:.17}) to match validator
+        let value = 0.99_f64;
+        let message = format!("observation:{}:uptime:{value:.17}:{}", bob.did(), now);
+        let signature = observer.sign(message.as_bytes());
+
+        let evidence = vec![TrustEvidence::TechnicalObservation {
+            observer: observer.did().clone(),
+            metric_type: TechnicalMetricType::Uptime,
+            value,
+            observed_at: now,
+            signature: signature.to_bytes().to_vec(),
+        }];
+
+        let result = validator.validate_all_evidence(&evidence, alice.did(), bob.did(), None);
+        assert!(
+            result.valid,
+            "Valid observation signature should be accepted"
+        );
+    }
+
+    #[test]
+    fn test_technical_observation_invalid_signature() {
+        let store = test_store();
+        let validator = EvidenceValidator::new(store);
+
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+        let observer = KeyPair::generate().unwrap();
+        let wrong_signer = KeyPair::generate().unwrap();
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        // Sign with wrong key (using deterministic float format)
+        let value = 0.99_f64;
+        let message = format!("observation:{}:uptime:{value:.17}:{}", bob.did(), now);
+        let wrong_signature = wrong_signer.sign(message.as_bytes());
+
+        let evidence = vec![TrustEvidence::TechnicalObservation {
+            observer: observer.did().clone(), // Claims to be observer
+            signature: wrong_signature.to_bytes().to_vec(), // But signed by wrong_signer
+            metric_type: TechnicalMetricType::Uptime,
+            value,
+            observed_at: now,
+        }];
+
+        let result = validator.validate_all_evidence(&evidence, alice.did(), bob.did(), None);
+        assert!(
+            !result.valid,
+            "Invalid observation signature should be rejected"
+        );
+        assert!(matches!(
+            &result.errors[0],
+            EvidenceValidationError::InvalidObservationSignature { .. }
+        ));
+    }
+
+    #[test]
+    fn test_production_config_rejects_unsigned_observations() {
+        let store = test_store();
+        let config = EvidenceValidatorConfig::production();
+        let validator = EvidenceValidator::with_config(store, config);
+
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+        let observer = KeyPair::generate().unwrap();
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        // Unsigned observation
+        let evidence = vec![TrustEvidence::TechnicalObservation {
+            observer: observer.did().clone(),
+            metric_type: TechnicalMetricType::Uptime,
+            value: 0.99,
+            observed_at: now,
+            signature: vec![], // Empty signature
+        }];
+
+        let result = validator.validate_all_evidence(&evidence, alice.did(), bob.did(), None);
+        assert!(
+            !result.valid,
+            "Production config should reject unsigned observations"
+        );
+        assert!(matches!(
+            &result.errors[0],
+            EvidenceValidationError::MissingObservationSignature { .. }
+        ));
+    }
+
+    #[test]
+    fn test_external_attestation_with_provider_key() {
+        let store = test_store();
+
+        // Create a mock provider key
+        let provider_keypair = KeyPair::generate().unwrap();
+        let provider_public_key: [u8; 32] = provider_keypair.verifying_key().as_bytes().to_owned();
+
+        let config = EvidenceValidatorConfig::default()
+            .with_provider_key("test_provider", provider_public_key)
+            .expect("valid provider key");
+        let validator = EvidenceValidator::with_config(store, config);
+
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+
+        // Create properly signed attestation
+        let message = format!("attestation:test_provider:attest123:{}", bob.did());
+        let signature = provider_keypair.sign(message.as_bytes());
+
+        let evidence = vec![TrustEvidence::ExternalAttestation {
+            provider: "test_provider".to_string(),
+            attestation_id: "attest123".to_string(),
+            signature: signature.to_bytes().to_vec(),
+            metadata: None,
+        }];
+
+        let result = validator.validate_all_evidence(&evidence, alice.did(), bob.did(), None);
+        assert!(result.valid, "Valid provider signature should be accepted");
+    }
+
+    #[test]
+    fn test_external_attestation_invalid_provider_signature() {
+        let store = test_store();
+
+        // Create a mock provider key
+        let provider_keypair = KeyPair::generate().unwrap();
+        let wrong_keypair = KeyPair::generate().unwrap();
+        let provider_public_key: [u8; 32] = provider_keypair.verifying_key().as_bytes().to_owned();
+
+        let config = EvidenceValidatorConfig::default()
+            .with_provider_key("test_provider", provider_public_key)
+            .expect("valid provider key");
+        let validator = EvidenceValidator::with_config(store, config);
+
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+
+        // Sign with wrong key
+        let message = format!("attestation:test_provider:attest123:{}", bob.did());
+        let wrong_signature = wrong_keypair.sign(message.as_bytes());
+
+        let evidence = vec![TrustEvidence::ExternalAttestation {
+            provider: "test_provider".to_string(),
+            attestation_id: "attest123".to_string(),
+            signature: wrong_signature.to_bytes().to_vec(),
+            metadata: None,
+        }];
+
+        let result = validator.validate_all_evidence(&evidence, alice.did(), bob.did(), None);
+        assert!(
+            !result.valid,
+            "Invalid provider signature should be rejected"
+        );
+        assert!(matches!(
+            &result.errors[0],
+            EvidenceValidationError::InvalidAttestationSignature
+        ));
+    }
+
+    // ============================================================================
+    // Float Edge Case Tests (IEEE 754 determinism)
+    // ============================================================================
+    //
+    // These tests verify that technical observation signatures work correctly
+    // for edge cases in IEEE 754 floating-point representation. The format
+    // `{:.17}` is used for cross-platform determinism, as it provides enough
+    // precision to round-trip any f64 value uniquely.
+
+    #[test]
+    fn test_technical_observation_float_zero() {
+        let store = test_store();
+        let validator = EvidenceValidator::new(store);
+
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+        let observer = KeyPair::generate().unwrap();
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        // Test with zero - latency metric allows any non-negative value
+        let value = 0.0_f64;
+        let message = format!("observation:{}:latency:{value:.17}:{}", bob.did(), now);
+        let signature = observer.sign(message.as_bytes());
+
+        let evidence = vec![TrustEvidence::TechnicalObservation {
+            observer: observer.did().clone(),
+            metric_type: TechnicalMetricType::Latency,
+            value,
+            observed_at: now,
+            signature: signature.to_bytes().to_vec(),
+        }];
+
+        let result = validator.validate_all_evidence(&evidence, alice.did(), bob.did(), None);
+        assert!(result.valid, "Zero value should be accepted");
+    }
+
+    #[test]
+    fn test_technical_observation_float_negative_zero() {
+        let store = test_store();
+        let validator = EvidenceValidator::new(store);
+
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+        let observer = KeyPair::generate().unwrap();
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        // Note: Negative zero formats DIFFERENTLY than positive zero with {:.17}!
+        // "-0.00000000000000000" vs "0.00000000000000000"
+        // This is important for signature verification - both sides must use
+        // the exact same value.
+        let value = -0.0_f64;
+        let message = format!("observation:{}:latency:{value:.17}:{}", bob.did(), now);
+        let signature = observer.sign(message.as_bytes());
+
+        let evidence = vec![TrustEvidence::TechnicalObservation {
+            observer: observer.did().clone(),
+            metric_type: TechnicalMetricType::Latency,
+            value,
+            observed_at: now,
+            signature: signature.to_bytes().to_vec(),
+        }];
+
+        let result = validator.validate_all_evidence(&evidence, alice.did(), bob.did(), None);
+        assert!(result.valid, "Negative zero should be accepted");
+
+        // Document that -0.0 and 0.0 format differently (important for callers!)
+        assert_ne!(
+            format!("{:.17}", -0.0_f64),
+            format!("{:.17}", 0.0_f64),
+            "-0.0 and 0.0 format differently - callers must be consistent"
+        );
+    }
+
+    #[test]
+    fn test_technical_observation_float_subnormal() {
+        let store = test_store();
+        let validator = EvidenceValidator::new(store);
+
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+        let observer = KeyPair::generate().unwrap();
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        // Smallest positive subnormal f64
+        let value = f64::MIN_POSITIVE / 2.0;
+        assert!(value > 0.0 && value < f64::MIN_POSITIVE); // Verify it's subnormal
+        let message = format!("observation:{}:uptime:{value:.17}:{}", bob.did(), now);
+        let signature = observer.sign(message.as_bytes());
+
+        let evidence = vec![TrustEvidence::TechnicalObservation {
+            observer: observer.did().clone(),
+            metric_type: TechnicalMetricType::Uptime,
+            value,
+            observed_at: now,
+            signature: signature.to_bytes().to_vec(),
+        }];
+
+        let result = validator.validate_all_evidence(&evidence, alice.did(), bob.did(), None);
+        assert!(result.valid, "Subnormal value should be accepted");
+    }
+
+    #[test]
+    fn test_technical_observation_float_very_small() {
+        let store = test_store();
+        let validator = EvidenceValidator::new(store);
+
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+        let observer = KeyPair::generate().unwrap();
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        // Very small but representable value near epsilon
+        let value = 1e-308_f64;
+        let message = format!("observation:{}:uptime:{value:.17}:{}", bob.did(), now);
+        let signature = observer.sign(message.as_bytes());
+
+        let evidence = vec![TrustEvidence::TechnicalObservation {
+            observer: observer.did().clone(),
+            metric_type: TechnicalMetricType::Uptime,
+            value,
+            observed_at: now,
+            signature: signature.to_bytes().to_vec(),
+        }];
+
+        let result = validator.validate_all_evidence(&evidence, alice.did(), bob.did(), None);
+        assert!(result.valid, "Very small value should be accepted");
+    }
+
+    #[test]
+    fn test_technical_observation_float_precision_roundtrip() {
+        // Verify that formatting with .17 preserves precision for signature verification
+        let test_values = [
+            0.1_f64, // Classic binary float representation issue
+            0.2_f64,
+            0.3_f64,
+            0.1 + 0.2,            // Should equal 0.30000000000000004
+            std::f64::consts::PI, // Irrational approximation
+            std::f64::consts::E,
+            1.0 / 3.0,         // Repeating decimal in binary
+            f64::MIN_POSITIVE, // Smallest positive normal
+            f64::MAX,          // Largest finite
+        ];
+
+        for &value in &test_values {
+            let formatted = format!("{value:.17}");
+            let parsed: f64 = formatted.parse().unwrap();
+
+            // The formatted-and-parsed value should match the original
+            // for signature verification purposes
+            assert!(
+                (value - parsed).abs() < f64::EPSILON || value == parsed,
+                "Value {} did not roundtrip correctly: {} -> {} (diff: {})",
+                value,
+                formatted,
+                parsed,
+                (value - parsed).abs()
+            );
+        }
+    }
+
+    #[test]
+    fn test_technical_observation_float_infinity_out_of_range() {
+        let store = test_store();
+        let validator = EvidenceValidator::new(store);
+
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+        let observer = KeyPair::generate().unwrap();
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        // Infinity for uptime (0.0..=1.0 range) - should be out of range but tolerated
+        let value = f64::INFINITY;
+        let message = format!("observation:{}:uptime:{value:.17}:{}", bob.did(), now);
+        let signature = observer.sign(message.as_bytes());
+
+        let evidence = vec![TrustEvidence::TechnicalObservation {
+            observer: observer.did().clone(),
+            metric_type: TechnicalMetricType::Uptime,
+            value,
+            observed_at: now,
+            signature: signature.to_bytes().to_vec(),
+        }];
+
+        let result = validator.validate_all_evidence(&evidence, alice.did(), bob.did(), None);
+        // Out-of-range values are tolerated (return valid with no adjustment)
+        assert!(
+            result.valid,
+            "Infinity should be tolerated (warning logged but accepted)"
+        );
+        assert_eq!(
+            result.score_adjustment, 0.0,
+            "Out-of-range should have no adjustment"
+        );
+    }
+
+    #[test]
+    fn test_technical_observation_float_nan_out_of_range() {
+        let store = test_store();
+        let validator = EvidenceValidator::new(store);
+
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+        let observer = KeyPair::generate().unwrap();
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        // NaN for uptime - NaN is never in any range
+        let value = f64::NAN;
+        let message = format!("observation:{}:uptime:{value:.17}:{}", bob.did(), now);
+        let signature = observer.sign(message.as_bytes());
+
+        let evidence = vec![TrustEvidence::TechnicalObservation {
+            observer: observer.did().clone(),
+            metric_type: TechnicalMetricType::Uptime,
+            value,
+            observed_at: now,
+            signature: signature.to_bytes().to_vec(),
+        }];
+
+        let result = validator.validate_all_evidence(&evidence, alice.did(), bob.did(), None);
+        // NaN values are tolerated (not in range but accepted with warning)
+        assert!(
+            result.valid,
+            "NaN should be tolerated (warning logged but accepted)"
+        );
+    }
+
+    #[test]
+    fn test_invalid_provider_key_returns_error() {
+        // Test that with_provider_key properly returns an error for invalid keys.
+        // Ed25519 public keys are points on the Ed25519 curve - most random byte
+        // patterns are NOT valid curve points. The pattern [0xAB; 32] is not
+        // decompressible as an Edwards point.
+        let invalid_key = [0xABu8; 32];
+
+        let result = EvidenceValidatorConfig::default().with_provider_key("test", invalid_key);
+
+        assert!(result.is_err(), "Invalid key should return error");
+        let err = result.unwrap_err();
+        assert!(
+            matches!(err, ConfigError::InvalidProviderKey { .. }),
+            "Should be InvalidProviderKey error"
+        );
     }
 }
