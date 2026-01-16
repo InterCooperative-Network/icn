@@ -1007,7 +1007,10 @@ impl Ledger {
 
     /// Validate witness signatures on a witnessed entry
     ///
-    /// Verifies that all signatures are valid Ed25519 signatures over the entry hash.
+    /// Verifies that all signatures are:
+    /// 1. Valid Ed25519 signatures over the entry hash
+    /// 2. Not timestamped in the future (with small tolerance for clock skew)
+    /// 3. Not expired (if `WitnessConfig::collection_timeout_secs` is configured)
     fn validate_witness_signatures(&self, witnessed: &crate::types::WitnessedEntry) -> Result<()> {
         use ed25519_dalek::{Signature, Verifier};
 
@@ -1016,6 +1019,12 @@ impl Ledger {
             .id
             .as_ref()
             .context("Entry must have hash for witness validation")?;
+
+        // Get current time for timestamp validation
+        let current_time = icn_time::current_timestamp_secs();
+
+        // Maximum allowed clock skew (5 seconds) to tolerate minor time differences
+        const MAX_CLOCK_SKEW_SECS: u64 = 5;
 
         for sig in &witnessed.witness_signatures {
             // Extract public key from witness DID using icn-identity
@@ -1033,7 +1042,34 @@ impl Ledger {
                     format!("Witness signature verification failed for {}", sig.witness)
                 })?;
 
-            debug!(witness = %sig.witness, "Witness signature verified");
+            // Validate timestamp is not in the future (with clock skew tolerance)
+            if sig.signed_at > current_time + MAX_CLOCK_SKEW_SECS {
+                anyhow::bail!(
+                    "Witness signature timestamp is in the future: {} (signed_at: {}, current: {})",
+                    sig.witness,
+                    sig.signed_at,
+                    current_time
+                );
+            }
+
+            // Validate timestamp is not expired based on witness config
+            if let Some(config) = &self.witness_config {
+                let age = current_time.saturating_sub(sig.signed_at);
+                if age > config.collection_timeout_secs {
+                    anyhow::bail!(
+                        "Witness signature expired for {} (age: {}s, max: {}s)",
+                        sig.witness,
+                        age,
+                        config.collection_timeout_secs
+                    );
+                }
+            }
+
+            debug!(
+                witness = %sig.witness,
+                signed_at = sig.signed_at,
+                "Witness signature verified"
+            );
         }
 
         Ok(())
@@ -4425,6 +4461,176 @@ mod tests {
         assert!(
             result.is_ok(),
             "Entry without parents should be accepted: {result:?}"
+        );
+    }
+
+    #[test]
+    fn test_witness_signature_timestamp_future_rejected() {
+        let (mut ledger, _temp) = create_test_ledger();
+        let alice_kp = KeyPair::generate().unwrap();
+        let alice = alice_kp.did().clone();
+        let bob_kp = KeyPair::generate().unwrap();
+        let bob = bob_kp.did().clone();
+
+        // Configure witness requirements
+        ledger.set_witness_config(crate::types::WitnessConfig::counterparty_above(0));
+
+        let entry = JournalEntryBuilder::new(alice.clone())
+            .debit(alice.clone(), "hours".to_string(), 10)
+            .credit(bob.clone(), "hours".to_string(), 10)
+            .build()
+            .unwrap();
+
+        let entry_hash = entry.id.clone().unwrap();
+
+        // Create signature with timestamp far in the future
+        let future_time = icn_time::current_timestamp_secs() + 3600; // 1 hour in the future
+        let signature = bob_kp.sign(entry_hash.as_bytes());
+        let witness_sig = crate::types::WitnessSignature::new(
+            bob.clone(),
+            signature.to_bytes().to_vec(),
+            future_time,
+        );
+
+        let witnessed = crate::types::WitnessedEntry {
+            entry,
+            witness_signatures: vec![witness_sig],
+            policy_applied: crate::types::WitnessPolicy::Counterparty,
+        };
+
+        let result = ledger.validate_witness_signatures(&witnessed);
+        assert!(result.is_err());
+        assert!(
+            result.unwrap_err().to_string().contains("in the future"),
+            "Error should mention 'in the future'"
+        );
+    }
+
+    #[test]
+    fn test_witness_signature_timestamp_expired_rejected() {
+        let (mut ledger, _temp) = create_test_ledger();
+        let alice_kp = KeyPair::generate().unwrap();
+        let alice = alice_kp.did().clone();
+        let bob_kp = KeyPair::generate().unwrap();
+        let bob = bob_kp.did().clone();
+
+        // Configure witness requirements with 60 second timeout
+        let mut config = crate::types::WitnessConfig::counterparty_above(0);
+        config.collection_timeout_secs = 60;
+        ledger.set_witness_config(config);
+
+        let entry = JournalEntryBuilder::new(alice.clone())
+            .debit(alice.clone(), "hours".to_string(), 10)
+            .credit(bob.clone(), "hours".to_string(), 10)
+            .build()
+            .unwrap();
+
+        let entry_hash = entry.id.clone().unwrap();
+
+        // Create signature with timestamp 120 seconds in the past (expired)
+        let expired_time = icn_time::current_timestamp_secs().saturating_sub(120);
+        let signature = bob_kp.sign(entry_hash.as_bytes());
+        let witness_sig = crate::types::WitnessSignature::new(
+            bob.clone(),
+            signature.to_bytes().to_vec(),
+            expired_time,
+        );
+
+        let witnessed = crate::types::WitnessedEntry {
+            entry,
+            witness_signatures: vec![witness_sig],
+            policy_applied: crate::types::WitnessPolicy::Counterparty,
+        };
+
+        let result = ledger.validate_witness_signatures(&witnessed);
+        assert!(result.is_err());
+        assert!(
+            result.unwrap_err().to_string().contains("expired"),
+            "Error should mention 'expired'"
+        );
+    }
+
+    #[test]
+    fn test_witness_signature_timestamp_valid_accepted() {
+        let (mut ledger, _temp) = create_test_ledger();
+        let alice_kp = KeyPair::generate().unwrap();
+        let alice = alice_kp.did().clone();
+        let bob_kp = KeyPair::generate().unwrap();
+        let bob = bob_kp.did().clone();
+
+        // Configure witness requirements
+        let mut config = crate::types::WitnessConfig::counterparty_above(0);
+        config.collection_timeout_secs = 300; // 5 minutes
+        ledger.set_witness_config(config);
+
+        let entry = JournalEntryBuilder::new(alice.clone())
+            .debit(alice.clone(), "hours".to_string(), 10)
+            .credit(bob.clone(), "hours".to_string(), 10)
+            .build()
+            .unwrap();
+
+        let entry_hash = entry.id.clone().unwrap();
+
+        // Create signature with current timestamp (valid)
+        let current_time = icn_time::current_timestamp_secs();
+        let signature = bob_kp.sign(entry_hash.as_bytes());
+        let witness_sig = crate::types::WitnessSignature::new(
+            bob.clone(),
+            signature.to_bytes().to_vec(),
+            current_time,
+        );
+
+        let witnessed = crate::types::WitnessedEntry {
+            entry,
+            witness_signatures: vec![witness_sig],
+            policy_applied: crate::types::WitnessPolicy::Counterparty,
+        };
+
+        let result = ledger.validate_witness_signatures(&witnessed);
+        assert!(
+            result.is_ok(),
+            "Valid timestamp should be accepted: {result:?}"
+        );
+    }
+
+    #[test]
+    fn test_witness_signature_timestamp_within_clock_skew_accepted() {
+        let (mut ledger, _temp) = create_test_ledger();
+        let alice_kp = KeyPair::generate().unwrap();
+        let alice = alice_kp.did().clone();
+        let bob_kp = KeyPair::generate().unwrap();
+        let bob = bob_kp.did().clone();
+
+        // Configure witness requirements
+        ledger.set_witness_config(crate::types::WitnessConfig::counterparty_above(0));
+
+        let entry = JournalEntryBuilder::new(alice.clone())
+            .debit(alice.clone(), "hours".to_string(), 10)
+            .credit(bob.clone(), "hours".to_string(), 10)
+            .build()
+            .unwrap();
+
+        let entry_hash = entry.id.clone().unwrap();
+
+        // Create signature with timestamp 3 seconds in the future (within 5s tolerance)
+        let near_future = icn_time::current_timestamp_secs() + 3;
+        let signature = bob_kp.sign(entry_hash.as_bytes());
+        let witness_sig = crate::types::WitnessSignature::new(
+            bob.clone(),
+            signature.to_bytes().to_vec(),
+            near_future,
+        );
+
+        let witnessed = crate::types::WitnessedEntry {
+            entry,
+            witness_signatures: vec![witness_sig],
+            policy_applied: crate::types::WitnessPolicy::Counterparty,
+        };
+
+        let result = ledger.validate_witness_signatures(&witnessed);
+        assert!(
+            result.is_ok(),
+            "Timestamp within clock skew tolerance should be accepted: {result:?}"
         );
     }
 }

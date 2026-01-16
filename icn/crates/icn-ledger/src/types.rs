@@ -417,9 +417,8 @@ pub struct WitnessConfig {
     /// Grace period (in seconds) to collect witness signatures.
     /// After this time, unsigned entries may be rejected.
     ///
-    /// TODO(witness-timeout): Implement timestamp validation against this timeout
-    /// in `validate_witness_signatures()`. Currently signatures are validated
-    /// cryptographically but not checked for expiration.
+    /// This is validated in `Ledger::validate_witness_signatures()` which
+    /// rejects signatures older than this timeout.
     pub collection_timeout_secs: u64,
 }
 
@@ -475,8 +474,9 @@ pub struct WitnessSignature {
 
     /// Timestamp when signature was created (Unix epoch seconds).
     ///
-    /// TODO(witness-timeout): This timestamp should be validated against
-    /// `WitnessConfig::collection_timeout_secs` to reject expired signatures.
+    /// Validated in `Ledger::validate_witness_signatures()`:
+    /// - Rejects future timestamps (beyond 5s clock skew tolerance)
+    /// - Rejects expired signatures (older than `WitnessConfig::collection_timeout_secs`)
     pub signed_at: u64,
 }
 
