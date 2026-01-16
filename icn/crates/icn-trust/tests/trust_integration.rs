@@ -210,7 +210,14 @@ fn test_attestation_sign_verify_store_cycle() {
 
     assert!((stored_edge.score - 0.75).abs() < 0.001);
     assert_eq!(stored_edge.labels, vec!["partner"]);
-    assert_eq!(stored_edge.evidence, vec!["contract_123"]);
+    // Evidence from attestation is converted to TrustEvidence::Legacy
+    assert_eq!(stored_edge.evidence.len(), 1);
+    match &stored_edge.evidence[0] {
+        icn_trust::TrustEvidence::Legacy { reference, .. } => {
+            assert_eq!(reference, "contract_123");
+        }
+        other => panic!("Expected Legacy evidence, got {:?}", other),
+    }
 }
 
 #[test]
