@@ -202,7 +202,7 @@ impl EvidenceValidator {
             Ok(None) => {
                 // Contract not found, try agreement store if agreement_id provided
                 if let Some(aid) = agreement_id {
-                    let agreement_key = format!("agreements/{}", aid);
+                    let agreement_key = format!("agreements/{aid}");
                     if self
                         .store
                         .get(agreement_key.as_bytes())

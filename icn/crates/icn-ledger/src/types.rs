@@ -383,9 +383,10 @@ pub struct Dispute {
 /// Witness signatures provide Byzantine fault tolerance by requiring
 /// multiple parties to co-sign transactions, preventing unilateral
 /// manipulation by ledger authorizers.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum WitnessPolicy {
     /// No witnesses required (current behavior, suitable for low-value transactions)
+    #[default]
     None,
 
     /// Require counterparty signature (the other party to the transaction)
@@ -403,12 +404,6 @@ pub enum WitnessPolicy {
     AllParties,
 }
 
-impl Default for WitnessPolicy {
-    fn default() -> Self {
-        WitnessPolicy::None
-    }
-}
-
 /// Configuration for witness requirements on a ledger
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WitnessConfig {
@@ -419,8 +414,12 @@ pub struct WitnessConfig {
     /// If None, policy applies to all entries regardless of value
     pub threshold: Option<u64>,
 
-    /// Grace period (in seconds) to collect witness signatures
-    /// After this time, unsigned entries may be rejected
+    /// Grace period (in seconds) to collect witness signatures.
+    /// After this time, unsigned entries may be rejected.
+    ///
+    /// TODO(witness-timeout): Implement timestamp validation against this timeout
+    /// in `validate_witness_signatures()`. Currently signatures are validated
+    /// cryptographically but not checked for expiration.
     pub collection_timeout_secs: u64,
 }
 
@@ -471,7 +470,10 @@ pub struct WitnessSignature {
     /// Ed25519 signature over the entry hash
     pub signature: Vec<u8>,
 
-    /// Timestamp when signature was created
+    /// Timestamp when signature was created (Unix epoch seconds).
+    ///
+    /// TODO(witness-timeout): This timestamp should be validated against
+    /// `WitnessConfig::collection_timeout_secs` to reject expired signatures.
     pub signed_at: u64,
 }
 
@@ -519,16 +521,38 @@ impl WitnessedEntry {
     }
 
     /// Check if the entry has sufficient signatures for the applied policy
+    ///
+    /// Note: This only checks that the policy requirements are met structurally.
+    /// Cryptographic signature validation must be performed separately by the caller.
     pub fn has_sufficient_signatures(&self) -> bool {
         match &self.policy_applied {
             WitnessPolicy::None => true,
-            WitnessPolicy::Counterparty => !self.witness_signatures.is_empty(),
-            WitnessPolicy::Quorum { required, .. } => {
-                self.witness_signatures.len() >= *required as usize
+            WitnessPolicy::Counterparty => {
+                // Require at least one witness who is a non-author counterparty
+                let counterparties: std::collections::HashSet<_> = self
+                    .entry
+                    .accounts
+                    .iter()
+                    .map(|d| &d.account_id)
+                    .filter(|id| **id != self.entry.author)
+                    .collect();
+                self.witness_signatures
+                    .iter()
+                    .any(|s| counterparties.contains(&s.witness))
+            }
+            WitnessPolicy::Quorum { required, witnesses } => {
+                // Only count signatures from authorized witnesses (unique DIDs)
+                let allowed_witnesses: std::collections::HashSet<_> = witnesses.iter().collect();
+                let signed_authorized: std::collections::HashSet<_> = self
+                    .witness_signatures
+                    .iter()
+                    .map(|s| &s.witness)
+                    .filter(|w| allowed_witnesses.contains(w))
+                    .collect();
+                signed_authorized.len() >= *required as usize
             }
             WitnessPolicy::AllParties => {
-                // Need to check against entry participants - caller must verify
-                // For now, require at least one signature per non-author account
+                // Each non-author account must have signed as a witness
                 let unique_accounts: std::collections::HashSet<_> = self
                     .entry
                     .accounts

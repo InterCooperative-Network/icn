@@ -978,18 +978,31 @@ impl Ledger {
         witnessed: crate::types::WitnessedEntry,
     ) -> Result<ContentHash> {
         // Validate witness signatures
-        self.validate_witness_signatures(&witnessed)?;
+        if let Err(e) = self.validate_witness_signatures(&witnessed) {
+            icn_obs::metrics::ledger::witnessed_entries_rejected_invalid_signature_inc();
+            return Err(e);
+        }
 
         // Check if sufficient signatures for the policy
         if !witnessed.has_sufficient_signatures() {
+            icn_obs::metrics::ledger::witnessed_entries_rejected_insufficient_inc();
             anyhow::bail!(
                 "Insufficient witness signatures: have {}, policy requires more",
                 witnessed.unique_witness_count()
             );
         }
 
+        // Record witness count metric
+        let witness_count = witnessed.witness_signatures.len() as u64;
+
         // Append the underlying entry
-        self.append_entry_internal(witnessed.entry, true).await
+        let hash = self.append_entry_internal(witnessed.entry, true).await?;
+
+        // Record success metrics
+        icn_obs::metrics::ledger::witnessed_entries_accepted_inc();
+        icn_obs::metrics::ledger::witness_signature_count_record(witness_count);
+
+        Ok(hash)
     }
 
     /// Validate witness signatures on a witnessed entry
@@ -1019,10 +1032,12 @@ impl Ledger {
 
             verifying_key
                 .verify(entry_hash.as_bytes(), &signature)
-                .context(format!(
-                    "Witness signature verification failed for {}",
-                    sig.witness
-                ))?;
+                .with_context(|| {
+                    format!(
+                        "Witness signature verification failed for {}",
+                        sig.witness
+                    )
+                })?;
 
             debug!(witness = %sig.witness, "Witness signature verified");
         }
@@ -1031,15 +1046,16 @@ impl Ledger {
     }
 
     /// Calculate the total absolute value of an entry (for threshold comparison)
+    ///
+    /// Uses only debits to determine transaction value. In a balanced double-entry
+    /// system, total debits equal total credits, so this correctly represents the
+    /// transaction size without double-counting.
     pub fn calculate_entry_value(&self, entry: &JournalEntry) -> u64 {
         entry
             .accounts
             .iter()
-            .map(|delta| {
-                let debit = delta.debit.unwrap_or(0).unsigned_abs();
-                let credit = delta.credit.unwrap_or(0).unsigned_abs();
-                debit.max(credit)
-            })
+            .filter_map(|delta| delta.debit)
+            .map(|d| d.unsigned_abs())
             .sum()
     }
 
@@ -1624,6 +1640,7 @@ impl Ledger {
                         error = %e,
                         "Witnessed entry signature validation failed"
                     );
+                    icn_obs::metrics::ledger::witnessed_entries_rejected_invalid_signature_inc();
                     return Ok(()); // Reject silently
                 }
 
@@ -1634,8 +1651,11 @@ impl Ledger {
                         witness_count = witnessed.unique_witness_count(),
                         "Witnessed entry has insufficient signatures"
                     );
+                    icn_obs::metrics::ledger::witnessed_entries_rejected_insufficient_inc();
                     return Ok(()); // Reject silently
                 }
+
+                let witness_count = witnessed.witness_signatures.len() as u64;
 
                 // Store the underlying entry (without re-broadcasting)
                 let result = self.append_entry_from_sync(witnessed.entry).await;
@@ -1644,10 +1664,12 @@ impl Ledger {
                     Ok(h) => {
                         info!(
                             entry_hash = %h,
-                            witness_count = witnessed.witness_signatures.len(),
+                            witness_count = witness_count,
                             source = "gossip",
                             "Received and stored witnessed ledger entry"
                         );
+                        icn_obs::metrics::ledger::witnessed_entries_accepted_inc();
+                        icn_obs::metrics::ledger::witness_signature_count_record(witness_count);
                         Ok(())
                     }
                     Err(e) => {
