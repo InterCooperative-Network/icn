@@ -94,7 +94,18 @@ impl EvidenceValidatorConfig {
     }
 
     /// Add a provider's public key for signature verification
+    ///
+    /// # Panics
+    ///
+    /// Panics if the provided public key is not a valid Ed25519 public key.
+    /// This follows the "fail fast" principle - invalid configuration should be
+    /// caught at startup, not at runtime during signature verification.
     pub fn with_provider_key(mut self, provider: &str, public_key: [u8; 32]) -> Self {
+        // Validate the key is a valid Ed25519 public key at configuration time
+        VerifyingKey::from_bytes(&public_key).unwrap_or_else(|e| {
+            panic!("Invalid Ed25519 public key for provider '{provider}': {e}")
+        });
+
         if !self.known_providers.contains(&provider.to_string()) {
             self.known_providers.push(provider.to_string());
         }
@@ -460,9 +471,9 @@ impl EvidenceValidator {
     ///
     /// Verifies that:
     /// 1. The endorser is different from source and target
-    /// 2. The endorser has sufficient trust (if trust graph available)
-    /// 3. The signature is cryptographically valid (signed by endorser's DID key)
-    /// 4. The endorsement is not too old
+    /// 2. The endorsement is not too old (cheap check, done early for DoS protection)
+    /// 3. The endorser has sufficient trust (if trust graph available)
+    /// 4. The signature is cryptographically valid (expensive, done last)
     ///
     /// Signed message format: `"endorsement:{source_did}:{target_did}:{timestamp}"`
     fn validate_peer_endorsement(
@@ -478,6 +489,20 @@ impl EvidenceValidator {
         // Self-endorsement is accepted but provides no additional trust adjustment
         if endorser == source || endorser == target {
             return EvidenceValidationResult::valid();
+        }
+
+        // Check endorsement age FIRST (cheap check, DoS protection)
+        // This prevents attackers from forcing expensive signature verification
+        // by sending expired endorsements with valid signatures.
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+
+        let age = now.saturating_sub(endorsed_at);
+        let max_age = 365 * 24 * 60 * 60; // 1 year max for endorsements
+        if age > max_age {
+            return EvidenceValidationResult::invalid(EvidenceValidationError::EvidenceExpired);
         }
 
         // Check endorser's trust score if we have a trust graph
@@ -514,7 +539,7 @@ impl EvidenceValidator {
             );
         }
 
-        // Verify signature cryptographically against endorser's DID
+        // Verify signature cryptographically against endorser's DID (expensive, do last)
         let verifying_key = match endorser.to_verifying_key() {
             Ok(key) => key,
             Err(e) => {
@@ -555,18 +580,6 @@ impl EvidenceValidator {
                     endorser: endorser.to_string(),
                 },
             );
-        }
-
-        // Check endorsement age
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
-
-        let age = now.saturating_sub(endorsed_at);
-        let max_age = 365 * 24 * 60 * 60; // 1 year max for endorsements
-        if age > max_age {
-            return EvidenceValidationResult::invalid(EvidenceValidationError::EvidenceExpired);
         }
 
         debug!(
@@ -673,6 +686,9 @@ impl EvidenceValidator {
             };
 
             // Construct the canonical message that was signed
+            // TODO(#680): Consider using deterministic float formatting (e.g., `{:.17}` for IEEE 754
+            // double precision) or raw bytes to prevent platform-dependent floating-point
+            // representation from causing signature mismatches across different systems.
             let message = format!(
                 "observation:{target}:{}:{value}:{observed_at}",
                 metric_type.as_str()
