@@ -97,7 +97,7 @@ impl StorageChallenge {
     /// Compute challenge ID from parameters (excluding signature)
     fn compute_id(&self) -> [u8; 32] {
         let mut hasher = Sha256::new();
-        hasher.update(&self.content_hash);
+        hasher.update(self.content_hash);
         hasher.update(self.target_peer.as_bytes());
         hasher.update(self.byte_offset.to_le_bytes());
         hasher.update(self.byte_length.to_le_bytes());
@@ -660,7 +660,7 @@ mod tests {
 
         for i in 0..tree.num_chunks() {
             let proof = tree.generate_proof(i).expect("should generate proof");
-            assert!(proof.verify(), "proof for chunk {} should verify", i);
+            assert!(proof.verify(), "proof for chunk {i} should verify");
         }
     }
 

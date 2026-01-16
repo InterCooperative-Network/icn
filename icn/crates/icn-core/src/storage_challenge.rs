@@ -35,6 +35,7 @@ struct PendingChallenge {
     expected_byte_hash: [u8; 32],
 
     /// Number of previous failures for this replica
+    #[allow(dead_code)] // May be used for per-challenge tracking
     failure_count: u32,
 }
 
@@ -51,7 +52,8 @@ pub struct ChallengeScheduler {
     /// Store for accessing replica metadata and content
     store: Arc<dyn Store>,
 
-    /// Trust graph for peer scoring
+    /// Trust graph for peer scoring (used for trust-gated challenge frequency)
+    #[allow(dead_code)] // Reserved for trust-gated challenge frequency
     trust_graph: Arc<RwLock<TrustGraph>>,
 
     /// Gossip actor for sending challenges
@@ -388,7 +390,7 @@ impl ChallengeScheduler {
                         info!(
                             "Recorded NoResponse violation for {} (content: {})",
                             pending.challenge.target_peer,
-                            hex::encode(&pending.challenge.content_hash)
+                            hex::encode(pending.challenge.content_hash)
                         );
                     }
                 }
@@ -479,7 +481,7 @@ impl ChallengeScheduler {
         info!(
             "Verified storage proof from {} for content {}",
             pending.challenge.target_peer,
-            hex::encode(&pending.challenge.content_hash)
+            hex::encode(pending.challenge.content_hash)
         );
 
         Ok(())
@@ -531,7 +533,7 @@ impl ChallengeScheduler {
                     "Recorded {:?} violation for {} (content: {})",
                     reason,
                     pending.challenge.target_peer,
-                    hex::encode(&pending.challenge.content_hash)
+                    hex::encode(pending.challenge.content_hash)
                 );
             }
         }
