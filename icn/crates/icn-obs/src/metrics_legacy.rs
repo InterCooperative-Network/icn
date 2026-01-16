@@ -2660,6 +2660,10 @@ pub mod trust {
         counter!("icn_trust_attestations_rejected_rate_limited_total").increment(1);
     }
 
+    pub fn attestations_rejected_invalid_evidence_inc() {
+        counter!("icn_trust_attestations_rejected_invalid_evidence_total").increment(1);
+    }
+
     pub fn attestations_new_inc() {
         counter!("icn_trust_attestations_new_total").increment(1);
     }

@@ -375,6 +375,47 @@ impl TrustGraph {
         Ok(())
     }
 
+    /// Add or update a trust edge with evidence validation
+    ///
+    /// This method validates all evidence attached to the edge before adding it
+    /// to the graph. If any evidence fails validation, the edge is rejected.
+    ///
+    /// Returns the validation result including any score adjustments suggested
+    /// by the evidence validation.
+    ///
+    /// # Parameters
+    ///
+    /// - `edge`: The trust edge to add
+    /// - `validator`: The evidence validator to use for validation
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if evidence validation fails or if storage fails.
+    pub fn add_edge_validated(
+        &mut self,
+        edge: TrustEdge,
+        validator: &EvidenceValidator,
+    ) -> Result<EvidenceValidationResult> {
+        // Validate evidence
+        let validation_result =
+            validator.validate_all_evidence(&edge.evidence, &edge.source, &edge.target, Some(self));
+
+        if !validation_result.valid {
+            debug!(
+                "Rejecting edge {} -> {}: evidence validation failed ({} errors)",
+                edge.source,
+                edge.target,
+                validation_result.errors.len()
+            );
+            return Ok(validation_result);
+        }
+
+        // Evidence is valid - add the edge
+        self.add_edge(edge)?;
+
+        Ok(validation_result)
+    }
+
     /// Generate storage key for an edge
     fn edge_key(&self, source: &Did, target: &Did) -> String {
         format!(
