@@ -21,7 +21,7 @@ COPY bins ./bins
 
 # Build release binaries
 # RUST_MIN_STACK: Increase rustc stack size to prevent SIGSEGV on complex crates
-# CARGO_BUILD_JOBS: Limit parallelism to reduce peak memory usage
+# -j 2: Limit parallelism to reduce peak memory usage
 ENV RUST_MIN_STACK=33554432
 RUN cargo build --release --bins -j 2
 
