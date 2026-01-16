@@ -722,6 +722,29 @@ impl Supervisor {
 
             info!("Gossip send callback configured");
 
+            // Spawn storage challenge scheduler (proof-of-storage verification)
+            // This verifies that replica holders actually store the data they claim
+            let challenge_scheduler_handle = crate::storage_challenge::ChallengeScheduler::spawn(
+                did.clone(),
+                icn_store::ChallengeConfig::default(),
+                gossip_store.clone(), // Uses the gossip store for content/replica access
+                trust_graph_handle.clone(),
+                gossip_handle.clone(),
+                misbehavior_detector.clone(),
+                self.shutdown_tx.subscribe(),
+            );
+
+            // Wire up proof callback: forward incoming proofs from gossip to scheduler
+            {
+                let proof_callback = background_tasks::storage_challenge::create_proof_callback(
+                    challenge_scheduler_handle,
+                );
+                let mut gossip = gossip_handle.write().await;
+                gossip.set_storage_proof_callback(proof_callback);
+            }
+
+            info!("Storage challenge scheduler spawned (proof-of-storage verification active)");
+
             // Run network bootstrap: dial peers, announce candidate, publish profile
             let bootstrap_config = init_bootstrap::BootstrapConfig::from_configs(
                 self.config.network.bootstrap_peers.clone(),
