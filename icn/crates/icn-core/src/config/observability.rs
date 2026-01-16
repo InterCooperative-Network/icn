@@ -22,6 +22,16 @@ pub struct ObservabilityConfig {
 }
 
 /// Distributed tracing configuration with OpenTelemetry
+///
+/// # Priority Sampling
+///
+/// ICN uses priority-based sampling to ensure important traces are always captured
+/// while reducing overhead for routine operations:
+///
+/// - **Errors**: Always sampled (set `always_sample_errors = true`)
+/// - **Slow requests**: Always sampled if slower than `slow_threshold_ms`
+/// - **Security events**: Always sampled (spans with "security" in name)
+/// - **Normal operations**: Sampled at `sampling_rate`
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TracingConfig {
     /// Enable distributed tracing export
@@ -33,8 +43,25 @@ pub struct TracingConfig {
     pub otlp_endpoint: String,
 
     /// Sampling rate (0.0 to 1.0). Default is 0.1 (10%) for production.
+    /// Note: Error and slow traces are sampled regardless of this rate
+    /// when `always_sample_errors` and `always_sample_slow` are enabled.
     #[serde(default = "default_sampling_rate")]
     pub sampling_rate: f64,
+
+    /// Always sample traces that contain errors.
+    /// This ensures debugging information is captured for all failures.
+    #[serde(default = "default_always_sample_errors")]
+    pub always_sample_errors: bool,
+
+    /// Always sample traces that exceed `slow_threshold_ms`.
+    /// This ensures performance issues are captured.
+    #[serde(default = "default_always_sample_slow")]
+    pub always_sample_slow: bool,
+
+    /// Threshold (in milliseconds) for considering a request "slow".
+    /// Traces exceeding this duration are always sampled if `always_sample_slow` is true.
+    #[serde(default = "default_slow_threshold_ms")]
+    pub slow_threshold_ms: u64,
 
     /// Service name for traces
     #[serde(default = "default_service_name")]
@@ -49,6 +76,18 @@ fn default_sampling_rate() -> f64 {
     0.1 // 10% sampling for production
 }
 
+fn default_always_sample_errors() -> bool {
+    true // Always capture errors by default
+}
+
+fn default_always_sample_slow() -> bool {
+    true // Always capture slow requests by default
+}
+
+fn default_slow_threshold_ms() -> u64 {
+    1000 // 1 second
+}
+
 fn default_service_name() -> String {
     "icnd".to_string()
 }
@@ -59,6 +98,9 @@ impl Default for TracingConfig {
             enabled: false,
             otlp_endpoint: default_otlp_endpoint(),
             sampling_rate: default_sampling_rate(),
+            always_sample_errors: default_always_sample_errors(),
+            always_sample_slow: default_always_sample_slow(),
+            slow_threshold_ms: default_slow_threshold_ms(),
             service_name: default_service_name(),
         }
     }
@@ -71,6 +113,9 @@ impl TracingConfig {
             enabled: self.enabled,
             otlp_endpoint: self.otlp_endpoint.clone(),
             sampling_rate: self.sampling_rate,
+            always_sample_errors: self.always_sample_errors,
+            always_sample_slow: self.always_sample_slow,
+            slow_threshold_ms: self.slow_threshold_ms,
             service_name: self.service_name.clone(),
             node_did,
         }
