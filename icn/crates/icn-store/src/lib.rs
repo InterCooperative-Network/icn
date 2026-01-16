@@ -38,6 +38,9 @@ pub use pos::{
     StorageChallenge, StorageFailureReason, StorageProof, DEFAULT_CHUNK_SIZE, MAX_BYTE_SAMPLE_SIZE,
 };
 
+// Note: StoreTransaction, TransactionalStore, and StoreTransactionError are publicly defined
+// in this file at the crate root (accessible as icn_store::TransactionalStore, etc.).
+
 /// Content hash type (32-byte SHA-256)
 pub type ContentHash = [u8; 32];
 
@@ -339,6 +342,114 @@ pub trait Store: Send + Sync {
             Ok(false)
         }
     }
+
+    /// Check if this store backend supports transactions
+    ///
+    /// Returns true if `transaction()` can be called on this store.
+    /// Backends without transaction support will return false.
+    fn supports_transactions(&self) -> bool {
+        false
+    }
+}
+
+/// Operations available within a transaction
+///
+/// This trait provides the subset of Store operations that can be performed
+/// atomically within a transaction. All operations are deferred until the
+/// transaction commits.
+pub trait StoreTransaction {
+    /// Get a value by key within the transaction
+    ///
+    /// Returns the value if it exists, considering any pending modifications
+    /// within this transaction.
+    fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>>;
+
+    /// Set a key-value pair within the transaction
+    ///
+    /// The value will be written when the transaction commits.
+    fn set(&self, key: &[u8], value: &[u8]) -> Result<()>;
+
+    /// Delete a key within the transaction
+    ///
+    /// The deletion will be applied when the transaction commits.
+    fn delete(&self, key: &[u8]) -> Result<()>;
+}
+
+/// Extension trait for stores that support transactional batch operations
+///
+/// This trait is separate from `Store` to maintain dyn-compatibility of the base trait.
+/// Use this when you need atomic multi-key operations.
+///
+/// # Retry Semantics
+///
+/// The closure is constrained to [`Fn`] (not [`FnOnce`]) because the underlying
+/// storage backend (Sled) may retry the transaction if it encounters conflicts
+/// with concurrent operations. This means:
+///
+/// - **The closure may be called multiple times** - design for idempotency
+/// - **Avoid side effects** that should not repeat (network calls, external state)
+/// - **Any non-transactional side effects** should happen AFTER the transaction
+///   returns `Ok`, based on the returned result
+///
+/// # Example
+/// ```ignore
+/// use icn_store::{SledStore, TransactionalStore};
+///
+/// let store = SledStore::temporary()?;
+/// store.transaction(|tx| {
+///     let balance = tx.get(b"balance:alice")?.unwrap_or_default();
+///     let new_balance = parse_balance(&balance)? + 100;
+///     tx.set(b"balance:alice", &encode_balance(new_balance))?;
+///     tx.set(b"log:12345", b"credited alice 100")?;
+///     Ok(())
+/// })?;
+/// ```
+pub trait TransactionalStore: Store {
+    /// Execute a transactional batch of operations atomically
+    ///
+    /// All operations within the transaction are applied atomically - either all
+    /// succeed or all are rolled back. This is useful for maintaining consistency
+    /// when multiple keys need to be updated together.
+    ///
+    /// # Arguments
+    /// * `f` - A closure that receives a `StoreTransaction` and returns a result.
+    ///   If the closure returns `Ok`, all operations are committed.
+    ///   If it returns `Err`, all operations are rolled back.
+    ///
+    /// # Important: Retry Behavior
+    ///
+    /// The closure uses `Fn` (not `FnOnce`) because the transaction may be
+    /// retried on conflicts. Avoid side effects inside the closure that are
+    /// not safe to repeat.
+    ///
+    /// # Use Cases
+    /// - Ledger entry + index update
+    /// - Trust edge + cache invalidation
+    /// - Contract state + event emission
+    fn transaction<F, T>(&self, f: F) -> Result<T>
+    where
+        F: Fn(&dyn StoreTransaction) -> Result<T>;
+}
+
+/// Error indicating a store transaction was aborted
+#[derive(Debug, Clone, thiserror::Error)]
+pub enum StoreTransactionError {
+    /// Transaction was explicitly aborted by user code
+    #[error("Transaction aborted: {reason}")]
+    Aborted { reason: String },
+
+    /// Transaction failed due to a conflict (e.g., concurrent modification)
+    ///
+    /// Note: Sled's current `TransactionError` type only exposes `Abort` and
+    /// `Storage` variants (conflicts are handled internally via retry). This
+    /// variant is reserved for future use if more detailed conflict information
+    /// becomes available from the storage backend.
+    #[error("Transaction conflict: another operation modified the same keys")]
+    Conflict,
+
+    /// Storage backend error during transaction
+    #[error("Storage error during transaction: {details}")]
+    StorageError { details: String },
 }
 
 /// Storage statistics for monitoring
@@ -559,6 +670,74 @@ impl Store for SledStore {
         }
 
         Ok(hashes)
+    }
+
+    fn supports_transactions(&self) -> bool {
+        true
+    }
+}
+
+/// Wrapper for Sled's transactional tree that implements StoreTransaction
+struct SledTransaction<'a> {
+    tree: &'a sled::transaction::TransactionalTree,
+}
+
+impl StoreTransaction for SledTransaction<'_> {
+    fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
+        self.tree
+            .get(key)
+            .map(|opt| opt.map(|v| v.to_vec()))
+            .map_err(|e| anyhow::anyhow!("Transaction get failed: {e}"))
+    }
+
+    fn set(&self, key: &[u8], value: &[u8]) -> Result<()> {
+        self.tree
+            .insert(key, value)
+            .map(|_| ())
+            .map_err(|e| anyhow::anyhow!("Transaction set failed: {e}"))
+    }
+
+    fn delete(&self, key: &[u8]) -> Result<()> {
+        self.tree
+            .remove(key)
+            .map(|_| ())
+            .map_err(|e| anyhow::anyhow!("Transaction delete failed: {e}"))
+    }
+}
+
+impl TransactionalStore for SledStore {
+    fn transaction<F, T>(&self, f: F) -> Result<T>
+    where
+        F: Fn(&dyn StoreTransaction) -> Result<T>,
+    {
+        use sled::transaction::ConflictableTransactionError;
+
+        // Use Sled's transaction API
+        let result = self.db.transaction(|tx_tree| {
+            let tx = SledTransaction { tree: tx_tree };
+
+            // Call user's closure
+            match f(&tx) {
+                Ok(value) => Ok(value),
+                Err(e) => {
+                    // Convert anyhow::Error to abort
+                    Err(ConflictableTransactionError::Abort(e.to_string()))
+                }
+            }
+        });
+
+        match result {
+            Ok(value) => Ok(value),
+            Err(sled::transaction::TransactionError::Abort(reason)) => {
+                Err(StoreTransactionError::Aborted { reason }.into())
+            }
+            Err(sled::transaction::TransactionError::Storage(e)) => {
+                Err(StoreTransactionError::StorageError {
+                    details: e.to_string(),
+                }
+                .into())
+            }
+        }
     }
 }
 
@@ -1130,6 +1309,210 @@ mod tests {
         store.put(binary_key, binary_value)?;
         let retrieved = store.get(binary_key)?;
         assert_eq!(retrieved.as_deref(), Some(binary_value.as_slice()));
+
+        Ok(())
+    }
+
+    // Transaction tests
+
+    #[test]
+    fn test_supports_transactions() {
+        let store = SledStore::temporary().unwrap();
+        assert!(store.supports_transactions());
+    }
+
+    #[test]
+    fn test_transaction_commit() -> Result<()> {
+        let store = SledStore::temporary()?;
+
+        // Execute a transaction that sets multiple keys
+        store.transaction(|tx| {
+            tx.set(b"balance:alice", b"100")?;
+            tx.set(b"balance:bob", b"200")?;
+            tx.set(b"log:0001", b"initial deposit")?;
+            Ok(())
+        })?;
+
+        // Verify all keys were committed
+        assert_eq!(store.get(b"balance:alice")?, Some(b"100".to_vec()));
+        assert_eq!(store.get(b"balance:bob")?, Some(b"200".to_vec()));
+        assert_eq!(store.get(b"log:0001")?, Some(b"initial deposit".to_vec()));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_transaction_rollback_on_error() -> Result<()> {
+        let store = SledStore::temporary()?;
+
+        // Set initial value
+        store.put(b"balance:alice", b"100")?;
+
+        // Execute a transaction that fails partway through
+        let result: Result<()> = store.transaction(|tx| {
+            tx.set(b"balance:alice", b"50")?; // This would commit on success
+            tx.set(b"balance:bob", b"50")?; // This too
+
+            // Simulate an error condition
+            anyhow::bail!("Simulated error: insufficient funds")
+        });
+
+        // Transaction should have failed
+        assert!(result.is_err());
+
+        // Original value should be preserved (rollback)
+        assert_eq!(store.get(b"balance:alice")?, Some(b"100".to_vec()));
+
+        // New key should not exist (rollback)
+        assert!(store.get(b"balance:bob")?.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_transaction_read_own_writes() -> Result<()> {
+        let store = SledStore::temporary()?;
+
+        // Set initial value
+        store.put(b"counter", b"10")?;
+
+        // Transaction that reads and modifies
+        let final_value = store.transaction(|tx| {
+            // Read initial value
+            let current = tx.get(b"counter")?.unwrap_or_default();
+            let current_num: i32 = String::from_utf8_lossy(&current).parse().unwrap_or(0);
+
+            // Increment and write
+            let new_value = (current_num + 5).to_string();
+            tx.set(b"counter", new_value.as_bytes())?;
+
+            // Read back (should see our write)
+            let updated = tx.get(b"counter")?.unwrap_or_default();
+            Ok(String::from_utf8_lossy(&updated).to_string())
+        })?;
+
+        assert_eq!(final_value, "15");
+        assert_eq!(store.get(b"counter")?, Some(b"15".to_vec()));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_transaction_delete() -> Result<()> {
+        let store = SledStore::temporary()?;
+
+        // Set initial values
+        store.put(b"key:a", b"value_a")?;
+        store.put(b"key:b", b"value_b")?;
+        store.put(b"key:c", b"value_c")?;
+
+        // Transaction that deletes some keys
+        store.transaction(|tx| {
+            tx.delete(b"key:a")?;
+            tx.delete(b"key:b")?;
+            // Keep key:c
+            Ok(())
+        })?;
+
+        // Verify deletions were committed
+        assert!(store.get(b"key:a")?.is_none());
+        assert!(store.get(b"key:b")?.is_none());
+        assert_eq!(store.get(b"key:c")?, Some(b"value_c".to_vec()));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_transaction_delete_rollback() -> Result<()> {
+        let store = SledStore::temporary()?;
+
+        // Set initial value
+        store.put(b"important:key", b"precious_data")?;
+
+        // Transaction that deletes then fails
+        let result: Result<()> = store.transaction(|tx| {
+            tx.delete(b"important:key")?;
+            anyhow::bail!("Abort after delete")
+        });
+
+        // Transaction should have failed
+        assert!(result.is_err());
+
+        // Key should still exist (deletion rolled back)
+        assert_eq!(
+            store.get(b"important:key")?,
+            Some(b"precious_data".to_vec())
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_transaction_returns_value() -> Result<()> {
+        let store = SledStore::temporary()?;
+
+        store.put(b"data:x", b"42")?;
+
+        // Transaction that returns a computed value
+        let result: i32 = store.transaction(|tx| {
+            let value = tx.get(b"data:x")?.unwrap_or_default();
+            let num: i32 = String::from_utf8_lossy(&value).parse().unwrap_or(0);
+            Ok(num * 2)
+        })?;
+
+        assert_eq!(result, 84);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_transaction_error_message() {
+        let store = SledStore::temporary().unwrap();
+
+        let result: Result<()> = store.transaction(|_tx| anyhow::bail!("Custom error message"));
+
+        let err = result.unwrap_err();
+        let err_msg = err.to_string();
+        assert!(
+            err_msg.contains("Custom error message"),
+            "Error should contain original message: {err_msg}"
+        );
+    }
+
+    #[test]
+    fn test_transaction_multiple_operations_atomicity() -> Result<()> {
+        let store = SledStore::temporary()?;
+
+        // Set up a ledger scenario: transfer from alice to bob
+        store.put(b"balance:alice", b"1000")?;
+        store.put(b"balance:bob", b"500")?;
+
+        // Successful transfer
+        store.transaction(|tx| {
+            // Read balances
+            let alice = String::from_utf8_lossy(&tx.get(b"balance:alice")?.unwrap_or_default())
+                .parse::<i32>()
+                .unwrap_or(0);
+            let bob = String::from_utf8_lossy(&tx.get(b"balance:bob")?.unwrap_or_default())
+                .parse::<i32>()
+                .unwrap_or(0);
+
+            // Transfer 100
+            let transfer = 100;
+            tx.set(b"balance:alice", (alice - transfer).to_string().as_bytes())?;
+            tx.set(b"balance:bob", (bob + transfer).to_string().as_bytes())?;
+            tx.set(b"log:transfer:001", b"alice->bob:100")?;
+
+            Ok(())
+        })?;
+
+        // Verify the transfer completed atomically
+        assert_eq!(store.get(b"balance:alice")?, Some(b"900".to_vec()));
+        assert_eq!(store.get(b"balance:bob")?, Some(b"600".to_vec()));
+        assert_eq!(
+            store.get(b"log:transfer:001")?,
+            Some(b"alice->bob:100".to_vec())
+        );
 
         Ok(())
     }

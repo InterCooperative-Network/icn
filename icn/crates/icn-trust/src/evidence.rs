@@ -196,6 +196,15 @@ pub enum EvidenceValidationError {
     #[error("Target DID {target} is not a party to contract {contract_id}")]
     NotContractParty { target: String, contract_id: String },
 
+    #[error("Source DID {source_did} is not a party to contract {contract_id}")]
+    SourceNotContractParty {
+        source_did: String,
+        contract_id: String,
+    },
+
+    #[error("Malformed contract data for {contract_id}: {reason}")]
+    MalformedContract { contract_id: String, reason: String },
+
     #[error("Ledger transaction not found: {entry_hash}")]
     TransactionNotFound { entry_hash: String },
 
