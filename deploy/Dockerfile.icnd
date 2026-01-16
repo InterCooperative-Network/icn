@@ -18,7 +18,10 @@ WORKDIR /build
 COPY . .
 
 # Build release binaries
-RUN cargo build --release --bin icnd --bin icnctl
+# RUST_MIN_STACK: Increase rustc stack size to prevent SIGSEGV on complex crates
+# -j 2: Limit parallelism to reduce peak memory usage
+ENV RUST_MIN_STACK=33554432
+RUN cargo build --release --bin icnd --bin icnctl -j 2
 
 # Runtime image
 FROM debian:bookworm-slim
