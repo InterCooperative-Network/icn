@@ -991,9 +991,7 @@ impl NetworkActor {
             let mut limiter = RateLimiter::new(config);
             if let Some(ps) = personhood_store {
                 let anchor_config = anchor_rate_config.unwrap_or_default();
-                info!(
-                    "Sybil resistance enabled (without trust-gating)"
-                );
+                info!("Sybil resistance enabled (without trust-gating)");
                 limiter = limiter.with_sybil_resistance(ps, anchor_config);
             }
 
@@ -1700,8 +1698,9 @@ impl NetworkActor {
 
                             // Check rate limit BEFORE processing message
                             // Uses dual-path rate limiting: per-DID and per-anchor (if Sybil resistance enabled)
-                            let (did_allowed, anchor_allowed) =
-                                rate_limiter.check_rate_limit_with_personhood(&message.from).await;
+                            let (did_allowed, anchor_allowed) = rate_limiter
+                                .check_rate_limit_with_personhood(&message.from)
+                                .await;
 
                             if !did_allowed {
                                 warn!(

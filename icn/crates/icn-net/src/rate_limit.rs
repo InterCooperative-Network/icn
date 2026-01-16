@@ -555,7 +555,8 @@ impl RateLimiter {
         };
 
         // Check if we need to apply verified multiplier
-        let (capacity, refill_rate) = self.get_anchor_bucket_params(peer, &anchor_id, anchor_config);
+        let (capacity, refill_rate) =
+            self.get_anchor_bucket_params(peer, &anchor_id, anchor_config);
 
         // Acquire the anchor buckets lock
         let mut anchor_buckets = self.anchor_buckets.write().await;
@@ -1051,7 +1052,11 @@ mod tests {
             attacker_dids.push(extra_did);
         }
 
-        assert_eq!(attacker_dids.len(), 10, "Should have 10 DIDs for the attacker");
+        assert_eq!(
+            attacker_dids.len(),
+            10,
+            "Should have 10 DIDs for the attacker"
+        );
 
         // Create rate limiter with Sybil resistance
         let trust_config = TrustGatedRateLimitConfig {
@@ -1267,10 +1272,12 @@ mod tests {
         );
 
         // check_rate_limit_with_personhood should work (anchor check passes)
-        let (did_allowed, anchor_allowed) =
-            limiter.check_rate_limit_with_personhood(&peer).await;
+        let (did_allowed, anchor_allowed) = limiter.check_rate_limit_with_personhood(&peer).await;
         assert!(did_allowed);
-        assert!(anchor_allowed, "Anchor check should pass when Sybil resistance is disabled");
+        assert!(
+            anchor_allowed,
+            "Anchor check should pass when Sybil resistance is disabled"
+        );
     }
 
     #[test]
@@ -1287,9 +1294,7 @@ mod tests {
             EnforcementMode::parse("requirepersonhood"),
             EnforcementMode::RequirePersonhood
         );
-        assert_eq!(
-            EnforcementMode::parse("unknown"),
-            EnforcementMode::Enforce
-        ); // Default
+        assert_eq!(EnforcementMode::parse("unknown"), EnforcementMode::Enforce);
+        // Default
     }
 }
