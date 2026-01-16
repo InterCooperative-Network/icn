@@ -1386,15 +1386,15 @@ mod tests {
     fn test_technical_observation_float_precision_roundtrip() {
         // Verify that formatting with .17 preserves precision for signature verification
         let test_values = [
-            0.1_f64,                        // Classic binary float representation issue
+            0.1_f64, // Classic binary float representation issue
             0.2_f64,
             0.3_f64,
-            0.1 + 0.2,                      // Should equal 0.30000000000000004
-            std::f64::consts::PI,           // Irrational approximation
+            0.1 + 0.2,            // Should equal 0.30000000000000004
+            std::f64::consts::PI, // Irrational approximation
             std::f64::consts::E,
-            1.0 / 3.0,                      // Repeating decimal in binary
-            f64::MIN_POSITIVE,              // Smallest positive normal
-            f64::MAX,                       // Largest finite
+            1.0 / 3.0,         // Repeating decimal in binary
+            f64::MIN_POSITIVE, // Smallest positive normal
+            f64::MAX,          // Largest finite
         ];
 
         for &value in &test_values {
