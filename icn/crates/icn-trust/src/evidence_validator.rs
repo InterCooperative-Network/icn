@@ -193,9 +193,28 @@ impl EvidenceValidator {
 
         match self.store.get(contract_key.as_bytes()) {
             Ok(Some(data)) => {
-                // Contract exists, extract participants and verify target is a party
+                // Contract exists, extract participants and verify BOTH source and target are parties
+                // This is a security requirement: contract evidence should only be valid if
+                // both the entity creating the trust edge AND the entity being trusted
+                // were actually parties to the referenced contract.
                 match self.extract_contract_participants(&data) {
                     Ok(participants) => {
+                        // Security check: verify source is a participant
+                        // (the entity creating this trust edge should be a contract party)
+                        if !participants.iter().any(|p| p == source) {
+                            warn!(
+                                "Source {} is not a party to contract {} - rejecting evidence",
+                                source,
+                                hex::encode(contract_id)
+                            );
+                            return EvidenceValidationResult::invalid(
+                                EvidenceValidationError::SourceNotContractParty {
+                                    source_did: source.to_string(),
+                                    contract_id: hex::encode(contract_id),
+                                },
+                            );
+                        }
+
                         // Verify target is a participant in the contract
                         if !participants.iter().any(|p| p == target) {
                             warn!(
@@ -212,23 +231,28 @@ impl EvidenceValidator {
                         }
 
                         debug!(
-                            "Contract {} found with target {} as participant for edge {} -> {}",
+                            "Contract {} found with both {} and {} as participants",
                             hex::encode(contract_id),
-                            target,
                             source,
                             target
                         );
                         EvidenceValidationResult::valid_with_adjustment(0.1) // Boost for contract evidence
                     }
                     Err(e) => {
-                        // Contract data is malformed - this shouldn't happen with valid contracts
+                        // Contract data is malformed - reject the evidence
+                        // This could indicate tampering or corruption, so we fail hard
+                        // rather than allowing potentially fraudulent evidence through
                         warn!(
-                            "Failed to parse contract {}: {}",
+                            "Failed to parse contract {}: {} - rejecting evidence",
                             hex::encode(contract_id),
                             e
                         );
-                        // Accept without boost since we can't verify parties
-                        EvidenceValidationResult::valid()
+                        EvidenceValidationResult::invalid(
+                            EvidenceValidationError::MalformedContract {
+                                contract_id: hex::encode(contract_id),
+                                reason: e,
+                            },
+                        )
                     }
                 }
             }
@@ -266,6 +290,10 @@ impl EvidenceValidator {
         }
     }
 
+    /// Maximum number of participants we'll process from a contract
+    /// This matches MAX_PARTICIPANTS in icn-ccl to prevent DoS via maliciously large arrays
+    const MAX_CONTRACT_PARTICIPANTS: usize = 100;
+
     /// Extract participants from contract JSON data
     ///
     /// This extracts just the participants field without requiring the full
@@ -279,6 +307,18 @@ impl EvidenceValidator {
             .ok_or("Missing participants field")?
             .as_array()
             .ok_or("participants is not an array")?;
+
+        // Bounds check to prevent DoS via maliciously large arrays
+        if participants.is_empty() {
+            return Err("Contract has no participants".to_string());
+        }
+        if participants.len() > Self::MAX_CONTRACT_PARTICIPANTS {
+            return Err(format!(
+                "Contract has too many participants ({}, max {})",
+                participants.len(),
+                Self::MAX_CONTRACT_PARTICIPANTS
+            ));
+        }
 
         let mut dids = Vec::with_capacity(participants.len());
         for (i, p) in participants.iter().enumerate() {
@@ -870,9 +910,102 @@ mod tests {
             executed_at: 12345,
         }];
 
-        // Should be valid but without boost (graceful degradation)
+        // Should be INVALID - malformed contracts could indicate tampering
         let result = validator.validate_all_evidence(&evidence, alice.did(), bob.did(), None);
-        assert!(result.valid);
-        assert_eq!(result.score_adjustment, 0.0); // No boost for unparseable contract
+        assert!(!result.valid);
+        assert!(matches!(
+            &result.errors[0],
+            EvidenceValidationError::MalformedContract { .. }
+        ));
+    }
+
+    #[test]
+    fn test_validator_contract_source_not_party() {
+        let store = test_store();
+        let validator = EvidenceValidator::new(store.clone());
+
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+        let charlie = KeyPair::generate().unwrap();
+
+        // Create a contract between bob and charlie (alice is NOT a party)
+        let contract_id = [4u8; 32];
+        let contract_json = serde_json::json!({
+            "name": "TestContract",
+            "participants": [bob.did().to_string(), charlie.did().to_string()],
+            "currency": null,
+            "state_vars": [],
+            "rules": [],
+            "triggers": []
+        });
+
+        // Store the contract
+        let contract_key = format!("contracts/{}", hex::encode(contract_id));
+        store
+            .put(
+                contract_key.as_bytes(),
+                &serde_json::to_vec(&contract_json).unwrap(),
+            )
+            .unwrap();
+
+        let evidence = vec![TrustEvidence::ContractExecution {
+            contract_id,
+            agreement_id: None,
+            executed_at: 12345,
+        }];
+
+        // Alice tries to create trust edge to Bob using contract she's not party to
+        // This should be INVALID - source must also be a contract party
+        let result = validator.validate_all_evidence(&evidence, alice.did(), bob.did(), None);
+        assert!(!result.valid);
+        assert!(matches!(
+            &result.errors[0],
+            EvidenceValidationError::SourceNotContractParty { source_did, .. }
+            if source_did == &alice.did().to_string()
+        ));
+    }
+
+    #[test]
+    fn test_validator_contract_empty_participants() {
+        let store = test_store();
+        let validator = EvidenceValidator::new(store.clone());
+
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+
+        // Create a contract with empty participants array
+        let contract_id = [5u8; 32];
+        let contract_json = serde_json::json!({
+            "name": "EmptyContract",
+            "participants": [],
+            "currency": null,
+            "state_vars": [],
+            "rules": [],
+            "triggers": []
+        });
+
+        // Store the contract
+        let contract_key = format!("contracts/{}", hex::encode(contract_id));
+        store
+            .put(
+                contract_key.as_bytes(),
+                &serde_json::to_vec(&contract_json).unwrap(),
+            )
+            .unwrap();
+
+        let evidence = vec![TrustEvidence::ContractExecution {
+            contract_id,
+            agreement_id: None,
+            executed_at: 12345,
+        }];
+
+        // Empty participants is invalid - contracts must have at least one participant
+        let result = validator.validate_all_evidence(&evidence, alice.did(), bob.did(), None);
+        assert!(!result.valid);
+        assert!(matches!(
+            &result.errors[0],
+            EvidenceValidationError::MalformedContract { reason, .. }
+            if reason.contains("no participants")
+        ));
     }
 }
