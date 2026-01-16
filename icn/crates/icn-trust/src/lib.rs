@@ -233,8 +233,11 @@ impl TrustEdge {
                 .any(|e| matches!(e, TrustEvidence::Legacy { .. }))
     }
 
-    /// Get all evidence items (including legacy)
-    pub fn all_evidence(&self) -> impl Iterator<Item = &TrustEvidence> {
+    /// Get all typed evidence items.
+    ///
+    /// Note: Legacy evidence must be migrated via [`migrate_legacy_evidence`]
+    /// before it will be included in this iterator.
+    pub fn evidence(&self) -> impl Iterator<Item = &TrustEvidence> {
         self.evidence.iter()
     }
 

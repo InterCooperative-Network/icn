@@ -351,8 +351,9 @@ impl EvidenceValidator {
         trust_graph: Option<&TrustGraph>,
     ) -> EvidenceValidationResult {
         // Endorser must be different from source and target
+        // Self-endorsement is accepted but provides no additional trust adjustment
         if endorser == source || endorser == target {
-            return EvidenceValidationResult::valid(); // Self-endorsement doesn't count
+            return EvidenceValidationResult::valid();
         }
 
         // Check endorser's trust score if we have a trust graph
@@ -472,13 +473,14 @@ impl EvidenceValidator {
         };
 
         if !valid_range.contains(&value) {
+            // Out-of-range values are tolerated to avoid rejecting edges due to measurement errors
             warn!(
                 "Invalid {} value {} for {}",
                 metric_type.as_str(),
                 value,
                 target
             );
-            return EvidenceValidationResult::valid(); // Invalid but don't fail
+            return EvidenceValidationResult::valid();
         }
 
         debug!(
