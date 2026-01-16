@@ -11,5 +11,5 @@ pub mod misbehavior;
 
 pub use misbehavior::{
     MisbehaviorDetector, MisbehaviorStats, MisbehaviorThresholds, ReputationScore,
-    TrustPenaltyCallback, Violation, ViolationRecord,
+    StorageFailureReason, TrustPenaltyCallback, Violation, ViolationRecord,
 };

@@ -14,6 +14,8 @@ pub mod escrow;
 pub mod notifications;
 /// Peer cache for persisting discovered peers
 pub mod peer_cache;
+/// Proof-of-storage challenge system
+pub mod pos;
 /// Storage quota management
 pub mod quotas;
 /// Recurring payment scheduling
@@ -21,6 +23,7 @@ pub mod recurring_payments;
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::time::SystemTime;
 
 // Re-export quota types
@@ -28,6 +31,12 @@ pub use quotas::{QuotaPriority, QuotaStats, StorageItem, StorageQuota, StorageQu
 
 // Re-export peer cache types
 pub use peer_cache::{CachedPeer, PeerCache, PeerSource, DEFAULT_PEER_TTL};
+
+// Re-export proof-of-storage types
+pub use pos::{
+    ChallengeConfig, ChallengeState, ContentChunkTree, MerkleProof, PendingChallenge,
+    StorageChallenge, StorageFailureReason, StorageProof, DEFAULT_CHUNK_SIZE, MAX_BYTE_SAMPLE_SIZE,
+};
 
 /// Content hash type (32-byte SHA-256)
 pub type ContentHash = [u8; 32];
@@ -63,6 +72,23 @@ pub struct ReplicaMetadata {
     pub replicas: Vec<ReplicaInfo>,
     /// When this metadata was last updated
     pub updated_at: SystemTime,
+
+    // Proof-of-Storage fields (optional for backward compatibility)
+    /// Merkle root of content chunks (for challenge verification)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub merkle_root: Option<[u8; 32]>,
+    /// Content size in bytes
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content_size: Option<u64>,
+    /// Chunk size used for Merkle tree (default: 4KB)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chunk_size: Option<u32>,
+    /// Last challenge timestamp per replica (peer_did -> Unix seconds)
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub last_challenged: HashMap<String, u64>,
+    /// Last successful verification per replica (peer_did -> Unix seconds)
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub last_verified: HashMap<String, u64>,
 }
 
 impl ReplicaMetadata {
@@ -72,7 +98,72 @@ impl ReplicaMetadata {
             content_hash,
             replicas: Vec::new(),
             updated_at: SystemTime::now(),
+            merkle_root: None,
+            content_size: None,
+            chunk_size: None,
+            last_challenged: HashMap::new(),
+            last_verified: HashMap::new(),
         }
+    }
+
+    /// Create replica metadata with Merkle tree info for PoS verification
+    pub fn with_merkle_info(
+        content_hash: ContentHash,
+        merkle_root: [u8; 32],
+        content_size: u64,
+        chunk_size: u32,
+    ) -> Self {
+        Self {
+            content_hash,
+            replicas: Vec::new(),
+            updated_at: SystemTime::now(),
+            merkle_root: Some(merkle_root),
+            content_size: Some(content_size),
+            chunk_size: Some(chunk_size),
+            last_challenged: HashMap::new(),
+            last_verified: HashMap::new(),
+        }
+    }
+
+    /// Set Merkle tree info for PoS verification
+    pub fn set_merkle_info(&mut self, merkle_root: [u8; 32], content_size: u64, chunk_size: u32) {
+        self.merkle_root = Some(merkle_root);
+        self.content_size = Some(content_size);
+        self.chunk_size = Some(chunk_size);
+        self.updated_at = SystemTime::now();
+    }
+
+    /// Record a challenge being sent to a replica
+    pub fn record_challenge(&mut self, peer_did: &str) {
+        let now = SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        self.last_challenged.insert(peer_did.to_string(), now);
+        self.updated_at = SystemTime::now();
+    }
+
+    /// Record successful verification of a replica
+    pub fn record_verification(&mut self, peer_did: &str) {
+        let now = SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        self.last_verified.insert(peer_did.to_string(), now);
+        self.updated_at = SystemTime::now();
+    }
+
+    /// Check if a replica was recently verified (within given seconds)
+    pub fn was_recently_verified(&self, peer_did: &str, within_secs: u64) -> bool {
+        let now = SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+
+        self.last_verified
+            .get(peer_did)
+            .map(|verified_at| now.saturating_sub(*verified_at) < within_secs)
+            .unwrap_or(false)
     }
 
     /// Add or update a replica entry

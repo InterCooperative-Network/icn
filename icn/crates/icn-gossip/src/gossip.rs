@@ -703,6 +703,16 @@ impl GossipActor {
         }
     }
 
+    /// Send a storage challenge to a replica holder
+    ///
+    /// Public API for the ChallengeScheduler to send proof-of-storage challenges.
+    pub fn send_storage_challenge(&self, target: Did, challenge: icn_store::StorageChallenge) {
+        self.send_message(
+            Some(target),
+            GossipMessage::StorageChallengeMsg { challenge },
+        );
+    }
+
     /// Get all known peers (Phase 17 Week 3 - ReplicationManager peer discovery)
     ///
     /// Returns the set of all DIDs that have interacted with this node
@@ -1448,6 +1458,12 @@ impl GossipActor {
                 diverged_topics,
                 entries_behind,
             ),
+
+            GossipMessage::StorageChallengeMsg { challenge } => {
+                self.handle_storage_challenge(sender, challenge)
+            }
+
+            GossipMessage::StorageProofMsg { proof } => self.handle_storage_proof(sender, proof),
         }
     }
 

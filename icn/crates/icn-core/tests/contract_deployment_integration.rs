@@ -189,6 +189,10 @@ impl TestNode {
                             icn_gossip::GossipMessage::PartitionHealResponse { .. } => {
                                 "PartitionHealResponse"
                             }
+                            icn_gossip::GossipMessage::StorageChallengeMsg { .. } => {
+                                "StorageChallengeMsg"
+                            }
+                            icn_gossip::GossipMessage::StorageProofMsg { .. } => "StorageProofMsg",
                         };
 
                         let result = if let Some(target_did) = recipient {
