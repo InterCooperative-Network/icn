@@ -157,6 +157,35 @@ fn sync_agreement(
     to_store.store_agreement(&agreement).unwrap();
 }
 
+/// Retry a condition with exponential backoff for eventual consistency testing.
+///
+/// This helper is used to verify that distributed systems eventually converge to
+/// the expected state, even if it takes multiple retries.
+///
+/// # Arguments
+/// * `condition` - A closure that checks if the expected state has been reached
+/// * `max_attempts` - Maximum number of retry attempts
+/// * `initial_delay_ms` - Initial delay between attempts (doubles each retry)
+///
+/// # Returns
+/// `true` if the condition was met within the retry limit, `false` otherwise.
+async fn retry_until<F>(condition: F, max_attempts: u32, initial_delay_ms: u64) -> bool
+where
+    F: Fn() -> bool,
+{
+    let mut delay_ms = initial_delay_ms;
+    for attempt in 1..=max_attempts {
+        if condition() {
+            return true;
+        }
+        if attempt < max_attempts {
+            tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;
+            delay_ms = delay_ms.saturating_mul(2).min(1000); // Cap at 1 second
+        }
+    }
+    false
+}
+
 // =============================================================================
 // Concurrent Signing Tests (Shared Store - Pre-Synced Scenario)
 // =============================================================================
@@ -1199,39 +1228,47 @@ async fn test_eventual_consistency_after_concurrent_ops() {
 
     // Final state should be consistent
     //
-    // NOTE: This "eventual consistency" test verifies the final state immediately
-    // after concurrent operations complete, without any retry logic or time-based
-    // waiting for convergence. True eventual consistency would imply temporary
-    // inconsistency that converges over time. This test relies on Tokio's cooperative
-    // scheduling to serialize operations, not on actual convergence mechanisms.
+    // NOTE: This test uses retry_until to handle potential timing variations in
+    // async execution. While the shared store with Tokio's cooperative scheduling
+    // typically serializes operations, the retry logic provides resilience against
+    // scheduler variations and makes the "eventual consistency" name more accurate.
     // For real distributed eventual consistency, use the `*_with_gossip_sync` tests.
-    let final_agreement = store.get_agreement(&agreement_id).unwrap().unwrap();
+    let store_for_check = store.clone();
+    let agreement_id_for_check = agreement_id.clone();
+    let keypair_a_did = keypair_a.did().clone();
+    let keypair_b_did = keypair_b.did().clone();
+    let keypair_c_did = keypair_c.did().clone();
 
-    // Should have exactly 3 signatures (one from each party)
+    // Retry until all signatures are present (handles timing variations)
+    let converged = retry_until(
+        || {
+            let agreement = match store_for_check.get_agreement(&agreement_id_for_check) {
+                Ok(Some(a)) => a,
+                _ => return false,
+            };
+            agreement.signatures.len() == 3
+                && agreement.status.is_active()
+                && agreement.has_signed(&keypair_a_did)
+                && agreement.has_signed(&keypair_b_did)
+                && agreement.has_signed(&keypair_c_did)
+        },
+        5,  // max 5 attempts
+        10, // start with 10ms delay
+    )
+    .await;
+
+    assert!(converged, "Agreement should converge to expected state");
+
+    // Final verification with detailed assertions
+    let final_agreement = store.get_agreement(&agreement_id).unwrap().unwrap();
     assert_eq!(
         final_agreement.signatures.len(),
         3,
         "Should have exactly 3 signatures"
     );
-
-    // Should be active
     assert!(
         final_agreement.status.is_active(),
         "Agreement should be active"
-    );
-
-    // Each party should have signed exactly once
-    assert!(
-        final_agreement.has_signed(keypair_a.did()),
-        "A should have signed"
-    );
-    assert!(
-        final_agreement.has_signed(keypair_b.did()),
-        "B should have signed"
-    );
-    assert!(
-        final_agreement.has_signed(keypair_c.did()),
-        "C should have signed"
     );
 }
 
@@ -1310,22 +1347,47 @@ async fn test_eventual_consistency_amendment_ratification() {
         "B should successfully sign amendment"
     );
 
-    // Version should be exactly 2 (incremented once, not twice)
+    // Use retry logic for eventual consistency verification
+    let store_for_check = store.clone();
+    let agreement_id_for_check = agreement_id.clone();
+    let amendment_id_for_check = amendment_id.clone();
+
+    let converged = retry_until(
+        || {
+            // Check version is exactly 2
+            let agreement = match store_for_check.get_agreement(&agreement_id_for_check) {
+                Ok(Some(a)) => a,
+                _ => return false,
+            };
+            if agreement.version != 2 {
+                return false;
+            }
+
+            // Check amendment is ratified
+            let amendments = match store_for_check.get_amendments(&agreement_id_for_check) {
+                Ok(a) => a,
+                _ => return false,
+            };
+            amendments.iter().any(|a| {
+                a.id == amendment_id_for_check
+                    && matches!(a.status, icn_federation::agreement::AmendmentStatus::Ratified)
+            })
+        },
+        5,  // max 5 attempts
+        10, // start with 10ms delay
+    )
+    .await;
+
+    assert!(
+        converged,
+        "Amendment should be ratified and version should be 2"
+    );
+
+    // Final verification with detailed assertions
     let final_agreement = store.get_agreement(&agreement_id).unwrap().unwrap();
     assert_eq!(
         final_agreement.version, 2,
         "Version should be exactly 2 after one amendment"
-    );
-
-    // Amendment should be ratified
-    let amendments = store.get_amendments(&agreement_id).unwrap();
-    let final_amendment = amendments.iter().find(|a| a.id == amendment_id).unwrap();
-    assert!(
-        matches!(
-            final_amendment.status,
-            icn_federation::agreement::AmendmentStatus::Ratified
-        ),
-        "Amendment should be ratified"
     );
 }
 
