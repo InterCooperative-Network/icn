@@ -227,6 +227,12 @@ pub enum EvidenceValidationError {
     #[error("Technical observation too old: {age_secs}s (max: {max_secs}s)")]
     ObservationTooOld { age_secs: u64, max_secs: u64 },
 
+    #[error("Technical observation from {observer} missing required signature")]
+    MissingObservationSignature { observer: String },
+
+    #[error("Technical observation signature invalid from observer {observer}")]
+    InvalidObservationSignature { observer: String },
+
     #[error("Legacy evidence not accepted for new edges")]
     LegacyNotAccepted,
 
