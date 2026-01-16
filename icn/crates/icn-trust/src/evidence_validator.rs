@@ -17,7 +17,8 @@
 //!
 //! - **External attestation**: `"attestation:{provider}:{attestation_id}:{target_did}"`
 //! - **Peer endorsement**: `"endorsement:{source_did}:{target_did}:{timestamp}"`
-//! - **Technical observation**: `"observation:{target_did}:{metric_type}:{value}:{timestamp}"`
+//! - **Technical observation**: `"observation:{target_did}:{metric_type}:{value:.17}:{timestamp}"`
+//!   (value uses IEEE 754 double precision formatting for cross-platform determinism)
 
 use crate::evidence::{
     EvidenceValidationError, EvidenceValidationResult, TechnicalMetricType, TrustEvidence,
@@ -686,11 +687,9 @@ impl EvidenceValidator {
             };
 
             // Construct the canonical message that was signed
-            // TODO(#680): Consider using deterministic float formatting (e.g., `{:.17}` for IEEE 754
-            // double precision) or raw bytes to prevent platform-dependent floating-point
-            // representation from causing signature mismatches across different systems.
+            // Use IEEE 754 double precision formatting ({:.17}) for cross-platform determinism
             let message = format!(
-                "observation:{target}:{}:{value}:{observed_at}",
+                "observation:{target}:{}:{value:.17}:{observed_at}",
                 metric_type.as_str()
             );
 
@@ -1031,13 +1030,15 @@ mod tests {
             .as_secs();
 
         // Create properly signed observation
-        let message = format!("observation:{}:uptime:0.99:{}", bob.did(), now);
+        // Note: value must use IEEE 754 double precision formatting ({:.17}) to match validator
+        let value = 0.99_f64;
+        let message = format!("observation:{}:uptime:{value:.17}:{}", bob.did(), now);
         let signature = observer.sign(message.as_bytes());
 
         let evidence = vec![TrustEvidence::TechnicalObservation {
             observer: observer.did().clone(),
             metric_type: TechnicalMetricType::Uptime,
-            value: 0.99,
+            value,
             observed_at: now,
             signature: signature.to_bytes().to_vec(),
         }];
@@ -1064,15 +1065,16 @@ mod tests {
             .unwrap()
             .as_secs();
 
-        // Sign with wrong key
-        let message = format!("observation:{}:uptime:0.99:{}", bob.did(), now);
+        // Sign with wrong key (using deterministic float format)
+        let value = 0.99_f64;
+        let message = format!("observation:{}:uptime:{value:.17}:{}", bob.did(), now);
         let wrong_signature = wrong_signer.sign(message.as_bytes());
 
         let evidence = vec![TrustEvidence::TechnicalObservation {
             observer: observer.did().clone(), // Claims to be observer
             signature: wrong_signature.to_bytes().to_vec(), // But signed by wrong_signer
             metric_type: TechnicalMetricType::Uptime,
-            value: 0.99,
+            value,
             observed_at: now,
         }];
 
