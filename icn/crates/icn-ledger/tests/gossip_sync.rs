@@ -496,3 +496,75 @@ async fn test_witnessed_entry_invalid_signature_quarantined_via_sync() {
 
     println!("Witnessed entry with invalid signature quarantined via sync");
 }
+
+#[tokio::test]
+async fn test_witnessed_entry_insufficient_signatures_quarantined_via_sync() {
+    let (mut ledger, _temp) = create_simple_ledger();
+
+    // Require 2-of-3 quorum
+    let witness1 = KeyPair::generate().unwrap().did().clone();
+    let witness2 = KeyPair::generate().unwrap().did().clone();
+    let witness3 = KeyPair::generate().unwrap().did().clone();
+
+    ledger.set_witness_config(WitnessConfig::quorum(
+        2,
+        vec![witness1.clone(), witness2.clone(), witness3.clone()],
+    ));
+
+    let alice_kp = KeyPair::generate().unwrap();
+    let bob_kp = KeyPair::generate().unwrap();
+    let alice = alice_kp.did().clone();
+    let bob = bob_kp.did().clone();
+
+    let entry = JournalEntryBuilder::new(alice.clone())
+        .debit(alice.clone(), "hours".to_string(), 10)
+        .credit(bob.clone(), "hours".to_string(), 10)
+        .build()
+        .unwrap();
+
+    let hash = entry.id.clone().unwrap();
+
+    // Create witnessed entry with zero signatures (need 2)
+    let witnessed = WitnessedEntry::new(
+        entry,
+        WitnessPolicy::Quorum {
+            required: 2,
+            witnesses: vec![witness1, witness2, witness3],
+        },
+    );
+    // No signatures added
+
+    // Send via sync message (simulates receiving from gossip)
+    let sync_msg = LedgerSyncMessage::NewWitnessedEntry {
+        hash: hash.clone(),
+        witnessed,
+    };
+
+    // Handle sync message - should quarantine the entry
+    ledger.handle_sync_message(sync_msg).await.unwrap();
+
+    // Verify entry was NOT stored in main ledger
+    assert!(
+        ledger.get_entry(&hash).unwrap().is_none(),
+        "Entry with insufficient signatures should not be stored"
+    );
+
+    // Verify entry was quarantined
+    let quarantine_items = ledger.quarantine().list().unwrap();
+    assert_eq!(quarantine_items.len(), 1, "Entry should be quarantined");
+
+    // Verify quarantine reason
+    let quarantined = &quarantine_items[0];
+    assert!(
+        matches!(
+            quarantined.reason,
+            icn_ledger::QuarantineReason::InsufficientWitnesses {
+                have: 0,
+                required: 2
+            }
+        ),
+        "Quarantine reason should be InsufficientWitnesses with have=0, required=2"
+    );
+
+    println!("Witnessed entry with insufficient signatures quarantined via sync");
+}

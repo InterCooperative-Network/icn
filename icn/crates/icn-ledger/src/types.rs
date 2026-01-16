@@ -253,6 +253,14 @@ pub enum QuarantineReason {
 
     /// Witness validation failed - signature verification or timestamp issues
     WitnessValidationFailed(String),
+
+    /// Insufficient witness signatures - entry has fewer signatures than policy requires
+    InsufficientWitnesses {
+        /// Number of unique witnesses that signed
+        have: u32,
+        /// Number required by policy
+        required: u32,
+    },
 }
 
 /// Quarantined entry awaiting resolution

@@ -1668,13 +1668,53 @@ impl Ledger {
 
                 // Check sufficient signatures
                 if !witnessed.has_sufficient_signatures() {
+                    let have = witnessed.unique_witness_count() as u32;
+                    let required = match &witnessed.policy_applied {
+                        crate::types::WitnessPolicy::None => 0,
+                        crate::types::WitnessPolicy::Counterparty => 1,
+                        crate::types::WitnessPolicy::Quorum { required, .. } => *required,
+                        crate::types::WitnessPolicy::AllParties => {
+                            // All non-author accounts must sign
+                            witnessed
+                                .entry
+                                .accounts
+                                .iter()
+                                .map(|d| &d.account_id)
+                                .filter(|id| **id != witnessed.entry.author)
+                                .collect::<std::collections::HashSet<_>>()
+                                .len() as u32
+                        }
+                    };
+
                     warn!(
                         entry_hash = %hash,
-                        witness_count = witnessed.unique_witness_count(),
-                        "Witnessed entry has insufficient signatures"
+                        witness_count = have,
+                        required = required,
+                        "Witnessed entry has insufficient signatures, quarantining"
                     );
+
+                    // Quarantine the entry for governance review
+                    let quarantine_item = QuarantineItem {
+                        entry_id: hash.clone(),
+                        reason: QuarantineReason::InsufficientWitnesses { have, required },
+                        author: witnessed.entry.author.clone(),
+                        observed_at: icn_time::current_timestamp_secs(),
+                        metadata: Some(format!("policy={:?}", witnessed.policy_applied)),
+                    };
+
+                    if let Err(qe) = self
+                        .quarantine
+                        .add(witnessed.entry.clone(), quarantine_item)
+                    {
+                        warn!(
+                            entry_hash = %hash,
+                            error = %qe,
+                            "Failed to quarantine witnessed entry"
+                        );
+                    }
+
                     icn_obs::metrics::ledger::witnessed_entries_rejected_insufficient_inc();
-                    return Ok(()); // Reject silently
+                    return Ok(());
                 }
 
                 let witness_count = witnessed.witness_signatures.len() as u64;
