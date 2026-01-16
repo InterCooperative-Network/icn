@@ -1020,10 +1020,15 @@ impl Ledger {
             .as_ref()
             .context("Entry must have hash for witness validation")?;
 
-        // Get current time for timestamp validation
-        let current_time = icn_time::current_timestamp_secs();
+        // Get current time for timestamp validation, failing closed on clock errors
+        // to prevent accepting invalid timestamps when the system clock is misconfigured
+        let current_time = icn_time::try_current_timestamp_secs()
+            .context("Failed to get current time for witness validation")?;
 
-        // Maximum allowed clock skew (5 seconds) to tolerate minor time differences
+        // Maximum allowed clock skew for witness signatures (5 seconds).
+        // This is intentionally stricter than icn-time::MAX_CLOCK_SKEW (300s) because
+        // ledger security requires tighter timestamp validation to limit the replay
+        // attack window. Witness signatures should be created and validated promptly.
         const MAX_CLOCK_SKEW_SECS: u64 = 5;
 
         for sig in &witnessed.witness_signatures {
@@ -4631,6 +4636,131 @@ mod tests {
         assert!(
             result.is_ok(),
             "Timestamp within clock skew tolerance should be accepted: {result:?}"
+        );
+    }
+
+    #[test]
+    fn test_witness_signature_exactly_at_clock_skew_boundary() {
+        let (mut ledger, _temp) = create_test_ledger();
+        let alice_kp = KeyPair::generate().unwrap();
+        let alice = alice_kp.did().clone();
+        let bob_kp = KeyPair::generate().unwrap();
+        let bob = bob_kp.did().clone();
+
+        // Configure witness requirements
+        ledger.set_witness_config(crate::types::WitnessConfig::counterparty_above(0));
+
+        let entry = JournalEntryBuilder::new(alice.clone())
+            .debit(alice.clone(), "hours".to_string(), 10)
+            .credit(bob.clone(), "hours".to_string(), 10)
+            .build()
+            .unwrap();
+
+        let entry_hash = entry.id.clone().unwrap();
+
+        // Create signature with timestamp exactly at the boundary (5s in future)
+        let at_boundary = icn_time::current_timestamp_secs() + 5;
+        let signature = bob_kp.sign(entry_hash.as_bytes());
+        let witness_sig = crate::types::WitnessSignature::new(
+            bob.clone(),
+            signature.to_bytes().to_vec(),
+            at_boundary,
+        );
+
+        let witnessed = crate::types::WitnessedEntry {
+            entry,
+            witness_signatures: vec![witness_sig],
+            policy_applied: crate::types::WitnessPolicy::Counterparty,
+        };
+
+        let result = ledger.validate_witness_signatures(&witnessed);
+        assert!(
+            result.is_ok(),
+            "Timestamp exactly at clock skew boundary should be accepted: {result:?}"
+        );
+    }
+
+    #[test]
+    fn test_witness_signature_just_past_clock_skew_boundary() {
+        let (mut ledger, _temp) = create_test_ledger();
+        let alice_kp = KeyPair::generate().unwrap();
+        let alice = alice_kp.did().clone();
+        let bob_kp = KeyPair::generate().unwrap();
+        let bob = bob_kp.did().clone();
+
+        // Configure witness requirements
+        ledger.set_witness_config(crate::types::WitnessConfig::counterparty_above(0));
+
+        let entry = JournalEntryBuilder::new(alice.clone())
+            .debit(alice.clone(), "hours".to_string(), 10)
+            .credit(bob.clone(), "hours".to_string(), 10)
+            .build()
+            .unwrap();
+
+        let entry_hash = entry.id.clone().unwrap();
+
+        // Create signature with timestamp just past the boundary (6s in future)
+        let past_boundary = icn_time::current_timestamp_secs() + 6;
+        let signature = bob_kp.sign(entry_hash.as_bytes());
+        let witness_sig = crate::types::WitnessSignature::new(
+            bob.clone(),
+            signature.to_bytes().to_vec(),
+            past_boundary,
+        );
+
+        let witnessed = crate::types::WitnessedEntry {
+            entry,
+            witness_signatures: vec![witness_sig],
+            policy_applied: crate::types::WitnessPolicy::Counterparty,
+        };
+
+        let result = ledger.validate_witness_signatures(&witnessed);
+        assert!(result.is_err());
+        assert!(
+            result.unwrap_err().to_string().contains("in the future"),
+            "Error should mention 'in the future'"
+        );
+    }
+
+    #[test]
+    fn test_witness_signature_future_rejected_without_witness_config() {
+        // Test that future validation still works even without witness_config
+        let (ledger, _temp) = create_test_ledger();
+        // Don't set witness_config - ledger has None
+        let alice_kp = KeyPair::generate().unwrap();
+        let alice = alice_kp.did().clone();
+        let bob_kp = KeyPair::generate().unwrap();
+        let bob = bob_kp.did().clone();
+
+        let entry = JournalEntryBuilder::new(alice.clone())
+            .debit(alice.clone(), "hours".to_string(), 10)
+            .credit(bob.clone(), "hours".to_string(), 10)
+            .build()
+            .unwrap();
+
+        let entry_hash = entry.id.clone().unwrap();
+
+        // Create signature with timestamp far in the future
+        let future_time = icn_time::current_timestamp_secs() + 3600;
+        let signature = bob_kp.sign(entry_hash.as_bytes());
+        let witness_sig = crate::types::WitnessSignature::new(
+            bob.clone(),
+            signature.to_bytes().to_vec(),
+            future_time,
+        );
+
+        let witnessed = crate::types::WitnessedEntry {
+            entry,
+            witness_signatures: vec![witness_sig],
+            policy_applied: crate::types::WitnessPolicy::Counterparty,
+        };
+
+        // Future validation should still work without witness_config
+        let result = ledger.validate_witness_signatures(&witnessed);
+        assert!(result.is_err());
+        assert!(
+            result.unwrap_err().to_string().contains("in the future"),
+            "Future timestamps should be rejected even without witness_config"
         );
     }
 }
