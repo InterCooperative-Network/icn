@@ -250,6 +250,9 @@ pub enum QuarantineReason {
 
     /// Charter rule violation - entry violates cooperative charter policies
     CharterViolation,
+
+    /// Witness validation failed - signature verification or timestamp issues
+    WitnessValidationFailed(String),
 }
 
 /// Quarantined entry awaiting resolution

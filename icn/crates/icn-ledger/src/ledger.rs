@@ -1635,10 +1635,35 @@ impl Ledger {
                     warn!(
                         entry_hash = %hash,
                         error = %e,
-                        "Witnessed entry signature validation failed"
+                        "Witnessed entry signature validation failed, quarantining"
                     );
+
+                    // Quarantine the entry for governance review
+                    let quarantine_item = QuarantineItem {
+                        entry_id: hash.clone(),
+                        reason: QuarantineReason::WitnessValidationFailed(e.to_string()),
+                        author: witnessed.entry.author.clone(),
+                        observed_at: icn_time::current_timestamp_secs(),
+                        metadata: Some(format!(
+                            "witness_count={}, policy={:?}",
+                            witnessed.witness_signatures.len(),
+                            witnessed.policy_applied
+                        )),
+                    };
+
+                    if let Err(qe) = self
+                        .quarantine
+                        .add(witnessed.entry.clone(), quarantine_item)
+                    {
+                        warn!(
+                            entry_hash = %hash,
+                            error = %qe,
+                            "Failed to quarantine witnessed entry"
+                        );
+                    }
+
                     icn_obs::metrics::ledger::witnessed_entries_rejected_invalid_signature_inc();
-                    return Ok(()); // Reject silently
+                    return Ok(());
                 }
 
                 // Check sufficient signatures
