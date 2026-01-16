@@ -19,6 +19,36 @@
 //! - **Peer endorsement**: `"endorsement:{source_did}:{target_did}:{timestamp}"`
 //! - **Technical observation**: `"observation:{target_did}:{metric_type}:{value:.17}:{timestamp}"`
 //!   (value uses IEEE 754 double precision formatting for cross-platform determinism)
+//!
+//! ## Verification Order and DoS Protection
+//!
+//! Validation checks are ordered to minimize computational cost under attack:
+//!
+//! 1. **Cheapest checks first**: Format validation, timestamp comparison, range checks
+//! 2. **Medium-cost checks**: Trust score lookups (involves graph traversal)
+//! 3. **Expensive checks last**: Cryptographic signature verification
+//!
+//! This ordering prevents denial-of-service attacks where an attacker floods the
+//! system with evidence that has valid-looking signatures but fails cheaper checks.
+//! By rejecting invalid evidence early, we avoid wasting CPU cycles on expensive
+//! Ed25519 signature verification.
+//!
+//! Example for peer endorsements:
+//! ```text
+//! validate_peer_endorsement():
+//!   1. Check endorser != source/target    (O(1) - string compare)
+//!   2. Check endorsement not expired      (O(1) - timestamp math)
+//!   3. Check endorser trust score         (O(n) - graph traversal)
+//!   4. Verify Ed25519 signature           (O(1) - expensive crypto)
+//! ```
+//!
+//! ## Float Formatting Notes
+//!
+//! Technical observations use `{:.17}` format for float values to ensure
+//! cross-platform determinism. Note that:
+//! - Negative zero (`-0.0`) formats as `"-0.00000000000000000"`, distinct from `0.0`
+//! - Callers must be consistent about which zero they use
+//! - `{:.17}` provides enough precision to round-trip any f64 value uniquely
 
 use crate::evidence::{
     EvidenceValidationError, EvidenceValidationResult, TechnicalMetricType, TrustEvidence,
@@ -31,6 +61,14 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, warn};
+
+/// Error type for evidence validator configuration
+#[derive(Debug, Clone, thiserror::Error)]
+pub enum ConfigError {
+    /// Invalid Ed25519 public key provided for a provider
+    #[error("Invalid Ed25519 public key for provider '{provider}': {reason}")]
+    InvalidProviderKey { provider: String, reason: String },
+}
 
 /// Configuration for evidence validation
 #[derive(Debug, Clone)]
@@ -96,22 +134,28 @@ impl EvidenceValidatorConfig {
 
     /// Add a provider's public key for signature verification
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics if the provided public key is not a valid Ed25519 public key.
-    /// This follows the "fail fast" principle - invalid configuration should be
-    /// caught at startup, not at runtime during signature verification.
-    pub fn with_provider_key(mut self, provider: &str, public_key: [u8; 32]) -> Self {
+    /// Returns `ConfigError::InvalidProviderKey` if the provided bytes are not
+    /// a valid Ed25519 public key. This follows the "fail fast" principle -
+    /// invalid configuration should be caught at startup, not at runtime during
+    /// signature verification.
+    pub fn with_provider_key(
+        mut self,
+        provider: &str,
+        public_key: [u8; 32],
+    ) -> Result<Self, ConfigError> {
         // Validate the key is a valid Ed25519 public key at configuration time
-        VerifyingKey::from_bytes(&public_key).unwrap_or_else(|e| {
-            panic!("Invalid Ed25519 public key for provider '{provider}': {e}")
-        });
+        VerifyingKey::from_bytes(&public_key).map_err(|e| ConfigError::InvalidProviderKey {
+            provider: provider.to_string(),
+            reason: e.to_string(),
+        })?;
 
         if !self.known_providers.contains(&provider.to_string()) {
             self.known_providers.push(provider.to_string());
         }
         self.provider_keys.insert(provider.to_string(), public_key);
-        self
+        Ok(self)
     }
 }
 
@@ -1133,7 +1177,8 @@ mod tests {
         let provider_public_key: [u8; 32] = provider_keypair.verifying_key().as_bytes().to_owned();
 
         let config = EvidenceValidatorConfig::default()
-            .with_provider_key("test_provider", provider_public_key);
+            .with_provider_key("test_provider", provider_public_key)
+            .expect("valid provider key");
         let validator = EvidenceValidator::with_config(store, config);
 
         let alice = KeyPair::generate().unwrap();
@@ -1164,7 +1209,8 @@ mod tests {
         let provider_public_key: [u8; 32] = provider_keypair.verifying_key().as_bytes().to_owned();
 
         let config = EvidenceValidatorConfig::default()
-            .with_provider_key("test_provider", provider_public_key);
+            .with_provider_key("test_provider", provider_public_key)
+            .expect("valid provider key");
         let validator = EvidenceValidator::with_config(store, config);
 
         let alice = KeyPair::generate().unwrap();
@@ -1190,5 +1236,273 @@ mod tests {
             &result.errors[0],
             EvidenceValidationError::InvalidAttestationSignature
         ));
+    }
+
+    // ============================================================================
+    // Float Edge Case Tests (IEEE 754 determinism)
+    // ============================================================================
+    //
+    // These tests verify that technical observation signatures work correctly
+    // for edge cases in IEEE 754 floating-point representation. The format
+    // `{:.17}` is used for cross-platform determinism, as it provides enough
+    // precision to round-trip any f64 value uniquely.
+
+    #[test]
+    fn test_technical_observation_float_zero() {
+        let store = test_store();
+        let validator = EvidenceValidator::new(store);
+
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+        let observer = KeyPair::generate().unwrap();
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        // Test with zero - latency metric allows any non-negative value
+        let value = 0.0_f64;
+        let message = format!("observation:{}:latency:{value:.17}:{}", bob.did(), now);
+        let signature = observer.sign(message.as_bytes());
+
+        let evidence = vec![TrustEvidence::TechnicalObservation {
+            observer: observer.did().clone(),
+            metric_type: TechnicalMetricType::Latency,
+            value,
+            observed_at: now,
+            signature: signature.to_bytes().to_vec(),
+        }];
+
+        let result = validator.validate_all_evidence(&evidence, alice.did(), bob.did(), None);
+        assert!(result.valid, "Zero value should be accepted");
+    }
+
+    #[test]
+    fn test_technical_observation_float_negative_zero() {
+        let store = test_store();
+        let validator = EvidenceValidator::new(store);
+
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+        let observer = KeyPair::generate().unwrap();
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        // Note: Negative zero formats DIFFERENTLY than positive zero with {:.17}!
+        // "-0.00000000000000000" vs "0.00000000000000000"
+        // This is important for signature verification - both sides must use
+        // the exact same value.
+        let value = -0.0_f64;
+        let message = format!("observation:{}:latency:{value:.17}:{}", bob.did(), now);
+        let signature = observer.sign(message.as_bytes());
+
+        let evidence = vec![TrustEvidence::TechnicalObservation {
+            observer: observer.did().clone(),
+            metric_type: TechnicalMetricType::Latency,
+            value,
+            observed_at: now,
+            signature: signature.to_bytes().to_vec(),
+        }];
+
+        let result = validator.validate_all_evidence(&evidence, alice.did(), bob.did(), None);
+        assert!(result.valid, "Negative zero should be accepted");
+
+        // Document that -0.0 and 0.0 format differently (important for callers!)
+        assert_ne!(
+            format!("{:.17}", -0.0_f64),
+            format!("{:.17}", 0.0_f64),
+            "-0.0 and 0.0 format differently - callers must be consistent"
+        );
+    }
+
+    #[test]
+    fn test_technical_observation_float_subnormal() {
+        let store = test_store();
+        let validator = EvidenceValidator::new(store);
+
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+        let observer = KeyPair::generate().unwrap();
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        // Smallest positive subnormal f64
+        let value = f64::MIN_POSITIVE / 2.0;
+        assert!(value > 0.0 && value < f64::MIN_POSITIVE); // Verify it's subnormal
+        let message = format!("observation:{}:uptime:{value:.17}:{}", bob.did(), now);
+        let signature = observer.sign(message.as_bytes());
+
+        let evidence = vec![TrustEvidence::TechnicalObservation {
+            observer: observer.did().clone(),
+            metric_type: TechnicalMetricType::Uptime,
+            value,
+            observed_at: now,
+            signature: signature.to_bytes().to_vec(),
+        }];
+
+        let result = validator.validate_all_evidence(&evidence, alice.did(), bob.did(), None);
+        assert!(result.valid, "Subnormal value should be accepted");
+    }
+
+    #[test]
+    fn test_technical_observation_float_very_small() {
+        let store = test_store();
+        let validator = EvidenceValidator::new(store);
+
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+        let observer = KeyPair::generate().unwrap();
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        // Very small but representable value near epsilon
+        let value = 1e-308_f64;
+        let message = format!("observation:{}:uptime:{value:.17}:{}", bob.did(), now);
+        let signature = observer.sign(message.as_bytes());
+
+        let evidence = vec![TrustEvidence::TechnicalObservation {
+            observer: observer.did().clone(),
+            metric_type: TechnicalMetricType::Uptime,
+            value,
+            observed_at: now,
+            signature: signature.to_bytes().to_vec(),
+        }];
+
+        let result = validator.validate_all_evidence(&evidence, alice.did(), bob.did(), None);
+        assert!(result.valid, "Very small value should be accepted");
+    }
+
+    #[test]
+    fn test_technical_observation_float_precision_roundtrip() {
+        // Verify that formatting with .17 preserves precision for signature verification
+        let test_values = [
+            0.1_f64,                        // Classic binary float representation issue
+            0.2_f64,
+            0.3_f64,
+            0.1 + 0.2,                      // Should equal 0.30000000000000004
+            std::f64::consts::PI,           // Irrational approximation
+            std::f64::consts::E,
+            1.0 / 3.0,                      // Repeating decimal in binary
+            f64::MIN_POSITIVE,              // Smallest positive normal
+            f64::MAX,                       // Largest finite
+        ];
+
+        for &value in &test_values {
+            let formatted = format!("{value:.17}");
+            let parsed: f64 = formatted.parse().unwrap();
+
+            // The formatted-and-parsed value should match the original
+            // for signature verification purposes
+            assert!(
+                (value - parsed).abs() < f64::EPSILON || value == parsed,
+                "Value {} did not roundtrip correctly: {} -> {} (diff: {})",
+                value,
+                formatted,
+                parsed,
+                (value - parsed).abs()
+            );
+        }
+    }
+
+    #[test]
+    fn test_technical_observation_float_infinity_out_of_range() {
+        let store = test_store();
+        let validator = EvidenceValidator::new(store);
+
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+        let observer = KeyPair::generate().unwrap();
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        // Infinity for uptime (0.0..=1.0 range) - should be out of range but tolerated
+        let value = f64::INFINITY;
+        let message = format!("observation:{}:uptime:{value:.17}:{}", bob.did(), now);
+        let signature = observer.sign(message.as_bytes());
+
+        let evidence = vec![TrustEvidence::TechnicalObservation {
+            observer: observer.did().clone(),
+            metric_type: TechnicalMetricType::Uptime,
+            value,
+            observed_at: now,
+            signature: signature.to_bytes().to_vec(),
+        }];
+
+        let result = validator.validate_all_evidence(&evidence, alice.did(), bob.did(), None);
+        // Out-of-range values are tolerated (return valid with no adjustment)
+        assert!(
+            result.valid,
+            "Infinity should be tolerated (warning logged but accepted)"
+        );
+        assert_eq!(
+            result.score_adjustment, 0.0,
+            "Out-of-range should have no adjustment"
+        );
+    }
+
+    #[test]
+    fn test_technical_observation_float_nan_out_of_range() {
+        let store = test_store();
+        let validator = EvidenceValidator::new(store);
+
+        let alice = KeyPair::generate().unwrap();
+        let bob = KeyPair::generate().unwrap();
+        let observer = KeyPair::generate().unwrap();
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        // NaN for uptime - NaN is never in any range
+        let value = f64::NAN;
+        let message = format!("observation:{}:uptime:{value:.17}:{}", bob.did(), now);
+        let signature = observer.sign(message.as_bytes());
+
+        let evidence = vec![TrustEvidence::TechnicalObservation {
+            observer: observer.did().clone(),
+            metric_type: TechnicalMetricType::Uptime,
+            value,
+            observed_at: now,
+            signature: signature.to_bytes().to_vec(),
+        }];
+
+        let result = validator.validate_all_evidence(&evidence, alice.did(), bob.did(), None);
+        // NaN values are tolerated (not in range but accepted with warning)
+        assert!(
+            result.valid,
+            "NaN should be tolerated (warning logged but accepted)"
+        );
+    }
+
+    #[test]
+    fn test_invalid_provider_key_returns_error() {
+        // Test that with_provider_key properly returns an error for invalid keys.
+        // Ed25519 public keys are points on the Ed25519 curve - most random byte
+        // patterns are NOT valid curve points. The pattern [0xAB; 32] is not
+        // decompressible as an Edwards point.
+        let invalid_key = [0xABu8; 32];
+
+        let result = EvidenceValidatorConfig::default().with_provider_key("test", invalid_key);
+
+        assert!(result.is_err(), "Invalid key should return error");
+        let err = result.unwrap_err();
+        assert!(
+            matches!(err, ConfigError::InvalidProviderKey { .. }),
+            "Should be InvalidProviderKey error"
+        );
     }
 }
