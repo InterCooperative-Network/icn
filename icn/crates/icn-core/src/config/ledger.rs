@@ -125,10 +125,14 @@ impl WitnessSettings {
                         ))?;
 
                 let mut witnesses = Vec::with_capacity(witness_strs.len());
+                let mut seen_dids = std::collections::HashSet::new();
                 for did_str in witness_strs {
                     let did = Did::from_str(did_str).map_err(|e| {
                         WitnessConfigError::InvalidDid(did_str.clone(), e.to_string())
                     })?;
+                    if !seen_dids.insert(did.clone()) {
+                        return Err(WitnessConfigError::DuplicateWitness(did_str.clone()));
+                    }
                     witnesses.push(did);
                 }
 
@@ -171,6 +175,10 @@ pub enum WitnessConfigError {
     /// Invalid DID format
     #[error("Invalid DID '{0}': {1}")]
     InvalidDid(String, String),
+
+    /// Duplicate witness in quorum configuration
+    #[error("Duplicate witness DID in quorum configuration: '{0}'")]
+    DuplicateWitness(String),
 
     /// Quorum requires more signatures than available witnesses
     #[error("Quorum requires {required} signatures but only {available} witnesses configured")]
@@ -507,14 +515,15 @@ default_suspicious_rate_threshold = 2000.0
 
     #[test]
     fn test_witness_settings_quorum_too_large() {
-        let keypair = icn_identity::KeyPair::generate().unwrap();
+        let keypair1 = icn_identity::KeyPair::generate().unwrap();
+        let keypair2 = icn_identity::KeyPair::generate().unwrap();
 
         let settings = WitnessSettings {
             default_policy: "quorum".to_string(),
             quorum_required: Some(5),
             quorum_witnesses: Some(vec![
-                keypair.did().to_string(),
-                keypair.did().to_string(), // Only 2 witnesses, require 5
+                keypair1.did().to_string(),
+                keypair2.did().to_string(), // Only 2 distinct witnesses, require 5
             ]),
             ..Default::default()
         };
@@ -524,6 +533,28 @@ default_suspicious_rate_threshold = 2000.0
         assert!(matches!(
             result.unwrap_err(),
             WitnessConfigError::QuorumTooLarge { .. }
+        ));
+    }
+
+    #[test]
+    fn test_witness_settings_duplicate_witness() {
+        let keypair = icn_identity::KeyPair::generate().unwrap();
+
+        let settings = WitnessSettings {
+            default_policy: "quorum".to_string(),
+            quorum_required: Some(2),
+            quorum_witnesses: Some(vec![
+                keypair.did().to_string(),
+                keypair.did().to_string(), // Same DID twice
+            ]),
+            ..Default::default()
+        };
+
+        let result = settings.to_witness_config();
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            WitnessConfigError::DuplicateWitness(_)
         ));
     }
 
