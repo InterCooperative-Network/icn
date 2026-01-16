@@ -157,6 +157,10 @@ pub struct Ledger {
     /// FX configuration for cross-currency transfers
     /// When set, enables cross-currency payment operations.
     fx_config: Option<crate::fx::FxConfig>,
+
+    /// Witness configuration for requiring co-signatures on entries
+    /// When set, entries above threshold require witness signatures (Issue #676)
+    witness_config: Option<crate::types::WitnessConfig>,
 }
 
 impl Ledger {
@@ -191,6 +195,7 @@ impl Ledger {
             dynamic_limit_manager: None,     // Set via set_dynamic_limit_manager()
             oracle_manager: None,            // Set via set_oracle_manager()
             fx_config: None,                 // Set via set_fx_config()
+            witness_config: None,            // Set via set_witness_config()
         };
 
         // Load cached balances from storage
@@ -451,6 +456,20 @@ impl Ledger {
     /// Get the FX configuration (if set)
     pub fn fx_config(&self) -> Option<&crate::fx::FxConfig> {
         self.fx_config.as_ref()
+    }
+
+    /// Set the witness configuration for requiring co-signatures
+    ///
+    /// When set, entries above the configured threshold require witness
+    /// signatures before acceptance. This provides Byzantine fault tolerance
+    /// against authorizer misbehavior.
+    pub fn set_witness_config(&mut self, config: crate::types::WitnessConfig) {
+        self.witness_config = Some(config);
+    }
+
+    /// Get the witness configuration (if set)
+    pub fn witness_config(&self) -> Option<&crate::types::WitnessConfig> {
+        self.witness_config.as_ref()
     }
 
     /// Get prerequisites for cross-currency transfers
@@ -949,6 +968,116 @@ impl Ledger {
         self.append_entry_internal(entry, false).await
     }
 
+    /// Append a witnessed entry with signature validation
+    ///
+    /// This method validates witness signatures before appending. Use this when
+    /// witness requirements are configured on the ledger.
+    #[instrument(skip(self, witnessed), fields(entry_hash = witnessed.entry.id.as_ref().map(|h| h.to_hex()).unwrap_or_else(|| "none".to_string()), witness_count = witnessed.witness_signatures.len()))]
+    pub async fn append_witnessed_entry(
+        &mut self,
+        witnessed: crate::types::WitnessedEntry,
+    ) -> Result<ContentHash> {
+        // Validate witness signatures
+        if let Err(e) = self.validate_witness_signatures(&witnessed) {
+            icn_obs::metrics::ledger::witnessed_entries_rejected_invalid_signature_inc();
+            return Err(e);
+        }
+
+        // Check if sufficient signatures for the policy
+        if !witnessed.has_sufficient_signatures() {
+            icn_obs::metrics::ledger::witnessed_entries_rejected_insufficient_inc();
+            anyhow::bail!(
+                "Insufficient witness signatures: have {}, policy requires more",
+                witnessed.unique_witness_count()
+            );
+        }
+
+        // Record witness count metric
+        let witness_count = witnessed.witness_signatures.len() as u64;
+
+        // Append the underlying entry
+        let hash = self.append_entry_internal(witnessed.entry, true).await?;
+
+        // Record success metrics
+        icn_obs::metrics::ledger::witnessed_entries_accepted_inc();
+        icn_obs::metrics::ledger::witness_signature_count_record(witness_count);
+
+        Ok(hash)
+    }
+
+    /// Validate witness signatures on a witnessed entry
+    ///
+    /// Verifies that all signatures are valid Ed25519 signatures over the entry hash.
+    fn validate_witness_signatures(&self, witnessed: &crate::types::WitnessedEntry) -> Result<()> {
+        use ed25519_dalek::{Signature, Verifier};
+
+        let entry_hash = witnessed
+            .entry
+            .id
+            .as_ref()
+            .context("Entry must have hash for witness validation")?;
+
+        for sig in &witnessed.witness_signatures {
+            // Extract public key from witness DID using icn-identity
+            let verifying_key = sig
+                .witness
+                .to_verifying_key()
+                .context("Failed to extract verifying key from witness DID")?;
+
+            let signature = Signature::from_slice(&sig.signature)
+                .context("Invalid Ed25519 signature format")?;
+
+            verifying_key
+                .verify(entry_hash.as_bytes(), &signature)
+                .with_context(|| {
+                    format!("Witness signature verification failed for {}", sig.witness)
+                })?;
+
+            debug!(witness = %sig.witness, "Witness signature verified");
+        }
+
+        Ok(())
+    }
+
+    /// Calculate the total absolute value of an entry (for threshold comparison)
+    ///
+    /// Uses only debits to determine transaction value. In a balanced double-entry
+    /// system, total debits equal total credits, so this correctly represents the
+    /// transaction size without double-counting.
+    pub fn calculate_entry_value(&self, entry: &JournalEntry) -> u64 {
+        entry
+            .accounts
+            .iter()
+            .filter_map(|delta| delta.debit)
+            .map(|d| d.unsigned_abs())
+            .sum()
+    }
+
+    /// Check if an entry requires witness signatures based on current config
+    pub fn requires_witnesses(&self, entry: &JournalEntry) -> bool {
+        match &self.witness_config {
+            None => false,
+            Some(config) => {
+                let value = self.calculate_entry_value(entry);
+                !matches!(
+                    config.effective_policy(value),
+                    crate::types::WitnessPolicy::None
+                )
+            }
+        }
+    }
+
+    /// Get the effective witness policy for an entry
+    pub fn effective_witness_policy(&self, entry: &JournalEntry) -> crate::types::WitnessPolicy {
+        match &self.witness_config {
+            None => crate::types::WitnessPolicy::None,
+            Some(config) => {
+                let value = self.calculate_entry_value(entry);
+                config.effective_policy(value).clone()
+            }
+        }
+    }
+
     /// Internal append method with control over gossip publishing
     ///
     /// # Arguments
@@ -1431,6 +1560,7 @@ impl Ledger {
     /// Handle an incoming sync message from gossip
     #[instrument(skip(self, msg), fields(message_type = match &msg {
         LedgerSyncMessage::NewEntry { .. } => "NewEntry",
+        LedgerSyncMessage::NewWitnessedEntry { .. } => "NewWitnessedEntry",
         LedgerSyncMessage::RequestEntry { .. } => "RequestEntry",
         LedgerSyncMessage::EntryResponse { .. } => "EntryResponse",
         LedgerSyncMessage::RollbackNotification { .. } => "RollbackNotification",
@@ -1476,6 +1606,74 @@ impl Ledger {
                             entry_hash = %hash,
                             error = %e,
                             "Failed to store received entry"
+                        );
+                        Ok(()) // Don't propagate error, just log it
+                    }
+                }
+            }
+
+            LedgerSyncMessage::NewWitnessedEntry {
+                hash,
+                mut witnessed,
+            } => {
+                observe_sync_lag(witnessed.entry.timestamp);
+
+                // Check if we already have this entry
+                if self.get_entry(&hash)?.is_some() {
+                    debug!(
+                        entry_hash = %hash,
+                        "Already have witnessed entry, skipping duplicate"
+                    );
+                    return Ok(());
+                }
+
+                // Ensure entry has the correct ID
+                witnessed.entry.id = Some(hash.clone());
+
+                // Validate witness signatures before accepting
+                if let Err(e) = self.validate_witness_signatures(&witnessed) {
+                    warn!(
+                        entry_hash = %hash,
+                        error = %e,
+                        "Witnessed entry signature validation failed"
+                    );
+                    icn_obs::metrics::ledger::witnessed_entries_rejected_invalid_signature_inc();
+                    return Ok(()); // Reject silently
+                }
+
+                // Check sufficient signatures
+                if !witnessed.has_sufficient_signatures() {
+                    warn!(
+                        entry_hash = %hash,
+                        witness_count = witnessed.unique_witness_count(),
+                        "Witnessed entry has insufficient signatures"
+                    );
+                    icn_obs::metrics::ledger::witnessed_entries_rejected_insufficient_inc();
+                    return Ok(()); // Reject silently
+                }
+
+                let witness_count = witnessed.witness_signatures.len() as u64;
+
+                // Store the underlying entry (without re-broadcasting)
+                let result = self.append_entry_from_sync(witnessed.entry).await;
+
+                match result {
+                    Ok(h) => {
+                        info!(
+                            entry_hash = %h,
+                            witness_count = witness_count,
+                            source = "gossip",
+                            "Received and stored witnessed ledger entry"
+                        );
+                        icn_obs::metrics::ledger::witnessed_entries_accepted_inc();
+                        icn_obs::metrics::ledger::witness_signature_count_record(witness_count);
+                        Ok(())
+                    }
+                    Err(e) => {
+                        warn!(
+                            entry_hash = %hash,
+                            error = %e,
+                            "Failed to store received witnessed entry"
                         );
                         Ok(()) // Don't propagate error, just log it
                     }

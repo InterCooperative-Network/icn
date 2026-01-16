@@ -2414,6 +2414,28 @@ pub mod ledger {
     pub fn entries_rejected_missing_parents_inc() {
         counter!("icn_ledger_entries_rejected_missing_parents_total").increment(1);
     }
+
+    // Witness signature metrics (Issue #676)
+
+    /// Increment counter when a witnessed entry is successfully validated and stored
+    pub fn witnessed_entries_accepted_inc() {
+        counter!("icn_ledger_witnessed_entries_accepted_total").increment(1);
+    }
+
+    /// Increment counter when a witnessed entry is rejected due to invalid signature
+    pub fn witnessed_entries_rejected_invalid_signature_inc() {
+        counter!("icn_ledger_witnessed_entries_rejected_invalid_signature_total").increment(1);
+    }
+
+    /// Increment counter when a witnessed entry is rejected due to insufficient signatures
+    pub fn witnessed_entries_rejected_insufficient_inc() {
+        counter!("icn_ledger_witnessed_entries_rejected_insufficient_total").increment(1);
+    }
+
+    /// Record the number of witness signatures on an accepted entry
+    pub fn witness_signature_count_record(count: u64) {
+        histogram!("icn_ledger_witness_signature_count").record(count as f64);
+    }
 }
 
 /// Governance execution metrics

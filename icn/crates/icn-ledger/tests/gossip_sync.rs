@@ -3,7 +3,10 @@
 
 use icn_gossip::GossipActor;
 use icn_identity::KeyPair;
-use icn_ledger::{entry::JournalEntryBuilder, Ledger, LedgerSyncMessage};
+use icn_ledger::{
+    entry::JournalEntryBuilder, Ledger, LedgerSyncMessage, WitnessConfig, WitnessPolicy,
+    WitnessSignature, WitnessedEntry,
+};
 use icn_store::SledStore;
 use icn_trust::TrustClass;
 use std::sync::Arc;
@@ -208,4 +211,225 @@ async fn test_duplicate_entry_handling() {
     assert_eq!(all_entries.len(), 1);
 
     println!("Duplicate entry handling successful");
+}
+
+// ============================================================================
+// Witness Signature Tests (Issue #676)
+// ============================================================================
+
+#[tokio::test]
+async fn test_witnessed_entry_with_valid_signature() {
+    // Create a simple ledger with witness config
+    let (mut ledger, _temp) = create_simple_ledger();
+    ledger.set_witness_config(WitnessConfig::counterparty_above(0)); // Require witness for all
+
+    let alice_kp = KeyPair::generate().unwrap();
+    let bob_kp = KeyPair::generate().unwrap();
+    let alice = alice_kp.did().clone();
+    let bob = bob_kp.did().clone();
+
+    // Create an entry
+    let entry = JournalEntryBuilder::new(alice.clone())
+        .debit(alice.clone(), "hours".to_string(), 10)
+        .credit(bob.clone(), "hours".to_string(), 10)
+        .build()
+        .unwrap();
+
+    let hash = entry.id.clone().unwrap();
+
+    // Create witness signature from Bob
+    let signature = bob_kp.sign(hash.as_bytes());
+    let witness_sig = WitnessSignature::new(
+        bob.clone(),
+        signature.to_bytes().to_vec(),
+        icn_time::current_timestamp_secs(),
+    );
+
+    // Create witnessed entry with counterparty policy
+    let mut witnessed = WitnessedEntry::new(entry, WitnessPolicy::Counterparty);
+    witnessed.add_signature(witness_sig);
+
+    // Append should succeed
+    let result_hash = ledger.append_witnessed_entry(witnessed).await.unwrap();
+    assert_eq!(result_hash, hash);
+
+    // Verify entry was stored
+    assert!(ledger.get_entry(&hash).unwrap().is_some());
+    assert_eq!(ledger.get_balance(&alice, "hours"), 10);
+
+    println!("Witnessed entry with valid signature accepted");
+}
+
+#[tokio::test]
+async fn test_witnessed_entry_with_invalid_signature() {
+    // Create a simple ledger
+    let (mut ledger, _temp) = create_simple_ledger();
+    ledger.set_witness_config(WitnessConfig::counterparty_above(0));
+
+    let alice_kp = KeyPair::generate().unwrap();
+    let bob_kp = KeyPair::generate().unwrap();
+    let wrong_kp = KeyPair::generate().unwrap(); // Different key
+    let alice = alice_kp.did().clone();
+    let bob = bob_kp.did().clone();
+
+    // Create an entry
+    let entry = JournalEntryBuilder::new(alice.clone())
+        .debit(alice.clone(), "hours".to_string(), 10)
+        .credit(bob.clone(), "hours".to_string(), 10)
+        .build()
+        .unwrap();
+
+    let hash = entry.id.clone().unwrap();
+
+    // Create signature with wrong key but claim it's from Bob
+    let wrong_signature = wrong_kp.sign(hash.as_bytes());
+    let witness_sig = WitnessSignature::new(
+        bob.clone(), // Claims to be Bob
+        wrong_signature.to_bytes().to_vec(),
+        icn_time::current_timestamp_secs(),
+    );
+
+    let mut witnessed = WitnessedEntry::new(entry, WitnessPolicy::Counterparty);
+    witnessed.add_signature(witness_sig);
+
+    // Append should fail due to invalid signature
+    let result = ledger.append_witnessed_entry(witnessed).await;
+    assert!(result.is_err(), "Expected error for invalid signature");
+
+    // Verify entry was NOT stored
+    assert!(ledger.get_entry(&hash).unwrap().is_none());
+
+    println!("Witnessed entry with invalid signature rejected");
+}
+
+#[tokio::test]
+async fn test_witnessed_entry_insufficient_signatures() {
+    let (mut ledger, _temp) = create_simple_ledger();
+
+    // Require 2-of-3 quorum
+    let witness1 = KeyPair::generate().unwrap().did().clone();
+    let witness2 = KeyPair::generate().unwrap().did().clone();
+    let witness3 = KeyPair::generate().unwrap().did().clone();
+
+    ledger.set_witness_config(WitnessConfig::quorum(
+        2,
+        vec![witness1.clone(), witness2.clone(), witness3.clone()],
+    ));
+
+    let alice_kp = KeyPair::generate().unwrap();
+    let bob_kp = KeyPair::generate().unwrap();
+    let alice = alice_kp.did().clone();
+    let bob = bob_kp.did().clone();
+
+    let entry = JournalEntryBuilder::new(alice.clone())
+        .debit(alice.clone(), "hours".to_string(), 10)
+        .credit(bob.clone(), "hours".to_string(), 10)
+        .build()
+        .unwrap();
+
+    // Create witnessed entry with only one signature (need 2)
+    let witnessed = WitnessedEntry::new(
+        entry,
+        WitnessPolicy::Quorum {
+            required: 2,
+            witnesses: vec![witness1, witness2, witness3],
+        },
+    );
+    // No signatures added
+
+    // Should fail due to insufficient signatures
+    let result = ledger.append_witnessed_entry(witnessed).await;
+    assert!(
+        result.is_err(),
+        "Expected error for insufficient signatures"
+    );
+
+    println!("Witnessed entry with insufficient signatures rejected");
+}
+
+#[tokio::test]
+async fn test_witnessed_entry_sync_message() {
+    // Create two simple ledgers
+    let (mut ledger1, _temp1) = create_simple_ledger();
+    let (mut ledger2, _temp2) = create_simple_ledger();
+
+    let alice_kp = KeyPair::generate().unwrap();
+    let bob_kp = KeyPair::generate().unwrap();
+    let alice = alice_kp.did().clone();
+    let bob = bob_kp.did().clone();
+
+    // Create an entry
+    let entry = JournalEntryBuilder::new(alice.clone())
+        .debit(alice.clone(), "hours".to_string(), 10)
+        .credit(bob.clone(), "hours".to_string(), 10)
+        .build()
+        .unwrap();
+
+    let hash = entry.id.clone().unwrap();
+
+    // Create witness signature from Bob
+    let signature = bob_kp.sign(hash.as_bytes());
+    let witness_sig = WitnessSignature::new(
+        bob.clone(),
+        signature.to_bytes().to_vec(),
+        icn_time::current_timestamp_secs(),
+    );
+
+    let mut witnessed = WitnessedEntry::new(entry, WitnessPolicy::Counterparty);
+    witnessed.add_signature(witness_sig);
+
+    // Append to ledger1 directly (without witness validation in this case)
+    ledger1.append_entry(witnessed.entry.clone()).await.unwrap();
+
+    // Create sync message for ledger2
+    let sync_msg = LedgerSyncMessage::NewWitnessedEntry {
+        hash: hash.clone(),
+        witnessed,
+    };
+
+    // Send to ledger2
+    ledger2.handle_sync_message(sync_msg).await.unwrap();
+
+    // Verify ledger2 has the entry
+    assert!(ledger2.get_entry(&hash).unwrap().is_some());
+    assert_eq!(ledger2.get_balance(&alice, "hours"), 10);
+
+    println!("Witnessed entry sync message handled successfully");
+}
+
+#[tokio::test]
+async fn test_witness_policy_threshold() {
+    let (mut ledger, _temp) = create_simple_ledger();
+
+    // Only require witnesses for entries above 100 units
+    ledger.set_witness_config(WitnessConfig::counterparty_above(100));
+
+    let alice_kp = KeyPair::generate().unwrap();
+    let bob_kp = KeyPair::generate().unwrap();
+    let alice = alice_kp.did().clone();
+    let bob = bob_kp.did().clone();
+
+    // Small entry (10 units) - should NOT require witnesses
+    let small_entry = JournalEntryBuilder::new(alice.clone())
+        .debit(alice.clone(), "hours".to_string(), 10)
+        .credit(bob.clone(), "hours".to_string(), 10)
+        .build()
+        .unwrap();
+
+    assert!(!ledger.requires_witnesses(&small_entry));
+
+    // Large entry (200 units) - SHOULD require witnesses
+    let large_entry = JournalEntryBuilder::new(alice.clone())
+        .debit(alice.clone(), "hours".to_string(), 200)
+        .credit(bob.clone(), "hours".to_string(), 200)
+        .build()
+        .unwrap();
+
+    assert!(ledger.requires_witnesses(&large_entry));
+
+    // Small entry can be appended without witnesses
+    ledger.append_entry(small_entry).await.unwrap();
+    assert_eq!(ledger.get_balance(&alice, "hours"), 10);
+
+    println!("Witness threshold policy works correctly");
 }

@@ -373,3 +373,215 @@ pub struct Dispute {
     /// Optional mediator assigned
     pub mediator: Option<Did>,
 }
+
+// ============================================================================
+// Witness Signature Types (BFT Hardening - Issue #676)
+// ============================================================================
+
+/// Policy for requiring witness signatures on ledger entries
+///
+/// Witness signatures provide Byzantine fault tolerance by requiring
+/// multiple parties to co-sign transactions, preventing unilateral
+/// manipulation by ledger authorizers.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum WitnessPolicy {
+    /// No witnesses required (current behavior, suitable for low-value transactions)
+    #[default]
+    None,
+
+    /// Require counterparty signature (the other party to the transaction)
+    Counterparty,
+
+    /// Require N-of-M designated witnesses to co-sign
+    Quorum {
+        /// Minimum signatures required
+        required: u32,
+        /// List of authorized witnesses
+        witnesses: Vec<Did>,
+    },
+
+    /// Require all parties involved in the transaction to sign
+    AllParties,
+}
+
+/// Configuration for witness requirements on a ledger
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WitnessConfig {
+    /// Default policy for all entries
+    pub default_policy: WitnessPolicy,
+
+    /// Value threshold above which witnesses are required
+    /// If None, policy applies to all entries regardless of value
+    pub threshold: Option<u64>,
+
+    /// Grace period (in seconds) to collect witness signatures.
+    /// After this time, unsigned entries may be rejected.
+    ///
+    /// TODO(witness-timeout): Implement timestamp validation against this timeout
+    /// in `validate_witness_signatures()`. Currently signatures are validated
+    /// cryptographically but not checked for expiration.
+    pub collection_timeout_secs: u64,
+}
+
+impl Default for WitnessConfig {
+    fn default() -> Self {
+        WitnessConfig {
+            default_policy: WitnessPolicy::None,
+            threshold: None,
+            collection_timeout_secs: 300, // 5 minutes default
+        }
+    }
+}
+
+impl WitnessConfig {
+    /// Create config requiring counterparty signature above threshold
+    pub fn counterparty_above(threshold: u64) -> Self {
+        WitnessConfig {
+            default_policy: WitnessPolicy::Counterparty,
+            threshold: Some(threshold),
+            collection_timeout_secs: 300,
+        }
+    }
+
+    /// Create config requiring quorum for all entries
+    pub fn quorum(required: u32, witnesses: Vec<Did>) -> Self {
+        WitnessConfig {
+            default_policy: WitnessPolicy::Quorum {
+                required,
+                witnesses,
+            },
+            threshold: None,
+            collection_timeout_secs: 300,
+        }
+    }
+
+    /// Determine the effective policy for a given entry value
+    pub fn effective_policy(&self, entry_value: u64) -> &WitnessPolicy {
+        match self.threshold {
+            Some(thresh) if entry_value < thresh => &WitnessPolicy::None,
+            _ => &self.default_policy,
+        }
+    }
+}
+
+/// A witness signature on a ledger entry
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WitnessSignature {
+    /// DID of the witness who signed
+    pub witness: Did,
+
+    /// Ed25519 signature over the entry hash
+    pub signature: Vec<u8>,
+
+    /// Timestamp when signature was created (Unix epoch seconds).
+    ///
+    /// TODO(witness-timeout): This timestamp should be validated against
+    /// `WitnessConfig::collection_timeout_secs` to reject expired signatures.
+    pub signed_at: u64,
+}
+
+impl WitnessSignature {
+    /// Create a new witness signature
+    pub fn new(witness: Did, signature: Vec<u8>, signed_at: u64) -> Self {
+        WitnessSignature {
+            witness,
+            signature,
+            signed_at,
+        }
+    }
+}
+
+/// A journal entry with attached witness signatures
+///
+/// This wraps a JournalEntry with the required witness signatures
+/// based on the ledger's WitnessPolicy. The entry hash is signed
+/// by witnesses, not the full entry content.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WitnessedEntry {
+    /// The underlying journal entry
+    pub entry: JournalEntry,
+
+    /// Witness signatures collected for this entry
+    pub witness_signatures: Vec<WitnessSignature>,
+
+    /// The policy that was applied when collecting signatures
+    pub policy_applied: WitnessPolicy,
+}
+
+impl WitnessedEntry {
+    /// Create a new witnessed entry with no signatures yet
+    pub fn new(entry: JournalEntry, policy: WitnessPolicy) -> Self {
+        WitnessedEntry {
+            entry,
+            witness_signatures: Vec::new(),
+            policy_applied: policy,
+        }
+    }
+
+    /// Add a witness signature
+    pub fn add_signature(&mut self, sig: WitnessSignature) {
+        self.witness_signatures.push(sig);
+    }
+
+    /// Check if the entry has sufficient signatures for the applied policy
+    ///
+    /// Note: This only checks that the policy requirements are met structurally.
+    /// Cryptographic signature validation must be performed separately by the caller.
+    pub fn has_sufficient_signatures(&self) -> bool {
+        match &self.policy_applied {
+            WitnessPolicy::None => true,
+            WitnessPolicy::Counterparty => {
+                // Require at least one witness who is a non-author counterparty
+                let counterparties: std::collections::HashSet<_> = self
+                    .entry
+                    .accounts
+                    .iter()
+                    .map(|d| &d.account_id)
+                    .filter(|id| **id != self.entry.author)
+                    .collect();
+                self.witness_signatures
+                    .iter()
+                    .any(|s| counterparties.contains(&s.witness))
+            }
+            WitnessPolicy::Quorum {
+                required,
+                witnesses,
+            } => {
+                // Only count signatures from authorized witnesses (unique DIDs)
+                let allowed_witnesses: std::collections::HashSet<_> = witnesses.iter().collect();
+                let signed_authorized: std::collections::HashSet<_> = self
+                    .witness_signatures
+                    .iter()
+                    .map(|s| &s.witness)
+                    .filter(|w| allowed_witnesses.contains(w))
+                    .collect();
+                signed_authorized.len() >= *required as usize
+            }
+            WitnessPolicy::AllParties => {
+                // Each non-author account must have signed as a witness
+                let unique_accounts: std::collections::HashSet<_> = self
+                    .entry
+                    .accounts
+                    .iter()
+                    .map(|d| &d.account_id)
+                    .filter(|id| **id != self.entry.author)
+                    .collect();
+                let signed_witnesses: std::collections::HashSet<_> =
+                    self.witness_signatures.iter().map(|s| &s.witness).collect();
+                unique_accounts.iter().all(|a| signed_witnesses.contains(a))
+            }
+        }
+    }
+
+    /// Get the entry hash that witnesses should sign
+    pub fn entry_hash(&self) -> Option<&ContentHash> {
+        self.entry.id.as_ref()
+    }
+
+    /// Count unique witnesses who have signed
+    pub fn unique_witness_count(&self) -> usize {
+        let witnesses: std::collections::HashSet<_> =
+            self.witness_signatures.iter().map(|s| &s.witness).collect();
+        witnesses.len()
+    }
+}
