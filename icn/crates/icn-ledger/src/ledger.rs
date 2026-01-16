@@ -1012,9 +1012,18 @@ impl Ledger {
         let hash = self.append_entry_internal(witnessed.entry, true).await?;
 
         // Persist witness signatures for fork resolution (Issue #688)
-        // This allows count_signers() to retrieve witness count when resolving forks
+        // This allows count_signers() to retrieve witness count when resolving forks.
+        // If persistence fails, the entry has already been appended. Treat this as
+        // degraded-but-successful: log error for observability but don't fail the append.
         if !witness_signatures.is_empty() {
-            self.store_witness_signatures(&hash, &witness_signatures)?;
+            if let Err(e) = self.store_witness_signatures(&hash, &witness_signatures) {
+                error!(
+                    entry_hash = %hash,
+                    witness_count = witness_signatures.len(),
+                    error = %e,
+                    "Failed to persist witness signatures - fork resolution may count fewer signers"
+                );
+            }
         }
 
         // Record success metrics
@@ -1100,6 +1109,7 @@ impl Ledger {
     ///
     /// Loads witness signatures from storage and counts unique DIDs.
     /// Returns 1 (author only) if no witness signatures are stored.
+    /// Note: Author is always counted once; witnesses matching the author DID are filtered.
     pub fn count_entry_signers(&self, entry: &JournalEntry) -> usize {
         let entry_hash = match &entry.id {
             Some(h) => h,
@@ -1108,9 +1118,14 @@ impl Ledger {
 
         match self.load_witness_signatures(entry_hash) {
             Ok(witnesses) => {
-                // Count unique witness DIDs + 1 for the author
-                let unique_witnesses: std::collections::HashSet<_> =
-                    witnesses.iter().map(|w| &w.witness).collect();
+                // Count unique witness DIDs excluding author (to prevent double-counting)
+                // then add 1 for the author
+                let author_did = &entry.author;
+                let unique_witnesses: std::collections::HashSet<_> = witnesses
+                    .iter()
+                    .map(|w| &w.witness)
+                    .filter(|did| *did != author_did)
+                    .collect();
                 unique_witnesses.len() + 1
             }
             Err(e) => {

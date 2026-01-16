@@ -297,6 +297,7 @@ impl ForkResolver {
     ///
     /// Loads witness signatures from storage and counts unique DIDs.
     /// Returns 1 (author only) if no store is configured or no witnesses found.
+    /// Note: Author is always counted once; witnesses matching the author DID are filtered.
     fn count_signers(&self, entry: &JournalEntry) -> usize {
         // If no store configured, just count the author
         let store = match &self.store {
@@ -316,9 +317,14 @@ impl ForkResolver {
             Ok(Some(data)) => {
                 match serde_json::from_slice::<Vec<WitnessSignature>>(&data) {
                     Ok(witnesses) => {
-                        // Count unique witness DIDs + 1 for the author
-                        let unique_witnesses: HashSet<_> =
-                            witnesses.iter().map(|w| &w.witness).collect();
+                        // Count unique witness DIDs excluding author (to prevent double-counting)
+                        // then add 1 for the author
+                        let author_did = &entry.author;
+                        let unique_witnesses: HashSet<_> = witnesses
+                            .iter()
+                            .map(|w| &w.witness)
+                            .filter(|did| *did != author_did)
+                            .collect();
                         debug!(
                             entry_hash = %entry_hash,
                             witness_count = unique_witnesses.len(),
@@ -705,7 +711,10 @@ mod tests {
         let signers1 = resolver.count_signers(&entry1);
         let signers2 = resolver.count_signers(&entry2);
         assert_eq!(signers1, 1, "Entry1 should have 1 signer (author only)");
-        assert_eq!(signers2, 3, "Entry2 should have 3 signers (author + 2 witnesses)");
+        assert_eq!(
+            signers2, 3,
+            "Entry2 should have 3 signers (author + 2 witnesses)"
+        );
 
         // Entry2 should win because it has more signers (3 vs 1)
         // Even though entry1 has an earlier timestamp
