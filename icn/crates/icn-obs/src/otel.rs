@@ -567,4 +567,56 @@ mod tests {
         let trace_id_low = TraceId::from_bytes([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]);
         assert!(!sampler_off.sample_by_trace_id(trace_id_low));
     }
+
+    #[test]
+    fn test_should_sample_integration() {
+        use opentelemetry::trace::{SamplingDecision, SpanKind};
+
+        let sampler = PrioritySampler::new(0.5); // 50% sampling
+
+        // Trace ID with high bytes = 0 will be sampled at 50% (0 < threshold)
+        let sampled_trace_id =
+            TraceId::from_bytes([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]);
+        // Trace ID with high bytes = MAX will NOT be sampled at 50% (MAX >= threshold)
+        let not_sampled_trace_id = TraceId::from_bytes([
+            255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 1,
+        ]);
+
+        // Test 1: Security span is always sampled (even with high trace ID)
+        let result = sampler.should_sample(
+            None,
+            not_sampled_trace_id,
+            "handle_security_event",
+            &SpanKind::Internal,
+            &[],
+            &[],
+        );
+        assert_eq!(result.decision, SamplingDecision::RecordAndSample);
+        assert!(result
+            .attributes
+            .iter()
+            .any(|kv| kv.key.as_str() == "sampling.priority"));
+
+        // Test 2: Normal span with high trace ID is NOT sampled
+        let result = sampler.should_sample(
+            None,
+            not_sampled_trace_id,
+            "process_message",
+            &SpanKind::Internal,
+            &[],
+            &[],
+        );
+        assert_eq!(result.decision, SamplingDecision::Drop);
+
+        // Test 3: Normal span with low trace ID IS sampled
+        let result = sampler.should_sample(
+            None,
+            sampled_trace_id,
+            "process_message",
+            &SpanKind::Internal,
+            &[],
+            &[],
+        );
+        assert_eq!(result.decision, SamplingDecision::RecordAndSample);
+    }
 }
