@@ -14,7 +14,7 @@ use icn_gossip::GossipActor;
 use icn_identity::{IdentityBundle, KeyPair};
 use icn_net::{IncomingMessageHandler, MessagePayload, NetworkActor, NetworkMessage};
 use icn_store::SledStore;
-use icn_trust::{TrustAttestation, TrustEdge, TrustGraph};
+use icn_trust::{TrustAttestation, TrustEdge, TrustEvidence, TrustGraph};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -90,6 +90,7 @@ impl TestNode {
                                 &trust_graph,
                                 &own_did,
                                 None, // No rate limiting in tests
+                                None, // No evidence validation in tests
                             )
                             .await
                             {
@@ -237,7 +238,9 @@ async fn test_trust_attestation_propagation() -> Result<()> {
     info!("Alice creating trust edge for Bob...");
     let edge = TrustEdge::new(alice.did.clone(), bob.did.clone(), 0.75)
         .with_label("test-partner")
-        .with_evidence("integration-test");
+        .with_evidence(TrustEvidence::from_legacy_string(
+            "integration-test".to_string(),
+        ));
 
     // Add edge locally to Alice's graph
     {

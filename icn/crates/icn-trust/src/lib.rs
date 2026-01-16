@@ -51,6 +51,8 @@
 
 pub mod anomaly;
 pub mod attestation;
+pub mod evidence;
+pub mod evidence_validator;
 pub mod facade;
 pub mod multi_graph;
 pub mod pathfinder;
@@ -63,6 +65,10 @@ pub mod types;
 
 pub use anomaly::{anomalies_to_sybil_flags, TrustAnomaly, TrustGraphAnalyzer};
 pub use attestation::TrustAttestation;
+pub use evidence::{
+    EvidenceValidationError, EvidenceValidationResult, TechnicalMetricType, TrustEvidence,
+};
+pub use evidence_validator::{EvidenceValidator, EvidenceValidatorConfig};
 pub use facade::TrustGraphFacade;
 pub use multi_graph::MultiTrustGraph;
 pub use pathfinder::{PathfinderConfig, TrustPathfinder};
@@ -129,8 +135,26 @@ pub struct TrustEdge {
     pub labels: Vec<String>,
     /// Trust score (0.0 to 1.0)
     pub score: f64,
-    /// Evidence references (content hashes)
-    pub evidence: Vec<String>,
+    /// Typed evidence supporting this trust relationship
+    ///
+    /// Each evidence item is a verifiable reference that can be validated
+    /// against actual records in the system. See [`TrustEvidence`] for types.
+    ///
+    /// # Migration Note
+    ///
+    /// When deserializing edges from storage, this field defaults to an empty
+    /// vector if not present. Callers should call [`TrustEdge::migrate_legacy_evidence`]
+    /// after deserialization to convert `legacy_evidence` to typed evidence.
+    /// Otherwise, legacy evidence will be silently ignored.
+    #[serde(default)]
+    pub evidence: Vec<TrustEvidence>,
+    /// Legacy string evidence (for backward compatibility during migration)
+    ///
+    /// **Deprecated**: New edges should not use this field. Existing edges
+    /// will have their string evidence migrated to [`TrustEvidence::Legacy`]
+    /// in the `evidence` field when [`TrustEdge::migrate_legacy_evidence`] is called.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub legacy_evidence: Vec<String>,
     /// Optional expiration timestamp
     pub expires_at: Option<u64>,
     /// Creation timestamp
@@ -159,6 +183,7 @@ impl TrustEdge {
             labels: Vec::new(),
             score,
             evidence: Vec::new(),
+            legacy_evidence: Vec::new(),
             expires_at: None,
             created_at: now,
             graph_type,
@@ -176,10 +201,52 @@ impl TrustEdge {
         self
     }
 
-    /// Add evidence to this edge
-    pub fn with_evidence(mut self, evidence: impl Into<String>) -> Self {
-        self.evidence.push(evidence.into());
+    /// Add typed evidence to this edge
+    pub fn with_evidence(mut self, evidence: TrustEvidence) -> Self {
+        self.evidence.push(evidence);
         self
+    }
+
+    /// Add multiple evidence items to this edge
+    pub fn with_evidence_list(mut self, evidence: Vec<TrustEvidence>) -> Self {
+        self.evidence.extend(evidence);
+        self
+    }
+
+    /// Migrate legacy string evidence to typed evidence
+    ///
+    /// This converts all `legacy_evidence` strings to `TrustEvidence::Legacy`
+    /// variants and moves them to the `evidence` field. Use during migration
+    /// from the old string-based evidence format.
+    pub fn migrate_legacy_evidence(&mut self) {
+        if self.legacy_evidence.is_empty() {
+            return;
+        }
+
+        let migrated: Vec<TrustEvidence> = self
+            .legacy_evidence
+            .drain(..)
+            .map(TrustEvidence::from_legacy_string)
+            .collect();
+
+        self.evidence.extend(migrated);
+    }
+
+    /// Check if this edge has any legacy evidence that needs migration
+    pub fn has_legacy_evidence(&self) -> bool {
+        !self.legacy_evidence.is_empty()
+            || self
+                .evidence
+                .iter()
+                .any(|e| matches!(e, TrustEvidence::Legacy { .. }))
+    }
+
+    /// Get all typed evidence items.
+    ///
+    /// Note: Legacy evidence must be migrated via [`migrate_legacy_evidence`]
+    /// before it will be included in this iterator.
+    pub fn evidence(&self) -> impl Iterator<Item = &TrustEvidence> {
+        self.evidence.iter()
     }
 
     /// Set expiry time
@@ -317,6 +384,47 @@ impl TrustGraph {
         }
 
         Ok(())
+    }
+
+    /// Add or update a trust edge with evidence validation
+    ///
+    /// This method validates all evidence attached to the edge before adding it
+    /// to the graph. If any evidence fails validation, the edge is rejected.
+    ///
+    /// Returns the validation result including any score adjustments suggested
+    /// by the evidence validation.
+    ///
+    /// # Parameters
+    ///
+    /// - `edge`: The trust edge to add
+    /// - `validator`: The evidence validator to use for validation
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if evidence validation fails or if storage fails.
+    pub fn add_edge_validated(
+        &mut self,
+        edge: TrustEdge,
+        validator: &EvidenceValidator,
+    ) -> Result<EvidenceValidationResult> {
+        // Validate evidence
+        let validation_result =
+            validator.validate_all_evidence(&edge.evidence, &edge.source, &edge.target, Some(self));
+
+        if !validation_result.valid {
+            debug!(
+                "Rejecting edge {} -> {}: evidence validation failed ({} errors)",
+                edge.source,
+                edge.target,
+                validation_result.errors.len()
+            );
+            return Ok(validation_result);
+        }
+
+        // Evidence is valid - add the edge
+        self.add_edge(edge)?;
+
+        Ok(validation_result)
     }
 
     /// Generate storage key for an edge
@@ -692,6 +800,7 @@ impl TrustGraph {
                 labels: edge.labels,
                 score: edge.score,
                 evidence: edge.evidence,
+                legacy_evidence: edge.legacy_evidence,
                 expires_at: edge.expires_at,
                 created_at: edge.created_at,
                 graph_type: edge.graph_type,
@@ -721,6 +830,7 @@ impl TrustGraph {
                     labels: edge.labels,
                     score: edge.score,
                     evidence: edge.evidence,
+                    legacy_evidence: edge.legacy_evidence,
                     expires_at: edge.expires_at,
                     created_at: edge.created_at,
                     graph_type: edge.graph_type,
@@ -766,15 +876,22 @@ mod tests {
         let alice = KeyPair::generate().unwrap().did().clone();
         let bob = KeyPair::generate().unwrap().did().clone();
 
+        let evidence = TrustEvidence::ContractExecution {
+            contract_id: [0u8; 32],
+            agreement_id: Some("contract_abc123".to_string()),
+            executed_at: 12345,
+        };
+
         let edge = TrustEdge::new(alice.clone(), bob.clone(), 0.5)
             .with_label("partner")
-            .with_evidence("contract_abc123");
+            .with_evidence(evidence.clone());
 
         assert_eq!(edge.source, alice);
         assert_eq!(edge.target, bob);
         assert_eq!(edge.score, 0.5);
         assert_eq!(edge.labels, vec!["partner"]);
-        assert_eq!(edge.evidence, vec!["contract_abc123"]);
+        assert_eq!(edge.evidence.len(), 1);
+        assert_eq!(edge.evidence[0], evidence);
     }
 
     #[test]

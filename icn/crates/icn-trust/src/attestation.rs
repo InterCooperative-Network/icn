@@ -7,6 +7,7 @@ use crate::types::TrustGraphType;
 use crate::TrustEdge;
 use anyhow::Result;
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+use hex;
 use icn_identity::Did;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -322,13 +323,46 @@ impl TrustAttestation {
     }
 
     /// Convert this attestation to a TrustEdge for storage
+    ///
+    /// Note: Attestation string evidence is converted to `TrustEvidence::Legacy`
+    /// during this conversion. For typed evidence, use `to_trust_edge_with_evidence()`.
     pub fn to_trust_edge(&self) -> TrustEdge {
+        use crate::evidence::TrustEvidence;
+
+        // Convert string evidence to legacy evidence type
+        let typed_evidence: Vec<TrustEvidence> = self
+            .evidence
+            .iter()
+            .map(|e| TrustEvidence::from_legacy_string(e.clone()))
+            .collect();
+
         TrustEdge {
             source: self.issuer.clone(),
             target: self.subject.clone(),
             labels: self.labels.clone(),
             score: self.score,
-            evidence: self.evidence.clone(),
+            evidence: typed_evidence,
+            legacy_evidence: Vec::new(), // Converted to typed evidence above
+            expires_at: Some(self.expires_at()),
+            created_at: self.created_at,
+            graph_type: self.graph_type,
+        }
+    }
+
+    /// Convert this attestation to a TrustEdge with provided typed evidence
+    ///
+    /// Use this when you have properly typed evidence to associate with the edge.
+    pub fn to_trust_edge_with_evidence(
+        &self,
+        evidence: Vec<crate::evidence::TrustEvidence>,
+    ) -> TrustEdge {
+        TrustEdge {
+            source: self.issuer.clone(),
+            target: self.subject.clone(),
+            labels: self.labels.clone(),
+            score: self.score,
+            evidence,
+            legacy_evidence: Vec::new(),
             expires_at: Some(self.expires_at()),
             created_at: self.created_at,
             graph_type: self.graph_type,
@@ -336,7 +370,12 @@ impl TrustAttestation {
     }
 
     /// Create an attestation from a TrustEdge (before signing)
+    ///
+    /// Note: Typed evidence is converted to string references for the attestation
+    /// wire format. Legacy evidence strings are extracted from `TrustEvidence::Legacy`.
     pub fn from_trust_edge(edge: &TrustEdge) -> Self {
+        use crate::evidence::TrustEvidence;
+
         let ttl_seconds =
             edge.expires_at
                 .map(|exp| {
@@ -364,12 +403,41 @@ impl TrustAttestation {
                 })
                 .unwrap_or(30 * 24 * 60 * 60); // Default 30 days
 
+        // Convert typed evidence to string references for attestation
+        let evidence: Vec<String> = edge
+            .evidence
+            .iter()
+            .filter_map(|e| match e {
+                TrustEvidence::Legacy { reference, .. } => Some(reference.clone()),
+                TrustEvidence::ContractExecution {
+                    contract_id,
+                    agreement_id,
+                    ..
+                } => agreement_id
+                    .clone()
+                    .or_else(|| Some(hex::encode(contract_id))),
+                TrustEvidence::LedgerTransaction { entry_hash, .. } => {
+                    Some(hex::encode(entry_hash))
+                }
+                TrustEvidence::GovernanceVote { proposal_id, .. } => Some(proposal_id.clone()),
+                TrustEvidence::ExternalAttestation { attestation_id, .. } => {
+                    Some(attestation_id.clone())
+                }
+                TrustEvidence::PeerEndorsement { endorser, .. } => Some(endorser.to_string()),
+                TrustEvidence::TechnicalObservation {
+                    observer,
+                    metric_type,
+                    ..
+                } => Some(format!("{}:{}", observer, metric_type.as_str())),
+            })
+            .collect();
+
         Self {
             issuer: edge.source.clone(),
             subject: edge.target.clone(),
             score: edge.score,
             labels: edge.labels.clone(),
-            evidence: edge.evidence.clone(),
+            evidence,
             ttl_seconds,
             created_at: edge.created_at,
             signature: Vec::new(),
@@ -508,12 +576,21 @@ mod tests {
 
     #[test]
     fn test_attestation_from_trust_edge() {
+        use crate::evidence::TrustEvidence;
+
         let alice = KeyPair::generate().unwrap();
         let bob = KeyPair::generate().unwrap();
 
+        // Create a typed evidence item
+        let evidence = TrustEvidence::ContractExecution {
+            contract_id: [0u8; 32],
+            agreement_id: Some("collaboration_proof".to_string()),
+            executed_at: 12345,
+        };
+
         let mut edge = TrustEdge::new(alice.did().clone(), bob.did().clone(), 0.8)
             .with_label("partner")
-            .with_evidence("collaboration_proof");
+            .with_evidence(evidence);
 
         let expiry = edge.created_at + 86400; // 1 day
         edge = edge.with_expiry(expiry);
@@ -524,7 +601,9 @@ mod tests {
         assert_eq!(attestation.subject, edge.target);
         assert_eq!(attestation.score, edge.score);
         assert_eq!(attestation.labels, edge.labels);
-        assert_eq!(attestation.evidence, edge.evidence);
+        // Attestation extracts string references from typed evidence
+        assert_eq!(attestation.evidence.len(), 1);
+        assert_eq!(attestation.evidence[0], "collaboration_proof");
         assert_eq!(attestation.ttl_seconds, 86400);
     }
 

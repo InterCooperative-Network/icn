@@ -6,7 +6,7 @@
 use anyhow::Result;
 use icn_gossip::{GossipEntry, GossipHandle};
 use icn_identity::{Did, KeyPair};
-use icn_trust::{TrustAttestation, TrustEdge, TrustGraph};
+use icn_trust::{EvidenceValidator, TrustAttestation, TrustEdge, TrustGraph};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -240,7 +240,7 @@ pub async fn broadcast_trust_attestation(
 
 /// Handle an incoming trust attestation entry from gossip
 ///
-/// Verifies the signature and applies the attestation to the trust graph.
+/// Verifies the signature, validates evidence, and applies the attestation to the trust graph.
 ///
 /// ## Parameters
 ///
@@ -248,11 +248,13 @@ pub async fn broadcast_trust_attestation(
 /// - `trust_graph`: The trust graph to apply attestations to
 /// - `own_did`: This node's DID (for logging when trust is received)
 /// - `rate_limiter`: Optional rate limiter to prevent attestation floods
+/// - `evidence_validator`: Optional evidence validator to verify evidence claims
 pub async fn handle_trust_attestation_entry(
     entry: &GossipEntry,
     trust_graph: &Arc<RwLock<TrustGraph>>,
     own_did: &Did,
     rate_limiter: Option<&AttestationRateLimiter>,
+    evidence_validator: Option<&EvidenceValidator>,
 ) -> Result<()> {
     // Issue #498: Track processing start time for propagation metrics
     let process_start = Instant::now();
@@ -304,6 +306,38 @@ pub async fn handle_trust_attestation_entry(
 
     // Convert to trust edge
     let edge = attestation.to_trust_edge();
+
+    // Validate evidence if validator provided
+    if let Some(validator) = evidence_validator {
+        let graph_for_validation = trust_graph.read().await;
+        let validation_result = validator.validate_all_evidence(
+            &edge.evidence,
+            &edge.source,
+            &edge.target,
+            Some(&graph_for_validation),
+        );
+        drop(graph_for_validation); // Release read lock before acquiring write lock
+
+        if !validation_result.valid {
+            warn!(
+                "Rejecting trust attestation with invalid evidence: {} -> {} (errors: {:?})",
+                edge.source, edge.target, validation_result.errors
+            );
+            icn_obs::metrics::trust::attestations_rejected_invalid_evidence_inc();
+            return Ok(()); // Don't propagate error, just log and ignore
+        }
+
+        // Log evidence validation results
+        if !edge.evidence.is_empty() {
+            debug!(
+                "Evidence validated for {} -> {}: {} items, score adjustment: {:.2}",
+                edge.source,
+                edge.target,
+                edge.evidence.len(),
+                validation_result.score_adjustment
+            );
+        }
+    }
 
     // Apply to trust graph
     let mut graph = trust_graph.write().await;
@@ -449,7 +483,7 @@ mod tests {
         };
 
         // Bob receives and handles it
-        handle_trust_attestation_entry(&entry, &bob_graph, bob.did(), None)
+        handle_trust_attestation_entry(&entry, &bob_graph, bob.did(), None, None)
             .await
             .unwrap();
 

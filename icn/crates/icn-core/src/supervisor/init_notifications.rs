@@ -86,6 +86,7 @@ pub async fn handle_trust_attestation(
         trust_graph,
         own_did,
         Some(rate_limiter.as_ref()),
+        None, // TODO: Wire up evidence validator when EvidenceValidator is instantiated
     )
     .await
     {

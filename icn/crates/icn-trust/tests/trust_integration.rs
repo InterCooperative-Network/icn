@@ -11,8 +11,8 @@
 use icn_identity::KeyPair;
 use icn_store::SledStore;
 use icn_trust::{
-    MultiTrustGraph, ScoringWeights, TrustAttestation, TrustCache, TrustClass, TrustEdge,
-    TrustGraph, TrustGraphType,
+    EvidenceValidator, EvidenceValidatorConfig, MultiTrustGraph, ScoringWeights, TrustAttestation,
+    TrustCache, TrustClass, TrustEdge, TrustEvidence, TrustGraph, TrustGraphType,
 };
 use std::sync::Arc;
 use std::time::Duration;
@@ -210,7 +210,14 @@ fn test_attestation_sign_verify_store_cycle() {
 
     assert!((stored_edge.score - 0.75).abs() < 0.001);
     assert_eq!(stored_edge.labels, vec!["partner"]);
-    assert_eq!(stored_edge.evidence, vec!["contract_123"]);
+    // Evidence from attestation is converted to TrustEvidence::Legacy
+    assert_eq!(stored_edge.evidence.len(), 1);
+    match &stored_edge.evidence[0] {
+        icn_trust::TrustEvidence::Legacy { reference, .. } => {
+            assert_eq!(reference, "contract_123");
+        }
+        other => panic!("Expected Legacy evidence, got {:?}", other),
+    }
 }
 
 #[test]
@@ -925,4 +932,97 @@ fn test_trust_graph_type_storage_isolation() {
     assert!((social_edge.score - 0.9).abs() < 0.001);
     assert!((economic_edge.score - 0.5).abs() < 0.001);
     assert!((technical_edge.score - 0.3).abs() < 0.001);
+}
+
+// ============================================================================
+// Evidence Validation Tests
+// ============================================================================
+
+#[test]
+fn test_add_edge_validated_with_legacy_evidence() {
+    let store = Arc::new(SledStore::temporary().unwrap());
+    let alice = KeyPair::generate().unwrap();
+    let bob = KeyPair::generate().unwrap();
+
+    let mut graph = TrustGraph::new(store.clone(), alice.did().clone());
+
+    // Create validator that accepts legacy evidence
+    let config = EvidenceValidatorConfig {
+        accept_legacy: true,
+        ..Default::default()
+    };
+    let validator = EvidenceValidator::with_config(store, config);
+
+    // Create edge with legacy evidence
+    let edge = TrustEdge::new(alice.did().clone(), bob.did().clone(), 0.7).with_evidence(
+        TrustEvidence::from_legacy_string("test-evidence".to_string()),
+    );
+
+    // Add with validation
+    let result = graph.add_edge_validated(edge, &validator).unwrap();
+
+    // Should succeed since we accept legacy evidence
+    assert!(result.valid);
+
+    // Verify edge was added
+    let retrieved = graph.get_edge(alice.did(), bob.did()).unwrap();
+    assert!(retrieved.is_some());
+    assert!((retrieved.unwrap().score - 0.7).abs() < 0.001);
+}
+
+#[test]
+fn test_add_edge_validated_reject_legacy_evidence() {
+    let store = Arc::new(SledStore::temporary().unwrap());
+    let alice = KeyPair::generate().unwrap();
+    let bob = KeyPair::generate().unwrap();
+
+    let mut graph = TrustGraph::new(store.clone(), alice.did().clone());
+
+    // Create validator that rejects legacy evidence
+    let config = EvidenceValidatorConfig {
+        accept_legacy: false,
+        ..Default::default()
+    };
+    let validator = EvidenceValidator::with_config(store, config);
+
+    // Create edge with legacy evidence
+    let edge = TrustEdge::new(alice.did().clone(), bob.did().clone(), 0.7).with_evidence(
+        TrustEvidence::from_legacy_string("test-evidence".to_string()),
+    );
+
+    // Add with validation
+    let result = graph.add_edge_validated(edge, &validator).unwrap();
+
+    // Should fail since we don't accept legacy evidence
+    assert!(!result.valid);
+    assert_eq!(result.errors.len(), 1);
+
+    // Verify edge was NOT added
+    let retrieved = graph.get_edge(alice.did(), bob.did()).unwrap();
+    assert!(retrieved.is_none());
+}
+
+#[test]
+fn test_add_edge_validated_empty_evidence() {
+    let store = Arc::new(SledStore::temporary().unwrap());
+    let alice = KeyPair::generate().unwrap();
+    let bob = KeyPair::generate().unwrap();
+
+    let mut graph = TrustGraph::new(store.clone(), alice.did().clone());
+
+    // Create validator with default config
+    let validator = EvidenceValidator::new(store);
+
+    // Create edge without evidence
+    let edge = TrustEdge::new(alice.did().clone(), bob.did().clone(), 0.5);
+
+    // Add with validation
+    let result = graph.add_edge_validated(edge, &validator).unwrap();
+
+    // Should succeed - empty evidence is valid
+    assert!(result.valid);
+
+    // Verify edge was added
+    let retrieved = graph.get_edge(alice.did(), bob.did()).unwrap();
+    assert!(retrieved.is_some());
 }
