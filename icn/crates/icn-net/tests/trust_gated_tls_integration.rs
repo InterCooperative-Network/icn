@@ -75,6 +75,8 @@ async fn test_trusted_peer_connection_accepted() -> Result<()> {
         None, // No TURN config for tests
         None, // No misbehavior detector for tests
         None, // No store for tests
+        None, // personhood_store
+        None, // anchor_rate_config
     )
     .await?;
 
@@ -100,6 +102,8 @@ async fn test_trusted_peer_connection_accepted() -> Result<()> {
         None, // No TURN config for tests
         None, // No misbehavior detector for tests
         None, // No store for tests
+        None, // personhood_store
+        None, // anchor_rate_config
     )
     .await?;
 
@@ -175,6 +179,8 @@ async fn test_untrusted_peer_connection_rejected() -> Result<()> {
         None, // No TURN config for tests
         None, // No misbehavior detector for tests
         None, // No store for tests
+        None, // personhood_store
+        None, // anchor_rate_config
     )
     .await?;
 
@@ -200,6 +206,8 @@ async fn test_untrusted_peer_connection_rejected() -> Result<()> {
         None, // No TURN config for tests
         None, // No misbehavior detector for tests
         None, // No store for tests
+        None, // personhood_store
+        None, // anchor_rate_config
     )
     .await?;
 
@@ -279,6 +287,8 @@ async fn test_trust_threshold_boundary() -> Result<()> {
         None, // No TURN config for tests
         None, // No misbehavior detector for tests
         None, // No store for tests
+        None, // personhood_store
+        None, // anchor_rate_config
     )
     .await?;
 
@@ -301,6 +311,8 @@ async fn test_trust_threshold_boundary() -> Result<()> {
         None, // No TURN config for tests
         None, // No misbehavior detector for tests
         None, // No store for tests
+        None, // personhood_store
+        None, // anchor_rate_config
     )
     .await?;
 

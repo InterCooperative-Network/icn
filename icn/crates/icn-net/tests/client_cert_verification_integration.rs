@@ -81,6 +81,8 @@ impl SecureTestNode {
             None,
             None,
             None, // store
+            None, // personhood_store
+            None, // anchor_rate_config
         )
         .await?;
 
@@ -136,6 +138,8 @@ impl SecureTestNode {
             None,
             None,
             None, // store
+            None, // personhood_store
+            None, // anchor_rate_config
         )
         .await?;
 
@@ -246,6 +250,8 @@ async fn test_client_cert_verification_allows_trusted_peer() -> Result<()> {
         None,
         None,
         None, // store
+        None, // personhood_store
+        None, // anchor_rate_config
     )
     .await?;
 
@@ -269,6 +275,8 @@ async fn test_client_cert_verification_allows_trusted_peer() -> Result<()> {
         None,
         None,
         None, // store
+        None, // personhood_store
+        None, // anchor_rate_config
     )
     .await?;
 
@@ -348,6 +356,8 @@ async fn test_client_cert_verification_rejects_untrusted_peer() -> Result<()> {
         None,
         None,
         None, // store
+        None, // personhood_store
+        None, // anchor_rate_config
     )
     .await?;
 
@@ -371,6 +381,8 @@ async fn test_client_cert_verification_rejects_untrusted_peer() -> Result<()> {
         None,
         None,
         None, // store
+        None, // personhood_store
+        None, // anchor_rate_config
     )
     .await?;
 
@@ -493,6 +505,8 @@ async fn test_did_tls_binding_verified_on_hello() -> Result<()> {
         None,
         None,
         None, // store
+        None, // personhood_store
+        None, // anchor_rate_config
     )
     .await?;
 
@@ -520,6 +534,8 @@ async fn test_did_tls_binding_verified_on_hello() -> Result<()> {
         None,
         None,
         None, // store
+        None, // personhood_store
+        None, // anchor_rate_config
     )
     .await?;
 

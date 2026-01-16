@@ -295,6 +295,46 @@ impl<S: PersonhoodStore> PersonhoodAnchorStore<S> {
         Ok(None)
     }
 
+    /// Link an additional DID to an existing anchor
+    ///
+    /// This is used when a person has multiple devices or rotates keys.
+    /// All linked DIDs will resolve to the same PersonhoodAnchor for
+    /// rate limiting and identity purposes.
+    ///
+    /// Returns error if the anchor doesn't exist.
+    pub fn link_did(&self, anchor_id: &[u8; 32], did: &Did) -> Result<()> {
+        // Verify anchor exists
+        if self.get(anchor_id)?.is_none() {
+            anyhow::bail!("Cannot link DID to non-existent anchor");
+        }
+
+        // Create the DID index entry pointing to this anchor
+        let did_key = Self::did_index_key(did);
+        self.store.put(&did_key, anchor_id)?;
+
+        debug!(
+            did = %did,
+            anchor_id = ?anchor_id,
+            "Linked DID to PersonhoodAnchor"
+        );
+        Ok(())
+    }
+
+    /// Unlink a DID from its anchor
+    ///
+    /// Note: This does not delete the anchor itself, just the DID mapping.
+    /// The primary DID (from anchor.to_did()) should not be unlinked.
+    pub fn unlink_did(&self, did: &Did) -> Result<bool> {
+        let did_key = Self::did_index_key(did);
+        if self.store.get(&did_key)?.is_some() {
+            self.store.delete(&did_key)?;
+            debug!(did = %did, "Unlinked DID from PersonhoodAnchor");
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
     /// Delete a PersonhoodAnchor
     pub fn delete(&self, anchor_id: &[u8; 32]) -> Result<bool> {
         // Get the anchor first to clean up indexes

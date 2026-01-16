@@ -13,10 +13,25 @@
 use icn_identity::{Did, PersonhoodStoreTrait};
 use icn_trust::TrustClass;
 use std::collections::HashMap;
+use std::fmt;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 use tracing::{debug, warn};
+
+/// Wrapper for lazy hex encoding - only encodes when Display is called.
+///
+/// This avoids computing hex strings when log levels would filter out the message.
+struct HexDisplay<'a>(&'a [u8; 32]);
+
+impl fmt::Display for HexDisplay<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for byte in self.0 {
+            write!(f, "{byte:02x}")?;
+        }
+        Ok(())
+    }
+}
 
 // Helper to convert TrustClass to string for metrics
 fn trust_class_to_str(class: TrustClass) -> &'static str {
@@ -571,7 +586,7 @@ impl RateLimiter {
                 EnforcementMode::LogOnly => {
                     warn!(
                         did = %peer,
-                        anchor_id = %hex::encode(anchor_id),
+                        anchor_id = %HexDisplay(&anchor_id),
                         "Per-person rate limit exceeded (LogOnly mode - allowing)"
                     );
                     return true; // Allow in LogOnly mode
@@ -579,7 +594,7 @@ impl RateLimiter {
                 EnforcementMode::Enforce | EnforcementMode::RequirePersonhood => {
                     debug!(
                         did = %peer,
-                        anchor_id = %hex::encode(anchor_id),
+                        anchor_id = %HexDisplay(&anchor_id),
                         "Per-person rate limit exceeded"
                     );
                     return false;
@@ -608,7 +623,7 @@ impl RateLimiter {
                         multiplier = config.verified_multiplier;
                         debug!(
                             did = %peer,
-                            anchor_id = %hex::encode(anchor_id),
+                            anchor_id = %HexDisplay(anchor_id),
                             multiplier = multiplier,
                             "Applying verified personhood multiplier"
                         );
@@ -912,8 +927,16 @@ mod tests {
         Arc::new(PersonhoodAnchorStore::new(store))
     }
 
+    /// Test that per-person rate limiting works correctly for different people.
+    ///
+    /// This test creates 10 different people (10 anchors), each with their own DID.
+    /// Each person should get their own per-anchor bucket, so 10 people × 5 burst
+    /// = 50 total messages allowed.
+    ///
+    /// Note: This is NOT a Sybil attack test. See `test_sybil_attack_multiple_dids_one_anchor`
+    /// for the actual Sybil resistance test.
     #[tokio::test]
-    async fn test_sybil_attack_mitigation() {
+    async fn test_per_person_rate_limiting() {
         use icn_store::SledStore;
         use icn_trust::TrustGraph;
 
@@ -925,19 +948,15 @@ mod tests {
 
         let personhood_store = create_test_personhood_store();
 
-        // Create multiple personhood anchors for different "attackers"
-        // Each anchor represents a unique person
-        // The test verifies that DIDs with the same anchor share rate limits
-        let mut attacker_dids = Vec::new();
+        // Create 10 different people, each with their own anchor and DID
+        let mut person_dids = Vec::new();
 
-        // Create 10 anchors, each with their own DID
-        // These simulate 10 different people (not a Sybil attack)
         for i in 0..10 {
             let anchor_key = [i as u8; 32];
             let anchor = PersonhoodAnchor::genesis(&format!("person_{i}"), anchor_key);
             personhood_store.store(&anchor).unwrap();
-            // Use the anchor's own DID
-            attacker_dids.push(anchor.to_did());
+            // Each person uses their anchor's DID
+            person_dids.push(anchor.to_did());
         }
 
         // Create rate limiter with Sybil resistance
@@ -953,7 +972,7 @@ mod tests {
 
         let anchor_config = AnchorRateLimitConfig {
             max_messages_per_person_per_second: 100,
-            person_burst_capacity: 5, // Low limit per person - this should be the bottleneck
+            person_burst_capacity: 5, // Low limit per person - this is the bottleneck
             enforcement_mode: EnforcementMode::Enforce,
             verified_multiplier: 1.0,
             refill_interval: Duration::from_millis(100),
@@ -970,7 +989,7 @@ mod tests {
         // 10 people × 5 burst each = 50 total messages
         let mut total_allowed = 0;
 
-        for did in &attacker_dids {
+        for did in &person_dids {
             // Each person tries to send 10 messages
             for _ in 0..10 {
                 let (did_allowed, anchor_allowed) =
@@ -993,6 +1012,110 @@ mod tests {
             limiter.tracked_anchors().await,
             10,
             "Should track 10 anchors (one per person)"
+        );
+    }
+
+    /// Test actual Sybil attack mitigation: multiple DIDs belonging to one person.
+    ///
+    /// A Sybil attacker creates multiple DIDs but they all resolve to the same
+    /// PersonhoodAnchor. Without per-anchor limiting, they'd get N × burst capacity.
+    /// With per-anchor limiting, all their DIDs share ONE bucket.
+    #[tokio::test]
+    async fn test_sybil_attack_multiple_dids_one_anchor() {
+        use icn_store::SledStore;
+        use icn_trust::TrustGraph;
+
+        let store = Arc::new(SledStore::temporary().unwrap());
+        let own_keypair = KeyPair::generate().unwrap();
+        let graph = TrustGraph::new(store, own_keypair.did().clone());
+        let graph_handle = Arc::new(tokio::sync::RwLock::new(graph));
+
+        let personhood_store = create_test_personhood_store();
+
+        // Create ONE person (one anchor)
+        let anchor_key = [42u8; 32];
+        let anchor = PersonhoodAnchor::genesis("sybil_attacker", anchor_key);
+        let anchor_id = anchor.anchor.id;
+        personhood_store.store(&anchor).unwrap();
+
+        // The attacker creates 10 different DIDs (simulating key rotation or multi-device)
+        // but they all point to the same anchor (same person)
+        let mut attacker_dids = vec![anchor.to_did()]; // Primary DID
+
+        for _ in 0..9 {
+            // Generate additional keypairs (simulating Sybil attack)
+            let extra_keypair = KeyPair::generate().unwrap();
+            let extra_did = extra_keypair.did().clone();
+            // Link this DID to the same anchor
+            personhood_store.link_did(&anchor_id, &extra_did).unwrap();
+            attacker_dids.push(extra_did);
+        }
+
+        assert_eq!(attacker_dids.len(), 10, "Should have 10 DIDs for the attacker");
+
+        // Create rate limiter with Sybil resistance
+        let trust_config = TrustGatedRateLimitConfig {
+            isolated: RateLimitConfig {
+                max_messages_per_second: 100,
+                burst_capacity: 20, // High per-DID limit (would allow 200 total without anchor limiting)
+                refill_interval: Duration::from_millis(100),
+            },
+            ..Default::default()
+        };
+
+        let anchor_config = AnchorRateLimitConfig {
+            max_messages_per_person_per_second: 100,
+            person_burst_capacity: 10, // Per-person limit: only 10 messages total
+            enforcement_mode: EnforcementMode::Enforce,
+            verified_multiplier: 1.0,
+            refill_interval: Duration::from_millis(100),
+        };
+
+        let limiter = RateLimiter::new_with_sybil_resistance(
+            trust_config,
+            graph_handle,
+            personhood_store.clone() as Arc<dyn PersonhoodStoreTrait>,
+            anchor_config,
+        );
+
+        // Attacker tries to send messages from all their DIDs
+        // Without Sybil protection: 10 DIDs × 20 burst = 200 messages
+        // With Sybil protection: all DIDs share ONE anchor bucket = 10 messages total
+        let mut total_allowed = 0;
+        let mut anchor_rejections = 0;
+
+        for did in &attacker_dids {
+            for _ in 0..5 {
+                let (did_allowed, anchor_allowed) =
+                    limiter.check_rate_limit_with_personhood(did).await;
+                if did_allowed && anchor_allowed {
+                    total_allowed += 1;
+                } else if did_allowed && !anchor_allowed {
+                    // DID limit passed but anchor limit blocked - this is Sybil mitigation
+                    anchor_rejections += 1;
+                }
+            }
+        }
+
+        // Key assertion: despite 10 DIDs, only ~10 messages should be allowed
+        // (the per-person burst capacity), not 200 (10 × 20)
+        assert!(
+            (8..=12).contains(&total_allowed),
+            "Expected ~10 messages allowed (per-person limit), got {total_allowed}. \
+             Sybil resistance should limit aggregate throughput."
+        );
+
+        // Verify significant rejections due to anchor limit (Sybil mitigation)
+        assert!(
+            anchor_rejections > 30,
+            "Expected many anchor-based rejections (Sybil mitigation), got {anchor_rejections}"
+        );
+
+        // Verify only ONE anchor is tracked (the attacker is one person)
+        assert_eq!(
+            limiter.tracked_anchors().await,
+            1,
+            "Should track only 1 anchor (all DIDs belong to same person)"
         );
     }
 

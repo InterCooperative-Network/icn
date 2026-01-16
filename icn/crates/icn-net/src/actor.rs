@@ -9,7 +9,7 @@
 use anyhow::{Context, Result};
 #[cfg(test)]
 use icn_identity::KeyPair;
-use icn_identity::{Did, IdentityBundle};
+use icn_identity::{Did, IdentityBundle, PersonhoodStoreTrait};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot, RwLock};
@@ -20,7 +20,7 @@ use crate::{
     protocol::{
         read_message, write_message, write_message_negotiated, MessagePayload, NetworkMessage,
     },
-    rate_limit::{RateLimitConfig, RateLimiter},
+    rate_limit::{AnchorRateLimitConfig, RateLimitConfig, RateLimiter},
     replay_guard::ReplayGuard,
     topology::{NeighborSets, TopologyConfig, TopologyInfo},
     CapabilityFlags, Discovery, PeerInfo, SessionManager,
@@ -896,6 +896,8 @@ impl NetworkActor {
     /// If trust_graph is provided, enables trust-gated rate limiting with different
     /// limits for different trust classes.
     /// If topology_config is provided, enables topology-aware neighbor management.
+    /// If personhood_store is provided, enables Sybil resistance via per-person rate limiting.
+    #[allow(clippy::too_many_arguments)]
     pub async fn spawn(
         identity_bundle: IdentityBundle,
         listen_addr: SocketAddr,
@@ -909,6 +911,8 @@ impl NetworkActor {
         turn_config: Option<crate::TurnConfig>,
         misbehavior_detector: Option<Arc<RwLock<icn_security::MisbehaviorDetector>>>,
         store: Option<Arc<dyn Store>>,
+        personhood_store: Option<Arc<dyn PersonhoodStoreTrait>>,
+        anchor_rate_config: Option<AnchorRateLimitConfig>,
     ) -> Result<NetworkHandle> {
         let did = identity_bundle.did().clone();
 
@@ -958,14 +962,42 @@ impl NetworkActor {
                 crate::rate_limit::TrustGatedRateLimitConfig::default()
             });
             info!("Trust-gated rate limiting enabled");
-            Arc::new(RateLimiter::new_trust_gated(config, tg.clone()))
+            let mut limiter = RateLimiter::new_trust_gated(config, tg.clone());
+
+            // Add Sybil resistance if personhood store is provided
+            if let Some(ps) = personhood_store {
+                let anchor_config = anchor_rate_config.unwrap_or_else(|| {
+                    info!("Using default anchor rate limit config for Sybil resistance");
+                    AnchorRateLimitConfig::default()
+                });
+                info!(
+                    enforcement_mode = ?anchor_config.enforcement_mode,
+                    person_burst = anchor_config.person_burst_capacity,
+                    "Sybil resistance enabled via personhood anchors"
+                );
+                limiter = limiter.with_sybil_resistance(ps, anchor_config);
+            }
+
+            Arc::new(limiter)
         } else {
             let config = fallback_config.unwrap_or_else(|| {
                 info!("Using default fallback rate limit config");
                 RateLimitConfig::default()
             });
             info!("Using fallback rate limiting (no trust graph)");
-            Arc::new(RateLimiter::new(config))
+
+            // Note: Sybil resistance requires trust-gated mode for full benefit
+            // but we can still add basic per-person limiting
+            let mut limiter = RateLimiter::new(config);
+            if let Some(ps) = personhood_store {
+                let anchor_config = anchor_rate_config.unwrap_or_default();
+                info!(
+                    "Sybil resistance enabled (without trust-gating)"
+                );
+                limiter = limiter.with_sybil_resistance(ps, anchor_config);
+            }
+
+            Arc::new(limiter)
         };
 
         // Create replay guard for signed message verification
@@ -1667,16 +1699,36 @@ impl NetworkActor {
                             );
 
                             // Check rate limit BEFORE processing message
-                            let allowed = rate_limiter.check_rate_limit(&message.from).await;
+                            // Uses dual-path rate limiting: per-DID and per-anchor (if Sybil resistance enabled)
+                            let (did_allowed, anchor_allowed) =
+                                rate_limiter.check_rate_limit_with_personhood(&message.from).await;
 
-                            if !allowed {
+                            if !did_allowed {
                                 warn!(
-                                    "Rate limited message from {} (exceeded limit)",
+                                    "Rate limited message from {} (per-DID limit exceeded)",
                                     message.from
                                 );
 
                                 // Track rate limiting metric
                                 icn_obs::metrics::network::messages_rate_limited_inc();
+
+                                // Close stream before continuing to avoid resource leak
+                                if let Err(e) = send.finish() {
+                                    tracing::debug!("Stream finish error during rate limit: {}", e);
+                                }
+
+                                // Drop the message (don't call handler)
+                                continue;
+                            }
+
+                            if !anchor_allowed {
+                                warn!(
+                                    "Rate limited message from {} (per-person limit exceeded - Sybil mitigation)",
+                                    message.from
+                                );
+
+                                // Track Sybil-specific rate limiting metric
+                                icn_obs::metrics::network::messages_rate_limited_by_anchor_inc();
 
                                 // Close stream before continuing to avoid resource leak
                                 if let Err(e) = send.finish() {
@@ -1985,6 +2037,8 @@ mod tests {
             None, // turn_config
             None, // misbehavior_detector
             None, // store (tests don't need persistence)
+            None, // personhood_store
+            None, // anchor_rate_config
         )
         .await
         .unwrap();
