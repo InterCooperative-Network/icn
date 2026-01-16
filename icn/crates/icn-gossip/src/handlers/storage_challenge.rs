@@ -140,11 +140,13 @@ impl GossipActor {
     /// Handle a StorageProofMsg - proof response from replica holder
     ///
     /// When we receive a storage proof:
-    /// 1. Match to pending challenge
-    /// 2. Verify byte data hash
-    /// 3. Verify Merkle proof
-    /// 4. Update replica health status
-    /// 5. Record violation if invalid
+    /// 1. Forward to ChallengeScheduler (via callback)
+    /// 2. ChallengeScheduler handles:
+    ///    - Match to pending challenge
+    ///    - Verify byte data hash
+    ///    - Verify Merkle proof
+    ///    - Update replica health status
+    ///    - Record violation if invalid
     pub(crate) fn handle_storage_proof(
         &mut self,
         _sender: &Did,
@@ -159,17 +161,22 @@ impl GossipActor {
             "Received storage proof"
         );
 
-        // TODO: Match to pending challenge
-        // TODO: Verify byte data matches expected hash
-        // TODO: Verify Merkle proof against expected root
-        // TODO: Update replica health status
-        // TODO: Record violation if invalid
-
-        info!(
-            challenge_id = %hex::encode(proof.challenge_id),
-            prover = %proof.prover,
-            "Storage proof received (verification not yet implemented)"
-        );
+        // Forward to ChallengeScheduler for verification
+        if let Some(callback) = &self.storage_proof_callback {
+            if let Err(e) = callback(proof.clone()) {
+                warn!(
+                    challenge_id = %hex::encode(proof.challenge_id),
+                    error = %e,
+                    "Error processing storage proof in ChallengeScheduler"
+                );
+            }
+        } else {
+            info!(
+                challenge_id = %hex::encode(proof.challenge_id),
+                prover = %proof.prover,
+                "Storage proof received (ChallengeScheduler not configured)"
+            );
+        }
 
         Ok(())
     }

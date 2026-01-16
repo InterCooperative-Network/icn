@@ -65,9 +65,12 @@ pub struct ChallengeScheduler {
     /// Pending challenges: challenge_id -> PendingChallenge
     pending: HashMap<[u8; 32], PendingChallenge>,
 
-    /// Per-replica failure counts: (content_hash, peer_did) -> count
-    failure_counts: HashMap<(ContentHash, String), u32>,
+    /// Per-replica failure tracking: (content_hash, peer_did) -> (count, last_updated)
+    failure_counts: HashMap<(ContentHash, String), (u32, Instant)>,
 }
+
+/// Maximum age for failure count entries before cleanup (24 hours)
+const FAILURE_COUNT_MAX_AGE_SECS: u64 = 86400;
 
 impl ChallengeScheduler {
     /// Create a new ChallengeScheduler
@@ -184,6 +187,15 @@ impl ChallengeScheduler {
             for replica in &metadata.replicas {
                 replicas_checked += 1;
 
+                // Skip if we have too many pending challenges globally
+                if self.pending.len() >= self.config.max_pending_total {
+                    debug!(
+                        "Max total pending challenges reached ({})",
+                        self.config.max_pending_total
+                    );
+                    break; // Stop this round entirely
+                }
+
                 // Skip if we have too many pending challenges for this node
                 let pending_for_node = self
                     .pending
@@ -288,7 +300,7 @@ impl ChallengeScheduler {
         let failure_count = self
             .failure_counts
             .get(&(*content_hash, target_peer.to_string()))
-            .copied()
+            .map(|(count, _)| *count)
             .unwrap_or(0);
 
         // Create the challenge
@@ -355,9 +367,11 @@ impl ChallengeScheduler {
                     pending.challenge.target_peer.clone(),
                 );
 
-                // Increment failure count
-                let count = self.failure_counts.entry(key.clone()).or_insert(0);
-                *count += 1;
+                // Increment failure count with timestamp
+                let entry = self.failure_counts.entry(key.clone()).or_insert((0, now));
+                entry.0 += 1;
+                entry.1 = now;
+                let count = entry.0;
 
                 // Emit timeout metric
                 icn_obs::metrics::storage_challenge::timeouts_inc();
@@ -371,7 +385,7 @@ impl ChallengeScheduler {
                 );
 
                 // Record violation if past grace period
-                if *count > self.config.grace_attempts {
+                if count > self.config.grace_attempts {
                     let violation = Violation::FailedStorageChallenge {
                         content_hash: pending.challenge.content_hash,
                         challenge_id,
@@ -396,6 +410,11 @@ impl ChallengeScheduler {
                 }
             }
         }
+
+        // Clean up stale failure count entries
+        let max_age = Duration::from_secs(FAILURE_COUNT_MAX_AGE_SECS);
+        self.failure_counts
+            .retain(|_, (_, last_updated)| now.duration_since(*last_updated) < max_age);
 
         Ok(())
     }
@@ -498,9 +517,12 @@ impl ChallengeScheduler {
             pending.challenge.target_peer.clone(),
         );
 
-        // Increment failure count
-        let count = self.failure_counts.entry(key).or_insert(0);
-        *count += 1;
+        // Increment failure count with timestamp
+        let now = Instant::now();
+        let entry = self.failure_counts.entry(key).or_insert((0, now));
+        entry.0 += 1;
+        entry.1 = now;
+        let count = entry.0;
 
         // Emit failure metric
         let reason_str = match reason {
@@ -513,7 +535,7 @@ impl ChallengeScheduler {
         icn_obs::metrics::storage_challenge::failures_inc(reason_str);
 
         // Record violation if past grace period
-        if *count > self.config.grace_attempts {
+        if count > self.config.grace_attempts {
             let violation = Violation::FailedStorageChallenge {
                 content_hash: pending.challenge.content_hash,
                 challenge_id: pending.challenge.id,

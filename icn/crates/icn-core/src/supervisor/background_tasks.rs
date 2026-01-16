@@ -683,6 +683,31 @@ pub fn spawn_candidate_announcement_task(
 /// Callback type for recording peer cache successes
 pub type PeerCacheCallback = Arc<dyn Fn(&Did, std::net::SocketAddr) + Send + Sync>;
 
+/// Storage challenge integration helpers
+pub mod storage_challenge {
+    use super::*;
+    use crate::storage_challenge::ChallengeSchedulerHandle;
+
+    /// Create a storage proof callback that forwards proofs to the ChallengeScheduler
+    ///
+    /// This callback is set on the GossipActor to handle incoming storage proofs.
+    /// When a proof is received, it spawns an async task to forward it to the
+    /// ChallengeScheduler for verification.
+    pub fn create_proof_callback(
+        scheduler_handle: ChallengeSchedulerHandle,
+    ) -> icn_gossip::StorageProofCallback {
+        Arc::new(move |proof| {
+            let handle = scheduler_handle.clone();
+            tokio::spawn(async move {
+                if let Err(e) = handle.handle_proof(proof).await {
+                    warn!("Error handling storage proof: {}", e);
+                }
+            });
+            Ok(())
+        })
+    }
+}
+
 /// Configuration for bootstrap peer health checking task
 pub struct BootstrapHealthConfig {
     /// Interval between health checks (default: 60s)

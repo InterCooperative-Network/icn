@@ -4,6 +4,9 @@
 //! Uses a combination of random byte range challenges and Merkle proofs.
 
 use crate::ContentHash;
+use anyhow::{Context, Result};
+use ed25519_dalek::{Signature, Verifier};
+use icn_identity::{Did, KeyPair};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -138,6 +141,54 @@ impl StorageChallenge {
     pub fn validate_id(&self) -> bool {
         self.id == self.compute_id()
     }
+
+    /// Sign this challenge with the challenger's keypair
+    ///
+    /// The keypair's DID must match the `challenger` field.
+    pub fn sign(&mut self, keypair: &KeyPair) -> Result<()> {
+        // Verify the keypair matches the challenger
+        if keypair.did().as_str() != self.challenger {
+            anyhow::bail!(
+                "Keypair DID {} does not match challenger {}",
+                keypair.did(),
+                self.challenger
+            );
+        }
+
+        let payload = self.signing_payload();
+        let signature = keypair.sign(&payload);
+        self.signature = signature.to_bytes().to_vec();
+        Ok(())
+    }
+
+    /// Verify the signature on this challenge
+    ///
+    /// Extracts the verifying key from the challenger's DID and verifies the signature.
+    pub fn verify_signature(&self) -> Result<()> {
+        if self.signature.is_empty() {
+            anyhow::bail!("Challenge has no signature");
+        }
+
+        let did = Did::from_str(&self.challenger).context("Invalid challenger DID format")?;
+        let verifying_key = did
+            .to_verifying_key()
+            .context("Failed to extract verifying key from challenger DID")?;
+
+        let signature =
+            Signature::from_slice(&self.signature).context("Invalid signature format")?;
+
+        let payload = self.signing_payload();
+        verifying_key
+            .verify(&payload, &signature)
+            .context("Challenge signature verification failed")?;
+
+        Ok(())
+    }
+
+    /// Check if this challenge has a valid signature
+    pub fn is_signed(&self) -> bool {
+        !self.signature.is_empty()
+    }
 }
 
 // ============================================================================
@@ -215,6 +266,54 @@ impl StorageProof {
         payload.extend_from_slice(self.prover.as_bytes());
         payload.extend_from_slice(&self.generated_at.to_le_bytes());
         payload
+    }
+
+    /// Sign this proof with the prover's keypair
+    ///
+    /// The keypair's DID must match the `prover` field.
+    pub fn sign(&mut self, keypair: &KeyPair) -> Result<()> {
+        // Verify the keypair matches the prover
+        if keypair.did().as_str() != self.prover {
+            anyhow::bail!(
+                "Keypair DID {} does not match prover {}",
+                keypair.did(),
+                self.prover
+            );
+        }
+
+        let payload = self.signing_payload();
+        let signature = keypair.sign(&payload);
+        self.signature = signature.to_bytes().to_vec();
+        Ok(())
+    }
+
+    /// Verify the signature on this proof
+    ///
+    /// Extracts the verifying key from the prover's DID and verifies the signature.
+    pub fn verify_signature(&self) -> Result<()> {
+        if self.signature.is_empty() {
+            anyhow::bail!("Proof has no signature");
+        }
+
+        let did = Did::from_str(&self.prover).context("Invalid prover DID format")?;
+        let verifying_key = did
+            .to_verifying_key()
+            .context("Failed to extract verifying key from prover DID")?;
+
+        let signature =
+            Signature::from_slice(&self.signature).context("Invalid signature format")?;
+
+        let payload = self.signing_payload();
+        verifying_key
+            .verify(&payload, &signature)
+            .context("Proof signature verification failed")?;
+
+        Ok(())
+    }
+
+    /// Check if this proof has a valid signature
+    pub fn is_signed(&self) -> bool {
+        !self.signature.is_empty()
     }
 }
 
@@ -562,6 +661,9 @@ pub struct ChallengeConfig {
     /// Max concurrent pending challenges per node
     pub max_pending_per_node: usize,
 
+    /// Max total pending challenges (prevents unbounded memory growth)
+    pub max_pending_total: usize,
+
     /// Chunk size for Merkle tree
     pub chunk_size: u32,
 
@@ -578,6 +680,7 @@ impl Default for ChallengeConfig {
             grace_attempts: 3,
             challenge_probability: 0.1, // 10% per round
             max_pending_per_node: 10,
+            max_pending_total: 1000,
             chunk_size: DEFAULT_CHUNK_SIZE,
             byte_sample_size: MAX_BYTE_SAMPLE_SIZE,
         }
