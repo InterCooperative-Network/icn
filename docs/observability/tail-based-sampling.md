@@ -23,9 +23,9 @@ sampling_rate = 0.1  # 10% of normal traces
 ```
 
 **Priority spans always sampled** (regardless of `sampling_rate`):
-- Security-related spans (`security.*`, `auth.*`, `permission.*`)
-- Trust computation spans (`trust.*`)
-- Cryptographic operations (`crypto.*`, `signature.*`)
+- Spans whose names contain `"security"` (case-insensitive)
+
+Other high-value span patterns (for example, `auth.*`, `permission.*`, `trust.*`, `crypto.*`, `signature.*`) are **not** automatically prioritized by ICN's head-based sampler and must be handled via collector-side tail-based sampling policies if you want them always captured.
 
 ## Why Tail-Based Sampling?
 
@@ -295,5 +295,5 @@ Tail-based sampling buffers traces in memory:
 ## Related Documentation
 
 - [Production Hardening Guide](../production-hardening.md) - Security configuration
-- [ICN Observability](../ARCHITECTURE.md#observability) - Architecture overview
+- [ICN Architecture](../ARCHITECTURE.md) - Architecture overview
 - [OpenTelemetry Tail Sampling Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/tailsamplingprocessor)
