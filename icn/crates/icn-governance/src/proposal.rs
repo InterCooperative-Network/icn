@@ -115,8 +115,9 @@
 //! proposal.start_deliberation(7 * 24 * 3600).unwrap();
 //! assert!(proposal.state.is_deliberating());
 //!
-//! // After deliberation ends, open for voting (5 days)
-//! // (In practice, time would pass; here we force it for the example)
+//! // After deliberation period expires naturally, use:
+//! //   proposal.end_deliberation_and_open(voting_period).unwrap();
+//! // For this doctest, we force the transition:
 //! proposal.force_end_deliberation(5 * 24 * 3600).unwrap();
 //! assert!(proposal.state.is_open());
 //!
