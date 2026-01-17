@@ -50,6 +50,7 @@ pub mod charter_rules;
 pub mod charter_validator;
 pub mod disputes;
 pub mod error;
+pub mod fuel_estimator;
 pub mod interpreter;
 pub mod messages;
 pub mod registry;
@@ -70,6 +71,9 @@ pub use disputes::{
     TOPIC_DISPUTES_RESOLVED,
 };
 pub use error::{CclError, Span};
+pub use fuel_estimator::{
+    estimate_fuel, estimate_fuel_dry_run, estimate_fuel_dry_run_with_context, FuelEstimator,
+};
 pub use interpreter::Interpreter;
 pub use messages::{
     ContractDeploymentMessage, ContractExecutionRequest, ContractExecutionResponse,
@@ -86,7 +90,7 @@ pub use registry_actor::{
 pub use runtime::{ContractInfo, ContractRuntime};
 pub use types::{
     Capability, ContractInstallation, ContractState, ExecutionContext, ExecutionResult, FuelConfig,
-    LedgerOperation, Value,
+    FuelEstimate, LedgerOperation, Value,
 };
 
 #[cfg(test)]

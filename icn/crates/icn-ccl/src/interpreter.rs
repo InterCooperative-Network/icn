@@ -28,6 +28,9 @@ pub struct Interpreter {
 
     /// Fuel configuration for cost metering
     fuel_config: FuelConfig,
+
+    /// Dry run mode - executes without side effects
+    dry_run: bool,
 }
 
 impl Interpreter {
@@ -64,6 +67,23 @@ impl Interpreter {
             locals: HashMap::new(),
             ledger_ops: Vec::new(),
             fuel_config,
+            dry_run: false,
+        }
+    }
+
+    /// Create a new interpreter in dry run mode
+    ///
+    /// Dry run executes the contract without producing side effects.
+    /// Useful for accurate fuel estimation based on actual execution.
+    pub fn dry_run(contract: Contract, state: ContractState, context: ExecutionContext) -> Self {
+        Interpreter {
+            contract,
+            state,
+            context,
+            locals: HashMap::new(),
+            ledger_ops: Vec::new(),
+            fuel_config: FuelConfig::default(),
+            dry_run: true,
         }
     }
 
@@ -115,6 +135,16 @@ impl Interpreter {
 
         // Compute fuel consumed (initial_fuel captured at start of function)
         let fuel_consumed = initial_fuel.saturating_sub(self.context.fuel);
+
+        // In dry run mode, discard side effects but keep fuel consumption
+        if self.dry_run {
+            return Ok(ExecutionResult {
+                value: return_value,
+                fuel_consumed,
+                state_changes: HashMap::new(),
+                ledger_ops: Vec::new(),
+            });
+        }
 
         // Collect state changes
         let state_changes = self.state.data.clone();
