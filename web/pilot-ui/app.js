@@ -5831,7 +5831,6 @@ elements.createListingSubmitBtn?.addEventListener('click', async () => {
         photos: (elements.listingPhotos?.value || '').split('\n').map(s => s.trim()).filter(s => s),
         tags: (elements.listingTags?.value || '').split(',').map(s => s.trim()).filter(s => s),
         expires_at: elements.listingExpires?.value ? Math.floor(new Date(elements.listingExpires.value).getTime() / 1000) : null,
-        location: null,
     };
 
     try {

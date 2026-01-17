@@ -98,7 +98,6 @@ fn listing_to_response(listing: &Listing, interest_count: usize) -> ListingRespo
         updated_at: listing.updated_at,
         expires_at: listing.expires_at,
         tags: listing.tags.clone(),
-        location: None, // Not currently in the data model
         interest_count,
     }
 }
@@ -416,10 +415,7 @@ pub async fn update_listing_status(
     }
     .map_err(|e| GatewayError::InternalError(format!("Failed to update listing status: {e}")))?;
 
-    let interest_count = mgr
-        .get_interests(&listing_id)
-        .map(|i| i.len())
-        .unwrap_or(0);
+    let interest_count = mgr.get_interests(&listing_id).map(|i| i.len()).unwrap_or(0);
 
     Ok(HttpResponse::Ok().json(listing_to_response(&updated_listing, interest_count)))
 }
@@ -644,12 +640,18 @@ mod tests {
     #[test]
     fn test_parse_status() {
         assert!(matches!(parse_status("active"), Ok(ListingStatus::Active)));
-        assert!(matches!(parse_status("matched"), Ok(ListingStatus::Matched)));
+        assert!(matches!(
+            parse_status("matched"),
+            Ok(ListingStatus::Matched)
+        ));
         assert!(matches!(
             parse_status("completed"),
             Ok(ListingStatus::Completed)
         ));
-        assert!(matches!(parse_status("expired"), Ok(ListingStatus::Expired)));
+        assert!(matches!(
+            parse_status("expired"),
+            Ok(ListingStatus::Expired)
+        ));
         assert!(matches!(
             parse_status("cancelled"),
             Ok(ListingStatus::Cancelled)

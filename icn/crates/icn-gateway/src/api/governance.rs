@@ -13,10 +13,10 @@ use crate::models::{
     ActionItemFilterParams, ActionItemNoteResponse, ActionItemResponse, AddActionItemNoteRequest,
     CastVoteRequest, CreateActionItemRequest, CreateDelegationRequest, CreateDomainRequest,
     CreateProposalRequest, DelegationListResponse, DelegationResponse,
-    EstablishClearingProposalRequest, JoinFederationProposalRequest, LeaveFederationProposalRequest,
-    OpenProposalRequest, ProposalPayloadRequest, RevokeVouchProposalRequest,
-    TerminateClearingProposalRequest, UpdateActionItemRequest, UpdateFederationPolicyProposalRequest,
-    VouchProposalRequest,
+    EstablishClearingProposalRequest, JoinFederationProposalRequest,
+    LeaveFederationProposalRequest, OpenProposalRequest, ProposalPayloadRequest,
+    RevokeVouchProposalRequest, TerminateClearingProposalRequest, UpdateActionItemRequest,
+    UpdateFederationPolicyProposalRequest, VouchProposalRequest,
 };
 use crate::pagination::{ListPagination, ListQuery, ListResponse};
 use crate::validation;
@@ -24,7 +24,8 @@ use icn_federation::SettlementInterval;
 use icn_governance::{
     ActionItemFilter, ActionItemId, ActionItemPriority, ActionItemStatus, DataSharingLevel,
     Delegation, DelegationScope, DisputeResolutionMethod, FederationProposal, FederationTerms,
-    GovernanceDomainId, GovernanceParams, MembershipConfig, ProposalId, ProposalPayload, VoteChoice,
+    GovernanceDomainId, GovernanceParams, MembershipConfig, ProposalId, ProposalPayload,
+    VoteChoice,
 };
 use icn_identity::Did;
 use icn_obs::metrics::gateway;
@@ -2042,6 +2043,35 @@ pub struct DiscussionResponse {
 // Action Item Endpoints
 // ============================================================================
 
+/// Check if a user is a member of a governance domain
+async fn check_domain_membership(
+    gov_mgr: &GovernanceManager,
+    domain_id: &GovernanceDomainId,
+    user_did: &Did,
+) -> Result<()> {
+    let domain = gov_mgr.get_domain(domain_id).await?.ok_or_else(|| {
+        crate::error::GatewayError::NotFound(format!("Domain not found: {}", domain_id.0))
+    })?;
+
+    let is_member = match &domain.config.membership.source {
+        icn_governance::MembershipSource::StaticList(members) => members.contains(user_did),
+        icn_governance::MembershipSource::TrustThreshold(_) => {
+            // For trust-based membership, trust graph integration required
+            // For now, allow (will be enforced by daemon integration)
+            true
+        }
+    };
+
+    if !is_member {
+        return Err(crate::error::GatewayError::AuthorizationFailed(format!(
+            "Only domain members can perform this action (you are not a member of domain '{}')",
+            domain_id.0
+        )));
+    }
+
+    Ok(())
+}
+
 /// POST /gov/domains/{domain_id}/action-items - Create a new action item
 #[post("/domains/{domain_id}/action-items")]
 pub async fn create_action_item(
@@ -2061,6 +2091,9 @@ pub async fn create_action_item(
     })?;
 
     let domain = GovernanceDomainId(domain_id.into_inner());
+
+    // Verify domain membership
+    check_domain_membership(&gov_mgr, &domain, &creator_did).await?;
 
     // Parse assignee DID if provided
     let assignee: Option<Did> = if let Some(ref assignee_str) = req.assignee {
@@ -2154,9 +2187,19 @@ pub async fn update_action_item(
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "gov:write")?;
 
+    let claims = get_claims(&http_req).ok_or_else(|| {
+        crate::error::GatewayError::AuthenticationFailed("No claims found".to_string())
+    })?;
+    let user_did: Did = claims.sub.parse().map_err(|e| {
+        crate::error::GatewayError::BadRequest(format!("Invalid DID in token: {e}"))
+    })?;
+
     let (domain_id, item_id) = path.into_inner();
     let domain = GovernanceDomainId(domain_id);
     let id = parse_action_item_id(&item_id)?;
+
+    // Verify domain membership
+    check_domain_membership(&gov_mgr, &domain, &user_did).await?;
 
     // Get existing item
     let mut item = gov_mgr
@@ -2211,9 +2254,19 @@ pub async fn delete_action_item(
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "gov:write")?;
 
+    let claims = get_claims(&http_req).ok_or_else(|| {
+        crate::error::GatewayError::AuthenticationFailed("No claims found".to_string())
+    })?;
+    let user_did: Did = claims.sub.parse().map_err(|e| {
+        crate::error::GatewayError::BadRequest(format!("Invalid DID in token: {e}"))
+    })?;
+
     let (domain_id, item_id) = path.into_inner();
     let domain = GovernanceDomainId(domain_id);
     let id = parse_action_item_id(&item_id)?;
+
+    // Verify domain membership
+    check_domain_membership(&gov_mgr, &domain, &user_did).await?;
 
     let deleted = gov_mgr
         .delete_action_item(&domain, &id)
@@ -2250,6 +2303,9 @@ pub async fn add_action_item_note(
     let domain = GovernanceDomainId(domain_id);
     let id = parse_action_item_id(&item_id)?;
 
+    // Verify domain membership
+    check_domain_membership(&gov_mgr, &domain, &author_did).await?;
+
     let item = gov_mgr
         .add_action_item_note(&domain, &id, author_did, req.content.clone())
         .map_err(|e| crate::error::GatewayError::InternalError(e.to_string()))?;
@@ -2257,7 +2313,7 @@ pub async fn add_action_item_note(
     Ok(HttpResponse::Ok().json(action_item_to_response(&item)))
 }
 
-/// PATCH /gov/domains/{domain_id}/action-items/{item_id}/status - Update action item status
+/// PUT /gov/domains/{domain_id}/action-items/{item_id}/status - Update action item status
 #[put("/domains/{domain_id}/action-items/{item_id}/status")]
 pub async fn update_action_item_status(
     http_req: HttpRequest,
@@ -2267,9 +2323,19 @@ pub async fn update_action_item_status(
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "gov:write")?;
 
+    let claims = get_claims(&http_req).ok_or_else(|| {
+        crate::error::GatewayError::AuthenticationFailed("No claims found".to_string())
+    })?;
+    let user_did: Did = claims.sub.parse().map_err(|e| {
+        crate::error::GatewayError::BadRequest(format!("Invalid DID in token: {e}"))
+    })?;
+
     let (domain_id, item_id) = path.into_inner();
     let domain = GovernanceDomainId(domain_id);
     let id = parse_action_item_id(&item_id)?;
+
+    // Verify domain membership
+    check_domain_membership(&gov_mgr, &domain, &user_did).await?;
 
     let status = parse_status(&req.status)?;
 

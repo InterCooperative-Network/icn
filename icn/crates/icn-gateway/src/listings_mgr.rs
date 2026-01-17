@@ -375,12 +375,20 @@ impl InMemoryListingsStore {
         Ok(result)
     }
 
-    /// Delete a listing
+    /// Delete a listing and its associated interests
     pub fn delete(&self, id: &ListingId) -> Result<bool> {
         let mut listings = self
             .listings
             .write()
             .map_err(|_| anyhow::anyhow!("Listings storage lock poisoned"))?;
+
+        // Also clean up any associated interests to prevent orphaned data
+        let mut interests = self
+            .interests
+            .write()
+            .map_err(|_| anyhow::anyhow!("Interests storage lock poisoned"))?;
+        interests.remove(id);
+
         Ok(listings.remove(id).is_some())
     }
 

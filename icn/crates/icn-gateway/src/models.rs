@@ -819,9 +819,6 @@ pub struct CreateListingRequest {
     /// Optional tags for discoverability
     #[serde(default)]
     pub tags: Vec<String>,
-    /// Optional location info
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub location: Option<String>,
 }
 
 fn default_visibility() -> String {
@@ -855,9 +852,6 @@ pub struct UpdateListingRequest {
     /// Updated tags
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tags: Option<Vec<String>>,
-    /// Updated location
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub location: Option<String>,
 }
 
 /// Request to express interest in a listing
@@ -904,9 +898,6 @@ pub struct ListingResponse {
     pub expires_at: Option<u64>,
     /// Tags
     pub tags: Vec<String>,
-    /// Location
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub location: Option<String>,
     /// Number of interests expressed
     pub interest_count: usize,
 }

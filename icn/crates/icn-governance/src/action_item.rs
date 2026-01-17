@@ -154,12 +154,7 @@ pub struct ActionItem {
 
 impl ActionItem {
     /// Create a new action item
-    pub fn new(
-        domain_id: GovernanceDomainId,
-        title: String,
-        created_by: Did,
-        now: u64,
-    ) -> Self {
+    pub fn new(domain_id: GovernanceDomainId, title: String, created_by: Did, now: u64) -> Self {
         Self {
             id: ActionItemId::new(),
             domain_id,
@@ -181,10 +176,11 @@ impl ActionItem {
 
     /// Check if this item is overdue
     pub fn is_overdue(&self, now: u64) -> bool {
-        if self.status == ActionItemStatus::Completed || self.status == ActionItemStatus::Cancelled {
+        if self.status == ActionItemStatus::Completed || self.status == ActionItemStatus::Cancelled
+        {
             return false;
         }
-        self.due_date.map_or(false, |due| now > due)
+        self.due_date.is_some_and(|due| now > due)
     }
 
     /// Check if this item is open (not completed or cancelled)
@@ -495,7 +491,11 @@ impl ActionItemStore {
     }
 
     /// Count action items matching filter
-    pub fn count(&self, domain_id: &GovernanceDomainId, filter: &ActionItemFilter) -> Result<usize> {
+    pub fn count(
+        &self,
+        domain_id: &GovernanceDomainId,
+        filter: &ActionItemFilter,
+    ) -> Result<usize> {
         self.backend.count(domain_id, filter)
     }
 }
@@ -530,12 +530,8 @@ mod tests {
 
     #[test]
     fn test_overdue_detection() {
-        let mut item = ActionItem::new(
-            test_domain(),
-            "Submit report".to_string(),
-            test_did(),
-            1000,
-        );
+        let mut item =
+            ActionItem::new(test_domain(), "Submit report".to_string(), test_did(), 1000);
 
         // No due date - not overdue
         assert!(!item.is_overdue(2000));
@@ -552,12 +548,7 @@ mod tests {
 
     #[test]
     fn test_filter_matches() {
-        let mut item = ActionItem::new(
-            test_domain(),
-            "Test item".to_string(),
-            test_did(),
-            1000,
-        );
+        let mut item = ActionItem::new(test_domain(), "Test item".to_string(), test_did(), 1000);
         item.assignee = Some(test_did());
         item.priority = ActionItemPriority::High;
         item.tags = vec!["budget".to_string()];
@@ -601,12 +592,7 @@ mod tests {
         let domain = test_domain();
 
         // Create and save
-        let item = ActionItem::new(
-            domain.clone(),
-            "Test task".to_string(),
-            test_did(),
-            1000,
-        );
+        let item = ActionItem::new(domain.clone(), "Test task".to_string(), test_did(), 1000);
         let item_id = item.id.clone();
 
         store.save(&item).expect("save should succeed");
@@ -629,7 +615,9 @@ mod tests {
         assert_eq!(count, 1);
 
         // Delete
-        let deleted = store.delete(&domain, &item_id).expect("delete should succeed");
+        let deleted = store
+            .delete(&domain, &item_id)
+            .expect("delete should succeed");
         assert!(deleted);
 
         let retrieved = store.get(&domain, &item_id).expect("get should succeed");
