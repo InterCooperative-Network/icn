@@ -31,6 +31,8 @@ const MAX_PHOTOS: usize = 10;
 const MAX_PHOTO_URL_LENGTH: usize = 500;
 const MAX_TAGS: usize = 15;
 const MAX_TAG_LENGTH: usize = 50;
+const MAX_INTEREST_MESSAGE_LENGTH: usize = 2000;
+const MAX_INTEREST_OFFER_LENGTH: usize = 1000;
 
 // ============================================================================
 // Validation Functions
@@ -706,6 +708,27 @@ pub async fn express_interest(
         return Err(GatewayError::BadRequest(
             "Cannot express interest in your own listing".to_string(),
         ));
+    }
+
+    // Validate interest message
+    if req.message.is_empty() {
+        return Err(GatewayError::BadRequest(
+            "Interest message cannot be empty".to_string(),
+        ));
+    }
+    if req.message.len() > MAX_INTEREST_MESSAGE_LENGTH {
+        return Err(GatewayError::BadRequest(format!(
+            "Interest message exceeds maximum length of {MAX_INTEREST_MESSAGE_LENGTH} characters"
+        )));
+    }
+
+    // Validate offer if provided
+    if let Some(ref offer) = req.offer {
+        if offer.len() > MAX_INTEREST_OFFER_LENGTH {
+            return Err(GatewayError::BadRequest(format!(
+                "Offer description exceeds maximum length of {MAX_INTEREST_OFFER_LENGTH} characters"
+            )));
+        }
     }
 
     // Express interest through the manager
