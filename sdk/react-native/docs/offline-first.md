@@ -69,6 +69,38 @@ console.log(`Queued payment with ID: ${operationId}`);
 | `proposal` | `{ title, description, coopId }` | Create proposal |
 | `trust_attestation` | `{ targetDid, score }` | Trust attestation |
 
+### Operation Data Types
+
+Define type-safe interfaces for operation data:
+
+```typescript
+// Type definitions for operation data
+interface PaymentData {
+  from: string;
+  to: string;
+  amount: number;
+  memo?: string;
+  coopId: string;
+}
+
+interface VoteData {
+  proposalId: string;
+  vote: 'yes' | 'no' | 'abstain';
+  coopId: string;
+}
+
+interface ProposalData {
+  title: string;
+  description: string;
+  coopId: string;
+}
+
+interface TrustData {
+  targetDid: string;
+  score: number;
+}
+```
+
 ### Processing the Queue
 
 Process queued operations when network becomes available:
@@ -77,7 +109,7 @@ Process queued operations when network becomes available:
 // Define executor for each operation type
 async function executeOperation(op: QueuedOperation): Promise<void> {
   switch (op.type) {
-    case 'payment':
+    case 'payment': {
       const paymentData = op.data as PaymentData;
       await client.payments.create(
         paymentData.coopId,
@@ -87,8 +119,9 @@ async function executeOperation(op: QueuedOperation): Promise<void> {
         paymentData.memo
       );
       break;
+    }
 
-    case 'vote':
+    case 'vote': {
       const voteData = op.data as VoteData;
       await client.governance.vote(
         voteData.coopId,
@@ -96,8 +129,9 @@ async function executeOperation(op: QueuedOperation): Promise<void> {
         voteData.vote
       );
       break;
+    }
 
-    case 'proposal':
+    case 'proposal': {
       const proposalData = op.data as ProposalData;
       await client.governance.createProposal(
         proposalData.coopId,
@@ -105,11 +139,13 @@ async function executeOperation(op: QueuedOperation): Promise<void> {
         proposalData.description
       );
       break;
+    }
 
-    case 'trust_attestation':
+    case 'trust_attestation': {
       const trustData = op.data as TrustData;
       await client.trust.attest(trustData.targetDid, trustData.score);
       break;
+    }
 
     default:
       throw new Error(`Unknown operation type: ${op.type}`);
@@ -244,24 +280,16 @@ When syncing queued operations, conflicts can occur if the server state has chan
 ### Handling Conflicts
 
 ```typescript
-async function executeOperation(op: QueuedOperation): Promise<void> {
-  try {
-    // ... execute operation
-  } catch (error) {
-    if (isConflictError(error)) {
-      // Check if we should retry or fail permanently
-      if (isRetryableConflict(error)) {
-        throw error; // Will retry with backoff
-      } else {
-        // Non-recoverable conflict - mark as failed with explanation
-        op.error = getConflictMessage(error);
-        throw new PermanentError(op.error);
-      }
-    }
-    throw error;
-  }
+// Check if an error represents a conflict (vs network/server issue)
+function isConflictError(error: Error): boolean {
+  return error.message.includes('insufficient balance') ||
+         error.message.includes('already voted') ||
+         error.message.includes('not found') ||
+         error.message.includes('expired') ||
+         error.message.includes('credit limit');
 }
 
+// Check if a conflict can be resolved by retrying
 function isRetryableConflict(error: Error): boolean {
   // Retryable: network issues, temporary server errors
   return error.message.includes('network') ||
@@ -269,15 +297,36 @@ function isRetryableConflict(error: Error): boolean {
          error.message.includes('503');
 }
 
+// Get user-friendly error message
 function getConflictMessage(error: Error): string {
-  // User-friendly messages
   if (error.message.includes('insufficient balance')) {
     return 'Not enough balance to complete this payment';
   }
   if (error.message.includes('already voted')) {
     return 'You have already voted on this proposal';
   }
+  if (error.message.includes('expired')) {
+    return 'The voting period has ended';
+  }
   return 'This operation could not be completed';
+}
+
+// Enhanced executor with conflict handling
+async function executeOperationWithConflictHandling(op: QueuedOperation): Promise<void> {
+  try {
+    await executeOperation(op);
+  } catch (error) {
+    if (isConflictError(error as Error)) {
+      if (isRetryableConflict(error as Error)) {
+        throw error; // Will retry with backoff
+      } else {
+        // Non-recoverable conflict - mark as failed
+        // The error will be caught by processQueue and status updated to 'failed'
+        throw new Error(getConflictMessage(error as Error));
+      }
+    }
+    throw error;
+  }
 }
 ```
 
@@ -392,10 +441,18 @@ async function logout() {
 
 ## Example: Complete Offline Payment Flow
 
+The following example demonstrates a complete offline-capable payment flow. Helper functions (`showSuccess`, `showInfo`, `showError`, `isNetworkError`) and variables (`coopId`, `userDid`, `client`, `queueManager`) are assumed to be defined elsewhere in your application.
+
 ```typescript
 import { useState, useEffect } from 'react';
 import { QueueManager, ICNClient } from '@icn/react-native-sdk';
 import NetInfo from '@react-native-community/netinfo';
+
+// Helper functions (implement based on your UI framework)
+// function showSuccess(msg: string): void { ... }
+// function showInfo(msg: string): void { ... }
+// function showError(msg: string): void { ... }
+// function isNetworkError(error: unknown): boolean { ... }
 
 function PaymentScreen() {
   const [isOnline, setIsOnline] = useState(true);
