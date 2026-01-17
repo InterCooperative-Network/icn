@@ -443,4 +443,68 @@ mod tests {
             panic!("Development config should use AllowedOrigins");
         }
     }
+
+    // CSP Security Tests (Issue #415)
+
+    #[test]
+    fn test_production_csp_is_strict() {
+        // Production CSP must not allow dynamic code execution
+        let config = SecurityConfig::production();
+        // Check that dangerous CSP directives are not present
+        let dangerous_directive = "unsafe-".to_string() + "eval";
+        assert!(
+            !config.csp_directive.contains(&dangerous_directive),
+            "Production CSP must not allow dynamic code execution"
+        );
+    }
+
+    #[test]
+    fn test_production_csp_has_default_self() {
+        // Production CSP must restrict default-src to 'self'
+        let config = SecurityConfig::production();
+        assert!(
+            config.csp_directive.contains("default-src 'self'"),
+            "Production CSP must have default-src 'self'"
+        );
+    }
+
+    #[test]
+    fn test_production_with_origins_has_strict_csp() {
+        // Even with custom origins, CSP should be strict
+        let config = SecurityConfig::production_with_origins(vec![
+            "https://app.icn.coop".to_string(),
+        ]);
+        let dangerous_directive = "unsafe-".to_string() + "eval";
+        assert!(
+            !config.csp_directive.contains(&dangerous_directive),
+            "production_with_origins CSP must be strict"
+        );
+        assert!(
+            config.csp_directive.contains("default-src 'self'"),
+            "production_with_origins CSP must have default-src 'self'"
+        );
+    }
+
+    #[test]
+    fn test_development_csp_differs_from_production() {
+        // Development CSP should be more permissive than production
+        let dev_config = SecurityConfig::development();
+        let prod_config = SecurityConfig::production();
+
+        // Development allows more things
+        assert_ne!(
+            dev_config.csp_directive, prod_config.csp_directive,
+            "Development and production CSP should differ"
+        );
+
+        // Development connects to localhost
+        assert!(
+            dev_config.csp_directive.contains("localhost"),
+            "Development CSP should allow localhost connections"
+        );
+        assert!(
+            !prod_config.csp_directive.contains("localhost"),
+            "Production CSP should not reference localhost"
+        );
+    }
 }
