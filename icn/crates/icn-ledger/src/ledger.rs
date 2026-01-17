@@ -10,12 +10,13 @@
 //!
 //! ```text
 //! JournalEntry {
-//!     id: ContentHash,           // SHA-256 hash of canonical serialization
-//!     timestamp: u64,            // Local timestamp (not consensus)
-//!     author: Did,               // Creator's decentralized identifier
-//!     accounts: Vec<AccountDelta>, // Debits and credits
-//!     parents: Vec<ContentHash>, // Links to parent entries (DAG edges)
-//!     signature: Signature,      // Ed25519 signature by author
+//!     id: Option<ContentHash>,      // SHA-256 hash of canonical serialization (set during entry creation)
+//!     timestamp: u64,               // Local timestamp (not consensus)
+//!     author: Did,                  // Creator's decentralized identifier
+//!     accounts: Vec<AccountDelta>,  // Debits and credits
+//!     parents: Vec<ContentHash>,    // Links to parent entries (DAG edges)
+//!     contract_ref: Option<ContentHash>, // Optional reference to related contract
+//!     signature: Option<Signature>, // Ed25519 signature by author (set by caller after building)
 //! }
 //! ```
 //!
@@ -35,12 +36,13 @@
 //! ### 3. Signature Validity
 //! - Every entry must have a valid Ed25519 signature from author
 //! - Signature covers the canonical hash (excluding signature field)
-//! - Enforced by: `validate_signature()` before append
+//! - Enforced by: entry validation logic (e.g. `validate_witness_signatures()` for
+//!   witnessed entries and `validate_entry()` before append)
 //!
 //! ### 4. Parent Existence
 //! - All parent hashes must reference existing entries in the DAG
 //! - Genesis entries have empty parents vector
-//! - Enforced by: `validate_parents()` checks parent existence
+//! - Enforced by: parent existence checks in `validate_entry()` and during append
 //!
 //! ### 5. Hash Integrity
 //! - Entry hash is deterministically computed from canonical serialization
@@ -157,15 +159,17 @@
 //!
 //! | Reason | Description |
 //! |--------|-------------|
+//! | `InvariantViolation` | Ledger invariant violated (e.g., unbalanced entry, double-entry violation) |
+//! | `ConflictingTimestamp` | Timestamp conflicts with existing ledger ordering rules |
 //! | `InvalidSignature` | Signature verification failed |
-//! | `DoubleEntryViolation` | Debits don't equal credits |
+//! | `ExceedsCreditLimit` | Would exceed member's credit limit according to credit policy |
+//! | `ForkConflict` | Conflicts with an alternative ledger history (fork) |
+//! | `CharterViolation` | Violates cooperative charter or governance rules |
+//! | `WitnessValidationFailed` | Witness signatures or attestations failed validation |
 //! | `InsufficientWitnesses` | Missing required witness signatures |
-//! | `CreditLimitExceeded` | Would exceed member's credit limit |
-//! | `LowTrust` | Author below trust threshold |
-//! | `MissingParents` | Parent entries not found |
 //!
 //! Quarantined entries can be reviewed and potentially accepted after
-//! the underlying issue is resolved (e.g., missing parents arrive).
+//! the underlying issue is resolved (e.g., fork resolved, invariants restored).
 //!
 //! ## Performance Considerations
 //!
