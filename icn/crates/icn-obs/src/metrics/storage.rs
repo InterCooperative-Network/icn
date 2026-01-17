@@ -30,6 +30,23 @@ pub fn init_descriptions() {
         "icn_storage_operations_total",
         "Total storage operations by type"
     );
+    // Maintenance metrics
+    describe_counter!(
+        "icn_storage_maintenance_runs_total",
+        "Total number of maintenance runs"
+    );
+    describe_histogram!(
+        "icn_storage_maintenance_duration_seconds",
+        "Duration of maintenance operations in seconds"
+    );
+    describe_counter!(
+        "icn_storage_maintenance_space_reclaimed_bytes",
+        "Total bytes reclaimed by maintenance"
+    );
+    describe_counter!(
+        "icn_storage_maintenance_errors_total",
+        "Total number of maintenance errors"
+    );
 }
 
 /// Set the current storage size in bytes
@@ -84,4 +101,26 @@ pub fn delete_inc() {
 /// Record a scan operation
 pub fn scan_inc() {
     operations_inc("scan");
+}
+
+// Maintenance metrics
+
+/// Increment maintenance runs counter
+pub fn maintenance_runs_inc() {
+    counter!("icn_storage_maintenance_runs_total").increment(1);
+}
+
+/// Record maintenance duration
+pub fn maintenance_duration_record(seconds: f64) {
+    histogram!("icn_storage_maintenance_duration_seconds").record(seconds);
+}
+
+/// Add to space reclaimed counter
+pub fn maintenance_space_reclaimed_add(bytes: u64) {
+    counter!("icn_storage_maintenance_space_reclaimed_bytes").increment(bytes);
+}
+
+/// Increment maintenance errors counter
+pub fn maintenance_errors_inc() {
+    counter!("icn_storage_maintenance_errors_total").increment(1);
 }
