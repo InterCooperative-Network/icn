@@ -501,6 +501,47 @@ let rate_limiter = Arc::new(RateLimiter::new(config));
 
 **Note**: Current implementation requires modifying `NetworkActor::spawn()` to accept custom config. This is a future enhancement opportunity.
 
+### Witness Signatures for Material Transactions
+
+Witness signatures provide Byzantine fault tolerance by requiring multiple parties to co-sign material transactions. This prevents double-spending and provides additional security for high-value transfers.
+
+**Configuration** (`[ledger.witness]` in TOML):
+
+```toml
+[ledger.witness]
+# Witness policy: "none", "counterparty", "quorum", "all_parties"
+# Default is "none". Example shows recommended production config:
+default_policy = "counterparty"
+
+# Only require witnesses for transactions above this value
+threshold = 1000
+
+# Timeout for collecting signatures (seconds)
+collection_timeout_secs = 300
+
+# For quorum policy only:
+# quorum_required = 2
+# quorum_witnesses = ["did:icn:abc123", "did:icn:def456", "did:icn:ghi789"]
+```
+
+**Policies**:
+| Policy | Description |
+|--------|-------------|
+| `none` | No witness signatures required (default) |
+| `counterparty` | The other party in the transaction must co-sign |
+| `quorum` | N-of-M designated witnesses must sign |
+| `all_parties` | All transaction participants must sign |
+
+**Metrics**:
+- `icn_ledger_witnessed_entries_accepted_total`: Witnessed entries successfully processed
+- `icn_ledger_witnessed_entries_rejected_total{reason}`: Rejected entries by reason (invalid_signature, insufficient_signatures)
+- `icn_ledger_witness_signature_count`: Histogram of signatures per witnessed entry
+
+**Use Cases**:
+1. **High-value transfers**: Set `threshold = 10000` with `counterparty` policy
+2. **Multi-sig treasury**: Use `quorum` policy with 2-of-3 trusted witnesses
+3. **Full consensus**: Use `all_parties` for unanimous agreement requirements
+
 ---
 
 ## Monitoring

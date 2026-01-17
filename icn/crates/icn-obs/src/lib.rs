@@ -103,6 +103,7 @@ pub fn init_metrics() -> Result<()> {
     metrics::init_descriptions();
     // Initialize new submodule metrics descriptions
     metrics::gateway::init_descriptions();
+    metrics::ledger::init_descriptions();
     metrics::network::init_descriptions();
     metrics::rpc::init_descriptions();
     metrics::storage::init_descriptions();
