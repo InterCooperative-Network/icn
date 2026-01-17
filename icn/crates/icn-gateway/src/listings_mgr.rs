@@ -8,7 +8,7 @@ use anyhow::Result;
 use icn_identity::Did;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::RwLock;
+use std::sync::{Arc, RwLock};
 use uuid::Uuid;
 
 /// Unique listing identifier
@@ -412,15 +412,163 @@ impl InMemoryListingsStore {
     }
 }
 
+/// Sled-backed persistent listings store
+pub struct SledListingsStore {
+    db: Arc<sled::Db>,
+}
+
+impl SledListingsStore {
+    /// Create a new Sled-backed listings store
+    pub fn new(db: Arc<sled::Db>) -> Self {
+        Self { db }
+    }
+
+    /// Save a listing
+    pub fn save(&self, listing: &Listing) -> Result<()> {
+        let key = format!("listing:{}", listing.id.0);
+        let value = icn_encoding::encode_versioned(listing)?;
+        self.db.insert(key.as_bytes(), value)?;
+        Ok(())
+    }
+
+    /// Get a listing by ID
+    pub fn get(&self, id: &ListingId) -> Result<Option<Listing>> {
+        let key = format!("listing:{}", id.0);
+        match self.db.get(key.as_bytes())? {
+            Some(value) => Ok(Some(icn_encoding::decode_versioned(&value)?)),
+            None => Ok(None),
+        }
+    }
+
+    /// List all listings matching a filter
+    pub fn list(&self, filter: &ListingFilter) -> Result<Vec<Listing>> {
+        let prefix = b"listing:";
+        let mut result = Vec::new();
+
+        for item in self.db.scan_prefix(prefix) {
+            let (_, value) = item?;
+            let listing: Listing = icn_encoding::decode_versioned(&value)?;
+            if filter.matches(&listing) {
+                result.push(listing);
+            }
+        }
+
+        // Sort by created_at descending (newest first)
+        result.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+
+        Ok(result)
+    }
+
+    /// Delete a listing and its associated interests
+    pub fn delete(&self, id: &ListingId) -> Result<bool> {
+        let listing_key = format!("listing:{}", id.0);
+        let existed = self.db.remove(listing_key.as_bytes())?.is_some();
+
+        // Clean up associated interests
+        let interest_prefix = format!("interest:{}:", id.0);
+        for item in self.db.scan_prefix(interest_prefix.as_bytes()) {
+            let (key, _) = item?;
+            self.db.remove(key)?;
+        }
+
+        Ok(existed)
+    }
+
+    /// Add interest in a listing
+    pub fn add_interest(&self, interest: &ListingInterest) -> Result<()> {
+        let key = format!("interest:{}:{}", interest.listing_id.0, interest.id);
+        let value = icn_encoding::encode_versioned(interest)?;
+        self.db.insert(key.as_bytes(), value)?;
+        Ok(())
+    }
+
+    /// Get interests for a listing
+    pub fn get_interests(&self, listing_id: &ListingId) -> Result<Vec<ListingInterest>> {
+        let prefix = format!("interest:{}:", listing_id.0);
+        let mut interests = Vec::new();
+
+        for item in self.db.scan_prefix(prefix.as_bytes()) {
+            let (_, value) = item?;
+            let interest: ListingInterest = icn_encoding::decode_versioned(&value)?;
+            interests.push(interest);
+        }
+
+        // Sort by created_at ascending
+        interests.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+
+        Ok(interests)
+    }
+}
+
+/// Listings store backend trait
+pub trait ListingsStoreBackend: Send + Sync {
+    fn save(&self, listing: &Listing) -> Result<()>;
+    fn get(&self, id: &ListingId) -> Result<Option<Listing>>;
+    fn list(&self, filter: &ListingFilter) -> Result<Vec<Listing>>;
+    fn delete(&self, id: &ListingId) -> Result<bool>;
+    fn add_interest(&self, interest: &ListingInterest) -> Result<()>;
+    fn get_interests(&self, listing_id: &ListingId) -> Result<Vec<ListingInterest>>;
+}
+
+impl ListingsStoreBackend for InMemoryListingsStore {
+    fn save(&self, listing: &Listing) -> Result<()> {
+        InMemoryListingsStore::save(self, listing)
+    }
+    fn get(&self, id: &ListingId) -> Result<Option<Listing>> {
+        InMemoryListingsStore::get(self, id)
+    }
+    fn list(&self, filter: &ListingFilter) -> Result<Vec<Listing>> {
+        InMemoryListingsStore::list(self, filter)
+    }
+    fn delete(&self, id: &ListingId) -> Result<bool> {
+        InMemoryListingsStore::delete(self, id)
+    }
+    fn add_interest(&self, interest: &ListingInterest) -> Result<()> {
+        InMemoryListingsStore::add_interest(self, interest)
+    }
+    fn get_interests(&self, listing_id: &ListingId) -> Result<Vec<ListingInterest>> {
+        InMemoryListingsStore::get_interests(self, listing_id)
+    }
+}
+
+impl ListingsStoreBackend for SledListingsStore {
+    fn save(&self, listing: &Listing) -> Result<()> {
+        SledListingsStore::save(self, listing)
+    }
+    fn get(&self, id: &ListingId) -> Result<Option<Listing>> {
+        SledListingsStore::get(self, id)
+    }
+    fn list(&self, filter: &ListingFilter) -> Result<Vec<Listing>> {
+        SledListingsStore::list(self, filter)
+    }
+    fn delete(&self, id: &ListingId) -> Result<bool> {
+        SledListingsStore::delete(self, id)
+    }
+    fn add_interest(&self, interest: &ListingInterest) -> Result<()> {
+        SledListingsStore::add_interest(self, interest)
+    }
+    fn get_interests(&self, listing_id: &ListingId) -> Result<Vec<ListingInterest>> {
+        SledListingsStore::get_interests(self, listing_id)
+    }
+}
+
 /// Listings manager for the gateway
 pub struct ListingsManager {
-    store: InMemoryListingsStore,
+    store: Box<dyn ListingsStoreBackend>,
 }
 
 impl ListingsManager {
+    /// Create a new listings manager with in-memory storage (for testing)
     pub fn new() -> Self {
         Self {
-            store: InMemoryListingsStore::new(),
+            store: Box::new(InMemoryListingsStore::new()),
+        }
+    }
+
+    /// Create a new listings manager with Sled-backed persistent storage
+    pub fn with_sled(db: Arc<sled::Db>) -> Self {
+        Self {
+            store: Box::new(SledListingsStore::new(db)),
         }
     }
 

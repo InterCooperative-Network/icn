@@ -835,7 +835,7 @@ pub async fn get_my_listings(
     Ok(HttpResponse::Ok().json(responses))
 }
 
-/// Configure listing routes
+/// Configure listing routes (creates its own /listings scope - for standalone use)
 pub fn configure(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/listings")
@@ -850,6 +850,20 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .service(express_interest)
             .service(get_interests),
     );
+}
+
+/// Configure listing routes without creating a scope (for use with external scope wrapping)
+pub fn configure_routes(cfg: &mut web::ServiceConfig) {
+    // Note: /my must come before /{id} to avoid being captured as an ID
+    cfg.service(get_my_listings)
+        .service(create_listing)
+        .service(list_listings)
+        .service(get_listing)
+        .service(update_listing)
+        .service(delete_listing)
+        .service(update_listing_status)
+        .service(express_interest)
+        .service(get_interests);
 }
 
 #[cfg(test)]
