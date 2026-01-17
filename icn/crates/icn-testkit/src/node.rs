@@ -305,6 +305,8 @@ impl TestNode {
             None, // No TURN config
             None, // No misbehavior detector
             None, // No store
+            None, // No personhood store (Sybil resistance)
+            None, // No anchor rate config
         )
         .await?;
 

@@ -336,6 +336,8 @@ impl RecoveryTestNode {
             None, // No TURN config
             None, // No misbehavior detector for tests
             None, // No store for tests
+            None, // personhood_store
+            None, // anchor_rate_config
         )
         .await?;
 

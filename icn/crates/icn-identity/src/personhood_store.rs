@@ -39,6 +39,23 @@ pub trait PersonhoodStore: Send + Sync {
     fn scan(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>>;
 }
 
+/// High-level trait for personhood anchor lookups.
+///
+/// This trait provides a simpler interface for components that only need
+/// to look up personhood anchors (e.g., rate limiting for Sybil resistance).
+/// Unlike `PersonhoodAnchorStore<S>`, this trait is object-safe and can be
+/// used as `dyn PersonhoodStoreTrait`.
+pub trait PersonhoodStoreTrait: Send + Sync {
+    /// Get a PersonhoodAnchor by its anchor ID
+    fn get_anchor(&self, anchor_id: &[u8; 32]) -> Result<Option<PersonhoodAnchor>>;
+
+    /// Get a PersonhoodAnchor by the DID associated with it
+    fn get_anchor_by_did(&self, did: &Did) -> Result<Option<PersonhoodAnchor>>;
+
+    /// Get just the anchor ID for a DID (faster than full anchor lookup)
+    fn get_anchor_id_for_did(&self, did: &Did) -> Result<Option<[u8; 32]>>;
+}
+
 /// In-memory store implementation for testing
 #[derive(Default)]
 pub struct InMemoryPersonhoodStore {
@@ -276,6 +293,46 @@ impl<S: PersonhoodStore> PersonhoodAnchorStore<S> {
             }
         }
         Ok(None)
+    }
+
+    /// Link an additional DID to an existing anchor
+    ///
+    /// This is used when a person has multiple devices or rotates keys.
+    /// All linked DIDs will resolve to the same PersonhoodAnchor for
+    /// rate limiting and identity purposes.
+    ///
+    /// Returns error if the anchor doesn't exist.
+    pub fn link_did(&self, anchor_id: &[u8; 32], did: &Did) -> Result<()> {
+        // Verify anchor exists
+        if self.get(anchor_id)?.is_none() {
+            anyhow::bail!("Cannot link DID to non-existent anchor");
+        }
+
+        // Create the DID index entry pointing to this anchor
+        let did_key = Self::did_index_key(did);
+        self.store.put(&did_key, anchor_id)?;
+
+        debug!(
+            did = %did,
+            anchor_id = ?anchor_id,
+            "Linked DID to PersonhoodAnchor"
+        );
+        Ok(())
+    }
+
+    /// Unlink a DID from its anchor
+    ///
+    /// Note: This does not delete the anchor itself, just the DID mapping.
+    /// The primary DID (from anchor.to_did()) should not be unlinked.
+    pub fn unlink_did(&self, did: &Did) -> Result<bool> {
+        let did_key = Self::did_index_key(did);
+        if self.store.get(&did_key)?.is_some() {
+            self.store.delete(&did_key)?;
+            debug!(did = %did, "Unlinked DID from PersonhoodAnchor");
+            Ok(true)
+        } else {
+            Ok(false)
+        }
     }
 
     /// Delete a PersonhoodAnchor
@@ -530,6 +587,30 @@ impl<S: PersonhoodStore> PersonhoodAnchorStore<S> {
                 poisoned.into_inner()
             })
             .clear();
+    }
+}
+
+// Implement PersonhoodStoreTrait for PersonhoodAnchorStore<S>
+impl<S: PersonhoodStore + 'static> PersonhoodStoreTrait for PersonhoodAnchorStore<S> {
+    fn get_anchor(&self, anchor_id: &[u8; 32]) -> Result<Option<PersonhoodAnchor>> {
+        self.get(anchor_id)
+    }
+
+    fn get_anchor_by_did(&self, did: &Did) -> Result<Option<PersonhoodAnchor>> {
+        self.get_by_did(did)
+    }
+
+    fn get_anchor_id_for_did(&self, did: &Did) -> Result<Option<[u8; 32]>> {
+        // Direct lookup in the DID index for efficiency
+        let did_key = Self::did_index_key(did);
+        if let Some(anchor_id_bytes) = self.store.get(&did_key)? {
+            if anchor_id_bytes.len() == 32 {
+                let mut anchor_id = [0u8; 32];
+                anchor_id.copy_from_slice(&anchor_id_bytes);
+                return Ok(Some(anchor_id));
+            }
+        }
+        Ok(None)
     }
 }
 

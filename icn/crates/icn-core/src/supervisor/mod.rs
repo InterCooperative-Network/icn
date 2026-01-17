@@ -495,6 +495,8 @@ impl Supervisor {
                 turn_config,
                 Some(misbehavior_detector.clone()), // Shared Byzantine fault detector
                 Some(network_store),                // Persistent store for replay protection
+                None, // Personhood store for Sybil resistance (TODO: wire from config)
+                None, // Anchor rate limit config (TODO: wire from config)
             )
             .await?;
 

@@ -58,7 +58,9 @@ pub use personhood::{
     POPMethod, PersonhoodAnchor, RecoverySignature, UniquenessAttestation, UniquenessProof,
     UniquenessProofType,
 };
-pub use personhood_store::{InMemoryPersonhoodStore, PersonhoodAnchorStore, PersonhoodStore};
+pub use personhood_store::{
+    InMemoryPersonhoodStore, PersonhoodAnchorStore, PersonhoodStore, PersonhoodStoreTrait,
+};
 pub use recovery::{
     RecoveryAttestation, RecoveryEvent, RecoveryMessage, RecoveryStatus, IDENTITY_RECOVERY_TOPIC,
 };
