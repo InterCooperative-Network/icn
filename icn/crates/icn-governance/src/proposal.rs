@@ -38,18 +38,19 @@
 //!     │         │  (terminal)  │ │  (terminal)  │ │  (terminal)  │   │
 //!     │         └──────────────┘ └──────────────┘ └──────────────┘   │
 //!     │                                                              │
-//!     │                      ┌───────────────────────────────────────┘
-//!     │                      │ cancel() / veto()
-//!     │                      │ (from Draft, Deliberation, or Open)
-//!     │                      ▼
-//!     │         ┌──────────────┐ ┌──────────────┐ ┌──────────────┐
-//!     │         │  Cancelled   │ │    Vetoed    │ │ ForceClosed  │
-//!     └────────▶│  (terminal)  │ │  (terminal)  │ │  (terminal)  │
-//!       cancel()└──────────────┘ └──────────────┘ └──────────────┘
-//!       veto()                                     ▲
-//!       force_close()                              │ force_close()
-//!       (from Deliberation)                        │ (from Deliberation/Open)
-//!                                                  └──────────────────────────
+//!     │
+//!     │  Emergency actions available from any non-terminal state:
+//!     │  ┌─────────────────────────────────────────────────────────────┐
+//!     │  │  cancel() → Cancelled    (from Draft, Deliberation, Open)  │
+//!     │  │  veto() → Vetoed         (from Draft, Deliberation, Open)  │
+//!     │  │  force_close() → ForceClosed  (from Deliberation, Open)    │
+//!     └──┴─────────────────────────────────────────────────────────────┘
+//!                      │                │               │
+//!                      ▼                ▼               ▼
+//!           ┌──────────────┐ ┌──────────────┐ ┌──────────────┐
+//!           │  Cancelled   │ │    Vetoed    │ │ ForceClosed  │
+//!           │  (terminal)  │ │  (terminal)  │ │  (terminal)  │
+//!           └──────────────┘ └──────────────┘ └──────────────┘
 //! ```
 //!
 //! ## State Descriptions
@@ -85,6 +86,11 @@
 //! | `Open` | `Cancelled` | `cancel()` | Proposer request |
 //! | `Open` | `Vetoed` | `veto()` | Emergency action |
 //! | `Open` | `ForceClosed` | `force_close()` | Emergency action |
+//!
+//! **Note:** The `cancel()`, `veto()`, and `force_close()` methods can be invoked
+//! from any non-terminal state (i.e., any state where `is_closed()` returns false).
+//! In the current lifecycle, the non-terminal states are `Draft`, `Deliberation`,
+//! and `Open`.
 //!
 //! ## Example Lifecycle
 //!
@@ -192,6 +198,11 @@
 //! - Emergency proposals requiring immediate action
 //! - Simple procedural matters
 //! - Time-sensitive decisions
+//!
+//! **Note:** This state machine does not define a dedicated amendment API for
+//! in-place modification of proposals during deliberation. Amendments are typically
+//! handled by cancelling and resubmitting a revised proposal, or via separate
+//! governance processes defined at the cooperative level.
 //!
 //! # Emergency Actions
 //!
