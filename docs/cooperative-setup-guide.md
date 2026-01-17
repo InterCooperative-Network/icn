@@ -49,8 +49,8 @@ The wizard will:
 For programmatic setup, use the Gateway REST API:
 
 ```bash
-# Get authentication token first
-icnctl auth login
+# Get JWT token for API access
+export TOKEN=$(icnctl auth token --gateway http://localhost:8080 --coop-id food-coop)
 
 # Create cooperative via API
 curl -X POST http://localhost:8080/v1/coops \
@@ -77,11 +77,15 @@ The charter is your cooperative's founding document, defining governance rules a
 ```bash
 # Create a charter for the cooperative
 icnctl charter create \
-  --org "food-coop" \
   --name "Downtown Food Cooperative Charter" \
-  --governance-model majority \
-  --quorum-percentage 50
+  --domain "coop:food-coop" \
+  --org-type cooperative \
+  --mission "Provide affordable local food to community members" \
+  --founders "did:icn:alice123,did:icn:bob456" \
+  --output food-coop-charter.json
 ```
+
+> **Note**: Governance rules (quorum, voting periods) are configured in the charter JSON template, not via CLI flags.
 
 ### Sign and Ratify
 
@@ -89,10 +93,10 @@ Founding members must sign the charter before it becomes active:
 
 ```bash
 # Each founder signs the charter
-icnctl charter sign food-coop-charter
+icnctl charter sign food-coop-charter --coop-id food-coop
 
 # Once enough signatures are collected, ratify the charter
-icnctl charter ratify food-coop-charter
+icnctl charter ratify food-coop-charter --coop-id food-coop
 ```
 
 ### View Charter Status
@@ -126,7 +130,7 @@ icnctl gov domain create \
 
 ```bash
 # Get JWT token for admin operations
-icnctl auth login
+export TOKEN=$(icnctl auth token --gateway http://localhost:8080 --coop-id food-coop)
 
 # Add a member via REST API
 curl -X POST http://localhost:8080/v1/coops/food-coop/members \
@@ -197,8 +201,11 @@ icnctl ledger head
 ### Test Ledger Operations
 
 ```bash
-# Check your balance
-icnctl ledger balance
+# Check a specific account balance (use your DID)
+icnctl ledger balance did:icn:alice123
+
+# With currency filter
+icnctl ledger balance did:icn:alice123 --currency hours
 
 # View recent transactions
 icnctl ledger history --limit 10
@@ -318,7 +325,7 @@ Ensure enough founding members have signed:
 icnctl charter show food-coop-charter
 
 # Have missing founders sign
-icnctl charter sign food-coop-charter
+icnctl charter sign food-coop-charter --coop-id food-coop
 ```
 
 ### "Domain not found" Error
@@ -334,11 +341,11 @@ icnctl gov domain create --domain-id "coop:food-coop"
 Ensure you have a valid JWT token:
 
 ```bash
-# Login to get a fresh token
-icnctl auth login
+# Get a fresh token
+export TOKEN=$(icnctl auth token --gateway http://localhost:8080 --coop-id food-coop)
 
-# Check authentication status
-icnctl auth status
+# Verify token is valid by making an API call
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/v1/health
 ```
 
 ---
