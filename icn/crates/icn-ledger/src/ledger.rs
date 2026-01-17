@@ -1,4 +1,192 @@
 //! Ledger implementation with storage
+//!
+//! # Merkle-DAG Structure
+//!
+//! The ICN ledger uses a Merkle-DAG (Directed Acyclic Graph) structure for
+//! double-entry mutual credit accounting. Each journal entry contains cryptographic
+//! links to its parent entries, forming an immutable audit trail.
+//!
+//! ## Entry Structure
+//!
+//! ```text
+//! JournalEntry {
+//!     id: Option<ContentHash>,      // SHA-256 hash of canonical serialization (set during entry creation)
+//!     timestamp: u64,               // Local timestamp (not consensus)
+//!     author: Did,                  // Creator's decentralized identifier
+//!     accounts: Vec<AccountDelta>,  // Debits and credits
+//!     parents: Vec<ContentHash>,    // Links to parent entries (DAG edges)
+//!     contract_ref: Option<ContentHash>, // Optional reference to related contract
+//!     signature: Option<Signature>, // Ed25519 signature by author (set by caller after building)
+//! }
+//! ```
+//!
+//! ## DAG Invariants
+//!
+//! The following invariants **MUST** be maintained for correctness:
+//!
+//! ### 1. Acyclicity
+//! - No entry may be its own ancestor (transitively via parents)
+//! - Enforced by: Parents must exist before child is created
+//!
+//! ### 2. Double-Entry Balance
+//! - Sum of all debits MUST equal sum of all credits within an entry
+//! - Each debit has a corresponding credit (no value creation/destruction)
+//! - Enforced by: `validate_double_entry()` before append
+//!
+//! ### 3. Signature Validity
+//! - Every entry must have a valid Ed25519 signature from author
+//! - Signature covers the canonical hash (excluding signature field)
+//! - Enforced by: entry validation logic (e.g. `validate_witness_signatures()` for
+//!   witnessed entries and `validate_entry()` before append)
+//!
+//! ### 4. Parent Existence
+//! - All parent hashes must reference existing entries in the DAG
+//! - Genesis entries have empty parents vector
+//! - Enforced by: parent existence checks in `validate_entry()` and during append
+//!
+//! ### 5. Hash Integrity
+//! - Entry hash is deterministically computed from canonical serialization
+//! - Hash changes if any field is modified (tamper detection)
+//! - Enforced by: `compute_hash()` on entry creation
+//!
+//! ## Fork Detection and Resolution
+//!
+//! A **fork** occurs when two entries reference the same parent(s) but have
+//! different content hashes. This happens during:
+//! - Network partitions (nodes create entries independently)
+//! - Concurrent operations (race conditions)
+//!
+//! ```text
+//!        [Parent P]
+//!         /     \
+//!   [Entry A]  [Entry B]   <- Fork: both reference P
+//! ```
+//!
+//! ### Detection
+//!
+//! The [`ForkDetector`] maintains a parent → children index:
+//! - When indexing entry E with parent P: `parent_index[P].push(E)`
+//! - Fork detected when: `parent_index[P].len() > 1`
+//!
+//! ### Resolution Strategies
+//!
+//! The [`ForkResolver`] supports multiple strategies:
+//!
+//! | Strategy | Selection Criteria | Best For |
+//! |----------|-------------------|----------|
+//! | `TimestampPreference` | Earlier timestamp wins | Simple coordination |
+//! | `TrustWeighted` | Higher trust author wins | Trust-based communities |
+//! | `MajoritySignatures` | More witness signatures wins | Multi-party transactions |
+//! | `Hybrid` (default) | Weighted combination (40% trust, 30% time, 30% sigs) | Production |
+//!
+//! **Note:** Hybrid weights shown are defaults; may be configurable per deployment.
+//!
+//! ### Resolution Process
+//!
+//! 1. Detect fork via `ForkDetector::detect_forks()`
+//! 2. Create `Fork` struct with both conflicting entries
+//! 3. Apply resolution strategy via `ForkResolver::resolve_fork()`
+//! 4. Winner becomes canonical, loser is quarantined or discarded
+//!
+//! ## Gossip Synchronization
+//!
+//! The ledger synchronizes across nodes via gossip protocol:
+//!
+//! ```text
+//! Node A                      Node B
+//!   |                            |
+//!   |-- NewEntry(hash, entry) -->|
+//!   |                            |-- validate_entry()
+//!   |                            |-- check_parents_exist()
+//!   |                            |-- if missing: RequestEntry -->
+//!   |<-- EntryResponse(entry) ---|
+//!   |                            |-- append_entry()
+//! ```
+//!
+//! ### Sync Message Types
+//!
+//! - `NewEntry`: Announce new entry to peers
+//! - `NewWitnessedEntry`: Entry with witness signatures (for material transactions)
+//! - `RequestEntry`: Request missing entry by hash
+//! - `EntryResponse`: Reply with requested entry
+//! - `RollbackNotification`: Governance-initiated rollback
+//!
+//! ### Merge Process
+//!
+//! When receiving entries from gossip:
+//!
+//! 1. **Validate**: Check signature, double-entry, trust requirements
+//! 2. **Check Parents**: Ensure all parents exist, request if missing
+//! 3. **Detect Forks**: Compare against existing entries with same parents
+//! 4. **Resolve**: Apply fork resolution strategy if needed
+//! 5. **Append or Quarantine**: Accept valid entries, quarantine violators
+//!
+//! The [`MergeDecision`] captures all outcomes (accepted, discarded, quarantined, conflicts).
+//!
+//! ## Valid vs Invalid States
+//!
+//! ### Valid DAG Example
+//!
+//! ```text
+//! [Genesis]                    // Empty parents
+//!     |
+//! [Entry A] ← parents: [Genesis]
+//!     |
+//! [Entry B] ← parents: [A]
+//!    / \
+//! [C]   [D] ← parents: [B]    // Valid: both reference B
+//!    \ /
+//!  [Entry E] ← parents: [C, D] // Valid: merges branches
+//! ```
+//!
+//! ### Invalid States (Prevented by Invariants)
+//!
+//! ```text
+//! // INVALID: Cycle
+//! [A] → [B] → [A]  // A is ancestor of itself
+//!
+//! // INVALID: Missing parent
+//! [A] → parents: [X]  // X doesn't exist
+//!
+//! // INVALID: Unbalanced entry
+//! [A] debit: 100, credit: 50  // debits ≠ credits
+//!
+//! // INVALID: Bad signature
+//! [A] signed by Bob, author: Alice  // signature mismatch
+//! ```
+//!
+//! ## Quarantine System
+//!
+//! Entries that violate invariants or policies are quarantined rather than rejected:
+//!
+//! | Reason | Description |
+//! |--------|-------------|
+//! | `InvariantViolation` | Ledger invariant violated (e.g., unbalanced entry, double-entry violation) |
+//! | `ConflictingTimestamp` | Timestamp conflicts with existing ledger ordering rules |
+//! | `InvalidSignature` | Signature verification failed |
+//! | `ExceedsCreditLimit` | Would exceed member's credit limit according to credit policy |
+//! | `ForkConflict` | Conflicts with an alternative ledger history (fork) |
+//! | `CharterViolation` | Violates cooperative charter or governance rules |
+//! | `WitnessValidationFailed` | Witness signatures or attestations failed validation |
+//! | `InsufficientWitnesses` | Missing required witness signatures |
+//!
+//! Quarantined entries can be reviewed and potentially accepted after
+//! the underlying issue is resolved (e.g., fork resolved, invariants restored).
+//! Use [`QuarantineStore::list()`] to retrieve entries for review.
+//!
+//! [`QuarantineStore::list()`]: crate::quarantine::QuarantineStore::list
+//!
+//! ## Performance Considerations
+//!
+//! - **Caching**: Balances cached in-memory, updated incrementally
+//! - **Indexing**: Timestamp index for efficient pagination
+//! - **Cleared Volume**: O(1) credit limit checks via pre-computed index
+//! - **Parent Index**: O(1) fork detection via hash map
+//! - **Trade-off**: Memory scales with DAG size; consider pruning for long-running nodes
+//!
+//! [`ForkDetector`]: crate::fork_resolution::ForkDetector
+//! [`ForkResolver`]: crate::fork_resolution::ForkResolver
+//! [`MergeDecision`]: crate::merge::MergeDecision
 
 use crate::balance::compute_all_balances;
 use crate::credit_policy::CreditPolicyManager;
