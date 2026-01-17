@@ -117,15 +117,16 @@ impl<'a> FuelEstimator<'a> {
                     .then(then_estimate.branch(else_estimate))
             }
 
-            Stmt::For {
-                iterable, body, ..
-            } => {
+            Stmt::For { iterable, body, .. } => {
                 let iter_estimate = self.estimate_expr(iterable);
                 let body_estimate = self.estimate_block(body);
 
                 // Loop iteration cost per iteration
-                let iteration_cost =
-                    FuelEstimate::new(FUEL_LOOP_ITERATION, FUEL_LOOP_ITERATION, FUEL_LOOP_ITERATION);
+                let iteration_cost = FuelEstimate::new(
+                    FUEL_LOOP_ITERATION,
+                    FUEL_LOOP_ITERATION,
+                    FUEL_LOOP_ITERATION,
+                );
                 let per_iteration = iteration_cost.then(body_estimate);
 
                 // Estimate: min 0 iterations, expected half of max, max is MAX_LOOP_ITERATIONS
@@ -155,10 +156,9 @@ impl<'a> FuelEstimator<'a> {
 
             Expr::FieldAccess { object, .. } => base.then(self.estimate_expr(object)),
 
-            Expr::BinOp { left, right, .. } => {
-                base.then(self.estimate_expr(left))
-                    .then(self.estimate_expr(right))
-            }
+            Expr::BinOp { left, right, .. } => base
+                .then(self.estimate_expr(left))
+                .then(self.estimate_expr(right)),
 
             Expr::UnOp { operand, .. } => base.then(self.estimate_expr(operand)),
 
@@ -451,8 +451,7 @@ mod tests {
         let capabilities = vec![Capability::WriteState {
             keys: vec!["counter".to_string()],
         }];
-        let context =
-            ExecutionContext::new(caller.clone(), 1234567890, 1000, capabilities, vec![]);
+        let context = ExecutionContext::new(caller.clone(), 1234567890, 1000, capabilities, vec![]);
 
         // Dry run execution
         let interpreter = Interpreter::dry_run(contract.clone(), state, context);

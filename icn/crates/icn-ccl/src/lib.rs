@@ -71,6 +71,7 @@ pub use disputes::{
     TOPIC_DISPUTES_RESOLVED,
 };
 pub use error::{CclError, Span};
+pub use fuel_estimator::{estimate_fuel, estimate_fuel_dry_run, FuelEstimator};
 pub use interpreter::Interpreter;
 pub use messages::{
     ContractDeploymentMessage, ContractExecutionRequest, ContractExecutionResponse,
@@ -85,10 +86,9 @@ pub use registry_actor::{
     TOPIC_CONTRACTS_REVOKE,
 };
 pub use runtime::{ContractInfo, ContractRuntime};
-pub use fuel_estimator::{estimate_fuel, estimate_fuel_dry_run, FuelEstimator};
 pub use types::{
-    Capability, ContractInstallation, ContractState, ExecutionContext, ExecutionResult,
-    FuelConfig, FuelEstimate, LedgerOperation, Value,
+    Capability, ContractInstallation, ContractState, ExecutionContext, ExecutionResult, FuelConfig,
+    FuelEstimate, LedgerOperation, Value,
 };
 
 #[cfg(test)]

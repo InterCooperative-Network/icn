@@ -493,11 +493,7 @@ impl FuelEstimate {
             minimum: self.minimum.saturating_add(other.minimum),
             expected: self.expected.saturating_add(other.expected),
             maximum: self.maximum.saturating_add(other.maximum),
-            warnings: self
-                .warnings
-                .into_iter()
-                .chain(other.warnings)
-                .collect(),
+            warnings: self.warnings.into_iter().chain(other.warnings).collect(),
         }
     }
 
@@ -507,11 +503,7 @@ impl FuelEstimate {
             minimum: self.minimum.min(other.minimum),
             expected: (self.expected + other.expected) / 2,
             maximum: self.maximum.max(other.maximum),
-            warnings: self
-                .warnings
-                .into_iter()
-                .chain(other.warnings)
-                .collect(),
+            warnings: self.warnings.into_iter().chain(other.warnings).collect(),
         }
     }
 
