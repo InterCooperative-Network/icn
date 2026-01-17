@@ -172,9 +172,9 @@
 //!
 //! Quarantined entries can be reviewed and potentially accepted after
 //! the underlying issue is resolved (e.g., fork resolved, invariants restored).
-//! Use [`QuarantineStore::get_quarantined()`] to retrieve entries for review.
+//! Use [`QuarantineStore::list()`] to retrieve entries for review.
 //!
-//! [`QuarantineStore::get_quarantined()`]: crate::quarantine::QuarantineStore::get_quarantined
+//! [`QuarantineStore::list()`]: crate::quarantine::QuarantineStore::list
 //!
 //! ## Performance Considerations
 //!
