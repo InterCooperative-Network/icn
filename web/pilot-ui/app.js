@@ -2,6 +2,16 @@
  * ICN Pilot UI - Application Logic
  */
 
+// Debug mode - set to true to enable console logging
+const DEBUG = localStorage.getItem('icn_debug') === 'true' || window.location.search.includes('debug=1');
+
+// Debug logger - only logs when DEBUG is enabled
+function debugLog(...args) {
+    if (DEBUG) {
+        console.log('[ICN Debug]', ...args);
+    }
+}
+
 // State
 const state = {
     gatewayUrl: '',
