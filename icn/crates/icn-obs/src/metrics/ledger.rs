@@ -11,9 +11,10 @@ pub fn init_descriptions() {
         "icn_ledger_witnessed_entries_accepted_total",
         "Total number of witnessed entries accepted"
     );
+    // Labels: reason={invalid_signature, insufficient_signatures}
     describe_counter!(
         "icn_ledger_witnessed_entries_rejected_total",
-        "Total number of witnessed entries rejected"
+        "Total number of witnessed entries rejected (by reason label)"
     );
     describe_histogram!(
         "icn_ledger_witness_signature_count",

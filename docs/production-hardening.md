@@ -510,6 +510,7 @@ Witness signatures provide Byzantine fault tolerance by requiring multiple parti
 ```toml
 [ledger.witness]
 # Witness policy: "none", "counterparty", "quorum", "all_parties"
+# Default is "none". Example shows recommended production config:
 default_policy = "counterparty"
 
 # Only require witnesses for transactions above this value
