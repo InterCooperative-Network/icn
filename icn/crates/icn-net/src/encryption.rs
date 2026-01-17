@@ -68,7 +68,7 @@
 //! ## Integration Status
 //!
 //! The `EncryptedEnvelope` is fully integrated into `NetworkActor`:
-//! - `NetworkActor::send_encrypted()` - Sends encrypted messages
+//! - `NetworkActor::send_encrypted_message()` - Sends encrypted messages
 //! - `handlers::encrypted` - Processes incoming encrypted envelopes
 //! - `OutgoingSequenceTracker` - Manages sequence numbers with persistence
 //!
