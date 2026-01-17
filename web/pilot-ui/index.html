@@ -1349,6 +1349,71 @@ did:icn:charlie,did:icn:alice,3.5,Childcare</code></pre>
                         </div>
                     </div>
                 </div>
+
+                <!-- Create Action Item Modal -->
+                <div id="create-action-item-modal" class="modal hidden" role="dialog" aria-labelledby="create-action-item-title" aria-modal="true">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h2 id="create-action-item-title">New Action Item</h2>
+                            <button id="close-create-action-item" class="modal-close" aria-label="Close create action item dialog">&times;</button>
+                        </div>
+
+                        <div class="modal-body">
+                            <form id="create-action-item-form">
+                                <div class="form-group">
+                                    <label for="action-item-title">Title</label>
+                                    <input type="text" id="action-item-title" placeholder="e.g., Review budget proposal" required maxlength="200" />
+                                    <p class="help-text">A clear, actionable description</p>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="action-item-description">Description (optional)</label>
+                                    <textarea id="action-item-description" rows="3" placeholder="Additional context or details..."></textarea>
+                                </div>
+
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="action-item-assignee">Assignee</label>
+                                        <select id="action-item-assignee">
+                                            <option value="">Unassigned</option>
+                                        </select>
+                                        <p class="help-text">Who is responsible?</p>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="action-item-priority">Priority</label>
+                                        <select id="action-item-priority">
+                                            <option value="low">Low</option>
+                                            <option value="medium" selected>Medium</option>
+                                            <option value="high">High</option>
+                                            <option value="critical">Critical</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="action-item-due-date">Due Date (optional)</label>
+                                        <input type="date" id="action-item-due-date" />
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="action-item-meeting">Meeting Context (optional)</label>
+                                        <input type="text" id="action-item-meeting" placeholder="e.g., 2026-01-17 board meeting" />
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="action-item-tags">Tags (comma-separated, optional)</label>
+                                    <input type="text" id="action-item-tags" placeholder="e.g., budget, urgent, q1-2026" />
+                                </div>
+                            </form>
+                        </div>
+
+                        <div class="modal-footer">
+                            <button id="create-action-item-cancel-btn" class="btn btn-secondary">Cancel</button>
+                            <button id="create-action-item-submit-btn" class="btn btn-primary">Create Item</button>
+                        </div>
+                    </div>
+                </div>
             </main>
 
             <!-- Exchange Tab -->
@@ -1403,6 +1468,156 @@ did:icn:charlie,did:icn:alice,3.5,Childcare</code></pre>
 
                         <div id="my-listings-list" class="listings-grid">
                             <p class="loading">Loading...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Create Listing Modal -->
+                <div id="create-listing-modal" class="modal hidden" role="dialog" aria-labelledby="create-listing-title" aria-modal="true">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h2 id="create-listing-title">Post a Listing</h2>
+                            <button id="close-create-listing" class="modal-close" aria-label="Close create listing dialog">&times;</button>
+                        </div>
+
+                        <div class="modal-body">
+                            <form id="create-listing-form">
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="listing-type">Type</label>
+                                        <select id="listing-type" required>
+                                            <option value="offer">Offer - I have something to share</option>
+                                            <option value="want">Want - I'm looking for something</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="listing-category">Category</label>
+                                        <select id="listing-category" required>
+                                            <option value="equipment">Equipment</option>
+                                            <option value="services">Services</option>
+                                            <option value="materials">Materials</option>
+                                            <option value="space">Space</option>
+                                            <option value="other">Other</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="listing-title">Title</label>
+                                    <input type="text" id="listing-title" placeholder="e.g., Commercial pizza oven available" required maxlength="100" />
+                                    <p class="help-text">A short, descriptive title</p>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="listing-description">Description</label>
+                                    <textarea id="listing-description" rows="4" placeholder="Describe what you're offering or looking for, including condition, specifications, etc." required></textarea>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="listing-seeking">What are you looking for in exchange?</label>
+                                    <input type="text" id="listing-seeking" placeholder="e.g., Credits, labor exchange, or make offer" required />
+                                    <p class="help-text">What would you accept in return?</p>
+                                </div>
+
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="listing-visibility">Visibility</label>
+                                        <select id="listing-visibility">
+                                            <option value="coop">My Coop Only</option>
+                                            <option value="federation" selected>Federation</option>
+                                            <option value="network">Entire Network</option>
+                                        </select>
+                                        <p class="help-text">Who can see this listing?</p>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="listing-expires">Expires (optional)</label>
+                                        <input type="date" id="listing-expires" />
+                                        <p class="help-text">Leave empty for no expiration</p>
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="listing-photos">Photo URLs (one per line, optional)</label>
+                                    <textarea id="listing-photos" rows="2" placeholder="https://example.com/photo1.jpg&#10;https://example.com/photo2.jpg"></textarea>
+                                    <p class="help-text">Direct links to images</p>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="listing-tags">Tags (comma-separated, optional)</label>
+                                    <input type="text" id="listing-tags" placeholder="e.g., kitchen, restaurant, commercial" />
+                                </div>
+                            </form>
+                        </div>
+
+                        <div class="modal-footer">
+                            <button id="create-listing-cancel-btn" class="btn btn-secondary">Cancel</button>
+                            <button id="create-listing-submit-btn" class="btn btn-primary">Post Listing</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Listing Detail Modal -->
+                <div id="listing-detail-modal" class="modal hidden" role="dialog" aria-labelledby="listing-detail-title" aria-modal="true">
+                    <div class="modal-content modal-large">
+                        <div class="modal-header">
+                            <h2 id="listing-detail-title">Listing Details</h2>
+                            <button id="close-listing-detail" class="modal-close" aria-label="Close listing detail">&times;</button>
+                        </div>
+
+                        <div class="modal-body">
+                            <div id="listing-detail-content">
+                                <div class="listing-detail-header">
+                                    <span id="listing-detail-type" class="listing-type-badge"></span>
+                                    <span id="listing-detail-category" class="listing-category-badge"></span>
+                                    <span id="listing-detail-status" class="listing-status-badge"></span>
+                                </div>
+
+                                <h3 id="listing-detail-title-text" class="listing-detail-title-text"></h3>
+
+                                <div class="listing-detail-meta">
+                                    <span id="listing-detail-coop"></span>
+                                    <span id="listing-detail-date"></span>
+                                </div>
+
+                                <div id="listing-detail-photos" class="listing-detail-photos"></div>
+
+                                <div class="listing-detail-section">
+                                    <h4>Description</h4>
+                                    <p id="listing-detail-description"></p>
+                                </div>
+
+                                <div class="listing-detail-section">
+                                    <h4>Looking For</h4>
+                                    <p id="listing-detail-seeking"></p>
+                                </div>
+
+                                <div id="listing-detail-tags" class="listing-detail-tags"></div>
+
+                                <div id="listing-detail-interests" class="listing-detail-section hidden">
+                                    <h4>Interest Expressed</h4>
+                                    <div id="listing-interests-list"></div>
+                                </div>
+                            </div>
+
+                            <div id="express-interest-section" class="express-interest-section hidden">
+                                <h4>Express Interest</h4>
+                                <form id="express-interest-form">
+                                    <div class="form-group">
+                                        <label for="interest-message">Message</label>
+                                        <textarea id="interest-message" rows="3" placeholder="Introduce yourself and explain your interest..." required></textarea>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="interest-offer">Your Offer (optional)</label>
+                                        <input type="text" id="interest-offer" placeholder="What can you offer in exchange?" />
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+
+                        <div class="modal-footer">
+                            <button id="listing-detail-close-btn" class="btn btn-secondary">Close</button>
+                            <button id="listing-detail-interest-btn" class="btn btn-primary hidden">Express Interest</button>
+                            <button id="submit-interest-btn" class="btn btn-primary hidden">Send Interest</button>
                         </div>
                     </div>
                 </div>

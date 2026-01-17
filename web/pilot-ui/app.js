@@ -106,6 +106,59 @@ const elements = {
     createListingBtn2: document.getElementById('create-listing-btn-2'),
     listingCategoryFilter: document.getElementById('listing-category-filter'),
 
+    // Create Listing Modal
+    createListingModal: document.getElementById('create-listing-modal'),
+    closeCreateListing: document.getElementById('close-create-listing'),
+    createListingForm: document.getElementById('create-listing-form'),
+    createListingCancelBtn: document.getElementById('create-listing-cancel-btn'),
+    createListingSubmitBtn: document.getElementById('create-listing-submit-btn'),
+    listingType: document.getElementById('listing-type'),
+    listingCategory: document.getElementById('listing-category'),
+    listingTitle: document.getElementById('listing-title'),
+    listingDescription: document.getElementById('listing-description'),
+    listingSeeking: document.getElementById('listing-seeking'),
+    listingVisibility: document.getElementById('listing-visibility'),
+    listingExpires: document.getElementById('listing-expires'),
+    listingPhotos: document.getElementById('listing-photos'),
+    listingTags: document.getElementById('listing-tags'),
+
+    // Listing Detail Modal
+    listingDetailModal: document.getElementById('listing-detail-modal'),
+    closeListingDetail: document.getElementById('close-listing-detail'),
+    listingDetailType: document.getElementById('listing-detail-type'),
+    listingDetailCategory: document.getElementById('listing-detail-category'),
+    listingDetailStatus: document.getElementById('listing-detail-status'),
+    listingDetailTitleText: document.getElementById('listing-detail-title-text'),
+    listingDetailCoop: document.getElementById('listing-detail-coop'),
+    listingDetailDate: document.getElementById('listing-detail-date'),
+    listingDetailPhotos: document.getElementById('listing-detail-photos'),
+    listingDetailDescription: document.getElementById('listing-detail-description'),
+    listingDetailSeeking: document.getElementById('listing-detail-seeking'),
+    listingDetailTags: document.getElementById('listing-detail-tags'),
+    listingDetailInterests: document.getElementById('listing-detail-interests'),
+    listingInterestsList: document.getElementById('listing-interests-list'),
+    expressInterestSection: document.getElementById('express-interest-section'),
+    expressInterestForm: document.getElementById('express-interest-form'),
+    interestMessage: document.getElementById('interest-message'),
+    interestOffer: document.getElementById('interest-offer'),
+    listingDetailCloseBtn: document.getElementById('listing-detail-close-btn'),
+    listingDetailInterestBtn: document.getElementById('listing-detail-interest-btn'),
+    submitInterestBtn: document.getElementById('submit-interest-btn'),
+
+    // Create Action Item Modal
+    createActionItemModal: document.getElementById('create-action-item-modal'),
+    closeCreateActionItem: document.getElementById('close-create-action-item'),
+    createActionItemForm: document.getElementById('create-action-item-form'),
+    createActionItemCancelBtn: document.getElementById('create-action-item-cancel-btn'),
+    createActionItemSubmitBtn: document.getElementById('create-action-item-submit-btn'),
+    actionItemTitle: document.getElementById('action-item-title'),
+    actionItemDescription: document.getElementById('action-item-description'),
+    actionItemAssignee: document.getElementById('action-item-assignee'),
+    actionItemPriority: document.getElementById('action-item-priority'),
+    actionItemDueDate: document.getElementById('action-item-due-date'),
+    actionItemMeeting: document.getElementById('action-item-meeting'),
+    actionItemTags: document.getElementById('action-item-tags'),
+
     // Footer
     connectionStatus: document.getElementById('connection-status'),
     lastUpdate: document.getElementById('last-update'),
@@ -5695,11 +5748,6 @@ function getCategoryIcon(category) {
     return icons[category] || '📋';
 }
 
-function viewListing(listingId) {
-    // TODO: Open listing detail modal
-    showToast('Listing detail view coming soon', 'info');
-}
-
 // Listing filter event handlers
 document.querySelectorAll('.listing-filters .filter-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -5735,17 +5783,426 @@ document.querySelectorAll('.exchange-tabs .tab-btn').forEach(btn => {
     });
 });
 
-// Create listing button handlers
-elements.createListingBtn?.addEventListener('click', () => {
-    showToast('Create listing form coming soon', 'info');
-});
-elements.createListingBtn2?.addEventListener('click', () => {
-    showToast('Create listing form coming soon', 'info');
+// =====================================================
+// Create Listing Modal Handlers
+// =====================================================
+
+function openCreateListingModal() {
+    // Reset form
+    elements.createListingForm?.reset();
+    elements.createListingModal?.classList.remove('hidden');
+    elements.listingTitle?.focus();
+}
+
+function closeCreateListingModal() {
+    elements.createListingModal?.classList.add('hidden');
+    elements.createListingForm?.reset();
+}
+
+// Create listing button handlers - both buttons open the same modal
+elements.createListingBtn?.addEventListener('click', openCreateListingModal);
+elements.createListingBtn2?.addEventListener('click', openCreateListingModal);
+
+// Close modal handlers
+elements.closeCreateListing?.addEventListener('click', closeCreateListingModal);
+elements.createListingCancelBtn?.addEventListener('click', closeCreateListingModal);
+
+// Close on backdrop click
+elements.createListingModal?.addEventListener('click', (e) => {
+    if (e.target === elements.createListingModal) {
+        closeCreateListingModal();
+    }
 });
 
+// Submit listing
+elements.createListingSubmitBtn?.addEventListener('click', async () => {
+    if (!elements.createListingForm?.checkValidity()) {
+        elements.createListingForm?.reportValidity();
+        return;
+    }
+
+    const listing = {
+        listing_type: elements.listingType?.value || 'offer',
+        title: elements.listingTitle?.value || '',
+        description: elements.listingDescription?.value || '',
+        category: elements.listingCategory?.value || 'other',
+        seeking: elements.listingSeeking?.value || '',
+        visibility: elements.listingVisibility?.value || 'federation',
+        photos: (elements.listingPhotos?.value || '').split('\n').map(s => s.trim()).filter(s => s),
+        tags: (elements.listingTags?.value || '').split(',').map(s => s.trim()).filter(s => s),
+        expires_at: elements.listingExpires?.value ? Math.floor(new Date(elements.listingExpires.value).getTime() / 1000) : null,
+        location: null,
+    };
+
+    try {
+        elements.createListingSubmitBtn.disabled = true;
+        elements.createListingSubmitBtn.textContent = 'Posting...';
+
+        const response = await fetch(`${state.gatewayUrl}/listings`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${state.token}`,
+                'X-Coop-Id': state.coopId,
+            },
+            body: JSON.stringify(listing),
+        });
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.message || 'Failed to create listing');
+        }
+
+        showToast('Listing posted successfully!', 'success');
+        closeCreateListingModal();
+        loadListings();
+        loadMyListings();
+    } catch (error) {
+        showToast(error.message || 'Failed to post listing', 'error');
+    } finally {
+        elements.createListingSubmitBtn.disabled = false;
+        elements.createListingSubmitBtn.textContent = 'Post Listing';
+    }
+});
+
+// =====================================================
+// Listing Detail Modal Handlers
+// =====================================================
+
+let currentListingId = null;
+
+async function viewListing(listingId) {
+    currentListingId = listingId;
+
+    // Find the listing in our cached data
+    let listing = state.listings.find(l => l.id === listingId);
+    if (!listing) {
+        listing = state.myListings.find(l => l.id === listingId);
+    }
+
+    if (!listing) {
+        // Try to fetch from API
+        try {
+            const response = await fetch(`${state.gatewayUrl}/listings/${listingId}`, {
+                headers: {
+                    'Authorization': `Bearer ${state.token}`,
+                    'X-Coop-Id': state.coopId,
+                },
+            });
+            if (response.ok) {
+                listing = await response.json();
+            }
+        } catch (error) {
+            console.error('Failed to fetch listing:', error);
+        }
+    }
+
+    if (!listing) {
+        showToast('Listing not found', 'error');
+        return;
+    }
+
+    // Populate modal
+    if (elements.listingDetailType) {
+        elements.listingDetailType.textContent = listing.listing_type === 'offer' ? 'Offering' : 'Looking For';
+        elements.listingDetailType.className = `listing-type-badge ${listing.listing_type}`;
+    }
+    if (elements.listingDetailCategory) {
+        elements.listingDetailCategory.textContent = listing.category;
+        elements.listingDetailCategory.className = 'listing-category-badge';
+    }
+    if (elements.listingDetailStatus) {
+        elements.listingDetailStatus.textContent = listing.status;
+        elements.listingDetailStatus.className = `listing-status-badge ${listing.status}`;
+    }
+    if (elements.listingDetailTitleText) {
+        elements.listingDetailTitleText.textContent = listing.title;
+    }
+    if (elements.listingDetailCoop) {
+        elements.listingDetailCoop.textContent = `From: ${listing.coop_id}`;
+    }
+    if (elements.listingDetailDate) {
+        elements.listingDetailDate.textContent = formatDate(listing.created_at);
+    }
+    if (elements.listingDetailDescription) {
+        elements.listingDetailDescription.textContent = listing.description;
+    }
+    if (elements.listingDetailSeeking) {
+        elements.listingDetailSeeking.textContent = listing.seeking;
+    }
+
+    // Photos
+    if (elements.listingDetailPhotos) {
+        elements.listingDetailPhotos.innerHTML = '';
+        if (listing.photos && listing.photos.length > 0) {
+            listing.photos.forEach(photoUrl => {
+                const img = document.createElement('img');
+                img.src = photoUrl;
+                img.alt = listing.title;
+                img.className = 'listing-detail-photo';
+                img.onerror = () => img.style.display = 'none';
+                elements.listingDetailPhotos.appendChild(img);
+            });
+        }
+    }
+
+    // Tags
+    if (elements.listingDetailTags) {
+        elements.listingDetailTags.innerHTML = '';
+        if (listing.tags && listing.tags.length > 0) {
+            listing.tags.forEach(tag => {
+                const span = document.createElement('span');
+                span.className = 'tag';
+                span.textContent = tag;
+                elements.listingDetailTags.appendChild(span);
+            });
+        }
+    }
+
+    // Show/hide interest button based on ownership
+    const isOwnListing = listing.offered_by === state.did;
+    if (elements.listingDetailInterestBtn) {
+        elements.listingDetailInterestBtn.classList.toggle('hidden', isOwnListing);
+    }
+    if (elements.expressInterestSection) {
+        elements.expressInterestSection.classList.add('hidden');
+    }
+    if (elements.submitInterestBtn) {
+        elements.submitInterestBtn.classList.add('hidden');
+    }
+
+    // Load interests if owner
+    if (isOwnListing && listing.interest_count > 0) {
+        elements.listingDetailInterests?.classList.remove('hidden');
+        loadListingInterests(listingId);
+    } else {
+        elements.listingDetailInterests?.classList.add('hidden');
+    }
+
+    elements.listingDetailModal?.classList.remove('hidden');
+}
+
+async function loadListingInterests(listingId) {
+    try {
+        const response = await fetch(`${state.gatewayUrl}/listings/${listingId}/interests`, {
+            headers: {
+                'Authorization': `Bearer ${state.token}`,
+                'X-Coop-Id': state.coopId,
+            },
+        });
+
+        if (!response.ok) throw new Error('Failed to load interests');
+
+        const data = await response.json();
+        const interests = data.interests || [];
+
+        if (elements.listingInterestsList) {
+            elements.listingInterestsList.innerHTML = '';
+            if (interests.length === 0) {
+                const p = document.createElement('p');
+                p.className = 'empty-state';
+                p.textContent = 'No interest expressed yet';
+                elements.listingInterestsList.appendChild(p);
+            } else {
+                interests.forEach(interest => {
+                    const div = document.createElement('div');
+                    div.className = 'interest-item';
+
+                    const header = document.createElement('div');
+                    header.className = 'interest-header';
+                    const fromSpan = document.createElement('span');
+                    fromSpan.textContent = `${interest.from_coop} (${interest.from_did.substring(0, 20)}...)`;
+                    const dateSpan = document.createElement('span');
+                    dateSpan.textContent = formatDate(interest.created_at);
+                    header.appendChild(fromSpan);
+                    header.appendChild(dateSpan);
+
+                    const msgP = document.createElement('p');
+                    msgP.textContent = interest.message;
+
+                    if (interest.offer) {
+                        const offerP = document.createElement('p');
+                        offerP.className = 'interest-offer';
+                        offerP.textContent = `Offering: ${interest.offer}`;
+                        div.appendChild(offerP);
+                    }
+
+                    div.appendChild(header);
+                    div.appendChild(msgP);
+                    elements.listingInterestsList.appendChild(div);
+                });
+            }
+        }
+    } catch (error) {
+        console.error('Failed to load interests:', error);
+    }
+}
+
+function closeListingDetailModal() {
+    elements.listingDetailModal?.classList.add('hidden');
+    elements.expressInterestSection?.classList.add('hidden');
+    elements.expressInterestForm?.reset();
+    currentListingId = null;
+}
+
+// Close handlers
+elements.closeListingDetail?.addEventListener('click', closeListingDetailModal);
+elements.listingDetailCloseBtn?.addEventListener('click', closeListingDetailModal);
+
+elements.listingDetailModal?.addEventListener('click', (e) => {
+    if (e.target === elements.listingDetailModal) {
+        closeListingDetailModal();
+    }
+});
+
+// Express interest button shows the form
+elements.listingDetailInterestBtn?.addEventListener('click', () => {
+    elements.expressInterestSection?.classList.remove('hidden');
+    elements.listingDetailInterestBtn?.classList.add('hidden');
+    elements.submitInterestBtn?.classList.remove('hidden');
+    elements.interestMessage?.focus();
+});
+
+// Submit interest
+elements.submitInterestBtn?.addEventListener('click', async () => {
+    if (!currentListingId) return;
+    if (!elements.expressInterestForm?.checkValidity()) {
+        elements.expressInterestForm?.reportValidity();
+        return;
+    }
+
+    const interest = {
+        message: elements.interestMessage?.value || '',
+        offer: elements.interestOffer?.value || null,
+    };
+
+    try {
+        elements.submitInterestBtn.disabled = true;
+        elements.submitInterestBtn.textContent = 'Sending...';
+
+        const response = await fetch(`${state.gatewayUrl}/listings/${currentListingId}/interest`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${state.token}`,
+                'X-Coop-Id': state.coopId,
+            },
+            body: JSON.stringify(interest),
+        });
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.message || 'Failed to express interest');
+        }
+
+        showToast('Interest sent successfully!', 'success');
+        closeListingDetailModal();
+    } catch (error) {
+        showToast(error.message || 'Failed to send interest', 'error');
+    } finally {
+        elements.submitInterestBtn.disabled = false;
+        elements.submitInterestBtn.textContent = 'Send Interest';
+    }
+});
+
+// =====================================================
+// Create Action Item Modal Handlers
+// =====================================================
+
+function populateAssigneeDropdown() {
+    const select = elements.actionItemAssignee;
+    if (!select) return;
+
+    // Clear existing options except the first (Unassigned)
+    while (select.options.length > 1) {
+        select.remove(1);
+    }
+
+    // Add members as options
+    state.members.forEach(member => {
+        const option = document.createElement('option');
+        option.value = member.did;
+        const displayName = member.display_name || member.did.substring(0, 20) + '...';
+        option.textContent = displayName;
+        select.appendChild(option);
+    });
+}
+
+function openCreateActionItemModal() {
+    // Reset form
+    elements.createActionItemForm?.reset();
+    populateAssigneeDropdown();
+    elements.createActionItemModal?.classList.remove('hidden');
+    elements.actionItemTitle?.focus();
+}
+
+function closeCreateActionItemModal() {
+    elements.createActionItemModal?.classList.add('hidden');
+    elements.createActionItemForm?.reset();
+}
+
 // Add action item button handler
-elements.addActionItemBtn?.addEventListener('click', () => {
-    showToast('Add action item form coming soon', 'info');
+elements.addActionItemBtn?.addEventListener('click', openCreateActionItemModal);
+
+// Close modal handlers
+elements.closeCreateActionItem?.addEventListener('click', closeCreateActionItemModal);
+elements.createActionItemCancelBtn?.addEventListener('click', closeCreateActionItemModal);
+
+// Close on backdrop click
+elements.createActionItemModal?.addEventListener('click', (e) => {
+    if (e.target === elements.createActionItemModal) {
+        closeCreateActionItemModal();
+    }
+});
+
+// Submit action item
+elements.createActionItemSubmitBtn?.addEventListener('click', async () => {
+    if (!elements.createActionItemForm?.checkValidity()) {
+        elements.createActionItemForm?.reportValidity();
+        return;
+    }
+
+    const actionItem = {
+        title: elements.actionItemTitle?.value || '',
+        description: elements.actionItemDescription?.value || null,
+        assignee: elements.actionItemAssignee?.value || null,
+        priority: elements.actionItemPriority?.value || 'medium',
+        due_date: elements.actionItemDueDate?.value ? Math.floor(new Date(elements.actionItemDueDate.value).getTime() / 1000) : null,
+        meeting_context: elements.actionItemMeeting?.value || null,
+        tags: (elements.actionItemTags?.value || '').split(',').map(s => s.trim()).filter(s => s),
+    };
+
+    try {
+        elements.createActionItemSubmitBtn.disabled = true;
+        elements.createActionItemSubmitBtn.textContent = 'Creating...';
+
+        // Get the domain ID from the coop ID
+        const domainId = state.coopId;
+
+        const response = await fetch(`${state.gatewayUrl}/gov/domains/${domainId}/action-items`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${state.token}`,
+                'X-Coop-Id': state.coopId,
+            },
+            body: JSON.stringify(actionItem),
+        });
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.message || 'Failed to create action item');
+        }
+
+        showToast('Action item created successfully!', 'success');
+        closeCreateActionItemModal();
+        loadActionItems();
+    } catch (error) {
+        showToast(error.message || 'Failed to create action item', 'error');
+    } finally {
+        elements.createActionItemSubmitBtn.disabled = false;
+        elements.createActionItemSubmitBtn.textContent = 'Create Item';
+    }
 });
 
 // Make functions available globally
