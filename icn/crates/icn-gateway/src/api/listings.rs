@@ -405,6 +405,9 @@ pub async fn list_listings(
     // Check authorization - read access is sufficient
     require_scope(&http_req, "coop:read")?;
 
+    // Get caller DID for privacy check
+    let caller_did: Option<Did> = get_claims(&http_req).and_then(|c| c.sub.parse().ok());
+
     // Build filter
     let filter = build_listing_filter(&query)?;
 
@@ -415,10 +418,16 @@ pub async fn list_listings(
         .map_err(|e| GatewayError::InternalError(format!("Failed to list listings: {e}")))?;
 
     // Convert to responses with interest counts
+    // Privacy: only show interest count for the caller's own listings
     let responses: Vec<ListingResponse> = listings
         .iter()
         .map(|l| {
-            let interest_count = mgr.get_interests(&l.id).map(|i| i.len()).unwrap_or(0);
+            let is_owner = caller_did.as_ref().is_some_and(|did| did == &l.offered_by);
+            let interest_count = if is_owner {
+                mgr.get_interests(&l.id).map(|i| i.len()).unwrap_or(0)
+            } else {
+                0 // Don't reveal interest count to non-owners
+            };
             listing_to_response(l, interest_count)
         })
         .collect();
@@ -436,6 +445,9 @@ pub async fn get_listing(
     // Check authorization
     require_scope(&http_req, "coop:read")?;
 
+    // Get caller DID for privacy check
+    let caller_did: Option<Did> = get_claims(&http_req).and_then(|c| c.sub.parse().ok());
+
     let listing_id = parse_listing_id(&path)?;
 
     let mgr = listings_mgr.read().await;
@@ -444,7 +456,13 @@ pub async fn get_listing(
         .map_err(|e| GatewayError::InternalError(format!("Failed to get listing: {e}")))?
         .ok_or_else(|| GatewayError::NotFound(format!("Listing not found: {listing_id}")))?;
 
-    let interest_count = mgr.get_interests(&listing_id).map(|i| i.len()).unwrap_or(0);
+    // Privacy: only show interest count if caller owns the listing
+    let is_owner = caller_did.as_ref().is_some_and(|did| did == &listing.offered_by);
+    let interest_count = if is_owner {
+        mgr.get_interests(&listing_id).map(|i| i.len()).unwrap_or(0)
+    } else {
+        0 // Don't reveal interest count to non-owners
+    };
 
     Ok(HttpResponse::Ok().json(listing_to_response(&listing, interest_count)))
 }
