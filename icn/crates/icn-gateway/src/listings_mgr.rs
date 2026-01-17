@@ -9,6 +9,7 @@ use icn_identity::Did;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
+use tracing::warn;
 use uuid::Uuid;
 
 /// Unique listing identifier
@@ -671,11 +672,12 @@ impl ListingsManager {
     pub fn get_interest_counts(&self, listing_ids: &[ListingId]) -> HashMap<ListingId, usize> {
         listing_ids
             .iter()
-            .filter_map(|id| {
-                self.store
-                    .get_interests(id)
-                    .ok()
-                    .map(|interests| (*id, interests.len()))
+            .filter_map(|id| match self.store.get_interests(id) {
+                Ok(interests) => Some((*id, interests.len())),
+                Err(e) => {
+                    warn!(listing_id = %id, error = %e, "Failed to get interests for listing");
+                    None
+                }
             })
             .collect()
     }

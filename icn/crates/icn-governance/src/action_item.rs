@@ -167,14 +167,16 @@ impl ActionItem {
     /// Check if this action item is overdue.
     ///
     /// An item is overdue if:
-    /// - It has a due date that has passed (now >= due_date)
+    /// - It has a due date that has passed (now > due_date, i.e., after the deadline)
     /// - It is not already completed or cancelled
+    ///
+    /// Note: Items are NOT overdue at exactly the due date - only after it passes.
     pub fn is_overdue(&self, now: u64) -> bool {
         if self.status == ActionItemStatus::Completed || self.status == ActionItemStatus::Cancelled
         {
             return false;
         }
-        self.due_date.is_some_and(|due| now >= due)
+        self.due_date.is_some_and(|due| now > due)
     }
 
     /// Check if this item is open (not completed or cancelled)
@@ -535,10 +537,15 @@ mod tests {
         assert!(item.is_overdue(2000));
         assert!(!item.is_overdue(1000));
 
-        // Edge case: exactly at due date - should be overdue
+        // Edge case: exactly at due date - NOT overdue (only after deadline)
         assert!(
-            item.is_overdue(1500),
-            "Item at exact due date should be overdue"
+            !item.is_overdue(1500),
+            "Item at exact due date should NOT be overdue - only after deadline passes"
+        );
+        // One second after due date - now it's overdue
+        assert!(
+            item.is_overdue(1501),
+            "Item should be overdue after deadline passes"
         );
 
         // Completed items are never overdue
