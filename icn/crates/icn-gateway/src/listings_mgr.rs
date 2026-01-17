@@ -277,6 +277,8 @@ pub struct ListingFilter {
     pub status: Option<ListingStatus>,
     /// Filter by tag
     pub tag: Option<String>,
+    /// Filter by owner (for "my listings" queries)
+    pub offered_by: Option<Did>,
     /// Only show active listings
     pub active_only: bool,
 }
@@ -305,6 +307,11 @@ impl ListingFilter {
         }
         if let Some(ref tag) = self.tag {
             if !listing.tags.contains(tag) {
+                return false;
+            }
+        }
+        if let Some(ref owner) = self.offered_by {
+            if &listing.offered_by != owner {
                 return false;
             }
         }
@@ -635,6 +642,33 @@ mod tests {
         let coop2_listings = mgr.list_listings(&filter).unwrap();
         assert_eq!(coop2_listings.len(), 1);
         assert_eq!(coop2_listings[0].coop_id, "coop2");
+
+        // Filter by owner (offered_by) - both listings have the same owner
+        let filter = ListingFilter {
+            offered_by: Some(test_did()),
+            ..Default::default()
+        };
+        let my_listings = mgr.list_listings(&filter).unwrap();
+        assert_eq!(my_listings.len(), 2);
+
+        // Filter by owner AND type (combining filters)
+        let filter = ListingFilter {
+            offered_by: Some(test_did()),
+            listing_type: Some(ListingType::Offer),
+            ..Default::default()
+        };
+        let my_offers = mgr.list_listings(&filter).unwrap();
+        assert_eq!(my_offers.len(), 1);
+        assert_eq!(my_offers[0].title, "Oven");
+
+        // Filter by owner with no matches
+        let other_did = Did::from_anchor_id(&[99; 32]);
+        let filter = ListingFilter {
+            offered_by: Some(other_did),
+            ..Default::default()
+        };
+        let no_listings = mgr.list_listings(&filter).unwrap();
+        assert_eq!(no_listings.len(), 0);
     }
 
     #[test]

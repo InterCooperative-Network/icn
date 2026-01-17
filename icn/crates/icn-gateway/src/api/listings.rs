@@ -330,7 +330,12 @@ fn build_listing_filter(params: &ListingFilterParams) -> Result<ListingFilter> {
     if let Some(ref tag) = params.tag {
         filter.tag = Some(tag.clone());
     }
-    // Note: visibility and offered_by filters not currently in ListingFilter
+    if let Some(ref owner) = params.offered_by {
+        filter.offered_by = Some(owner.parse().map_err(|e| {
+            GatewayError::BadRequest(format!("Invalid offered_by DID: {e}"))
+        })?);
+    }
+    // Note: visibility filter not currently in ListingFilter
     // search filter not currently supported
 
     Ok(filter)
