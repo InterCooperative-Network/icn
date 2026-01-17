@@ -87,6 +87,26 @@ pub async fn init_ledger_services(
         );
     }
 
+    // Initialize witness config for material transaction signatures (Issue #676)
+    let witness_config = config.ledger.witness.to_witness_config()?;
+    let witness_policy = format!("{:?}", witness_config.default_policy);
+    ledger.set_witness_config(witness_config);
+
+    match &config.ledger.witness.threshold {
+        Some(threshold) => {
+            info!(
+                "Witness signatures configured: policy={}, threshold={} (timeout={}s)",
+                witness_policy, threshold, config.ledger.witness.collection_timeout_secs
+            );
+        }
+        None => {
+            info!(
+                "Witness signatures configured: policy={} for all transactions (timeout={}s)",
+                witness_policy, config.ledger.witness.collection_timeout_secs
+            );
+        }
+    }
+
     // Initialize membership store for tracking when members joined
     // Used for new member credit limit ramping
     let membership_store = Arc::new(SledMembershipStore::new(store.clone()));
