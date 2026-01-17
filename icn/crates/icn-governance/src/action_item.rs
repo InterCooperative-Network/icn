@@ -47,10 +47,11 @@ impl std::str::FromStr for ActionItemId {
 }
 
 /// Status of an action item
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ActionItemStatus {
     /// Not yet started
+    #[default]
     Pending,
     /// Work in progress
     InProgress,
@@ -60,12 +61,6 @@ pub enum ActionItemStatus {
     Deferred,
     /// No longer relevant
     Cancelled,
-}
-
-impl Default for ActionItemStatus {
-    fn default() -> Self {
-        Self::Pending
-    }
 }
 
 impl std::fmt::Display for ActionItemStatus {
