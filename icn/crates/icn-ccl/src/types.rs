@@ -243,6 +243,85 @@ impl std::hash::Hash for Value {
     }
 }
 
+/// Configuration for fuel (gas) costs in contract execution
+///
+/// Fuel is used to limit computation and prevent unbounded execution.
+/// This configuration allows tuning costs for different deployment profiles.
+///
+/// # Example
+///
+/// ```
+/// use icn_ccl::FuelConfig;
+///
+/// // Use default costs
+/// let config = FuelConfig::default();
+/// assert_eq!(config.stmt_cost, 1);
+///
+/// // Create restrictive config for untrusted contracts
+/// let restrictive = FuelConfig {
+///     call_cost: 20,  // Double call cost
+///     max_loop_iterations: 500,  // Halve loop limit
+///     ..Default::default()
+/// };
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FuelConfig {
+    /// Cost per statement execution
+    pub stmt_cost: u64,
+
+    /// Cost per expression evaluation
+    pub expr_cost: u64,
+
+    /// Cost per function/rule call
+    pub call_cost: u64,
+
+    /// Cost per loop iteration
+    pub loop_iteration_cost: u64,
+
+    /// Maximum allowed loop iterations (prevents infinite loops)
+    pub max_loop_iterations: usize,
+}
+
+impl Default for FuelConfig {
+    fn default() -> Self {
+        Self {
+            stmt_cost: 1,
+            expr_cost: 1,
+            call_cost: 10,
+            loop_iteration_cost: 5,
+            max_loop_iterations: 1000,
+        }
+    }
+}
+
+impl FuelConfig {
+    /// Create a restrictive config for untrusted contract execution
+    ///
+    /// Doubles all costs and halves loop limits compared to defaults.
+    pub fn restrictive() -> Self {
+        Self {
+            stmt_cost: 2,
+            expr_cost: 2,
+            call_cost: 20,
+            loop_iteration_cost: 10,
+            max_loop_iterations: 500,
+        }
+    }
+
+    /// Create a permissive config for trusted/internal contracts
+    ///
+    /// Reduces call and loop iteration costs and doubles loop limits compared to defaults.
+    pub fn permissive() -> Self {
+        Self {
+            stmt_cost: 1,
+            expr_cost: 1,
+            call_cost: 5,
+            loop_iteration_cost: 2,
+            max_loop_iterations: 2000,
+        }
+    }
+}
+
 /// Execution context for contract runtime
 #[derive(Debug, Clone)]
 pub struct ExecutionContext {

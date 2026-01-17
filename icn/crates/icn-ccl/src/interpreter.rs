@@ -3,17 +3,11 @@
 use crate::ast::{BinOp, Contract, Expr, Stmt, UnOp};
 use crate::error::{CclError, Result, Span};
 use crate::types::{
-    Capability, ContractState, ExecutionContext, ExecutionResult, LedgerOperation, Value,
+    Capability, ContractState, ExecutionContext, ExecutionResult, FuelConfig, LedgerOperation,
+    Value,
 };
 use std::collections::{HashMap, HashSet};
 use tracing::{debug, instrument, trace};
-
-/// Fuel cost constants
-const FUEL_STMT: u64 = 1;
-const FUEL_EXPR: u64 = 1;
-const FUEL_CALL: u64 = 10;
-const FUEL_LOOP_ITERATION: u64 = 5;
-const MAX_LOOP_ITERATIONS: usize = 1000;
 
 /// CCL Interpreter
 pub struct Interpreter {
@@ -31,17 +25,45 @@ pub struct Interpreter {
 
     /// Ledger operations accumulated during execution
     ledger_ops: Vec<LedgerOperation>,
+
+    /// Fuel configuration for cost metering
+    fuel_config: FuelConfig,
 }
 
 impl Interpreter {
-    /// Create a new interpreter for a contract
+    /// Create a new interpreter for a contract with default fuel configuration
     pub fn new(contract: Contract, state: ContractState, context: ExecutionContext) -> Self {
+        Self::with_fuel_config(contract, state, context, FuelConfig::default())
+    }
+
+    /// Create a new interpreter with custom fuel configuration
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use icn_ccl::{Interpreter, FuelConfig};
+    ///
+    /// // Use restrictive config for untrusted contracts
+    /// let interpreter = Interpreter::with_fuel_config(
+    ///     contract,
+    ///     state,
+    ///     context,
+    ///     FuelConfig::restrictive(),
+    /// );
+    /// ```
+    pub fn with_fuel_config(
+        contract: Contract,
+        state: ContractState,
+        context: ExecutionContext,
+        fuel_config: FuelConfig,
+    ) -> Self {
         Interpreter {
             contract,
             state,
             context,
             locals: HashMap::new(),
             ledger_ops: Vec::new(),
+            fuel_config,
         }
     }
 
@@ -107,7 +129,7 @@ impl Interpreter {
 
     /// Execute a statement, returns Some(value) if return statement
     fn execute_stmt(&mut self, stmt: &Stmt) -> Result<Option<Value>> {
-        self.context.consume_fuel(FUEL_STMT)?;
+        self.context.consume_fuel(self.fuel_config.stmt_cost)?;
 
         match stmt {
             Stmt::Assign { name, value } => {
@@ -299,16 +321,17 @@ impl Interpreter {
                 };
 
                 // Limit iterations
-                if items.len() > MAX_LOOP_ITERATIONS {
+                if items.len() > self.fuel_config.max_loop_iterations {
                     return Err(CclError::LoopLimitExceeded {
                         span: Span::unknown(),
                         count: items.len(),
-                        max: MAX_LOOP_ITERATIONS,
+                        max: self.fuel_config.max_loop_iterations,
                     });
                 }
 
                 for item in items {
-                    self.context.consume_fuel(FUEL_LOOP_ITERATION)?;
+                    self.context
+                        .consume_fuel(self.fuel_config.loop_iteration_cost)?;
                     self.locals.insert(var.clone(), item);
 
                     for stmt in body {
@@ -335,7 +358,7 @@ impl Interpreter {
 
     /// Evaluate an expression
     fn eval_expr(&mut self, expr: &Expr) -> Result<Value> {
-        self.context.consume_fuel(FUEL_EXPR)?;
+        self.context.consume_fuel(self.fuel_config.expr_cost)?;
 
         match expr {
             Expr::Literal(val) => Ok(val.clone()),
@@ -397,7 +420,7 @@ impl Interpreter {
             }
 
             Expr::Call { name, args } => {
-                self.context.consume_fuel(FUEL_CALL)?;
+                self.context.consume_fuel(self.fuel_config.call_cost)?;
                 let arg_vals: Result<Vec<_>> = args.iter().map(|arg| self.eval_expr(arg)).collect();
                 let arg_vals = arg_vals?;
                 self.eval_call(name, arg_vals)
@@ -981,5 +1004,95 @@ mod tests {
         // 21 * 2 = 42
         assert_eq!(result.value, Value::Int(42));
         assert_eq!(result.state_changes.get("counter"), Some(&Value::Int(42)));
+    }
+
+    // ========================================================================
+    // FuelConfig Tests (Issue #162)
+    // ========================================================================
+
+    #[test]
+    fn test_fuel_config_default_values() {
+        let config = FuelConfig::default();
+        assert_eq!(config.stmt_cost, 1);
+        assert_eq!(config.expr_cost, 1);
+        assert_eq!(config.call_cost, 10);
+        assert_eq!(config.loop_iteration_cost, 5);
+        assert_eq!(config.max_loop_iterations, 1000);
+    }
+
+    #[test]
+    fn test_fuel_config_restrictive() {
+        let config = FuelConfig::restrictive();
+        // Restrictive should have higher costs
+        assert!(config.stmt_cost > FuelConfig::default().stmt_cost);
+        assert!(config.call_cost > FuelConfig::default().call_cost);
+        assert!(config.max_loop_iterations < FuelConfig::default().max_loop_iterations);
+    }
+
+    #[test]
+    fn test_fuel_config_permissive() {
+        let config = FuelConfig::permissive();
+        // Permissive should have lower costs (or same for stmt/expr)
+        assert!(config.call_cost < FuelConfig::default().call_cost);
+        assert!(config.loop_iteration_cost < FuelConfig::default().loop_iteration_cost);
+        assert!(config.max_loop_iterations > FuelConfig::default().max_loop_iterations);
+    }
+
+    #[test]
+    fn test_interpreter_with_custom_fuel_config() {
+        // Test that custom fuel config is actually used
+        let contract = Contract::new("test".to_string());
+        let state = ContractState::new();
+        let keypair = KeyPair::generate().unwrap();
+
+        // Create context with 10 fuel units
+        let mut context = create_test_context(keypair.did().clone());
+        context.fuel = 10;
+        context.fuel_limit = 10;
+
+        // Use a fuel config with high expression cost (5 per expr)
+        let high_cost_config = FuelConfig {
+            expr_cost: 5,
+            ..Default::default()
+        };
+
+        let mut interp = Interpreter::with_fuel_config(contract, state, context, high_cost_config);
+
+        // Simple expression should consume 5 fuel (our custom cost)
+        let expr = Expr::Literal(Value::Int(42));
+        let result = interp.eval_expr(&expr);
+        assert!(result.is_ok());
+
+        // Should have consumed 5 fuel, leaving 5
+        assert_eq!(interp.context.fuel, 5);
+
+        // Another expression consumes another 5, leaving 0
+        let result = interp.eval_expr(&expr);
+        assert!(result.is_ok());
+        assert_eq!(interp.context.fuel, 0);
+
+        // Next expression should fail (no fuel left)
+        let result = interp.eval_expr(&expr);
+        assert!(matches!(
+            result,
+            Err(crate::error::CclError::FuelExhausted { .. })
+        ));
+    }
+
+    #[test]
+    fn test_fuel_config_serde() {
+        // Test that FuelConfig can be serialized/deserialized
+        let config = FuelConfig {
+            stmt_cost: 2,
+            expr_cost: 3,
+            call_cost: 15,
+            loop_iteration_cost: 8,
+            max_loop_iterations: 500,
+        };
+
+        let json = serde_json::to_string(&config).expect("serialize");
+        let parsed: FuelConfig = serde_json::from_str(&json).expect("deserialize");
+
+        assert_eq!(config, parsed);
     }
 }
