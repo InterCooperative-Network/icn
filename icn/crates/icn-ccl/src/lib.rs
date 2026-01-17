@@ -71,7 +71,9 @@ pub use disputes::{
     TOPIC_DISPUTES_RESOLVED,
 };
 pub use error::{CclError, Span};
-pub use fuel_estimator::{estimate_fuel, estimate_fuel_dry_run, FuelEstimator};
+pub use fuel_estimator::{
+    estimate_fuel, estimate_fuel_dry_run, estimate_fuel_dry_run_with_context, FuelEstimator,
+};
 pub use interpreter::Interpreter;
 pub use messages::{
     ContractDeploymentMessage, ContractExecutionRequest, ContractExecutionResponse,

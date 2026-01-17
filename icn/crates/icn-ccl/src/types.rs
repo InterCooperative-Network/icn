@@ -456,7 +456,7 @@ pub struct FuelEstimate {
     /// Maximum fuel (worst case, max loop iterations)
     pub maximum: u64,
 
-    /// Warnings about estimation (e.g., "contains unbounded recursion")
+    /// Warnings about estimation (e.g., "Loop estimation assumes max 1000 iterations")
     pub warnings: Vec<String>,
 }
 
@@ -501,7 +501,7 @@ impl FuelEstimate {
     pub fn branch(self, other: Self) -> Self {
         Self {
             minimum: self.minimum.min(other.minimum),
-            expected: (self.expected + other.expected) / 2,
+            expected: self.expected.saturating_add(other.expected) / 2,
             maximum: self.maximum.max(other.maximum),
             warnings: self.warnings.into_iter().chain(other.warnings).collect(),
         }

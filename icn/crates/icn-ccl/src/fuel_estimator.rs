@@ -214,6 +214,13 @@ pub fn estimate_fuel(contract: &Contract, rule_name: &str) -> Option<FuelEstimat
 ///
 /// Returns the actual fuel consumed during execution.
 ///
+/// # Limitations
+///
+/// This function does not provide capabilities, so rules that require
+/// capability-protected operations (WriteState, WriteLedger, etc.) will
+/// fail with a capability error. Use [`estimate_fuel_dry_run_with_context`]
+/// if you need to estimate fuel for such rules.
+///
 /// # Arguments
 ///
 /// * `contract` - The contract to estimate
@@ -255,9 +262,39 @@ pub fn estimate_fuel_dry_run(
         caller,
         timestamp,
         fuel_limit,
-        vec![], // No capabilities needed for dry run fuel estimation
-        vec![], // No participants needed
+        vec![], // No capabilities - rules requiring capabilities will fail
+        vec![], // No participants - use estimate_fuel_dry_run_with_context if needed
     );
+
+    // Execute in dry run mode
+    let interpreter = Interpreter::dry_run(contract.clone(), state, context);
+    let result = interpreter.execute_rule(rule_name, args)?;
+
+    Ok(result.fuel_consumed)
+}
+
+/// Estimate fuel by executing a dry run with a custom execution context
+///
+/// This variant allows providing capabilities and participants for more
+/// accurate estimation of rules that require capability-protected operations.
+///
+/// Returns the actual fuel consumed during execution.
+///
+/// # Arguments
+///
+/// * `contract` - The contract to estimate
+/// * `rule_name` - The rule to execute
+/// * `args` - Arguments to pass to the rule
+/// * `state` - Initial contract state
+/// * `context` - Execution context with caller, fuel limit, capabilities, etc.
+pub fn estimate_fuel_dry_run_with_context(
+    contract: &Contract,
+    rule_name: &str,
+    args: std::collections::HashMap<String, crate::Value>,
+    state: crate::types::ContractState,
+    context: crate::types::ExecutionContext,
+) -> Result<u64, crate::error::CclError> {
+    use crate::Interpreter;
 
     // Execute in dry run mode
     let interpreter = Interpreter::dry_run(contract.clone(), state, context);
