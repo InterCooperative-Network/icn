@@ -23,7 +23,7 @@ The `QueueManager` handles queuing, persistence, and retry logic for operations 
 ### Initialization
 
 ```typescript
-import { QueueManager, SecureStorage } from '@icn/react-native-sdk';
+import { QueueManager, SecureStorage } from '@icn/react-native';
 
 // Create secure storage adapter (platform-specific)
 const storage: SecureStorage = {
@@ -43,17 +43,18 @@ await queueManager.initialize();
 Add operations to the queue when network calls fail:
 
 ```typescript
-import { QueuedOperation } from '@icn/react-native-sdk';
+import { QueuedOperation } from '@icn/react-native';
 
 // Enqueue a payment that failed due to network error
 const operationId = await queueManager.enqueue({
   type: 'payment',
   data: {
+    coopId: 'food-coop',
     from: userDid,
     to: recipientDid,
     amount: 10,
+    currency: 'hours',
     memo: 'Coffee',
-    coopId: 'food-coop',
   },
 });
 
@@ -64,10 +65,11 @@ console.log(`Queued payment with ID: ${operationId}`);
 
 | Type | Data Structure | Description |
 |------|----------------|-------------|
-| `payment` | `{ from, to, amount, memo, coopId }` | Mutual credit transfer |
-| `vote` | `{ proposalId, vote, coopId }` | Governance vote |
-| `proposal` | `{ title, description, coopId }` | Create proposal |
-| `trust_attestation` | `{ targetDid, score }` | Trust attestation |
+| `payment` | `{ coopId, from, to, amount, currency, memo? }` | Mutual credit transfer |
+| `vote` | `{ proposalId, choice }` | Governance vote |
+| `proposal` | `{ domain_id, title, description?, kind }` | Create proposal |
+
+> **Note**: Trust attestations are not yet available through the SDK API and cannot be queued.
 
 ### Operation Data Types
 
@@ -75,29 +77,27 @@ Define type-safe interfaces for operation data:
 
 ```typescript
 // Type definitions for operation data
+// These mirror the SDK's request types but include queue-specific fields
+
 interface PaymentData {
+  coopId: string;  // Passed separately to client.pay()
   from: string;
   to: string;
   amount: number;
+  currency: string;  // Required (e.g., 'hours', 'credits')
   memo?: string;
-  coopId: string;
 }
 
 interface VoteData {
-  proposalId: string;
-  vote: 'yes' | 'no' | 'abstain';
-  coopId: string;
+  proposalId: string;  // Passed separately to client.vote()
+  choice: 'yes' | 'no' | 'abstain';
 }
 
 interface ProposalData {
+  domain_id: string;  // e.g., 'coop:food-coop'
   title: string;
-  description: string;
-  coopId: string;
-}
-
-interface TrustData {
-  targetDid: string;
-  score: number;
+  description?: string;
+  kind: 'standard' | 'constitutional' | 'emergency';
 }
 ```
 
@@ -106,44 +106,42 @@ interface TrustData {
 Process queued operations when network becomes available:
 
 ```typescript
+import { ICNMobileClient } from '@icn/react-native';
+
+// Assumes client is initialized ICNMobileClient instance
+declare const client: ICNMobileClient;
+
 // Define executor for each operation type
 async function executeOperation(op: QueuedOperation): Promise<void> {
   switch (op.type) {
     case 'payment': {
-      const paymentData = op.data as PaymentData;
-      await client.payments.create(
-        paymentData.coopId,
-        paymentData.from,
-        paymentData.to,
-        paymentData.amount,
-        paymentData.memo
-      );
+      const data = op.data as PaymentData;
+      await client.pay(data.coopId, {
+        from: data.from,
+        to: data.to,
+        amount: data.amount,
+        currency: data.currency,
+        memo: data.memo,
+      });
       break;
     }
 
     case 'vote': {
-      const voteData = op.data as VoteData;
-      await client.governance.vote(
-        voteData.coopId,
-        voteData.proposalId,
-        voteData.vote
-      );
+      const data = op.data as VoteData;
+      await client.vote(data.proposalId, {
+        choice: data.choice,
+      });
       break;
     }
 
     case 'proposal': {
-      const proposalData = op.data as ProposalData;
-      await client.governance.createProposal(
-        proposalData.coopId,
-        proposalData.title,
-        proposalData.description
-      );
-      break;
-    }
-
-    case 'trust_attestation': {
-      const trustData = op.data as TrustData;
-      await client.trust.attest(trustData.targetDid, trustData.score);
+      const data = op.data as ProposalData;
+      await client.createProposal({
+        domain_id: data.domain_id,
+        title: data.title,
+        description: data.description,
+        kind: data.kind,
+      });
       break;
     }
 
@@ -196,10 +194,9 @@ if (failedOps.length > 0) {
 }
 
 async function retryFailedOperations() {
-  // Reset failed operations to pending
+  // Reset failed operations to pending using the proper API
   for (const op of failedOps) {
-    op.status = 'pending';
-    op.retries = 0;
+    await queueManager.updateStatus(op.id, 'pending');
   }
   await queueManager.processQueue(executeOperation);
 }
@@ -364,18 +361,18 @@ function SyncIndicator() {
 Update UI immediately, then sync in background:
 
 ```typescript
-async function sendPayment(to: string, amount: number) {
+async function sendPayment(to: string, amount: number, currency: string) {
   // Optimistically update local balance
   setBalance(prev => prev - amount);
 
   try {
-    await client.payments.create(coopId, userDid, to, amount);
+    await client.pay(coopId, { from: userDid, to, amount, currency });
   } catch (error) {
     if (isNetworkError(error)) {
       // Queue for later - UI already updated
       await queueManager.enqueue({
         type: 'payment',
-        data: { from: userDid, to, amount, coopId },
+        data: { coopId, from: userDid, to, amount, currency },
       });
     } else {
       // Revert optimistic update
@@ -391,7 +388,7 @@ async function sendPayment(to: string, amount: number) {
 Check constraints locally before queuing:
 
 ```typescript
-async function enqueuePayment(to: string, amount: number) {
+async function enqueuePayment(to: string, amount: number, currency: string) {
   // Local validation
   if (amount <= 0) {
     throw new Error('Amount must be positive');
@@ -403,7 +400,7 @@ async function enqueuePayment(to: string, amount: number) {
   // Queue if validation passes
   await queueManager.enqueue({
     type: 'payment',
-    data: { from: userDid, to, amount, coopId },
+    data: { coopId, from: userDid, to, amount, currency },
   });
 }
 ```
@@ -433,7 +430,7 @@ Remove queued operations when user logs out:
 async function logout() {
   // Clear queue to prevent leaking operations to new user
   await queueManager.clear();
-  await client.auth.logout();
+  await client.logout();
 }
 ```
 
@@ -441,18 +438,23 @@ async function logout() {
 
 ## Example: Complete Offline Payment Flow
 
-The following example demonstrates a complete offline-capable payment flow. Helper functions (`showSuccess`, `showInfo`, `showError`, `isNetworkError`) and variables (`coopId`, `userDid`, `client`, `queueManager`) are assumed to be defined elsewhere in your application.
+The following example demonstrates a complete offline-capable payment flow.
 
 ```typescript
 import { useState, useEffect } from 'react';
-import { QueueManager, ICNClient } from '@icn/react-native-sdk';
+import { QueueManager, ICNMobileClient, QueuedOperation, isNetworkError } from '@icn/react-native';
 import NetInfo from '@react-native-community/netinfo';
 
 // Helper functions (implement based on your UI framework)
 // function showSuccess(msg: string): void { ... }
 // function showInfo(msg: string): void { ... }
 // function showError(msg: string): void { ... }
-// function isNetworkError(error: unknown): boolean { ... }
+
+// Assumes these are initialized elsewhere in your app
+declare const client: ICNMobileClient;
+declare const queueManager: QueueManager;
+declare const coopId: string;
+declare const userDid: string;
 
 function PaymentScreen() {
   const [isOnline, setIsOnline] = useState(true);
@@ -475,17 +477,17 @@ function PaymentScreen() {
     };
   }, []);
 
-  async function handlePayment(to: string, amount: number, memo: string) {
+  async function handlePayment(to: string, amount: number, currency: string, memo: string) {
     try {
       if (isOnline) {
         // Try direct payment
-        await client.payments.create(coopId, userDid, to, amount, memo);
+        await client.pay(coopId, { from: userDid, to, amount, currency, memo });
         showSuccess('Payment sent!');
       } else {
         // Queue for later
         await queueManager.enqueue({
           type: 'payment',
-          data: { from: userDid, to, amount, memo, coopId },
+          data: { coopId, from: userDid, to, amount, currency, memo },
         });
         showInfo('Payment queued - will sync when online');
       }
@@ -494,11 +496,11 @@ function PaymentScreen() {
         // Network failed during request - queue it
         await queueManager.enqueue({
           type: 'payment',
-          data: { from: userDid, to, amount, memo, coopId },
+          data: { coopId, from: userDid, to, amount, currency, memo },
         });
         showInfo('Payment queued - will sync when online');
       } else {
-        showError(error.message);
+        showError((error as Error).message);
       }
     }
   }
@@ -537,12 +539,14 @@ function PaymentScreen() {
 | Field | Type | Description |
 |-------|------|-------------|
 | `id` | `string` | Unique identifier |
-| `type` | `'payment' \| 'vote' \| 'proposal' \| 'trust_attestation'` | Operation type |
+| `type` | `'payment' \| 'vote' \| 'proposal'` | Operation type |
 | `data` | `unknown` | Type-specific data |
 | `queuedAt` | `number` | Timestamp (ms) |
 | `retries` | `number` | Retry count (max 3) |
-| `status` | `'pending' \| 'processing' \| 'failed' \| 'completed'` | Current status |
+| `status` | `'pending' \| 'processing' \| 'failed'` | Current status |
 | `error?` | `string` | Error message if failed |
+
+> **Note**: Successfully processed operations are removed from the queue rather than being marked as `'completed'`.
 
 ---
 
