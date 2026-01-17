@@ -265,6 +265,11 @@ impl ListingInterest {
     }
 }
 
+/// Maximum items per page for pagination
+pub const MAX_PAGE_SIZE: usize = 100;
+/// Default page size
+pub const DEFAULT_PAGE_SIZE: usize = 20;
+
 /// Filter criteria for listings
 #[derive(Debug, Clone, Default)]
 pub struct ListingFilter {
@@ -282,6 +287,10 @@ pub struct ListingFilter {
     pub offered_by: Option<Did>,
     /// Only show active listings
     pub active_only: bool,
+    /// Maximum number of results (for pagination)
+    pub limit: Option<usize>,
+    /// Number of results to skip (for pagination)
+    pub offset: Option<usize>,
 }
 
 impl ListingFilter {
@@ -354,7 +363,7 @@ impl InMemoryListingsStore {
         Ok(listings.get(id).cloned())
     }
 
-    /// List all listings matching a filter
+    /// List all listings matching a filter with pagination
     pub fn list(&self, filter: &ListingFilter) -> Result<Vec<Listing>> {
         let listings = self
             .listings
@@ -370,7 +379,11 @@ impl InMemoryListingsStore {
         // Sort by created_at descending (newest first)
         result.sort_by(|a, b| b.created_at.cmp(&a.created_at));
 
-        Ok(result)
+        // Apply pagination
+        let offset = filter.offset.unwrap_or(0);
+        let limit = filter.limit.unwrap_or(DEFAULT_PAGE_SIZE).min(MAX_PAGE_SIZE);
+
+        Ok(result.into_iter().skip(offset).take(limit).collect())
     }
 
     /// Delete a listing and its associated interests
@@ -411,7 +424,34 @@ impl InMemoryListingsStore {
             .map_err(|_| anyhow::anyhow!("Interests storage lock poisoned"))?;
         Ok(interests.get(listing_id).cloned().unwrap_or_default())
     }
+
+    /// Atomically add interest if user hasn't already expressed interest.
+    /// Returns Ok(true) if added, Ok(false) if duplicate.
+    pub fn add_interest_if_not_duplicate(
+        &self,
+        interest: &ListingInterest,
+        from_did: &Did,
+    ) -> Result<bool> {
+        let mut interests = self
+            .interests
+            .write()
+            .map_err(|_| anyhow::anyhow!("Interests storage lock poisoned"))?;
+
+        let existing = interests.entry(interest.listing_id).or_default();
+
+        // Check for duplicate under the same write lock
+        if existing.iter().any(|i| &i.from_did == from_did) {
+            return Ok(false);
+        }
+
+        existing.push(interest.clone());
+        Ok(true)
+    }
 }
+
+/// Sled key version for schema migration support.
+/// When the schema changes, increment this version and add migration logic.
+const SLED_KEY_VERSION: &str = "v1";
 
 /// Sled-backed persistent listings store
 pub struct SledListingsStore {
@@ -424,9 +464,51 @@ impl SledListingsStore {
         Self { db }
     }
 
+    /// Generate a versioned key for listings
+    #[inline]
+    fn listing_key(id: &ListingId) -> String {
+        format!("{SLED_KEY_VERSION}:listing:{}", id.0)
+    }
+
+    /// Generate a versioned key prefix for listing scans
+    #[inline]
+    fn listing_prefix() -> String {
+        format!("{SLED_KEY_VERSION}:listing:")
+    }
+
+    /// Generate a versioned key for interests
+    #[inline]
+    fn interest_key(listing_id: &ListingId, interest_id: &Uuid) -> String {
+        format!(
+            "{SLED_KEY_VERSION}:interest:{}:{}",
+            listing_id.0, interest_id
+        )
+    }
+
+    /// Generate a versioned key prefix for interest scans
+    #[inline]
+    fn interest_prefix(listing_id: &ListingId) -> String {
+        format!("{SLED_KEY_VERSION}:interest:{}:", listing_id.0)
+    }
+
+    /// Generate a versioned index key for duplicate detection
+    #[inline]
+    fn interest_index_key(listing_id: &ListingId, from_did: &Did) -> String {
+        format!(
+            "{SLED_KEY_VERSION}:interest_idx:{}:{}",
+            listing_id.0, from_did
+        )
+    }
+
+    /// Generate a versioned key prefix for interest index scans
+    #[inline]
+    fn interest_index_prefix(listing_id: &ListingId) -> String {
+        format!("{SLED_KEY_VERSION}:interest_idx:{}:", listing_id.0)
+    }
+
     /// Save a listing
     pub fn save(&self, listing: &Listing) -> Result<()> {
-        let key = format!("listing:{}", listing.id.0);
+        let key = Self::listing_key(&listing.id);
         let value = icn_encoding::encode_versioned(listing)?;
         self.db.insert(key.as_bytes(), value)?;
         Ok(())
@@ -434,19 +516,19 @@ impl SledListingsStore {
 
     /// Get a listing by ID
     pub fn get(&self, id: &ListingId) -> Result<Option<Listing>> {
-        let key = format!("listing:{}", id.0);
+        let key = Self::listing_key(id);
         match self.db.get(key.as_bytes())? {
             Some(value) => Ok(Some(icn_encoding::decode_versioned(&value)?)),
             None => Ok(None),
         }
     }
 
-    /// List all listings matching a filter
+    /// List all listings matching a filter with pagination
     pub fn list(&self, filter: &ListingFilter) -> Result<Vec<Listing>> {
-        let prefix = b"listing:";
+        let prefix = Self::listing_prefix();
         let mut result = Vec::new();
 
-        for item in self.db.scan_prefix(prefix) {
+        for item in self.db.scan_prefix(prefix.as_bytes()) {
             let (_, value) = item?;
             let listing: Listing = icn_encoding::decode_versioned(&value)?;
             if filter.matches(&listing) {
@@ -457,27 +539,34 @@ impl SledListingsStore {
         // Sort by created_at descending (newest first)
         result.sort_by(|a, b| b.created_at.cmp(&a.created_at));
 
-        Ok(result)
+        // Apply pagination
+        let offset = filter.offset.unwrap_or(0);
+        let limit = filter.limit.unwrap_or(DEFAULT_PAGE_SIZE).min(MAX_PAGE_SIZE);
+
+        Ok(result.into_iter().skip(offset).take(limit).collect())
     }
 
     /// Delete a listing and its associated interests
     pub fn delete(&self, id: &ListingId) -> Result<bool> {
-        let listing_key = format!("listing:{}", id.0);
+        let listing_key = Self::listing_key(id);
         let existed = self.db.remove(listing_key.as_bytes())?.is_some();
 
         // Clean up associated interests
-        let interest_prefix = format!("interest:{}:", id.0);
+        let interest_prefix = Self::interest_prefix(id);
         for item in self.db.scan_prefix(interest_prefix.as_bytes()) {
             let (key, _) = item?;
             self.db.remove(key)?;
         }
+
+        // Clean up interest index keys
+        self.delete_interest_indexes(id)?;
 
         Ok(existed)
     }
 
     /// Add interest in a listing
     pub fn add_interest(&self, interest: &ListingInterest) -> Result<()> {
-        let key = format!("interest:{}:{}", interest.listing_id.0, interest.id);
+        let key = Self::interest_key(&interest.listing_id, &interest.id);
         let value = icn_encoding::encode_versioned(interest)?;
         self.db.insert(key.as_bytes(), value)?;
         Ok(())
@@ -485,7 +574,7 @@ impl SledListingsStore {
 
     /// Get interests for a listing
     pub fn get_interests(&self, listing_id: &ListingId) -> Result<Vec<ListingInterest>> {
-        let prefix = format!("interest:{}:", listing_id.0);
+        let prefix = Self::interest_prefix(listing_id);
         let mut interests = Vec::new();
 
         for item in self.db.scan_prefix(prefix.as_bytes()) {
@@ -499,6 +588,51 @@ impl SledListingsStore {
 
         Ok(interests)
     }
+
+    /// Atomically add interest if user hasn't already expressed interest.
+    /// Returns Ok(true) if added, Ok(false) if duplicate.
+    ///
+    /// Uses a separate versioned index key with compare-and-swap to ensure
+    /// atomicity: if CAS succeeds, we know no other concurrent request got there first.
+    pub fn add_interest_if_not_duplicate(
+        &self,
+        interest: &ListingInterest,
+        from_did: &Did,
+    ) -> Result<bool> {
+        let listing_id = interest.listing_id;
+
+        // Use an index key to track which DIDs have expressed interest
+        // This allows atomic CAS without scanning all interests
+        let index_key = Self::interest_index_key(&listing_id, from_did);
+
+        // Atomically try to set the index key (only succeeds if not present)
+        // compare_and_swap(key, old, new) - if old matches current value, set to new
+        let cas_result =
+            self.db
+                .compare_and_swap(index_key.as_bytes(), None::<&[u8]>, Some(b"1"))?;
+
+        if cas_result.is_err() {
+            // Key already existed - duplicate interest
+            return Ok(false);
+        }
+
+        // CAS succeeded - no duplicate, now insert the actual interest data
+        let interest_key = Self::interest_key(&listing_id, &interest.id);
+        let interest_value = icn_encoding::encode_versioned(interest)?;
+        self.db.insert(interest_key.as_bytes(), interest_value)?;
+
+        Ok(true)
+    }
+
+    /// Clean up index keys when deleting a listing's interests
+    fn delete_interest_indexes(&self, listing_id: &ListingId) -> Result<()> {
+        let prefix = Self::interest_index_prefix(listing_id);
+        for item in self.db.scan_prefix(prefix.as_bytes()) {
+            let (key, _) = item?;
+            self.db.remove(key)?;
+        }
+        Ok(())
+    }
 }
 
 /// Listings store backend trait
@@ -509,6 +643,13 @@ pub trait ListingsStoreBackend: Send + Sync {
     fn delete(&self, id: &ListingId) -> Result<bool>;
     fn add_interest(&self, interest: &ListingInterest) -> Result<()>;
     fn get_interests(&self, listing_id: &ListingId) -> Result<Vec<ListingInterest>>;
+    /// Atomically add interest if user hasn't already expressed interest.
+    /// Returns Ok(true) if added, Ok(false) if duplicate, Err on failure.
+    fn add_interest_if_not_duplicate(
+        &self,
+        interest: &ListingInterest,
+        from_did: &Did,
+    ) -> Result<bool>;
 }
 
 impl ListingsStoreBackend for InMemoryListingsStore {
@@ -530,6 +671,13 @@ impl ListingsStoreBackend for InMemoryListingsStore {
     fn get_interests(&self, listing_id: &ListingId) -> Result<Vec<ListingInterest>> {
         InMemoryListingsStore::get_interests(self, listing_id)
     }
+    fn add_interest_if_not_duplicate(
+        &self,
+        interest: &ListingInterest,
+        from_did: &Did,
+    ) -> Result<bool> {
+        InMemoryListingsStore::add_interest_if_not_duplicate(self, interest, from_did)
+    }
 }
 
 impl ListingsStoreBackend for SledListingsStore {
@@ -550,6 +698,13 @@ impl ListingsStoreBackend for SledListingsStore {
     }
     fn get_interests(&self, listing_id: &ListingId) -> Result<Vec<ListingInterest>> {
         SledListingsStore::get_interests(self, listing_id)
+    }
+    fn add_interest_if_not_duplicate(
+        &self,
+        interest: &ListingInterest,
+        from_did: &Did,
+    ) -> Result<bool> {
+        SledListingsStore::add_interest_if_not_duplicate(self, interest, from_did)
     }
 }
 
@@ -647,16 +802,19 @@ impl ListingsManager {
             anyhow::bail!("Listing is not active");
         }
 
-        // Prevent duplicate interests from the same user
-        let existing_interests = self.store.get_interests(&listing_id)?;
-        if existing_interests.iter().any(|i| i.from_did == from_did) {
+        let now = icn_time::current_timestamp_secs();
+        let interest =
+            ListingInterest::new(listing_id, from_did.clone(), from_coop, message, offer, now);
+
+        // Use atomic check-and-insert to prevent race conditions
+        let added = self
+            .store
+            .add_interest_if_not_duplicate(&interest, &from_did)?;
+
+        if !added {
             anyhow::bail!("You have already expressed interest in this listing");
         }
 
-        let now = icn_time::current_timestamp_secs();
-        let interest = ListingInterest::new(listing_id, from_did, from_coop, message, offer, now);
-
-        self.store.add_interest(&interest)?;
         Ok(interest)
     }
 

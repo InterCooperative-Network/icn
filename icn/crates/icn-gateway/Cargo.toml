@@ -51,6 +51,9 @@ jsonwebtoken = "9"
 # UUID generation
 uuid = { version = "1", features = ["v4"] }
 
+# URL parsing
+url = "2"
+
 # Time
 chrono = "0.4"
 

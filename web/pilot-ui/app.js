@@ -1038,7 +1038,7 @@ function renderRecentActivity(transactions) {
                     <div class="activity-parties">
                         ${isReceived ? 'From' : 'To'} ${truncateDid(other)}
                     </div>
-                    ${tx.memo ? `<div class="activity-memo">${tx.memo}</div>` : ''}
+                    ${tx.memo ? `<div class="activity-memo">${escapeHtml(tx.memo)}</div>` : ''}
                 </div>
                 <div class="activity-amount ${amountClass}">
                     ${sign}${tx.amount} hrs
@@ -1255,7 +1255,7 @@ function renderTransactionList(transactions) {
                     </div>
                     <div class="transaction-meta">
                         ${formatDateTime(tx.timestamp)}
-                        ${tx.memo ? ` &bull; ${tx.memo}` : ''}
+                        ${tx.memo ? ` &bull; ${escapeHtml(tx.memo)}` : ''}
                     </div>
                 </div>
                 <div class="transaction-amount">
@@ -1283,12 +1283,12 @@ function renderMemberList(members) {
         const displayRole = member.role || 'Member';
 
         return `
-            <div class="member-item" data-did="${member.did}">
+            <div class="member-item" data-did="${escapeHtml(member.did)}">
                 <div class="member-info">
-                    <div class="member-did" title="${member.did}">${truncateDid(member.did)}</div>
-                    <button class="btn-copy-did" data-did="${member.did}" title="Copy full DID">📋</button>
+                    <div class="member-did" title="${escapeHtml(member.did)}">${truncateDid(member.did)}</div>
+                    <button class="btn-copy-did" data-did="${escapeHtml(member.did)}" title="Copy full DID">📋</button>
                 </div>
-                <div class="member-role ${roleClass}">${displayRole}</div>
+                <div class="member-role ${roleClass}">${escapeHtml(displayRole)}</div>
             </div>
         `;
     }).join('');
@@ -3595,7 +3595,7 @@ function renderPreview() {
         errorList.innerHTML = csvImportState.invalidRows
             .slice(0, 10) // Show first 10 errors
             .map(row => {
-                return `<li>Line ${row.lineNumber}: ${row.errors.join(', ')}</li>`;
+                return `<li>Line ${row.lineNumber}: ${escapeHtml(row.errors.join(', '))}</li>`;
             })
             .join('');
 
@@ -3625,7 +3625,7 @@ function renderPreview() {
             return `
                 <tr>
                     <td>${truncateDid(row.did)}</td>
-                    <td>${row.role}</td>
+                    <td>${escapeHtml(row.role)}</td>
                     <td>${parseFloat(row.balance).toFixed(1)}</td>
                     <td class="${statusClass}">${statusText}</td>
                 </tr>
@@ -3969,7 +3969,7 @@ function renderBatchPreview() {
         errorList.innerHTML = batchImportState.invalidRows
             .slice(0, 10) // Show first 10 errors
             .map(row => {
-                return `<li>Line ${row.lineNumber}: ${row.errors.join(', ')}</li>`;
+                return `<li>Line ${row.lineNumber}: ${escapeHtml(row.errors.join(', '))}</li>`;
             })
             .join('');
 
@@ -3999,7 +3999,7 @@ function renderBatchPreview() {
                     <td>${truncateDid(row.from)}</td>
                     <td>${truncateDid(row.to)}</td>
                     <td>${parseFloat(row.amount).toFixed(1)} hrs</td>
-                    <td>${row.memo}</td>
+                    <td>${escapeHtml(row.memo || '')}</td>
                     <td class="${statusClass}">${statusText}</td>
                 </tr>
             `;

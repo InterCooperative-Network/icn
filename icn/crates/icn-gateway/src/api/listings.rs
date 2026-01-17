@@ -4,8 +4,10 @@
 //! Enables cooperatives to post offers/wants before going to external markets.
 
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
+use std::net::IpAddr;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use url::Url;
 use uuid::Uuid;
 
 use crate::error::{GatewayError, Result};
@@ -33,6 +35,110 @@ const MAX_TAGS: usize = 15;
 const MAX_TAG_LENGTH: usize = 50;
 const MAX_INTEREST_MESSAGE_LENGTH: usize = 2000;
 const MAX_INTEREST_OFFER_LENGTH: usize = 1000;
+
+// Maximum expiry duration: 1 year (365 days in seconds)
+const MAX_EXPIRY_DURATION_SECS: u64 = 365 * 24 * 60 * 60;
+
+// ============================================================================
+// URL Validation Functions
+// ============================================================================
+
+/// Validate a photo URL for security
+/// - Only allows https:// and ipfs:// schemes
+/// - Blocks private/internal IPs (SSRF protection)
+/// - Validates URL format
+fn validate_photo_url(url_str: &str, index: usize) -> Result<()> {
+    // IPFS URLs are handled specially (they don't have a host)
+    if url_str.starts_with("ipfs://") {
+        // Basic IPFS validation: must have a CID after the scheme
+        let cid = url_str.strip_prefix("ipfs://").unwrap_or("");
+        if cid.is_empty() || cid.contains('\n') || cid.contains('\r') {
+            return Err(GatewayError::BadRequest(format!(
+                "Photo URL {} has invalid IPFS format",
+                index + 1
+            )));
+        }
+        return Ok(());
+    }
+
+    // Parse as URL
+    let url = Url::parse(url_str).map_err(|e| {
+        GatewayError::BadRequest(format!("Photo URL {} is not a valid URL: {}", index + 1, e))
+    })?;
+
+    // Only allow https scheme
+    if url.scheme() != "https" {
+        return Err(GatewayError::BadRequest(format!(
+            "Photo URL {} must use https:// or ipfs:// scheme",
+            index + 1
+        )));
+    }
+
+    // Get the host
+    let host = url
+        .host_str()
+        .ok_or_else(|| GatewayError::BadRequest(format!("Photo URL {} has no host", index + 1)))?;
+
+    // Block localhost and common internal hostnames
+    let host_lower = host.to_lowercase();
+    if host_lower == "localhost"
+        || host_lower == "127.0.0.1"
+        || host_lower.ends_with(".local")
+        || host_lower.ends_with(".internal")
+        || host_lower.ends_with(".localhost")
+    {
+        return Err(GatewayError::BadRequest(format!(
+            "Photo URL {} cannot reference internal/localhost addresses",
+            index + 1
+        )));
+    }
+
+    // Try to parse as IP address and block private ranges
+    if let Ok(ip) = host.parse::<IpAddr>() {
+        if is_private_ip(&ip) {
+            return Err(GatewayError::BadRequest(format!(
+                "Photo URL {} cannot reference private IP addresses",
+                index + 1
+            )));
+        }
+    }
+
+    // Check for CRLF injection in the URL
+    if url_str.contains('\n') || url_str.contains('\r') {
+        return Err(GatewayError::BadRequest(format!(
+            "Photo URL {} contains invalid characters",
+            index + 1
+        )));
+    }
+
+    Ok(())
+}
+
+/// Check if an IP address is in a private/reserved range
+fn is_private_ip(ip: &IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(ipv4) => {
+            ipv4.is_private()
+                || ipv4.is_loopback()
+                || ipv4.is_link_local()
+                || ipv4.is_broadcast()
+                || ipv4.is_documentation()
+                || ipv4.is_unspecified()
+                // Also block 100.64.0.0/10 (Carrier-grade NAT)
+                || (ipv4.octets()[0] == 100 && (ipv4.octets()[1] & 0xC0) == 64)
+                // Block 192.0.0.0/24 (IETF Protocol Assignments)
+                || (ipv4.octets()[0] == 192 && ipv4.octets()[1] == 0 && ipv4.octets()[2] == 0)
+        }
+        IpAddr::V6(ipv6) => {
+            ipv6.is_loopback()
+                || ipv6.is_unspecified()
+                // is_unique_local() and is_unicast_link_local() are unstable,
+                // so we check manually
+                || (ipv6.segments()[0] & 0xfe00) == 0xfc00 // Unique local (fc00::/7)
+                || (ipv6.segments()[0] & 0xffc0) == 0xfe80 // Link-local (fe80::/10)
+        }
+    }
+}
 
 // ============================================================================
 // Validation Functions
@@ -89,13 +195,8 @@ fn validate_listing_input(req: &CreateListingRequest) -> Result<()> {
                 "Photo URLs cannot be empty strings".to_string(),
             ));
         }
-        // Only allow https:// and ipfs:// URLs for security
-        if !photo.starts_with("https://") && !photo.starts_with("ipfs://") {
-            return Err(GatewayError::BadRequest(format!(
-                "Photo URL {} must use https:// or ipfs:// scheme",
-                i + 1
-            )));
-        }
+        // Validate URL scheme, format, and block private IPs (SSRF protection)
+        validate_photo_url(photo, i)?;
     }
 
     // Tags validation
@@ -117,12 +218,18 @@ fn validate_listing_input(req: &CreateListingRequest) -> Result<()> {
         }
     }
 
-    // Expiry date validation - can't be in the past
+    // Expiry date validation - can't be in the past or too far in the future
     if let Some(expires_at) = req.expires_at {
         let now = icn_time::current_timestamp_secs();
         if expires_at < now {
             return Err(GatewayError::BadRequest(
                 "Expiry date cannot be in the past".to_string(),
+            ));
+        }
+        let max_expiry = now.saturating_add(MAX_EXPIRY_DURATION_SECS);
+        if expires_at > max_expiry {
+            return Err(GatewayError::BadRequest(
+                "Expiry date cannot be more than 1 year in the future".to_string(),
             ));
         }
     }
@@ -188,13 +295,8 @@ fn validate_listing_update(req: &UpdateListingRequest) -> Result<()> {
                     "Photo URLs cannot be empty strings".to_string(),
                 ));
             }
-            // Only allow https:// and ipfs:// URLs for security
-            if !photo.starts_with("https://") && !photo.starts_with("ipfs://") {
-                return Err(GatewayError::BadRequest(format!(
-                    "Photo URL {} must use https:// or ipfs:// scheme",
-                    i + 1
-                )));
-            }
+            // Validate URL scheme, format, and block private IPs (SSRF protection)
+            validate_photo_url(photo, i)?;
         }
     }
 
@@ -219,12 +321,18 @@ fn validate_listing_update(req: &UpdateListingRequest) -> Result<()> {
         }
     }
 
-    // Expiry date validation - if provided, can't be in the past
+    // Expiry date validation - if provided, can't be in the past or too far in the future
     if let Some(expires_at) = req.expires_at {
         let now = icn_time::current_timestamp_secs();
         if expires_at < now {
             return Err(GatewayError::BadRequest(
                 "Expiry date cannot be in the past".to_string(),
+            ));
+        }
+        let max_expiry = now.saturating_add(MAX_EXPIRY_DURATION_SECS);
+        if expires_at > max_expiry {
+            return Err(GatewayError::BadRequest(
+                "Expiry date cannot be more than 1 year in the future".to_string(),
             ));
         }
     }
@@ -353,6 +461,10 @@ fn build_listing_filter(params: &ListingFilterParams) -> Result<ListingFilter> {
     }
     // Note: visibility filter not currently in ListingFilter
     // search filter not currently supported
+
+    // Pagination parameters
+    filter.limit = params.limit;
+    filter.offset = params.offset;
 
     Ok(filter)
 }

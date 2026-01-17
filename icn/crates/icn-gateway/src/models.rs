@@ -949,4 +949,10 @@ pub struct ListingFilterParams {
     /// Filter by tag
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tag: Option<String>,
+    /// Maximum number of results (default: 20, max: 100)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limit: Option<usize>,
+    /// Number of results to skip for pagination (default: 0)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub offset: Option<usize>,
 }
