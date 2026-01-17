@@ -536,7 +536,10 @@ mod tests {
         assert!(!item.is_overdue(1000));
 
         // Edge case: exactly at due date - should be overdue
-        assert!(item.is_overdue(1500), "Item at exact due date should be overdue");
+        assert!(
+            item.is_overdue(1500),
+            "Item at exact due date should be overdue"
+        );
 
         // Completed items are never overdue
         item.status = ActionItemStatus::Completed;

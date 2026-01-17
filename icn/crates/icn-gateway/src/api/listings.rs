@@ -40,7 +40,9 @@ const MAX_TAG_LENGTH: usize = 50;
 fn validate_listing_input(req: &CreateListingRequest) -> Result<()> {
     // Title validation
     if req.title.is_empty() {
-        return Err(GatewayError::BadRequest("Title cannot be empty".to_string()));
+        return Err(GatewayError::BadRequest(
+            "Title cannot be empty".to_string(),
+        ));
     }
     if req.title.len() > MAX_TITLE_LENGTH {
         return Err(GatewayError::BadRequest(format!(
@@ -127,7 +129,9 @@ fn validate_listing_update(req: &UpdateListingRequest) -> Result<()> {
     // Title validation
     if let Some(ref title) = req.title {
         if title.is_empty() {
-            return Err(GatewayError::BadRequest("Title cannot be empty".to_string()));
+            return Err(GatewayError::BadRequest(
+                "Title cannot be empty".to_string(),
+            ));
         }
         if title.len() > MAX_TITLE_LENGTH {
             return Err(GatewayError::BadRequest(format!(
@@ -331,9 +335,11 @@ fn build_listing_filter(params: &ListingFilterParams) -> Result<ListingFilter> {
         filter.tag = Some(tag.clone());
     }
     if let Some(ref owner) = params.offered_by {
-        filter.offered_by = Some(owner.parse().map_err(|e| {
-            GatewayError::BadRequest(format!("Invalid offered_by DID: {e}"))
-        })?);
+        filter.offered_by = Some(
+            owner
+                .parse()
+                .map_err(|e| GatewayError::BadRequest(format!("Invalid offered_by DID: {e}")))?,
+        );
     }
     // Note: visibility filter not currently in ListingFilter
     // search filter not currently supported
@@ -457,7 +463,9 @@ pub async fn get_listing(
         .ok_or_else(|| GatewayError::NotFound(format!("Listing not found: {listing_id}")))?;
 
     // Privacy: only show interest count if caller owns the listing
-    let is_owner = caller_did.as_ref().is_some_and(|did| did == &listing.offered_by);
+    let is_owner = caller_did
+        .as_ref()
+        .is_some_and(|did| did == &listing.offered_by);
     let interest_count = if is_owner {
         mgr.get_interests(&listing_id).map(|i| i.len()).unwrap_or(0)
     } else {
