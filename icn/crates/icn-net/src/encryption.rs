@@ -65,12 +65,20 @@
 //!
 //! [`OutgoingSequenceTracker`]: crate::sequence_tracker::OutgoingSequenceTracker
 //!
-//! ## TODO: Integration
+//! ## Integration Status
 //!
-//! The `OutgoingSequenceTracker` is currently standalone. Future work:
-//! - Wire into `NetworkActor` for automatic sequence management
-//! - Add periodic cleanup task for stale entries
-//! - Add metrics for cache size monitoring
+//! The `EncryptedEnvelope` is fully integrated into [`NetworkActor`]:
+//! - [`NetworkActor::send_encrypted_message()`] - Sends encrypted messages
+//! - [`crate::handlers::encrypted`] - Processes incoming encrypted envelopes
+//! - [`OutgoingSequenceTracker`] - Manages sequence numbers with persistence
+//!
+//! [`NetworkActor`]: crate::actor::NetworkActor
+//! [`NetworkActor::send_encrypted_message()`]: crate::actor::NetworkHandle::send_encrypted_message
+//!
+//! ### Related Issues
+//!
+//! - #404 (closed): Initial wiring into NetworkActor
+//! - #412 (closed): Documentation of integration TODO
 //!
 //! ## Limitations
 //!
