@@ -2072,6 +2072,146 @@ async fn check_domain_membership(
     Ok(())
 }
 
+/// Validation constants for action items
+const MAX_TITLE_LENGTH: usize = 200;
+const MAX_DESCRIPTION_LENGTH: usize = 5000;
+const MAX_TAGS: usize = 10;
+const MAX_TAG_LENGTH: usize = 50;
+const MAX_MEETING_CONTEXT_LENGTH: usize = 500;
+
+/// Validate action item input
+fn validate_action_item_input(req: &CreateActionItemRequest) -> Result<()> {
+    // Title validation
+    if req.title.is_empty() {
+        return Err(crate::error::GatewayError::BadRequest(
+            "Title cannot be empty".to_string(),
+        ));
+    }
+    if req.title.len() > MAX_TITLE_LENGTH {
+        return Err(crate::error::GatewayError::BadRequest(format!(
+            "Title exceeds maximum length of {MAX_TITLE_LENGTH} characters"
+        )));
+    }
+
+    // Description validation
+    if let Some(ref desc) = req.description {
+        if desc.len() > MAX_DESCRIPTION_LENGTH {
+            return Err(crate::error::GatewayError::BadRequest(format!(
+                "Description exceeds maximum length of {MAX_DESCRIPTION_LENGTH} characters"
+            )));
+        }
+    }
+
+    // Tags validation
+    if req.tags.len() > MAX_TAGS {
+        return Err(crate::error::GatewayError::BadRequest(format!(
+            "Too many tags (maximum {MAX_TAGS})"
+        )));
+    }
+    for tag in &req.tags {
+        if tag.len() > MAX_TAG_LENGTH {
+            return Err(crate::error::GatewayError::BadRequest(format!(
+                "Tag '{tag}' exceeds maximum length of {MAX_TAG_LENGTH} characters"
+            )));
+        }
+        if tag.is_empty() {
+            return Err(crate::error::GatewayError::BadRequest(
+                "Tags cannot be empty strings".to_string(),
+            ));
+        }
+    }
+
+    // Meeting context validation
+    if let Some(ref context) = req.meeting_context {
+        if context.len() > MAX_MEETING_CONTEXT_LENGTH {
+            return Err(crate::error::GatewayError::BadRequest(format!(
+                "Meeting context exceeds maximum length of {MAX_MEETING_CONTEXT_LENGTH} characters"
+            )));
+        }
+    }
+
+    // Due date validation - can't be in the past (allow 5 minute grace period)
+    if let Some(due_date) = req.due_date {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let grace_period = 5 * 60; // 5 minutes
+        if due_date < now.saturating_sub(grace_period) {
+            return Err(crate::error::GatewayError::BadRequest(
+                "Due date cannot be in the past".to_string(),
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+/// Validate action item update input
+fn validate_action_item_update(req: &UpdateActionItemRequest) -> Result<()> {
+    // Title validation
+    if let Some(ref title) = req.title {
+        if title.is_empty() {
+            return Err(crate::error::GatewayError::BadRequest(
+                "Title cannot be empty".to_string(),
+            ));
+        }
+        if title.len() > MAX_TITLE_LENGTH {
+            return Err(crate::error::GatewayError::BadRequest(format!(
+                "Title exceeds maximum length of {MAX_TITLE_LENGTH} characters"
+            )));
+        }
+    }
+
+    // Description validation
+    if let Some(ref desc) = req.description {
+        if desc.len() > MAX_DESCRIPTION_LENGTH {
+            return Err(crate::error::GatewayError::BadRequest(format!(
+                "Description exceeds maximum length of {MAX_DESCRIPTION_LENGTH} characters"
+            )));
+        }
+    }
+
+    // Tags validation
+    if let Some(ref tags) = req.tags {
+        if tags.len() > MAX_TAGS {
+            return Err(crate::error::GatewayError::BadRequest(format!(
+                "Too many tags (maximum {MAX_TAGS})"
+            )));
+        }
+        for tag in tags {
+            if tag.len() > MAX_TAG_LENGTH {
+                return Err(crate::error::GatewayError::BadRequest(format!(
+                    "Tag '{tag}' exceeds maximum length of {MAX_TAG_LENGTH} characters"
+                )));
+            }
+            if tag.is_empty() {
+                return Err(crate::error::GatewayError::BadRequest(
+                    "Tags cannot be empty strings".to_string(),
+                ));
+            }
+        }
+    }
+
+    // Due date validation - if provided and non-zero, can't be in the past
+    if let Some(due_date) = req.due_date {
+        if due_date != 0 {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
+            let grace_period = 5 * 60; // 5 minutes
+            if due_date < now.saturating_sub(grace_period) {
+                return Err(crate::error::GatewayError::BadRequest(
+                    "Due date cannot be in the past".to_string(),
+                ));
+            }
+        }
+    }
+
+    Ok(())
+}
+
 /// POST /gov/domains/{domain_id}/action-items - Create a new action item
 #[post("/domains/{domain_id}/action-items")]
 pub async fn create_action_item(
@@ -2094,6 +2234,9 @@ pub async fn create_action_item(
 
     // Verify domain membership
     check_domain_membership(&gov_mgr, &domain, &creator_did).await?;
+
+    // Input validation
+    validate_action_item_input(&req)?;
 
     // Parse assignee DID if provided
     let assignee: Option<Did> = if let Some(ref assignee_str) = req.assignee {
@@ -2196,6 +2339,9 @@ pub async fn update_action_item(
 
     // Verify domain membership
     check_domain_membership(&gov_mgr, &domain, &user_did).await?;
+
+    // Input validation
+    validate_action_item_update(&req)?;
 
     // Get existing item
     let mut item = gov_mgr

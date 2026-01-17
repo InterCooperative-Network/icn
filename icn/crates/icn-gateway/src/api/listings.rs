@@ -21,6 +21,204 @@ use crate::models::{
 use icn_identity::Did;
 
 // ============================================================================
+// Validation Constants
+// ============================================================================
+
+const MAX_TITLE_LENGTH: usize = 200;
+const MAX_DESCRIPTION_LENGTH: usize = 5000;
+const MAX_SEEKING_LENGTH: usize = 1000;
+const MAX_PHOTOS: usize = 10;
+const MAX_PHOTO_URL_LENGTH: usize = 500;
+const MAX_TAGS: usize = 15;
+const MAX_TAG_LENGTH: usize = 50;
+
+// ============================================================================
+// Validation Functions
+// ============================================================================
+
+/// Validate listing create input
+fn validate_listing_input(req: &CreateListingRequest) -> Result<()> {
+    // Title validation
+    if req.title.is_empty() {
+        return Err(GatewayError::BadRequest("Title cannot be empty".to_string()));
+    }
+    if req.title.len() > MAX_TITLE_LENGTH {
+        return Err(GatewayError::BadRequest(format!(
+            "Title exceeds maximum length of {MAX_TITLE_LENGTH} characters"
+        )));
+    }
+
+    // Description validation
+    if req.description.is_empty() {
+        return Err(GatewayError::BadRequest(
+            "Description cannot be empty".to_string(),
+        ));
+    }
+    if req.description.len() > MAX_DESCRIPTION_LENGTH {
+        return Err(GatewayError::BadRequest(format!(
+            "Description exceeds maximum length of {MAX_DESCRIPTION_LENGTH} characters"
+        )));
+    }
+
+    // Seeking validation
+    if req.seeking.len() > MAX_SEEKING_LENGTH {
+        return Err(GatewayError::BadRequest(format!(
+            "Seeking text exceeds maximum length of {MAX_SEEKING_LENGTH} characters"
+        )));
+    }
+
+    // Photos validation
+    if req.photos.len() > MAX_PHOTOS {
+        return Err(GatewayError::BadRequest(format!(
+            "Too many photos (maximum {MAX_PHOTOS})"
+        )));
+    }
+    for (i, photo) in req.photos.iter().enumerate() {
+        if photo.len() > MAX_PHOTO_URL_LENGTH {
+            return Err(GatewayError::BadRequest(format!(
+                "Photo URL {} exceeds maximum length of {MAX_PHOTO_URL_LENGTH} characters",
+                i + 1
+            )));
+        }
+        if photo.is_empty() {
+            return Err(GatewayError::BadRequest(
+                "Photo URLs cannot be empty strings".to_string(),
+            ));
+        }
+    }
+
+    // Tags validation
+    if req.tags.len() > MAX_TAGS {
+        return Err(GatewayError::BadRequest(format!(
+            "Too many tags (maximum {MAX_TAGS})"
+        )));
+    }
+    for tag in &req.tags {
+        if tag.len() > MAX_TAG_LENGTH {
+            return Err(GatewayError::BadRequest(format!(
+                "Tag '{tag}' exceeds maximum length of {MAX_TAG_LENGTH} characters"
+            )));
+        }
+        if tag.is_empty() {
+            return Err(GatewayError::BadRequest(
+                "Tags cannot be empty strings".to_string(),
+            ));
+        }
+    }
+
+    // Expiry date validation - can't be in the past
+    if let Some(expires_at) = req.expires_at {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        if expires_at < now {
+            return Err(GatewayError::BadRequest(
+                "Expiry date cannot be in the past".to_string(),
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+/// Validate listing update input
+fn validate_listing_update(req: &UpdateListingRequest) -> Result<()> {
+    // Title validation
+    if let Some(ref title) = req.title {
+        if title.is_empty() {
+            return Err(GatewayError::BadRequest("Title cannot be empty".to_string()));
+        }
+        if title.len() > MAX_TITLE_LENGTH {
+            return Err(GatewayError::BadRequest(format!(
+                "Title exceeds maximum length of {MAX_TITLE_LENGTH} characters"
+            )));
+        }
+    }
+
+    // Description validation
+    if let Some(ref desc) = req.description {
+        if desc.is_empty() {
+            return Err(GatewayError::BadRequest(
+                "Description cannot be empty".to_string(),
+            ));
+        }
+        if desc.len() > MAX_DESCRIPTION_LENGTH {
+            return Err(GatewayError::BadRequest(format!(
+                "Description exceeds maximum length of {MAX_DESCRIPTION_LENGTH} characters"
+            )));
+        }
+    }
+
+    // Seeking validation
+    if let Some(ref seeking) = req.seeking {
+        if seeking.len() > MAX_SEEKING_LENGTH {
+            return Err(GatewayError::BadRequest(format!(
+                "Seeking text exceeds maximum length of {MAX_SEEKING_LENGTH} characters"
+            )));
+        }
+    }
+
+    // Photos validation
+    if let Some(ref photos) = req.photos {
+        if photos.len() > MAX_PHOTOS {
+            return Err(GatewayError::BadRequest(format!(
+                "Too many photos (maximum {MAX_PHOTOS})"
+            )));
+        }
+        for (i, photo) in photos.iter().enumerate() {
+            if photo.len() > MAX_PHOTO_URL_LENGTH {
+                return Err(GatewayError::BadRequest(format!(
+                    "Photo URL {} exceeds maximum length of {MAX_PHOTO_URL_LENGTH} characters",
+                    i + 1
+                )));
+            }
+            if photo.is_empty() {
+                return Err(GatewayError::BadRequest(
+                    "Photo URLs cannot be empty strings".to_string(),
+                ));
+            }
+        }
+    }
+
+    // Tags validation
+    if let Some(ref tags) = req.tags {
+        if tags.len() > MAX_TAGS {
+            return Err(GatewayError::BadRequest(format!(
+                "Too many tags (maximum {MAX_TAGS})"
+            )));
+        }
+        for tag in tags {
+            if tag.len() > MAX_TAG_LENGTH {
+                return Err(GatewayError::BadRequest(format!(
+                    "Tag '{tag}' exceeds maximum length of {MAX_TAG_LENGTH} characters"
+                )));
+            }
+            if tag.is_empty() {
+                return Err(GatewayError::BadRequest(
+                    "Tags cannot be empty strings".to_string(),
+                ));
+            }
+        }
+    }
+
+    // Expiry date validation - if provided, can't be in the past
+    if let Some(expires_at) = req.expires_at {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        if expires_at < now {
+            return Err(GatewayError::BadRequest(
+                "Expiry date cannot be in the past".to_string(),
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+// ============================================================================
 // Helper Functions
 // ============================================================================
 
@@ -163,7 +361,10 @@ pub async fn create_listing(
 
     let coop_id = claims.coop_id.clone();
 
-    // Parse and validate inputs
+    // Validate input
+    validate_listing_input(&req)?;
+
+    // Parse inputs
     let listing_type = parse_listing_type(&req.listing_type)?;
     let category = parse_category(&req.category);
     let visibility = parse_visibility(&req.visibility)?;
@@ -264,6 +465,9 @@ pub async fn update_listing(
         .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
 
     let listing_id = parse_listing_id(&path)?;
+
+    // Validate input
+    validate_listing_update(&req)?;
 
     let mgr = listings_mgr.write().await;
 
