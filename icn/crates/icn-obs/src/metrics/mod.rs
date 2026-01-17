@@ -29,6 +29,7 @@ pub use legacy::*;
 
 pub mod agreement;
 pub mod gateway;
+pub mod ledger;
 pub mod nat;
 pub mod network;
 pub mod rpc;
