@@ -451,9 +451,10 @@ mod tests {
         // Production CSP must not allow dynamic code execution
         let config = SecurityConfig::production();
         // Check that dangerous CSP directives are not present
-        let dangerous_directive = "unsafe-".to_string() + "eval";
+        // CSP keywords use single quotes, e.g., 'unsafe-eval'
+        let dangerous_directive = "'unsafe-eval'";
         assert!(
-            !config.csp_directive.contains(&dangerous_directive),
+            !config.csp_directive.contains(dangerous_directive),
             "Production CSP must not allow dynamic code execution"
         );
     }
@@ -473,9 +474,10 @@ mod tests {
         // Even with custom origins, CSP should be strict
         let config =
             SecurityConfig::production_with_origins(vec!["https://app.icn.coop".to_string()]);
-        let dangerous_directive = "unsafe-".to_string() + "eval";
+        // CSP keywords use single quotes, e.g., 'unsafe-eval'
+        let dangerous_directive = "'unsafe-eval'";
         assert!(
-            !config.csp_directive.contains(&dangerous_directive),
+            !config.csp_directive.contains(dangerous_directive),
             "production_with_origins CSP must be strict"
         );
         assert!(
