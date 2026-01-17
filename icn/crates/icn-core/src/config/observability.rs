@@ -22,6 +22,24 @@ pub struct ObservabilityConfig {
 }
 
 /// Distributed tracing configuration with OpenTelemetry
+///
+/// # Priority Sampling
+///
+/// ICN uses priority-based sampling to reduce overhead while capturing important traces:
+///
+/// ## Implemented (Head-Based)
+///
+/// - **Security events**: Always sampled (spans with "security" in name)
+/// - **Normal operations**: Sampled at `sampling_rate`
+///
+/// ## Requires Collector-Side Configuration (Tail-Based)
+///
+/// Error and slow request sampling require tail-based sampling decisions
+/// (decisions made after span completion). These must be configured in your
+/// OpenTelemetry Collector using tail-based sampling processors.
+///
+/// The `always_sample_errors` and `always_sample_slow` fields are reserved
+/// for future collector policy generation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TracingConfig {
     /// Enable distributed tracing export
@@ -33,8 +51,28 @@ pub struct TracingConfig {
     pub otlp_endpoint: String,
 
     /// Sampling rate (0.0 to 1.0). Default is 0.1 (10%) for production.
+    /// Security spans (names containing "security") are always sampled.
+    /// Error/slow sampling requires collector-side tail-based configuration.
     #[serde(default = "default_sampling_rate")]
     pub sampling_rate: f64,
+
+    /// Reserved for collector-side tail-based sampling configuration.
+    /// Error sampling requires post-span analysis at the collector level.
+    /// Set to true to indicate intent for collector policy generation.
+    #[serde(default = "default_always_sample_errors")]
+    pub always_sample_errors: bool,
+
+    /// Reserved for collector-side tail-based sampling configuration.
+    /// Duration-based sampling requires post-span analysis at the collector level.
+    /// Set to true to indicate intent for collector policy generation.
+    #[serde(default = "default_always_sample_slow")]
+    pub always_sample_slow: bool,
+
+    /// Reserved for collector-side tail-based sampling configuration.
+    /// Threshold (in milliseconds) for considering a request "slow".
+    /// Used by collector tail-sampling processors, not enforced at SDK level.
+    #[serde(default = "default_slow_threshold_ms")]
+    pub slow_threshold_ms: u64,
 
     /// Service name for traces
     #[serde(default = "default_service_name")]
@@ -49,6 +87,18 @@ fn default_sampling_rate() -> f64 {
     0.1 // 10% sampling for production
 }
 
+fn default_always_sample_errors() -> bool {
+    true // Reserved for collector-side tail-based sampling
+}
+
+fn default_always_sample_slow() -> bool {
+    true // Reserved for collector-side tail-based sampling
+}
+
+fn default_slow_threshold_ms() -> u64 {
+    1000 // 1 second
+}
+
 fn default_service_name() -> String {
     "icnd".to_string()
 }
@@ -59,6 +109,9 @@ impl Default for TracingConfig {
             enabled: false,
             otlp_endpoint: default_otlp_endpoint(),
             sampling_rate: default_sampling_rate(),
+            always_sample_errors: default_always_sample_errors(),
+            always_sample_slow: default_always_sample_slow(),
+            slow_threshold_ms: default_slow_threshold_ms(),
             service_name: default_service_name(),
         }
     }
@@ -71,6 +124,9 @@ impl TracingConfig {
             enabled: self.enabled,
             otlp_endpoint: self.otlp_endpoint.clone(),
             sampling_rate: self.sampling_rate,
+            always_sample_errors: self.always_sample_errors,
+            always_sample_slow: self.always_sample_slow,
+            slow_threshold_ms: self.slow_threshold_ms,
             service_name: self.service_name.clone(),
             node_did,
         }
