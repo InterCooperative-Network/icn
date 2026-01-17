@@ -49,7 +49,7 @@ rust-i18n.workspace = true
 jsonwebtoken = "9"
 
 # UUID generation
-uuid = { version = "1", features = ["v4"] }
+uuid = { version = "1", features = ["v4", "serde"] }
 
 # URL parsing
 url = "2"

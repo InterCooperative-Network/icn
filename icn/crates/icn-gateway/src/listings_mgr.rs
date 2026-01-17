@@ -58,6 +58,16 @@ pub enum ListingType {
     Want,
 }
 
+impl ListingType {
+    /// Return the string representation of the listing type
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Offer => "offer",
+            Self::Want => "want",
+        }
+    }
+}
+
 /// Category of listing
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -748,7 +758,7 @@ impl ListingsManager {
             listing_type,
             title,
             description,
-            category,
+            category.clone(),
             offered_by,
             coop_id,
             seeking,
@@ -760,6 +770,13 @@ impl ListingsManager {
         listing.tags = tags;
 
         self.store.save(&listing)?;
+
+        // Emit metrics
+        icn_obs::metrics::exchange::listings_created_inc(
+            listing_type.as_str(),
+            category.as_str(),
+        );
+
         Ok(listing)
     }
 
@@ -812,8 +829,13 @@ impl ListingsManager {
             .add_interest_if_not_duplicate(&interest, &from_did)?;
 
         if !added {
+            // Emit duplicate interest blocked metric
+            icn_obs::metrics::exchange::duplicate_interests_blocked_inc();
             anyhow::bail!("You have already expressed interest in this listing");
         }
+
+        // Emit interest expressed metric
+        icn_obs::metrics::exchange::interests_expressed_inc(listing.listing_type.as_str());
 
         Ok(interest)
     }
@@ -848,8 +870,16 @@ impl ListingsManager {
             .ok_or_else(|| anyhow::anyhow!("Listing not found"))?;
 
         let now = icn_time::current_timestamp_secs();
+
+        // Calculate time to match
+        let time_to_match = (now - listing.created_at) as f64;
+
         listing.mark_matched(now);
         self.store.save(&listing)?;
+
+        // Emit metrics
+        icn_obs::metrics::exchange::listing_time_to_match_observe(time_to_match);
+
         Ok(listing)
     }
 
@@ -861,8 +891,22 @@ impl ListingsManager {
             .ok_or_else(|| anyhow::anyhow!("Listing not found"))?;
 
         let now = icn_time::current_timestamp_secs();
+
+        // Calculate time to complete
+        let time_to_complete = (now - listing.created_at) as f64;
+
         listing.mark_completed(now);
         self.store.save(&listing)?;
+
+        // Emit metrics
+        icn_obs::metrics::exchange::listings_completed_inc();
+        icn_obs::metrics::exchange::listing_time_to_complete_observe(time_to_complete);
+
+        // Also record the number of interests this listing received
+        if let Ok(interests) = self.store.get_interests(id) {
+            icn_obs::metrics::exchange::listing_interests_count_observe(interests.len());
+        }
+
         Ok(listing)
     }
 
@@ -876,6 +920,10 @@ impl ListingsManager {
         let now = icn_time::current_timestamp_secs();
         listing.cancel(now);
         self.store.save(&listing)?;
+
+        // Emit cancelled metric
+        icn_obs::metrics::exchange::listings_cancelled_inc();
+
         Ok(listing)
     }
 }
@@ -892,7 +940,36 @@ mod tests {
     use icn_identity::Did;
 
     fn test_did() -> Did {
-        Did::from_anchor_id(&[1; 32])
+        // Use deterministic secret bytes to generate a valid Ed25519-based DID
+        // This ensures the DID will pass validation during deserialization
+        use ed25519_dalek::SigningKey;
+        let signing_key = SigningKey::from_bytes(&[1; 32]);
+        let verifying_key = signing_key.verifying_key();
+        Did::from_public_key(&verifying_key)
+    }
+
+    fn test_did_2() -> Did {
+        // Second valid DID for testing
+        use ed25519_dalek::SigningKey;
+        let signing_key = SigningKey::from_bytes(&[2; 32]);
+        let verifying_key = signing_key.verifying_key();
+        Did::from_public_key(&verifying_key)
+    }
+
+    fn test_did_3() -> Did {
+        // Third valid DID for testing
+        use ed25519_dalek::SigningKey;
+        let signing_key = SigningKey::from_bytes(&[3; 32]);
+        let verifying_key = signing_key.verifying_key();
+        Did::from_public_key(&verifying_key)
+    }
+
+    fn test_did_99() -> Did {
+        // Another valid DID for testing
+        use ed25519_dalek::SigningKey;
+        let signing_key = SigningKey::from_bytes(&[99; 32]);
+        let verifying_key = signing_key.verifying_key();
+        Did::from_public_key(&verifying_key)
     }
 
     #[test]
@@ -992,7 +1069,7 @@ mod tests {
         assert_eq!(my_offers[0].title, "Oven");
 
         // Filter by owner with no matches
-        let other_did = Did::from_anchor_id(&[99; 32]);
+        let other_did = test_did_99();
         let filter = ListingFilter {
             offered_by: Some(other_did),
             ..Default::default()
@@ -1024,7 +1101,7 @@ mod tests {
         let interest = mgr
             .express_interest(
                 listing.id,
-                Did::from_anchor_id(&[2; 32]),
+                test_did_2(),
                 "coop2".to_string(),
                 "I'm interested! Can offer 10 hours of tech support.".to_string(),
                 Some("10 hours tech support".to_string()),
@@ -1039,7 +1116,7 @@ mod tests {
         // Trying to express interest again from same user should fail
         let duplicate_result = mgr.express_interest(
             listing.id,
-            Did::from_anchor_id(&[2; 32]), // Same DID as before
+            test_did_2(), // Same DID as before
             "coop2".to_string(),
             "Another message".to_string(),
             None,
@@ -1056,7 +1133,7 @@ mod tests {
         // Different user should be able to express interest
         let different_user_interest = mgr.express_interest(
             listing.id,
-            Did::from_anchor_id(&[3; 32]), // Different DID
+            test_did_3(), // Different DID
             "coop3".to_string(),
             "I'm also interested!".to_string(),
             None,
@@ -1097,5 +1174,127 @@ mod tests {
         // Mark as completed
         let listing = mgr.mark_completed(&listing.id).unwrap();
         assert_eq!(listing.status, ListingStatus::Completed);
+    }
+
+    #[test]
+    fn test_sled_listing_roundtrip() {
+        // Test that listings can be stored and retrieved with Sled
+        let db = sled::Config::new().temporary(true).open().unwrap();
+        let mgr = ListingsManager::with_sled(std::sync::Arc::new(db));
+
+        let listing = mgr
+            .create_listing(
+                ListingType::Offer,
+                "Sled Test Item".to_string(),
+                "Testing Sled storage".to_string(),
+                ListingCategory::Equipment,
+                test_did(),
+                "coop1".to_string(),
+                "Credits".to_string(),
+                vec![],
+                ListingVisibility::Federation,
+                None,
+                vec![],
+            )
+            .expect("should create listing");
+
+        // Retrieve it
+        let retrieved = mgr.get_listing(&listing.id).unwrap();
+        assert!(retrieved.is_some());
+        let retrieved = retrieved.unwrap();
+        assert_eq!(retrieved.title, "Sled Test Item");
+        assert_eq!(retrieved.offered_by, test_did());
+    }
+
+    #[test]
+    fn test_listing_interest_serialization() {
+        // Test that ListingInterest roundtrips through icn_encoding correctly
+        let did = test_did();
+        let interest = ListingInterest {
+            id: uuid::Uuid::new_v4(),
+            listing_id: ListingId(uuid::Uuid::new_v4()),
+            from_did: did.clone(),
+            from_coop: "test-coop".to_string(),
+            message: "Hello".to_string(),
+            offer: Some("My offer".to_string()),
+            created_at: 12345,
+        };
+
+        // Test direct encoding (no version prefix)
+        let bytes = icn_encoding::encode(&interest).unwrap();
+        let decoded: ListingInterest = icn_encoding::decode(&bytes).unwrap();
+        assert_eq!(decoded.from_did, did);
+        assert_eq!(decoded.from_coop, "test-coop");
+        assert_eq!(decoded.message, "Hello");
+
+        // Test versioned encoding
+        let versioned_bytes = icn_encoding::encode_versioned(&interest).unwrap();
+        let versioned_decoded: ListingInterest =
+            icn_encoding::decode_versioned(&versioned_bytes).unwrap();
+        assert_eq!(versioned_decoded.from_did, did);
+
+        // Test with a different DID to ensure encoding handles variations
+        let did2 = test_did_2();
+        let interest2 = ListingInterest {
+            id: uuid::Uuid::new_v4(),
+            listing_id: ListingId(uuid::Uuid::new_v4()),
+            from_did: did2.clone(),
+            from_coop: "coop2".to_string(),
+            message: "I want this!".to_string(),
+            offer: Some("My offer".to_string()),
+            created_at: icn_time::current_timestamp_secs(),
+        };
+
+        let bytes2 = icn_encoding::encode_versioned(&interest2).unwrap();
+        let decoded2: ListingInterest = icn_encoding::decode_versioned(&bytes2).unwrap();
+        assert_eq!(decoded2.from_did, did2);
+        assert_eq!(decoded2.from_coop, "coop2");
+        assert_eq!(decoded2.message, "I want this!");
+    }
+
+    #[test]
+    fn test_sled_interest_roundtrip() {
+        // Test that interests can be stored and retrieved with Sled
+        let db = sled::Config::new().temporary(true).open().unwrap();
+        let mgr = ListingsManager::with_sled(std::sync::Arc::new(db));
+
+        let owner = test_did();
+        let interested = test_did_2();
+
+        let listing = mgr
+            .create_listing(
+                ListingType::Offer,
+                "Sled Interest Test".to_string(),
+                "Testing Sled interest storage".to_string(),
+                ListingCategory::Equipment,
+                owner,
+                "coop1".to_string(),
+                "Credits".to_string(),
+                vec![],
+                ListingVisibility::Federation,
+                None,
+                vec![],
+            )
+            .unwrap();
+
+        // Express interest
+        let interest = mgr
+            .express_interest(
+                listing.id,
+                interested.clone(),
+                "coop2".to_string(),
+                "I want this!".to_string(),
+                Some("My offer".to_string()),
+            )
+            .expect("should express interest");
+
+        assert_eq!(interest.from_did, interested);
+
+        // Retrieve interests
+        let interests = mgr.get_interests(&listing.id).unwrap();
+        assert_eq!(interests.len(), 1);
+        assert_eq!(interests[0].from_did, interested);
+        assert_eq!(interests[0].message, "I want this!");
+        assert_eq!(interests[0].offer, Some("My offer".to_string()));
     }
 }

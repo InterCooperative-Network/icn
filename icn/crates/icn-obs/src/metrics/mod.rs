@@ -28,6 +28,7 @@ mod legacy {
 pub use legacy::*;
 
 pub mod agreement;
+pub mod exchange;
 pub mod gateway;
 pub mod ledger;
 pub mod nat;
