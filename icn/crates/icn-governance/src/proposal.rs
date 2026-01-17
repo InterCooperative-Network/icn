@@ -1,4 +1,220 @@
-//! Proposal types and state machine
+//! Proposal types and state machine for cooperative governance.
+//!
+//! This module implements the proposal lifecycle for ICN governance, supporting
+//! democratic decision-making in cooperatives with optional deliberation phases,
+//! emergency actions, and comprehensive state tracking.
+//!
+//! # Proposal State Machine
+//!
+//! Proposals move through a defined set of states with explicit transitions.
+//! The state machine supports two paths: standard (with deliberation) and
+//! expedited (skipping deliberation for emergency or simple proposals).
+//!
+//! ## State Diagram
+//!
+//! ```text
+//!                              ┌─────────────────────┐
+//!                              │                     │
+//!                              │        Draft        │
+//!                              │                     │
+//!                              └──────────┬──────────┘
+//!                                         │
+//!              ┌──────────────────────────┼──────────────────────────┐
+//!              │ start_deliberation()     │ open()                   │
+//!              ▼                          ▼                          │
+//!   ┌──────────────────────┐   ┌──────────────────────┐              │
+//!   │                      │   │                      │              │
+//!   │    Deliberation      │   │        Open          │              │
+//!   │  (discussion only)   │──▶│   (voting active)    │              │
+//!   │                      │   │                      │              │
+//!   └──────────────────────┘   └──────────┬──────────┘              │
+//!     │  end_deliberation_and_open()      │                          │
+//!     │  force_end_deliberation()         │ close()                  │
+//!     │                                   │                          │
+//!     │                    ┌──────────────┼──────────────┐           │
+//!     │                    ▼              ▼              ▼           │
+//!     │         ┌──────────────┐ ┌──────────────┐ ┌──────────────┐   │
+//!     │         │   Accepted   │ │   Rejected   │ │   NoQuorum   │   │
+//!     │         │  (terminal)  │ │  (terminal)  │ │  (terminal)  │   │
+//!     │         └──────────────┘ └──────────────┘ └──────────────┘   │
+//!     │                                                              │
+//!     │
+//!     │  Emergency actions available from any non-terminal state:
+//!     │  ┌─────────────────────────────────────────────────────────────┐
+//!     │  │  cancel() → Cancelled    (from Draft, Deliberation, Open)  │
+//!     │  │  veto() → Vetoed         (from Draft, Deliberation, Open)  │
+//!     │  │  force_close() → ForceClosed  (from Deliberation, Open)    │
+//!     └──┴─────────────────────────────────────────────────────────────┘
+//!                      │                │               │
+//!                      ▼                ▼               ▼
+//!           ┌──────────────┐ ┌──────────────┐ ┌──────────────┐
+//!           │  Cancelled   │ │    Vetoed    │ │ ForceClosed  │
+//!           │  (terminal)  │ │  (terminal)  │ │  (terminal)  │
+//!           └──────────────┘ └──────────────┘ └──────────────┘
+//! ```
+//!
+//! ## State Descriptions
+//!
+//! | State | Description | Can Vote | Can Comment |
+//! |-------|-------------|----------|-------------|
+//! | `Draft` | Initial state, proposal not yet submitted | No | No |
+//! | `Deliberation` | Discussion phase before voting | No | Yes |
+//! | `Open` | Active voting period | Yes | Yes |
+//! | `Accepted` | Voting closed, proposal passed | No | No |
+//! | `Rejected` | Voting closed, proposal failed | No | No |
+//! | `NoQuorum` | Voting closed, insufficient participation | No | No |
+//! | `Cancelled` | Proposer withdrew the proposal | No | No |
+//! | `Vetoed` | Emergency override by authorized party | No | No |
+//! | `ForceClosed` | Administratively closed with forced outcome | No | No |
+//!
+//! ## Valid State Transitions
+//!
+//! | From | To | Method | Conditions |
+//! |------|-----|--------|------------|
+//! | `Draft` | `Deliberation` | `start_deliberation()` | - |
+//! | `Draft` | `Open` | `open()` | Skips deliberation |
+//! | `Draft` | `Cancelled` | `cancel()` | Proposer request |
+//! | `Draft` | `Vetoed` | `veto()` | Emergency action |
+//! | `Deliberation` | `Open` | `end_deliberation_and_open()` | Deliberation period ended |
+//! | `Deliberation` | `Open` | `force_end_deliberation()` | Administrative override |
+//! | `Deliberation` | `Cancelled` | `cancel()` | Proposer request |
+//! | `Deliberation` | `Vetoed` | `veto()` | Emergency action |
+//! | `Deliberation` | `ForceClosed` | `force_close()` | Emergency action |
+//! | `Open` | `Accepted` | `close()` | Quorum met, majority yes |
+//! | `Open` | `Rejected` | `close()` | Quorum met, majority no |
+//! | `Open` | `NoQuorum` | `close()` | Quorum not met |
+//! | `Open` | `Cancelled` | `cancel()` | Proposer request |
+//! | `Open` | `Vetoed` | `veto()` | Emergency action |
+//! | `Open` | `ForceClosed` | `force_close()` | Emergency action |
+//!
+//! **Note:** The `cancel()`, `veto()`, and `force_close()` methods can be invoked
+//! from any non-terminal state (i.e., any state where `is_closed()` returns false).
+//! In the current lifecycle, the non-terminal states are `Draft`, `Deliberation`,
+//! and `Open`.
+//!
+//! ## Example Lifecycle
+//!
+//! ### Standard Proposal (with deliberation)
+//!
+//! ```rust
+//! use icn_governance::{Proposal, ProposalPayload, ProposalState, GovernanceDomainId};
+//! use icn_identity::KeyPair;
+//!
+//! // Create a proposal
+//! let kp = KeyPair::generate().unwrap();
+//! let mut proposal = Proposal::new(
+//!     GovernanceDomainId::new("coop-alpha"),
+//!     kp.did().clone(),
+//!     "Increase member dues".to_string(),
+//!     "Proposal to increase monthly dues by 5%".to_string(),
+//!     ProposalPayload::Text { body: "...".to_string() },
+//! );
+//! assert!(proposal.state.is_draft());
+//!
+//! // Start deliberation (7 days)
+//! proposal.start_deliberation(7 * 24 * 3600).unwrap();
+//! assert!(proposal.state.is_deliberating());
+//!
+//! // After deliberation period expires naturally, use:
+//! //   proposal.end_deliberation_and_open(voting_period).unwrap();
+//! // For this doctest, we force the transition:
+//! proposal.force_end_deliberation(5 * 24 * 3600).unwrap();
+//! assert!(proposal.state.is_open());
+//!
+//! // After voting closes, close with outcome
+//! let now = icn_time::current_timestamp_secs();
+//! proposal.close(ProposalState::Accepted { closed_at: now }).unwrap();
+//! assert!(proposal.state.is_closed());
+//! ```
+//!
+//! ### Emergency Proposal (skipping deliberation)
+//!
+//! ```rust
+//! use icn_governance::{Proposal, ProposalPayload, ProposalState, GovernanceDomainId};
+//! use icn_identity::KeyPair;
+//!
+//! let kp = KeyPair::generate().unwrap();
+//! let mut proposal = Proposal::new(
+//!     GovernanceDomainId::new("coop-alpha"),
+//!     kp.did().clone(),
+//!     "Emergency: Freeze compromised account".to_string(),
+//!     "Security incident requires immediate action".to_string(),
+//!     ProposalPayload::FreezeMember {
+//!         member: kp.did().clone(),
+//!         reason: "Account compromised".to_string(),
+//!         duration_seconds: Some(86400),
+//!     },
+//! );
+//!
+//! // Skip deliberation, open immediately (24 hour voting)
+//! proposal.open(24 * 3600).unwrap();
+//! assert!(proposal.state.is_open());
+//! ```
+//!
+//! ### Cancellation
+//!
+//! ```rust
+//! use icn_governance::{Proposal, ProposalPayload, ProposalState, GovernanceDomainId};
+//! use icn_identity::KeyPair;
+//!
+//! let kp = KeyPair::generate().unwrap();
+//! let mut proposal = Proposal::new(
+//!     GovernanceDomainId::new("coop-alpha"),
+//!     kp.did().clone(),
+//!     "Some proposal".to_string(),
+//!     "Description".to_string(),
+//!     ProposalPayload::Text { body: "...".to_string() },
+//! );
+//!
+//! // Proposer decides to cancel
+//! proposal.cancel().unwrap();
+//! assert!(matches!(proposal.state, ProposalState::Cancelled { .. }));
+//! assert!(proposal.state.is_closed());
+//! ```
+//!
+//! # Terminal States
+//!
+//! All states except `Draft`, `Deliberation`, and `Open` are terminal.
+//! Once a proposal reaches a terminal state, no further transitions are possible.
+//!
+//! | Terminal State | Outcome | Execution |
+//! |----------------|---------|-----------|
+//! | `Accepted` | Proposal enacted | Payload executed |
+//! | `Rejected` | Proposal defeated | No action |
+//! | `NoQuorum` | Insufficient votes | No action |
+//! | `Cancelled` | Proposer withdrew | No action |
+//! | `Vetoed` | Emergency override | No action |
+//! | `ForceClosed` | Administrative | Per forced outcome |
+//!
+//! # Deliberation Phase
+//!
+//! The deliberation phase is an optional period between `Draft` and `Open` where
+//! members can discuss and refine the proposal before voting begins. This supports:
+//!
+//! - **Informed decision-making**: Members understand implications before voting
+//! - **Amendment opportunity**: Proposer can modify based on feedback
+//! - **Conflict resolution**: Issues identified before binding vote
+//!
+//! Use `open()` to skip deliberation for:
+//! - Emergency proposals requiring immediate action
+//! - Simple procedural matters
+//! - Time-sensitive decisions
+//!
+//! **Note:** This state machine does not define a dedicated amendment API for
+//! in-place modification of proposals during deliberation. Amendments are typically
+//! handled by cancelling and resubmitting a revised proposal, or via separate
+//! governance processes defined at the cooperative level.
+//!
+//! # Emergency Actions
+//!
+//! Three methods enable emergency governance:
+//!
+//! - **`cancel()`**: Proposer withdraws their own proposal
+//! - **`veto()`**: Authorized party blocks a proposal (requires emergency quorum)
+//! - **`force_close()`**: Administratively close with specified outcome
+//!
+//! These are intended for exceptional circumstances and typically require
+//! higher approval thresholds than normal proposals.
 
 use crate::domain::GovernanceDomainId;
 use crate::Timestamp;
