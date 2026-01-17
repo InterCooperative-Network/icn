@@ -210,9 +210,11 @@ function showToast(message, type = 'info', duration = 5000) {
 
     toast.innerHTML = `
         <span class="toast-icon">${icons[type] || icons.info}</span>
-        <span class="toast-message">${message}</span>
+        <span class="toast-message"></span>
         <button class="toast-close">&times;</button>
     `;
+    // Use textContent to prevent XSS from user-controlled messages
+    toast.querySelector('.toast-message').textContent = message;
 
     elements.toastContainer.appendChild(toast);
 
@@ -2515,13 +2517,14 @@ function createServiceListing(service) {
     const card = document.createElement('div');
     card.className = 'service-listing';
 
+    // Use escapeHtml for user-provided content to prevent XSS
     card.innerHTML = `
         <div class="service-listing-header">
-            <span class="service-type-badge ${service.type}">${service.type}</span>
-            <span class="service-category">${service.category}</span>
+            <span class="service-type-badge ${escapeHtml(service.type)}">${escapeHtml(service.type)}</span>
+            <span class="service-category">${escapeHtml(service.category)}</span>
         </div>
-        <h3 class="service-listing-title">${service.title}</h3>
-        <p class="service-listing-description">${service.description}</p>
+        <h3 class="service-listing-title">${escapeHtml(service.title)}</h3>
+        <p class="service-listing-description">${escapeHtml(service.description)}</p>
         <div class="service-listing-meta">
             <div class="service-listing-poster">
                 Posted by <strong>${truncateDid(service.poster)}</strong>
