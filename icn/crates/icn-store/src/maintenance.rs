@@ -1,12 +1,13 @@
-//! Storage maintenance and compaction for Sled databases
+//! Storage maintenance and monitoring for Sled databases
 //!
 //! Provides periodic maintenance tasks to optimize storage performance:
 //! - Periodic flush to ensure durability
 //! - Space amplification monitoring
 //! - Configurable maintenance schedule
 //!
-//! Note: Sled uses a lock-free B+ tree and performs automatic garbage collection.
-//! This module provides additional maintenance operations and monitoring.
+//! Note: Sled uses a lock-free B+ tree with automatic garbage collection.
+//! This module provides additional maintenance operations (flush, monitoring)
+//! but does not perform manual compaction as Sled handles this internally.
 
 use crate::SledStore;
 use anyhow::Result;
@@ -231,7 +232,9 @@ impl MaintenanceManager {
                     }
                 }
 
+                // Check shutdown before running maintenance
                 if shutdown.load(Ordering::SeqCst) {
+                    info!("Storage maintenance task shutting down");
                     break;
                 }
 
@@ -352,5 +355,40 @@ mod tests {
         assert!(!shutdown.load(Ordering::SeqCst));
         handle.stop();
         assert!(shutdown.load(Ordering::SeqCst));
+    }
+
+    #[tokio::test]
+    async fn test_background_task_lifecycle() {
+        let store = Arc::new(SledStore::temporary().unwrap());
+
+        // Put some data to make maintenance meaningful
+        store.db().insert(b"key1", b"value1").unwrap();
+
+        // Use short interval for testing
+        let config = MaintenanceConfig {
+            enabled: true,
+            interval_secs: 1, // 1 second for fast testing
+            ..MaintenanceConfig::default()
+        };
+
+        let manager = Arc::new(MaintenanceManager::new(store, config));
+        let handle = manager.start_background_task();
+
+        // Give the task time to start
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        // Trigger immediate maintenance
+        handle.trigger();
+
+        // Wait a bit for the triggered maintenance to complete
+        tokio::time::sleep(Duration::from_millis(200)).await;
+
+        // Stop the task
+        handle.stop();
+
+        // Give the task time to shut down
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        // Verify the task actually stopped (can't directly verify, but no crash is good)
     }
 }

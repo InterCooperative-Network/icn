@@ -10,7 +10,7 @@
 pub mod budgets;
 /// Escrow functionality for conditional payments
 pub mod escrow;
-/// Storage maintenance and compaction
+/// Storage maintenance tasks
 pub mod maintenance;
 /// Notification storage and management
 pub mod notifications;
