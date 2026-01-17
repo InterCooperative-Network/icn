@@ -65,33 +65,24 @@ Then configure tail-based sampling in the collector.
 
 ### Grafana Tempo
 
-Tempo supports tail-based sampling via the `metrics-generator` component.
+Tempo stores all received traces and provides filtering via TraceQL queries. For true tail-based sampling (dropping traces before storage), use the OTEL Collector as a preprocessor in front of Tempo.
 
 **tempo.yaml:**
 ```yaml
-overrides:
-  defaults:
-    metrics_generator:
-      processors: [span-metrics, service-graphs]
-
-# For tail-based sampling, use Tempo's head_sampling with
-# probabilistic sampling, then filter in Grafana queries
+# Tempo receives all traces and stores them
 distributor:
   receivers:
     otlp:
       protocols:
         grpc:
+          # Binds to all interfaces - use specific IP in production
           endpoint: 0.0.0.0:4317
 
-# Use trace policies for sampling decisions
-trace_policies:
-  - name: error-traces
-    type: status_code
-    status_codes: [ERROR]
-
-  - name: slow-traces
-    type: latency
-    threshold: 1000ms
+# Metrics generator for trace-derived metrics
+overrides:
+  defaults:
+    metrics_generator:
+      processors: [span-metrics, service-graphs]
 
 storage:
   trace:
@@ -99,6 +90,20 @@ storage:
     local:
       path: /var/tempo/traces
 ```
+
+**Querying for errors and slow traces** (TraceQL in Grafana):
+```
+# Find error traces
+{ status = error }
+
+# Find slow traces (> 1s)
+{ duration > 1s }
+
+# Find security-related traces
+{ span.icn.priority = "security" }
+```
+
+For pre-storage tail-based sampling, place OTEL Collector in front of Tempo (see configuration below).
 
 ### OpenTelemetry Collector
 
@@ -110,11 +115,14 @@ receivers:
   otlp:
     protocols:
       grpc:
+        # Binds to all interfaces - use specific IP in production
         endpoint: 0.0.0.0:4317
 
 processors:
   # Tail-based sampling processor
   tail_sampling:
+    # Wait for trace spans to arrive before making sampling decision.
+    # Increase if you have long-running operations or high network latency.
     decision_wait: 10s
     num_traces: 100000
     expected_new_traces_per_sec: 1000
@@ -131,12 +139,13 @@ processors:
         latency:
           threshold_ms: 1000
 
-      # Always sample security spans
+      # Always sample security spans (matches span names containing these keywords)
+      # ICN's PrioritySampler uses span name matching, so we do the same here
       - name: security-policy
         type: string_attribute
         string_attribute:
-          key: otel.scope.name
-          values: ["security", "auth", "trust", "crypto"]
+          key: name
+          values: ["security", "auth", "trust", "crypto", "permission", "signature"]
           enabled_regex_matching: true
 
       # Probabilistic sampling for everything else
@@ -149,6 +158,7 @@ exporters:
   otlp:
     endpoint: tempo:4317
     tls:
+      # Set to false in production with proper TLS certificates
       insecure: true
 
 service:
@@ -201,6 +211,7 @@ enabled = true
 sampling_rate = 1.0
 always_sample_errors = true
 always_sample_slow = true
+# Lower threshold in dev to catch moderately slow operations during debugging
 slow_threshold_ms = 500
 ```
 
@@ -231,6 +242,8 @@ slow_threshold_ms = 1000
 ```
 
 Use OTEL Collector tail-based sampling (see configuration above).
+
+> **⚠️ Performance Warning**: Sending 100% of traces (`sampling_rate = 1.0`) generates significant network traffic. A node producing 10K spans/sec at ~1KB each results in ~10MB/sec egress. Ensure adequate network capacity and collector resources before enabling full capture.
 
 ## Verifying Configuration
 
@@ -284,4 +297,4 @@ Tail-based sampling buffers traces in memory:
 
 - [Production Hardening Guide](../production-hardening.md) - Security configuration
 - [ICN Observability](../ARCHITECTURE.md#observability) - Architecture overview
-- [OpenTelemetry Tail Sampling](https://opentelemetry.io/docs/collector/transformations/#tail-sampling)
+- [OpenTelemetry Tail Sampling Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/tailsamplingprocessor)
