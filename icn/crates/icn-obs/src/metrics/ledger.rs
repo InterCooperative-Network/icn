@@ -19,10 +19,8 @@ pub fn init_descriptions() {
         "icn_ledger_witness_signature_count",
         "Number of signatures per witnessed entry"
     );
-    describe_counter!(
-        "icn_ledger_witness_quarantine_total",
-        "Total number of entries quarantined due to witness issues"
-    );
+    // Note: Witness quarantine events are tracked via witnessed_entries_rejected_*
+    // counters with specific reasons (invalid_signature, insufficient_signatures)
 
     // Trust-based entry rejection
     describe_counter!(
@@ -155,15 +153,6 @@ pub fn witnessed_entries_rejected_insufficient_inc() {
 /// Record the number of signatures on a witnessed entry
 pub fn witness_signature_count_record(count: u64) {
     histogram!("icn_ledger_witness_signature_count").record(count as f64);
-}
-
-/// Increment witness quarantine counter by reason
-pub fn witness_quarantine_inc(reason: &str) {
-    counter!(
-        "icn_ledger_witness_quarantine_total",
-        "reason" => reason.to_string()
-    )
-    .increment(1);
 }
 
 // Trust-based rejection metrics
