@@ -1,0 +1,292 @@
+# ICN CLI Translations - Spanish (Espanol)
+# Format: {command}.{subcommand}.{message_type}
+# Variables: {var_name} for interpolation
+
+cli:
+  # Common messages
+  common:
+    no_identity: "No se encontro identidad. Ejecuta 'icnctl id init' para crear una."
+    error: "Error"
+    success: "Exito"
+    failed: "Fallido"
+
+  # Prompts
+  prompts:
+    enter_passphrase: "Introduce la contrasena: "
+    confirm_passphrase: "Confirma la contrasena: "
+    choose_passphrase: "Elige una contrasena: "
+
+  # Status command
+  status:
+    checking: "Verificando estado del daemon..."
+    connected: "Conectado al daemon ICN"
+    not_running: "El daemon no esta en ejecucion"
+    endpoint: "Punto de conexion"
+
+  # Network commands
+  network:
+    peers:
+      title: "Pares Descubiertos"
+      no_peers: "Aun no se han descubierto pares"
+      header: "DID                                          Direccion"
+      tip: "Consejo: Asegurate de que otros nodos ICN esten ejecutandose en la red."
+
+    dial:
+      connecting: "Conectando al par..."
+      success: "Conexion establecida"
+      failed: "Conexion fallida"
+
+    stats:
+      title: "Estadisticas de Red"
+      active_connections: "Conexiones activas"
+      bytes_sent: "Bytes enviados"
+      bytes_received: "Bytes recibidos"
+      uptime: "Tiempo activo"
+
+    status:
+      title: "Estado del Actor de Red"
+      listening: "Escuchando en"
+      peer_count: "Pares conectados"
+
+  # Trust commands
+  trust:
+    add:
+      success: "Arista de confianza anadida exitosamente"
+      did_label: "DID destino"
+      score_label: "Puntuacion de confianza"
+      label_label: "Etiqueta"
+
+    list:
+      title: "Aristas de Confianza"
+      no_edges: "No se encontraron aristas de confianza"
+      header: "DID                                          Puntuacion  Etiqueta"
+
+    show:
+      title: "Puntuacion de Confianza"
+      computed_score: "Puntuacion de confianza calculada"
+      direct_score: "Puntuacion de confianza directa"
+      transitive: "Confianza transitiva"
+      class_label: "Clase"
+      class_isolated: "Aislado"
+      class_known: "Conocido"
+      class_partner: "Socio"
+      class_federated: "Federado"
+
+    remove:
+      success: "Arista de confianza eliminada"
+      not_found: "Arista de confianza no encontrada"
+
+  # Ledger commands
+  ledger:
+    head:
+      title: "Cabecera del Libro Mayor"
+      no_entries: "El libro mayor esta vacio"
+      entry_hash: "Hash de entrada"
+      timestamp: "Marca de tiempo"
+
+    balance:
+      title: "Saldo de Cuenta"
+      account_label: "Cuenta"
+      currency_label: "Moneda"
+      balance_label: "Saldo"
+      no_balance: "No se encontro saldo para esta cuenta"
+
+    history:
+      title: "Historial del Libro Mayor"
+      no_entries: "No se encontraron entradas en el libro mayor"
+      showing: "Mostrando las {count} entradas mas recientes"
+      header: "Hash                             Marca de tiempo      Tipo"
+      hash: "Hash"
+      author: "Autor"
+      accounts_label: "Cuentas"
+      debit_label: "debito"
+      credit_label: "credito"
+
+  # Backup commands
+  backup:
+    creating: "Creando copia de seguridad..."
+    success: "Copia de seguridad creada exitosamente"
+    output_label: "Archivo de respaldo"
+    includes: "La copia incluye: almacen de claves, grafo de confianza, libro mayor, estado de gobernanza"
+
+  restore:
+    checking: "Verificando integridad del respaldo..."
+    restoring: "Restaurando desde copia de seguridad..."
+    success: "Restauracion completada exitosamente"
+    backup_info: "Informacion del Respaldo"
+    created_at: "Creado"
+    node_did: "DID del Nodo"
+    warning_overwrite: "ADVERTENCIA: Esto sobreescribira los datos existentes en {path}"
+
+  verify_backup:
+    verifying: "Verificando copia de seguridad..."
+    valid: "La copia de seguridad es valida"
+    invalid: "La copia de seguridad es invalida"
+    checksum_match: "Suma de verificacion coincide"
+    checksum_mismatch: "Suma de verificacion no coincide"
+
+  # Identity commands
+  id:
+    init:
+      starting: "Inicializando nueva identidad ICN..."
+      generating: "Generando par de claves Ed25519"
+      success: "Identidad creada exitosamente!"
+      did_label: "DID"
+      keystore_label: "Almacen de claves"
+      important: "IMPORTANTE: Guarda tu contrasena de forma segura. No se puede recuperar."
+      already_exists: "Ya existe una identidad en {path}."
+
+    show:
+      title: "Identidad:"
+      did_label: "  DID:"
+      keystore_label: "  Almacen de claves:"
+
+    rotate:
+      starting: "Rotando clave de identidad..."
+      generating: "Generando nuevo par de claves Ed25519"
+      success: "Rotacion de clave exitosa!"
+      old_did: "DID anterior"
+      new_did: "Nuevo DID"
+      reason: "Razon"
+      important: "IMPORTANTE: Publica la prueba de rotacion para mantener la continuidad de identidad."
+      timestamp: "Marca de tiempo"
+
+    export:
+      exporting: "Exportando identidad..."
+      success: "Identidad exportada exitosamente"
+      output_label: "Archivo de exportacion"
+
+    import:
+      importing: "Importando identidad..."
+      success: "Identidad importada exitosamente"
+      input_label: "Archivo de importacion"
+
+  # Device commands (multi-device identity)
+  device:
+    list:
+      title: "Dispositivos"
+      no_devices: "No se encontraron dispositivos"
+      header: "ID                 Etiqueta           Estado      Anadido"
+      current: "(dispositivo actual)"
+
+    add:
+      creating: "Creando solicitud de agregar dispositivo..."
+      success: "Solicitud de agregar dispositivo creada"
+      file_saved: "Solicitud guardada en"
+      instructions: "Transfiere este archivo a tu dispositivo principal y apruebalo con: icnctl device approve {file}"
+
+    approve:
+      approving: "Aprobando dispositivo..."
+      success: "Dispositivo aprobado exitosamente"
+      device_label: "Dispositivo"
+      device_id: "ID de dispositivo"
+
+    revoke:
+      revoking: "Revocando dispositivo..."
+      success: "Dispositivo revocado exitosamente"
+      reason_label: "Razon"
+
+  # Contract commands
+  contract:
+    deploy:
+      deploying: "Desplegando contrato..."
+      success: "Contrato desplegado exitosamente"
+      code_hash: "Hash del codigo"
+
+    call:
+      calling: "Llamando contrato..."
+      success: "Contrato ejecutado exitosamente"
+      result: "Resultado"
+      fuel_used: "Combustible usado"
+
+    list:
+      title: "Contratos Desplegados"
+      no_contracts: "No hay contratos desplegados"
+      header: "Hash del Codigo                  Desplegado Por"
+
+  # Governance commands
+  gov:
+    domain:
+      create:
+        creating: "Creando dominio de gobernanza..."
+        success: "Dominio creado exitosamente"
+        domain_id: "ID de Dominio"
+
+      show:
+        title: "Detalles del Dominio"
+        members_label: "Miembros"
+        quorum_label: "Quorum"
+        approval_label: "Umbral de aprobacion"
+
+      list:
+        title: "Dominios de Gobernanza"
+        no_domains: "No se encontraron dominios"
+        header: "ID                    Nombre               Miembros  Quorum"
+
+    proposal:
+      create:
+        creating: "Creando propuesta..."
+        success: "Propuesta creada exitosamente"
+        proposal_id: "ID de Propuesta"
+
+      list:
+        title: "Propuestas"
+        no_proposals: "No se encontraron propuestas"
+        header: "ID            Titulo                   Estado     Votos"
+
+      show:
+        title: "Detalles de la Propuesta"
+        state_label: "Estado"
+        votes_for: "Votos a favor"
+        votes_against: "Votos en contra"
+        quorum_reached: "Quorum alcanzado"
+
+    vote:
+      cast:
+        casting: "Registrando voto..."
+        success: "Voto registrado exitosamente"
+        choice_label: "Eleccion"
+
+  # Compute commands
+  compute:
+    submit:
+      submitting: "Enviando tarea..."
+      success: "Tarea enviada exitosamente"
+      task_id: "ID de Tarea"
+      task_hash: "Hash de tarea"
+
+    status:
+      title: "Estado de la Tarea"
+      state_label: "Estado"
+      result_label: "Resultado"
+      fuel_used: "Combustible usado"
+
+    cancel:
+      cancelling: "Cancelando tarea..."
+      success: "Tarea cancelada exitosamente"
+
+  # Snapshot commands
+  snapshot:
+    create:
+      creating: "Creando instantanea..."
+      success: "Instantanea creada exitosamente"
+      filename: "Archivo de instantanea"
+
+    list:
+      title: "Instantaneas Disponibles"
+      no_snapshots: "No se encontraron instantaneas"
+      header: "Nombre                Creada               Tamano"
+
+    verify:
+      verifying: "Verificando instantanea..."
+      valid: "La instantanea es valida"
+      invalid: "La instantanea es invalida"
+
+    delete:
+      deleting: "Eliminando instantanea..."
+      success: "Instantanea eliminada exitosamente"
+
+    cleanup:
+      cleaning: "Limpiando instantaneas antiguas..."
+      deleted_count: "Se eliminaron {count} instantanea(s) antigua(s)"
+      kept_count: "Se conservaron {count} instantanea(s) reciente(s)"
