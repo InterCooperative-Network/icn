@@ -87,6 +87,13 @@ fn validate_listing_input(req: &CreateListingRequest) -> Result<()> {
                 "Photo URLs cannot be empty strings".to_string(),
             ));
         }
+        // Only allow https:// and ipfs:// URLs for security
+        if !photo.starts_with("https://") && !photo.starts_with("ipfs://") {
+            return Err(GatewayError::BadRequest(format!(
+                "Photo URL {} must use https:// or ipfs:// scheme",
+                i + 1
+            )));
+        }
     }
 
     // Tags validation
@@ -178,6 +185,13 @@ fn validate_listing_update(req: &UpdateListingRequest) -> Result<()> {
                 return Err(GatewayError::BadRequest(
                     "Photo URLs cannot be empty strings".to_string(),
                 ));
+            }
+            // Only allow https:// and ipfs:// URLs for security
+            if !photo.starts_with("https://") && !photo.starts_with("ipfs://") {
+                return Err(GatewayError::BadRequest(format!(
+                    "Photo URL {} must use https:// or ipfs:// scheme",
+                    i + 1
+                )));
             }
         }
     }
