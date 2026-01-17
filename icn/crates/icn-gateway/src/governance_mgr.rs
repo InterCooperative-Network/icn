@@ -17,11 +17,13 @@
 
 use anyhow::Result;
 use icn_governance::{
-    scopes_overlap, Comment, CommentId, Delegation, DelegationId, DelegationScope, Discussion,
-    DiscussionStore, GovernanceConfig, GovernanceDomain, GovernanceDomainId, GovernanceOps,
-    GovernanceParams, GovernanceProfileId, InMemoryDiscussionStore, MembershipConfig,
-    MembershipSource, PaginatedResult, Proposal, ProposalDomainLookup, ProposalId, ProposalPayload,
-    ProposalState, Timestamp, Vote, VoteChoice, VoteTally, DEFAULT_MAX_DELEGATION_DEPTH,
+    scopes_overlap, ActionItem, ActionItemFilter, ActionItemId, ActionItemPriority,
+    ActionItemStatus, ActionItemStoreBackend, Comment, CommentId, Delegation, DelegationId,
+    DelegationScope, Discussion, DiscussionStore, GovernanceConfig, GovernanceDomain,
+    GovernanceDomainId, GovernanceOps, GovernanceParams, GovernanceProfileId,
+    InMemoryActionItemStore, InMemoryDiscussionStore, MembershipConfig, MembershipSource,
+    PaginatedResult, Proposal, ProposalDomainLookup, ProposalId, ProposalPayload, ProposalState,
+    Timestamp, Vote, VoteChoice, VoteTally, DEFAULT_MAX_DELEGATION_DEPTH,
 };
 use icn_identity::Did;
 use std::collections::{HashMap, HashSet};
@@ -54,6 +56,8 @@ pub struct GovernanceManager {
     delegations: RwLock<HashMap<DelegationId, Delegation>>,
     /// In-memory storage for discussions (standalone mode only)
     discussions: RwLock<InMemoryDiscussionStore>,
+    /// In-memory storage for action items
+    action_items: InMemoryActionItemStore,
     /// Optional handle to daemon's GovernanceActor (actor-backed mode)
     governance_handle: Option<GovernanceHandle>,
 }
@@ -71,6 +75,7 @@ impl GovernanceManager {
             votes: RwLock::new(HashMap::new()),
             delegations: RwLock::new(HashMap::new()),
             discussions: RwLock::new(InMemoryDiscussionStore::new()),
+            action_items: InMemoryActionItemStore::new(),
             governance_handle: None,
         }
     }
@@ -95,6 +100,8 @@ impl GovernanceManager {
             votes: RwLock::new(HashMap::new()),
             delegations: RwLock::new(HashMap::new()),
             discussions: RwLock::new(InMemoryDiscussionStore::new()),
+            // Action items are always stored in gateway (not synced via gossip)
+            action_items: InMemoryActionItemStore::new(),
             governance_handle: Some(handle),
         }
     }
@@ -1006,6 +1013,139 @@ impl GovernanceManager {
             .map_err(|e| anyhow::anyhow!("Discussions storage lock poisoned: {e}"))?;
 
         Ok(discussions.get_participants(proposal_id))
+    }
+
+    // ========================================================================
+    // Action Item Management
+    // ========================================================================
+
+    /// Create a new action item
+    pub fn create_action_item(
+        &self,
+        domain_id: GovernanceDomainId,
+        title: String,
+        description: Option<String>,
+        created_by: Did,
+        assignee: Option<Did>,
+        due_date: Option<u64>,
+        priority: ActionItemPriority,
+        linked_proposal: Option<ProposalId>,
+        meeting_context: Option<String>,
+        tags: Vec<String>,
+    ) -> Result<ActionItem> {
+        let now = icn_time::current_timestamp_secs();
+        let mut item = ActionItem::new(domain_id, title, created_by, now);
+        item.description = description;
+        item.assignee = assignee;
+        item.due_date = due_date;
+        item.priority = priority;
+        item.linked_proposal = linked_proposal;
+        item.meeting_context = meeting_context;
+        item.tags = tags;
+
+        self.action_items
+            .save(&item)
+            .map_err(|e| anyhow::anyhow!("Failed to save action item: {e}"))?;
+
+        Ok(item)
+    }
+
+    /// Get an action item by ID
+    pub fn get_action_item(
+        &self,
+        domain_id: &GovernanceDomainId,
+        id: &ActionItemId,
+    ) -> Result<Option<ActionItem>> {
+        self.action_items
+            .get(domain_id, id)
+            .map_err(|e| anyhow::anyhow!("Failed to get action item: {e}"))
+    }
+
+    /// List action items with optional filtering
+    pub fn list_action_items(
+        &self,
+        domain_id: &GovernanceDomainId,
+        filter: &ActionItemFilter,
+    ) -> Result<Vec<ActionItem>> {
+        self.action_items
+            .list(domain_id, filter)
+            .map_err(|e| anyhow::anyhow!("Failed to list action items: {e}"))
+    }
+
+    /// Update an action item
+    pub fn update_action_item(&self, item: &ActionItem) -> Result<()> {
+        self.action_items
+            .save(item)
+            .map_err(|e| anyhow::anyhow!("Failed to update action item: {e}"))
+    }
+
+    /// Delete an action item
+    pub fn delete_action_item(
+        &self,
+        domain_id: &GovernanceDomainId,
+        id: &ActionItemId,
+    ) -> Result<bool> {
+        self.action_items
+            .delete(domain_id, id)
+            .map_err(|e| anyhow::anyhow!("Failed to delete action item: {e}"))
+    }
+
+    /// Count action items matching a filter
+    pub fn count_action_items(
+        &self,
+        domain_id: &GovernanceDomainId,
+        filter: &ActionItemFilter,
+    ) -> Result<usize> {
+        self.action_items
+            .count(domain_id, filter)
+            .map_err(|e| anyhow::anyhow!("Failed to count action items: {e}"))
+    }
+
+    /// Add a note to an action item
+    pub fn add_action_item_note(
+        &self,
+        domain_id: &GovernanceDomainId,
+        id: &ActionItemId,
+        author: Did,
+        content: String,
+    ) -> Result<ActionItem> {
+        let mut item = self
+            .action_items
+            .get(domain_id, id)
+            .map_err(|e| anyhow::anyhow!("Failed to get action item: {e}"))?
+            .ok_or_else(|| anyhow::anyhow!("Action item not found: {id}"))?;
+
+        let now = icn_time::current_timestamp_secs();
+        item.add_note(author, content, now);
+
+        self.action_items
+            .save(&item)
+            .map_err(|e| anyhow::anyhow!("Failed to save action item: {e}"))?;
+
+        Ok(item)
+    }
+
+    /// Update the status of an action item
+    pub fn update_action_item_status(
+        &self,
+        domain_id: &GovernanceDomainId,
+        id: &ActionItemId,
+        status: ActionItemStatus,
+    ) -> Result<ActionItem> {
+        let mut item = self
+            .action_items
+            .get(domain_id, id)
+            .map_err(|e| anyhow::anyhow!("Failed to get action item: {e}"))?
+            .ok_or_else(|| anyhow::anyhow!("Action item not found: {id}"))?;
+
+        item.status = status;
+        item.updated_at = icn_time::current_timestamp_secs();
+
+        self.action_items
+            .save(&item)
+            .map_err(|e| anyhow::anyhow!("Failed to save action item: {e}"))?;
+
+        Ok(item)
     }
 }
 

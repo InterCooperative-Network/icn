@@ -75,6 +75,14 @@ pub enum GovernanceError {
     /// Internal error
     #[error("internal error: {0}")]
     Internal(String),
+
+    /// Lock poisoned (concurrent access failure)
+    #[error("lock poisoned: {0}")]
+    LockPoisoned(String),
+
+    /// Action item not found
+    #[error("action item not found: {0}")]
+    ActionItemNotFound(String),
 }
 
 impl From<serde_json::Error> for GovernanceError {

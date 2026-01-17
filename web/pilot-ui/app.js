@@ -13,6 +13,9 @@ const state = {
     members: [],
     transactions: [],
     proposals: [],
+    actionItems: [],
+    listings: [],
+    myListings: [],
     ws: null,
     wsConnected: false,
 };
@@ -93,6 +96,15 @@ const elements = {
     // Governance
     proposalList: document.getElementById('proposal-list'),
     closedProposals: document.getElementById('closed-proposals'),
+    actionItemsList: document.getElementById('action-items-list'),
+    addActionItemBtn: document.getElementById('add-action-item-btn'),
+
+    // Exchange
+    listingsGrid: document.getElementById('listings-grid'),
+    myListingsList: document.getElementById('my-listings-list'),
+    createListingBtn: document.getElementById('create-listing-btn'),
+    createListingBtn2: document.getElementById('create-listing-btn-2'),
+    listingCategoryFilter: document.getElementById('listing-category-filter'),
 
     // Footer
     connectionStatus: document.getElementById('connection-status'),
@@ -1497,9 +1509,9 @@ elements.exportCsv.addEventListener('click', exportTransactionsToCSV);
 // Keyboard shortcuts (Ctrl+1-5 for tab navigation)
 document.addEventListener('keydown', (e) => {
     // Only when Ctrl/Cmd is pressed with number keys
-    if ((e.ctrlKey || e.metaKey) && e.key >= '1' && e.key <= '5') {
+    if ((e.ctrlKey || e.metaKey) && e.key >= '1' && e.key <= '6') {
         e.preventDefault();
-        const tabs = ['dashboard', 'log-hours', 'history', 'members', 'governance'];
+        const tabs = ['dashboard', 'log-hours', 'history', 'members', 'governance', 'exchange'];
         const tabIndex = parseInt(e.key) - 1;
         if (tabs[tabIndex]) {
             switchTab(tabs[tabIndex]);
@@ -5332,3 +5344,420 @@ window.removeFilter = removeFilter;
 window.clearAllFilters = clearAllFilters;
 
 console.log('Transaction filtering initialized');
+
+// ============================================================================
+// Action Items (Track 1)
+// ============================================================================
+
+let currentActionItemFilter = 'all';
+
+async function loadActionItems() {
+    try {
+        const domainId = `coop:${state.coopId}`;
+        const response = await apiRequest('GET', `/gov/domains/${encodeURIComponent(domainId)}/action-items`);
+        state.actionItems = Array.isArray(response) ? response : (response.data || []);
+        renderActionItems();
+    } catch (error) {
+        console.error('Failed to load action items:', error);
+        if (elements.actionItemsList) {
+            // Safe text content assignment
+            elements.actionItemsList.textContent = '';
+            const emptyState = document.createElement('p');
+            emptyState.className = 'empty-state';
+            emptyState.textContent = 'No action items yet';
+            elements.actionItemsList.appendChild(emptyState);
+        }
+    }
+}
+
+function renderActionItems() {
+    if (!elements.actionItemsList) return;
+
+    let items = [...state.actionItems];
+
+    // Apply filter
+    switch (currentActionItemFilter) {
+        case 'mine':
+            items = items.filter(item => item.assignee === state.did);
+            break;
+        case 'overdue':
+            items = items.filter(item => item.is_overdue);
+            break;
+        case 'pending':
+            items = items.filter(item => item.status === 'pending' || item.status === 'in_progress');
+            break;
+        case 'completed':
+            items = items.filter(item => item.status === 'completed');
+            break;
+    }
+
+    // Clear existing content
+    elements.actionItemsList.textContent = '';
+
+    if (items.length === 0) {
+        const emptyState = document.createElement('p');
+        emptyState.className = 'empty-state';
+        emptyState.textContent = 'No action items match the current filter';
+        elements.actionItemsList.appendChild(emptyState);
+        return;
+    }
+
+    items.forEach(item => {
+        const isOverdue = item.is_overdue;
+        const isCompleted = item.status === 'completed';
+        const itemClass = isCompleted ? 'completed' : (isOverdue ? 'overdue' : '');
+
+        const dueDateStr = item.due_date ?
+            new Date(item.due_date * 1000).toLocaleDateString() : '';
+
+        const assigneeDisplay = item.assignee ?
+            (state.members.find(m => m.did === item.assignee)?.name || item.assignee.slice(0, 20) + '...') : 'Unassigned';
+
+        const div = document.createElement('div');
+        div.className = `action-item ${itemClass}`;
+        div.dataset.itemId = item.id;
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.className = 'action-item-checkbox';
+        checkbox.checked = isCompleted;
+        checkbox.addEventListener('change', () => toggleActionItemStatus(item.id, checkbox.checked));
+
+        const content = document.createElement('div');
+        content.className = 'action-item-content';
+
+        const title = document.createElement('div');
+        title.className = 'action-item-title';
+        title.textContent = item.title;
+
+        const meta = document.createElement('div');
+        meta.className = 'action-item-meta';
+
+        const assignee = document.createElement('span');
+        assignee.className = 'action-item-assignee';
+        assignee.textContent = assigneeDisplay;
+        meta.appendChild(assignee);
+
+        if (dueDateStr) {
+            const dueDate = document.createElement('span');
+            dueDate.className = isOverdue ? 'overdue' : '';
+            dueDate.textContent = (isOverdue ? 'Overdue: ' : 'Due: ') + dueDateStr;
+            meta.appendChild(dueDate);
+        }
+
+        const priority = document.createElement('span');
+        priority.className = `action-item-priority ${item.priority}`;
+        priority.textContent = item.priority;
+        meta.appendChild(priority);
+
+        content.appendChild(title);
+        content.appendChild(meta);
+        div.appendChild(checkbox);
+        div.appendChild(content);
+        elements.actionItemsList.appendChild(div);
+    });
+}
+
+async function toggleActionItemStatus(itemId, isCompleted) {
+    try {
+        const domainId = `coop:${state.coopId}`;
+        const newStatus = isCompleted ? 'completed' : 'pending';
+        await apiRequest('PUT', `/gov/domains/${encodeURIComponent(domainId)}/action-items/${itemId}/status`, {
+            status: newStatus
+        });
+        showToast(`Action item ${isCompleted ? 'completed' : 'reopened'}`, 'success');
+        await loadActionItems();
+    } catch (error) {
+        console.error('Failed to update action item:', error);
+        showToast('Failed to update action item', 'error');
+    }
+}
+
+// Action item filter event handlers
+document.querySelectorAll('.action-items-filter .filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.action-items-filter .filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentActionItemFilter = btn.dataset.filter;
+        renderActionItems();
+    });
+});
+
+// Governance sub-tab handlers
+document.querySelectorAll('.governance-tabs .tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.governance-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        const tab = btn.dataset.governanceTab;
+        document.querySelectorAll('.governance-subtab').forEach(subtab => {
+            subtab.classList.toggle('hidden', subtab.id !== `governance-${tab}`);
+        });
+
+        if (tab === 'action-items') {
+            loadActionItems();
+        }
+    });
+});
+
+// Make functions available globally
+window.toggleActionItemStatus = toggleActionItemStatus;
+
+// ============================================================================
+// Exchange / Listings (Track 2)
+// ============================================================================
+
+let currentListingTypeFilter = 'all';
+let currentListingCategoryFilter = '';
+
+async function loadListings() {
+    try {
+        let url = '/listings';
+        const params = new URLSearchParams();
+        if (currentListingTypeFilter !== 'all') {
+            params.append('listing_type', currentListingTypeFilter);
+        }
+        if (currentListingCategoryFilter) {
+            params.append('category', currentListingCategoryFilter);
+        }
+        if (params.toString()) {
+            url += '?' + params.toString();
+        }
+
+        const response = await apiRequest('GET', url);
+        state.listings = Array.isArray(response) ? response : (response.data || []);
+        renderListings();
+    } catch (error) {
+        console.error('Failed to load listings:', error);
+        if (elements.listingsGrid) {
+            elements.listingsGrid.textContent = '';
+            const emptyState = document.createElement('p');
+            emptyState.className = 'empty-state';
+            emptyState.textContent = 'No listings available';
+            elements.listingsGrid.appendChild(emptyState);
+        }
+    }
+}
+
+async function loadMyListings() {
+    try {
+        const response = await apiRequest('GET', '/listings/my');
+        state.myListings = Array.isArray(response) ? response : (response.data || []);
+        renderMyListings();
+    } catch (error) {
+        console.error('Failed to load my listings:', error);
+        if (elements.myListingsList) {
+            elements.myListingsList.textContent = '';
+            const emptyState = document.createElement('p');
+            emptyState.className = 'empty-state';
+            emptyState.textContent = 'No listings created yet';
+            elements.myListingsList.appendChild(emptyState);
+        }
+    }
+}
+
+function renderListings() {
+    if (!elements.listingsGrid) return;
+
+    elements.listingsGrid.textContent = '';
+
+    if (state.listings.length === 0) {
+        const emptyState = document.createElement('p');
+        emptyState.className = 'empty-state';
+        emptyState.textContent = 'No listings found. Be the first to post!';
+        elements.listingsGrid.appendChild(emptyState);
+        return;
+    }
+
+    state.listings.forEach(listing => {
+        elements.listingsGrid.appendChild(createListingCard(listing));
+    });
+}
+
+function renderMyListings() {
+    if (!elements.myListingsList) return;
+
+    elements.myListingsList.textContent = '';
+
+    if (state.myListings.length === 0) {
+        const emptyState = document.createElement('p');
+        emptyState.className = 'empty-state';
+        emptyState.textContent = "You haven't created any listings yet";
+        elements.myListingsList.appendChild(emptyState);
+        return;
+    }
+
+    state.myListings.forEach(listing => {
+        elements.myListingsList.appendChild(createListingCard(listing, true));
+    });
+}
+
+function createListingCard(listing, showStatus = false) {
+    const typeClass = listing.listing_type === 'offer' ? 'offer' : 'want';
+    const typeLabel = listing.listing_type === 'offer' ? 'Offering' : 'Looking for';
+
+    const card = document.createElement('div');
+    card.className = 'listing-card';
+    card.dataset.listingId = listing.id;
+    card.addEventListener('click', () => viewListing(listing.id));
+
+    // Image section
+    const imageDiv = document.createElement('div');
+    imageDiv.className = 'listing-card-image';
+    if (listing.photos && listing.photos.length > 0) {
+        const img = document.createElement('img');
+        img.src = listing.photos[0];
+        img.alt = listing.title;
+        imageDiv.appendChild(img);
+    } else {
+        imageDiv.textContent = getCategoryIcon(listing.category);
+    }
+    card.appendChild(imageDiv);
+
+    // Body section
+    const body = document.createElement('div');
+    body.className = 'listing-card-body';
+
+    const header = document.createElement('div');
+    header.className = 'listing-card-header';
+
+    const title = document.createElement('h3');
+    title.className = 'listing-card-title';
+    title.textContent = listing.title;
+    header.appendChild(title);
+
+    const badge = document.createElement('span');
+    badge.className = `listing-type-badge ${typeClass}`;
+    badge.textContent = typeLabel;
+    header.appendChild(badge);
+
+    body.appendChild(header);
+
+    const description = document.createElement('p');
+    description.className = 'listing-card-description';
+    description.textContent = listing.description;
+    body.appendChild(description);
+
+    const meta = document.createElement('div');
+    meta.className = 'listing-card-meta';
+
+    const category = document.createElement('span');
+    category.className = 'listing-card-category';
+    category.textContent = listing.category;
+    meta.appendChild(category);
+
+    const coop = document.createElement('span');
+    coop.className = 'listing-card-coop';
+    coop.textContent = listing.coop_id;
+    meta.appendChild(coop);
+
+    body.appendChild(meta);
+    card.appendChild(body);
+
+    // Footer section
+    const footer = document.createElement('div');
+    footer.className = 'listing-card-footer';
+
+    const seeking = document.createElement('div');
+    seeking.className = 'listing-card-seeking';
+    const seekingStrong = document.createElement('strong');
+    seekingStrong.textContent = 'Seeking: ';
+    seeking.appendChild(seekingStrong);
+    seeking.appendChild(document.createTextNode(listing.seeking));
+    footer.appendChild(seeking);
+
+    if (showStatus) {
+        const statusBadge = document.createElement('span');
+        statusBadge.className = `listing-status-badge ${listing.status}`;
+        statusBadge.textContent = listing.status;
+        footer.appendChild(statusBadge);
+    }
+
+    if (listing.interest_count > 0) {
+        const interest = document.createElement('span');
+        interest.className = 'listing-interest-count';
+        interest.textContent = `${listing.interest_count} interested`;
+        footer.appendChild(interest);
+    }
+
+    card.appendChild(footer);
+    return card;
+}
+
+function getCategoryIcon(category) {
+    const icons = {
+        equipment: '🔧',
+        services: '🤝',
+        materials: '📦',
+        space: '🏠',
+        other: '📋'
+    };
+    return icons[category] || '📋';
+}
+
+function viewListing(listingId) {
+    // TODO: Open listing detail modal
+    showToast('Listing detail view coming soon', 'info');
+}
+
+// Listing filter event handlers
+document.querySelectorAll('.listing-filters .filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.listing-filters .filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentListingTypeFilter = btn.dataset.listingFilter;
+        loadListings();
+    });
+});
+
+// Category filter handler
+elements.listingCategoryFilter?.addEventListener('change', (e) => {
+    currentListingCategoryFilter = e.target.value;
+    loadListings();
+});
+
+// Exchange sub-tab handlers
+document.querySelectorAll('.exchange-tabs .tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.exchange-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        const tab = btn.dataset.exchangeTab;
+        document.querySelectorAll('.exchange-subtab').forEach(subtab => {
+            subtab.classList.toggle('hidden', subtab.id !== `exchange-${tab}`);
+        });
+
+        if (tab === 'my-listings') {
+            loadMyListings();
+        } else {
+            loadListings();
+        }
+    });
+});
+
+// Create listing button handlers
+elements.createListingBtn?.addEventListener('click', () => {
+    showToast('Create listing form coming soon', 'info');
+});
+elements.createListingBtn2?.addEventListener('click', () => {
+    showToast('Create listing form coming soon', 'info');
+});
+
+// Add action item button handler
+elements.addActionItemBtn?.addEventListener('click', () => {
+    showToast('Add action item form coming soon', 'info');
+});
+
+// Make functions available globally
+window.viewListing = viewListing;
+
+// Load data when exchange tab is first viewed
+const originalSwitchTab = switchTab;
+window.switchTab = function(tabId) {
+    originalSwitchTab(tabId);
+    if (tabId === 'exchange') {
+        loadListings();
+    }
+};
+
+console.log('Action items and listings functionality initialized');

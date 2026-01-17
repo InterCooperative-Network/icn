@@ -42,6 +42,7 @@ pub mod identity_mgr;
 pub mod invite;
 pub mod ledger_events;
 pub mod ledger_mgr;
+pub mod listings_mgr;
 pub mod logging;
 pub mod middleware;
 pub mod models;
@@ -93,3 +94,7 @@ pub use server::GatewayServer;
 pub use steward_mgr::{StewardHandleType, StewardManager};
 pub use treasury_mgr::{GatewayTreasuryManager, LedgerHandle, TreasuryHandle};
 pub use websocket::ServerMessage;
+pub use listings_mgr::{
+    InMemoryListingsStore, Listing, ListingCategory, ListingFilter, ListingId, ListingInterest,
+    ListingStatus, ListingType, ListingVisibility, ListingsManager,
+};

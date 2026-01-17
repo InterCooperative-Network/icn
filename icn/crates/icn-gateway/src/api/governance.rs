@@ -10,19 +10,21 @@ use crate::events::{EventBroadcaster, GatewayEvent};
 use crate::governance_mgr::GovernanceManager;
 use crate::middleware::{get_claims, require_scope};
 use crate::models::{
-    CastVoteRequest, CreateDelegationRequest, CreateDomainRequest, CreateProposalRequest,
-    DelegationListResponse, DelegationResponse, EstablishClearingProposalRequest,
-    JoinFederationProposalRequest, LeaveFederationProposalRequest, OpenProposalRequest,
-    ProposalPayloadRequest, RevokeVouchProposalRequest, TerminateClearingProposalRequest,
-    UpdateFederationPolicyProposalRequest, VouchProposalRequest,
+    ActionItemFilterParams, ActionItemNoteResponse, ActionItemResponse, AddActionItemNoteRequest,
+    CastVoteRequest, CreateActionItemRequest, CreateDelegationRequest, CreateDomainRequest,
+    CreateProposalRequest, DelegationListResponse, DelegationResponse,
+    EstablishClearingProposalRequest, JoinFederationProposalRequest, LeaveFederationProposalRequest,
+    OpenProposalRequest, ProposalPayloadRequest, RevokeVouchProposalRequest,
+    TerminateClearingProposalRequest, UpdateActionItemRequest, UpdateFederationPolicyProposalRequest,
+    VouchProposalRequest,
 };
 use crate::pagination::{ListPagination, ListQuery, ListResponse};
 use crate::validation;
 use icn_federation::SettlementInterval;
 use icn_governance::{
-    DataSharingLevel, Delegation, DelegationScope, DisputeResolutionMethod, FederationProposal,
-    FederationTerms, GovernanceDomainId, GovernanceParams, MembershipConfig, ProposalId,
-    ProposalPayload, VoteChoice,
+    ActionItemFilter, ActionItemId, ActionItemPriority, ActionItemStatus, DataSharingLevel,
+    Delegation, DelegationScope, DisputeResolutionMethod, FederationProposal, FederationTerms,
+    GovernanceDomainId, GovernanceParams, MembershipConfig, ProposalId, ProposalPayload, VoteChoice,
 };
 use icn_identity::Did;
 use icn_obs::metrics::gateway;
@@ -2034,6 +2036,355 @@ pub struct DiscussionResponse {
     pub comments: Vec<CommentResponse>,
     pub participant_count: usize,
     pub last_activity_at: u64,
+}
+
+// ============================================================================
+// Action Item Endpoints
+// ============================================================================
+
+/// POST /gov/domains/{domain_id}/action-items - Create a new action item
+#[post("/domains/{domain_id}/action-items")]
+pub async fn create_action_item(
+    http_req: HttpRequest,
+    gov_mgr: web::Data<Arc<GovernanceManager>>,
+    domain_id: web::Path<String>,
+    req: web::Json<CreateActionItemRequest>,
+) -> Result<HttpResponse> {
+    require_scope(&http_req, "gov:write")?;
+
+    let claims = get_claims(&http_req).ok_or_else(|| {
+        crate::error::GatewayError::AuthenticationFailed("No claims found".to_string())
+    })?;
+
+    let creator_did: Did = claims.sub.parse().map_err(|e| {
+        crate::error::GatewayError::BadRequest(format!("Invalid DID in token: {e}"))
+    })?;
+
+    let domain = GovernanceDomainId(domain_id.into_inner());
+
+    // Parse assignee DID if provided
+    let assignee: Option<Did> = if let Some(ref assignee_str) = req.assignee {
+        Some(assignee_str.parse().map_err(|e| {
+            crate::error::GatewayError::BadRequest(format!("Invalid assignee DID: {e}"))
+        })?)
+    } else {
+        None
+    };
+
+    // Parse linked proposal if provided
+    let linked_proposal: Option<ProposalId> = if let Some(ref proposal_str) = req.linked_proposal {
+        Some(ProposalId::new(proposal_str))
+    } else {
+        None
+    };
+
+    // Parse priority
+    let priority = parse_priority(&req.priority)?;
+
+    let item = gov_mgr
+        .create_action_item(
+            domain,
+            req.title.clone(),
+            req.description.clone(),
+            creator_did,
+            assignee,
+            req.due_date,
+            priority,
+            linked_proposal,
+            req.meeting_context.clone(),
+            req.tags.clone(),
+        )
+        .map_err(|e| crate::error::GatewayError::InternalError(e.to_string()))?;
+
+    Ok(HttpResponse::Created().json(action_item_to_response(&item)))
+}
+
+/// GET /gov/domains/{domain_id}/action-items - List action items
+#[get("/domains/{domain_id}/action-items")]
+pub async fn list_action_items(
+    http_req: HttpRequest,
+    gov_mgr: web::Data<Arc<GovernanceManager>>,
+    domain_id: web::Path<String>,
+    query: web::Query<ActionItemFilterParams>,
+) -> Result<HttpResponse> {
+    require_scope(&http_req, "gov:read")?;
+
+    let domain = GovernanceDomainId(domain_id.into_inner());
+
+    // Build filter from query parameters
+    let filter = build_action_item_filter(&query)?;
+
+    let items = gov_mgr
+        .list_action_items(&domain, &filter)
+        .map_err(|e| crate::error::GatewayError::InternalError(e.to_string()))?;
+
+    let responses: Vec<ActionItemResponse> = items.iter().map(action_item_to_response).collect();
+
+    Ok(HttpResponse::Ok().json(responses))
+}
+
+/// GET /gov/domains/{domain_id}/action-items/{item_id} - Get a specific action item
+#[get("/domains/{domain_id}/action-items/{item_id}")]
+pub async fn get_action_item(
+    http_req: HttpRequest,
+    gov_mgr: web::Data<Arc<GovernanceManager>>,
+    path: web::Path<(String, String)>,
+) -> Result<HttpResponse> {
+    require_scope(&http_req, "gov:read")?;
+
+    let (domain_id, item_id) = path.into_inner();
+    let domain = GovernanceDomainId(domain_id);
+    let id = parse_action_item_id(&item_id)?;
+
+    let item = gov_mgr
+        .get_action_item(&domain, &id)
+        .map_err(|e| crate::error::GatewayError::InternalError(e.to_string()))?
+        .ok_or_else(|| crate::error::GatewayError::NotFound("Action item not found".to_string()))?;
+
+    Ok(HttpResponse::Ok().json(action_item_to_response(&item)))
+}
+
+/// PUT /gov/domains/{domain_id}/action-items/{item_id} - Update an action item
+#[put("/domains/{domain_id}/action-items/{item_id}")]
+pub async fn update_action_item(
+    http_req: HttpRequest,
+    gov_mgr: web::Data<Arc<GovernanceManager>>,
+    path: web::Path<(String, String)>,
+    req: web::Json<UpdateActionItemRequest>,
+) -> Result<HttpResponse> {
+    require_scope(&http_req, "gov:write")?;
+
+    let (domain_id, item_id) = path.into_inner();
+    let domain = GovernanceDomainId(domain_id);
+    let id = parse_action_item_id(&item_id)?;
+
+    // Get existing item
+    let mut item = gov_mgr
+        .get_action_item(&domain, &id)
+        .map_err(|e| crate::error::GatewayError::InternalError(e.to_string()))?
+        .ok_or_else(|| crate::error::GatewayError::NotFound("Action item not found".to_string()))?;
+
+    // Apply updates
+    if let Some(ref title) = req.title {
+        item.title = title.clone();
+    }
+    if let Some(ref description) = req.description {
+        item.description = Some(description.clone());
+    }
+    if let Some(ref assignee_str) = req.assignee {
+        if assignee_str.is_empty() {
+            item.assignee = None;
+        } else {
+            item.assignee = Some(assignee_str.parse().map_err(|e| {
+                crate::error::GatewayError::BadRequest(format!("Invalid assignee DID: {e}"))
+            })?);
+        }
+    }
+    if let Some(due_date) = req.due_date {
+        item.due_date = if due_date == 0 { None } else { Some(due_date) };
+    }
+    if let Some(ref priority) = req.priority {
+        item.priority = parse_priority(priority)?;
+    }
+    if let Some(ref status) = req.status {
+        item.status = parse_status(status)?;
+    }
+    if let Some(ref tags) = req.tags {
+        item.tags = tags.clone();
+    }
+
+    item.updated_at = icn_time::current_timestamp_secs();
+
+    gov_mgr
+        .update_action_item(&item)
+        .map_err(|e| crate::error::GatewayError::InternalError(e.to_string()))?;
+
+    Ok(HttpResponse::Ok().json(action_item_to_response(&item)))
+}
+
+/// DELETE /gov/domains/{domain_id}/action-items/{item_id} - Delete an action item
+#[delete("/domains/{domain_id}/action-items/{item_id}")]
+pub async fn delete_action_item(
+    http_req: HttpRequest,
+    gov_mgr: web::Data<Arc<GovernanceManager>>,
+    path: web::Path<(String, String)>,
+) -> Result<HttpResponse> {
+    require_scope(&http_req, "gov:write")?;
+
+    let (domain_id, item_id) = path.into_inner();
+    let domain = GovernanceDomainId(domain_id);
+    let id = parse_action_item_id(&item_id)?;
+
+    let deleted = gov_mgr
+        .delete_action_item(&domain, &id)
+        .map_err(|e| crate::error::GatewayError::InternalError(e.to_string()))?;
+
+    if deleted {
+        Ok(HttpResponse::NoContent().finish())
+    } else {
+        Err(crate::error::GatewayError::NotFound(
+            "Action item not found".to_string(),
+        ))
+    }
+}
+
+/// POST /gov/domains/{domain_id}/action-items/{item_id}/notes - Add a note to an action item
+#[post("/domains/{domain_id}/action-items/{item_id}/notes")]
+pub async fn add_action_item_note(
+    http_req: HttpRequest,
+    gov_mgr: web::Data<Arc<GovernanceManager>>,
+    path: web::Path<(String, String)>,
+    req: web::Json<AddActionItemNoteRequest>,
+) -> Result<HttpResponse> {
+    require_scope(&http_req, "gov:write")?;
+
+    let claims = get_claims(&http_req).ok_or_else(|| {
+        crate::error::GatewayError::AuthenticationFailed("No claims found".to_string())
+    })?;
+
+    let author_did: Did = claims.sub.parse().map_err(|e| {
+        crate::error::GatewayError::BadRequest(format!("Invalid DID in token: {e}"))
+    })?;
+
+    let (domain_id, item_id) = path.into_inner();
+    let domain = GovernanceDomainId(domain_id);
+    let id = parse_action_item_id(&item_id)?;
+
+    let item = gov_mgr
+        .add_action_item_note(&domain, &id, author_did, req.content.clone())
+        .map_err(|e| crate::error::GatewayError::InternalError(e.to_string()))?;
+
+    Ok(HttpResponse::Ok().json(action_item_to_response(&item)))
+}
+
+/// PATCH /gov/domains/{domain_id}/action-items/{item_id}/status - Update action item status
+#[put("/domains/{domain_id}/action-items/{item_id}/status")]
+pub async fn update_action_item_status(
+    http_req: HttpRequest,
+    gov_mgr: web::Data<Arc<GovernanceManager>>,
+    path: web::Path<(String, String)>,
+    req: web::Json<StatusUpdateRequest>,
+) -> Result<HttpResponse> {
+    require_scope(&http_req, "gov:write")?;
+
+    let (domain_id, item_id) = path.into_inner();
+    let domain = GovernanceDomainId(domain_id);
+    let id = parse_action_item_id(&item_id)?;
+
+    let status = parse_status(&req.status)?;
+
+    let item = gov_mgr
+        .update_action_item_status(&domain, &id, status)
+        .map_err(|e| crate::error::GatewayError::InternalError(e.to_string()))?;
+
+    Ok(HttpResponse::Ok().json(action_item_to_response(&item)))
+}
+
+/// Request for status update
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct StatusUpdateRequest {
+    pub status: String,
+}
+
+// Helper functions for action items
+
+fn parse_action_item_id(s: &str) -> Result<ActionItemId> {
+    uuid::Uuid::parse_str(s)
+        .map(ActionItemId::from_uuid)
+        .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid action item ID: {e}")))
+}
+
+fn parse_priority(s: &str) -> Result<ActionItemPriority> {
+    match s.to_lowercase().as_str() {
+        "low" => Ok(ActionItemPriority::Low),
+        "medium" => Ok(ActionItemPriority::Medium),
+        "high" => Ok(ActionItemPriority::High),
+        "critical" => Ok(ActionItemPriority::Critical),
+        _ => Err(crate::error::GatewayError::BadRequest(format!(
+            "Invalid priority: {s}. Must be one of: low, medium, high, critical"
+        ))),
+    }
+}
+
+fn parse_status(s: &str) -> Result<ActionItemStatus> {
+    match s.to_lowercase().as_str() {
+        "pending" => Ok(ActionItemStatus::Pending),
+        "in_progress" | "inprogress" => Ok(ActionItemStatus::InProgress),
+        "completed" => Ok(ActionItemStatus::Completed),
+        "deferred" => Ok(ActionItemStatus::Deferred),
+        "cancelled" | "canceled" => Ok(ActionItemStatus::Cancelled),
+        _ => Err(crate::error::GatewayError::BadRequest(format!(
+            "Invalid status: {s}. Must be one of: pending, in_progress, completed, deferred, cancelled"
+        ))),
+    }
+}
+
+fn build_action_item_filter(query: &ActionItemFilterParams) -> Result<ActionItemFilter> {
+    let mut filter = ActionItemFilter::default();
+
+    if let Some(ref status) = query.status {
+        filter.status = Some(parse_status(status)?);
+    }
+    if let Some(ref assignee) = query.assignee {
+        let did: Did = assignee.parse().map_err(|e| {
+            crate::error::GatewayError::BadRequest(format!("Invalid assignee DID: {e}"))
+        })?;
+        filter.assignee = Some(did);
+    }
+    if let Some(ref priority) = query.priority {
+        filter.priority = Some(parse_priority(priority)?);
+    }
+    if query.overdue == Some(true) {
+        filter.overdue_only = Some(icn_time::current_timestamp_secs());
+    }
+    if let Some(ref tag) = query.tag {
+        filter.tag = Some(tag.clone());
+    }
+
+    Ok(filter)
+}
+
+fn action_item_to_response(item: &icn_governance::ActionItem) -> ActionItemResponse {
+    let now = icn_time::current_timestamp_secs();
+
+    ActionItemResponse {
+        id: item.id.to_string(),
+        domain_id: item.domain_id.0.clone(),
+        title: item.title.clone(),
+        description: item.description.clone(),
+        assignee: item.assignee.as_ref().map(|d| d.to_string()),
+        due_date: item.due_date,
+        status: match item.status {
+            ActionItemStatus::Pending => "pending".to_string(),
+            ActionItemStatus::InProgress => "in_progress".to_string(),
+            ActionItemStatus::Completed => "completed".to_string(),
+            ActionItemStatus::Deferred => "deferred".to_string(),
+            ActionItemStatus::Cancelled => "cancelled".to_string(),
+        },
+        priority: match item.priority {
+            ActionItemPriority::Low => "low".to_string(),
+            ActionItemPriority::Medium => "medium".to_string(),
+            ActionItemPriority::High => "high".to_string(),
+            ActionItemPriority::Critical => "critical".to_string(),
+        },
+        created_by: item.created_by.to_string(),
+        created_at: item.created_at,
+        updated_at: item.updated_at,
+        linked_proposal: item.linked_proposal.as_ref().map(|p| p.to_string()),
+        meeting_context: item.meeting_context.clone(),
+        tags: item.tags.clone(),
+        notes: item
+            .notes
+            .iter()
+            .map(|n| ActionItemNoteResponse {
+                id: n.id.to_string(),
+                author: n.author.to_string(),
+                content: n.content.clone(),
+                created_at: n.created_at,
+            })
+            .collect(),
+        is_overdue: item.is_overdue(now),
+    }
 }
 
 #[cfg(test)]

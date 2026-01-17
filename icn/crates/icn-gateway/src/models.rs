@@ -649,3 +649,313 @@ pub struct UpdateFederationPolicyProposalRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_attestations_per_minute: Option<u32>,
 }
+
+// === Action Items ===
+
+/// Request to create a new action item
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct CreateActionItemRequest {
+    /// Title of the action item
+    pub title: String,
+    /// Optional description
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// Optional assignee DID
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub assignee: Option<String>,
+    /// Optional due date (Unix timestamp in seconds)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub due_date: Option<u64>,
+    /// Priority level: "low", "medium", "high", "critical"
+    #[serde(default = "default_priority")]
+    pub priority: String,
+    /// Optional linked proposal ID
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub linked_proposal: Option<String>,
+    /// Optional meeting context (e.g., "2026-01-17 board meeting")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub meeting_context: Option<String>,
+    /// Tags for categorization
+    #[serde(default)]
+    pub tags: Vec<String>,
+}
+
+fn default_priority() -> String {
+    "medium".to_string()
+}
+
+/// Request to update an action item
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct UpdateActionItemRequest {
+    /// Updated title
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    /// Updated description
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// Updated assignee DID (use empty string to unassign)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub assignee: Option<String>,
+    /// Updated due date (use 0 to remove)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub due_date: Option<u64>,
+    /// Updated priority
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub priority: Option<String>,
+    /// Updated status: "pending", "in_progress", "completed", "deferred"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    /// Updated tags
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tags: Option<Vec<String>>,
+}
+
+/// Request to add a note to an action item
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct AddActionItemNoteRequest {
+    /// Note content
+    pub content: String,
+}
+
+/// Action item response
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ActionItemResponse {
+    /// Unique action item ID
+    pub id: String,
+    /// Domain ID
+    pub domain_id: String,
+    /// Title
+    pub title: String,
+    /// Description
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// Assignee DID
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub assignee: Option<String>,
+    /// Due date (Unix timestamp)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub due_date: Option<u64>,
+    /// Status
+    pub status: String,
+    /// Priority
+    pub priority: String,
+    /// Creator DID
+    pub created_by: String,
+    /// Creation timestamp
+    pub created_at: u64,
+    /// Last update timestamp
+    pub updated_at: u64,
+    /// Linked proposal ID
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub linked_proposal: Option<String>,
+    /// Meeting context
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub meeting_context: Option<String>,
+    /// Tags
+    pub tags: Vec<String>,
+    /// Notes
+    pub notes: Vec<ActionItemNoteResponse>,
+    /// Whether the item is overdue
+    pub is_overdue: bool,
+}
+
+/// Action item note response
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ActionItemNoteResponse {
+    /// Note ID
+    pub id: String,
+    /// Author DID
+    pub author: String,
+    /// Note content
+    pub content: String,
+    /// Timestamp
+    pub created_at: u64,
+}
+
+/// Query parameters for listing action items
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ActionItemFilterParams {
+    /// Filter by status
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    /// Filter by assignee DID
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub assignee: Option<String>,
+    /// Filter by priority
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub priority: Option<String>,
+    /// Filter by overdue status
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub overdue: Option<bool>,
+    /// Filter by tag
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tag: Option<String>,
+}
+
+// === Listings / Exchange ===
+
+/// Request to create a new listing
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct CreateListingRequest {
+    /// Type: "offer" or "want"
+    pub listing_type: String,
+    /// Title of the listing
+    pub title: String,
+    /// Detailed description
+    pub description: String,
+    /// Category: "equipment", "services", "materials", "space", "other"
+    pub category: String,
+    /// What the poster is seeking in exchange
+    pub seeking: String,
+    /// Visibility: "coop", "federation", "public"
+    #[serde(default = "default_visibility")]
+    pub visibility: String,
+    /// Optional photo URLs (IPFS hashes or URLs)
+    #[serde(default)]
+    pub photos: Vec<String>,
+    /// Optional expiry date (Unix timestamp)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expires_at: Option<u64>,
+    /// Optional tags for discoverability
+    #[serde(default)]
+    pub tags: Vec<String>,
+    /// Optional location info
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub location: Option<String>,
+}
+
+fn default_visibility() -> String {
+    "federation".to_string()
+}
+
+/// Request to update a listing
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct UpdateListingRequest {
+    /// Updated title
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    /// Updated description
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// Updated category
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
+    /// Updated seeking
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub seeking: Option<String>,
+    /// Updated visibility
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub visibility: Option<String>,
+    /// Updated photos
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub photos: Option<Vec<String>>,
+    /// Updated expiry
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expires_at: Option<u64>,
+    /// Updated tags
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tags: Option<Vec<String>>,
+    /// Updated location
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub location: Option<String>,
+}
+
+/// Request to express interest in a listing
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ExpressInterestRequest {
+    /// Message to the listing owner
+    pub message: String,
+    /// Optional offer details
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub offer: Option<String>,
+}
+
+/// Listing response
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ListingResponse {
+    /// Unique listing ID
+    pub id: String,
+    /// Type: "offer" or "want"
+    pub listing_type: String,
+    /// Title
+    pub title: String,
+    /// Description
+    pub description: String,
+    /// Category
+    pub category: String,
+    /// Photo URLs
+    pub photos: Vec<String>,
+    /// Creator DID
+    pub offered_by: String,
+    /// Creator's cooperative ID
+    pub coop_id: String,
+    /// What they're seeking
+    pub seeking: String,
+    /// Visibility level
+    pub visibility: String,
+    /// Status: "active", "matched", "completed", "expired", "cancelled"
+    pub status: String,
+    /// Creation timestamp
+    pub created_at: u64,
+    /// Last update timestamp
+    pub updated_at: u64,
+    /// Expiry timestamp
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expires_at: Option<u64>,
+    /// Tags
+    pub tags: Vec<String>,
+    /// Location
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub location: Option<String>,
+    /// Number of interests expressed
+    pub interest_count: usize,
+}
+
+/// Interest response
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ListingInterestResponse {
+    /// Interest ID
+    pub id: String,
+    /// Listing ID
+    pub listing_id: String,
+    /// Interested party's DID
+    pub from_did: String,
+    /// Interested party's cooperative
+    pub from_coop: String,
+    /// Message
+    pub message: String,
+    /// Offer details
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub offer: Option<String>,
+    /// Timestamp
+    pub created_at: u64,
+}
+
+/// Query parameters for listing search
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ListingFilterParams {
+    /// Filter by type: "offer" or "want"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub listing_type: Option<String>,
+    /// Filter by category
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
+    /// Filter by visibility level
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub visibility: Option<String>,
+    /// Filter by status
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    /// Filter by coop
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub coop_id: Option<String>,
+    /// Filter by creator DID
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub offered_by: Option<String>,
+    /// Search in title and description
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub search: Option<String>,
+    /// Filter by tag
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tag: Option<String>,
+}

@@ -357,6 +357,9 @@
                 <button class="nav-btn" data-tab="governance">
                     <span aria-label="Governance and proposals">Governance</span>
                 </button>
+                <button class="nav-btn" data-tab="exchange">
+                    <span aria-label="Internal exchange marketplace">Exchange</span>
+                </button>
             </nav>
 
             <!-- Dashboard Tab -->
@@ -1300,18 +1303,107 @@ did:icn:charlie,did:icn:alice,3.5,Childcare</code></pre>
 
             <!-- Governance Tab -->
             <main id="governance" class="tab-content">
-                <div class="card">
-                    <h2>Active Proposals</h2>
-                    <p class="subtitle">Vote on community decisions</p>
-                    <div id="proposal-list" class="proposal-list">
-                        <p class="loading">Loading...</p>
+                <!-- Governance Sub-tabs -->
+                <div class="governance-tabs">
+                    <button class="tab-btn active" data-governance-tab="proposals">Proposals</button>
+                    <button class="tab-btn" data-governance-tab="action-items">Action Items</button>
+                </div>
+
+                <!-- Proposals Sub-tab -->
+                <div id="governance-proposals" class="governance-subtab">
+                    <div class="card">
+                        <h2>Active Proposals</h2>
+                        <p class="subtitle">Vote on community decisions</p>
+                        <div id="proposal-list" class="proposal-list">
+                            <p class="loading">Loading...</p>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h2>Recent Decisions</h2>
+                        <div id="closed-proposals" class="proposal-list">
+                            <p class="empty-state">No closed proposals yet</p>
+                        </div>
                     </div>
                 </div>
 
-                <div class="card">
-                    <h2>Recent Decisions</h2>
-                    <div id="closed-proposals" class="proposal-list">
-                        <p class="empty-state">No closed proposals yet</p>
+                <!-- Action Items Sub-tab -->
+                <div id="governance-action-items" class="governance-subtab hidden">
+                    <div class="card">
+                        <div class="card-header">
+                            <h2>Action Items</h2>
+                            <button id="add-action-item-btn" class="btn btn-small btn-primary">+ New Item</button>
+                        </div>
+
+                        <!-- Action Items Filter -->
+                        <div class="action-items-filter">
+                            <button class="filter-btn active" data-filter="all">All</button>
+                            <button class="filter-btn" data-filter="mine">My Items</button>
+                            <button class="filter-btn" data-filter="overdue">Overdue</button>
+                            <button class="filter-btn" data-filter="pending">Pending</button>
+                            <button class="filter-btn" data-filter="completed">Completed</button>
+                        </div>
+
+                        <div id="action-items-list" class="action-items-list">
+                            <p class="loading">Loading...</p>
+                        </div>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Exchange Tab -->
+            <main id="exchange" class="tab-content">
+                <!-- Exchange Sub-tabs -->
+                <div class="exchange-tabs">
+                    <button class="tab-btn active" data-exchange-tab="browse">Browse Listings</button>
+                    <button class="tab-btn" data-exchange-tab="my-listings">My Listings</button>
+                </div>
+
+                <!-- Browse Listings Sub-tab -->
+                <div id="exchange-browse" class="exchange-subtab">
+                    <div class="card">
+                        <div class="card-header">
+                            <h2>Exchange</h2>
+                            <button id="create-listing-btn" class="btn btn-small btn-primary">+ Post Listing</button>
+                        </div>
+                        <p class="subtitle">Find what you need, share what you have</p>
+
+                        <!-- Listing Filters -->
+                        <div class="listing-filters">
+                            <button class="filter-btn active" data-listing-filter="all">All</button>
+                            <button class="filter-btn" data-listing-filter="offer">Offers</button>
+                            <button class="filter-btn" data-listing-filter="want">Wants</button>
+                        </div>
+
+                        <div class="category-filters">
+                            <select id="listing-category-filter">
+                                <option value="">All Categories</option>
+                                <option value="equipment">Equipment</option>
+                                <option value="services">Services</option>
+                                <option value="materials">Materials</option>
+                                <option value="space">Space</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+
+                        <div id="listings-grid" class="listings-grid">
+                            <p class="loading">Loading...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- My Listings Sub-tab -->
+                <div id="exchange-my-listings" class="exchange-subtab hidden">
+                    <div class="card">
+                        <div class="card-header">
+                            <h2>My Listings</h2>
+                            <button id="create-listing-btn-2" class="btn btn-small btn-primary">+ Post Listing</button>
+                        </div>
+                        <p class="subtitle">Manage your offers and wants</p>
+
+                        <div id="my-listings-list" class="listings-grid">
+                            <p class="loading">Loading...</p>
+                        </div>
                     </div>
                 </div>
             </main>
