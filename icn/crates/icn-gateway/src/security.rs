@@ -471,9 +471,8 @@ mod tests {
     #[test]
     fn test_production_with_origins_has_strict_csp() {
         // Even with custom origins, CSP should be strict
-        let config = SecurityConfig::production_with_origins(vec![
-            "https://app.icn.coop".to_string(),
-        ]);
+        let config =
+            SecurityConfig::production_with_origins(vec!["https://app.icn.coop".to_string()]);
         let dangerous_directive = "unsafe-".to_string() + "eval";
         assert!(
             !config.csp_directive.contains(&dangerous_directive),
