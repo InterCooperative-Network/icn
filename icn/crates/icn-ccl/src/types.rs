@@ -422,6 +422,117 @@ pub enum LedgerOperation {
 }
 
 // ============================================================================
+// Fuel Estimation Types
+// ============================================================================
+
+/// Pre-execution fuel estimate for a contract rule
+///
+/// Provides minimum, expected, and maximum fuel estimates to help
+/// clients set appropriate fuel limits before execution.
+///
+/// # Example
+///
+/// ```
+/// use icn_ccl::FuelEstimate;
+///
+/// let estimate = FuelEstimate {
+///     minimum: 50,
+///     expected: 100,
+///     maximum: 1000,
+///     warnings: vec![],
+/// };
+///
+/// // Use maximum for safety, or expected for normal cases
+/// let fuel_limit = estimate.recommended();
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FuelEstimate {
+    /// Minimum fuel required (best case, no loops/branches)
+    pub minimum: u64,
+
+    /// Expected fuel (typical execution path)
+    pub expected: u64,
+
+    /// Maximum fuel (worst case, max loop iterations)
+    pub maximum: u64,
+
+    /// Warnings about estimation (e.g., "contains unbounded recursion")
+    pub warnings: Vec<String>,
+}
+
+impl FuelEstimate {
+    /// Create a new fuel estimate
+    pub fn new(minimum: u64, expected: u64, maximum: u64) -> Self {
+        Self {
+            minimum,
+            expected,
+            maximum,
+            warnings: Vec::new(),
+        }
+    }
+
+    /// Create a zero estimate (for empty rules)
+    pub fn zero() -> Self {
+        Self::new(0, 0, 0)
+    }
+
+    /// Add a warning to the estimate
+    pub fn with_warning(mut self, warning: impl Into<String>) -> Self {
+        self.warnings.push(warning.into());
+        self
+    }
+
+    /// Get recommended fuel limit (adds 20% buffer to maximum)
+    pub fn recommended(&self) -> u64 {
+        self.maximum.saturating_add(self.maximum / 5)
+    }
+
+    /// Combine two estimates (for sequential execution)
+    pub fn then(self, other: Self) -> Self {
+        Self {
+            minimum: self.minimum.saturating_add(other.minimum),
+            expected: self.expected.saturating_add(other.expected),
+            maximum: self.maximum.saturating_add(other.maximum),
+            warnings: self
+                .warnings
+                .into_iter()
+                .chain(other.warnings)
+                .collect(),
+        }
+    }
+
+    /// Combine two estimates for branching (if/else)
+    pub fn branch(self, other: Self) -> Self {
+        Self {
+            minimum: self.minimum.min(other.minimum),
+            expected: (self.expected + other.expected) / 2,
+            maximum: self.maximum.max(other.maximum),
+            warnings: self
+                .warnings
+                .into_iter()
+                .chain(other.warnings)
+                .collect(),
+        }
+    }
+
+    /// Scale estimate for loop iterations
+    pub fn loop_scale(self, min_iters: u64, expected_iters: u64, max_iters: u64) -> Self {
+        Self {
+            minimum: self.minimum.saturating_mul(min_iters),
+            expected: self.expected.saturating_mul(expected_iters),
+            maximum: self.maximum.saturating_mul(max_iters),
+            warnings: self.warnings,
+        }
+    }
+}
+
+impl Default for FuelEstimate {
+    fn default() -> Self {
+        Self::zero()
+    }
+}
+
+// ============================================================================
 // Governance Types
 // ============================================================================
 

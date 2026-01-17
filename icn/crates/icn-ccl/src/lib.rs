@@ -50,6 +50,7 @@ pub mod charter_rules;
 pub mod charter_validator;
 pub mod disputes;
 pub mod error;
+pub mod fuel_estimator;
 pub mod interpreter;
 pub mod messages;
 pub mod registry;
@@ -84,9 +85,10 @@ pub use registry_actor::{
     TOPIC_CONTRACTS_REVOKE,
 };
 pub use runtime::{ContractInfo, ContractRuntime};
+pub use fuel_estimator::{estimate_fuel, estimate_fuel_dry_run, FuelEstimator};
 pub use types::{
-    Capability, ContractInstallation, ContractState, ExecutionContext, ExecutionResult, FuelConfig,
-    LedgerOperation, Value,
+    Capability, ContractInstallation, ContractState, ExecutionContext, ExecutionResult,
+    FuelConfig, FuelEstimate, LedgerOperation, Value,
 };
 
 #[cfg(test)]
