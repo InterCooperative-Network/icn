@@ -2343,6 +2343,13 @@ pub async fn update_action_item(
         .map_err(|e| crate::error::GatewayError::InternalError(e.to_string()))?
         .ok_or_else(|| crate::error::GatewayError::NotFound("Action item not found".to_string()))?;
 
+    // Ownership check: only the creator can update the action item
+    if item.created_by != user_did {
+        return Err(crate::error::GatewayError::Forbidden(
+            "Only the action item creator can update it".to_string(),
+        ));
+    }
+
     // Apply updates
     if let Some(ref title) = req.title {
         item.title = title.clone();
@@ -2404,17 +2411,24 @@ pub async fn delete_action_item(
     // Verify domain membership
     check_domain_membership(&gov_mgr, &domain, &user_did).await?;
 
-    let deleted = gov_mgr
+    // Get the item to verify ownership before deleting
+    let item = gov_mgr
+        .get_action_item(&domain, &id)
+        .map_err(|e| crate::error::GatewayError::InternalError(e.to_string()))?
+        .ok_or_else(|| crate::error::GatewayError::NotFound("Action item not found".to_string()))?;
+
+    // Ownership check: only the creator can delete the action item
+    if item.created_by != user_did {
+        return Err(crate::error::GatewayError::Forbidden(
+            "Only the action item creator can delete it".to_string(),
+        ));
+    }
+
+    gov_mgr
         .delete_action_item(&domain, &id)
         .map_err(|e| crate::error::GatewayError::InternalError(e.to_string()))?;
 
-    if deleted {
-        Ok(HttpResponse::NoContent().finish())
-    } else {
-        Err(crate::error::GatewayError::NotFound(
-            "Action item not found".to_string(),
-        ))
-    }
+    Ok(HttpResponse::NoContent().finish())
 }
 
 /// POST /gov/domains/{domain_id}/action-items/{item_id}/notes - Add a note to an action item
@@ -2472,6 +2486,21 @@ pub async fn update_action_item_status(
 
     // Verify domain membership
     check_domain_membership(&gov_mgr, &domain, &user_did).await?;
+
+    // Get the item to check permissions
+    let existing = gov_mgr
+        .get_action_item(&domain, &id)
+        .map_err(|e| crate::error::GatewayError::InternalError(e.to_string()))?
+        .ok_or_else(|| crate::error::GatewayError::NotFound("Action item not found".to_string()))?;
+
+    // Permission check: only creator or assignee can update status
+    let is_creator = existing.created_by == user_did;
+    let is_assignee = existing.assignee.as_ref().is_some_and(|a| a == &user_did);
+    if !is_creator && !is_assignee {
+        return Err(crate::error::GatewayError::Forbidden(
+            "Only the creator or assignee can update action item status".to_string(),
+        ));
+    }
 
     let status = parse_status(&req.status)?;
 
