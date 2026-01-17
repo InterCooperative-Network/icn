@@ -77,6 +77,10 @@ pub use events::{
 };
 pub use identity_mgr::{DeviceInfo, IdentityManager, RegisterDeviceRequest};
 pub use ledger_events::LedgerEventBridge;
+pub use listings_mgr::{
+    InMemoryListingsStore, Listing, ListingCategory, ListingFilter, ListingId, ListingInterest,
+    ListingStatus, ListingType, ListingVisibility, ListingsManager,
+};
 pub use notification_queue::{
     DeliveryStatus, NotificationChannel, NotificationPriority, NotificationQueue,
     NotificationStatsSnapshot, NotificationType, QueuedNotification,
@@ -94,7 +98,3 @@ pub use server::GatewayServer;
 pub use steward_mgr::{StewardHandleType, StewardManager};
 pub use treasury_mgr::{GatewayTreasuryManager, LedgerHandle, TreasuryHandle};
 pub use websocket::ServerMessage;
-pub use listings_mgr::{
-    InMemoryListingsStore, Listing, ListingCategory, ListingFilter, ListingId, ListingInterest,
-    ListingStatus, ListingType, ListingVisibility, ListingsManager,
-};

@@ -2105,11 +2105,7 @@ pub async fn create_action_item(
     };
 
     // Parse linked proposal if provided
-    let linked_proposal: Option<ProposalId> = if let Some(ref proposal_str) = req.linked_proposal {
-        Some(ProposalId::new(proposal_str))
-    } else {
-        None
-    };
+    let linked_proposal = req.linked_proposal.as_ref().map(ProposalId::new);
 
     // Parse priority
     let priority = parse_priority(&req.priority)?;
