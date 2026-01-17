@@ -88,11 +88,11 @@ fn default_sampling_rate() -> f64 {
 }
 
 fn default_always_sample_errors() -> bool {
-    true // Always capture errors by default
+    true // Reserved for collector-side tail-based sampling
 }
 
 fn default_always_sample_slow() -> bool {
-    true // Always capture slow requests by default
+    true // Reserved for collector-side tail-based sampling
 }
 
 fn default_slow_threshold_ms() -> u64 {
