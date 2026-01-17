@@ -67,12 +67,13 @@
 //!
 //! ## Integration Status
 //!
-//! The `EncryptedEnvelope` is fully integrated into `NetworkActor`:
-//! - `NetworkActor::send_encrypted_message()` - Sends encrypted messages
-//! - `handlers::encrypted` - Processes incoming encrypted envelopes
-//! - `OutgoingSequenceTracker` - Manages sequence numbers with persistence
+//! The `EncryptedEnvelope` is fully integrated into [`NetworkActor`]:
+//! - [`NetworkActor::send_encrypted_message()`] - Sends encrypted messages
+//! - [`crate::handlers::encrypted`] - Processes incoming encrypted envelopes
+//! - [`OutgoingSequenceTracker`] - Manages sequence numbers with persistence
 //!
-//! See [`crate::actor::NetworkActor`] for the full integration.
+//! [`NetworkActor`]: crate::actor::NetworkActor
+//! [`NetworkActor::send_encrypted_message()`]: crate::actor::NetworkHandle::send_encrypted_message
 //!
 //! ### Related Issues
 //!
