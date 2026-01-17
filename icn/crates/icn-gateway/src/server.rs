@@ -27,6 +27,7 @@ use crate::governance_mgr::GovernanceHandle;
 use crate::governance_mgr::GovernanceManager;
 use crate::identity_mgr::IdentityManager;
 use crate::ledger_mgr::LedgerManager;
+use crate::listings_mgr::ListingsManager;
 use crate::notification_processor::{NotificationProcessor, ProcessorConfig};
 use crate::notification_queue::NotificationQueue;
 use crate::notification_triggers::{GovernanceNotificationTrigger, LedgerNotificationTrigger};
@@ -37,7 +38,6 @@ use crate::rate_limit::{
 use crate::security::{configure_cors, SecurityConfig, SecurityHeaders};
 use crate::treasury_mgr::{GatewayTreasuryManager, LedgerHandle, TreasuryHandle};
 use crate::trust_mgr::{TrustGraphHandle, TrustManager};
-use crate::listings_mgr::ListingsManager;
 use icn_compute::ComputeHandle;
 use icn_store::SledStore;
 use tokio::sync::RwLock;
@@ -502,9 +502,9 @@ impl GatewayServer {
         info!("Entity audit manager initialized");
 
         // Create listings manager with Sled-backed persistent storage
-        let listings_manager = Arc::new(RwLock::new(
-            ListingsManager::with_sled(Arc::new(db.clone())),
-        ));
+        let listings_manager = Arc::new(RwLock::new(ListingsManager::with_sled(Arc::new(
+            db.clone(),
+        ))));
         info!("Listings manager initialized with persistent storage");
 
         // Create ledger manager with persistent storage if data_dir is set
@@ -567,8 +567,7 @@ impl GatewayServer {
         info!("Velocity limiter initialized (trust-gated: 10-200 tx/hour by trust class)");
 
         // Create persistent notification store
-        let notification_store =
-            Arc::new(crate::notifications::NotificationStore::new(db.clone()));
+        let notification_store = Arc::new(crate::notifications::NotificationStore::new(db.clone()));
         info!("Persistent notification store initialized");
 
         // Create notification service (FCM credentials would be loaded from config in production)

@@ -75,8 +75,9 @@ impl ActionItemStoreBackend for SledActionItemStore {
         let key = Self::item_key(domain_id, id);
         match self.db.get(key.as_bytes()) {
             Ok(Some(value)) => {
-                let item = icn_encoding::decode_versioned(&value)
-                    .map_err(|e| GovernanceError::Internal(format!("Failed to decode action item: {e}")))?;
+                let item = icn_encoding::decode_versioned(&value).map_err(|e| {
+                    GovernanceError::Internal(format!("Failed to decode action item: {e}"))
+                })?;
                 Ok(Some(item))
             }
             Ok(None) => Ok(None),
@@ -93,10 +94,11 @@ impl ActionItemStoreBackend for SledActionItemStore {
         let mut items = Vec::new();
 
         for result in self.db.scan_prefix(prefix.as_bytes()) {
-            let (_, value) = result
-                .map_err(|e| GovernanceError::Internal(format!("Sled scan failed: {e}")))?;
-            let item: ActionItem = icn_encoding::decode_versioned(&value)
-                .map_err(|e| GovernanceError::Internal(format!("Failed to decode action item: {e}")))?;
+            let (_, value) =
+                result.map_err(|e| GovernanceError::Internal(format!("Sled scan failed: {e}")))?;
+            let item: ActionItem = icn_encoding::decode_versioned(&value).map_err(|e| {
+                GovernanceError::Internal(format!("Failed to decode action item: {e}"))
+            })?;
             if filter.matches(&item) {
                 items.push(item);
             }
@@ -129,10 +131,11 @@ impl ActionItemStoreBackend for SledActionItemStore {
         let mut count = 0;
 
         for result in self.db.scan_prefix(prefix.as_bytes()) {
-            let (_, value) = result
-                .map_err(|e| GovernanceError::Internal(format!("Sled scan failed: {e}")))?;
-            let item: ActionItem = icn_encoding::decode_versioned(&value)
-                .map_err(|e| GovernanceError::Internal(format!("Failed to decode action item: {e}")))?;
+            let (_, value) =
+                result.map_err(|e| GovernanceError::Internal(format!("Sled scan failed: {e}")))?;
+            let item: ActionItem = icn_encoding::decode_versioned(&value).map_err(|e| {
+                GovernanceError::Internal(format!("Failed to decode action item: {e}"))
+            })?;
             if filter.matches(&item) {
                 count += 1;
             }
