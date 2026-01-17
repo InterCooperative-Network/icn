@@ -96,28 +96,24 @@ impl ListingCategory {
 }
 
 /// Visibility scope of a listing
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ListingVisibility {
     /// Only visible within the coop
     Coop,
     /// Visible to federation members
+    #[default]
     Federation,
     /// Visible to all network participants
     Network,
 }
 
-impl Default for ListingVisibility {
-    fn default() -> Self {
-        Self::Federation
-    }
-}
-
 /// Status of a listing
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ListingStatus {
     /// Active and available
+    #[default]
     Active,
     /// Matched with someone but not completed
     Matched,
@@ -127,12 +123,6 @@ pub enum ListingStatus {
     Expired,
     /// Cancelled by owner
     Cancelled,
-}
-
-impl Default for ListingStatus {
-    fn default() -> Self {
-        Self::Active
-    }
 }
 
 /// A listing for internal exchange
@@ -629,15 +619,19 @@ mod tests {
         .unwrap();
 
         // Filter by type
-        let mut filter = ListingFilter::default();
-        filter.listing_type = Some(ListingType::Offer);
+        let filter = ListingFilter {
+            listing_type: Some(ListingType::Offer),
+            ..Default::default()
+        };
         let offers = mgr.list_listings(&filter).unwrap();
         assert_eq!(offers.len(), 1);
         assert_eq!(offers[0].title, "Oven");
 
         // Filter by coop
-        let mut filter = ListingFilter::default();
-        filter.coop_id = Some("coop2".to_string());
+        let filter = ListingFilter {
+            coop_id: Some("coop2".to_string()),
+            ..Default::default()
+        };
         let coop2_listings = mgr.list_listings(&filter).unwrap();
         assert_eq!(coop2_listings.len(), 1);
         assert_eq!(coop2_listings[0].coop_id, "coop2");
