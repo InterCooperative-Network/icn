@@ -79,6 +79,8 @@
 //! | `MajoritySignatures` | More witness signatures wins | Multi-party transactions |
 //! | `Hybrid` (default) | Weighted combination (40% trust, 30% time, 30% sigs) | Production |
 //!
+//! **Note:** Hybrid weights shown are defaults; may be configurable per deployment.
+//!
 //! ### Resolution Process
 //!
 //! 1. Detect fork via `ForkDetector::detect_forks()`
@@ -170,6 +172,9 @@
 //!
 //! Quarantined entries can be reviewed and potentially accepted after
 //! the underlying issue is resolved (e.g., fork resolved, invariants restored).
+//! Use [`QuarantineStore::get_quarantined()`] to retrieve entries for review.
+//!
+//! [`QuarantineStore::get_quarantined()`]: crate::quarantine::QuarantineStore::get_quarantined
 //!
 //! ## Performance Considerations
 //!
@@ -177,6 +182,7 @@
 //! - **Indexing**: Timestamp index for efficient pagination
 //! - **Cleared Volume**: O(1) credit limit checks via pre-computed index
 //! - **Parent Index**: O(1) fork detection via hash map
+//! - **Trade-off**: Memory scales with DAG size; consider pruning for long-running nodes
 //!
 //! [`ForkDetector`]: crate::fork_resolution::ForkDetector
 //! [`ForkResolver`]: crate::fork_resolution::ForkResolver
