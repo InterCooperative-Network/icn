@@ -99,11 +99,11 @@ storage:
 # Find slow traces (> 1s)
 { duration > 1s }
 
-# Find security-related traces
-{ span.icn.priority = "security" }
+# Find security-related traces (ICN sets sampling.priority attribute)
+{ resource.sampling.priority = "security" }
 ```
 
-For pre-storage tail-based sampling, place OTEL Collector in front of Tempo (see configuration below).
+> **Note**: Tempo stores all traces it receives. The TraceQL queries shown above are for **retrieval** only, not filtering during ingestion. To reduce storage costs, place an OTEL Collector with tail sampling in front of Tempo (see configuration below).
 
 ### OpenTelemetry Collector
 
@@ -139,14 +139,13 @@ processors:
         latency:
           threshold_ms: 1000
 
-      # Always sample security spans (matches span names containing these keywords)
-      # ICN's PrioritySampler uses span name matching, so we do the same here
+      # Always sample security spans
+      # ICN sets sampling.priority="security" attribute on priority spans
       - name: security-policy
         type: string_attribute
         string_attribute:
-          key: name
-          values: ["security", "auth", "trust", "crypto", "permission", "signature"]
-          enabled_regex_matching: true
+          key: sampling.priority
+          values: ["security"]
 
       # Probabilistic sampling for everything else
       - name: probabilistic-policy
