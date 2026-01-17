@@ -20,6 +20,8 @@ img-src 'self' data:;
 connect-src 'self' ws: wss:;
 ```
 
+**Note:** The CSP is sent as a single-line HTTP header. The formatting above is for readability.
+
 | Directive | Value | Purpose |
 |-----------|-------|---------|
 | `default-src` | `'self'` | Only load resources from same origin |
