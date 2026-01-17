@@ -76,19 +76,14 @@ impl std::fmt::Display for ActionItemStatus {
 }
 
 /// Priority level for action items
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ActionItemPriority {
     Low,
+    #[default]
     Medium,
     High,
     Critical,
-}
-
-impl Default for ActionItemPriority {
-    fn default() -> Self {
-        Self::Medium
-    }
 }
 
 /// An action item tracked within a governance domain
