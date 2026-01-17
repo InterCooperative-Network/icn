@@ -178,3 +178,12 @@ git checkout main
 git pull
 git branch -d feat/my-feature
 ```
+
+---
+
+## Related Guides
+
+- [Internationalization Guide](docs/i18n-guide.md) - Adding translations to ICN components
+- [Architecture Overview](docs/ARCHITECTURE.md) - System architecture documentation
+- [Phase History](docs/PHASE_HISTORY.md) - Completed development phases
+- [Production Hardening](docs/production-hardening.md) - Security configuration
