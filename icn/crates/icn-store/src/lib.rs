@@ -10,6 +10,8 @@
 pub mod budgets;
 /// Escrow functionality for conditional payments
 pub mod escrow;
+/// Storage maintenance tasks
+pub mod maintenance;
 /// Notification storage and management
 pub mod notifications;
 /// Peer cache for persisting discovered peers
@@ -36,6 +38,11 @@ pub use peer_cache::{CachedPeer, PeerCache, PeerSource, DEFAULT_PEER_TTL};
 pub use pos::{
     ChallengeConfig, ChallengeState, ContentChunkTree, MerkleProof, PendingChallenge,
     StorageChallenge, StorageFailureReason, StorageProof, DEFAULT_CHUNK_SIZE, MAX_BYTE_SAMPLE_SIZE,
+};
+
+// Re-export maintenance types
+pub use maintenance::{
+    MaintenanceConfig, MaintenanceHandle, MaintenanceManager, MaintenanceResult,
 };
 
 // Note: StoreTransaction, TransactionalStore, and StoreTransactionError are publicly defined
