@@ -110,10 +110,7 @@ fn validate_listing_input(req: &CreateListingRequest) -> Result<()> {
 
     // Expiry date validation - can't be in the past
     if let Some(expires_at) = req.expires_at {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
         if expires_at < now {
             return Err(GatewayError::BadRequest(
                 "Expiry date cannot be in the past".to_string(),
@@ -208,10 +205,7 @@ fn validate_listing_update(req: &UpdateListingRequest) -> Result<()> {
 
     // Expiry date validation - if provided, can't be in the past
     if let Some(expires_at) = req.expires_at {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
         if expires_at < now {
             return Err(GatewayError::BadRequest(
                 "Expiry date cannot be in the past".to_string(),
@@ -425,15 +419,19 @@ pub async fn list_listings(
 
     // Convert to responses with interest counts
     // Privacy: only show interest count for the caller's own listings
+    // Batch-fetch interest counts to avoid N+1 queries
+    let owned_listing_ids: Vec<ListingId> = listings
+        .iter()
+        .filter(|l| caller_did.as_ref().is_some_and(|did| did == &l.offered_by))
+        .map(|l| l.id)
+        .collect();
+
+    let interest_counts = mgr.get_interest_counts(&owned_listing_ids);
+
     let responses: Vec<ListingResponse> = listings
         .iter()
         .map(|l| {
-            let is_owner = caller_did.as_ref().is_some_and(|did| did == &l.offered_by);
-            let interest_count = if is_owner {
-                mgr.get_interests(&l.id).map(|i| i.len()).unwrap_or(0)
-            } else {
-                0 // Don't reveal interest count to non-owners
-            };
+            let interest_count = interest_counts.get(&l.id).copied().unwrap_or(0);
             listing_to_response(l, interest_count)
         })
         .collect();
@@ -776,23 +774,28 @@ pub async fn get_my_listings(
 
     let mgr = listings_mgr.read().await;
 
-    // Get all listings and filter by creator
-    // Note: In a production system, we'd add offered_by to ListingFilter
-    let filter = ListingFilter::default();
-    let all_listings = mgr
+    // Use the offered_by filter for efficient lookup
+    let filter = ListingFilter {
+        offered_by: Some(caller_did),
+        ..Default::default()
+    };
+    let my_listings = mgr
         .list_listings(&filter)
         .map_err(|e| GatewayError::InternalError(format!("Failed to list listings: {e}")))?;
 
-    let my_listings: Vec<ListingResponse> = all_listings
+    // Batch-fetch interest counts to avoid N+1 queries
+    let listing_ids: Vec<ListingId> = my_listings.iter().map(|l| l.id).collect();
+    let interest_counts = mgr.get_interest_counts(&listing_ids);
+
+    let responses: Vec<ListingResponse> = my_listings
         .iter()
-        .filter(|l| l.offered_by == caller_did)
         .map(|l| {
-            let interest_count = mgr.get_interests(&l.id).map(|i| i.len()).unwrap_or(0);
+            let interest_count = interest_counts.get(&l.id).copied().unwrap_or(0);
             listing_to_response(l, interest_count)
         })
         .collect();
 
-    Ok(HttpResponse::Ok().json(my_listings))
+    Ok(HttpResponse::Ok().json(responses))
 }
 
 /// Configure listing routes

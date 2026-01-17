@@ -2132,10 +2132,7 @@ fn validate_action_item_input(req: &CreateActionItemRequest) -> Result<()> {
 
     // Due date validation - can't be in the past (allow 5 minute grace period)
     if let Some(due_date) = req.due_date {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = icn_time::current_timestamp_secs();
         let grace_period = 5 * 60; // 5 minutes
         if due_date < now.saturating_sub(grace_period) {
             return Err(crate::error::GatewayError::BadRequest(
@@ -2196,10 +2193,7 @@ fn validate_action_item_update(req: &UpdateActionItemRequest) -> Result<()> {
     // Due date validation - if provided and non-zero, can't be in the past
     if let Some(due_date) = req.due_date {
         if due_date != 0 {
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
+            let now = icn_time::current_timestamp_secs();
             let grace_period = 5 * 60; // 5 minutes
             if due_date < now.saturating_sub(grace_period) {
                 return Err(crate::error::GatewayError::BadRequest(

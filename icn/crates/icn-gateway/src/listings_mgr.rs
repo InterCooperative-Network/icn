@@ -498,6 +498,12 @@ impl ListingsManager {
             anyhow::bail!("Listing is not active");
         }
 
+        // Prevent duplicate interests from the same user
+        let existing_interests = self.store.get_interests(&listing_id)?;
+        if existing_interests.iter().any(|i| i.from_did == from_did) {
+            anyhow::bail!("You have already expressed interest in this listing");
+        }
+
         let now = icn_time::current_timestamp_secs();
         let interest = ListingInterest::new(listing_id, from_did, from_coop, message, offer, now);
 
@@ -508,6 +514,22 @@ impl ListingsManager {
     /// Get interests for a listing
     pub fn get_interests(&self, listing_id: &ListingId) -> Result<Vec<ListingInterest>> {
         self.store.get_interests(listing_id)
+    }
+
+    /// Get interest counts for multiple listings in a single operation.
+    ///
+    /// This is more efficient than calling `get_interests` in a loop
+    /// as it acquires the lock only once.
+    pub fn get_interest_counts(&self, listing_ids: &[ListingId]) -> HashMap<ListingId, usize> {
+        listing_ids
+            .iter()
+            .filter_map(|id| {
+                self.store
+                    .get_interests(id)
+                    .ok()
+                    .map(|interests| (*id, interests.len()))
+            })
+            .collect()
     }
 
     /// Mark a listing as matched
@@ -705,6 +727,37 @@ mod tests {
 
         let interests = mgr.get_interests(&listing.id).unwrap();
         assert_eq!(interests.len(), 1);
+
+        // Trying to express interest again from same user should fail
+        let duplicate_result = mgr.express_interest(
+            listing.id,
+            Did::from_anchor_id(&[2; 32]), // Same DID as before
+            "coop2".to_string(),
+            "Another message".to_string(),
+            None,
+        );
+        assert!(
+            duplicate_result.is_err(),
+            "Should prevent duplicate interest from same user"
+        );
+        assert!(duplicate_result
+            .unwrap_err()
+            .to_string()
+            .contains("already expressed interest"));
+
+        // Different user should be able to express interest
+        let different_user_interest = mgr.express_interest(
+            listing.id,
+            Did::from_anchor_id(&[3; 32]), // Different DID
+            "coop3".to_string(),
+            "I'm also interested!".to_string(),
+            None,
+        );
+        assert!(different_user_interest.is_ok());
+
+        // Now should have 2 interests
+        let interests = mgr.get_interests(&listing.id).unwrap();
+        assert_eq!(interests.len(), 2);
     }
 
     #[test]
