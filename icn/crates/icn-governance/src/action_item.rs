@@ -537,8 +537,7 @@ impl ActionItemStoreBackend for SledActionItemStore {
         let mut result = Vec::new();
 
         for item in self.db.scan_prefix(prefix.as_bytes()) {
-            let (_, value) =
-                item.map_err(|e| crate::GovernanceError::Storage(e.to_string()))?;
+            let (_, value) = item.map_err(|e| crate::GovernanceError::Storage(e.to_string()))?;
             if let Ok(action_item) = icn_encoding::decode_versioned::<ActionItem>(&value) {
                 if filter.matches(&action_item) {
                     result.push(action_item);
@@ -547,22 +546,20 @@ impl ActionItemStoreBackend for SledActionItemStore {
         }
 
         // Sort by due date (nulls last), then by priority, then by created_at
-        result.sort_by(|a, b| {
-            match (a.due_date, b.due_date) {
-                (Some(a_due), Some(b_due)) => a_due.cmp(&b_due),
-                (Some(_), None) => std::cmp::Ordering::Less,
-                (None, Some(_)) => std::cmp::Ordering::Greater,
-                (None, None) => {
-                    let priority_order = |p: &ActionItemPriority| match p {
-                        ActionItemPriority::Critical => 0,
-                        ActionItemPriority::High => 1,
-                        ActionItemPriority::Medium => 2,
-                        ActionItemPriority::Low => 3,
-                    };
-                    match priority_order(&a.priority).cmp(&priority_order(&b.priority)) {
-                        std::cmp::Ordering::Equal => a.created_at.cmp(&b.created_at),
-                        other => other,
-                    }
+        result.sort_by(|a, b| match (a.due_date, b.due_date) {
+            (Some(a_due), Some(b_due)) => a_due.cmp(&b_due),
+            (Some(_), None) => std::cmp::Ordering::Less,
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+            (None, None) => {
+                let priority_order = |p: &ActionItemPriority| match p {
+                    ActionItemPriority::Critical => 0,
+                    ActionItemPriority::High => 1,
+                    ActionItemPriority::Medium => 2,
+                    ActionItemPriority::Low => 3,
+                };
+                match priority_order(&a.priority).cmp(&priority_order(&b.priority)) {
+                    std::cmp::Ordering::Equal => a.created_at.cmp(&b.created_at),
+                    other => other,
                 }
             }
         });
@@ -585,8 +582,7 @@ impl ActionItemStoreBackend for SledActionItemStore {
         let mut count = 0;
 
         for item in self.db.scan_prefix(prefix.as_bytes()) {
-            let (_, value) =
-                item.map_err(|e| crate::GovernanceError::Storage(e.to_string()))?;
+            let (_, value) = item.map_err(|e| crate::GovernanceError::Storage(e.to_string()))?;
             if let Ok(action_item) = icn_encoding::decode_versioned::<ActionItem>(&value) {
                 if filter.matches(&action_item) {
                     count += 1;
@@ -837,7 +833,12 @@ mod tests {
         let domain = test_domain();
 
         // Create and save
-        let item = ActionItem::new(domain.clone(), "Sled test task".to_string(), test_did(), 1000);
+        let item = ActionItem::new(
+            domain.clone(),
+            "Sled test task".to_string(),
+            test_did(),
+            1000,
+        );
         let item_id = item.id.clone();
 
         store.save(&item).expect("save should succeed");
@@ -881,12 +882,24 @@ mod tests {
         let domain2 = GovernanceDomainId("other-domain".to_string());
 
         // Create items in two domains
-        let item1 =
-            ActionItem::new(domain1.clone(), "Domain 1 task 1".to_string(), test_did(), 1000);
-        let item2 =
-            ActionItem::new(domain1.clone(), "Domain 1 task 2".to_string(), test_did(), 1001);
-        let item3 =
-            ActionItem::new(domain2.clone(), "Domain 2 task 1".to_string(), test_did(), 1002);
+        let item1 = ActionItem::new(
+            domain1.clone(),
+            "Domain 1 task 1".to_string(),
+            test_did(),
+            1000,
+        );
+        let item2 = ActionItem::new(
+            domain1.clone(),
+            "Domain 1 task 2".to_string(),
+            test_did(),
+            1001,
+        );
+        let item3 = ActionItem::new(
+            domain2.clone(),
+            "Domain 2 task 1".to_string(),
+            test_did(),
+            1002,
+        );
 
         store.save(&item1).unwrap();
         store.save(&item2).unwrap();
@@ -894,15 +907,11 @@ mod tests {
 
         // Verify counts
         assert_eq!(
-            store
-                .count(&domain1, &ActionItemFilter::default())
-                .unwrap(),
+            store.count(&domain1, &ActionItemFilter::default()).unwrap(),
             2
         );
         assert_eq!(
-            store
-                .count(&domain2, &ActionItemFilter::default())
-                .unwrap(),
+            store.count(&domain2, &ActionItemFilter::default()).unwrap(),
             1
         );
 
@@ -912,15 +921,11 @@ mod tests {
 
         // Verify domain1 is empty, domain2 unchanged
         assert_eq!(
-            store
-                .count(&domain1, &ActionItemFilter::default())
-                .unwrap(),
+            store.count(&domain1, &ActionItemFilter::default()).unwrap(),
             0
         );
         assert_eq!(
-            store
-                .count(&domain2, &ActionItemFilter::default())
-                .unwrap(),
+            store.count(&domain2, &ActionItemFilter::default()).unwrap(),
             1
         );
     }
