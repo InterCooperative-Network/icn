@@ -71,6 +71,9 @@ pub mod store;
 pub mod tally;
 pub mod vote;
 
+// Action items for meeting/task tracking
+pub mod action_item;
+
 // Orphan cleanup (Phase 21)
 pub mod orphan_cleanup;
 
@@ -153,6 +156,12 @@ pub use orphan_cleanup::{
 
 // Proposal cleanup and archival types
 pub use proposal_cleanup::{CleanupStats, ProposalArchive, ProposalCleanupTask, ProposalRetention};
+
+// Action item types
+pub use action_item::{
+    ActionItem, ActionItemFilter, ActionItemId, ActionItemNote, ActionItemPriority,
+    ActionItemStatus, ActionItemStore, ActionItemStoreBackend, InMemoryActionItemStore,
+};
 
 /// Unix timestamp in seconds
 pub type Timestamp = u64;

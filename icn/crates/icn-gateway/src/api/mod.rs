@@ -20,6 +20,7 @@ pub mod health;
 pub mod identity;
 pub mod invites;
 pub mod ledger;
+pub mod listings;
 pub mod members;
 pub mod membership;
 pub mod notifications;

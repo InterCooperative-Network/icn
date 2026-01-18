@@ -24,6 +24,15 @@ Essential security documentation for production deployment:
 - **EDUCATIONAL_GUIDE_SECURITY_FIXES.md** - Learning resource
 - **TESTING_SUMMARY.md** - Test coverage analysis
 
+### 💰 Economic System & Strategy
+**Location**: `docs/`
+
+Strategic vision and economic architecture:
+
+- **ECONOMIC_VISION.md** - Strategic framing, dual-track approach, value retention strategy
+- **ECONOMIC_ARCHITECTURE.md** - Layered economy, transformation model, failure mode defenses
+- **dev-journal/ROADMAP.md** - Implementation phases with economic staging
+
 ### 🏗️ Architecture Documentation
 **Location**: `docs/architecture/`
 
@@ -95,6 +104,12 @@ Detailed development notes and historical records:
 3. Check [docs/security/SECURITY_TESTING_GUIDE.md](security/SECURITY_TESTING_GUIDE.md)
 4. Monitor security metrics as documented
 
+### For Cooperative Developers/Community Members
+1. Start with [ECONOMIC_VISION.md](ECONOMIC_VISION.md) - understand the strategic vision
+2. Review [ECONOMIC_ARCHITECTURE.md](ECONOMIC_ARCHITECTURE.md) - economic system design
+3. Check [dev-journal/ROADMAP.md](dev-journal/ROADMAP.md) - implementation roadmap
+4. Browse [README.md](../README.md) - quick start and deployment
+
 ### For Learning/Training
 1. Start with [docs/security/EDUCATIONAL_GUIDE_SECURITY_FIXES.md](security/EDUCATIONAL_GUIDE_SECURITY_FIXES.md)
 2. Review [docs/sessions/](sessions/) for development process
@@ -141,6 +156,6 @@ Detailed development notes and historical records:
 
 ---
 
-**Last Updated**: 2025-12-18  
-**Documentation Version**: 1.0  
+**Last Updated**: 2026-01-17
+**Documentation Version**: 1.1
 **Status**: Organized and Production-Ready ✅

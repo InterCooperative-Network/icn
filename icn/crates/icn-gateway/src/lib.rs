@@ -42,6 +42,7 @@ pub mod identity_mgr;
 pub mod invite;
 pub mod ledger_events;
 pub mod ledger_mgr;
+pub mod listings_mgr;
 pub mod logging;
 pub mod middleware;
 pub mod models;
@@ -76,6 +77,10 @@ pub use events::{
 };
 pub use identity_mgr::{DeviceInfo, IdentityManager, RegisterDeviceRequest};
 pub use ledger_events::LedgerEventBridge;
+pub use listings_mgr::{
+    InMemoryListingsStore, Listing, ListingCategory, ListingFilter, ListingId, ListingInterest,
+    ListingStatus, ListingType, ListingVisibility, ListingsManager,
+};
 pub use notification_queue::{
     DeliveryStatus, NotificationChannel, NotificationPriority, NotificationQueue,
     NotificationStatsSnapshot, NotificationType, QueuedNotification,

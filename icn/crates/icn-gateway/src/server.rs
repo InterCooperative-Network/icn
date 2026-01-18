@@ -27,6 +27,7 @@ use crate::governance_mgr::GovernanceHandle;
 use crate::governance_mgr::GovernanceManager;
 use crate::identity_mgr::IdentityManager;
 use crate::ledger_mgr::LedgerManager;
+use crate::listings_mgr::ListingsManager;
 use crate::notification_processor::{NotificationProcessor, ProcessorConfig};
 use crate::notification_queue::NotificationQueue;
 use crate::notification_triggers::{GovernanceNotificationTrigger, LedgerNotificationTrigger};
@@ -39,6 +40,7 @@ use crate::treasury_mgr::{GatewayTreasuryManager, LedgerHandle, TreasuryHandle};
 use crate::trust_mgr::{TrustGraphHandle, TrustManager};
 use icn_compute::ComputeHandle;
 use icn_store::SledStore;
+use tokio::sync::RwLock;
 
 /// Configuration for audit record pruning
 #[derive(Debug, Clone)]
@@ -356,14 +358,46 @@ impl GatewayServer {
                 None
             };
 
-        // Create governance manager (uses actor if handle available, otherwise in-memory)
+        // Initialize Sled DB early for managers that need persistent storage
+        // (governance action items, listings, budgets, etc.)
+        // Note: sled::Db is internally Arc-wrapped, so db.clone() is cheap
+        let db = if let Some(ref data_dir) = self.data_dir {
+            let db_path = data_dir.join("gateway_store");
+            match sled::open(&db_path) {
+                Ok(db) => {
+                    info!("Opened gateway storage at {:?}", db_path);
+                    db
+                }
+                Err(e) => {
+                    return Err(crate::error::GatewayError::InternalError(format!(
+                        "Failed to open gateway storage: {e}"
+                    )));
+                }
+            }
+        } else {
+            info!("Using temporary in-memory storage for gateway");
+            match sled::Config::new().temporary(true).open() {
+                Ok(db) => db,
+                Err(e) => {
+                    return Err(crate::error::GatewayError::InternalError(format!(
+                        "Failed to open temporary storage: {e}"
+                    )));
+                }
+            }
+        };
+
+        // Create governance manager with Sled-backed action items
+        // (uses GovernanceActor if handle available for proposals/votes/domains)
         let governance_manager: Arc<GovernanceManager> =
             if let Some(handle) = self.governance_handle {
-                info!("Governance manager connected to daemon (using GovernanceActor)");
-                Arc::new(GovernanceManager::with_handle(handle))
+                info!("Governance manager connected to daemon with persistent action items");
+                Arc::new(GovernanceManager::with_sled_action_items(
+                    handle,
+                    Arc::new(db.clone()),
+                ))
             } else {
-                info!("Governance manager running standalone (in-memory only)");
-                Arc::new(GovernanceManager::new())
+                info!("Governance manager running standalone with persistent action items");
+                Arc::new(GovernanceManager::new_with_sled(Arc::new(db.clone())))
             };
         let invite_manager = Arc::new(crate::invite::InviteManager::new());
         let session_manager = Arc::new(crate::session::SessionManager::new());
@@ -444,33 +478,7 @@ impl GatewayServer {
             ),
         );
 
-        // Initialize Sled DB for persistent stores (moved up for dependency injection)
-        let db = if let Some(ref data_dir) = self.data_dir {
-            let db_path = data_dir.join("gateway_store");
-            match sled::open(&db_path) {
-                Ok(db) => {
-                    info!("Opened gateway storage at {:?}", db_path);
-                    db
-                }
-                Err(e) => {
-                    return Err(crate::error::GatewayError::InternalError(format!(
-                        "Failed to open gateway storage: {e}"
-                    )));
-                }
-            }
-        } else {
-            info!("Using temporary in-memory storage for gateway");
-            match sled::Config::new().temporary(true).open() {
-                Ok(db) => db,
-                Err(e) => {
-                    return Err(crate::error::GatewayError::InternalError(format!(
-                        "Failed to open temporary storage: {e}"
-                    )));
-                }
-            }
-        };
-
-        // Create budget store
+        // Create budget store (uses db initialized earlier)
         let budget_store = crate::api::budgets::BudgetStore::new(db.clone());
         let budget_store = Arc::new(budget_store);
         info!("Budget store initialized");
@@ -492,6 +500,12 @@ impl GatewayServer {
             };
         let entity_audit_manager = Arc::new(EntityAuditManager::new(entity_audit_store));
         info!("Entity audit manager initialized");
+
+        // Create listings manager with Sled-backed persistent storage
+        let listings_manager = Arc::new(RwLock::new(ListingsManager::with_sled(Arc::new(
+            db.clone(),
+        ))));
+        info!("Listings manager initialized with persistent storage");
 
         // Create ledger manager with persistent storage if data_dir is set
         let mut ledger_manager = if let Some(ref data_dir) = self.data_dir {
@@ -544,7 +558,8 @@ impl GatewayServer {
         );
         let rate_limiter = Arc::new(RateLimiter::new(rate_limit_config));
 
-        // Create IP-based rate limiter for auth endpoints (more aggressive limits)
+        // Create IP-based rate limiter for auth endpoints and interest submissions
+        // Used for DoS protection on sensitive endpoints
         let ip_rate_limiter = Arc::new(IpRateLimiter::new_for_auth());
 
         // Create trust-gated velocity limiter for transaction rate limiting
@@ -606,6 +621,13 @@ impl GatewayServer {
             60, // Check every minute
         );
         info!("Recurring payments scheduler started");
+
+        // Start listings expiry scheduler
+        let _listings_expiry_handle = crate::listings_mgr::start_expiry_scheduler(
+            listings_manager.clone(),
+            crate::listings_mgr::DEFAULT_EXPIRY_CHECK_INTERVAL_SECS, // 1 hour
+        );
+        info!("Listings expiry scheduler started (interval: 1 hour)");
 
         // Create shutdown channel
         let (shutdown_tx, _shutdown_rx) = tokio::sync::broadcast::channel::<()>(1);
@@ -797,6 +819,8 @@ impl GatewayServer {
                 .app_data(web::Data::new(contract_registry.clone()))
                 // Agreement manager (optional - for inter-cooperative agreements)
                 .app_data(web::Data::new(agreement_manager.clone()))
+                // Listings manager for cooperative exchange
+                .app_data(web::Data::new(listings_manager.clone()))
                 // JSON payload size limit (256KB - we're not handling file uploads)
                 .app_data(web::JsonConfig::default().limit(262_144))
                 // Middleware (order: last wrapped runs first for REQUEST, first runs last for RESPONSE)
@@ -1016,6 +1040,16 @@ impl GatewayServer {
                         .service(
                             web::scope("/entities")
                                 .configure(api::entity::configure)
+                                .wrap(middleware::from_fn(
+                                    crate::rate_limit::rate_limit_middleware,
+                                ))
+                                .wrap(auth.clone()),
+                        )
+                        // Protected listings endpoints (auth + rate limiting)
+                        // Internal cooperative exchange - offers, wants, interests
+                        .service(
+                            web::scope("/listings")
+                                .configure(api::listings::configure_routes)
                                 .wrap(middleware::from_fn(
                                     crate::rate_limit::rate_limit_middleware,
                                 ))

@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Action Items and Internal Exchange (2026-01-17)
+
+**Action Item Tracker for Governance** (PR #714):
+- Track tasks from board meetings with assignees, priorities, and due dates
+- Status lifecycle: Pending → InProgress → Completed/Deferred
+- Filter by status, assignee, priority, overdue, or tags
+- Proper authorization: only creators can edit, assignees can update status
+- Linked to governance proposals and meeting context
+
+**Internal Exchange (Listings)** (PR #714):
+- Post offers/wants before going to external markets
+- Categories: Equipment, Services, Materials, Space, Other
+- Photo URLs with SSRF protection (blocks private IPs, localhost, reserved TLDs)
+- Express interest with atomic duplicate prevention (Sled CAS)
+- Status lifecycle: Active → Matched → Completed/Cancelled/Expired
+- Automatic expiry filtering excludes stale listings from queries
+
+**Storage**:
+- Versioned Sled keys (`v1:` prefix) for future schema migrations
+- `ListingsStoreBackend` trait with in-memory (testing) and Sled (production) implementations
+- Orphan cleanup: deleting listings removes associated interests and indexes
+
+**Security**:
+- SSRF protection blocking RFC1918, link-local, carrier-grade NAT, localhost
+- RFC 6761 reserved TLD blocking (.test, .invalid, .example)
+- Only https:// and ipfs:// schemes allowed for photos
+- Input validation with length limits on all fields
+- Interest count privacy: only listing owners see demand signals
+
+**Metrics**:
+- `icn_exchange_listings_created_total`, `listings_completed_total`, `listings_expired_total`
+- `icn_exchange_interests_expressed_total`, `duplicate_interests_blocked_total`
+- Time-to-match and time-to-complete histograms
+
+**Frontend** (pilot-ui):
+- Action Items tab with filter buttons and quick status toggles
+- Exchange tab with card-based listings and photo galleries
+- XSS-safe rendering using `textContent` for user-provided data
+
 ### Added - Exchange Rate Oracle (2025-12-30)
 
 **Multi-Currency Support for Cooperative Economies** (PR #364):

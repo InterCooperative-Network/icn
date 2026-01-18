@@ -49,7 +49,10 @@ rust-i18n.workspace = true
 jsonwebtoken = "9"
 
 # UUID generation
-uuid = { version = "1", features = ["v4"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+
+# URL parsing
+url = "2"
 
 # Time
 chrono = "0.4"
@@ -98,6 +101,7 @@ reqwest = { version = "0.12", features = ["json"] }
 lettre = { version = "0.11", default-features = false, features = ["tokio1-rustls-tls", "smtp-transport", "builder"] }
 
 [dev-dependencies]
+futures = "0.3"
 reqwest = "0.12"
 tempfile = "3"
 criterion = { version = "0.5", features = ["async_tokio"] }

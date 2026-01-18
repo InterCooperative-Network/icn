@@ -17,16 +17,175 @@
 
 use anyhow::Result;
 use icn_governance::{
-    scopes_overlap, Comment, CommentId, Delegation, DelegationId, DelegationScope, Discussion,
-    DiscussionStore, GovernanceConfig, GovernanceDomain, GovernanceDomainId, GovernanceOps,
-    GovernanceParams, GovernanceProfileId, InMemoryDiscussionStore, MembershipConfig,
-    MembershipSource, PaginatedResult, Proposal, ProposalDomainLookup, ProposalId, ProposalPayload,
-    ProposalState, Timestamp, Vote, VoteChoice, VoteTally, DEFAULT_MAX_DELEGATION_DEPTH,
+    scopes_overlap, ActionItem, ActionItemFilter, ActionItemId, ActionItemPriority,
+    ActionItemStatus, ActionItemStoreBackend, Comment, CommentId, Delegation, DelegationId,
+    DelegationScope, Discussion, DiscussionStore, GovernanceConfig, GovernanceDomain,
+    GovernanceDomainId, GovernanceError, GovernanceOps, GovernanceParams, GovernanceProfileId,
+    InMemoryActionItemStore, InMemoryDiscussionStore, MembershipConfig, MembershipSource,
+    PaginatedResult, Proposal, ProposalDomainLookup, ProposalId, ProposalPayload, ProposalState,
+    Timestamp, Vote, VoteChoice, VoteTally, DEFAULT_MAX_DELEGATION_DEPTH,
 };
 use icn_identity::Did;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, RwLock};
 use tracing::debug;
+
+// ============================================================================
+// Sled-Backed Action Item Store
+// ============================================================================
+
+/// Sled-backed storage for action items
+///
+/// # Performance Characteristics
+///
+/// The current implementation uses prefix scanning for list operations, which is O(n)
+/// where n is the number of action items in the domain. This is acceptable for
+/// typical cooperative workloads (< 1000 items per domain).
+///
+/// For larger deployments with 10K+ items per domain, consider adding secondary
+/// indexes for common filter fields:
+/// - `action_item_idx:status:{domain}:{status}:{id}` for status filtering
+/// - `action_item_idx:assignee:{domain}:{did}:{id}` for assignee filtering
+/// - `action_item_idx:due:{domain}:{timestamp}:{id}` for due date queries
+///
+/// Index maintenance would need to be transactional with the primary item storage.
+pub struct SledActionItemStore {
+    db: Arc<sled::Db>,
+}
+
+impl SledActionItemStore {
+    /// Create a new Sled-backed action item store
+    pub fn new(db: Arc<sled::Db>) -> Self {
+        Self { db }
+    }
+
+    /// Generate key for an action item
+    fn item_key(domain_id: &GovernanceDomainId, id: &ActionItemId) -> String {
+        format!("action_item:{}:{}", domain_id.0, id.0)
+    }
+
+    /// Generate prefix for all action items in a domain
+    fn domain_prefix(domain_id: &GovernanceDomainId) -> String {
+        format!("action_item:{}:", domain_id.0)
+    }
+}
+
+impl ActionItemStoreBackend for SledActionItemStore {
+    fn save(&self, item: &ActionItem) -> std::result::Result<(), GovernanceError> {
+        let key = Self::item_key(&item.domain_id, &item.id);
+        let value = icn_encoding::encode_versioned(item)
+            .map_err(|e| GovernanceError::Internal(format!("Failed to encode action item: {e}")))?;
+        self.db
+            .insert(key.as_bytes(), value)
+            .map_err(|e| GovernanceError::Internal(format!("Sled insert failed: {e}")))?;
+        Ok(())
+    }
+
+    fn get(
+        &self,
+        domain_id: &GovernanceDomainId,
+        id: &ActionItemId,
+    ) -> std::result::Result<Option<ActionItem>, GovernanceError> {
+        let key = Self::item_key(domain_id, id);
+        match self.db.get(key.as_bytes()) {
+            Ok(Some(value)) => {
+                let item = icn_encoding::decode_versioned(&value).map_err(|e| {
+                    GovernanceError::Internal(format!("Failed to decode action item: {e}"))
+                })?;
+                Ok(Some(item))
+            }
+            Ok(None) => Ok(None),
+            Err(e) => Err(GovernanceError::Internal(format!("Sled get failed: {e}"))),
+        }
+    }
+
+    fn list(
+        &self,
+        domain_id: &GovernanceDomainId,
+        filter: &ActionItemFilter,
+    ) -> std::result::Result<Vec<ActionItem>, GovernanceError> {
+        let prefix = Self::domain_prefix(domain_id);
+        let mut items = Vec::new();
+
+        for result in self.db.scan_prefix(prefix.as_bytes()) {
+            let (_, value) =
+                result.map_err(|e| GovernanceError::Internal(format!("Sled scan failed: {e}")))?;
+            let item: ActionItem = icn_encoding::decode_versioned(&value).map_err(|e| {
+                GovernanceError::Internal(format!("Failed to decode action item: {e}"))
+            })?;
+            if filter.matches(&item) {
+                items.push(item);
+            }
+        }
+
+        // Sort by created_at descending (newest first)
+        items.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+
+        Ok(items)
+    }
+
+    fn delete(
+        &self,
+        domain_id: &GovernanceDomainId,
+        id: &ActionItemId,
+    ) -> std::result::Result<bool, GovernanceError> {
+        let key = Self::item_key(domain_id, id);
+        self.db
+            .remove(key.as_bytes())
+            .map(|opt| opt.is_some())
+            .map_err(|e| GovernanceError::Internal(format!("Sled delete failed: {e}")))
+    }
+
+    fn count(
+        &self,
+        domain_id: &GovernanceDomainId,
+        filter: &ActionItemFilter,
+    ) -> std::result::Result<usize, GovernanceError> {
+        let prefix = Self::domain_prefix(domain_id);
+        let mut count = 0;
+
+        for result in self.db.scan_prefix(prefix.as_bytes()) {
+            let (_, value) =
+                result.map_err(|e| GovernanceError::Internal(format!("Sled scan failed: {e}")))?;
+            let item: ActionItem = icn_encoding::decode_versioned(&value).map_err(|e| {
+                GovernanceError::Internal(format!("Failed to decode action item: {e}"))
+            })?;
+            if filter.matches(&item) {
+                count += 1;
+            }
+        }
+
+        Ok(count)
+    }
+
+    fn delete_all(
+        &self,
+        domain_id: &GovernanceDomainId,
+    ) -> std::result::Result<usize, GovernanceError> {
+        let prefix = Self::domain_prefix(domain_id);
+        let mut deleted_count = 0;
+
+        // Collect keys first to avoid iterator invalidation
+        let keys: Vec<_> = self
+            .db
+            .scan_prefix(prefix.as_bytes())
+            .filter_map(|r| r.ok().map(|(k, _)| k))
+            .collect();
+
+        for key in keys {
+            if self
+                .db
+                .remove(key)
+                .map_err(|e| GovernanceError::Internal(format!("Sled delete failed: {e}")))?
+                .is_some()
+            {
+                deleted_count += 1;
+            }
+        }
+
+        Ok(deleted_count)
+    }
+}
 
 /// Handle type for actor-backed governance
 ///
@@ -43,6 +202,9 @@ pub type GovernanceHandle = Arc<dyn GovernanceOps + Send + Sync>;
 /// Note: In actor-backed mode, the in-memory fields (domains, proposals, votes,
 /// delegations) are initialized but unused - all operations delegate to the
 /// daemon's GovernanceActor. They exist for standalone testing fallback.
+///
+/// Action items are always managed locally (not gossiped) and can use either
+/// in-memory or Sled-backed persistent storage.
 pub struct GovernanceManager {
     /// In-memory storage for domains (standalone mode only)
     domains: RwLock<HashMap<GovernanceDomainId, GovernanceDomain>>,
@@ -54,6 +216,8 @@ pub struct GovernanceManager {
     delegations: RwLock<HashMap<DelegationId, Delegation>>,
     /// In-memory storage for discussions (standalone mode only)
     discussions: RwLock<InMemoryDiscussionStore>,
+    /// Action item storage backend (in-memory or Sled-backed)
+    action_items: Box<dyn ActionItemStoreBackend>,
     /// Optional handle to daemon's GovernanceActor (actor-backed mode)
     governance_handle: Option<GovernanceHandle>,
 }
@@ -71,6 +235,7 @@ impl GovernanceManager {
             votes: RwLock::new(HashMap::new()),
             delegations: RwLock::new(HashMap::new()),
             discussions: RwLock::new(InMemoryDiscussionStore::new()),
+            action_items: Box::new(InMemoryActionItemStore::new()),
             governance_handle: None,
         }
     }
@@ -85,6 +250,9 @@ impl GovernanceManager {
     ///
     /// Note: The in-memory HashMaps are initialized but never used in this mode.
     /// They exist only for API consistency with standalone mode.
+    ///
+    /// Action items use in-memory storage by default. Call `set_action_item_store`
+    /// to use persistent storage.
     pub fn with_handle(handle: GovernanceHandle) -> Self {
         debug!("GovernanceManager created with daemon GovernanceActor handle");
         GovernanceManager {
@@ -95,7 +263,50 @@ impl GovernanceManager {
             votes: RwLock::new(HashMap::new()),
             delegations: RwLock::new(HashMap::new()),
             discussions: RwLock::new(InMemoryDiscussionStore::new()),
+            // Action items are always stored in gateway (not synced via gossip)
+            // Use set_action_item_store() to configure persistent storage
+            action_items: Box::new(InMemoryActionItemStore::new()),
             governance_handle: Some(handle),
+        }
+    }
+
+    /// Set a custom action item store backend
+    ///
+    /// Use this to configure Sled-backed persistent storage for action items.
+    /// Must be called before any action items are created.
+    pub fn set_action_item_store(&mut self, store: Box<dyn ActionItemStoreBackend>) {
+        self.action_items = store;
+    }
+
+    /// Create a governance manager with Sled-backed action item storage
+    ///
+    /// This is the recommended mode for production with persistent action items.
+    pub fn with_sled_action_items(handle: GovernanceHandle, db: Arc<sled::Db>) -> Self {
+        debug!("GovernanceManager created with daemon handle + Sled action item store");
+        GovernanceManager {
+            domains: RwLock::new(HashMap::new()),
+            proposals: RwLock::new(HashMap::new()),
+            votes: RwLock::new(HashMap::new()),
+            delegations: RwLock::new(HashMap::new()),
+            discussions: RwLock::new(InMemoryDiscussionStore::new()),
+            action_items: Box::new(SledActionItemStore::new(db)),
+            governance_handle: Some(handle),
+        }
+    }
+
+    /// Create a standalone governance manager with Sled-backed action item storage
+    ///
+    /// Useful for testing persistence without a daemon connection.
+    pub fn new_with_sled(db: Arc<sled::Db>) -> Self {
+        debug!("GovernanceManager created in standalone mode with Sled action item store");
+        GovernanceManager {
+            domains: RwLock::new(HashMap::new()),
+            proposals: RwLock::new(HashMap::new()),
+            votes: RwLock::new(HashMap::new()),
+            delegations: RwLock::new(HashMap::new()),
+            discussions: RwLock::new(InMemoryDiscussionStore::new()),
+            action_items: Box::new(SledActionItemStore::new(db)),
+            governance_handle: None,
         }
     }
 
@@ -1006,6 +1217,139 @@ impl GovernanceManager {
             .map_err(|e| anyhow::anyhow!("Discussions storage lock poisoned: {e}"))?;
 
         Ok(discussions.get_participants(proposal_id))
+    }
+
+    // ========================================================================
+    // Action Item Management
+    // ========================================================================
+
+    /// Create a new action item
+    pub fn create_action_item(
+        &self,
+        domain_id: GovernanceDomainId,
+        title: String,
+        description: Option<String>,
+        created_by: Did,
+        assignee: Option<Did>,
+        due_date: Option<u64>,
+        priority: ActionItemPriority,
+        linked_proposal: Option<ProposalId>,
+        meeting_context: Option<String>,
+        tags: Vec<String>,
+    ) -> Result<ActionItem> {
+        let now = icn_time::current_timestamp_secs();
+        let mut item = ActionItem::new(domain_id, title, created_by, now);
+        item.description = description;
+        item.assignee = assignee;
+        item.due_date = due_date;
+        item.priority = priority;
+        item.linked_proposal = linked_proposal;
+        item.meeting_context = meeting_context;
+        item.tags = tags;
+
+        self.action_items
+            .save(&item)
+            .map_err(|e| anyhow::anyhow!("Failed to save action item: {e}"))?;
+
+        Ok(item)
+    }
+
+    /// Get an action item by ID
+    pub fn get_action_item(
+        &self,
+        domain_id: &GovernanceDomainId,
+        id: &ActionItemId,
+    ) -> Result<Option<ActionItem>> {
+        self.action_items
+            .get(domain_id, id)
+            .map_err(|e| anyhow::anyhow!("Failed to get action item: {e}"))
+    }
+
+    /// List action items with optional filtering
+    pub fn list_action_items(
+        &self,
+        domain_id: &GovernanceDomainId,
+        filter: &ActionItemFilter,
+    ) -> Result<Vec<ActionItem>> {
+        self.action_items
+            .list(domain_id, filter)
+            .map_err(|e| anyhow::anyhow!("Failed to list action items: {e}"))
+    }
+
+    /// Update an action item
+    pub fn update_action_item(&self, item: &ActionItem) -> Result<()> {
+        self.action_items
+            .save(item)
+            .map_err(|e| anyhow::anyhow!("Failed to update action item: {e}"))
+    }
+
+    /// Delete an action item
+    pub fn delete_action_item(
+        &self,
+        domain_id: &GovernanceDomainId,
+        id: &ActionItemId,
+    ) -> Result<bool> {
+        self.action_items
+            .delete(domain_id, id)
+            .map_err(|e| anyhow::anyhow!("Failed to delete action item: {e}"))
+    }
+
+    /// Count action items matching a filter
+    pub fn count_action_items(
+        &self,
+        domain_id: &GovernanceDomainId,
+        filter: &ActionItemFilter,
+    ) -> Result<usize> {
+        self.action_items
+            .count(domain_id, filter)
+            .map_err(|e| anyhow::anyhow!("Failed to count action items: {e}"))
+    }
+
+    /// Add a note to an action item
+    pub fn add_action_item_note(
+        &self,
+        domain_id: &GovernanceDomainId,
+        id: &ActionItemId,
+        author: Did,
+        content: String,
+    ) -> Result<ActionItem> {
+        let mut item = self
+            .action_items
+            .get(domain_id, id)
+            .map_err(|e| anyhow::anyhow!("Failed to get action item: {e}"))?
+            .ok_or_else(|| anyhow::anyhow!("Action item not found: {id}"))?;
+
+        let now = icn_time::current_timestamp_secs();
+        item.add_note(author, content, now);
+
+        self.action_items
+            .save(&item)
+            .map_err(|e| anyhow::anyhow!("Failed to save action item: {e}"))?;
+
+        Ok(item)
+    }
+
+    /// Update the status of an action item
+    pub fn update_action_item_status(
+        &self,
+        domain_id: &GovernanceDomainId,
+        id: &ActionItemId,
+        status: ActionItemStatus,
+    ) -> Result<ActionItem> {
+        let mut item = self
+            .action_items
+            .get(domain_id, id)
+            .map_err(|e| anyhow::anyhow!("Failed to get action item: {e}"))?
+            .ok_or_else(|| anyhow::anyhow!("Action item not found: {id}"))?;
+
+        item.status = status;
+        item.updated_at = icn_time::current_timestamp_secs();
+
+        self.action_items
+            .save(&item)
+            .map_err(|e| anyhow::anyhow!("Failed to save action item: {e}"))?;
+
+        Ok(item)
     }
 }
 

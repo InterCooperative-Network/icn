@@ -1,14 +1,49 @@
 # ICN Roadmap
 
-**Last Updated**: 2026-01-07
+**Last Updated**: 2026-01-17
 **Current Phase**: 18 Complete, Phase 19 Next
 **Target**: Production-ready release followed by pilot deployment
 
 ---
 
+## Strategic Context
+
+ICN is infrastructure for a **parallel political economy** — enabling cooperatives, communities, and federations to deliver better material outcomes than traditional capitalist and captured democratic systems.
+
+**See also**:
+- [ECONOMIC_VISION.md](../ECONOMIC_VISION.md) — Strategic framing and value proposition
+- [ECONOMIC_ARCHITECTURE.md](../ECONOMIC_ARCHITECTURE.md) — Technical design of the economic system
+
+### The Dual-Track Approach
+
+Development follows two parallel tracks that both serve the core mission:
+
+| Track | Entry Point | Value |
+|-------|-------------|-------|
+| **Governance & Coordination** | "Your org will function better" | Individual org efficiency |
+| **Internal Exchange** | "Keep value in the network" | Network-level capital retention |
+
+Both tracks are built on the same substrate (identity, trust, ledger, governance, federation).
+
+### Economic System Staging
+
+The economic layer builds incrementally:
+
+| Stage | Capability | Enables |
+|-------|------------|---------|
+| A | Mutual credit (hours, services) | Timebanks, service exchange |
+| B | Simple asset tokens | Tool libraries, equipment sharing |
+| C | Transformation tracking | Supply chains, manufacturing |
+| D | Cross-community exchange | Regional cooperative economies |
+| E | Fiat bridges | External interface when needed |
+
+Each stage is independently useful. Build based on user need, not speculation.
+
+---
+
 ## Overview
 
-ICN development follows sequential phases. Each phase must be completed before the next begins. No parallel tracks.
+ICN development follows sequential phases. Each phase must be completed before the next begins. Some phases can run in parallel where noted.
 
 **Implementation Status**: ~75% complete (272K LOC, 2,287 tests, deployed on K3s)
 
@@ -427,9 +462,16 @@ These issues exist but aren't assigned to phases yet:
 - #265: ICN as Cooperative Middle Layer (epic)
 - #328: Chaos engineering framework
 - #330: Message batching and compression
-- #75-79: Phase 21.x economic features (demurrage, exchange, marketplace, labor credits)
 - #412: Encryption integration TODO
 - #415: Dev-mode CSP documentation
+
+**Economic System** (see [ECONOMIC_ARCHITECTURE.md](../ECONOMIC_ARCHITECTURE.md) for staging):
+- Asset token listings and exchange (Stage B)
+- Transformation tracking and recipes (Stage C)
+- Cross-community exchange protocols (Stage D)
+- Fiat bridge interfaces (Stage E)
+
+*Note: Old Phase 21.x issues (#64-79) were closed as obsolete — they used a deprecated tracking system. Economic features now follow the staged approach documented in ECONOMIC_ARCHITECTURE.md.*
 
 ---
 
