@@ -305,3 +305,57 @@ Security measures:
 - All user content escaped with `escapeHtml()` before rendering
 - Uses `textContent` instead of `innerHTML` for dynamic content
 - Input validation mirrors backend constraints
+
+## Operations
+
+### Listing Expiry Management
+
+Listings can have optional expiry dates. The system provides two mechanisms for handling expired listings:
+
+1. **Automatic Filtering**: Expired Active listings are automatically filtered out of list queries. Users won't see stale listings in search results, but the data is preserved.
+
+2. **Manual Cleanup**: The `expire_stale_listings()` method can be called to transition all expired Active listings to Expired status:
+
+```rust
+// In a maintenance task or admin endpoint
+let count = listings_manager.expire_stale_listings()?;
+tracing::info!("Expired {} stale listings", count);
+```
+
+For the pilot phase, this can be triggered manually via an admin endpoint or script. For production, consider adding a background task:
+
+```rust
+// Example: hourly expiry check
+tokio::spawn(async move {
+    let mut interval = tokio::time::interval(Duration::from_secs(3600));
+    loop {
+        interval.tick().await;
+        if let Err(e) = listings_manager.expire_stale_listings() {
+            tracing::error!("Failed to expire listings: {}", e);
+        }
+    }
+});
+```
+
+### Performance Limits
+
+**Pilot Phase Limits** (tested and supported):
+- Up to 10,000 listings per deployment
+- Up to 1,000 interests per listing
+- Up to 100 active users per cooperative
+
+**Scaling Considerations**:
+- List queries scan all listings matching status filter - O(n) complexity
+- For >10K listings, add secondary Sled indexes for status/category/offered_by
+- Interest cleanup on listing delete is O(m) where m = interest count
+- Batch operations (get_interest_counts) prevent N+1 query patterns
+
+### Monitoring
+
+Prometheus metrics track feature adoption:
+- `icn_exchange_listings_created_total{listing_type, category}` - Listing creation by type/category
+- `icn_exchange_listings_completed_total` - Successful exchanges
+- `icn_exchange_listings_expired_total` - Expired listings (from cleanup task)
+- `icn_exchange_interests_expressed_total{listing_type}` - Interest expression activity
+- `icn_exchange_listings_active` (gauge) - Current active listing count
+- `icn_exchange_listing_time_to_match_seconds` (histogram) - Time to first interest match
