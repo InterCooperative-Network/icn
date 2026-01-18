@@ -143,6 +143,34 @@ impl ActionItemStoreBackend for SledActionItemStore {
 
         Ok(count)
     }
+
+    fn delete_all(
+        &self,
+        domain_id: &GovernanceDomainId,
+    ) -> std::result::Result<usize, GovernanceError> {
+        let prefix = Self::domain_prefix(domain_id);
+        let mut deleted_count = 0;
+
+        // Collect keys first to avoid iterator invalidation
+        let keys: Vec<_> = self
+            .db
+            .scan_prefix(prefix.as_bytes())
+            .filter_map(|r| r.ok().map(|(k, _)| k))
+            .collect();
+
+        for key in keys {
+            if self
+                .db
+                .remove(key)
+                .map_err(|e| GovernanceError::Internal(format!("Sled delete failed: {e}")))?
+                .is_some()
+            {
+                deleted_count += 1;
+            }
+        }
+
+        Ok(deleted_count)
+    }
 }
 
 /// Handle type for actor-backed governance

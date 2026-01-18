@@ -87,6 +87,9 @@ pub enum ActionItemPriority {
 }
 
 /// An action item tracked within a governance domain
+///
+/// Note: Option fields use `#[serde(default)]` for binary serialization compatibility
+/// with postcard. The `skip_serializing_if` is only used for JSON API responses.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ActionItem {
     /// Unique identifier
@@ -99,15 +102,15 @@ pub struct ActionItem {
     pub title: String,
 
     /// Detailed description (optional)
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub description: Option<String>,
 
     /// Member responsible for this item (optional)
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub assignee: Option<Did>,
 
     /// Due date as Unix timestamp (optional)
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub due_date: Option<u64>,
 
     /// Current status
@@ -126,19 +129,19 @@ pub struct ActionItem {
     pub updated_at: u64,
 
     /// Linked proposal (if this came from a proposal discussion)
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub linked_proposal: Option<ProposalId>,
 
     /// Meeting context (e.g., "2026-01-17 board meeting")
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub meeting_context: Option<String>,
 
     /// Tags for categorization
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
     pub tags: Vec<String>,
 
     /// Notes/updates history
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
     pub notes: Vec<ActionItemNote>,
 }
 
@@ -343,6 +346,9 @@ pub trait ActionItemStoreBackend: Send + Sync {
 
     /// Count action items matching filter
     fn count(&self, domain_id: &GovernanceDomainId, filter: &ActionItemFilter) -> Result<usize>;
+
+    /// Delete all action items for a domain
+    fn delete_all(&self, domain_id: &GovernanceDomainId) -> Result<usize>;
 }
 
 /// In-memory action item store for testing
@@ -440,6 +446,176 @@ impl ActionItemStoreBackend for InMemoryActionItemStore {
             .filter(|item| item.domain_id == *domain_id && filter.matches(item))
             .count())
     }
+
+    fn delete_all(&self, domain_id: &GovernanceDomainId) -> Result<usize> {
+        let mut items = self
+            .items
+            .write()
+            .map_err(|_| crate::GovernanceError::LockPoisoned("action item store".to_string()))?;
+
+        let keys_to_remove: Vec<_> = items
+            .keys()
+            .filter(|(d, _)| d == &domain_id.0)
+            .cloned()
+            .collect();
+
+        let count = keys_to_remove.len();
+        for key in keys_to_remove {
+            items.remove(&key);
+        }
+
+        Ok(count)
+    }
+}
+
+/// Sled key version for schema migration support.
+/// When the schema changes, increment this version and add migration logic.
+const SLED_KEY_VERSION: &str = "v1";
+
+/// Sled-backed persistent action item store
+pub struct SledActionItemStore {
+    db: std::sync::Arc<sled::Db>,
+}
+
+impl SledActionItemStore {
+    /// Create a new Sled-backed action item store
+    pub fn new(db: std::sync::Arc<sled::Db>) -> Self {
+        Self { db }
+    }
+
+    /// Generate a versioned key for action items
+    #[inline]
+    fn item_key(domain_id: &GovernanceDomainId, id: &ActionItemId) -> String {
+        format!("{SLED_KEY_VERSION}:action_item:{}:{}", domain_id.0, id.0)
+    }
+
+    /// Generate a versioned key prefix for domain scans
+    #[inline]
+    fn domain_prefix(domain_id: &GovernanceDomainId) -> String {
+        format!("{SLED_KEY_VERSION}:action_item:{}:", domain_id.0)
+    }
+}
+
+impl ActionItemStoreBackend for SledActionItemStore {
+    fn save(&self, item: &ActionItem) -> Result<()> {
+        let key = Self::item_key(&item.domain_id, &item.id);
+        let value = icn_encoding::encode_versioned(item)
+            .map_err(|e| crate::GovernanceError::Storage(e.to_string()))?;
+        self.db
+            .insert(key.as_bytes(), value)
+            .map_err(|e| crate::GovernanceError::Storage(e.to_string()))?;
+        Ok(())
+    }
+
+    fn get(&self, domain_id: &GovernanceDomainId, id: &ActionItemId) -> Result<Option<ActionItem>> {
+        let key = Self::item_key(domain_id, id);
+        match self
+            .db
+            .get(key.as_bytes())
+            .map_err(|e| crate::GovernanceError::Storage(e.to_string()))?
+        {
+            Some(value) => {
+                let item: ActionItem = icn_encoding::decode_versioned(&value)
+                    .map_err(|e| crate::GovernanceError::Storage(e.to_string()))?;
+                Ok(Some(item))
+            }
+            None => Ok(None),
+        }
+    }
+
+    fn list(
+        &self,
+        domain_id: &GovernanceDomainId,
+        filter: &ActionItemFilter,
+    ) -> Result<Vec<ActionItem>> {
+        let prefix = Self::domain_prefix(domain_id);
+        let mut result = Vec::new();
+
+        for item in self.db.scan_prefix(prefix.as_bytes()) {
+            let (_, value) =
+                item.map_err(|e| crate::GovernanceError::Storage(e.to_string()))?;
+            if let Ok(action_item) = icn_encoding::decode_versioned::<ActionItem>(&value) {
+                if filter.matches(&action_item) {
+                    result.push(action_item);
+                }
+            }
+        }
+
+        // Sort by due date (nulls last), then by priority, then by created_at
+        result.sort_by(|a, b| {
+            match (a.due_date, b.due_date) {
+                (Some(a_due), Some(b_due)) => a_due.cmp(&b_due),
+                (Some(_), None) => std::cmp::Ordering::Less,
+                (None, Some(_)) => std::cmp::Ordering::Greater,
+                (None, None) => {
+                    let priority_order = |p: &ActionItemPriority| match p {
+                        ActionItemPriority::Critical => 0,
+                        ActionItemPriority::High => 1,
+                        ActionItemPriority::Medium => 2,
+                        ActionItemPriority::Low => 3,
+                    };
+                    match priority_order(&a.priority).cmp(&priority_order(&b.priority)) {
+                        std::cmp::Ordering::Equal => a.created_at.cmp(&b.created_at),
+                        other => other,
+                    }
+                }
+            }
+        });
+
+        Ok(result)
+    }
+
+    fn delete(&self, domain_id: &GovernanceDomainId, id: &ActionItemId) -> Result<bool> {
+        let key = Self::item_key(domain_id, id);
+        let existed = self
+            .db
+            .remove(key.as_bytes())
+            .map_err(|e| crate::GovernanceError::Storage(e.to_string()))?
+            .is_some();
+        Ok(existed)
+    }
+
+    fn count(&self, domain_id: &GovernanceDomainId, filter: &ActionItemFilter) -> Result<usize> {
+        let prefix = Self::domain_prefix(domain_id);
+        let mut count = 0;
+
+        for item in self.db.scan_prefix(prefix.as_bytes()) {
+            let (_, value) =
+                item.map_err(|e| crate::GovernanceError::Storage(e.to_string()))?;
+            if let Ok(action_item) = icn_encoding::decode_versioned::<ActionItem>(&value) {
+                if filter.matches(&action_item) {
+                    count += 1;
+                }
+            }
+        }
+
+        Ok(count)
+    }
+
+    fn delete_all(&self, domain_id: &GovernanceDomainId) -> Result<usize> {
+        let prefix = Self::domain_prefix(domain_id);
+        let mut count = 0;
+
+        // Collect keys first to avoid iterator invalidation
+        let keys: Vec<_> = self
+            .db
+            .scan_prefix(prefix.as_bytes())
+            .filter_map(|r| r.ok().map(|(k, _)| k))
+            .collect();
+
+        for key in keys {
+            if self
+                .db
+                .remove(key)
+                .map_err(|e| crate::GovernanceError::Storage(e.to_string()))?
+                .is_some()
+            {
+                count += 1;
+            }
+        }
+
+        Ok(count)
+    }
 }
 
 /// Action item store with pluggable backend
@@ -456,6 +632,11 @@ impl ActionItemStore {
     /// Create an in-memory store
     pub fn in_memory() -> Self {
         Self::new(Box::new(InMemoryActionItemStore::new()))
+    }
+
+    /// Create a Sled-backed persistent store
+    pub fn with_sled(db: std::sync::Arc<sled::Db>) -> Self {
+        Self::new(Box::new(SledActionItemStore::new(db)))
     }
 
     /// Save an action item
@@ -493,6 +674,11 @@ impl ActionItemStore {
         filter: &ActionItemFilter,
     ) -> Result<usize> {
         self.backend.count(domain_id, filter)
+    }
+
+    /// Delete all action items in a domain
+    pub fn delete_all(&self, domain_id: &GovernanceDomainId) -> Result<usize> {
+        self.backend.delete_all(domain_id)
     }
 }
 
@@ -633,5 +819,104 @@ mod tests {
 
         let retrieved = store.get(&domain, &item_id).expect("get should succeed");
         assert!(retrieved.is_none());
+    }
+
+    #[test]
+    fn test_sled_store_roundtrip() {
+        // Create a temporary Sled database
+        let db = sled::Config::new()
+            .temporary(true)
+            .open()
+            .expect("Failed to create temp db");
+        let store = ActionItemStore::with_sled(std::sync::Arc::new(db));
+        let domain = test_domain();
+
+        // Create and save
+        let item = ActionItem::new(domain.clone(), "Sled test task".to_string(), test_did(), 1000);
+        let item_id = item.id.clone();
+
+        store.save(&item).expect("save should succeed");
+
+        // Retrieve
+        let retrieved = store.get(&domain, &item_id).expect("get should succeed");
+        assert!(retrieved.is_some());
+        assert_eq!(retrieved.unwrap().title, "Sled test task");
+
+        // List
+        let items = store
+            .list(&domain, &ActionItemFilter::default())
+            .expect("list should succeed");
+        assert_eq!(items.len(), 1);
+
+        // Count
+        let count = store
+            .count(&domain, &ActionItemFilter::default())
+            .expect("count should succeed");
+        assert_eq!(count, 1);
+
+        // Delete
+        let deleted = store
+            .delete(&domain, &item_id)
+            .expect("delete should succeed");
+        assert!(deleted);
+
+        let retrieved = store.get(&domain, &item_id).expect("get should succeed");
+        assert!(retrieved.is_none());
+    }
+
+    #[test]
+    fn test_sled_delete_all() {
+        // Create a temporary Sled database
+        let db = sled::Config::new()
+            .temporary(true)
+            .open()
+            .expect("Failed to create temp db");
+        let store = ActionItemStore::with_sled(std::sync::Arc::new(db));
+        let domain1 = test_domain();
+        let domain2 = GovernanceDomainId("other-domain".to_string());
+
+        // Create items in two domains
+        let item1 =
+            ActionItem::new(domain1.clone(), "Domain 1 task 1".to_string(), test_did(), 1000);
+        let item2 =
+            ActionItem::new(domain1.clone(), "Domain 1 task 2".to_string(), test_did(), 1001);
+        let item3 =
+            ActionItem::new(domain2.clone(), "Domain 2 task 1".to_string(), test_did(), 1002);
+
+        store.save(&item1).unwrap();
+        store.save(&item2).unwrap();
+        store.save(&item3).unwrap();
+
+        // Verify counts
+        assert_eq!(
+            store
+                .count(&domain1, &ActionItemFilter::default())
+                .unwrap(),
+            2
+        );
+        assert_eq!(
+            store
+                .count(&domain2, &ActionItemFilter::default())
+                .unwrap(),
+            1
+        );
+
+        // Delete all from domain1
+        let deleted = store.delete_all(&domain1).unwrap();
+        assert_eq!(deleted, 2);
+
+        // Verify domain1 is empty, domain2 unchanged
+        assert_eq!(
+            store
+                .count(&domain1, &ActionItemFilter::default())
+                .unwrap(),
+            0
+        );
+        assert_eq!(
+            store
+                .count(&domain2, &ActionItemFilter::default())
+                .unwrap(),
+            1
+        );
     }
 }

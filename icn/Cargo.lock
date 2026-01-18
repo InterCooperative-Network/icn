@@ -3055,6 +3055,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "hex",
+ "icn-encoding",
  "icn-entity",
  "icn-federation",
  "icn-identity",

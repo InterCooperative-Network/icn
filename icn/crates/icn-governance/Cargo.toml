@@ -11,6 +11,7 @@ anyhow.workspace = true
 async-trait = "0.1"
 serde = { workspace = true, features = ["derive"] }
 serde_json = "1.0"
+icn-encoding = { path = "../icn-encoding" }
 icn-entity = { path = "../icn-entity" }
 icn-federation = { path = "../icn-federation" }
 icn-identity = { path = "../icn-identity" }
