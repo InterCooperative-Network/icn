@@ -153,7 +153,6 @@ pub struct ChallengeScheduler {
     store: Arc<dyn Store>,
 
     /// Trust graph for peer scoring (used for trust-gated challenge frequency)
-    #[allow(dead_code)] // Reserved for trust-gated challenge frequency
     trust_graph: Arc<RwLock<TrustGraph>>,
 
     /// Gossip actor for sending challenges
@@ -243,6 +242,39 @@ impl ChallengeScheduler {
                 e
             );
         }
+    }
+
+    /// Calculate trust-adjusted challenge probability for a peer
+    ///
+    /// Lower trust peers are challenged more frequently. The formula scales
+    /// the base probability by the inverse of the trust score:
+    /// - Trust 1.0 (fully trusted): base_probability (no increase)
+    /// - Trust 0.5: base_probability * 1.5
+    /// - Trust 0.0 (no trust): base_probability * 2.0
+    ///
+    /// Returns the adjusted probability, capped at 1.0.
+    async fn trust_adjusted_probability(&self, peer_did: &str) -> f64 {
+        let base = self.config.challenge_probability;
+
+        // Try to get trust score for the peer
+        let trust_score = if let Ok(did) = Did::from_str(peer_did) {
+            let trust_graph = self.trust_graph.read().await;
+            // Compute trust score for this peer
+            trust_graph.compute_trust_score(&did).unwrap_or(0.0)
+        } else {
+            0.0 // Unknown peer, treat as untrusted
+        };
+
+        // Scale probability: lower trust = higher probability
+        // Formula: base * (1 + (1 - trust_score))
+        // - Trust 1.0 -> multiplier 1.0
+        // - Trust 0.5 -> multiplier 1.5
+        // - Trust 0.0 -> multiplier 2.0
+        let multiplier = 1.0 + (1.0 - trust_score.clamp(0.0, 1.0));
+        let adjusted = base * multiplier;
+
+        // Cap at 1.0 to ensure valid probability
+        adjusted.min(1.0)
     }
 
     /// Load all persisted pending challenges from the store
@@ -420,9 +452,11 @@ impl ChallengeScheduler {
                     continue;
                 }
 
-                // Probabilistic challenge
+                // Probabilistic challenge with trust-adjusted frequency
+                // Lower trust peers are challenged more frequently
+                let adjusted_probability = self.trust_adjusted_probability(&replica.peer_did).await;
                 let roll: f64 = rand::random();
-                if roll > self.config.challenge_probability {
+                if roll > adjusted_probability {
                     continue;
                 }
 
