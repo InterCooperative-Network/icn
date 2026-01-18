@@ -40,9 +40,7 @@ use tracing::{debug, info, warn};
 use icn_gossip::GossipActor;
 use icn_identity::{Did, KeyPair};
 use icn_security::{MisbehaviorDetector, StorageFailureReason, Violation};
-use icn_store::{
-    ChallengeConfig, ContentChunkTree, ContentHash, MerkleProof, StorageChallenge, Store,
-};
+use icn_store::{ChallengeConfig, ContentChunkTree, ContentHash, StorageChallenge, Store};
 use icn_trust::TrustGraph;
 
 /// Pending challenge tracking info
@@ -317,12 +315,25 @@ impl ChallengeScheduler {
             .byte_sample_size
             .min((content_size - byte_offset) as u32);
 
-        // Random chunk index (using gen_range to avoid modulo bias)
+        // Generate random chunk indices (v2 multi-block challenges)
         let num_chunks = tree.num_chunks();
-        let chunk_index = if num_chunks > 0 {
-            rand::thread_rng().gen_range(0..num_chunks)
+        let blocks_to_challenge = self.config.blocks_per_challenge.min(num_chunks);
+        let chunk_indices: Vec<u32> = if num_chunks > 0 && blocks_to_challenge > 0 {
+            // Use reservoir sampling to pick random unique indices
+            let mut rng = rand::thread_rng();
+            let mut indices: Vec<u32> = Vec::with_capacity(blocks_to_challenge as usize);
+            for _ in 0..blocks_to_challenge {
+                loop {
+                    let idx = rng.gen_range(0..num_chunks);
+                    if !indices.contains(&idx) {
+                        indices.push(idx);
+                        break;
+                    }
+                }
+            }
+            indices
         } else {
-            0
+            vec![0]
         };
 
         // Compute expected byte hash
@@ -336,13 +347,13 @@ impl ChallengeScheduler {
             .map(|(count, _)| *count)
             .unwrap_or(0);
 
-        // Create and sign the challenge
-        let mut challenge = StorageChallenge::new(
+        // Create and sign the challenge (v2 multi-block)
+        let mut challenge = StorageChallenge::new_multi_block(
             *content_hash,
             target_peer.to_string(),
             byte_offset,
             byte_length,
-            chunk_index,
+            chunk_indices,
             self.own_did.to_string(),
             self.config.timeout_secs,
         );
@@ -514,24 +525,39 @@ impl ChallengeScheduler {
                 .await;
         }
 
-        // Verify Merkle proof
-        let merkle_proof = MerkleProof {
-            chunk_index: pending.challenge.chunk_index,
-            chunk_hash: proof.chunk_hash,
-            siblings: proof.merkle_siblings.clone(),
-            path_bits: proof.merkle_path_bits.clone(),
-            root: pending.expected_merkle_root,
-        };
-        let merkle_valid = merkle_proof.verify();
+        // Verify all Merkle proofs (v2: one per challenged chunk)
+        // All challenged chunk indices must have corresponding valid proofs
+        for expected_idx in &pending.challenge.chunk_indices {
+            // Find the proof for this chunk index
+            let proof_data = proof
+                .merkle_proofs
+                .iter()
+                .find(|p| p.chunk_index == *expected_idx);
 
-        if !merkle_valid {
-            warn!(
-                "Invalid Merkle proof for challenge {}",
-                hex::encode(&proof.challenge_id[..8])
-            );
-            return self
-                .record_failure(&pending, StorageFailureReason::InvalidMerkleProof)
-                .await;
+            match proof_data {
+                Some(p) => {
+                    if !p.verify_against_root(&pending.expected_merkle_root) {
+                        warn!(
+                            "Invalid Merkle proof for chunk {} in challenge {}",
+                            expected_idx,
+                            hex::encode(&proof.challenge_id[..8])
+                        );
+                        return self
+                            .record_failure(&pending, StorageFailureReason::InvalidMerkleProof)
+                            .await;
+                    }
+                }
+                None => {
+                    warn!(
+                        "Missing Merkle proof for chunk {} in challenge {}",
+                        expected_idx,
+                        hex::encode(&proof.challenge_id[..8])
+                    );
+                    return self
+                        .record_failure(&pending, StorageFailureReason::InvalidMerkleProof)
+                        .await;
+                }
+            }
         }
 
         // Success! Reset failure count
