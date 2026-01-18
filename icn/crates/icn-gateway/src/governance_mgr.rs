@@ -34,7 +34,21 @@ use tracing::debug;
 // Sled-Backed Action Item Store
 // ============================================================================
 
-/// Sled-backed persistent action item store
+/// Sled-backed storage for action items
+///
+/// # Performance Characteristics
+///
+/// The current implementation uses prefix scanning for list operations, which is O(n)
+/// where n is the number of action items in the domain. This is acceptable for
+/// typical cooperative workloads (< 1000 items per domain).
+///
+/// For larger deployments with 10K+ items per domain, consider adding secondary
+/// indexes for common filter fields:
+/// - `action_item_idx:status:{domain}:{status}:{id}` for status filtering
+/// - `action_item_idx:assignee:{domain}:{did}:{id}` for assignee filtering
+/// - `action_item_idx:due:{domain}:{timestamp}:{id}` for due date queries
+///
+/// Index maintenance would need to be transactional with the primary item storage.
 pub struct SledActionItemStore {
     db: Arc<sled::Db>,
 }
