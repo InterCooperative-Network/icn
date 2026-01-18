@@ -340,7 +340,24 @@ fn sort_listings(listings: &mut [Listing], sort_by: ListingSortBy) {
     }
 }
 
-/// Filter criteria for listings
+/// Filter criteria for listings.
+///
+/// # Pagination
+///
+/// - `limit`: Maximum results per page. Defaults to [`DEFAULT_PAGE_SIZE`] (20) if `None`.
+///   Capped at [`MAX_PAGE_SIZE`] (100) even if a higher value is requested.
+/// - `offset`: Number of results to skip. Defaults to 0 if `None`.
+///
+/// # Example
+///
+/// ```ignore
+/// let filter = ListingFilter {
+///     status: Some(ListingStatus::Active),
+///     limit: Some(50),  // Get 50 results
+///     offset: Some(100), // Skip first 100 (page 3 of 50-per-page)
+///     ..Default::default()
+/// };
+/// ```
 #[derive(Debug, Clone, Default)]
 pub struct ListingFilter {
     /// Filter by type
@@ -357,9 +374,10 @@ pub struct ListingFilter {
     pub offered_by: Option<Did>,
     /// Only show active listings
     pub active_only: bool,
-    /// Maximum number of results (for pagination)
+    /// Maximum number of results (for pagination).
+    /// Defaults to [`DEFAULT_PAGE_SIZE`] (20), capped at [`MAX_PAGE_SIZE`] (100).
     pub limit: Option<usize>,
-    /// Number of results to skip (for pagination)
+    /// Number of results to skip (for pagination). Defaults to 0.
     pub offset: Option<usize>,
     /// Sort order for results
     pub sort_by: ListingSortBy,
@@ -725,7 +743,13 @@ impl SledListingsStore {
         // CAS succeeded - no duplicate, now insert the actual interest data
         let interest_key = Self::interest_key(&listing_id, &interest.id);
         let interest_value = icn_encoding::encode_versioned(interest)?;
-        self.db.insert(interest_key.as_bytes(), interest_value)?;
+
+        // If insert fails, clean up the index key to avoid permanently blocking this DID
+        if let Err(e) = self.db.insert(interest_key.as_bytes(), interest_value) {
+            // Best effort cleanup - remove the index key we just set
+            let _ = self.db.remove(index_key.as_bytes());
+            return Err(e.into());
+        }
 
         Ok(true)
     }
