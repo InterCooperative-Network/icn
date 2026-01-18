@@ -292,10 +292,8 @@ fn validate_listing_input(req: &CreateListingRequest) -> Result<()> {
                 "Expiry date cannot be in the past".to_string(),
             ));
         }
-        // Use checked_add to explicitly detect overflow (e.g., if now is near u64::MAX)
-        let max_expiry = now
-            .checked_add(MAX_EXPIRY_DURATION_SECS)
-            .unwrap_or(u64::MAX);
+        // Use saturating_add to handle overflow (e.g., if now is near u64::MAX)
+        let max_expiry = now.saturating_add(MAX_EXPIRY_DURATION_SECS);
         if expires_at > max_expiry {
             return Err(GatewayError::BadRequest(
                 "Expiry date cannot be more than 1 year in the future".to_string(),
@@ -398,10 +396,8 @@ fn validate_listing_update(req: &UpdateListingRequest) -> Result<()> {
                 "Expiry date cannot be in the past".to_string(),
             ));
         }
-        // Use checked_add to explicitly detect overflow (e.g., if now is near u64::MAX)
-        let max_expiry = now
-            .checked_add(MAX_EXPIRY_DURATION_SECS)
-            .unwrap_or(u64::MAX);
+        // Use saturating_add to handle overflow (e.g., if now is near u64::MAX)
+        let max_expiry = now.saturating_add(MAX_EXPIRY_DURATION_SECS);
         if expires_at > max_expiry {
             return Err(GatewayError::BadRequest(
                 "Expiry date cannot be more than 1 year in the future".to_string(),
