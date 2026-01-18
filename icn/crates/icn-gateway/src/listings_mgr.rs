@@ -1456,6 +1456,102 @@ impl Default for ListingsManager {
     }
 }
 
+// ============================================================================
+// Background Scheduler
+// ============================================================================
+
+/// Default interval for expiry checks (1 hour in seconds)
+pub const DEFAULT_EXPIRY_CHECK_INTERVAL_SECS: u64 = 3600;
+
+/// Start the listings expiry scheduler
+///
+/// Spawns a background task that periodically:
+/// 1. Expires stale listings (marks Active listings past their expiry date as Expired)
+/// 2. Cleans up orphaned interest index keys (Sled backend only)
+///
+/// # Arguments
+///
+/// * `listings_mgr` - The listings manager (must be wrapped in Arc<tokio::sync::RwLock>)
+/// * `check_interval_secs` - How often to check for expired listings (default: 3600 = 1 hour)
+///
+/// # Example
+///
+/// ```ignore
+/// use std::sync::Arc;
+/// use tokio::sync::RwLock;
+///
+/// let listings_mgr = Arc::new(RwLock::new(ListingsManager::new()));
+/// let handle = start_expiry_scheduler(
+///     listings_mgr.clone(),
+///     DEFAULT_EXPIRY_CHECK_INTERVAL_SECS,
+/// );
+/// ```
+///
+/// # Recommended Configuration
+///
+/// | Deployment Size | Interval | Rationale |
+/// |-----------------|----------|-----------|
+/// | Pilot (<1K listings) | 1 hour | Low overhead, responsive cleanup |
+/// | Small (<10K) | 1 hour | Acceptable scan overhead |
+/// | Medium (<50K) | 6 hours | Reduce peak load, run during off-hours |
+/// | Large (>50K) | Daily | Schedule during maintenance window |
+pub fn start_expiry_scheduler(
+    listings_mgr: Arc<tokio::sync::RwLock<ListingsManager>>,
+    check_interval_secs: u64,
+) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+        tracing::info!(
+            interval_secs = check_interval_secs,
+            "Starting listings expiry scheduler"
+        );
+
+        let mut interval =
+            tokio::time::interval(std::time::Duration::from_secs(check_interval_secs));
+
+        loop {
+            interval.tick().await;
+
+            let mgr = listings_mgr.write().await;
+
+            // Expire stale listings
+            match mgr.expire_stale_listings() {
+                Ok(count) => {
+                    if count > 0 {
+                        tracing::info!(
+                            expired_count = count,
+                            "Listings expiry scheduler: expired stale listings"
+                        );
+                    }
+                }
+                Err(e) => {
+                    tracing::error!(
+                        error = %e,
+                        "Listings expiry scheduler: failed to expire stale listings"
+                    );
+                }
+            }
+
+            // Clean up orphaned interest indexes (Sled only, no-op for in-memory)
+            match mgr.cleanup_orphaned_interest_indexes() {
+                Ok(count) => {
+                    if count > 0 {
+                        tracing::info!(
+                            cleaned_count = count,
+                            "Listings expiry scheduler: cleaned up orphaned interest indexes"
+                        );
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        error = %e,
+                        "Listings expiry scheduler: failed to clean up orphaned indexes"
+                    );
+                }
+            }
+        }
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

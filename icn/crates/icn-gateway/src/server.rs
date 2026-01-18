@@ -622,6 +622,13 @@ impl GatewayServer {
         );
         info!("Recurring payments scheduler started");
 
+        // Start listings expiry scheduler
+        let _listings_expiry_handle = crate::listings_mgr::start_expiry_scheduler(
+            listings_manager.clone(),
+            crate::listings_mgr::DEFAULT_EXPIRY_CHECK_INTERVAL_SECS, // 1 hour
+        );
+        info!("Listings expiry scheduler started (interval: 1 hour)");
+
         // Create shutdown channel
         let (shutdown_tx, _shutdown_rx) = tokio::sync::broadcast::channel::<()>(1);
 
