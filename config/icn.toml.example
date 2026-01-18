@@ -300,3 +300,17 @@ shutdown_timeout_secs = 5
 
 # Clock synchronization interval in seconds
 clock_sync_interval_secs = 600
+
+# Storage maintenance configuration
+# Periodic maintenance keeps the Sled database optimized
+[supervisor.storage_maintenance]
+# Enable periodic maintenance (default: true)
+enabled = true
+# Interval between maintenance runs in seconds (default: 3600 = 1 hour)
+interval_secs = 3600
+# Warn if space amplification exceeds this threshold (default: 2.0)
+amplification_threshold = 2.0
+# Warn if database size exceeds this threshold in bytes (default: 1GB)
+size_threshold_bytes = 1073741824
+# Flush data to disk during maintenance (default: true)
+flush_on_maintenance = true

@@ -1,5 +1,6 @@
 //! Supervisor configuration for background tasks and timeouts
 
+use icn_store::MaintenanceConfig;
 use serde::{Deserialize, Serialize};
 
 /// Supervisor configuration for background tasks and timeouts (A5 fix)
@@ -34,6 +35,10 @@ pub struct SupervisorConfig {
     /// Actor restart policy configuration
     #[serde(default)]
     pub restart_policy: RestartPolicyConfig,
+
+    /// Storage maintenance configuration (compaction, cleanup)
+    #[serde(default)]
+    pub storage_maintenance: MaintenanceConfig,
 }
 
 /// Configuration for actor restart with exponential backoff.
@@ -130,6 +135,7 @@ impl Default for SupervisorConfig {
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
             clock_sync_interval_secs: default_clock_sync_interval_secs(),
             restart_policy: RestartPolicyConfig::default(),
+            storage_maintenance: MaintenanceConfig::default(),
         }
     }
 }
