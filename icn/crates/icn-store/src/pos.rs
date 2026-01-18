@@ -23,9 +23,26 @@ pub const DEFAULT_CHALLENGE_TIMEOUT_SECS: u64 = 30;
 // Challenge Types
 // ============================================================================
 
+/// Protocol version for storage challenges
+pub const CHALLENGE_PROTOCOL_VERSION: u8 = 2;
+
+/// Minimum supported protocol version
+pub const MIN_SUPPORTED_VERSION: u8 = 1;
+
+/// Maximum supported protocol version
+pub const MAX_SUPPORTED_VERSION: u8 = 2;
+
 /// Storage challenge combining byte range + Merkle proof verification
+///
+/// # Protocol Versions
+/// - v1: Single chunk index, u64 nonce (legacy)
+/// - v2: Multiple chunk indices, 32-byte CSPRNG nonce
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct StorageChallenge {
+    /// Protocol version (default: 2)
+    #[serde(default = "default_challenge_version")]
+    pub version: u8,
+
     /// Unique challenge ID (SHA-256 of challenge parameters)
     pub id: [u8; 32],
 
@@ -41,11 +58,13 @@ pub struct StorageChallenge {
     /// Number of bytes to return (max 4KB)
     pub byte_length: u32,
 
-    /// Merkle chunk index to prove
-    pub chunk_index: u32,
+    /// Merkle chunk indices to prove (v2: multiple blocks)
+    /// For v1 compatibility, a single-element vec is used
+    pub chunk_indices: Vec<u32>,
 
-    /// Nonce for replay protection
-    pub nonce: u64,
+    /// CSPRNG nonce for replay protection (v2: 32 bytes)
+    /// For v1 compatibility, first 8 bytes contain the u64 nonce
+    pub challenge_nonce: [u8; 32],
 
     /// DID of the challenger
     pub challenger: String,
@@ -60,14 +79,45 @@ pub struct StorageChallenge {
     pub signature: Vec<u8>,
 }
 
+fn default_challenge_version() -> u8 {
+    CHALLENGE_PROTOCOL_VERSION
+}
+
 impl StorageChallenge {
-    /// Create a new storage challenge (unsigned)
+    /// Create a new storage challenge for a single chunk (v2 protocol, unsigned)
+    ///
+    /// For multi-block challenges, use `new_multi_block` instead.
     pub fn new(
         content_hash: ContentHash,
         target_peer: String,
         byte_offset: u64,
         byte_length: u32,
         chunk_index: u32,
+        challenger: String,
+        timeout_secs: u64,
+    ) -> Self {
+        Self::new_multi_block(
+            content_hash,
+            target_peer,
+            byte_offset,
+            byte_length,
+            vec![chunk_index],
+            challenger,
+            timeout_secs,
+        )
+    }
+
+    /// Create a new multi-block storage challenge (v2 protocol, unsigned)
+    ///
+    /// Requests proofs for multiple chunk indices in a single challenge,
+    /// making it harder for malicious nodes to pass challenges while storing
+    /// only portions of the data.
+    pub fn new_multi_block(
+        content_hash: ContentHash,
+        target_peer: String,
+        byte_offset: u64,
+        byte_length: u32,
+        chunk_indices: Vec<u32>,
         challenger: String,
         timeout_secs: u64,
     ) -> Self {
@@ -78,16 +128,18 @@ impl StorageChallenge {
             Err(_) => 0,
         };
 
-        let nonce = rand::random::<u64>();
+        // Generate 32-byte CSPRNG nonce for unpredictability
+        let challenge_nonce: [u8; 32] = rand::random();
 
         let mut challenge = Self {
+            version: CHALLENGE_PROTOCOL_VERSION,
             id: [0u8; 32],
             content_hash,
             target_peer,
             byte_offset,
             byte_length: byte_length.min(MAX_BYTE_SAMPLE_SIZE),
-            chunk_index,
-            nonce,
+            chunk_indices,
+            challenge_nonce,
             challenger,
             created_at: now,
             expires_at: now + timeout_secs,
@@ -99,15 +151,41 @@ impl StorageChallenge {
         challenge
     }
 
+    /// Get the primary chunk index (for single-block compatibility)
+    pub fn chunk_index(&self) -> Option<u32> {
+        self.chunk_indices.first().copied()
+    }
+
+    /// Get legacy u64 nonce from first 8 bytes (for v1 compatibility)
+    pub fn nonce(&self) -> u64 {
+        // Explicit construction avoids try_into() and is infallible for fixed-size arrays
+        let bytes: [u8; 8] = [
+            self.challenge_nonce[0],
+            self.challenge_nonce[1],
+            self.challenge_nonce[2],
+            self.challenge_nonce[3],
+            self.challenge_nonce[4],
+            self.challenge_nonce[5],
+            self.challenge_nonce[6],
+            self.challenge_nonce[7],
+        ];
+        u64::from_le_bytes(bytes)
+    }
+
     /// Compute challenge ID from parameters (excluding signature)
     fn compute_id(&self) -> [u8; 32] {
         let mut hasher = Sha256::new();
+        hasher.update([self.version]);
         hasher.update(self.content_hash);
         hasher.update(self.target_peer.as_bytes());
         hasher.update(self.byte_offset.to_le_bytes());
         hasher.update(self.byte_length.to_le_bytes());
-        hasher.update(self.chunk_index.to_le_bytes());
-        hasher.update(self.nonce.to_le_bytes());
+        // Include count and all chunk indices
+        hasher.update((self.chunk_indices.len() as u32).to_le_bytes());
+        for idx in &self.chunk_indices {
+            hasher.update(idx.to_le_bytes());
+        }
+        hasher.update(self.challenge_nonce);
         hasher.update(self.challenger.as_bytes());
         hasher.update(self.created_at.to_le_bytes());
         hasher.update(self.expires_at.to_le_bytes());
@@ -117,13 +195,18 @@ impl StorageChallenge {
     /// Get the signing payload (used for signature creation/verification)
     pub fn signing_payload(&self) -> Vec<u8> {
         let mut payload = Vec::new();
+        payload.push(self.version);
         payload.extend_from_slice(&self.id);
         payload.extend_from_slice(&self.content_hash);
         payload.extend_from_slice(self.target_peer.as_bytes());
         payload.extend_from_slice(&self.byte_offset.to_le_bytes());
         payload.extend_from_slice(&self.byte_length.to_le_bytes());
-        payload.extend_from_slice(&self.chunk_index.to_le_bytes());
-        payload.extend_from_slice(&self.nonce.to_le_bytes());
+        // Include count and all chunk indices
+        payload.extend_from_slice(&(self.chunk_indices.len() as u32).to_le_bytes());
+        for idx in &self.chunk_indices {
+            payload.extend_from_slice(&idx.to_le_bytes());
+        }
+        payload.extend_from_slice(&self.challenge_nonce[..]);
         payload.extend_from_slice(self.challenger.as_bytes());
         payload.extend_from_slice(&self.created_at.to_le_bytes());
         payload.extend_from_slice(&self.expires_at.to_le_bytes());
@@ -142,6 +225,22 @@ impl StorageChallenge {
     /// Validate challenge ID matches computed value
     pub fn validate_id(&self) -> bool {
         self.id == self.compute_id()
+    }
+
+    /// Validate that the protocol version is supported
+    ///
+    /// Returns an error if the version is outside the supported range.
+    /// This prevents silent mishandling of future protocol versions.
+    pub fn validate_version(&self) -> Result<()> {
+        if self.version < MIN_SUPPORTED_VERSION || self.version > MAX_SUPPORTED_VERSION {
+            anyhow::bail!(
+                "Unsupported challenge protocol version {}: supported range is {}-{}",
+                self.version,
+                MIN_SUPPORTED_VERSION,
+                MAX_SUPPORTED_VERSION
+            );
+        }
+        Ok(())
     }
 
     /// Sign this challenge with the challenger's keypair
@@ -197,23 +296,76 @@ impl StorageChallenge {
 // Proof Types
 // ============================================================================
 
+/// Individual Merkle proof data for a single chunk
+///
+/// Used within `StorageProof` to provide proofs for multiple chunks.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct MerkleProofData {
+    /// Index of the chunk being proven
+    pub chunk_index: u32,
+
+    /// Hash of the chunk
+    pub chunk_hash: [u8; 32],
+
+    /// Sibling hashes from leaf to root
+    pub siblings: Vec<[u8; 32]>,
+
+    /// Position bits: false = left child, true = right child
+    pub path_bits: Vec<bool>,
+}
+
+impl MerkleProofData {
+    /// Verify this proof against an expected root
+    pub fn verify_against_root(&self, expected_root: &[u8; 32]) -> bool {
+        if self.siblings.len() != self.path_bits.len() {
+            return false;
+        }
+
+        let mut current = self.chunk_hash;
+
+        for (sibling, is_right) in self.siblings.iter().zip(self.path_bits.iter()) {
+            current = if *is_right {
+                ContentChunkTree::hash_pair(sibling, &current)
+            } else {
+                ContentChunkTree::hash_pair(&current, sibling)
+            };
+        }
+
+        current == *expected_root
+    }
+}
+
+impl From<MerkleProof> for MerkleProofData {
+    fn from(proof: MerkleProof) -> Self {
+        Self {
+            chunk_index: proof.chunk_index,
+            chunk_hash: proof.chunk_hash,
+            siblings: proof.siblings,
+            path_bits: proof.path_bits,
+        }
+    }
+}
+
 /// Storage proof response from replica holder
+///
+/// # Protocol Versions
+/// - v1: Single proof (chunk_hash, merkle_siblings, merkle_path_bits)
+/// - v2: Multiple proofs via `merkle_proofs` vec
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct StorageProof {
+    /// Protocol version (default: 2)
+    #[serde(default = "default_challenge_version")]
+    pub version: u8,
+
     /// Challenge ID being answered
     pub challenge_id: [u8; 32],
 
     /// The requested bytes from byte range challenge
     pub byte_data: Vec<u8>,
 
-    /// Hash of the chunk being proven
-    pub chunk_hash: [u8; 32],
-
-    /// Merkle sibling hashes from leaf to root
-    pub merkle_siblings: Vec<[u8; 32]>,
-
-    /// Position bits indicating left(false)/right(true) at each level
-    pub merkle_path_bits: Vec<bool>,
+    /// Multiple Merkle proofs (v2: one per challenged chunk)
+    /// For v1 compatibility, single-element vec works
+    pub merkle_proofs: Vec<MerkleProofData>,
 
     /// DID of the prover (replica holder)
     pub prover: String,
@@ -226,13 +378,35 @@ pub struct StorageProof {
 }
 
 impl StorageProof {
-    /// Create a new storage proof (unsigned)
+    /// Create a new storage proof for a single chunk (v2 protocol, unsigned)
+    ///
+    /// For multi-chunk proofs, use `new_multi` instead.
     pub fn new(
         challenge_id: [u8; 32],
         byte_data: Vec<u8>,
         chunk_hash: [u8; 32],
         merkle_siblings: Vec<[u8; 32]>,
         merkle_path_bits: Vec<bool>,
+        prover: String,
+    ) -> Self {
+        Self::new_multi(
+            challenge_id,
+            byte_data,
+            vec![MerkleProofData {
+                chunk_index: 0, // Default index for single-proof compatibility
+                chunk_hash,
+                siblings: merkle_siblings,
+                path_bits: merkle_path_bits,
+            }],
+            prover,
+        )
+    }
+
+    /// Create a new multi-chunk storage proof (v2 protocol, unsigned)
+    pub fn new_multi(
+        challenge_id: [u8; 32],
+        byte_data: Vec<u8>,
+        merkle_proofs: Vec<MerkleProofData>,
         prover: String,
     ) -> Self {
         // Get current Unix timestamp. If system clock is before Unix epoch, use 0.
@@ -242,29 +416,66 @@ impl StorageProof {
         };
 
         Self {
+            version: CHALLENGE_PROTOCOL_VERSION,
             challenge_id,
             byte_data,
-            chunk_hash,
-            merkle_siblings,
-            merkle_path_bits,
+            merkle_proofs,
             prover,
             generated_at: now,
             signature: Vec::new(),
         }
     }
 
+    /// Get the first chunk hash (for single-proof compatibility)
+    pub fn chunk_hash(&self) -> Option<[u8; 32]> {
+        self.merkle_proofs.first().map(|p| p.chunk_hash)
+    }
+
+    /// Get the first merkle siblings (for single-proof compatibility)
+    pub fn merkle_siblings(&self) -> Option<&Vec<[u8; 32]>> {
+        self.merkle_proofs.first().map(|p| &p.siblings)
+    }
+
+    /// Get the first merkle path bits (for single-proof compatibility)
+    pub fn merkle_path_bits(&self) -> Option<&Vec<bool>> {
+        self.merkle_proofs.first().map(|p| &p.path_bits)
+    }
+
+    /// Validate that the protocol version is supported
+    ///
+    /// Returns an error if the version is outside the supported range.
+    /// This prevents silent mishandling of future protocol versions.
+    pub fn validate_version(&self) -> Result<()> {
+        if self.version < MIN_SUPPORTED_VERSION || self.version > MAX_SUPPORTED_VERSION {
+            anyhow::bail!(
+                "Unsupported proof protocol version {}: supported range is {}-{}",
+                self.version,
+                MIN_SUPPORTED_VERSION,
+                MAX_SUPPORTED_VERSION
+            );
+        }
+        Ok(())
+    }
+
     /// Get the signing payload (used for signature creation/verification)
     pub fn signing_payload(&self) -> Vec<u8> {
         let mut payload = Vec::new();
+        payload.push(self.version);
         payload.extend_from_slice(&self.challenge_id);
         payload.extend_from_slice(&(self.byte_data.len() as u32).to_le_bytes());
         payload.extend_from_slice(&self.byte_data);
-        payload.extend_from_slice(&self.chunk_hash);
-        for sibling in &self.merkle_siblings {
-            payload.extend_from_slice(sibling);
-        }
-        for bit in &self.merkle_path_bits {
-            payload.push(if *bit { 1 } else { 0 });
+        // Include count and all merkle proofs
+        payload.extend_from_slice(&(self.merkle_proofs.len() as u32).to_le_bytes());
+        for proof in &self.merkle_proofs {
+            payload.extend_from_slice(&proof.chunk_index.to_le_bytes());
+            payload.extend_from_slice(&proof.chunk_hash);
+            payload.extend_from_slice(&(proof.siblings.len() as u32).to_le_bytes());
+            for sibling in &proof.siblings {
+                payload.extend_from_slice(sibling);
+            }
+            for bit in &proof.path_bits {
+                payload.push(if *bit { 1 } else { 0 });
+            }
         }
         payload.extend_from_slice(self.prover.as_bytes());
         payload.extend_from_slice(&self.generated_at.to_le_bytes());
@@ -643,6 +854,9 @@ pub struct PendingChallenge {
 // Configuration
 // ============================================================================
 
+/// Default number of blocks per challenge
+pub const DEFAULT_BLOCKS_PER_CHALLENGE: u32 = 3;
+
 /// Configuration for the challenge scheduler
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChallengeConfig {
@@ -672,6 +886,10 @@ pub struct ChallengeConfig {
 
     /// Byte sample size for challenges
     pub byte_sample_size: u32,
+
+    /// Number of random chunk indices to challenge per request (v2 protocol)
+    /// Higher values increase security but also increase proof size
+    pub blocks_per_challenge: u32,
 }
 
 impl Default for ChallengeConfig {
@@ -686,6 +904,7 @@ impl Default for ChallengeConfig {
             max_pending_total: 1000,
             chunk_size: DEFAULT_CHUNK_SIZE,
             byte_sample_size: MAX_BYTE_SAMPLE_SIZE,
+            blocks_per_challenge: DEFAULT_BLOCKS_PER_CHALLENGE,
         }
     }
 }
@@ -710,8 +929,30 @@ mod tests {
         assert_eq!(challenge.content_hash, content_hash);
         assert_eq!(challenge.byte_offset, 100);
         assert_eq!(challenge.byte_length, 1024);
-        assert_eq!(challenge.chunk_index, 5);
+        assert_eq!(challenge.chunk_index(), Some(5));
+        assert_eq!(challenge.chunk_indices, vec![5]);
+        assert_eq!(challenge.version, CHALLENGE_PROTOCOL_VERSION);
         assert!(!challenge.is_expired());
+        assert!(challenge.validate_id());
+    }
+
+    #[test]
+    fn test_multi_block_challenge_creation() {
+        let content_hash = [1u8; 32];
+        let challenge = StorageChallenge::new_multi_block(
+            content_hash,
+            "did:icn:target".to_string(),
+            100,
+            1024,
+            vec![2, 5, 8],
+            "did:icn:challenger".to_string(),
+            30,
+        );
+
+        assert_eq!(challenge.chunk_indices, vec![2, 5, 8]);
+        assert_eq!(challenge.chunk_index(), Some(2));
+        assert_eq!(challenge.version, 2);
+        assert_eq!(challenge.challenge_nonce.len(), 32);
         assert!(challenge.validate_id());
     }
 
@@ -736,7 +977,7 @@ mod tests {
         assert_eq!(c1.id, c2.id);
 
         // Different nonce should produce different ID
-        c1.nonce = 12345;
+        c1.challenge_nonce = [0x42u8; 32];
         c1.id = c1.compute_id();
         assert_ne!(c1.id, c2.id);
     }
@@ -808,7 +1049,51 @@ mod tests {
 
         assert_eq!(proof.challenge_id, [1u8; 32]);
         assert_eq!(proof.byte_data, b"test data");
+        assert_eq!(proof.version, CHALLENGE_PROTOCOL_VERSION);
+        assert_eq!(proof.merkle_proofs.len(), 1);
+        assert_eq!(proof.chunk_hash(), Some([2u8; 32]));
         assert!(!proof.signing_payload().is_empty());
+    }
+
+    #[test]
+    fn test_multi_proof_creation() {
+        let proofs = vec![
+            MerkleProofData {
+                chunk_index: 2,
+                chunk_hash: [2u8; 32],
+                siblings: vec![[10u8; 32], [11u8; 32]],
+                path_bits: vec![false, true],
+            },
+            MerkleProofData {
+                chunk_index: 5,
+                chunk_hash: [5u8; 32],
+                siblings: vec![[12u8; 32], [13u8; 32]],
+                path_bits: vec![true, false],
+            },
+        ];
+
+        let proof = StorageProof::new_multi(
+            [1u8; 32],
+            b"test data".to_vec(),
+            proofs,
+            "did:icn:prover".to_string(),
+        );
+
+        assert_eq!(proof.merkle_proofs.len(), 2);
+        assert_eq!(proof.merkle_proofs[0].chunk_index, 2);
+        assert_eq!(proof.merkle_proofs[1].chunk_index, 5);
+        assert_eq!(proof.chunk_hash(), Some([2u8; 32]));
+    }
+
+    #[test]
+    fn test_merkle_proof_data_verification() {
+        let content = b"0123456789abcdef".to_vec();
+        let tree = ContentChunkTree::new(content, 4);
+
+        let proof = tree.generate_proof(0).expect("should generate proof");
+        let proof_data = MerkleProofData::from(proof);
+
+        assert!(proof_data.verify_against_root(&tree.root()));
     }
 
     #[test]
@@ -825,5 +1110,6 @@ mod tests {
         assert_eq!(config.base_interval_secs, 3600);
         assert_eq!(config.timeout_secs, 30);
         assert_eq!(config.grace_attempts, 3);
+        assert_eq!(config.blocks_per_challenge, DEFAULT_BLOCKS_PER_CHALLENGE);
     }
 }

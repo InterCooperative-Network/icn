@@ -3000,6 +3000,10 @@ pub mod replication {
         gauge!("icn_replication_replicas_unreachable").set(count as f64);
     }
 
+    pub fn replicas_unhealthy_set(count: usize) {
+        gauge!("icn_replication_replicas_unhealthy").set(count as f64);
+    }
+
     pub fn requests_sent_inc(count: u64) {
         counter!("icn_replication_requests_sent_total").increment(count);
     }
@@ -3073,6 +3077,18 @@ pub mod storage_challenge {
     /// Increment timeout counter
     pub fn timeouts_inc() {
         counter!("icn_storage_challenge_timeouts_total").increment(1);
+    }
+
+    /// Increment persistence failure counter
+    ///
+    /// Tracks failures to persist pending challenges for crash recovery.
+    /// High values may indicate storage issues.
+    pub fn persist_failures_inc(operation: &str) {
+        counter!(
+            "icn_storage_challenge_persist_failures_total",
+            "operation" => operation.to_string()
+        )
+        .increment(1);
     }
 }
 

@@ -7,7 +7,9 @@ use crate::gossip::GossipActor;
 use crate::types::GossipMessage;
 use anyhow::Result;
 use icn_identity::Did;
-use icn_store::{ContentChunkTree, StorageChallenge, StorageProof, DEFAULT_CHUNK_SIZE};
+use icn_store::{
+    ContentChunkTree, MerkleProofData, StorageChallenge, StorageProof, DEFAULT_CHUNK_SIZE,
+};
 use tracing::{debug, info, warn};
 
 impl GossipActor {
@@ -31,6 +33,17 @@ impl GossipActor {
             message_type = "StorageChallengeMsg",
             "Received storage challenge"
         );
+
+        // Validate protocol version (reject unsupported versions early)
+        if let Err(e) = challenge.validate_version() {
+            warn!(
+                challenge_id = %hex::encode(challenge.id),
+                version = challenge.version,
+                error = %e,
+                "Rejecting challenge with unsupported protocol version"
+            );
+            return Ok(());
+        }
 
         // Check if challenge is for us
         if challenge.target_peer != self.own_did.to_string() {
@@ -91,27 +104,29 @@ impl GossipActor {
             .get_bytes(challenge.byte_offset, challenge.byte_length)
             .unwrap_or_default();
 
-        // Generate Merkle proof for requested chunk
-        let merkle_proof = match tree.generate_proof(challenge.chunk_index) {
-            Some(proof) => proof,
-            None => {
-                warn!(
-                    challenge_id = %hex::encode(challenge.id),
-                    chunk_index = challenge.chunk_index,
-                    num_chunks = tree.num_chunks(),
-                    "Invalid chunk index in challenge"
-                );
-                return Ok(());
-            }
-        };
+        // Generate Merkle proofs for all requested chunk indices (v2 multi-block)
+        let mut merkle_proofs: Vec<MerkleProofData> = Vec::new();
+        for &chunk_idx in &challenge.chunk_indices {
+            let merkle_proof = match tree.generate_proof(chunk_idx) {
+                Some(proof) => proof,
+                None => {
+                    warn!(
+                        challenge_id = %hex::encode(challenge.id),
+                        chunk_index = chunk_idx,
+                        num_chunks = tree.num_chunks(),
+                        "Invalid chunk index in challenge"
+                    );
+                    return Ok(());
+                }
+            };
+            merkle_proofs.push(MerkleProofData::from(merkle_proof));
+        }
 
-        // Create proof response
-        let mut proof = StorageProof::new(
+        // Create proof response (v2 multi-proof)
+        let mut proof = StorageProof::new_multi(
             challenge.id,
             byte_data,
-            merkle_proof.chunk_hash,
-            merkle_proof.siblings,
-            merkle_proof.path_bits,
+            merkle_proofs,
             self.own_did.to_string(),
         );
 
@@ -153,7 +168,7 @@ impl GossipActor {
             challenge_id = %hex::encode(challenge.id),
             content_hash = %hex::encode(challenge.content_hash),
             byte_data_len = proof.byte_data.len(),
-            merkle_depth = proof.merkle_siblings.len(),
+            num_proofs = proof.merkle_proofs.len(),
             "Sending storage proof"
         );
 
@@ -184,7 +199,7 @@ impl GossipActor {
             challenge_id = %hex::encode(proof.challenge_id),
             prover = %proof.prover,
             byte_data_len = proof.byte_data.len(),
-            merkle_depth = proof.merkle_siblings.len(),
+            num_proofs = proof.merkle_proofs.len(),
             message_type = "StorageProofMsg",
             "Received storage proof"
         );

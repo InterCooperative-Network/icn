@@ -136,8 +136,7 @@ impl<'a> FuelEstimator<'a> {
                 base.then(iter_estimate)
                     .then(loop_estimate)
                     .with_warning(format!(
-                        "Loop estimation assumes max {} iterations",
-                        MAX_LOOP_ITERATIONS
+                        "Loop estimation assumes max {MAX_LOOP_ITERATIONS} iterations"
                     ))
             }
 
@@ -147,6 +146,8 @@ impl<'a> FuelEstimator<'a> {
         }
     }
 
+    // &self is intentionally used only for recursive calls to maintain API consistency
+    #[allow(clippy::only_used_in_recursion)]
     fn estimate_expr(&self, expr: &Expr) -> FuelEstimate {
         // Base cost for any expression
         let base = FuelEstimate::new(FUEL_EXPR, FUEL_EXPR, FUEL_EXPR);

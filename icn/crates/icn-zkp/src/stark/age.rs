@@ -415,8 +415,8 @@ mod tests {
         // STARK proofs for small traces are compact (~3-5KB)
         // Size varies based on trace complexity and proof options
         let size = proof.proof_bytes.len();
-        assert!(size > 1_000, "Proof too small: {} bytes", size);
-        assert!(size < 20_000, "Proof too large: {} bytes", size);
+        assert!(size > 1_000, "Proof too small: {size} bytes");
+        assert!(size < 20_000, "Proof too large: {size} bytes");
         println!(
             "Age proof size: {} bytes ({:.1} KB)",
             size,
