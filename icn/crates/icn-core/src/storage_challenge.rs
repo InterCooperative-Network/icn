@@ -50,7 +50,10 @@ use icn_trust::TrustGraph;
 pub type ReReplicationCallback =
     Arc<dyn Fn(ContentHash, String, u32) -> anyhow::Result<()> + Send + Sync>;
 
-/// Pending challenge tracking info
+/// Key prefix for persisted pending challenges
+const PENDING_CHALLENGE_PREFIX: &[u8] = b"challenge:pending:";
+
+/// Pending challenge tracking info (in-memory)
 #[derive(Debug)]
 struct PendingChallenge {
     /// The challenge that was sent
@@ -68,6 +71,69 @@ struct PendingChallenge {
     /// Number of previous failures for this replica
     #[allow(dead_code)] // May be used for per-challenge tracking
     failure_count: u32,
+}
+
+/// Persisted pending challenge (serializable version)
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct PersistedPendingChallenge {
+    /// The challenge that was sent
+    challenge: StorageChallenge,
+
+    /// When the challenge was sent (Unix timestamp seconds)
+    sent_at_secs: u64,
+
+    /// Expected Merkle root (for verification)
+    expected_merkle_root: [u8; 32],
+
+    /// Expected byte hash (for verification)
+    expected_byte_hash: [u8; 32],
+
+    /// Number of previous failures for this replica
+    failure_count: u32,
+}
+
+impl From<&PendingChallenge> for PersistedPendingChallenge {
+    fn from(p: &PendingChallenge) -> Self {
+        // Convert Instant to Unix timestamp
+        let now = std::time::SystemTime::now();
+        let elapsed = p.sent_at.elapsed();
+        let sent_at = now
+            .checked_sub(elapsed)
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+
+        Self {
+            challenge: p.challenge.clone(),
+            sent_at_secs: sent_at,
+            expected_merkle_root: p.expected_merkle_root,
+            expected_byte_hash: p.expected_byte_hash,
+            failure_count: p.failure_count,
+        }
+    }
+}
+
+impl PersistedPendingChallenge {
+    /// Convert back to in-memory PendingChallenge
+    fn into_pending(self) -> PendingChallenge {
+        // Convert Unix timestamp back to Instant (approximate)
+        let now_secs = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        let elapsed_secs = now_secs.saturating_sub(self.sent_at_secs);
+        let sent_at = Instant::now()
+            .checked_sub(Duration::from_secs(elapsed_secs))
+            .unwrap_or_else(Instant::now);
+
+        PendingChallenge {
+            challenge: self.challenge,
+            sent_at,
+            expected_merkle_root: self.expected_merkle_root,
+            expected_byte_hash: self.expected_byte_hash,
+            failure_count: self.failure_count,
+        }
+    }
 }
 
 /// Storage Challenge Scheduler
@@ -142,6 +208,96 @@ impl ChallengeScheduler {
         self.re_replication_callback = Some(callback);
     }
 
+    /// Persist a pending challenge to the store
+    fn persist_pending_challenge(&self, challenge_id: &[u8; 32], pending: &PendingChallenge) {
+        let key = [PENDING_CHALLENGE_PREFIX, challenge_id.as_slice()].concat();
+        let persisted = PersistedPendingChallenge::from(pending);
+
+        match serde_json::to_vec(&persisted) {
+            Ok(value) => {
+                if let Err(e) = self.store.put(&key, &value) {
+                    warn!(
+                        "Failed to persist pending challenge {}: {}",
+                        hex::encode(&challenge_id[..8]),
+                        e
+                    );
+                }
+            }
+            Err(e) => {
+                warn!(
+                    "Failed to serialize pending challenge {}: {}",
+                    hex::encode(&challenge_id[..8]),
+                    e
+                );
+            }
+        }
+    }
+
+    /// Remove a persisted pending challenge from the store
+    fn remove_persisted_challenge(&self, challenge_id: &[u8; 32]) {
+        let key = [PENDING_CHALLENGE_PREFIX, challenge_id.as_slice()].concat();
+        if let Err(e) = self.store.delete(&key) {
+            debug!(
+                "Failed to remove persisted challenge {}: {}",
+                hex::encode(&challenge_id[..8]),
+                e
+            );
+        }
+    }
+
+    /// Load all persisted pending challenges from the store
+    ///
+    /// Called on scheduler startup to restore in-flight challenges.
+    pub fn load_pending_challenges(&mut self) -> Result<usize> {
+        let entries = self.store.scan(PENDING_CHALLENGE_PREFIX)?;
+        let mut loaded = 0;
+
+        for (key, value) in entries {
+            // Extract challenge ID from key
+            if key.len() != PENDING_CHALLENGE_PREFIX.len() + 32 {
+                debug!("Skipping malformed pending challenge key");
+                continue;
+            }
+
+            let challenge_id: [u8; 32] = key[PENDING_CHALLENGE_PREFIX.len()..]
+                .try_into()
+                .unwrap_or([0u8; 32]);
+
+            match serde_json::from_slice::<PersistedPendingChallenge>(&value) {
+                Ok(persisted) => {
+                    // Skip if challenge has already expired
+                    if persisted.challenge.is_expired() {
+                        debug!(
+                            "Removing expired persisted challenge {}",
+                            hex::encode(&challenge_id[..8])
+                        );
+                        self.remove_persisted_challenge(&challenge_id);
+                        continue;
+                    }
+
+                    let pending = persisted.into_pending();
+                    self.pending.insert(challenge_id, pending);
+                    loaded += 1;
+                }
+                Err(e) => {
+                    warn!(
+                        "Failed to deserialize pending challenge {}: {}",
+                        hex::encode(&challenge_id[..8]),
+                        e
+                    );
+                    // Remove corrupted entry
+                    self.remove_persisted_challenge(&challenge_id);
+                }
+            }
+        }
+
+        if loaded > 0 {
+            info!("Loaded {} pending challenges from storage", loaded);
+        }
+
+        Ok(loaded)
+    }
+
     /// Spawn the scheduler as a background task
     pub fn spawn(
         own_did: Did,
@@ -153,7 +309,7 @@ impl ChallengeScheduler {
         misbehavior: Arc<RwLock<MisbehaviorDetector>>,
         mut shutdown_rx: tokio::sync::broadcast::Receiver<()>,
     ) -> ChallengeSchedulerHandle {
-        let scheduler = Self::new(
+        let mut scheduler = Self::new(
             own_did,
             keypair,
             config.clone(),
@@ -162,6 +318,12 @@ impl ChallengeScheduler {
             gossip,
             misbehavior,
         );
+
+        // Load any persisted pending challenges from previous run
+        if let Err(e) = scheduler.load_pending_challenges() {
+            warn!("Failed to load pending challenges: {}", e);
+        }
+
         let handle = Arc::new(RwLock::new(scheduler));
 
         let handle_clone = handle.clone();
@@ -389,7 +551,13 @@ impl ChallengeScheduler {
             failure_count,
         };
 
-        self.pending.insert(challenge.id, pending);
+        let challenge_id = challenge.id;
+        self.pending.insert(challenge_id, pending);
+
+        // Persist challenge for crash recovery
+        if let Some(p) = self.pending.get(&challenge_id) {
+            self.persist_pending_challenge(&challenge_id, p);
+        }
 
         // Send via gossip
         let target_did = Did::from_str(target_peer)?;
@@ -426,6 +594,9 @@ impl ChallengeScheduler {
 
         for challenge_id in expired {
             if let Some(pending) = self.pending.remove(&challenge_id) {
+                // Remove persisted challenge
+                self.remove_persisted_challenge(&challenge_id);
+
                 let key = (
                     pending.challenge.content_hash,
                     pending.challenge.target_peer.clone(),
@@ -487,7 +658,11 @@ impl ChallengeScheduler {
     pub async fn handle_proof(&mut self, proof: icn_store::StorageProof) -> Result<()> {
         // Find the pending challenge
         let pending = match self.pending.remove(&proof.challenge_id) {
-            Some(p) => p,
+            Some(p) => {
+                // Remove persisted challenge
+                self.remove_persisted_challenge(&proof.challenge_id);
+                p
+            }
             None => {
                 debug!(
                     "Received proof for unknown challenge {}",
