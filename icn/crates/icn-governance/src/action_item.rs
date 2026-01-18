@@ -352,6 +352,11 @@ pub trait ActionItemStoreBackend: Send + Sync {
 }
 
 /// In-memory action item store for testing
+///
+/// # Concurrency Model
+/// Uses RwLock for exclusive write access, preventing lost updates within a single
+/// process. For horizontal scaling, version-based optimistic locking would be needed.
+/// Deferred as the pilot phase uses a single gateway instance.
 #[derive(Debug, Default)]
 pub struct InMemoryActionItemStore {
     items: std::sync::RwLock<HashMap<(String, Uuid), ActionItem>>,

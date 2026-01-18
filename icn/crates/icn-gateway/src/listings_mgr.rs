@@ -442,6 +442,12 @@ impl ListingFilter {
 /// For production, use [`SledListingsStore`] which provides:
 /// - Persistent storage with versioned keys for migrations
 /// - True atomic CAS operations for duplicate prevention
+///
+/// # Concurrency Model
+/// The current implementation uses RwLock for exclusive write access, which prevents
+/// lost updates within a single process. For horizontal scaling (multiple gateway
+/// instances), version-based optimistic locking would be needed. This is deferred
+/// as the pilot phase uses a single gateway instance.
 #[derive(Default)]
 pub struct InMemoryListingsStore {
     listings: RwLock<HashMap<ListingId, Listing>>,
