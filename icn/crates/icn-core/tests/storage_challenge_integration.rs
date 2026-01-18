@@ -172,24 +172,31 @@ async fn test_proof_generation_multi_block() -> Result<()> {
     let data = vec![42u8; 5000];
     let (hash, tree) = node.store_content(&data)?;
 
-    // Select chunk indices
-    let chunk_indices: Vec<u32> = (0..3).map(|i| i % tree.num_chunks()).collect();
+    // Select chunk indices (0, 1, 2 for a 5-chunk file)
+    let chunk_indices: Vec<u32> = vec![0, 1, 2];
 
-    // Create a challenge for 3 blocks
+    // Create a challenge for 3 blocks with byte range [0..1024]
+    let byte_offset = 0u64;
+    let byte_length = 1024u32;
     let challenge = StorageChallenge::new_multi_block(
         hash,
         "did:icn:peer".to_string(),
-        0,
-        1024,
+        byte_offset,
+        byte_length,
         chunk_indices.clone(),
         node.did.to_string(),
         30,
     );
 
-    // Generate proof
+    // Extract just the challenged byte range for the proof
+    let challenged_bytes = tree
+        .get_bytes(byte_offset, byte_length)
+        .unwrap_or_default();
+
+    // Generate proof with correct byte range
     let proof = StorageProof::new_multi(
         challenge.id,
-        data.clone(),
+        challenged_bytes,
         challenge
             .chunk_indices
             .iter()
@@ -402,7 +409,7 @@ async fn test_challenge_nonce_uniqueness() -> Result<()> {
     // Test that challenge nonces are unique (CSPRNG)
     let node = TestNode::new(ChallengeConfig::default()).await?;
     let data = vec![0u8; 1024];
-    let (hash, tree) = node.store_content(&data)?;
+    let (hash, _tree) = node.store_content(&data)?;
 
     let peer_did = KeyPair::generate()?.did().clone();
 
@@ -411,7 +418,7 @@ async fn test_challenge_nonce_uniqueness() -> Result<()> {
         peer_did.to_string(),
         0,
         1024,
-        vec![0 % tree.num_chunks()],
+        vec![0], // First chunk
         node.did.to_string(),
         30,
     );
@@ -421,7 +428,7 @@ async fn test_challenge_nonce_uniqueness() -> Result<()> {
         peer_did.to_string(),
         0,
         1024,
-        vec![0 % tree.num_chunks()],
+        vec![0], // Same chunk - nonces should still differ
         node.did.to_string(),
         30,
     );

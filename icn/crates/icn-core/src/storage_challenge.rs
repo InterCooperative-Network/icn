@@ -531,22 +531,16 @@ impl ChallengeScheduler {
             .min((content_size - byte_offset) as u32);
 
         // Generate random chunk indices (v2 multi-block challenges)
+        // Uses rand::seq::index::sample for O(k) time complexity where k = blocks_to_challenge
         let num_chunks = tree.num_chunks();
         let blocks_to_challenge = self.config.blocks_per_challenge.min(num_chunks);
         let chunk_indices: Vec<u32> = if num_chunks > 0 && blocks_to_challenge > 0 {
-            // Use reservoir sampling to pick random unique indices
+            use rand::seq::index::sample;
             let mut rng = rand::thread_rng();
-            let mut indices: Vec<u32> = Vec::with_capacity(blocks_to_challenge as usize);
-            for _ in 0..blocks_to_challenge {
-                loop {
-                    let idx = rng.gen_range(0..num_chunks);
-                    if !indices.contains(&idx) {
-                        indices.push(idx);
-                        break;
-                    }
-                }
-            }
-            indices
+            sample(&mut rng, num_chunks as usize, blocks_to_challenge as usize)
+                .into_iter()
+                .map(|i| i as u32)
+                .collect()
         } else {
             vec![0]
         };

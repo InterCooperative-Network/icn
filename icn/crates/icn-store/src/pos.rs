@@ -152,7 +152,11 @@ impl StorageChallenge {
 
     /// Get legacy u64 nonce from first 8 bytes (for v1 compatibility)
     pub fn nonce(&self) -> u64 {
-        u64::from_le_bytes(self.challenge_nonce[..8].try_into().unwrap_or([0u8; 8]))
+        u64::from_le_bytes(
+            self.challenge_nonce[..8]
+                .try_into()
+                .expect("challenge_nonce is [u8; 32], first 8 bytes always valid"),
+        )
     }
 
     /// Compute challenge ID from parameters (excluding signature)
