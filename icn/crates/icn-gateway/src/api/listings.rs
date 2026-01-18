@@ -51,17 +51,51 @@ fn get_client_ip(req: &HttpRequest) -> String {
 // Validation Constants
 // ============================================================================
 
+/// Maximum title length (200 chars).
+/// Rationale: Long enough for descriptive titles, short enough for UI display
+/// without truncation in cards/lists. Comparable to eBay listing titles (80 chars).
 const MAX_TITLE_LENGTH: usize = 200;
+
+/// Maximum description length (5000 chars).
+/// Rationale: Sufficient for detailed item descriptions including condition,
+/// dimensions, history, etc. ~1000 words typical.
 const MAX_DESCRIPTION_LENGTH: usize = 5000;
+
+/// Maximum "seeking" field length (1000 chars).
+/// Rationale: Shorter than description since it's typically just exchange terms
+/// (e.g., "20 hours labor exchange or 500 credits").
 const MAX_SEEKING_LENGTH: usize = 1000;
+
+/// Maximum number of photos per listing (10).
+/// Rationale: Enough to show item from multiple angles, but limits storage.
+/// Comparable to marketplace sites (eBay: 12, Craigslist: 24, FB Marketplace: 10).
 const MAX_PHOTOS: usize = 10;
+
+/// Maximum photo URL length (500 chars).
+/// Rationale: URLs can be long with query params, but 500 is sufficient for
+/// most CDN URLs and IPFS hashes with gateway prefixes.
 const MAX_PHOTO_URL_LENGTH: usize = 500;
+
+/// Maximum number of tags per listing (15).
+/// Rationale: Enough for categorization without tag spam.
 const MAX_TAGS: usize = 15;
+
+/// Maximum tag length (50 chars).
+/// Rationale: Tags should be short keywords, not sentences.
 const MAX_TAG_LENGTH: usize = 50;
+
+/// Maximum interest message length (2000 chars).
+/// Rationale: Enough to explain interest and propose exchange terms,
+/// but keeps conversations focused.
 const MAX_INTEREST_MESSAGE_LENGTH: usize = 2000;
+
+/// Maximum interest offer field length (1000 chars).
+/// Rationale: Similar to "seeking" - just exchange terms, not a full description.
 const MAX_INTEREST_OFFER_LENGTH: usize = 1000;
 
-// Maximum expiry duration: 1 year (365 days in seconds)
+/// Maximum expiry duration: 1 year (365 days in seconds).
+/// Rationale: Listings older than 1 year are likely stale. Users can renew
+/// by creating a new listing. Prevents database accumulating ancient entries.
 const MAX_EXPIRY_DURATION_SECS: u64 = 365 * 24 * 60 * 60;
 
 // ============================================================================
@@ -809,7 +843,7 @@ pub async fn update_listing_status(
         ListingStatus::Completed => mgr.mark_completed(&listing_id),
         ListingStatus::Cancelled => mgr.cancel_listing(&listing_id),
         _ => Err(anyhow::anyhow!(
-            "Cannot set status to {status_str} directly. Use matched, completed, or cancelled."
+            "Cannot manually set status to '{status_str}'. Active and Expired statuses are managed automatically. Use 'matched', 'completed', or 'cancelled'."
         )),
     }
     .map_err(|e| GatewayError::InternalError(format!("Failed to update listing status: {e}")))?;
@@ -1102,5 +1136,125 @@ mod tests {
             Ok(ListingStatus::Cancelled)
         ));
         assert!(parse_status("invalid").is_err());
+    }
+
+    // ========================================================================
+    // SSRF Protection Tests
+    // ========================================================================
+
+    #[test]
+    fn test_validate_photo_url_valid_https() {
+        // Use real public domains (not RFC 6761 reserved)
+        assert!(validate_photo_url("https://images.unsplash.com/photo.jpg", 0).is_ok());
+        assert!(validate_photo_url("https://cdn.cooperative.cloud/images/123.png", 0).is_ok());
+    }
+
+    #[test]
+    fn test_validate_photo_url_valid_ipfs() {
+        assert!(
+            validate_photo_url("ipfs://QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG", 0).is_ok()
+        );
+        assert!(validate_photo_url(
+            "ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",
+            0
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn test_validate_photo_url_rejects_http() {
+        let result = validate_photo_url("http://example.com/photo.jpg", 0);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("https://"));
+    }
+
+    #[test]
+    fn test_validate_photo_url_rejects_localhost() {
+        assert!(validate_photo_url("https://localhost/photo.jpg", 0).is_err());
+        assert!(validate_photo_url("https://127.0.0.1/photo.jpg", 0).is_err());
+        assert!(validate_photo_url("https://myapp.localhost/photo.jpg", 0).is_err());
+    }
+
+    #[test]
+    fn test_validate_photo_url_rejects_private_ips() {
+        // RFC 1918 private ranges
+        assert!(validate_photo_url("https://10.0.0.1/photo.jpg", 0).is_err());
+        assert!(validate_photo_url("https://172.16.0.1/photo.jpg", 0).is_err());
+        assert!(validate_photo_url("https://192.168.1.1/photo.jpg", 0).is_err());
+
+        // Loopback
+        assert!(validate_photo_url("https://127.0.0.1/photo.jpg", 0).is_err());
+        assert!(validate_photo_url("https://127.255.255.255/photo.jpg", 0).is_err());
+
+        // Link-local
+        assert!(validate_photo_url("https://169.254.1.1/photo.jpg", 0).is_err());
+
+        // Carrier-grade NAT
+        assert!(validate_photo_url("https://100.64.0.1/photo.jpg", 0).is_err());
+    }
+
+    #[test]
+    fn test_validate_photo_url_rejects_internal_tlds() {
+        assert!(validate_photo_url("https://server.local/photo.jpg", 0).is_err());
+        assert!(validate_photo_url("https://db.internal/photo.jpg", 0).is_err());
+    }
+
+    #[test]
+    fn test_validate_photo_url_rejects_rfc6761_reserved() {
+        assert!(validate_photo_url("https://test.test/photo.jpg", 0).is_err());
+        assert!(validate_photo_url("https://invalid.invalid/photo.jpg", 0).is_err());
+        assert!(validate_photo_url("https://foo.example/photo.jpg", 0).is_err());
+        assert!(validate_photo_url("https://example.com/photo.jpg", 0).is_err());
+        assert!(validate_photo_url("https://example.net/photo.jpg", 0).is_err());
+        assert!(validate_photo_url("https://example.org/photo.jpg", 0).is_err());
+    }
+
+    #[test]
+    fn test_validate_photo_url_rejects_crlf_injection() {
+        assert!(
+            validate_photo_url("https://example.com/photo.jpg\r\nX-Injected: header", 0).is_err()
+        );
+        assert!(validate_photo_url("https://example.com/photo.jpg\nmalicious", 0).is_err());
+    }
+
+    #[test]
+    fn test_validate_photo_url_rejects_invalid_ipfs() {
+        assert!(validate_photo_url("ipfs://", 0).is_err());
+        assert!(validate_photo_url("ipfs://\n\r", 0).is_err());
+    }
+
+    #[test]
+    fn test_is_private_ip_ipv4() {
+        use std::net::IpAddr;
+
+        // Private ranges
+        assert!(is_private_ip(&"10.0.0.1".parse::<IpAddr>().unwrap()));
+        assert!(is_private_ip(&"172.16.0.1".parse::<IpAddr>().unwrap()));
+        assert!(is_private_ip(&"172.31.255.255".parse::<IpAddr>().unwrap()));
+        assert!(is_private_ip(&"192.168.0.1".parse::<IpAddr>().unwrap()));
+
+        // Public IPs should not be flagged
+        assert!(!is_private_ip(&"8.8.8.8".parse::<IpAddr>().unwrap()));
+        assert!(!is_private_ip(&"1.1.1.1".parse::<IpAddr>().unwrap()));
+
+        // Edge cases
+        assert!(!is_private_ip(&"172.15.255.255".parse::<IpAddr>().unwrap())); // Just below 172.16
+        assert!(!is_private_ip(&"172.32.0.0".parse::<IpAddr>().unwrap())); // Just above 172.31
+    }
+
+    #[test]
+    fn test_is_private_ip_ipv6() {
+        use std::net::IpAddr;
+
+        // Loopback
+        assert!(is_private_ip(&"::1".parse::<IpAddr>().unwrap()));
+
+        // Link-local
+        assert!(is_private_ip(&"fe80::1".parse::<IpAddr>().unwrap()));
+
+        // Public IPv6 should not be flagged
+        assert!(!is_private_ip(
+            &"2607:f8b0:4004:800::200e".parse::<IpAddr>().unwrap()
+        ));
     }
 }

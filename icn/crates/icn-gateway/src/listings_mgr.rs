@@ -578,7 +578,22 @@ impl InMemoryListingsStore {
     }
 
     /// List all listings with a specific status (ignores pagination and expiry filtering).
+    ///
     /// Used for background tasks like expiring stale listings.
+    ///
+    /// # Performance
+    ///
+    /// This method performs a full table scan (O(n) where n = total listings).
+    /// For deployments with >10K listings, schedule execution during off-peak hours
+    /// or add a secondary index on (status, expires_at) for efficient queries.
+    ///
+    /// Current pilot phase supports up to 10K listings efficiently.
+    ///
+    /// # Difference from `list()`
+    ///
+    /// Unlike `list()`, this method does NOT filter out expired Active listings.
+    /// This is intentional: when expiring stale listings, we need to find Active
+    /// listings that have expired, which `list()` would hide.
     pub fn list_all_matching_status(&self, status: ListingStatus) -> Result<Vec<Listing>> {
         let listings = self
             .listings
@@ -806,6 +821,68 @@ impl SledListingsStore {
         Ok(true)
     }
 
+    /// Clean up orphaned index keys that don't have corresponding interest entries.
+    ///
+    /// This handles edge cases where a process crash occurs between CAS success
+    /// and interest insert completion. Such orphaned index keys would permanently
+    /// block the affected user from expressing interest.
+    ///
+    /// # Performance
+    ///
+    /// This is O(n) where n = total interest index keys. Schedule during off-peak hours.
+    ///
+    /// # Returns
+    ///
+    /// The number of orphaned index keys that were cleaned up.
+    pub fn cleanup_orphaned_interest_indexes(&self) -> Result<usize> {
+        let index_prefix = format!("{SLED_KEY_VERSION}:interest_idx:");
+        let mut cleaned = 0;
+
+        for item in self.db.scan_prefix(index_prefix.as_bytes()) {
+            let (key, _) = item?;
+            let key_str = String::from_utf8_lossy(&key);
+
+            // Parse the index key to extract listing_id and from_did
+            // Format: v1:interest_idx:{listing_id}:{from_did}
+            let parts: Vec<&str> = key_str.split(':').collect();
+            if parts.len() != 4 {
+                continue;
+            }
+
+            let listing_id_str = parts[2];
+            let from_did_str = parts[3];
+
+            // Check if any interest exists for this listing_id from this from_did
+            let interest_prefix = format!("{SLED_KEY_VERSION}:interest:{listing_id_str}:");
+            let mut has_matching_interest = false;
+
+            for interest_item in self.db.scan_prefix(interest_prefix.as_bytes()) {
+                let (_, value) = interest_item?;
+                if let Ok(interest) = icn_encoding::decode_versioned::<ListingInterest>(&value) {
+                    if interest.from_did.to_string() == from_did_str {
+                        has_matching_interest = true;
+                        break;
+                    }
+                }
+            }
+
+            if !has_matching_interest {
+                tracing::info!(
+                    index_key = %key_str,
+                    "Cleaning up orphaned interest index key"
+                );
+                self.db.remove(key)?;
+                cleaned += 1;
+            }
+        }
+
+        if cleaned > 0 {
+            tracing::info!(count = cleaned, "Cleaned up orphaned interest index keys");
+        }
+
+        Ok(cleaned)
+    }
+
     /// Clean up index keys when deleting a listing's interests
     fn delete_interest_indexes(&self, listing_id: &ListingId) -> Result<()> {
         let prefix = Self::interest_index_prefix(listing_id);
@@ -817,7 +894,22 @@ impl SledListingsStore {
     }
 
     /// List all listings with a specific status (ignores pagination and expiry filtering).
+    ///
     /// Used for background tasks like expiring stale listings.
+    ///
+    /// # Performance
+    ///
+    /// This method performs a full table scan (O(n) where n = total listings).
+    /// For deployments with >10K listings, schedule execution during off-peak hours
+    /// or add a secondary index on (status, expires_at) for efficient queries.
+    ///
+    /// Current pilot phase supports up to 10K listings efficiently.
+    ///
+    /// # Difference from `list()`
+    ///
+    /// Unlike `list()`, this method does NOT filter out expired Active listings.
+    /// This is intentional: when expiring stale listings, we need to find Active
+    /// listings that have expired, which `list()` would hide.
     pub fn list_all_matching_status(&self, status: ListingStatus) -> Result<Vec<Listing>> {
         let prefix = Self::listing_prefix();
         let mut result = Vec::new();
@@ -853,6 +945,13 @@ pub trait ListingsStoreBackend: Send + Sync {
     /// List all listings with a specific status (ignores pagination and expiry filtering).
     /// Used for background tasks like expiring stale listings.
     fn list_all_matching_status(&self, status: ListingStatus) -> Result<Vec<Listing>>;
+
+    /// Clean up orphaned interest index keys.
+    /// Returns the number of keys cleaned up.
+    /// Default implementation returns 0 (no-op for in-memory stores).
+    fn cleanup_orphaned_interest_indexes(&self) -> Result<usize> {
+        Ok(0)
+    }
 }
 
 impl ListingsStoreBackend for InMemoryListingsStore {
@@ -884,6 +983,10 @@ impl ListingsStoreBackend for InMemoryListingsStore {
     fn list_all_matching_status(&self, status: ListingStatus) -> Result<Vec<Listing>> {
         InMemoryListingsStore::list_all_matching_status(self, status)
     }
+    fn cleanup_orphaned_interest_indexes(&self) -> Result<usize> {
+        // In-memory store doesn't persist, so no orphans possible
+        Ok(0)
+    }
 }
 
 impl ListingsStoreBackend for SledListingsStore {
@@ -914,6 +1017,9 @@ impl ListingsStoreBackend for SledListingsStore {
     }
     fn list_all_matching_status(&self, status: ListingStatus) -> Result<Vec<Listing>> {
         SledListingsStore::list_all_matching_status(self, status)
+    }
+    fn cleanup_orphaned_interest_indexes(&self) -> Result<usize> {
+        SledListingsStore::cleanup_orphaned_interest_indexes(self)
     }
 }
 
@@ -1149,6 +1255,24 @@ impl ListingsManager {
         }
 
         Ok(expired_count)
+    }
+
+    /// Clean up orphaned interest index keys (Sled backend only).
+    ///
+    /// Orphaned index keys can occur if a process crashes between a successful
+    /// CAS (compare-and-swap) operation and the subsequent interest insert.
+    /// These orphaned keys would permanently block the affected user from
+    /// expressing interest.
+    ///
+    /// This is a maintenance operation that should be scheduled to run periodically
+    /// (e.g., hourly or daily) during off-peak hours.
+    ///
+    /// # Returns
+    ///
+    /// The number of orphaned index keys that were cleaned up.
+    /// Returns 0 for in-memory backends (no persistence = no orphans).
+    pub fn cleanup_orphaned_interest_indexes(&self) -> Result<usize> {
+        self.store.cleanup_orphaned_interest_indexes()
     }
 }
 
