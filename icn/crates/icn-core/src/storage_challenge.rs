@@ -59,7 +59,12 @@ struct PendingChallenge {
     /// The challenge that was sent
     challenge: StorageChallenge,
 
-    /// When the challenge was sent
+    /// When the challenge was sent (local monotonic clock)
+    ///
+    /// Note: Timeout detection uses `challenge.expires_at` (wall-clock) rather than
+    /// `sent_at.elapsed()` because wall-clock expiry is more robust across process
+    /// restarts and clock adjustments. This field is kept for debugging/logging.
+    #[allow(dead_code)]
     sent_at: Instant,
 
     /// Expected Merkle root (for verification)
@@ -669,17 +674,28 @@ impl ChallengeScheduler {
     }
 
     /// Process expired challenges and record violations
+    ///
+    /// Uses the challenge's absolute `expires_at` timestamp for timeout detection.
+    /// This is more robust than Instant-based timing because:
+    /// 1. It works correctly across process restarts (persisted challenges)
+    /// 2. It's immune to monotonic clock discontinuities
+    /// 3. It matches the challenge's documented expiry semantics
     async fn process_expired_challenges(&mut self) -> Result<()> {
-        let timeout = Duration::from_secs(self.config.timeout_secs);
-        let now = Instant::now();
+        let now_secs = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
 
-        // Find expired challenges
+        // Find expired challenges using absolute wall-clock expiry
         let expired: Vec<[u8; 32]> = self
             .pending
             .iter()
-            .filter(|(_, p)| now.duration_since(p.sent_at) > timeout)
+            .filter(|(_, p)| now_secs >= p.challenge.expires_at)
             .map(|(id, _)| *id)
             .collect();
+
+        // Use Instant for failure tracking (doesn't need to survive restarts)
+        let now = Instant::now();
 
         for challenge_id in expired {
             if let Some(pending) = self.pending.remove(&challenge_id) {
