@@ -988,7 +988,12 @@ impl Supervisor {
             info!("Parameter scheduler task spawned (interval: 10 seconds)");
 
             // Spawn storage maintenance task (Issue #702)
+            // Currently maintains the ledger store (highest write volume). Future: could extend
+            // to maintain multiple stores (trust, gossip, identity) via Vec<Arc<SledStore>>.
             if self.config.supervisor.storage_maintenance.enabled {
+                // Note: Handle not retained - maintenance runs purely on timer with graceful
+                // shutdown via broadcast channel. Future: retain handle for on-demand trigger
+                // via gRPC endpoint (e.g., `icnctl storage compact`).
                 let _maintenance_handle = background_tasks::spawn_storage_maintenance_task(
                     self.config.supervisor.storage_maintenance.clone(),
                     ledger_store.clone(),
