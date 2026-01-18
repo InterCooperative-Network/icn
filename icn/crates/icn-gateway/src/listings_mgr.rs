@@ -631,6 +631,25 @@ impl InMemoryListingsStore {
             .cloned()
             .collect())
     }
+
+    /// Delete all interests for a listing.
+    ///
+    /// Used when expiring or cancelling listings to prevent stale data accumulation
+    /// and privacy leaks from retained buyer/interest information.
+    ///
+    /// Returns the number of interests deleted.
+    pub fn delete_interests(&self, listing_id: &ListingId) -> Result<usize> {
+        let mut interests = self
+            .interests
+            .write()
+            .map_err(|_| anyhow::anyhow!("Interests storage lock poisoned"))?;
+
+        if let Some(removed) = interests.remove(listing_id) {
+            Ok(removed.len())
+        } else {
+            Ok(0)
+        }
+    }
 }
 
 /// Sled key version for schema migration support.
@@ -958,6 +977,17 @@ impl SledListingsStore {
     /// Unlike `list()`, this method does NOT filter out expired Active listings.
     /// This is intentional: when expiring stale listings, we need to find Active
     /// listings that have expired, which `list()` would hide.
+    ///
+    /// # Memory Usage
+    ///
+    /// Results are collected in memory before returning. For n active listings,
+    /// memory usage is approximately O(n × avg_listing_size). Typical listing
+    /// is ~500 bytes, so 10K listings ≈ 5MB memory.
+    ///
+    /// For deployments exceeding 50K listings, consider:
+    /// 1. Adding a cursor-based iterator API to process results in batches
+    /// 2. Adding a secondary `status:listing_id` index for O(1) status lookups
+    /// 3. Partitioning by created_at date range for incremental processing
     pub fn list_all_matching_status(&self, status: ListingStatus) -> Result<Vec<Listing>> {
         let prefix = Self::listing_prefix();
         let mut result = Vec::new();
@@ -972,6 +1002,28 @@ impl SledListingsStore {
         }
 
         Ok(result)
+    }
+
+    /// Delete all interests for a listing.
+    ///
+    /// Used when expiring or cancelling listings to prevent stale data accumulation
+    /// and privacy leaks from retained buyer/interest information.
+    ///
+    /// Returns the number of interests deleted.
+    pub fn delete_interests(&self, listing_id: &ListingId) -> Result<usize> {
+        let prefix = Self::interest_prefix(listing_id);
+        let mut deleted_count = 0;
+
+        for item in self.db.scan_prefix(prefix.as_bytes()) {
+            let (key, _) = item?;
+            self.db.remove(key)?;
+            deleted_count += 1;
+        }
+
+        // Also clean up interest index keys to prevent orphaned indexes
+        self.delete_interest_indexes(listing_id)?;
+
+        Ok(deleted_count)
     }
 }
 
@@ -1000,6 +1052,11 @@ pub trait ListingsStoreBackend: Send + Sync {
     fn cleanup_orphaned_interest_indexes(&self) -> Result<usize> {
         Ok(0)
     }
+
+    /// Delete all interests for a listing.
+    /// Used when expiring or cancelling listings to prevent stale data accumulation.
+    /// Returns the number of interests deleted.
+    fn delete_interests(&self, listing_id: &ListingId) -> Result<usize>;
 }
 
 impl ListingsStoreBackend for InMemoryListingsStore {
@@ -1035,6 +1092,9 @@ impl ListingsStoreBackend for InMemoryListingsStore {
         // In-memory store doesn't persist, so no orphans possible
         Ok(0)
     }
+    fn delete_interests(&self, listing_id: &ListingId) -> Result<usize> {
+        InMemoryListingsStore::delete_interests(self, listing_id)
+    }
 }
 
 impl ListingsStoreBackend for SledListingsStore {
@@ -1068,6 +1128,9 @@ impl ListingsStoreBackend for SledListingsStore {
     }
     fn cleanup_orphaned_interest_indexes(&self) -> Result<usize> {
         SledListingsStore::cleanup_orphaned_interest_indexes(self)
+    }
+    fn delete_interests(&self, listing_id: &ListingId) -> Result<usize> {
+        SledListingsStore::delete_interests(self, listing_id)
     }
 }
 
@@ -1332,8 +1395,23 @@ impl ListingsManager {
         let all_active = self.store.list_all_matching_status(ListingStatus::Active)?;
 
         let mut expired_count = 0;
+        let mut interests_deleted = 0;
         for mut listing in all_active {
             if listing.is_expired(now) {
+                // Delete associated interests first to prevent stale data accumulation
+                // and privacy leaks from retained buyer information
+                match self.store.delete_interests(&listing.id) {
+                    Ok(count) => interests_deleted += count,
+                    Err(e) => {
+                        warn!(
+                            listing_id = %listing.id,
+                            error = %e,
+                            "Failed to delete interests for expired listing"
+                        );
+                        // Continue expiring the listing even if interest cleanup fails
+                    }
+                }
+
                 listing.status = ListingStatus::Expired;
                 listing.updated_at = now;
                 self.store.save(&listing)?;
@@ -1343,7 +1421,11 @@ impl ListingsManager {
         }
 
         if expired_count > 0 {
-            tracing::info!(count = expired_count, "Expired stale listings");
+            tracing::info!(
+                count = expired_count,
+                interests_deleted = interests_deleted,
+                "Expired stale listings"
+            );
         }
 
         Ok(expired_count)

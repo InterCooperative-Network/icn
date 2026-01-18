@@ -103,10 +103,26 @@ const MAX_EXPIRY_DURATION_SECS: u64 = 365 * 24 * 60 * 60;
 // ============================================================================
 
 /// Validate a photo URL for security
-/// - Only allows https:// and ipfs:// schemes
-/// - Blocks private/internal IPs (SSRF protection)
+/// - Only allows https:// and ipfs:// schemes (checked FIRST for SSRF protection)
+/// - Blocks private/internal IPs
 /// - Validates URL format
+///
+/// # Security Note
+///
+/// Scheme validation is performed FIRST via string prefix check, before any
+/// URL parsing or length processing. This ensures malicious schemes like
+/// `file://`, `data://`, `ftp://`, `gopher://` are rejected immediately,
+/// preventing SSRF attacks regardless of URL length or format.
 fn validate_photo_url(url_str: &str, index: usize) -> Result<()> {
+    // SECURITY: Check allowed scheme prefix FIRST, before any other processing.
+    // This prevents SSRF attacks via file://, data://, ftp://, gopher://, etc.
+    if !url_str.starts_with("https://") && !url_str.starts_with("ipfs://") {
+        return Err(GatewayError::BadRequest(format!(
+            "Photo URL {} must use https:// or ipfs:// scheme",
+            index + 1
+        )));
+    }
+
     // IPFS URLs are handled specially (they don't have a host)
     if url_str.starts_with("ipfs://") {
         // Basic IPFS validation: must have a CID after the scheme
@@ -120,18 +136,10 @@ fn validate_photo_url(url_str: &str, index: usize) -> Result<()> {
         return Ok(());
     }
 
-    // Parse as URL
+    // Parse as URL (already verified scheme is https://)
     let url = Url::parse(url_str).map_err(|e| {
         GatewayError::BadRequest(format!("Photo URL {} is not a valid URL: {}", index + 1, e))
     })?;
-
-    // Only allow https scheme
-    if url.scheme() != "https" {
-        return Err(GatewayError::BadRequest(format!(
-            "Photo URL {} must use https:// or ipfs:// scheme",
-            index + 1
-        )));
-    }
 
     // Get the host
     let host = url
@@ -594,6 +602,17 @@ pub async fn create_listing(
 }
 
 /// GET /listings - List/search listings
+///
+/// # DoS Protection
+///
+/// Pagination parameters are automatically capped to prevent resource exhaustion:
+/// - `limit`: Capped at MAX_PAGE_SIZE (100) regardless of requested value
+/// - `offset`: Capped at MAX_OFFSET (100,000) regardless of requested value
+///
+/// Large offset values (> MAX_OFFSET) are logged as potential DoS attempts.
+/// Authentication-based rate limiting is provided by the middleware layer.
+/// Consider adding IP-based rate limiting if public (unauthenticated) list
+/// access is enabled in the future.
 #[get("")]
 pub async fn list_listings(
     http_req: HttpRequest,
@@ -771,16 +790,23 @@ pub async fn delete_listing(
 
     let mgr = listings_mgr.write().await;
 
-    // Get the existing listing to check ownership
-    let listing = mgr
-        .get_listing(&listing_id)
-        .map_err(|e| GatewayError::InternalError(format!("Failed to get listing: {e}")))?
-        .ok_or_else(|| GatewayError::NotFound(format!("Listing not found: {listing_id}")))?;
+    // Get the existing listing and check ownership atomically.
+    // SECURITY: Return the same error for both "not found" and "not owner" to prevent
+    // enumeration attacks via timing side-channel. An attacker cannot determine if a
+    // listing ID exists based on error response.
+    let listing = match mgr.get_listing(&listing_id) {
+        Ok(Some(l)) => l,
+        Ok(None) | Err(_) => {
+            return Err(GatewayError::NotFound(
+                "Listing not found or you don't have permission to delete it".to_string(),
+            ));
+        }
+    };
 
-    // Check ownership
+    // Check ownership - return same error as not found to prevent enumeration
     if listing.offered_by != caller_did {
-        return Err(GatewayError::Forbidden(
-            "Only the listing owner can delete it".to_string(),
+        return Err(GatewayError::NotFound(
+            "Listing not found or you don't have permission to delete it".to_string(),
         ));
     }
 
@@ -822,16 +848,23 @@ pub async fn update_listing_status(
 
     let mgr = listings_mgr.write().await;
 
-    // Get the existing listing to check ownership
-    let listing = mgr
-        .get_listing(&listing_id)
-        .map_err(|e| GatewayError::InternalError(format!("Failed to get listing: {e}")))?
-        .ok_or_else(|| GatewayError::NotFound(format!("Listing not found: {listing_id}")))?;
+    // Get the existing listing and check ownership atomically.
+    // SECURITY: Return the same error for both "not found" and "not owner" to prevent
+    // enumeration attacks via timing side-channel. An attacker cannot determine if a
+    // listing ID exists based on error response.
+    let listing = match mgr.get_listing(&listing_id) {
+        Ok(Some(l)) => l,
+        Ok(None) | Err(_) => {
+            return Err(GatewayError::NotFound(
+                "Listing not found or you don't have permission to update it".to_string(),
+            ));
+        }
+    };
 
-    // Check ownership
+    // Check ownership - return same error as not found to prevent enumeration
     if listing.offered_by != caller_did {
-        return Err(GatewayError::Forbidden(
-            "Only the listing owner can update its status".to_string(),
+        return Err(GatewayError::NotFound(
+            "Listing not found or you don't have permission to update it".to_string(),
         ));
     }
 
