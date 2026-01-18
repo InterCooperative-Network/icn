@@ -713,3 +713,242 @@ async fn test_interest_persists_across_manager_instances() {
             .contains("already expressed interest"));
     }
 }
+
+// ============================================================================
+// Expired Listing Tests
+// ============================================================================
+
+#[tokio::test]
+async fn test_expired_listing_filtering() {
+    // Test that expired listings are filtered out from list queries
+    let db = sled::Config::new().temporary(true).open().unwrap();
+    let mgr = ListingsManager::with_sled(Arc::new(db));
+
+    let owner = test_did(1);
+    let now = icn_time::current_timestamp_secs();
+
+    // Create a listing that expires in the past (already expired)
+    let expired_listing = mgr
+        .create_listing(
+            ListingType::Offer,
+            "Expired Item".to_string(),
+            "This item has expired".to_string(),
+            ListingCategory::Equipment,
+            owner.clone(),
+            "test-coop".to_string(),
+            "Credits".to_string(),
+            vec![],
+            ListingVisibility::Federation,
+            Some(now.saturating_sub(3600)), // Expired 1 hour ago
+            vec![],
+        )
+        .expect("should create listing");
+
+    // Create a listing that hasn't expired
+    let _active_listing = mgr
+        .create_listing(
+            ListingType::Offer,
+            "Active Item".to_string(),
+            "This item is still active".to_string(),
+            ListingCategory::Equipment,
+            owner.clone(),
+            "test-coop".to_string(),
+            "Credits".to_string(),
+            vec![],
+            ListingVisibility::Federation,
+            Some(now + 86400), // Expires in 1 day
+            vec![],
+        )
+        .expect("should create listing");
+
+    // Create a listing with no expiry
+    let _no_expiry_listing = mgr
+        .create_listing(
+            ListingType::Offer,
+            "No Expiry Item".to_string(),
+            "This item never expires".to_string(),
+            ListingCategory::Equipment,
+            owner,
+            "test-coop".to_string(),
+            "Credits".to_string(),
+            vec![],
+            ListingVisibility::Federation,
+            None, // No expiry
+            vec![],
+        )
+        .expect("should create listing");
+
+    // Default filter should exclude expired listings
+    let filter = ListingFilter::default();
+    let results = mgr.list_listings(&filter).unwrap();
+
+    // Should only see the active and no-expiry listings
+    assert_eq!(results.len(), 2);
+    let titles: Vec<_> = results.iter().map(|l| l.title.as_str()).collect();
+    assert!(titles.contains(&"Active Item"));
+    assert!(titles.contains(&"No Expiry Item"));
+    assert!(!titles.contains(&"Expired Item"));
+
+    // But we can still get the expired listing by ID directly
+    let expired = mgr.get_listing(&expired_listing.id).unwrap();
+    assert!(expired.is_some());
+    assert_eq!(expired.unwrap().title, "Expired Item");
+}
+
+#[tokio::test]
+async fn test_expire_stale_listings() {
+    // Test the background expiry mechanism
+    let db = sled::Config::new().temporary(true).open().unwrap();
+    let mgr = ListingsManager::with_sled(Arc::new(db));
+
+    let owner = test_did(1);
+    let now = icn_time::current_timestamp_secs();
+
+    // Create some listings with different expiry states
+    let _ = mgr
+        .create_listing(
+            ListingType::Offer,
+            "Expired 1".to_string(),
+            "Already expired".to_string(),
+            ListingCategory::Equipment,
+            owner.clone(),
+            "test-coop".to_string(),
+            "Credits".to_string(),
+            vec![],
+            ListingVisibility::Federation,
+            Some(now.saturating_sub(3600)),
+            vec![],
+        )
+        .expect("should create listing");
+
+    let _ = mgr
+        .create_listing(
+            ListingType::Offer,
+            "Expired 2".to_string(),
+            "Also expired".to_string(),
+            ListingCategory::Equipment,
+            owner.clone(),
+            "test-coop".to_string(),
+            "Credits".to_string(),
+            vec![],
+            ListingVisibility::Federation,
+            Some(now.saturating_sub(7200)),
+            vec![],
+        )
+        .expect("should create listing");
+
+    let _ = mgr
+        .create_listing(
+            ListingType::Offer,
+            "Still Active".to_string(),
+            "Not expired yet".to_string(),
+            ListingCategory::Equipment,
+            owner,
+            "test-coop".to_string(),
+            "Credits".to_string(),
+            vec![],
+            ListingVisibility::Federation,
+            Some(now + 86400),
+            vec![],
+        )
+        .expect("should create listing");
+
+    // Run the expiry task
+    let expired_count = mgr.expire_stale_listings().unwrap();
+    assert_eq!(expired_count, 2, "Should have expired 2 listings");
+
+    // Running again should find no more to expire
+    let expired_count = mgr.expire_stale_listings().unwrap();
+    assert_eq!(expired_count, 0, "Should find no more expired listings");
+}
+
+// ============================================================================
+// Sorting Tests
+// ============================================================================
+
+#[tokio::test]
+async fn test_listing_sorting_options() {
+    use icn_gateway::listings_mgr::ListingSortBy;
+
+    let db = sled::Config::new().temporary(true).open().unwrap();
+    let mgr = ListingsManager::with_sled(Arc::new(db));
+
+    let owner = test_did(1);
+
+    // Create listings - since timestamps are in seconds, we verify sorting works
+    // by checking category/type sorting (which doesn't depend on timestamp differences)
+    let _ = mgr
+        .create_listing(
+            ListingType::Want,
+            "Want Item A".to_string(),
+            "Description".to_string(),
+            ListingCategory::Materials,
+            owner.clone(),
+            "test-coop".to_string(),
+            "Credits".to_string(),
+            vec![],
+            ListingVisibility::Federation,
+            None,
+            vec![],
+        )
+        .unwrap();
+
+    let _ = mgr
+        .create_listing(
+            ListingType::Offer,
+            "Offer Item B".to_string(),
+            "Description".to_string(),
+            ListingCategory::Equipment,
+            owner.clone(),
+            "test-coop".to_string(),
+            "Credits".to_string(),
+            vec![],
+            ListingVisibility::Federation,
+            None,
+            vec![],
+        )
+        .unwrap();
+
+    let _ = mgr
+        .create_listing(
+            ListingType::Offer,
+            "Offer Item C".to_string(),
+            "Description".to_string(),
+            ListingCategory::Services,
+            owner,
+            "test-coop".to_string(),
+            "Credits".to_string(),
+            vec![],
+            ListingVisibility::Federation,
+            None,
+            vec![],
+        )
+        .unwrap();
+
+    // Test default sorting (CreatedAt descending) - with same-second timestamps,
+    // order depends on internal iteration order, so just verify we get all 3
+    let filter = ListingFilter::default();
+    let results = mgr.list_listings(&filter).unwrap();
+    assert_eq!(results.len(), 3);
+
+    // Test sorting by category
+    let filter = ListingFilter {
+        sort_by: ListingSortBy::Category,
+        ..Default::default()
+    };
+    let results = mgr.list_listings(&filter).unwrap();
+    // Equipment < Materials < Services (alphabetically)
+    assert_eq!(results[0].category, ListingCategory::Equipment);
+    assert_eq!(results[1].category, ListingCategory::Materials);
+    assert_eq!(results[2].category, ListingCategory::Services);
+
+    // Test sorting by listing type (Offer before Want)
+    let filter = ListingFilter {
+        sort_by: ListingSortBy::ListingType,
+        ..Default::default()
+    };
+    let results = mgr.list_listings(&filter).unwrap();
+    assert_eq!(results[0].listing_type, ListingType::Offer);
+    assert_eq!(results[1].listing_type, ListingType::Offer);
+    assert_eq!(results[2].listing_type, ListingType::Want);
+}

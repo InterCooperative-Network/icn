@@ -79,16 +79,23 @@ fn validate_photo_url(url_str: &str, index: usize) -> Result<()> {
         .host_str()
         .ok_or_else(|| GatewayError::BadRequest(format!("Photo URL {} has no host", index + 1)))?;
 
-    // Block localhost and common internal hostnames
+    // Block localhost, internal hostnames, and RFC 6761 reserved TLDs
     let host_lower = host.to_lowercase();
     if host_lower == "localhost"
         || host_lower == "127.0.0.1"
         || host_lower.ends_with(".local")
         || host_lower.ends_with(".internal")
         || host_lower.ends_with(".localhost")
+        // RFC 6761 reserved TLDs
+        || host_lower.ends_with(".test")
+        || host_lower.ends_with(".invalid")
+        || host_lower.ends_with(".example")
+        || host_lower == "example.com"
+        || host_lower == "example.net"
+        || host_lower == "example.org"
     {
         return Err(GatewayError::BadRequest(format!(
-            "Photo URL {} cannot reference internal/localhost addresses",
+            "Photo URL {} cannot reference internal/localhost/reserved addresses",
             index + 1
         )));
     }

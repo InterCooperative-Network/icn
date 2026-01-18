@@ -280,6 +280,66 @@ pub const MAX_PAGE_SIZE: usize = 100;
 /// Default page size
 pub const DEFAULT_PAGE_SIZE: usize = 20;
 
+/// Sorting options for listings
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum ListingSortBy {
+    /// Sort by creation time (default, newest first)
+    #[default]
+    CreatedAt,
+    /// Sort by status (Active > Matched > Completed > Cancelled > Expired)
+    Status,
+    /// Sort by category alphabetically
+    Category,
+    /// Sort by listing type (Offer before Want)
+    ListingType,
+}
+
+/// Helper function to sort listings based on the sort option
+fn sort_listings(listings: &mut [Listing], sort_by: ListingSortBy) {
+    match sort_by {
+        ListingSortBy::CreatedAt => {
+            // Newest first
+            listings.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        }
+        ListingSortBy::Status => {
+            // Active > Matched > Completed > Cancelled > Expired, then by created_at
+            listings.sort_by(|a, b| {
+                let status_order = |s: &ListingStatus| match s {
+                    ListingStatus::Active => 0,
+                    ListingStatus::Matched => 1,
+                    ListingStatus::Completed => 2,
+                    ListingStatus::Cancelled => 3,
+                    ListingStatus::Expired => 4,
+                };
+                status_order(&a.status)
+                    .cmp(&status_order(&b.status))
+                    .then_with(|| b.created_at.cmp(&a.created_at))
+            });
+        }
+        ListingSortBy::Category => {
+            // Alphabetically by category, then by created_at
+            listings.sort_by(|a, b| {
+                a.category
+                    .as_str()
+                    .cmp(b.category.as_str())
+                    .then_with(|| b.created_at.cmp(&a.created_at))
+            });
+        }
+        ListingSortBy::ListingType => {
+            // Offer before Want, then by created_at
+            listings.sort_by(|a, b| {
+                let type_order = |t: &ListingType| match t {
+                    ListingType::Offer => 0,
+                    ListingType::Want => 1,
+                };
+                type_order(&a.listing_type)
+                    .cmp(&type_order(&b.listing_type))
+                    .then_with(|| b.created_at.cmp(&a.created_at))
+            });
+        }
+    }
+}
+
 /// Filter criteria for listings
 #[derive(Debug, Clone, Default)]
 pub struct ListingFilter {
@@ -301,10 +361,18 @@ pub struct ListingFilter {
     pub limit: Option<usize>,
     /// Number of results to skip (for pagination)
     pub offset: Option<usize>,
+    /// Sort order for results
+    pub sort_by: ListingSortBy,
 }
 
 impl ListingFilter {
     pub fn matches(&self, listing: &Listing) -> bool {
+        self.matches_at(listing, icn_time::current_timestamp_secs())
+    }
+
+    /// Check if a listing matches at a specific timestamp.
+    /// Useful for testing with controlled time.
+    pub fn matches_at(&self, listing: &Listing, now: u64) -> bool {
         if let Some(ref lt) = self.listing_type {
             if listing.listing_type != *lt {
                 return false;
@@ -338,11 +406,24 @@ impl ListingFilter {
         if self.active_only && !listing.is_active() {
             return false;
         }
+        // Filter out expired active listings - they appear stale to users
+        if listing.status == ListingStatus::Active && listing.is_expired(now) {
+            return false;
+        }
         true
     }
 }
 
-/// In-memory listings store
+/// In-memory listings store for testing purposes only.
+///
+/// # Warning
+/// This store is NOT suitable for production use. It lacks:
+/// - Persistence (data is lost on restart)
+/// - True atomic compare-and-swap operations (uses RwLock instead)
+///
+/// For production, use [`SledListingsStore`] which provides:
+/// - Persistent storage with versioned keys for migrations
+/// - True atomic CAS operations for duplicate prevention
 #[derive(Default)]
 pub struct InMemoryListingsStore {
     listings: RwLock<HashMap<ListingId, Listing>>,
@@ -386,8 +467,8 @@ impl InMemoryListingsStore {
             .cloned()
             .collect();
 
-        // Sort by created_at descending (newest first)
-        result.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        // Apply sorting based on filter
+        sort_listings(&mut result, filter.sort_by);
 
         // Apply pagination
         let offset = filter.offset.unwrap_or(0);
@@ -456,6 +537,21 @@ impl InMemoryListingsStore {
 
         existing.push(interest.clone());
         Ok(true)
+    }
+
+    /// List all listings with a specific status (ignores pagination and expiry filtering).
+    /// Used for background tasks like expiring stale listings.
+    pub fn list_all_matching_status(&self, status: ListingStatus) -> Result<Vec<Listing>> {
+        let listings = self
+            .listings
+            .read()
+            .map_err(|_| anyhow::anyhow!("Listings storage lock poisoned"))?;
+
+        Ok(listings
+            .values()
+            .filter(|l| l.status == status)
+            .cloned()
+            .collect())
     }
 }
 
@@ -546,8 +642,8 @@ impl SledListingsStore {
             }
         }
 
-        // Sort by created_at descending (newest first)
-        result.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        // Apply sorting based on filter
+        sort_listings(&mut result, filter.sort_by);
 
         // Apply pagination
         let offset = filter.offset.unwrap_or(0);
@@ -643,6 +739,24 @@ impl SledListingsStore {
         }
         Ok(())
     }
+
+    /// List all listings with a specific status (ignores pagination and expiry filtering).
+    /// Used for background tasks like expiring stale listings.
+    pub fn list_all_matching_status(&self, status: ListingStatus) -> Result<Vec<Listing>> {
+        let prefix = Self::listing_prefix();
+        let mut result = Vec::new();
+
+        for item in self.db.scan_prefix(prefix.as_bytes()) {
+            let (_, value) = item?;
+            if let Ok(listing) = icn_encoding::decode_versioned::<Listing>(&value) {
+                if listing.status == status {
+                    result.push(listing);
+                }
+            }
+        }
+
+        Ok(result)
+    }
 }
 
 /// Listings store backend trait
@@ -660,6 +774,9 @@ pub trait ListingsStoreBackend: Send + Sync {
         interest: &ListingInterest,
         from_did: &Did,
     ) -> Result<bool>;
+    /// List all listings with a specific status (ignores pagination and expiry filtering).
+    /// Used for background tasks like expiring stale listings.
+    fn list_all_matching_status(&self, status: ListingStatus) -> Result<Vec<Listing>>;
 }
 
 impl ListingsStoreBackend for InMemoryListingsStore {
@@ -688,6 +805,9 @@ impl ListingsStoreBackend for InMemoryListingsStore {
     ) -> Result<bool> {
         InMemoryListingsStore::add_interest_if_not_duplicate(self, interest, from_did)
     }
+    fn list_all_matching_status(&self, status: ListingStatus) -> Result<Vec<Listing>> {
+        InMemoryListingsStore::list_all_matching_status(self, status)
+    }
 }
 
 impl ListingsStoreBackend for SledListingsStore {
@@ -715,6 +835,9 @@ impl ListingsStoreBackend for SledListingsStore {
         from_did: &Did,
     ) -> Result<bool> {
         SledListingsStore::add_interest_if_not_duplicate(self, interest, from_did)
+    }
+    fn list_all_matching_status(&self, status: ListingStatus) -> Result<Vec<Listing>> {
+        SledListingsStore::list_all_matching_status(self, status)
     }
 }
 
@@ -868,8 +991,8 @@ impl ListingsManager {
 
         let now = icn_time::current_timestamp_secs();
 
-        // Calculate time to match
-        let time_to_match = (now - listing.created_at) as f64;
+        // Calculate time to match (use saturating_sub to handle potential clock skew)
+        let time_to_match = now.saturating_sub(listing.created_at) as f64;
 
         listing.mark_matched(now);
         self.store.save(&listing)?;
@@ -889,8 +1012,8 @@ impl ListingsManager {
 
         let now = icn_time::current_timestamp_secs();
 
-        // Calculate time to complete
-        let time_to_complete = (now - listing.created_at) as f64;
+        // Calculate time to complete (use saturating_sub to handle potential clock skew)
+        let time_to_complete = now.saturating_sub(listing.created_at) as f64;
 
         listing.mark_completed(now);
         self.store.save(&listing)?;
@@ -922,6 +1045,34 @@ impl ListingsManager {
         icn_obs::metrics::exchange::listings_cancelled_inc();
 
         Ok(listing)
+    }
+
+    /// Expire all listings that have passed their expiry date.
+    /// Returns the number of listings that were marked as expired.
+    ///
+    /// This method is designed to be called periodically by a background task.
+    pub fn expire_stale_listings(&self) -> Result<usize> {
+        let now = icn_time::current_timestamp_secs();
+
+        // Get all active listings (without expiry filter so we can find the stale ones)
+        let all_active = self.store.list_all_matching_status(ListingStatus::Active)?;
+
+        let mut expired_count = 0;
+        for mut listing in all_active {
+            if listing.is_expired(now) {
+                listing.status = ListingStatus::Expired;
+                listing.updated_at = now;
+                self.store.save(&listing)?;
+                expired_count += 1;
+                icn_obs::metrics::exchange::listings_expired_inc();
+            }
+        }
+
+        if expired_count > 0 {
+            tracing::info!(count = expired_count, "Expired stale listings");
+        }
+
+        Ok(expired_count)
     }
 }
 
