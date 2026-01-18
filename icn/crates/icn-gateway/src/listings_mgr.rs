@@ -372,6 +372,8 @@ pub struct ListingFilter {
     pub tag: Option<String>,
     /// Filter by owner (for "my listings" queries)
     pub offered_by: Option<Did>,
+    /// Filter by visibility level
+    pub visibility: Option<ListingVisibility>,
     /// Only show active listings
     pub active_only: bool,
     /// Maximum number of results (for pagination).
@@ -418,6 +420,11 @@ impl ListingFilter {
         }
         if let Some(ref owner) = self.offered_by {
             if &listing.offered_by != owner {
+                return false;
+            }
+        }
+        if let Some(ref vis) = self.visibility {
+            if &listing.visibility != vis {
                 return false;
             }
         }

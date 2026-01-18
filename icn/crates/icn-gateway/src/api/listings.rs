@@ -527,8 +527,10 @@ fn build_listing_filter(params: &ListingFilterParams) -> Result<ListingFilter> {
                 .map_err(|e| GatewayError::BadRequest(format!("Invalid offered_by DID: {e}")))?,
         );
     }
-    // Note: visibility filter not currently in ListingFilter
-    // search filter not currently supported
+    if let Some(ref vis) = params.visibility {
+        filter.visibility = Some(parse_visibility(vis)?);
+    }
+    // Note: search filter not currently supported
 
     // Pagination parameters
     filter.limit = params.limit;
