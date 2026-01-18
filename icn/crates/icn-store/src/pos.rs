@@ -26,6 +26,12 @@ pub const DEFAULT_CHALLENGE_TIMEOUT_SECS: u64 = 30;
 /// Protocol version for storage challenges
 pub const CHALLENGE_PROTOCOL_VERSION: u8 = 2;
 
+/// Minimum supported protocol version
+pub const MIN_SUPPORTED_VERSION: u8 = 1;
+
+/// Maximum supported protocol version
+pub const MAX_SUPPORTED_VERSION: u8 = 2;
+
 /// Storage challenge combining byte range + Merkle proof verification
 ///
 /// # Protocol Versions
@@ -219,6 +225,22 @@ impl StorageChallenge {
     /// Validate challenge ID matches computed value
     pub fn validate_id(&self) -> bool {
         self.id == self.compute_id()
+    }
+
+    /// Validate that the protocol version is supported
+    ///
+    /// Returns an error if the version is outside the supported range.
+    /// This prevents silent mishandling of future protocol versions.
+    pub fn validate_version(&self) -> Result<()> {
+        if self.version < MIN_SUPPORTED_VERSION || self.version > MAX_SUPPORTED_VERSION {
+            anyhow::bail!(
+                "Unsupported challenge protocol version {}: supported range is {}-{}",
+                self.version,
+                MIN_SUPPORTED_VERSION,
+                MAX_SUPPORTED_VERSION
+            );
+        }
+        Ok(())
     }
 
     /// Sign this challenge with the challenger's keypair
@@ -417,6 +439,22 @@ impl StorageProof {
     /// Get the first merkle path bits (for single-proof compatibility)
     pub fn merkle_path_bits(&self) -> Option<&Vec<bool>> {
         self.merkle_proofs.first().map(|p| &p.path_bits)
+    }
+
+    /// Validate that the protocol version is supported
+    ///
+    /// Returns an error if the version is outside the supported range.
+    /// This prevents silent mishandling of future protocol versions.
+    pub fn validate_version(&self) -> Result<()> {
+        if self.version < MIN_SUPPORTED_VERSION || self.version > MAX_SUPPORTED_VERSION {
+            anyhow::bail!(
+                "Unsupported proof protocol version {}: supported range is {}-{}",
+                self.version,
+                MIN_SUPPORTED_VERSION,
+                MAX_SUPPORTED_VERSION
+            );
+        }
+        Ok(())
     }
 
     /// Get the signing payload (used for signature creation/verification)

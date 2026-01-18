@@ -3078,6 +3078,18 @@ pub mod storage_challenge {
     pub fn timeouts_inc() {
         counter!("icn_storage_challenge_timeouts_total").increment(1);
     }
+
+    /// Increment persistence failure counter
+    ///
+    /// Tracks failures to persist pending challenges for crash recovery.
+    /// High values may indicate storage issues.
+    pub fn persist_failures_inc(operation: &str) {
+        counter!(
+            "icn_storage_challenge_persist_failures_total",
+            "operation" => operation.to_string()
+        )
+        .increment(1);
+    }
 }
 
 /// Gateway API metrics

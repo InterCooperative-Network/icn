@@ -34,6 +34,17 @@ impl GossipActor {
             "Received storage challenge"
         );
 
+        // Validate protocol version (reject unsupported versions early)
+        if let Err(e) = challenge.validate_version() {
+            warn!(
+                challenge_id = %hex::encode(challenge.id),
+                version = challenge.version,
+                error = %e,
+                "Rejecting challenge with unsupported protocol version"
+            );
+            return Ok(());
+        }
+
         // Check if challenge is for us
         if challenge.target_peer != self.own_did.to_string() {
             debug!(

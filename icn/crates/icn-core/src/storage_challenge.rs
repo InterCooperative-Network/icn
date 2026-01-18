@@ -74,13 +74,15 @@ struct PendingChallenge {
 }
 
 /// Persisted pending challenge (serializable version)
+///
+/// Note: We use the challenge's built-in `expires_at` timestamp (absolute Unix time)
+/// to determine expiration. The `sent_at` field is reconstructed on load using the
+/// challenge's timestamps, which avoids clock-drift issues that would occur if we
+/// tried to persist monotonic `Instant` values as wall-clock time.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 struct PersistedPendingChallenge {
-    /// The challenge that was sent
+    /// The challenge that was sent (contains expires_at for deadline)
     challenge: StorageChallenge,
-
-    /// When the challenge was sent (Unix timestamp seconds)
-    sent_at_secs: u64,
 
     /// Expected Merkle root (for verification)
     expected_merkle_root: [u8; 32],
@@ -94,18 +96,11 @@ struct PersistedPendingChallenge {
 
 impl From<&PendingChallenge> for PersistedPendingChallenge {
     fn from(p: &PendingChallenge) -> Self {
-        // Convert Instant to Unix timestamp
-        let now = std::time::SystemTime::now();
-        let elapsed = p.sent_at.elapsed();
-        let sent_at = now
-            .checked_sub(elapsed)
-            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
-
+        // The challenge itself contains created_at and expires_at as absolute Unix timestamps,
+        // so we don't need to persist sent_at separately. On reload, we compute sent_at
+        // from the challenge's timestamps to avoid clock-drift issues.
         Self {
             challenge: p.challenge.clone(),
-            sent_at_secs: sent_at,
             expected_merkle_root: p.expected_merkle_root,
             expected_byte_hash: p.expected_byte_hash,
             failure_count: p.failure_count,
@@ -115,24 +110,45 @@ impl From<&PendingChallenge> for PersistedPendingChallenge {
 
 impl PersistedPendingChallenge {
     /// Convert back to in-memory PendingChallenge
-    fn into_pending(self) -> PendingChallenge {
-        // Convert Unix timestamp back to Instant (approximate)
+    ///
+    /// Computes a synthetic `sent_at` using the challenge's absolute timestamps,
+    /// which is correct regardless of wall-clock changes between persist and load.
+    fn into_pending(self) -> Option<PendingChallenge> {
+        // Use the challenge's absolute timestamps to compute elapsed time
         let now_secs = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_secs())
             .unwrap_or(0);
-        let elapsed_secs = now_secs.saturating_sub(self.sent_at_secs);
+
+        // If challenge is already expired, return None
+        if now_secs >= self.challenge.expires_at {
+            return None;
+        }
+
+        // Compute original timeout from challenge timestamps
+        let original_timeout_secs = self
+            .challenge
+            .expires_at
+            .saturating_sub(self.challenge.created_at);
+
+        // Compute how much time has passed since challenge was created
+        let elapsed_secs = now_secs.saturating_sub(self.challenge.created_at);
+
+        // Cap elapsed to original timeout (handles clock adjustments gracefully)
+        let elapsed_secs = elapsed_secs.min(original_timeout_secs);
+
+        // Create synthetic sent_at: Instant::now() - elapsed
         let sent_at = Instant::now()
             .checked_sub(Duration::from_secs(elapsed_secs))
             .unwrap_or_else(Instant::now);
 
-        PendingChallenge {
+        Some(PendingChallenge {
             challenge: self.challenge,
             sent_at,
             expected_merkle_root: self.expected_merkle_root,
             expected_byte_hash: self.expected_byte_hash,
             failure_count: self.failure_count,
-        }
+        })
     }
 }
 
@@ -169,10 +185,18 @@ pub struct ChallengeScheduler {
 
     /// Optional callback for triggering re-replication when a replica becomes unhealthy
     re_replication_callback: Option<ReReplicationCallback>,
+
+    /// Cached trust scores: peer_did -> (score, last_updated)
+    /// Avoids expensive trust graph computations on every challenge decision.
+    trust_score_cache: HashMap<String, (f64, Instant)>,
 }
 
 /// Maximum age for failure count entries before cleanup (24 hours)
 const FAILURE_COUNT_MAX_AGE_SECS: u64 = 86400;
+
+/// Trust score cache TTL (5 minutes)
+/// Prevents expensive trust graph recomputation on every challenge decision.
+const TRUST_SCORE_CACHE_TTL_SECS: u64 = 300;
 
 impl ChallengeScheduler {
     /// Create a new ChallengeScheduler
@@ -196,6 +220,7 @@ impl ChallengeScheduler {
             pending: HashMap::new(),
             failure_counts: HashMap::new(),
             re_replication_callback: None,
+            trust_score_cache: HashMap::new(),
         }
     }
 
@@ -220,6 +245,7 @@ impl ChallengeScheduler {
                         hex::encode(&challenge_id[..8]),
                         e
                     );
+                    icn_obs::metrics::storage_challenge::persist_failures_inc("write");
                 }
             }
             Err(e) => {
@@ -228,6 +254,7 @@ impl ChallengeScheduler {
                     hex::encode(&challenge_id[..8]),
                     e
                 );
+                icn_obs::metrics::storage_challenge::persist_failures_inc("serialize");
             }
         }
     }
@@ -253,17 +280,32 @@ impl ChallengeScheduler {
     /// - Trust 0.0 (no trust): base_probability * 2.0
     ///
     /// Returns the adjusted probability, capped at 1.0.
-    async fn trust_adjusted_probability(&self, peer_did: &str) -> f64 {
+    async fn trust_adjusted_probability(&mut self, peer_did: &str) -> f64 {
         let base = self.config.challenge_probability;
 
-        // Try to get trust score for the peer
-        let trust_score = if let Ok(did) = Did::from_str(peer_did) {
-            let trust_graph = self.trust_graph.read().await;
-            // Compute trust score for this peer
-            trust_graph.compute_trust_score(&did).unwrap_or(0.0)
-        } else {
-            0.0 // Unknown peer, treat as untrusted
-        };
+        // Check cache first (TTL-based caching to avoid expensive trust computations)
+        let now = Instant::now();
+        let cache_ttl = Duration::from_secs(TRUST_SCORE_CACHE_TTL_SECS);
+
+        let trust_score =
+            if let Some((cached_score, cached_at)) = self.trust_score_cache.get(peer_did) {
+                if now.duration_since(*cached_at) < cache_ttl {
+                    // Cache hit - use cached score
+                    *cached_score
+                } else {
+                    // Cache expired - recompute
+                    let score = self.compute_trust_score(peer_did).await;
+                    self.trust_score_cache
+                        .insert(peer_did.to_string(), (score, now));
+                    score
+                }
+            } else {
+                // Cache miss - compute and cache
+                let score = self.compute_trust_score(peer_did).await;
+                self.trust_score_cache
+                    .insert(peer_did.to_string(), (score, now));
+                score
+            };
 
         // Scale probability: lower trust = higher probability
         // Formula: base * (1 + (1 - trust_score))
@@ -275,6 +317,16 @@ impl ChallengeScheduler {
 
         // Cap at 1.0 to ensure valid probability
         adjusted.min(1.0)
+    }
+
+    /// Compute trust score for a peer (expensive operation - use caching)
+    async fn compute_trust_score(&self, peer_did: &str) -> f64 {
+        if let Ok(did) = Did::from_str(peer_did) {
+            let trust_graph = self.trust_graph.read().await;
+            trust_graph.compute_trust_score(&did).unwrap_or(0.0)
+        } else {
+            0.0 // Unknown peer, treat as untrusted
+        }
     }
 
     /// Load all persisted pending challenges from the store
@@ -297,19 +349,21 @@ impl ChallengeScheduler {
 
             match serde_json::from_slice::<PersistedPendingChallenge>(&value) {
                 Ok(persisted) => {
-                    // Skip if challenge has already expired
-                    if persisted.challenge.is_expired() {
-                        debug!(
-                            "Removing expired persisted challenge {}",
-                            hex::encode(&challenge_id[..8])
-                        );
-                        self.remove_persisted_challenge(&challenge_id);
-                        continue;
+                    // Convert to in-memory format (returns None if expired)
+                    match persisted.into_pending() {
+                        Some(pending) => {
+                            self.pending.insert(challenge_id, pending);
+                            loaded += 1;
+                        }
+                        None => {
+                            // Challenge expired during downtime
+                            debug!(
+                                "Removing expired persisted challenge {}",
+                                hex::encode(&challenge_id[..8])
+                            );
+                            self.remove_persisted_challenge(&challenge_id);
+                        }
                     }
-
-                    let pending = persisted.into_pending();
-                    self.pending.insert(challenge_id, pending);
-                    loaded += 1;
                 }
                 Err(e) => {
                     warn!(
@@ -533,16 +587,23 @@ impl ChallengeScheduler {
         // Generate random chunk indices (v2 multi-block challenges)
         // Uses rand::seq::index::sample for O(k) time complexity where k = blocks_to_challenge
         let num_chunks = tree.num_chunks();
+        if num_chunks == 0 {
+            // Edge case: empty or invalid content tree - cannot challenge
+            debug!(
+                "Cannot challenge {} - content has no chunks",
+                hex::encode(content_hash)
+            );
+            return Ok(());
+        }
+
         let blocks_to_challenge = self.config.blocks_per_challenge.min(num_chunks);
-        let chunk_indices: Vec<u32> = if num_chunks > 0 && blocks_to_challenge > 0 {
+        let chunk_indices: Vec<u32> = {
             use rand::seq::index::sample;
             let mut rng = rand::thread_rng();
             sample(&mut rng, num_chunks as usize, blocks_to_challenge as usize)
                 .into_iter()
                 .map(|i| i as u32)
                 .collect()
-        } else {
-            vec![0]
         };
 
         // Compute expected byte hash
@@ -684,6 +745,15 @@ impl ChallengeScheduler {
 
     /// Handle a received storage proof (called from gossip handler)
     pub async fn handle_proof(&mut self, proof: icn_store::StorageProof) -> Result<()> {
+        // Validate proof protocol version (reject unsupported versions early)
+        if let Err(e) = proof.validate_version() {
+            warn!(
+                "Rejecting proof with unsupported version {}: {}",
+                proof.version, e
+            );
+            return Err(e);
+        }
+
         // Find the pending challenge
         let pending = match self.pending.remove(&proof.challenge_id) {
             Some(p) => {
