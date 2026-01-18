@@ -772,10 +772,7 @@ impl ListingsManager {
         self.store.save(&listing)?;
 
         // Emit metrics
-        icn_obs::metrics::exchange::listings_created_inc(
-            listing_type.as_str(),
-            category.as_str(),
-        );
+        icn_obs::metrics::exchange::listings_created_inc(listing_type.as_str(), category.as_str());
 
         Ok(listing)
     }

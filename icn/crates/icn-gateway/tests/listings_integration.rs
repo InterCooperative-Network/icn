@@ -81,7 +81,10 @@ async fn test_listing_interest_lifecycle() {
     let interests = mgr.get_interests(&listing.id).unwrap();
     assert_eq!(interests.len(), 1);
     assert_eq!(interests[0].from_did, user_b);
-    assert_eq!(interests[0].offer, Some("20 hours tech support".to_string()));
+    assert_eq!(
+        interests[0].offer,
+        Some("20 hours tech support".to_string())
+    );
 
     // Step 4: User A marks as matched
     let matched_listing = mgr.mark_matched(&listing.id).unwrap();
@@ -380,9 +383,7 @@ async fn test_listing_pagination() {
     }
 
     // Default page size is 20
-    let page1 = mgr
-        .list_listings(&ListingFilter::default())
-        .unwrap();
+    let page1 = mgr.list_listings(&ListingFilter::default()).unwrap();
     assert_eq!(page1.len(), 20);
 
     // Get second page
