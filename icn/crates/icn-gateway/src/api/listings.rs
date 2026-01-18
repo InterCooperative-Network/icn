@@ -47,6 +47,27 @@ fn get_client_ip(req: &HttpRequest) -> String {
         .unwrap_or_else(|| "unknown".to_string())
 }
 
+/// Extract caller DID from JWT claims (required auth)
+///
+/// Use this when authentication is required for the endpoint.
+/// Returns an error if claims are missing or DID is invalid.
+fn extract_caller_did(req: &HttpRequest) -> Result<Did> {
+    let claims = get_claims(req)
+        .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
+    claims
+        .sub
+        .parse()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in token: {e}")))
+}
+
+/// Try to extract caller DID from JWT claims (optional auth)
+///
+/// Use this when authentication is optional for the endpoint.
+/// Returns None if claims are missing or DID is invalid.
+fn try_extract_caller_did(req: &HttpRequest) -> Option<Did> {
+    get_claims(req).and_then(|c| c.sub.parse().ok())
+}
+
 // ============================================================================
 // Validation Constants
 // ============================================================================
@@ -622,8 +643,8 @@ pub async fn list_listings(
     // Check authorization - read access is sufficient
     require_scope(&http_req, "coop:read")?;
 
-    // Get caller DID for privacy check
-    let caller_did: Option<Did> = get_claims(&http_req).and_then(|c| c.sub.parse().ok());
+    // Get caller DID for privacy check (optional - unauthenticated users can list)
+    let caller_did: Option<Did> = try_extract_caller_did(&http_req);
 
     // Build filter
     let filter = build_listing_filter(&query)?;
@@ -666,8 +687,8 @@ pub async fn get_listing(
     // Check authorization
     require_scope(&http_req, "coop:read")?;
 
-    // Get caller DID for privacy check
-    let caller_did: Option<Did> = get_claims(&http_req).and_then(|c| c.sub.parse().ok());
+    // Get caller DID for privacy check (optional - unauthenticated users can view)
+    let caller_did: Option<Did> = try_extract_caller_did(&http_req);
 
     let listing_id = parse_listing_id(&path)?;
 
@@ -702,13 +723,7 @@ pub async fn update_listing(
     require_scope(&http_req, "coop:write")?;
 
     // Extract authenticated DID from JWT claims
-    let claims = get_claims(&http_req)
-        .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
-
-    let caller_did: Did = claims
-        .sub
-        .parse()
-        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
+    let caller_did = extract_caller_did(&http_req)?;
 
     let listing_id = parse_listing_id(&path)?;
 
@@ -778,13 +793,7 @@ pub async fn delete_listing(
     require_scope(&http_req, "coop:write")?;
 
     // Extract authenticated DID from JWT claims
-    let claims = get_claims(&http_req)
-        .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
-
-    let caller_did: Did = claims
-        .sub
-        .parse()
-        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
+    let caller_did = extract_caller_did(&http_req)?;
 
     let listing_id = parse_listing_id(&path)?;
 
@@ -829,13 +838,7 @@ pub async fn update_listing_status(
     require_scope(&http_req, "coop:write")?;
 
     // Extract authenticated DID from JWT claims
-    let claims = get_claims(&http_req)
-        .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
-
-    let caller_did: Did = claims
-        .sub
-        .parse()
-        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
+    let caller_did = extract_caller_did(&http_req)?;
 
     let listing_id = parse_listing_id(&path)?;
 
@@ -977,13 +980,7 @@ pub async fn get_interests(
     require_scope(&http_req, "coop:read")?;
 
     // Extract authenticated DID from JWT claims
-    let claims = get_claims(&http_req)
-        .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
-
-    let caller_did: Did = claims
-        .sub
-        .parse()
-        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
+    let caller_did = extract_caller_did(&http_req)?;
 
     let listing_id = parse_listing_id(&path)?;
 
@@ -1022,13 +1019,7 @@ pub async fn get_my_listings(
     require_scope(&http_req, "coop:read")?;
 
     // Extract authenticated DID from JWT claims
-    let claims = get_claims(&http_req)
-        .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
-
-    let caller_did: Did = claims
-        .sub
-        .parse()
-        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
+    let caller_did = extract_caller_did(&http_req)?;
 
     let mgr = listings_mgr.read().await;
 
