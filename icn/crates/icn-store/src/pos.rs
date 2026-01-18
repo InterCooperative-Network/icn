@@ -152,11 +152,18 @@ impl StorageChallenge {
 
     /// Get legacy u64 nonce from first 8 bytes (for v1 compatibility)
     pub fn nonce(&self) -> u64 {
-        u64::from_le_bytes(
-            self.challenge_nonce[..8]
-                .try_into()
-                .expect("challenge_nonce is [u8; 32], first 8 bytes always valid"),
-        )
+        // Explicit construction avoids try_into() and is infallible for fixed-size arrays
+        let bytes: [u8; 8] = [
+            self.challenge_nonce[0],
+            self.challenge_nonce[1],
+            self.challenge_nonce[2],
+            self.challenge_nonce[3],
+            self.challenge_nonce[4],
+            self.challenge_nonce[5],
+            self.challenge_nonce[6],
+            self.challenge_nonce[7],
+        ];
+        u64::from_le_bytes(bytes)
     }
 
     /// Compute challenge ID from parameters (excluding signature)

@@ -144,8 +144,8 @@ async fn test_challenge_creation_multi_block() -> Result<()> {
     let challenge = StorageChallenge::new_multi_block(
         hash,
         peer_did.to_string(),
-        0,     // byte_offset
-        1024,  // byte_length
+        0,    // byte_offset
+        1024, // byte_length
         chunk_indices,
         node.did.to_string(),
         30, // timeout_secs
@@ -189,9 +189,7 @@ async fn test_proof_generation_multi_block() -> Result<()> {
     );
 
     // Extract just the challenged byte range for the proof
-    let challenged_bytes = tree
-        .get_bytes(byte_offset, byte_length)
-        .unwrap_or_default();
+    let challenged_bytes = tree.get_bytes(byte_offset, byte_length).unwrap_or_default();
 
     // Generate proof with correct byte range
     let proof = StorageProof::new_multi(
@@ -335,7 +333,7 @@ async fn test_merkle_proof_data_round_trip() -> Result<()> {
 async fn test_challenge_scheduler_handle_pending_count() -> Result<()> {
     // Test that pending count is tracked correctly
     let config = ChallengeConfig {
-        timeout_secs: 60, // Long timeout so challenges stay pending
+        timeout_secs: 60,           // Long timeout so challenges stay pending
         challenge_probability: 0.0, // Disable automatic challenges
         ..Default::default()
     };
