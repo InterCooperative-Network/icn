@@ -377,3 +377,84 @@ Interest submissions are protected by two layers of rate limiting:
 - `icn_action_items_in_progress` (gauge) - Current in-progress items
 - `icn_action_items_overdue` (gauge) - Current overdue items
 - `icn_action_items_time_to_complete_seconds` (histogram) - Time to completion
+
+### Example Prometheus Alert Rules
+
+Add these to your Prometheus rules configuration for proactive monitoring:
+
+```yaml
+groups:
+  - name: icn_exchange_alerts
+    rules:
+      # Alert if too many active listings accumulate (may indicate cleanup issues)
+      - alert: ExchangeListingsAccumulating
+        expr: icn_exchange_listings_active > 10000
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "High number of active listings"
+          description: "Active listings ({{ $value }}) exceeds threshold. Check if expiry scheduler is running."
+
+      # Alert if listings aren't being completed (exchange not being used)
+      - alert: ExchangeLowCompletionRate
+        expr: |
+          rate(icn_exchange_listings_completed_total[24h]) == 0
+          and icn_exchange_listings_active > 10
+        for: 7d
+        labels:
+          severity: info
+        annotations:
+          summary: "No listings completed in 7 days"
+          description: "No exchange listings have been completed despite active inventory."
+
+      # Alert if many interests are being blocked as duplicates
+      - alert: ExchangeHighDuplicateInterests
+        expr: |
+          rate(icn_exchange_duplicate_interests_blocked_total[1h])
+          / rate(icn_exchange_interests_expressed_total[1h]) > 0.5
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "High duplicate interest rate"
+          description: "Over 50% of interests are duplicates. May indicate UI bug or abuse."
+
+  - name: icn_action_items_alerts
+    rules:
+      # Alert if overdue items are accumulating
+      - alert: ActionItemsOverdueAccumulating
+        expr: icn_action_items_overdue > 50
+        for: 24h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Many overdue action items"
+          description: "{{ $value }} action items are overdue. Review and reschedule or complete."
+
+      # Alert if action items are being deferred frequently
+      - alert: ActionItemsHighDeferralRate
+        expr: |
+          rate(icn_action_items_deferred_total[7d])
+          / rate(icn_action_items_created_total[7d]) > 0.3
+        for: 7d
+        labels:
+          severity: info
+        annotations:
+          summary: "High action item deferral rate"
+          description: "Over 30% of action items being deferred. May indicate capacity issues."
+
+      # Alert if high-priority items aren't being addressed
+      - alert: HighPriorityItemsStale
+        expr: |
+          increase(icn_action_items_completed_total{priority="high"}[7d]) == 0
+          and icn_action_items_pending{priority="high"} > 0
+        for: 7d
+        labels:
+          severity: warning
+        annotations:
+          summary: "High-priority action items not being completed"
+          description: "High-priority items exist but none completed in 7 days."
+```
+
+Adjust thresholds based on your cooperative's size and activity level.
