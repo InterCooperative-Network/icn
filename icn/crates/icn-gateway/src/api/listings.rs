@@ -20,7 +20,32 @@ use crate::models::{
     CreateListingRequest, ExpressInterestRequest, ListingFilterParams, ListingInterestResponse,
     ListingResponse, UpdateListingRequest,
 };
+use crate::rate_limit::IpRateLimiter;
 use icn_identity::Did;
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/// Extract client IP address from request
+/// Returns IP as string, using X-Forwarded-For header if present (proxy support)
+fn get_client_ip(req: &HttpRequest) -> String {
+    // Check for X-Forwarded-For header first (reverse proxy support)
+    if let Some(forwarded) = req.headers().get("x-forwarded-for") {
+        if let Ok(forwarded_str) = forwarded.to_str() {
+            // X-Forwarded-For can contain multiple IPs (client, proxy1, proxy2...)
+            // Use the first one (actual client)
+            if let Some(client_ip) = forwarded_str.split(',').next() {
+                return client_ip.trim().to_string();
+            }
+        }
+    }
+
+    // Fall back to peer address
+    req.peer_addr()
+        .map(|addr| addr.ip().to_string())
+        .unwrap_or_else(|| "unknown".to_string())
+}
 
 // ============================================================================
 // Validation Constants
@@ -803,11 +828,17 @@ pub async fn update_listing_status(
 pub async fn express_interest(
     http_req: HttpRequest,
     listings_mgr: web::Data<Arc<RwLock<ListingsManager>>>,
+    ip_limiter: web::Data<Arc<IpRateLimiter>>,
     path: web::Path<String>,
     req: web::Json<ExpressInterestRequest>,
 ) -> Result<HttpResponse> {
     // Check authorization
     require_scope(&http_req, "coop:write")?;
+
+    // IP-based rate limiting for DoS protection
+    // This is in addition to DID-based rate limiting from middleware
+    let client_ip = get_client_ip(&http_req);
+    ip_limiter.check_rate_limit(&client_ip)?;
 
     // Extract authenticated DID from JWT claims
     let claims = get_claims(&http_req)

@@ -350,12 +350,30 @@ tokio::spawn(async move {
 - Interest cleanup on listing delete is O(m) where m = interest count
 - Batch operations (get_interest_counts) prevent N+1 query patterns
 
+### Rate Limiting
+
+Interest submissions are protected by two layers of rate limiting:
+
+1. **DID-based Rate Limiting**: Applied via middleware to all authenticated endpoints. Uses token bucket algorithm with 60 burst capacity and 6 req/sec sustained rate for write operations.
+
+2. **IP-based Rate Limiting**: Applied specifically to the interest submission endpoint (`POST /listings/{id}/interest`) for additional DoS protection. This prevents attackers from rotating DIDs to spam interest submissions.
+
 ### Monitoring
 
-Prometheus metrics track feature adoption:
+**Exchange Metrics** (Prometheus):
 - `icn_exchange_listings_created_total{listing_type, category}` - Listing creation by type/category
 - `icn_exchange_listings_completed_total` - Successful exchanges
 - `icn_exchange_listings_expired_total` - Expired listings (from cleanup task)
 - `icn_exchange_interests_expressed_total{listing_type}` - Interest expression activity
 - `icn_exchange_listings_active` (gauge) - Current active listing count
 - `icn_exchange_listing_time_to_match_seconds` (histogram) - Time to first interest match
+
+**Action Item Metrics** (Prometheus):
+- `icn_action_items_created_total{priority}` - Action items created by priority
+- `icn_action_items_completed_total` - Completed action items
+- `icn_action_items_deferred_total` - Deferred action items
+- `icn_action_items_status_changes_total{from_status, to_status}` - Status transitions
+- `icn_action_items_pending` (gauge) - Current pending items
+- `icn_action_items_in_progress` (gauge) - Current in-progress items
+- `icn_action_items_overdue` (gauge) - Current overdue items
+- `icn_action_items_time_to_complete_seconds` (histogram) - Time to completion

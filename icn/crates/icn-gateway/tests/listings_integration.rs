@@ -952,3 +952,144 @@ async fn test_listing_sorting_options() {
     assert_eq!(results[1].listing_type, ListingType::Offer);
     assert_eq!(results[2].listing_type, ListingType::Want);
 }
+
+// ============================================================================
+// Concurrency Tests
+// ============================================================================
+
+/// Test that CAS (compare-and-swap) correctly prevents duplicate interests
+/// when multiple threads attempt to express interest concurrently
+#[tokio::test]
+async fn test_concurrent_duplicate_interest_prevention() {
+    let db = sled::Config::new().temporary(true).open().unwrap();
+    let mgr = Arc::new(ListingsManager::with_sled(Arc::new(db)));
+
+    let owner = test_did(1);
+    let interested_user = test_did(2);
+
+    // Create a listing
+    let listing = mgr
+        .create_listing(
+            ListingType::Offer,
+            "Concurrent Test Item".to_string(),
+            "Testing concurrent duplicate prevention".to_string(),
+            ListingCategory::Equipment,
+            owner,
+            "test-coop".to_string(),
+            "Credits".to_string(),
+            vec![],
+            ListingVisibility::Federation,
+            None,
+            vec![],
+        )
+        .unwrap();
+
+    let listing_id = listing.id;
+    let num_concurrent_tasks = 10;
+
+    // Spawn multiple tasks that all try to express interest as the same user
+    let mut handles = Vec::new();
+    for i in 0..num_concurrent_tasks {
+        let mgr_clone = Arc::clone(&mgr);
+        let interested_user_clone = interested_user.clone();
+        let handle = tokio::spawn(async move {
+            let result = mgr_clone.express_interest(
+                listing_id,
+                interested_user_clone,
+                format!("coop-{i}"),
+                format!("Interest message from task {i}"),
+                None,
+            );
+            result.is_ok()
+        });
+        handles.push(handle);
+    }
+
+    // Wait for all tasks to complete
+    let results: Vec<bool> = futures::future::join_all(handles)
+        .await
+        .into_iter()
+        .map(|r| r.unwrap())
+        .collect();
+
+    // Exactly one should succeed (the CAS ensures only one wins)
+    let success_count: usize = results.iter().filter(|&&b| b).count();
+    assert_eq!(
+        success_count, 1,
+        "Expected exactly 1 success, got {success_count}"
+    );
+
+    // Verify only one interest was actually created
+    let interests = mgr.get_interests(&listing_id).unwrap();
+    assert_eq!(
+        interests.len(),
+        1,
+        "Expected exactly 1 interest to be stored"
+    );
+}
+
+/// Test that different users can express interest concurrently without conflict
+#[tokio::test]
+async fn test_concurrent_different_users_interest() {
+    let db = sled::Config::new().temporary(true).open().unwrap();
+    let mgr = Arc::new(ListingsManager::with_sled(Arc::new(db)));
+
+    let owner = test_did(1);
+
+    // Create a listing
+    let listing = mgr
+        .create_listing(
+            ListingType::Offer,
+            "Multi-User Concurrent Test".to_string(),
+            "Testing different users expressing interest concurrently".to_string(),
+            ListingCategory::Equipment,
+            owner,
+            "test-coop".to_string(),
+            "Credits".to_string(),
+            vec![],
+            ListingVisibility::Federation,
+            None,
+            vec![],
+        )
+        .unwrap();
+
+    let listing_id = listing.id;
+    let num_users = 10;
+
+    // Spawn multiple tasks, each as a different user
+    let mut handles = Vec::new();
+    for i in 0..num_users {
+        let mgr_clone = Arc::clone(&mgr);
+        // Each task uses a different user (seed 2 through 11, avoiding owner's seed 1)
+        let user = test_did((i + 2) as u8);
+        let handle = tokio::spawn(async move {
+            mgr_clone.express_interest(
+                listing_id,
+                user,
+                format!("coop-{i}"),
+                format!("Interest from user {i}"),
+                None,
+            )
+        });
+        handles.push(handle);
+    }
+
+    // Wait for all tasks to complete
+    let results: Vec<_> = futures::future::join_all(handles).await;
+
+    // All should succeed since they're different users
+    for (i, result) in results.iter().enumerate() {
+        assert!(
+            result.as_ref().unwrap().is_ok(),
+            "User {i} should have succeeded: {result:?}",
+        );
+    }
+
+    // Verify all interests were created
+    let interests = mgr.get_interests(&listing_id).unwrap();
+    assert_eq!(
+        interests.len(),
+        num_users,
+        "Expected {num_users} interests to be stored",
+    );
+}

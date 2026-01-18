@@ -558,7 +558,8 @@ impl GatewayServer {
         );
         let rate_limiter = Arc::new(RateLimiter::new(rate_limit_config));
 
-        // Create IP-based rate limiter for auth endpoints (more aggressive limits)
+        // Create IP-based rate limiter for auth endpoints and interest submissions
+        // Used for DoS protection on sensitive endpoints
         let ip_rate_limiter = Arc::new(IpRateLimiter::new_for_auth());
 
         // Create trust-gated velocity limiter for transaction rate limiting

@@ -102,6 +102,7 @@ pub fn init_metrics() -> Result<()> {
     // Initialize legacy metrics descriptions
     metrics::init_descriptions();
     // Initialize new submodule metrics descriptions
+    metrics::action_items::init_descriptions();
     metrics::agreement::init_descriptions();
     metrics::exchange::init_descriptions();
     metrics::gateway::init_descriptions();

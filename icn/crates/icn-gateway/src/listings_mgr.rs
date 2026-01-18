@@ -488,9 +488,29 @@ impl InMemoryListingsStore {
         // Apply sorting based on filter
         sort_listings(&mut result, filter.sort_by);
 
-        // Apply pagination
+        // Apply pagination with validation logging
         let offset = filter.offset.unwrap_or(0);
-        let limit = filter.limit.unwrap_or(DEFAULT_PAGE_SIZE).min(MAX_PAGE_SIZE);
+        let requested_limit = filter.limit.unwrap_or(DEFAULT_PAGE_SIZE);
+        let limit = requested_limit.min(MAX_PAGE_SIZE);
+
+        // Log if limit was capped
+        if requested_limit > MAX_PAGE_SIZE {
+            tracing::debug!(
+                requested = requested_limit,
+                actual = limit,
+                "Pagination limit capped to MAX_PAGE_SIZE"
+            );
+        }
+
+        // Log if offset is larger than result set (empty response)
+        let total_matching = result.len();
+        if offset >= total_matching && !result.is_empty() {
+            tracing::debug!(
+                offset = offset,
+                total_matching = total_matching,
+                "Pagination offset exceeds result count - returning empty results"
+            );
+        }
 
         Ok(result.into_iter().skip(offset).take(limit).collect())
     }
@@ -663,9 +683,29 @@ impl SledListingsStore {
         // Apply sorting based on filter
         sort_listings(&mut result, filter.sort_by);
 
-        // Apply pagination
+        // Apply pagination with validation logging
         let offset = filter.offset.unwrap_or(0);
-        let limit = filter.limit.unwrap_or(DEFAULT_PAGE_SIZE).min(MAX_PAGE_SIZE);
+        let requested_limit = filter.limit.unwrap_or(DEFAULT_PAGE_SIZE);
+        let limit = requested_limit.min(MAX_PAGE_SIZE);
+
+        // Log if limit was capped
+        if requested_limit > MAX_PAGE_SIZE {
+            tracing::debug!(
+                requested = requested_limit,
+                actual = limit,
+                "Pagination limit capped to MAX_PAGE_SIZE"
+            );
+        }
+
+        // Log if offset is larger than result set (empty response)
+        let total_matching = result.len();
+        if offset >= total_matching && !result.is_empty() {
+            tracing::debug!(
+                offset = offset,
+                total_matching = total_matching,
+                "Pagination offset exceeds result count - returning empty results"
+            );
+        }
 
         Ok(result.into_iter().skip(offset).take(limit).collect())
     }
@@ -746,8 +786,20 @@ impl SledListingsStore {
 
         // If insert fails, clean up the index key to avoid permanently blocking this DID
         if let Err(e) = self.db.insert(interest_key.as_bytes(), interest_value) {
-            // Best effort cleanup - remove the index key we just set
-            let _ = self.db.remove(index_key.as_bytes());
+            tracing::warn!(
+                listing_id = %listing_id,
+                from_did = %from_did,
+                error = %e,
+                "Failed to insert interest data; attempting cleanup of index key"
+            );
+            if let Err(cleanup_err) = self.db.remove(index_key.as_bytes()) {
+                tracing::error!(
+                    listing_id = %listing_id,
+                    from_did = %from_did,
+                    error = %cleanup_err,
+                    "Critical: Failed to clean up index key - user may be permanently blocked from expressing interest"
+                );
+            }
             return Err(e.into());
         }
 

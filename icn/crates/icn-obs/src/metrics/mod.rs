@@ -27,6 +27,7 @@ mod legacy {
 
 pub use legacy::*;
 
+pub mod action_items;
 pub mod agreement;
 pub mod exchange;
 pub mod gateway;

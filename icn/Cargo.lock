@@ -2975,6 +2975,7 @@ dependencies = [
  "criterion",
  "dashmap",
  "ed25519-dalek",
+ "futures",
  "futures-util",
  "hex",
  "icn-ccl",
