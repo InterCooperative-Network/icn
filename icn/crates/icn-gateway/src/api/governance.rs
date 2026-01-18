@@ -28,7 +28,7 @@ use icn_governance::{
     VoteChoice,
 };
 use icn_identity::Did;
-use icn_obs::metrics::gateway;
+use icn_obs::metrics::{action_items, gateway};
 
 // ============================================================================
 // Domain Endpoints
@@ -2262,6 +2262,9 @@ pub async fn create_action_item(
         )
         .map_err(|e| crate::error::GatewayError::InternalError(e.to_string()))?;
 
+    // Record metrics
+    action_items::action_items_created_inc(&format!("{priority:?}"));
+
     Ok(HttpResponse::Created().json(action_item_to_response(&item)))
 }
 
@@ -2334,21 +2337,24 @@ pub async fn update_action_item(
     // Verify domain membership
     check_domain_membership(&gov_mgr, &domain, &user_did).await?;
 
-    // Input validation
-    validate_action_item_update(&req)?;
-
-    // Get existing item
+    // Get existing item FIRST (before validation to prevent information leakage)
     let mut item = gov_mgr
         .get_action_item(&domain, &id)
         .map_err(|e| crate::error::GatewayError::InternalError(e.to_string()))?
         .ok_or_else(|| crate::error::GatewayError::NotFound("Action item not found".to_string()))?;
 
-    // Ownership check: only the creator can update the action item
+    // Ownership check BEFORE validation (prevents probing via validation errors)
     if item.created_by != user_did {
         return Err(crate::error::GatewayError::Forbidden(
             "Only the action item creator can update it".to_string(),
         ));
     }
+
+    // Input validation (safe to reveal validation errors now that ownership is confirmed)
+    validate_action_item_update(&req)?;
+
+    // Capture old status for metrics tracking
+    let old_status = item.status;
 
     // Apply updates
     if let Some(ref title) = req.title {
@@ -2384,6 +2390,21 @@ pub async fn update_action_item(
     gov_mgr
         .update_action_item(&item)
         .map_err(|e| crate::error::GatewayError::InternalError(e.to_string()))?;
+
+    // Record metrics if status changed
+    if old_status != item.status {
+        action_items::action_items_status_change_inc(
+            &format!("{old_status:?}"),
+            &format!("{:?}", item.status),
+        );
+
+        // Track completed/deferred status transitions
+        if matches!(item.status, ActionItemStatus::Completed) {
+            action_items::action_items_completed_inc();
+        } else if matches!(item.status, ActionItemStatus::Deferred) {
+            action_items::action_items_deferred_inc();
+        }
+    }
 
     Ok(HttpResponse::Ok().json(action_item_to_response(&item)))
 }
@@ -2427,6 +2448,9 @@ pub async fn delete_action_item(
     gov_mgr
         .delete_action_item(&domain, &id)
         .map_err(|e| crate::error::GatewayError::InternalError(e.to_string()))?;
+
+    // Record metrics
+    action_items::action_items_deleted_inc();
 
     Ok(HttpResponse::NoContent().finish())
 }
@@ -2502,11 +2526,25 @@ pub async fn update_action_item_status(
         ));
     }
 
-    let status = parse_status(&req.status)?;
+    let new_status = parse_status(&req.status)?;
+    let old_status = existing.status;
 
     let item = gov_mgr
-        .update_action_item_status(&domain, &id, status)
+        .update_action_item_status(&domain, &id, new_status)
         .map_err(|e| crate::error::GatewayError::InternalError(e.to_string()))?;
+
+    // Record metrics for status change
+    action_items::action_items_status_change_inc(
+        &format!("{old_status:?}"),
+        &format!("{new_status:?}"),
+    );
+
+    // Track completed/deferred status transitions
+    if matches!(new_status, ActionItemStatus::Completed) {
+        action_items::action_items_completed_inc();
+    } else if matches!(new_status, ActionItemStatus::Deferred) {
+        action_items::action_items_deferred_inc();
+    }
 
     Ok(HttpResponse::Ok().json(action_item_to_response(&item)))
 }

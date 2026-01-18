@@ -693,23 +693,23 @@ pub async fn update_listing(
 
     let listing_id = parse_listing_id(&path)?;
 
-    // Validate input
-    validate_listing_update(&req)?;
-
     let mgr = listings_mgr.write().await;
 
-    // Get the existing listing
+    // Get the existing listing FIRST (before validation to prevent information leakage)
     let mut listing = mgr
         .get_listing(&listing_id)
         .map_err(|e| GatewayError::InternalError(format!("Failed to get listing: {e}")))?
         .ok_or_else(|| GatewayError::NotFound(format!("Listing not found: {listing_id}")))?;
 
-    // Check ownership
+    // Check ownership BEFORE validation (prevents probing via validation errors)
     if listing.offered_by != caller_did {
         return Err(GatewayError::Forbidden(
             "Only the listing owner can update it".to_string(),
         ));
     }
+
+    // Validate input (safe to reveal validation errors now that ownership is confirmed)
+    validate_listing_update(&req)?;
 
     // Apply updates
     if let Some(ref title) = req.title {

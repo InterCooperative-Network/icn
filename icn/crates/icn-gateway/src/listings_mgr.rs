@@ -279,6 +279,8 @@ impl ListingInterest {
 pub const MAX_PAGE_SIZE: usize = 100;
 /// Default page size
 pub const DEFAULT_PAGE_SIZE: usize = 20;
+/// Maximum offset for pagination (prevents DoS via huge skip values)
+pub const MAX_OFFSET: usize = 100_000;
 
 /// Sorting options for listings
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -502,9 +504,19 @@ impl InMemoryListingsStore {
         sort_listings(&mut result, filter.sort_by);
 
         // Apply pagination with validation logging
-        let offset = filter.offset.unwrap_or(0);
+        let requested_offset = filter.offset.unwrap_or(0);
+        let offset = requested_offset.min(MAX_OFFSET);
         let requested_limit = filter.limit.unwrap_or(DEFAULT_PAGE_SIZE);
         let limit = requested_limit.min(MAX_PAGE_SIZE);
+
+        // Log if offset was capped (potential DoS attempt)
+        if requested_offset > MAX_OFFSET {
+            tracing::warn!(
+                requested = requested_offset,
+                actual = offset,
+                "Pagination offset capped to MAX_OFFSET (potential DoS attempt)"
+            );
+        }
 
         // Log if limit was capped
         if requested_limit > MAX_PAGE_SIZE {
@@ -712,9 +724,19 @@ impl SledListingsStore {
         sort_listings(&mut result, filter.sort_by);
 
         // Apply pagination with validation logging
-        let offset = filter.offset.unwrap_or(0);
+        let requested_offset = filter.offset.unwrap_or(0);
+        let offset = requested_offset.min(MAX_OFFSET);
         let requested_limit = filter.limit.unwrap_or(DEFAULT_PAGE_SIZE);
         let limit = requested_limit.min(MAX_PAGE_SIZE);
+
+        // Log if offset was capped (potential DoS attempt)
+        if requested_offset > MAX_OFFSET {
+            tracing::warn!(
+                requested = requested_offset,
+                actual = offset,
+                "Pagination offset capped to MAX_OFFSET (potential DoS attempt)"
+            );
+        }
 
         // Log if limit was capped
         if requested_limit > MAX_PAGE_SIZE {
@@ -843,6 +865,19 @@ impl SledListingsStore {
     /// # Performance
     ///
     /// This is O(n) where n = total interest index keys. Schedule during off-peak hours.
+    ///
+    /// # Concurrency Warning
+    ///
+    /// This function has a TOCTOU (time-of-check-time-of-use) race condition:
+    /// between checking if an interest exists and removing the orphaned index,
+    /// another thread could insert a new interest. This is acceptable because:
+    /// 1. This is a maintenance task meant for off-peak/quiescent periods
+    /// 2. Worst case: an index is removed for a just-created interest, which
+    ///    only affects duplicate detection (the interest data remains intact)
+    /// 3. The next express_interest call will recreate the index
+    ///
+    /// For production at scale, consider running this in a transaction or
+    /// during scheduled maintenance windows when write traffic is minimal.
     ///
     /// # Returns
     ///
