@@ -73,6 +73,9 @@ pub enum ReplicaHealth {
     Stale,
     /// Peer reported as offline/unreachable
     Unreachable,
+    /// Replica failed proof-of-storage challenges (potential Byzantine behavior)
+    /// The u32 is the consecutive failure count
+    Unhealthy(u32),
 }
 
 /// Metadata about all replicas for a given content hash
@@ -230,6 +233,46 @@ impl ReplicaMetadata {
             .filter(|r| r.health == ReplicaHealth::Healthy)
             .map(|r| r.peer_did.clone())
             .collect()
+    }
+
+    /// Mark a replica as unhealthy due to failed proof-of-storage challenges
+    ///
+    /// This is called when a replica exceeds the grace period for failed challenges.
+    /// Returns true if the replica was found and marked unhealthy.
+    pub fn mark_replica_unhealthy(&mut self, peer_did: &str, failure_count: u32) -> bool {
+        for replica in &mut self.replicas {
+            if replica.peer_did == peer_did {
+                replica.health = ReplicaHealth::Unhealthy(failure_count);
+                replica.last_seen = SystemTime::now();
+                self.updated_at = SystemTime::now();
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Get count of unhealthy replicas
+    pub fn unhealthy_count(&self) -> usize {
+        self.replicas
+            .iter()
+            .filter(|r| matches!(r.health, ReplicaHealth::Unhealthy(_)))
+            .count()
+    }
+
+    /// Get all unhealthy replica DIDs
+    pub fn unhealthy_replicas(&self) -> Vec<String> {
+        self.replicas
+            .iter()
+            .filter(|r| matches!(r.health, ReplicaHealth::Unhealthy(_)))
+            .map(|r| r.peer_did.clone())
+            .collect()
+    }
+
+    /// Check if re-replication is needed based on healthy vs unhealthy replica ratio
+    ///
+    /// Returns true if the number of healthy replicas is below the minimum threshold.
+    pub fn needs_re_replication(&self, min_healthy_replicas: usize) -> bool {
+        self.healthy_count() < min_healthy_replicas
     }
 }
 

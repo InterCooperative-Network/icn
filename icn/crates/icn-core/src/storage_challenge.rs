@@ -43,6 +43,13 @@ use icn_security::{MisbehaviorDetector, StorageFailureReason, Violation};
 use icn_store::{ChallengeConfig, ContentChunkTree, ContentHash, StorageChallenge, Store};
 use icn_trust::TrustGraph;
 
+/// Callback function type for triggering re-replication
+///
+/// Called when a replica fails too many storage challenges and should be replaced.
+/// Arguments: (content_hash, unhealthy_peer_did, failure_count)
+pub type ReReplicationCallback =
+    Arc<dyn Fn(ContentHash, String, u32) -> anyhow::Result<()> + Send + Sync>;
+
 /// Pending challenge tracking info
 #[derive(Debug)]
 struct PendingChallenge {
@@ -94,6 +101,9 @@ pub struct ChallengeScheduler {
 
     /// Per-replica failure tracking: (content_hash, peer_did) -> (count, last_updated)
     failure_counts: HashMap<(ContentHash, String), (u32, Instant)>,
+
+    /// Optional callback for triggering re-replication when a replica becomes unhealthy
+    re_replication_callback: Option<ReReplicationCallback>,
 }
 
 /// Maximum age for failure count entries before cleanup (24 hours)
@@ -120,7 +130,16 @@ impl ChallengeScheduler {
             misbehavior,
             pending: HashMap::new(),
             failure_counts: HashMap::new(),
+            re_replication_callback: None,
         }
+    }
+
+    /// Set the re-replication callback
+    ///
+    /// This callback is invoked when a replica fails too many storage challenges
+    /// and should be replaced with a new replica to maintain data availability.
+    pub fn set_re_replication_callback(&mut self, callback: ReReplicationCallback) {
+        self.re_replication_callback = Some(callback);
     }
 
     /// Spawn the scheduler as a background task
@@ -641,6 +660,36 @@ impl ChallengeScheduler {
                     pending.challenge.target_peer,
                     hex::encode(pending.challenge.content_hash)
                 );
+            }
+
+            // Mark replica as unhealthy in metadata
+            if let Ok(Some(mut metadata)) = self
+                .store
+                .get_replica_metadata(&pending.challenge.content_hash)
+            {
+                metadata.mark_replica_unhealthy(&pending.challenge.target_peer, count);
+                let _ = self.store.put_replica_metadata(&metadata);
+
+                // Trigger re-replication callback if configured
+                if let Some(ref callback) = self.re_replication_callback {
+                    if let Err(e) = callback(
+                        pending.challenge.content_hash,
+                        pending.challenge.target_peer.clone(),
+                        count,
+                    ) {
+                        warn!(
+                            "Re-replication callback failed for content {}: {}",
+                            hex::encode(pending.challenge.content_hash),
+                            e
+                        );
+                    } else {
+                        info!(
+                            "Triggered re-replication for content {} (unhealthy replica: {})",
+                            hex::encode(pending.challenge.content_hash),
+                            pending.challenge.target_peer
+                        );
+                    }
+                }
             }
         }
 

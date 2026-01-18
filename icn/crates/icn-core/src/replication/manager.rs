@@ -147,6 +147,7 @@ impl ReplicationManager {
         let mut healthy_replicas = 0;
         let mut stale_replicas = 0;
         let mut unreachable_replicas = 0;
+        let mut unhealthy_replicas = 0;
 
         for hash in &content_hashes {
             match self.check_content_replication(hash).await {
@@ -169,6 +170,7 @@ impl ReplicationManager {
                         ReplicaHealth::Healthy => healthy_replicas += 1,
                         ReplicaHealth::Stale => stale_replicas += 1,
                         ReplicaHealth::Unreachable => unreachable_replicas += 1,
+                        ReplicaHealth::Unhealthy(_) => unhealthy_replicas += 1,
                     }
                 }
             }
@@ -182,6 +184,7 @@ impl ReplicationManager {
         icn_obs::metrics::replication::replicas_healthy_set(healthy_replicas);
         icn_obs::metrics::replication::replicas_stale_set(stale_replicas);
         icn_obs::metrics::replication::replicas_unreachable_set(unreachable_replicas);
+        icn_obs::metrics::replication::replicas_unhealthy_set(unhealthy_replicas);
         icn_obs::metrics::replication::health_checks_inc();
         icn_obs::metrics::replication::health_check_duration_record(start.elapsed().as_secs_f64());
 

@@ -3000,6 +3000,10 @@ pub mod replication {
         gauge!("icn_replication_replicas_unreachable").set(count as f64);
     }
 
+    pub fn replicas_unhealthy_set(count: usize) {
+        gauge!("icn_replication_replicas_unhealthy").set(count as f64);
+    }
+
     pub fn requests_sent_inc(count: u64) {
         counter!("icn_replication_requests_sent_total").increment(count);
     }
