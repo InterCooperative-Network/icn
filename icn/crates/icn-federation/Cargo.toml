@@ -43,7 +43,7 @@ sha2.workspace = true
 uuid = { version = "1", features = ["v4"] }
 
 # HTTP client for remote DID resolution
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { version = "0.13", features = ["json"] }
 urlencoding = "2.1"
 
 [dev-dependencies]
