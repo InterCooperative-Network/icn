@@ -5,16 +5,102 @@
 
 import { test, expect } from '@playwright/test';
 
+test.use({ serviceWorkers: 'block' });
+
+async function mockApiResponses(page) {
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
+    'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+  };
+
+  await page.route('**/v1/**', (route) => {
+    const url = route.request().url();
+    const now = Date.now();
+
+    if (route.request().method() === 'OPTIONS') {
+      return route.fulfill({ status: 204, headers: corsHeaders });
+    }
+
+    if (url.endsWith('/health')) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: corsHeaders,
+        body: JSON.stringify({ status: 'ok' }),
+      });
+    }
+
+    if (url.includes('/ledger/') && url.includes('/balance/')) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: corsHeaders,
+        body: JSON.stringify({ balances: { hours: 12.0 } }),
+      });
+    }
+
+    if (url.includes('/ledger/') && url.includes('/history')) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: corsHeaders,
+        body: JSON.stringify({
+          transactions: [
+            {
+              id: '1',
+              timestamp: now - 1000 * 60 * 60,
+              author: 'did:icn:alice',
+              memo: 'Garden work',
+              accounts: [
+                { account_id: 'did:icn:alice', currency: 'hours', debit: 5 },
+                { account_id: 'did:icn:test123', currency: 'hours', credit: 5 },
+              ],
+            },
+          ],
+        }),
+      });
+    }
+
+    if (url.includes('/coops/') && !url.includes('/members')) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: corsHeaders,
+        body: JSON.stringify({
+          members: [
+            { did: 'did:icn:test123', role: 'owner', balance: 12.0 },
+            { did: 'did:icn:alice', role: 'member', balance: 5.0 },
+          ],
+        }),
+      });
+    }
+
+    if (url.includes('/gov/') && url.includes('/proposals')) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: corsHeaders,
+        body: JSON.stringify({ data: [] }),
+      });
+    }
+
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      headers: corsHeaders,
+      body: '{}',
+    });
+  });
+}
+
 async function loginToApp(page) {
+  await mockApiResponses(page);
   await page.goto('/');
-  await page.fill('#gateway-url', 'http://localhost:8080');
+  await page.fill('#gateway-url', 'http://localhost:8000');
   await page.fill('#coop-id', 'test-coop');
   await page.fill('#did', 'did:icn:test123');
   await page.fill('#token', 'test-token-123');
-
-  // Mock API
-  await page.route('**/v1/**', route => route.fulfill({ status: 200, body: '{}' }));
-
   await page.click('#login-btn');
   await page.waitForSelector('#main-screen', { state: 'visible' });
 }
@@ -105,9 +191,9 @@ test.describe('Member Profile', () => {
   });
 
   test('should display profile statistics', async ({ page }) => {
-    await expect(page.locator('#profile-hours-given')).toBeVisible();
-    await expect(page.locator('#profile-hours-received')).toBeVisible();
-    await expect(page.locator('#profile-total-hours')).toBeVisible();
+    await expect(page.locator('#profile-balance')).toBeVisible();
+    await expect(page.locator('#profile-tx-count')).toBeVisible();
+    await expect(page.locator('#profile-member-since')).toBeVisible();
   });
 
   test('should display bio section', async ({ page }) => {
@@ -115,31 +201,29 @@ test.describe('Member Profile', () => {
   });
 
   test('should display skills section', async ({ page }) => {
-    await expect(page.locator('#skills-list')).toBeVisible();
+    await expect(page.locator('#profile-skills')).toBeVisible();
   });
 
   test('should display availability section', async ({ page }) => {
-    await expect(page.locator('#availability-display')).toBeVisible();
+    await expect(page.locator('#profile-availability')).toBeVisible();
   });
 
   test('should display contact information', async ({ page }) => {
-    await expect(page.locator('#contact-email')).toBeVisible();
-    await expect(page.locator('#contact-phone')).toBeVisible();
-    await expect(page.locator('#contact-location')).toBeVisible();
+    await expect(page.locator('#profile-contact')).toBeVisible();
   });
 
   test('should switch between service history tabs', async ({ page }) => {
     // Click Services Given tab
-    const givenTab = page.locator('button[data-tab="services-given"]');
+    const givenTab = page.locator('.service-history-tabs button[data-history="given"]');
     await givenTab.click();
     await expect(givenTab).toHaveClass(/active/);
-    await expect(page.locator('#services-given')).toBeVisible();
+    await expect(page.locator('#profile-service-history')).toBeVisible();
 
     // Click Services Received tab
-    const receivedTab = page.locator('button[data-tab="services-received"]');
+    const receivedTab = page.locator('.service-history-tabs button[data-history="received"]');
     await receivedTab.click();
     await expect(receivedTab).toHaveClass(/active/);
-    await expect(page.locator('#services-received')).toBeVisible();
+    await expect(page.locator('#profile-service-history')).toBeVisible();
   });
 
   test('should open edit profile modal', async ({ page }) => {
@@ -151,9 +235,9 @@ test.describe('Member Profile', () => {
 
     // Should contain form fields
     await expect(page.locator('#edit-bio')).toBeVisible();
-    await expect(page.locator('#edit-email')).toBeVisible();
-    await expect(page.locator('#edit-phone')).toBeVisible();
-    await expect(page.locator('#edit-location')).toBeVisible();
+    await expect(page.locator('#edit-skills')).toBeVisible();
+    await expect(page.locator('#edit-availability')).toBeVisible();
+    await expect(page.locator('#edit-contact')).toBeVisible();
   });
 
   test('should save profile changes', async ({ page }) => {
@@ -162,12 +246,12 @@ test.describe('Member Profile', () => {
 
     // Fill in form
     await page.fill('#edit-bio', 'Test bio content');
-    await page.fill('#edit-email', 'test@example.com');
-    await page.fill('#edit-phone', '555-1234');
-    await page.fill('#edit-location', 'Test City');
+    await page.fill('#edit-skills', 'Gardening, Teaching');
+    await page.selectOption('#edit-availability', 'weekdays');
+    await page.fill('#edit-contact', 'test@example.com');
 
     // Save
-    const saveBtn = page.locator('#save-profile-btn');
+    const saveBtn = page.locator('#edit-profile-form button[type="submit"]');
     await saveBtn.click();
 
     // Modal should close
@@ -183,7 +267,7 @@ test.describe('Member Profile', () => {
       JSON.parse(localStorage.getItem('icn-profile') || '{}')
     );
     expect(profileData.bio).toBe('Test bio content');
-    expect(profileData.contact.email).toBe('test@example.com');
+    expect(profileData.contact.info).toBe('test@example.com');
   });
 
   test('should close edit modal on cancel', async ({ page }) => {
@@ -193,7 +277,7 @@ test.describe('Member Profile', () => {
     const modal = page.locator('#edit-profile-modal');
     await expect(modal).toBeVisible();
 
-    const closeBtn = page.locator('#close-edit-profile');
+    const closeBtn = page.locator('#cancel-edit-profile');
     await closeBtn.click();
 
     await expect(modal).toBeHidden();
@@ -241,7 +325,7 @@ test.describe('Service Request Board', () => {
 
   test('should filter by category', async ({ page }) => {
     const filter = page.locator('#service-category-filter');
-    await filter.selectOption('Education');
+    await filter.selectOption('teaching');
 
     // Listings should be filtered
     // (With actual data, we'd verify the category)
@@ -274,12 +358,12 @@ test.describe('Service Request Board', () => {
 
     // Fill in form
     await page.check('input[value="offer"]');
-    await page.selectOption('#service-category', 'Education');
+    await page.selectOption('#service-category', 'teaching');
     await page.fill('#service-title', 'Test Service');
     await page.fill('#service-description', 'Test description');
 
     // Submit
-    const submitBtn = page.locator('#submit-service-btn');
+    const submitBtn = page.locator('#post-service-form button[type="submit"]');
     await submitBtn.click();
 
     // Modal should close
@@ -287,8 +371,8 @@ test.describe('Service Request Board', () => {
     await expect(modal).toBeHidden();
 
     // Should show success toast
-    await expect(page.locator('.toast')).toBeVisible();
-    await expect(page.locator('.toast')).toContainText('Service posted');
+    const successToast = page.locator('.toast', { hasText: 'Service posted' });
+    await expect(successToast).toBeVisible();
 
     // New listing should appear
     const listings = page.locator('.service-listing');
@@ -301,12 +385,13 @@ test.describe('Service Request Board', () => {
     await postBtn.click();
 
     // Try to submit without filling fields
-    const submitBtn = page.locator('#submit-service-btn');
+    const submitBtn = page.locator('#post-service-form button[type="submit"]');
     await submitBtn.click();
 
-    // Should show error toast
-    await expect(page.locator('.toast')).toBeVisible();
-    await expect(page.locator('.toast')).toContainText('fill in all fields');
+    // Required fields should be invalid
+    const titleField = page.locator('#service-title');
+    const isInvalid = await titleField.evaluate((el) => !el.validity.valid);
+    expect(isInvalid).toBeTruthy();
   });
 
   test('should close post modal on cancel', async ({ page }) => {
@@ -328,11 +413,11 @@ test.describe('Service Request Board', () => {
     await postBtn.click();
 
     await page.check('input[value="request"]');
-    await page.selectOption('#service-category', 'Home');
+    await page.selectOption('#service-category', 'gardening');
     await page.fill('#service-title', 'Persistent Service');
     await page.fill('#service-description', 'Should persist');
 
-    const submitBtn = page.locator('#submit-service-btn');
+    const submitBtn = page.locator('#post-service-form button[type="submit"]');
     await submitBtn.click();
 
     // Reload page

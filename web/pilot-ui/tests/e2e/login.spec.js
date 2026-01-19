@@ -4,6 +4,87 @@
 
 import { test, expect } from '@playwright/test';
 
+test.use({ serviceWorkers: 'block' });
+
+async function mockApiResponses(page) {
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
+    'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+  };
+
+  await page.route('**/v1/**', (route) => {
+    const url = route.request().url();
+
+    if (route.request().method() === 'OPTIONS') {
+      return route.fulfill({ status: 204, headers: corsHeaders });
+    }
+
+    if (url.endsWith('/health')) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: corsHeaders,
+        body: '{}',
+      });
+    }
+
+    if (url.includes('/ledger/') && url.includes('/balance/')) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: corsHeaders,
+        body: JSON.stringify({ balances: { hours: 42.5 } }),
+      });
+    }
+
+    if (url.includes('/coops/') && !url.includes('/members')) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: corsHeaders,
+        body: JSON.stringify({ members: [] }),
+      });
+    }
+
+    if (url.includes('/ledger/') && url.includes('/history')) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: corsHeaders,
+        body: JSON.stringify({ transactions: [] }),
+      });
+    }
+
+    if (url.includes('/gov/') && url.includes('/proposals')) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: corsHeaders,
+        body: JSON.stringify({ data: [] }),
+      });
+    }
+
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      headers: corsHeaders,
+      body: '{}',
+    });
+  });
+}
+
+async function loginWithMock(page) {
+  await mockApiResponses(page);
+  await page.goto('/');
+  await page.fill('#gateway-url', 'http://localhost:8000');
+  await page.fill('#coop-id', 'test-coop');
+  await page.fill('#did', 'did:icn:test123');
+  await page.fill('#token', 'test-token-123');
+  await page.click('#login-btn');
+  await page.waitForSelector('#main-screen', { state: 'visible' });
+}
+
 test.describe('Login Flow', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
@@ -21,10 +102,9 @@ test.describe('Login Flow', () => {
     // Click login without filling fields
     await loginBtn.click();
 
-    // Should show validation errors (HTML5 validation)
-    const gatewayUrl = page.locator('#gateway-url');
-    const isInvalid = await gatewayUrl.evaluate(el => !el.validity.valid);
-    expect(isInvalid).toBeTruthy();
+    // Should show validation errors
+    await expect(page.locator('#login-error')).toBeVisible();
+    await expect(page.locator('#login-error')).toContainText('Please fill in all fields');
   });
 
   test('should show authentication help modal', async ({ page }) => {
@@ -66,18 +146,17 @@ test.describe('Login Flow', () => {
   });
 
   test('should save form values to localStorage', async ({ page }) => {
-    // Fill in form
-    await page.fill('#gateway-url', 'http://localhost:8080');
-    await page.fill('#coop-id', 'test-coop');
-    await page.fill('#did', 'did:icn:test123');
+    await loginWithMock(page);
 
-    // Reload page
-    await page.reload();
+    const storedValues = await page.evaluate(() => ({
+      gateway: localStorage.getItem('icn-gateway'),
+      coop: localStorage.getItem('icn-coop'),
+      did: localStorage.getItem('icn-did'),
+    }));
 
-    // Values should be restored
-    await expect(page.locator('#gateway-url')).toHaveValue('http://localhost:8080');
-    await expect(page.locator('#coop-id')).toHaveValue('test-coop');
-    await expect(page.locator('#did')).toHaveValue('did:icn:test123');
+    expect(storedValues.gateway).toBe('http://localhost:8000');
+    expect(storedValues.coop).toBe('test-coop');
+    expect(storedValues.did).toBe('did:icn:test123');
   });
 
   test('should copy authentication command', async ({ page }) => {
@@ -119,9 +198,9 @@ test.describe('Login Flow', () => {
 
 test.describe('Login Flow - Dark Mode', () => {
   test('should toggle dark mode', async ({ page }) => {
-    await page.goto('/');
-
+    await loginWithMock(page);
     const themeToggle = page.locator('#theme-toggle');
+    await expect(themeToggle).toBeVisible();
     await themeToggle.click();
 
     // Check if dark mode is applied
@@ -139,10 +218,10 @@ test.describe('Login Flow - Dark Mode', () => {
   });
 
   test('should persist theme preference', async ({ page }) => {
-    await page.goto('/');
+    await loginWithMock(page);
 
-    // Enable dark mode
     const themeToggle = page.locator('#theme-toggle');
+    await expect(themeToggle).toBeVisible();
     await themeToggle.click();
 
     // Reload page
@@ -183,7 +262,7 @@ test.describe('Login Flow - Accessibility', () => {
     await page.goto('/');
 
     // This is a simplified check - in production, use axe-core
-    const primaryButton = page.locator('.btn-primary');
+    const primaryButton = page.locator('#login-btn');
     const bgColor = await primaryButton.evaluate(el =>
       window.getComputedStyle(el).backgroundColor
     );

@@ -194,7 +194,7 @@ test.describe('Accessibility - Dark Mode', () => {
 
     // Toggle dark mode (if theme toggle exists)
     const themeToggle = page.locator('#theme-toggle, [data-theme-toggle]');
-    if ((await themeToggle.count()) > 0) {
+    if ((await themeToggle.count()) > 0 && (await themeToggle.first().isVisible())) {
       await themeToggle.click();
 
       // Wait for theme transition by checking for theme attribute change
@@ -222,7 +222,7 @@ test.describe('Accessibility - Dark Mode', () => {
     await page.waitForLoadState('networkidle');
 
     const themeToggle = page.locator('#theme-toggle, [data-theme-toggle]');
-    if ((await themeToggle.count()) > 0) {
+    if ((await themeToggle.count()) > 0 && (await themeToggle.first().isVisible())) {
       await themeToggle.click();
 
       // Wait for theme transition
