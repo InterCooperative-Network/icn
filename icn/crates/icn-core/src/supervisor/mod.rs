@@ -365,6 +365,7 @@ impl Supervisor {
             let treasury_manager_handle = ledger_services.treasury_manager.clone();
             let contract_runtime_handle = ledger_services.contract_runtime.clone();
             let contract_actor_handle = ledger_services.contract_actor.clone();
+            let ledger_store = ledger_services.ledger_store.clone(); // For maintenance task
 
             // Initialize cooperative services
             let coop_services =
@@ -985,6 +986,26 @@ impl Supervisor {
             );
 
             info!("Parameter scheduler task spawned (interval: 10 seconds)");
+
+            // Spawn storage maintenance task (Issue #702)
+            // Currently maintains the ledger store (highest write volume). Future: could extend
+            // to maintain multiple stores (trust, gossip, identity) via Vec<Arc<SledStore>>.
+            if self.config.supervisor.storage_maintenance.enabled {
+                // Note: Handle not retained - maintenance runs purely on timer with graceful
+                // shutdown via broadcast channel. Future: retain handle for on-demand trigger
+                // via gRPC endpoint (e.g., `icnctl storage compact`).
+                let _maintenance_handle = background_tasks::spawn_storage_maintenance_task(
+                    self.config.supervisor.storage_maintenance.clone(),
+                    ledger_store.clone(),
+                    self.shutdown_tx.subscribe(),
+                );
+                info!(
+                    "Storage maintenance task spawned (interval: {} seconds)",
+                    self.config.supervisor.storage_maintenance.interval_secs
+                );
+            } else {
+                info!("Storage maintenance disabled by configuration");
+            }
 
             // Spawn connection candidate re-announcement task (Phase M2)
             let candidate_announce_config = background_tasks::CandidateAnnouncementConfig {

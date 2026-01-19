@@ -708,6 +708,40 @@ pub mod storage_challenge {
     }
 }
 
+/// Spawn the storage maintenance background task
+///
+/// This task periodically runs Sled database maintenance operations:
+/// - Flush data to disk for durability
+/// - Monitor space amplification
+/// - Generate warnings when thresholds are exceeded
+///
+/// # Parameters
+/// - `config`: Maintenance configuration (interval, thresholds)
+/// - `store`: The Sled store to maintain
+/// - `shutdown_rx`: Shutdown signal receiver from supervisor
+///
+/// # Returns
+/// A `MaintenanceHandle` that can be used to trigger immediate maintenance
+/// or stop the task.
+pub fn spawn_storage_maintenance_task(
+    config: icn_store::MaintenanceConfig,
+    store: Arc<icn_store::SledStore>,
+    mut shutdown_rx: BroadcastReceiver<()>,
+) -> icn_store::MaintenanceHandle {
+    let manager = Arc::new(icn_store::MaintenanceManager::new(store, config));
+    let handle = manager.start_background_task();
+
+    // Spawn a task that listens for supervisor shutdown and stops the maintenance task
+    let handle_for_shutdown = handle.clone();
+    tokio::spawn(async move {
+        let _ = shutdown_rx.recv().await;
+        info!("Stopping storage maintenance task due to supervisor shutdown");
+        handle_for_shutdown.stop();
+    });
+
+    handle
+}
+
 /// Configuration for bootstrap peer health checking task
 pub struct BootstrapHealthConfig {
     /// Interval between health checks (default: 60s)
@@ -954,5 +988,13 @@ mod tests {
         assert_eq!(config.check_interval, Duration::from_secs(60));
         assert_eq!(config.reconnect_timeout, Duration::from_secs(10));
         assert_eq!(config.max_failures, 3);
+    }
+
+    #[test]
+    fn test_maintenance_config_default() {
+        let config = icn_store::MaintenanceConfig::default();
+        assert!(config.enabled);
+        assert_eq!(config.interval_secs, 3600); // 1 hour
+        assert_eq!(config.amplification_threshold, 2.0);
     }
 }

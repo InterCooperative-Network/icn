@@ -101,6 +101,7 @@ impl MaintenanceResult {
 }
 
 /// Handle for controlling the maintenance task
+#[derive(Clone)]
 pub struct MaintenanceHandle {
     shutdown: Arc<AtomicBool>,
     notify: Arc<Notify>,
