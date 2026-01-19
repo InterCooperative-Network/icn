@@ -52,7 +52,7 @@ tonic = "0.14"
 prost = "0.14"
 
 # Discovery
-mdns-sd = "0.11"
+mdns-sd = "0.17"
 
 # Identity & Crypto
 ed25519-dalek = { version = "2.1", features = ["rand_core", "batch"] }
