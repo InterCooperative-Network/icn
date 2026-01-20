@@ -8,6 +8,7 @@ license = "Apache-2.0"
 tokio.workspace = true
 icn-encoding = { path = "../icn-encoding" }
 icn-identity.workspace = true
+icn-time = { path = "../icn-time" }
 icn-trust.workspace = true
 icn-obs.workspace = true
 icn-snapshot.workspace = true

@@ -158,6 +158,241 @@ fn default_notification_days() -> u32 {
     30
 }
 
+/// Maximum length for free-form description fields
+const MAX_DESCRIPTION_LENGTH: usize = 4000;
+
+/// Maximum length for title fields
+const MAX_TITLE_LENGTH: usize = 200;
+
+/// Maximum length for currency codes
+const MAX_CURRENCY_LENGTH: usize = 10;
+
+impl CreateAgreementRequest {
+    /// Validate the create agreement request
+    /// Returns None if valid, Some(error_message) if invalid
+    pub fn validate(&self) -> Option<&'static str> {
+        if self.title.is_empty() {
+            return Some("Agreement title cannot be empty");
+        }
+        if self.title.len() > MAX_TITLE_LENGTH {
+            return Some("Agreement title exceeds maximum length");
+        }
+        if self.description.len() > MAX_DESCRIPTION_LENGTH {
+            return Some("Agreement description exceeds maximum length");
+        }
+        if let Some(err) = self.agreement_type.validate() {
+            return Some(err);
+        }
+        None
+    }
+}
+
+impl AgreementTypeRequest {
+    /// Validate the agreement type request
+    /// Returns None if valid, Some(error_message) if invalid
+    pub fn validate(&self) -> Option<&'static str> {
+        match self {
+            AgreementTypeRequest::Trade { items, currency } => {
+                if items.is_empty() {
+                    return Some("Trade agreement must have at least one item");
+                }
+                if currency.is_empty() {
+                    return Some("Trade currency cannot be empty");
+                }
+                if currency.len() > MAX_CURRENCY_LENGTH {
+                    return Some("Currency code exceeds maximum length");
+                }
+                for item in items {
+                    if let Some(err) = item.validate() {
+                        return Some(err);
+                    }
+                }
+                None
+            }
+            AgreementTypeRequest::Credit {
+                credit_limit,
+                interest_rate_bps,
+                currency,
+            } => {
+                if *credit_limit <= 0 {
+                    return Some("Credit limit must be positive");
+                }
+                // Interest rate in basis points; 10000 bps = 100%
+                if *interest_rate_bps > 10000 {
+                    return Some("Interest rate cannot exceed 100% (10000 basis points)");
+                }
+                if currency.is_empty() {
+                    return Some("Credit currency cannot be empty");
+                }
+                if currency.len() > MAX_CURRENCY_LENGTH {
+                    return Some("Currency code exceeds maximum length");
+                }
+                None
+            }
+            AgreementTypeRequest::ResourceSharing {
+                resource_type,
+                duration_days,
+                compensation_model,
+            } => {
+                if resource_type.is_empty() {
+                    return Some("Resource type cannot be empty");
+                }
+                if *duration_days == 0 {
+                    return Some("Resource sharing duration must be greater than 0");
+                }
+                if let Some(err) = compensation_model.validate() {
+                    return Some(err);
+                }
+                None
+            }
+            AgreementTypeRequest::FederationMembership {
+                federation_id,
+                min_trust_threshold,
+                ..
+            } => {
+                if federation_id.is_empty() {
+                    return Some("Federation ID cannot be empty");
+                }
+                if *min_trust_threshold < 0.0 || *min_trust_threshold > 1.0 {
+                    return Some("Trust threshold must be between 0.0 and 1.0");
+                }
+                None
+            }
+            AgreementTypeRequest::Custom {
+                agreement_type_name,
+                terms_json,
+            } => {
+                if agreement_type_name.is_empty() {
+                    return Some("Custom agreement type name cannot be empty");
+                }
+                if terms_json.len() > MAX_DESCRIPTION_LENGTH {
+                    return Some("Custom terms JSON exceeds maximum length");
+                }
+                // Validate that terms_json is valid JSON
+                if serde_json::from_str::<serde_json::Value>(terms_json).is_err() {
+                    return Some("Custom terms must be valid JSON");
+                }
+                None
+            }
+        }
+    }
+}
+
+impl TradeItemRequest {
+    /// Validate the trade item request
+    /// Returns None if valid, Some(error_message) if invalid
+    pub fn validate(&self) -> Option<&'static str> {
+        if self.description.is_empty() {
+            return Some("Trade item description cannot be empty");
+        }
+        if self.description.len() > MAX_DESCRIPTION_LENGTH {
+            return Some("Trade item description exceeds maximum length");
+        }
+        if self.quantity == 0 {
+            return Some("Trade item quantity must be greater than 0");
+        }
+        if self.unit.is_empty() {
+            return Some("Trade item unit cannot be empty");
+        }
+        if self.unit_price < 0 {
+            return Some("Trade item unit price cannot be negative");
+        }
+        if self.currency.is_empty() {
+            return Some("Trade item currency cannot be empty");
+        }
+        if self.currency.len() > MAX_CURRENCY_LENGTH {
+            return Some("Trade item currency code exceeds maximum length");
+        }
+        None
+    }
+}
+
+impl CompensationModelRequest {
+    /// Validate the compensation model request
+    /// Returns None if valid, Some(error_message) if invalid
+    pub fn validate(&self) -> Option<&'static str> {
+        match self {
+            CompensationModelRequest::FixedRate {
+                amount,
+                currency,
+                period_days,
+            } => {
+                if *amount < 0 {
+                    return Some("Fixed rate amount cannot be negative");
+                }
+                if currency.is_empty() {
+                    return Some("Currency cannot be empty");
+                }
+                if *period_days == 0 {
+                    return Some("Period days must be greater than 0");
+                }
+                None
+            }
+            CompensationModelRequest::PerUse {
+                amount,
+                currency,
+                unit,
+            } => {
+                if *amount < 0 {
+                    return Some("Per-use amount cannot be negative");
+                }
+                if currency.is_empty() {
+                    return Some("Currency cannot be empty");
+                }
+                if unit.is_empty() {
+                    return Some("Unit cannot be empty");
+                }
+                None
+            }
+            CompensationModelRequest::RevenueShare { percentage } => {
+                if *percentage > 100 {
+                    return Some("Revenue share percentage cannot exceed 100");
+                }
+                None
+            }
+            CompensationModelRequest::Reciprocal { description } => {
+                if description.len() > MAX_DESCRIPTION_LENGTH {
+                    return Some("Reciprocal description exceeds maximum length");
+                }
+                None
+            }
+            CompensationModelRequest::None => None,
+        }
+    }
+}
+
+impl AutoRenewalRequest {
+    /// Validate the auto-renewal request
+    /// Returns None if valid, Some(error_message) if invalid
+    pub fn validate(&self) -> Option<&'static str> {
+        if self.period_days == 0 {
+            return Some("Auto-renewal period must be greater than 0");
+        }
+        if self.notification_days > self.period_days {
+            return Some("Notification days cannot exceed renewal period");
+        }
+        None
+    }
+}
+
+impl SetTermsRequest {
+    /// Validate the set terms request
+    /// Returns None if valid, Some(error_message) if invalid
+    pub fn validate(&self) -> Option<&'static str> {
+        if let Some(ref auto_renewal) = self.auto_renewal {
+            if let Some(err) = auto_renewal.validate() {
+                return Some(err);
+            }
+        }
+        if let Some(ref additional_terms) = self.additional_terms {
+            if additional_terms.len() > MAX_DESCRIPTION_LENGTH {
+                return Some("Additional terms exceeds maximum length");
+            }
+        }
+        None
+    }
+}
+
 /// Request to suspend an agreement
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct SuspendRequest {
@@ -317,6 +552,11 @@ fn to_domain_agreement_type(req_type: AgreementTypeRequest) -> Result<AgreementT
             duration_days,
             compensation_model,
         } => {
+            // Validate compensation model before conversion
+            if let Some(err) = compensation_model.validate() {
+                return Err(GatewayError::BadRequest(err.to_string()));
+            }
+
             // Parse resource_type string to enum, returning error for unknown values
             let resource_type_enum = match resource_type.as_str() {
                 "equipment" => ResourceType::Equipment,
@@ -620,6 +860,11 @@ pub async fn create_agreement(
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "agreements:write")?;
 
+    // Validate request before processing
+    if let Some(err) = req.validate() {
+        return Err(GatewayError::BadRequest(err.to_string()));
+    }
+
     let _claims = get_claims(&http_req)
         .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
 
@@ -793,6 +1038,11 @@ pub async fn set_terms(
     req: web::Json<SetTermsRequest>,
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "agreements:write")?;
+
+    // Validate request before processing
+    if let Some(err) = req.validate() {
+        return Err(GatewayError::BadRequest(err.to_string()));
+    }
 
     let agreement_id = path.into_inner();
 

@@ -7,9 +7,13 @@ use crate::gossip::GossipActor;
 use crate::types::GossipMessage;
 use anyhow::Result;
 use icn_identity::Did;
+use icn_obs::metrics::storage::{
+    challenge_result_inc, challenges_received_inc, proof_verification_inc, proofs_received_inc,
+    ChallengeResult, ProofVerifyResult,
+};
 use icn_store::{
     ContentChunkTree, MerkleProofData, StorageChallenge, StorageContentNotFound, StorageProof,
-    DEFAULT_CHUNK_SIZE,
+    DEFAULT_CHALLENGE_TIMEOUT_SECS, DEFAULT_CHUNK_SIZE,
 };
 use tracing::{debug, info, warn};
 
@@ -26,6 +30,9 @@ impl GossipActor {
         _sender: &Did,
         challenge: StorageChallenge,
     ) -> Result<()> {
+        // Record that we received a challenge
+        challenges_received_inc();
+
         debug!(
             challenge_id = %hex::encode(challenge.id),
             content_hash = %hex::encode(challenge.content_hash),
@@ -43,6 +50,7 @@ impl GossipActor {
                 error = %e,
                 "Rejecting challenge with unsupported protocol version"
             );
+            challenge_result_inc(ChallengeResult::InvalidVersion);
             return Ok(());
         }
 
@@ -54,6 +62,7 @@ impl GossipActor {
                 our_did = %self.own_did,
                 "Challenge not for us, ignoring"
             );
+            challenge_result_inc(ChallengeResult::WrongTarget);
             return Ok(());
         }
 
@@ -63,6 +72,7 @@ impl GossipActor {
                 challenge_id = %hex::encode(challenge.id),
                 "Received expired storage challenge"
             );
+            challenge_result_inc(ChallengeResult::Expired);
             return Ok(());
         }
 
@@ -74,6 +84,7 @@ impl GossipActor {
                 error = %e,
                 "Challenge signature verification failed"
             );
+            challenge_result_inc(ChallengeResult::SignatureFailed);
             return Ok(());
         }
 
@@ -130,6 +141,7 @@ impl GossipActor {
                 GossipMessage::StorageContentNotFoundMsg { response },
             );
 
+            challenge_result_inc(ChallengeResult::ContentNotFound);
             return Ok(());
         };
 
@@ -154,6 +166,7 @@ impl GossipActor {
                         num_chunks = tree.num_chunks(),
                         "Invalid chunk index in challenge"
                     );
+                    challenge_result_inc(ChallengeResult::ProofError);
                     return Ok(());
                 }
             };
@@ -177,6 +190,7 @@ impl GossipActor {
                         error = %e,
                         "Failed to sign storage proof"
                     );
+                    challenge_result_inc(ChallengeResult::SignatureFailed);
                     return Ok(());
                 }
             }
@@ -185,6 +199,7 @@ impl GossipActor {
                     challenge_id = %hex::encode(challenge.id),
                     "Cannot sign storage proof - no keypair configured"
                 );
+                challenge_result_inc(ChallengeResult::NoKeypair);
                 return Ok(());
             }
         }
@@ -215,6 +230,7 @@ impl GossipActor {
             GossipMessage::StorageProofMsg { proof },
         );
 
+        challenge_result_inc(ChallengeResult::ProofSent);
         Ok(())
     }
 
@@ -233,6 +249,9 @@ impl GossipActor {
         _sender: &Did,
         proof: StorageProof,
     ) -> Result<()> {
+        // Record that we received a proof
+        proofs_received_inc();
+
         debug!(
             challenge_id = %hex::encode(proof.challenge_id),
             prover = %proof.prover,
@@ -251,12 +270,15 @@ impl GossipActor {
                     "Error processing storage proof in ChallengeScheduler"
                 );
             }
+            // Verification result is tracked by ChallengeScheduler
+            proof_verification_inc(ProofVerifyResult::Valid);
         } else {
             info!(
                 challenge_id = %hex::encode(proof.challenge_id),
                 prover = %proof.prover,
                 "Storage proof received (ChallengeScheduler not configured)"
             );
+            proof_verification_inc(ProofVerifyResult::NoScheduler);
         }
 
         Ok(())
@@ -285,6 +307,20 @@ impl GossipActor {
             "Received content-not-found response"
         );
 
+        // Validate timestamp to prevent replay attacks
+        let now = icn_time::current_timestamp_secs();
+        let age = now.saturating_sub(response.generated_at);
+        if age > DEFAULT_CHALLENGE_TIMEOUT_SECS {
+            warn!(
+                challenge_id = %hex::encode(response.challenge_id),
+                responder = %response.responder,
+                age_seconds = age,
+                "Content-not-found response too old, possible replay attack"
+            );
+            proof_verification_inc(ProofVerifyResult::NotFoundExpired);
+            return Ok(());
+        }
+
         // Verify signature if present (unsigned responses are suspicious)
         if response.is_signed() {
             if let Err(e) = response.verify_signature() {
@@ -294,6 +330,7 @@ impl GossipActor {
                     error = %e,
                     "Content-not-found signature verification failed"
                 );
+                proof_verification_inc(ProofVerifyResult::InvalidSignature);
                 return Ok(());
             }
         } else {
@@ -302,6 +339,7 @@ impl GossipActor {
                 responder = %response.responder,
                 "Received unsigned content-not-found response"
             );
+            proof_verification_inc(ProofVerifyResult::NotFoundUnsigned);
             // Still forward to scheduler - it may want to track unsigned responses differently
         }
 
@@ -314,12 +352,14 @@ impl GossipActor {
                     "Error processing content-not-found in ChallengeScheduler"
                 );
             }
+            proof_verification_inc(ProofVerifyResult::NotFound);
         } else {
             info!(
                 challenge_id = %hex::encode(response.challenge_id),
                 responder = %response.responder,
                 "Content-not-found received (ChallengeScheduler not configured)"
             );
+            proof_verification_inc(ProofVerifyResult::NoScheduler);
         }
 
         Ok(())
