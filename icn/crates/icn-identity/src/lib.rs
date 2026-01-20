@@ -26,7 +26,7 @@ pub mod keystore;
 pub mod keystore_backend;
 #[cfg(feature = "hsm")]
 pub mod keystore_pkcs11;
-#[cfg(feature = "tpm")]
+#[cfg(feature = "tpm-experimental")]
 pub mod keystore_tpm;
 pub mod multi_device;
 pub mod personhood;
@@ -61,9 +61,9 @@ pub use keystore_backend::{BackendConfig, KeyStoreBackend, SigningBackend};
 pub use keystore_backend::Pkcs11Config;
 #[cfg(feature = "hsm")]
 pub use keystore_pkcs11::Pkcs11Backend;
-#[cfg(feature = "tpm")]
+#[cfg(feature = "tpm-experimental")]
 pub use keystore_backend::TpmConfig;
-#[cfg(feature = "tpm")]
+#[cfg(feature = "tpm-experimental")]
 pub use keystore_tpm::TpmBackend;
 pub use multi_device::{
     Capability, DidDocument, KeyType, RecoveryConfig, RecoveryMethod, RecoveryProof,

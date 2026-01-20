@@ -5,9 +5,9 @@
 //! This backend is scaffolding only and does not provide actual TPM security.
 //! Key operations are placeholders that will fail at runtime.
 //!
-//! To prevent accidental use, this module requires the `tpm-experimental` feature
-//! flag in addition to `tpm`. This ensures no one can enable TPM support without
-//! explicitly acknowledging it is non-functional.
+//! This module requires the `tpm-experimental` feature flag.
+//! It will not compile without explicitly enabling this flag to ensure
+//! no one can accidentally use non-functional TPM support.
 //!
 //! ## Why this doesn't work yet
 //!
@@ -25,20 +25,7 @@
 //! 4. Add TPM attestation support
 //! 5. Test with real TPM 2.0 hardware or simulator
 
-#![cfg(feature = "tpm")]
-
-// Compile error unless explicit experimental flag is set
-#[cfg(not(feature = "tpm-experimental"))]
-compile_error!(
-    "TPM backend is not implemented and cannot be used. \n\
-     \n\
-     This backend is scaffolding only. Key operations are placeholders. \n\
-     \n\
-     If you want to work on TPM implementation, enable the \n\
-     'tpm-experimental' feature flag to acknowledge it is non-functional.\n\
-     \n\
-     DO NOT use this in production."
-);
+#![cfg(feature = "tpm-experimental")]
 
 use crate::keystore_backend::{BackendConfig, KeyStoreBackend, SigningBackend, TpmConfig};
 use crate::{Did, IdentityBundle, KeyPair};

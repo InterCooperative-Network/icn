@@ -29,7 +29,7 @@ fn test_backend_config_types() {
     }
 
     // Test TPM backend config (only when feature is enabled)
-    #[cfg(feature = "tpm")]
+    #[cfg(feature = "tpm-experimental")]
     {
         use icn_identity::TpmConfig;
 
@@ -66,7 +66,7 @@ fn test_backend_abstraction() {
     }
 
     // TPM backend should implement the trait (when feature is enabled)
-    #[cfg(feature = "tpm")]
+    #[cfg(feature = "tpm-experimental")]
     {
         // Would need actual TPM to test
         // accept_backend(TpmBackend::new(...));

@@ -8,9 +8,8 @@ license.workspace = true
 default = []
 post-quantum = []
 hsm = ["cryptoki"]
-tpm = ["tss-esapi"]
 # TPM backend is not implemented - requires explicit experimental flag
-tpm-experimental = ["tpm"]
+tpm-experimental = ["tss-esapi"]
 
 [dependencies]
 tokio.workspace = true

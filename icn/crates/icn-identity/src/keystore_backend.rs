@@ -96,7 +96,7 @@ pub struct Pkcs11Config {
 }
 
 /// Configuration for TPM 2.0 backend
-#[cfg(feature = "tpm")]
+#[cfg(feature = "tpm-experimental")]
 #[derive(Debug, Clone)]
 pub struct TpmConfig {
     /// TPM device path (e.g., /dev/tpmrm0)
@@ -121,7 +121,7 @@ pub enum BackendConfig {
     #[cfg(feature = "hsm")]
     Pkcs11(Pkcs11Config),
     /// TPM 2.0 backend
-    #[cfg(feature = "tpm")]
+    #[cfg(feature = "tpm-experimental")]
     Tpm(TpmConfig),
 }
 
@@ -132,7 +132,7 @@ impl BackendConfig {
             BackendConfig::Age { .. } => "age",
             #[cfg(feature = "hsm")]
             BackendConfig::Pkcs11(_) => "pkcs11",
-            #[cfg(feature = "tpm")]
+            #[cfg(feature = "tpm-experimental")]
             BackendConfig::Tpm(_) => "tpm",
         }
     }
@@ -143,7 +143,7 @@ impl BackendConfig {
             BackendConfig::Age { .. } => false,
             #[cfg(feature = "hsm")]
             BackendConfig::Pkcs11(_) => true,
-            #[cfg(feature = "tpm")]
+            #[cfg(feature = "tpm-experimental")]
             BackendConfig::Tpm(_) => true,
         }
     }
