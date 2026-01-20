@@ -120,6 +120,97 @@ pub enum VuiSyncMessage {
     },
 }
 
+impl VuiSyncMessage {
+    /// Get the signing bytes for a NewVui message
+    ///
+    /// Returns None for other message types that don't require signing.
+    pub fn signing_bytes(&self) -> Option<Vec<u8>> {
+        match self {
+            VuiSyncMessage::NewVui {
+                from_did,
+                vui_hash,
+                timestamp,
+                ..
+            } => {
+                let mut bytes = Vec::new();
+                bytes.extend_from_slice(b"icn-steward-newvui-v1");
+                bytes.extend_from_slice(from_did.as_str().as_bytes());
+                bytes.extend_from_slice(vui_hash);
+                bytes.extend_from_slice(&timestamp.to_le_bytes());
+                Some(bytes)
+            }
+            _ => None,
+        }
+    }
+
+    /// Create a signed NewVui message
+    pub fn new_vui_signed(
+        from_did: icn_identity::Did,
+        vui_hash: [u8; 32],
+        keypair: &icn_identity::KeyPair,
+    ) -> Self {
+        let timestamp = icn_time::current_timestamp_secs();
+
+        // Create message without signature first
+        let mut msg = VuiSyncMessage::NewVui {
+            from_did,
+            vui_hash,
+            timestamp,
+            signature: Vec::new(),
+        };
+
+        // Sign and update
+        if let Some(signing_bytes) = msg.signing_bytes() {
+            let signature = keypair.sign(&signing_bytes).to_vec();
+            if let VuiSyncMessage::NewVui {
+                signature: ref mut sig,
+                ..
+            } = msg
+            {
+                *sig = signature;
+            }
+        }
+
+        msg
+    }
+
+    /// Verify the signature on a NewVui message
+    pub fn verify_signature(&self) -> bool {
+        use ed25519_dalek::Verifier;
+
+        match self {
+            VuiSyncMessage::NewVui {
+                from_did,
+                signature,
+                ..
+            } => {
+                if signature.is_empty() {
+                    return false;
+                }
+
+                let Some(signing_bytes) = self.signing_bytes() else {
+                    return false;
+                };
+
+                // Extract verifying key from DID
+                let Ok(verifying_key) = from_did.to_verifying_key() else {
+                    return false;
+                };
+
+                // Parse signature bytes
+                let Ok(sig_bytes): Result<[u8; 64], _> = signature.as_slice().try_into() else {
+                    return false;
+                };
+
+                let sig = ed25519_dalek::Signature::from_bytes(&sig_bytes);
+
+                verifying_key.verify(&signing_bytes, &sig).is_ok()
+            }
+            _ => true, // Other message types don't have signatures yet
+        }
+    }
+}
+
 /// Enrollment ceremony coordination message
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum EnrollmentMessage {
