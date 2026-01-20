@@ -35,14 +35,14 @@
 
 ## Code review findings (2026-01-20)
 - Repo-wide TODO scan across icn/ captured items below.
-- icn-core supervisor: personhood store and anchor rate limit config are TODOs (icn-core/src/supervisor/mod.rs:499-500).
-- icn-core governance handlers: treasury disbursement/redemption/bond issuance TODOs (icn-core/src/supervisor/governance_handlers.rs:392-419).
-- icn-core notifications: evidence validator wiring TODO (icn-core/src/supervisor/init_notifications.rs:89).
+- icn-core supervisor: personhood store and anchor rate limit config are TODOs (icn-core/src/supervisor/mod.rs:499-500). [Requires config schema extension]
+- ✅ icn-core governance handlers: treasury disbursement/redemption/bond issuance implemented (icn-core/src/supervisor/governance_handlers.rs).
+- ✅ icn-core notifications: evidence validator wired up (icn-core/src/supervisor/init_notifications.rs).
 - ✅ icn-governance proposal cleanup: metrics implemented, archive store stubbed (icn-governance/src/proposal_cleanup.rs).
 - ✅ icn-gateway agreements: compensation_model and terms parsing implemented (icn-gateway/src/api/agreements.rs).
 - icn-gateway governance domains: performance note for large domain counts (icn-gateway/src/api/governance.rs:174-176).
 - icn-gateway SDIS enrollment: temporary VUI hash and steward rate limit TODOs (icn-gateway/src/api/sdis/simple_enrollment.rs:11-77, 477-484).
-- icn-steward: message-level signatures TODO for VUI sync (icn-steward/src/actor.rs:679-689).
+- ✅ icn-steward: message-level signatures implemented for VUI sync (icn-steward/src/gossip.rs).
 - icn-compute: federated task settlement TODO (icn-compute/src/actor/placement.rs:983-988).
 - ✅ icn-gossip storage challenge: ContentNotFound response implemented (icn-gossip/src/handlers/storage_challenge.rs).
 - icnctl: automatic daemon start TODO (bins/icnctl/src/main.rs:6532-6541).
