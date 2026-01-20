@@ -1,68 +1,71 @@
 # Cooperative Middle Layer: Gap Analysis
 
 ---
-**Status**: DRAFT
+**Status**: RECONCILED
 **Created**: 2025-12-23
-**Updated**: 2025-12-24
+**Updated**: 2026-01-20
 **Authors**: fahertym, Claude Code
 **Decision Makers**: TBD (pending review)
 
 ---
 
-**Related**: [ICN_SDIS_INTEGRATED_VISION.md](ICN_SDIS_INTEGRATED_VISION.md)
+**Related**:
+- [ICN_SDIS_INTEGRATED_VISION.md](ICN_SDIS_INTEGRATED_VISION.md)
+- [ROADMAP.md](ROADMAP.md) - Reconciled roadmap with this vision
+- [STRATEGIC_ALIGNMENT_AUDIT_2026-01-20.md](STRATEGIC_ALIGNMENT_AUDIT_2026-01-20.md) - Audit that reconciled documents
 
 ## Executive Summary
 
 This document identifies gaps between ICN's current implementation and the "Cooperative Middle Layer" vision where ICN is itself cooperatively governed infrastructure.
 
+**2026-01-20 Update**: A strategic alignment audit found that implementation is significantly more advanced than this document originally stated. The gap analysis below has been updated to reflect actual implementation status.
+
 ### Gap Categories
 
-| Category | Current State | Vision State | Priority |
-|----------|--------------|--------------|----------|
-| **Recursive Entity Model** | Separate types per level | Unified CooperativeEntity | CRITICAL |
-| **Protocol Governance** | Hardcoded parameters | Democratically adjustable | CRITICAL |
-| **SDIS Integration** | Phase S1-S6 complete | Full anchor-based identity | HIGH |
-| **Inter-Coop Economics** | Treasury + basic ledger | Clearing agreements, group purchasing | HIGH |
-| **Federation Hierarchy** | Single-level federation | Recursive federation | MEDIUM |
-| **Subsidiarity** | Not implemented | Decision scoping by level | MEDIUM |
+| Category | Current State | Vision State | Priority | Status |
+|----------|--------------|--------------|----------|--------|
+| **Recursive Entity Model** | ✅ Implemented (icn-entity) | Unified CooperativeEntity | CRITICAL | **INTEGRATION ONLY** |
+| **Protocol Governance** | Hardcoded parameters | Democratically adjustable | CRITICAL | Needs Phase 22 |
+| **SDIS Integration** | Phase S1-S6 complete | Full anchor-based identity | HIGH | Needs Phase 24 |
+| **Inter-Coop Economics** | Treasury + basic ledger | Clearing agreements, group purchasing | HIGH | Needs Phase 25 |
+| **Federation Hierarchy** | ✅ 90% implemented | Recursive federation | MEDIUM | Needs Phase 28 |
+| **Subsidiarity** | Not implemented | Decision scoping by level | MEDIUM | Needs Phase 28 |
 
 ---
 
 ## Gap 1: Unified CooperativeEntity Model
 
-### Current State
-- `icn-identity`: DIDs for individuals/devices
-- `icn-governance`: Proposals, votes, delegation (separate from identity)
-- `icn-ledger`: Accounts for DIDs (not for coops as first-class entities)
-- `icn-trust`: Trust between DIDs (not between coops/federations)
+**Status**: ✅ **IMPLEMENTED** (Integration remaining)
 
-Each subsystem has its own entity model that doesn't compose.
+### Current State (2026-01-20 Update)
 
-### Vision State
-A single `CooperativeEntity` type that:
-- Works at every scale (individual → coop → federation → global)
-- Composes identity, governance, economics, trust, compute
-- Is the spine that all subsystems attach to
+**The entity model is fully implemented:**
+- `icn-entity`: 4,624 LOC, 72 tests, **100% complete**
+- `icn-coop`: 4,125 LOC, 93 tests, **95% complete** (not spawned in supervisor)
+- `icn-governance`: 25,438 LOC, 347 tests, entity-scoped proposals
+- `icn-federation`: 14,732 LOC, 101 tests, multi-level federation
 
-### Gap Analysis
+**What's implemented:**
+- `CooperativeEntity` type with EntityId (`entity:icn:<type>:<identifier>`)
+- Entity types: Individual, Cooperative, Federation, Community
+- Recursive membership tracking
+- Entity-scoped governance
+- SledEntityRegistry for persistence
 
-| Component | Current | Needed |
-|-----------|---------|--------|
-| Identity | `Did` (individual focus) | `CooperativeEntity` with anchor |
-| Membership | Implicit via trust | Explicit recursive membership |
-| Governance | Per-proposal, no scoping | Entity-scoped, subsidiarity |
-| Treasury | Coop-level only | At every level |
-| Trust | DID-to-DID | Entity-to-entity, domain-aware |
+### Remaining Work (Phase 19)
 
-### Implementation Path
+| Task | Status | Effort |
+|------|--------|--------|
+| Spawn CoopActor in supervisor | ❌ Not done | 8 hours |
+| Add entity gossip topic | ❌ Not done | 4 hours |
+| Wire SledEntityRegistry | ❌ Not done | 4 hours |
+| Update gateway endpoints | ⚠️ Partial | 8 hours |
 
-1. **Define CooperativeEntity in icn-identity** (or new icn-entity crate)
-2. **Migrate icn-governance** to entity-scoped proposals
-3. **Migrate icn-ledger** to entity accounts (not just DID accounts)
-4. **Migrate icn-trust** to entity trust relationships
-5. **Update icn-gateway** APIs to work with entities
+**Total remaining: ~2 weeks** (not 6-8 weeks)
 
-### Estimated Effort: 6-8 weeks
+### Tracking Issue
+
+See GitHub Issue #738 for the integration work.
 
 ---
 
@@ -244,59 +247,71 @@ A single `CooperativeEntity` type that:
 
 ## Implementation Roadmap
 
-### Phase 19: Cooperative Entity Foundation (8 weeks)
-- [ ] Define CooperativeEntity core type
-- [ ] Entity-scoped governance
-- [ ] Entity accounts in ledger
-- [ ] Entity trust relationships
+**Note**: This roadmap has been reconciled with the main [ROADMAP.md](ROADMAP.md). Phase numbers below match the unified roadmap.
+
+### Phase 19: Entity & Coop Integration (2 weeks) ← **NEXT**
+- [x] CooperativeEntity core type (DONE - icn-entity)
+- [x] Entity-scoped governance (DONE - icn-governance)
+- [ ] Spawn CoopActor in supervisor
+- [ ] Add entity gossip topic
+- [ ] Wire SledEntityRegistry
 - [ ] Update gateway APIs
 
-### Phase 20: Protocol Governance (4 weeks)
+**Tracking**: #738
+
+### Phase 22: Protocol Governance (4 weeks)
 - [ ] ProtocolParameter types
 - [ ] Parameter governance domain
 - [ ] Change application mechanism
 - [ ] Constraint propagation
 
-### Phase 21: Inter-Coop Economics (8 weeks)
-- [ ] InterCoopAgreement implementation
-- [ ] Clearing house for settlement
-- [ ] Contribution tracking
-- [ ] Anti-extraction policies
-- [ ] Group purchasing (basic)
+**Tracking**: #267
 
-### Phase 22: SDIS Completion (8 weeks)
+### Phase 24: SDIS Completion (6 weeks)
 - [ ] ZK voting circuits
 - [ ] Cooperative anchor ceremonies
 - [ ] Steward network governance
 - [ ] Full credential ecosystem
 
-### Phase 23: Recursive Federation (6 weeks)
+**Tracking**: #269
+
+### Phase 25: Inter-Coop Economics (8 weeks)
+- [ ] InterCoopAgreement implementation
+- [ ] Clearing house for settlement
+- [ ] Labor shares and cooperative bonds
+- [ ] Contribution tracking
+- [ ] Anti-extraction policies
+- [ ] Group purchasing coordination
+
+**Tracking**: #268, #386
+
+### Phase 28: Recursive Federation & Subsidiarity (6 weeks)
 - [ ] Multi-level hierarchy
 - [ ] Recursive trust
 - [ ] Multi-level settlement
 - [ ] Proposal escalation
-
-### Phase 24: Subsidiarity (4 weeks)
 - [ ] Decision scoping
-- [ ] Automatic scope detection
 - [ ] Constraint enforcement
-- [ ] Override mechanisms
+
+**Tracking**: #270
 
 ---
 
 ## Dependencies
 
 ```
-Phase 19 (Entity Foundation)
+Phase 19 (Entity Integration)
     │
-    ├──► Phase 20 (Protocol Governance) ──► Phase 24 (Subsidiarity)
+    ├──► Phase 22 (Protocol Governance)
+    │       │
+    │       └──► Phase 28 (Federation & Subsidiarity)
     │
-    ├──► Phase 21 (Inter-Coop Economics)
+    ├──► Phase 24 (SDIS Completion)
     │
-    └──► Phase 22 (SDIS Completion)
-            │
-            └──► Phase 23 (Recursive Federation)
+    └──► Phase 25 (Inter-Coop Economics)
 ```
+
+See [ROADMAP.md](ROADMAP.md) for complete dependency graph including infrastructure phases.
 
 ## Success Criteria
 
@@ -311,9 +326,7 @@ The cooperative middle layer is complete when:
 
 ---
 
-## Next Steps
+## Change Log
 
-1. **Create GitHub issues** for each phase
-2. **Prioritize Phase 19** (Entity Foundation) as critical path
-3. **Begin CooperativeEntity design** document
-4. **Plan migration path** from current types to unified model
+- **2026-01-20**: Reconciled with Strategic Alignment Audit. Updated Gap 1 to reflect icn-entity implementation. Aligned phase numbers with unified ROADMAP.md.
+- **2025-12-24**: Initial draft
