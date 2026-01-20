@@ -1,6 +1,6 @@
 # ICN Roadmap
 
-**Last Updated**: 2026-01-17
+**Last Updated**: 2026-01-20
 **Current Phase**: 18 Complete, Phase 19 Next
 **Target**: Production-ready release followed by pilot deployment
 
@@ -10,9 +10,13 @@
 
 ICN is infrastructure for a **parallel political economy** — enabling cooperatives, communities, and federations to deliver better material outcomes than traditional capitalist and captured democratic systems.
 
+**Core Vision**: ICN is not just infrastructure *for* cooperatives — it is **cooperative infrastructure that governs itself democratically**. The protocols are adjustable by the organizations using them. This is the "Cooperative Middle Layer" vision.
+
 **See also**:
 - [ECONOMIC_VISION.md](../ECONOMIC_VISION.md) — Strategic framing and value proposition
 - [ECONOMIC_ARCHITECTURE.md](../ECONOMIC_ARCHITECTURE.md) — Technical design of the economic system
+- [COOPERATIVE_MIDDLE_LAYER_GAP_ANALYSIS.md](COOPERATIVE_MIDDLE_LAYER_GAP_ANALYSIS.md) — Vision gap analysis
+- [STRATEGIC_ALIGNMENT_AUDIT_2026-01-20.md](STRATEGIC_ALIGNMENT_AUDIT_2026-01-20.md) — Roadmap reconciliation audit
 
 ### The Dual-Track Approach
 
@@ -47,6 +51,8 @@ ICN development follows sequential phases. Each phase must be completed before t
 
 **Implementation Status**: ~75% complete (272K LOC, 2,287 tests, deployed on K3s)
 
+**Note**: This roadmap was reconciled on 2026-01-20 to integrate the Cooperative Middle Layer vision with the infrastructure roadmap. See the audit document for details.
+
 ---
 
 ## Completed Phases (1-18)
@@ -67,12 +73,39 @@ See [PHASE_HISTORY.md](../PHASE_HISTORY.md) for details on completed phases.
 
 ---
 
-## Planned Phases (19-34)
+## Planned Phases (19-35)
 
-### Phase 19: Release Infrastructure
+### Phase 19: Entity & Coop Integration
 **Status**: ⏳ Planned
 **Blockers**: None
-**Goal**: CI/CD pipeline ready for production releases
+**Goal**: Wire up completed entity and cooperative subsystems
+**Duration**: 2 weeks
+
+The CooperativeEntity model and Coop management code is **already implemented** (icn-entity: 4.6K LOC, icn-coop: 4.1K LOC). This phase completes integration into the runtime.
+
+**Effort Breakdown**: Core tasks ~24 hours (3 days), plus integration testing, documentation, and buffer for unexpected issues = 2 weeks total.
+
+**Issues**:
+- #738: CooperativeEntity integration (replaces deprecated #266; tracking issue)
+- Spawn CoopActor in supervisor (plan exists in COOP_INTEGRATION_PLAN.md)
+- Add entity gossip topic for multi-node sync
+- Wire SledEntityRegistry for persistence
+- Update gateway endpoints for full entity/coop CRUD
+
+**Deliverables**:
+- CoopActor spawned and persistent across restarts
+- Entity gossip synchronization working
+- Gateway has complete entity/coop API
+- Multi-node entity convergence tested
+
+**Related Epic**: #265 (ICN as Cooperative Middle Layer)
+
+---
+
+### Phase 20: Release & Testing Infrastructure
+**Status**: ⏳ Planned
+**Blockers**: None (can parallel with Phase 19)
+**Goal**: CI/CD pipeline and comprehensive testing
 
 Enable secure, validated releases with automated quality gates.
 
@@ -82,24 +115,6 @@ Enable secure, validated releases with automated quality gates.
 - #186: Benchmark regression detection in CI
 - #223: Horizontal Pod Autoscaling for icnd
 - #224: Backup validation tests
-
-**Deliverables**:
-- Signed release binaries with software bill of materials
-- Health checks run before every deployment
-- Performance regressions caught automatically
-- Auto-scaling under load
-- Backup/restore validated in CI
-
----
-
-### Phase 20: Testing Foundation
-**Status**: ⏳ Planned
-**Blockers**: None (can parallel with Phase 19)
-**Goal**: Comprehensive testing infrastructure
-
-Build confidence through systematic testing.
-
-**Issues**:
 - #226: Chaos engineering tests
 - #227: Performance benchmark suite
 - #228: Fuzz testing for CCL parser
@@ -109,10 +124,11 @@ Build confidence through systematic testing.
 - #329: Load testing and benchmarking suite
 
 **Deliverables**:
+- Signed release binaries with software bill of materials
+- Health checks run before every deployment
+- Performance regressions caught automatically
 - Fault injection framework
-- Reproducible performance benchmarks
 - CCL parser fuzzing in CI
-- Easy multi-node test setup
 - Load testing capability
 
 ---
@@ -140,7 +156,32 @@ Currently mDNS only works on local network. This phase enables global connectivi
 
 ---
 
-### Phase 22: Security Hardening
+### Phase 22: Protocol Governance
+**Status**: ⏳ Planned
+**Blockers**: Phase 19 (entity foundation)
+**Goal**: ICN governs itself democratically
+
+Enable the network to modify its own parameters through democratic governance.
+
+**Issues**:
+- #267: Protocol self-governance
+- NEW: ProtocolParameter type with modification scopes
+- NEW: Parameter governance domain in icn-governance
+- NEW: Change application mechanism with versioning
+- NEW: Constraint propagation (higher levels constrain lower)
+
+**Deliverables**:
+- ProtocolParameter types defined with scopes
+- Protocol Commons as root entity
+- Parameters changeable via governance proposals
+- Constraint inheritance across federation levels
+- Audit trail for all parameter changes
+
+**Related Epic**: #265 (ICN as Cooperative Middle Layer)
+
+---
+
+### Phase 23: Security Hardening
 **Status**: ⏳ Planned
 **Blockers**: Phase 21 (network must work first)
 **Goal**: Production-grade security posture
@@ -162,28 +203,73 @@ Close security gaps before exposing to internet.
 
 ---
 
-### Phase 23: Identity & Trust Evolution
+### Phase 24: Identity & SDIS Completion
 **Status**: ⏳ Planned
-**Blockers**: Phase 22
-**Goal**: Identity and trust that reflect reality
+**Blockers**: Phase 22 (protocol governance)
+**Goal**: Complete SDIS integration with ZK voting
 
-Make trust dynamic and identity robust.
+Finish the Sybil-resistant Decentralized Identity System.
 
 **Issues**:
 - #469: Key rotation events propagate via gossip
 - #248: Multi-device identity synchronization
 - #482: LRU cache with TTL for computed trust scores
 - #205: Enhanced onion routing circuit selection
+- #269: SDIS ZK voting and cooperative anchors
+- NEW: ZK voting circuits for anonymous one-person-one-vote
+- NEW: Cooperative anchor creation ceremonies
+- NEW: Steward network governance (stewards as cooperative)
+- NEW: Full L0-L3 credential ecosystem
 
 **Deliverables**:
 - Key rotations broadcast network-wide
 - Seamless multi-device experience
 - Fast trust score lookups
 - Privacy-preserving routing
+- ZK voting circuits operational
+- Steward network is itself a cooperative
+
+**Related Epic**: #265 (ICN as Cooperative Middle Layer)
 
 ---
 
-### Phase 24: SDK Completion
+### Phase 25: Inter-Cooperative Economics
+**Status**: ⏳ Planned
+**Blockers**: Phase 19 (entity integration), Phase 22 (protocol governance)
+**Goal**: Complete economic functionality for coop-to-coop coordination
+
+Implement Razeto's intercooperative economic patterns.
+
+**Issues**:
+- #268: Inter-cooperative economics (agreements, clearing, group purchasing)
+- #386: Razeto's Four Intercooperative Bodies Integration
+- #718-722: Labor assignment and credit routing types
+- #474: Per-currency-pair oracle rate thresholds
+- #318: Bilateral clearing house
+- #317: Inter-cooperative agreement framework
+- #208: Currency rebalancing policies
+- #327: Demurrage scheduler
+- #485: Cleared volume index compaction
+- #337: Use-based resource access model
+- NEW: Labor shares (earning through work)
+- NEW: Cooperative bonds (inter-coop financing)
+- NEW: Group purchasing coordination
+- NEW: Anti-extraction policies
+
+**Deliverables**:
+- Labor shares system operational
+- Cooperative bonds for inter-coop capital
+- Bilateral credit clearing with netting
+- Inter-coop agreements as first-class objects
+- Group purchasing coordination
+- Anti-extraction enforcement (ratio limits, ramp periods)
+- Demurrage scheduler running
+
+**Related Epic**: #265, #386
+
+---
+
+### Phase 26: SDK Completion
 **Status**: ⏳ Planned
 **Blockers**: Phase 21 (need stable network API)
 **Goal**: SDK ready for application developers
@@ -206,10 +292,10 @@ TypeScript SDK must be solid before apps can build on ICN.
 
 ---
 
-### Phase 25: Observability
+### Phase 27: Observability & Documentation
 **Status**: ⏳ Planned
-**Blockers**: Phase 19 (need CI infrastructure)
-**Goal**: Production monitoring and debugging
+**Blockers**: Phase 20 (need CI infrastructure)
+**Goal**: Production monitoring and complete documentation
 
 Operators need visibility into running systems.
 
@@ -220,24 +306,6 @@ Operators need visibility into running systems.
 - #494: Review metric cardinality
 - #495: Configurable trace sampling
 - #331: Enhanced Grafana dashboards
-
-**Deliverables**:
-- Request tracing across services
-- Real-time operational dashboard
-- Performance trends over time
-- Reasonable metric cardinality
-- Production-appropriate sampling
-
----
-
-### Phase 26: Documentation
-**Status**: ⏳ Planned
-**Blockers**: Phases 21-25 (document what exists)
-**Goal**: Operators and developers can use ICN
-
-Can't release without documentation.
-
-**Issues**:
 - #230: Production runbooks
 - #220: Service Level Objectives (SLOs)
 - #189: Secrets rotation runbook
@@ -249,42 +317,49 @@ Can't release without documentation.
 - #497: Gateway API versioning strategy
 
 **Deliverables**:
+- Request tracing across services
+- Real-time operational dashboard
+- Reasonable metric cardinality
+- Production-appropriate sampling
 - Runbooks for common operations
 - Defined SLOs with alerting
-- Security procedures documented
-- Technical internals explained
 - User-facing setup guides
 
 ---
 
-### Phase 27: Ledger & Economics
+### Phase 28: Recursive Federation & Subsidiarity
 **Status**: ⏳ Planned
-**Blockers**: Phase 22 (security first)
-**Goal**: Complete economic functionality
+**Blockers**: Phase 22 (protocol governance), Phase 25 (inter-coop economics)
+**Goal**: Federations of federations with proper decision scoping
 
-Full mutual credit system with inter-coop settlement.
+Enable arbitrary-depth federation with subsidiarity enforcement.
 
 **Issues**:
-- #474: Per-currency-pair oracle rate thresholds
-- #318: Bilateral clearing house
-- #317: Inter-cooperative agreement framework
-- #208: Currency rebalancing policies
-- #327: Demurrage scheduler
-- #485: Cleared volume index compaction
-- #337: Use-based resource access model
+- #270: Recursive federation hierarchy
+- NEW: Multi-level hierarchy (Coop → Federation → Meta-Federation → Global Commons)
+- NEW: Recursive trust calculation across levels
+- NEW: Multi-level settlement with netting
+- NEW: Proposal escalation mechanism
+- NEW: DecisionScope enum (Personal → Local → Regional → Network → Global)
+- NEW: Automatic scope detection for proposals
+- NEW: Constraint propagation enforcement
+- NEW: Override/appeal mechanism
 
 **Deliverables**:
-- Oracle rate validation
-- Bilateral credit clearing
-- Inter-coop agreements
-- Currency rebalancing
-- Time-based value decay
+- Federations of federations operational
+- Trust propagates through hierarchy
+- Settlement at each level
+- Governance bubbles up appropriately
+- Decisions made at lowest appropriate level
+- Clear scope boundaries enforced
+
+**Related Epic**: #265 (ICN as Cooperative Middle Layer)
 
 ---
 
-### Phase 28: CCL & Governance
+### Phase 29: CCL & Contracts
 **Status**: ⏳ Planned
-**Blockers**: Phase 27 (economics for contracts)
+**Blockers**: Phase 25 (economics for contracts)
 **Goal**: Contract ecosystem ready
 
 Contracts people can actually use.
@@ -296,7 +371,6 @@ Contracts people can actually use.
 - #332: Contract template library
 - #486: Explicit contract version fields
 - #487: Pre-execution gas estimation
-- #267: Protocol self-governance
 
 **Deliverables**:
 - Verified state isolation
@@ -308,7 +382,7 @@ Contracts people can actually use.
 
 ---
 
-### Phase 29: Code Quality
+### Phase 30: Code Quality
 **Status**: ⏳ Planned
 **Blockers**: None (can parallel)
 **Goal**: Clean, maintainable codebase
@@ -330,9 +404,9 @@ Technical debt cleanup before release.
 
 ---
 
-### Phase 30: Mobile SDK
+### Phase 31: Mobile SDK
 **Status**: ⏳ Planned
-**Blockers**: Phase 24 (TypeScript SDK first)
+**Blockers**: Phase 26 (TypeScript SDK first)
 **Goal**: Mobile applications possible
 
 React Native SDK for iOS/Android apps.
@@ -353,9 +427,9 @@ React Native SDK for iOS/Android apps.
 
 ---
 
-### Phase 31: Infrastructure Polish
+### Phase 32: Infrastructure Polish
 **Status**: ⏳ Planned
-**Blockers**: Phase 19
+**Blockers**: Phase 20
 **Goal**: Production Kubernetes deployment
 
 Enterprise-ready deployment.
@@ -376,29 +450,9 @@ Enterprise-ready deployment.
 
 ---
 
-### Phase 32: Federation
-**Status**: ⏳ Planned
-**Blockers**: Phases 21, 27 (network + economics)
-**Goal**: Cooperatives can interconnect
-
-Multiple ICN networks can coordinate.
-
-**Issues**:
-- #270: Recursive federation hierarchy
-- #268: Inter-cooperative economics (agreements, clearing, group purchasing)
-- #386: Razeto's Four Intercooperative Bodies Integration
-
-**Deliverables**:
-- Federations of federations
-- Cross-network settlement
-- Cooperative economic patterns
-- Theoretical foundation implemented
-
----
-
 ### Phase 33: CLI & UX Polish
 **Status**: ⏳ Planned
-**Blockers**: Phase 28 (features to expose)
+**Blockers**: Phase 29 (features to expose)
 **Goal**: Pleasant user experience
 
 Command-line and operational UX.
@@ -442,6 +496,8 @@ Final integration, polish, and validation.
 
 Deploy with actual cooperative, gather feedback.
 
+**Critical**: Issue #5 (Select Pilot Community) should begin immediately in parallel with Phase 19.
+
 **Deliverables**:
 - Pilot community selected
 - Onboarding completed
@@ -458,9 +514,7 @@ These issues exist but aren't assigned to phases yet:
 **Low Priority / Future**:
 - #506: Full algebraic constraints for STARK circuits
 - #481: HSM/TPM backend for keystore
-- #269: SDIS ZK voting and cooperative anchors
-- #265: ICN as Cooperative Middle Layer (epic)
-- #328: Chaos engineering framework
+- #328: Chaos engineering framework (partial in Phase 20)
 - #330: Message batching and compression
 - #412: Encryption integration TODO
 - #415: Dev-mode CSP documentation
@@ -471,18 +525,56 @@ These issues exist but aren't assigned to phases yet:
 - Cross-community exchange protocols (Stage D)
 - Fiat bridge interfaces (Stage E)
 
-*Note: Old Phase 21.x issues (#64-79) were closed as obsolete — they used a deprecated tracking system. Economic features now follow the staged approach documented in ECONOMIC_ARCHITECTURE.md.*
-
 ---
 
 ## Summary
 
 | Milestone | Phases | Target |
 |-----------|--------|--------|
-| **Testing Ready** | 19-20 | CI/CD + test infrastructure |
-| **Internet Ready** | 21-22 | NAT traversal + security |
-| **Developer Ready** | 23-26 | Identity + SDK + observability + docs |
-| **Feature Complete** | 27-29 | Economics + contracts + cleanup |
-| **Production Ready** | 30-33 | Mobile + infra + federation + UX |
+| **Foundation Ready** | 19 | Entity/Coop integration |
+| **Testing Ready** | 20 | CI/CD + test infrastructure |
+| **Internet Ready** | 21 | NAT traversal |
+| **Self-Governing** | 22 | Protocol governance |
+| **Secure** | 23 | Security hardening |
+| **Identity Complete** | 24 | SDIS + ZK voting |
+| **Economics Complete** | 25 | Inter-coop economics |
+| **Developer Ready** | 26-27 | SDK + observability + docs |
+| **Federated** | 28 | Recursive federation |
+| **Feature Complete** | 29-30 | Contracts + cleanup |
+| **Production Ready** | 31-33 | Mobile + infra + UX |
 | **Release** | 34 | RC validation |
 | **Pilot** | 35 | Real-world deployment |
+
+---
+
+## Phase Dependencies
+
+```
+Phase 19 (Entity Integration)
+    │
+    ├──► Phase 22 (Protocol Governance)
+    │       │
+    │       ├──► Phase 24 (SDIS Completion)
+    │       │
+    │       ├──► Phase 25 (Inter-Cooperative Economics)
+    │       │       │
+    │       │       └──► Phase 29 (CCL & Contracts)
+    │       │
+    │       └──► Phase 28 (Federation & Subsidiarity)
+    │               [also depends on Phase 25]
+
+Phase 20 (Testing) ──► Phase 27 (Observability) ──► Phase 32 (Infrastructure)
+
+Phase 21 (Network) ──► Phase 23 (Security) ──► Phase 26 (SDK)
+
+Phase 26 (SDK) ──► Phase 31 (Mobile)
+
+All Phases ──► Phase 34 (RC) ──► Phase 35 (Pilot)
+```
+
+---
+
+## Change Log
+
+- **2026-01-20**: Reconciled with Cooperative Middle Layer vision. Added Phases 22 (Protocol Governance), 24 (SDIS Completion), 25 (Inter-Coop Economics), 28 (Federation & Subsidiarity). Renumbered subsequent phases. See STRATEGIC_ALIGNMENT_AUDIT_2026-01-20.md.
+- **2026-01-17**: Initial roadmap with Phases 19-35.
