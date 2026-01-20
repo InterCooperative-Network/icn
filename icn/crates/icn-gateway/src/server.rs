@@ -314,14 +314,14 @@ impl GatewayServer {
             ));
         }
 
-        // SECURITY: Warn if JWT secret is too short
+        // SECURITY: Enforce minimum JWT secret length for HS256 security
         if self.jwt_secret.len() < 32 {
-            warn!(
-                "SECURITY WARNING: JWT secret is only {} bytes. \
-                 Recommended minimum is 32 bytes for HS256. \
-                 Tokens may be vulnerable to brute-force attacks.",
+            return Err(GatewayError::InternalError(format!(
+                "SECURITY: JWT secret is only {} bytes. \
+                 Minimum 32 bytes required for HS256 to resist brute-force attacks. \
+                 Generate a secure secret with: openssl rand -base64 32",
                 self.jwt_secret.len()
-            );
+            )));
         }
 
         // Create shared managers

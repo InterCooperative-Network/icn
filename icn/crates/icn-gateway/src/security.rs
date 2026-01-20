@@ -72,6 +72,16 @@ impl Default for SecurityConfig {
 }
 
 impl SecurityConfig {
+    /// Validate and set a custom CSP directive.
+    /// Returns an error if the directive contains invalid header characters.
+    pub fn with_csp_directive(mut self, directive: String) -> Result<Self, String> {
+        // Validate that the directive can be parsed as a header value
+        actix_web::http::header::HeaderValue::from_str(&directive)
+            .map_err(|e| format!("Invalid CSP directive: {}", e))?;
+        self.csp_directive = directive;
+        Ok(self)
+    }
+
     /// Development configuration (permissive CORS for local development)
     pub fn development() -> Self {
         Self {
@@ -231,9 +241,17 @@ where
                 let headers = res.headers_mut();
 
                 // Content Security Policy
-                // SAFETY: csp_directive is validated at config load time
-                #[allow(clippy::unwrap_used)]
-                let csp_value = HeaderValue::from_str(&config.csp_directive).unwrap();
+                // SAFETY: Default CSP directives are hardcoded valid strings.
+                // Custom directives must use with_csp_directive() which validates the input.
+                // Using unwrap_or with a safe fallback rather than expect() due to crate lint rules.
+                let csp_value = HeaderValue::from_str(&config.csp_directive).unwrap_or_else(|_| {
+                    // This should never happen with validated configs, but provide safe fallback
+                    tracing::error!(
+                        "Invalid CSP directive in config - using restrictive default. \
+                             Use with_csp_directive() to validate custom directives."
+                    );
+                    HeaderValue::from_static("default-src 'none'")
+                });
                 headers.insert(
                     HeaderName::from_static("content-security-policy"),
                     csp_value,

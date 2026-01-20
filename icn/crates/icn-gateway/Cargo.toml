@@ -95,14 +95,14 @@ utoipa = { version = "4", features = ["actix_extras"] }
 utoipa-swagger-ui = { version = "6", features = ["actix-web"] }
 
 # HTTP client for FCM
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { workspace = true }
 
 # Email/SMTP
 lettre = { version = "0.11", default-features = false, features = ["tokio1-rustls-tls", "smtp-transport", "builder"] }
 
 [dev-dependencies]
 futures = "0.3"
-reqwest = "0.12"
+reqwest = { workspace = true }
 tempfile = "3"
 criterion = { version = "0.5", features = ["async_tokio"] }
 prometheus = "0.14"

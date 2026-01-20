@@ -5,6 +5,7 @@
 
 use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
@@ -355,11 +356,10 @@ impl FcmClient {
         // Sign the JWT
         let jwt = self.sign_jwt(&claims)?;
 
-        // Exchange JWT for access token
-        let params = [
-            ("grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer"),
-            ("assertion", &jwt),
-        ];
+        // Exchange JWT for access token (reqwest 0.13+ requires Serialize for form())
+        let mut params = HashMap::new();
+        params.insert("grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer");
+        params.insert("assertion", jwt.as_str());
 
         let response = self
             .http_client
