@@ -540,4 +540,46 @@ mod tests {
             "Development CSP should allow unsafe-eval for HMR"
         );
     }
+
+    #[test]
+    fn test_with_csp_directive_accepts_valid() {
+        let config = SecurityConfig::default();
+        let result = config.with_csp_directive("default-src 'self'".to_string());
+        assert!(result.is_ok());
+        let updated = result.unwrap();
+        assert_eq!(updated.csp_directive, "default-src 'self'");
+    }
+
+    #[test]
+    fn test_with_csp_directive_accepts_complex_policy() {
+        let config = SecurityConfig::default();
+        let complex_csp = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:".to_string();
+        let result = config.with_csp_directive(complex_csp.clone());
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().csp_directive, complex_csp);
+    }
+
+    #[test]
+    fn test_with_csp_directive_rejects_newline() {
+        let config = SecurityConfig::default();
+        let result = config.with_csp_directive("default-src 'self'\nmalicious".to_string());
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Invalid CSP directive"));
+    }
+
+    #[test]
+    fn test_with_csp_directive_rejects_carriage_return() {
+        let config = SecurityConfig::default();
+        let result = config.with_csp_directive("default-src 'self'\rmalicious".to_string());
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Invalid CSP directive"));
+    }
+
+    #[test]
+    fn test_with_csp_directive_rejects_null_byte() {
+        let config = SecurityConfig::default();
+        let result = config.with_csp_directive("default-src\x00".to_string());
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Invalid CSP directive"));
+    }
 }
