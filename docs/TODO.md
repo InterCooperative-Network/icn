@@ -1,35 +1,28 @@
 # ICN TODO (ordered)
 
-1) Resolve Rust toolchain mismatch:
-   - rustc 1.88.0 fails due to wasmtime/cranelift requiring 1.89.0
-   - Option A: upgrade toolchain to 1.89.0
-   - Option B: pin compatible wasmtime/cranelift versions
-   Acceptance: cargo fmt/clippy/test can start without toolchain error.
+1) Standardize Rust toolchain to 1.89.0:
+   - Current local override is set in icn/ to satisfy wasmtime/cranelift
+   - Option: add rust-toolchain.toml or update docs to declare required version
+   Acceptance: repo clearly specifies required rustc and baseline runs without manual overrides.
 
-2) Re-verify CI baseline (from icn/):
-   - cargo fmt --all --check
-   - cargo clippy --workspace --all-targets --all-features -- -D warnings
-   - cargo test --workspace
-   Acceptance: results captured and docs/ci/CI_CURRENT_STATUS.md updated with current timestamp.
-
-3) Refresh status docs with current timestamps and outcomes:
-   - docs/ci/CI_CURRENT_STATUS.md
+2) Refresh status docs with current timestamps and outcomes:
+   - docs/ci/CI_CURRENT_STATUS.md (updated 2026-01-20)
    - docs/status/FINAL_SESSION_STATUS.md
    - docs/status/TESTS_FIXED_STATUS.md
    - docs/status/CURRENT_SYSTEM_STATUS.md
    Acceptance: each file reflects latest verification date and status.
 
-4) Demo runtime validation (if demo is needed):
+3) Demo runtime validation (if demo is needed):
    - Start icnd/gateway/pilot-ui
    - Verify /v1/health returns 200 and UI loads
    Acceptance: health check succeeds; UI renders without console errors.
 
-5) PRs:
+4) PRs:
    - chore/opencode-pilot-ui branch (opencode + pilot-ui changes)
    - docs/status-sync-2026-01-19 branch (status doc sync + STATE/TODO updates)
    Acceptance: PRs opened with summaries and reviewers assigned.
 
-6) Phase 19 planning (Release Infrastructure):
+5) Phase 19 planning (Release Infrastructure):
    - #183 Binary signing and SBOM generation
    - #184 Pre-deployment health validation
    - #186 Benchmark regression detection in CI
@@ -37,12 +30,12 @@
    - #224 Backup validation tests
    Acceptance: choose next issue and write a short execution plan.
 
-7) If Gateway API changes, regenerate TS types:
+6) If Gateway API changes, regenerate TS types:
    - cd icn && ./target/debug/icnctl api export-openapi -o ../docs/api/openapi.generated.yaml
    - cd sdk/typescript && npm run generate-types && npm run check-types
    Acceptance: generated types are committed and check-types passes.
 
-8) Code review follow-ups:
+7) Code review follow-ups:
    - Consider secondary index/unsorted pagination for large domain counts (icn-gateway/src/api/governance.rs:174-176).
    - Wire personhood store + anchor rate limit config (icn-core/src/supervisor/mod.rs:499-500).
    - Implement treasury disbursement/redemption/bond issuance (icn-core/src/supervisor/governance_handlers.rs:392-419).

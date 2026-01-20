@@ -27,7 +27,7 @@
 ## Current status (2026-01-20 snapshot)
 - Roadmap (docs/dev-journal/ROADMAP.md): Phase 18 complete, Phase 19 (Release Infrastructure) next; implementation ~75% (272K LOC, 2,287 tests).
 - CI status docs last updated 2025-12-18; re-run CI baseline to refresh timestamps.
-- Local CI baseline attempt 2026-01-20 failed: rustc 1.88.0 incompatible with wasmtime/cranelift (needs 1.89.0).
+- Local CI baseline 2026-01-20 passed with rustc 1.89.0 override in icn/. (fmt/clippy/test).
 - K3s/self-hosted runner node down (2026-01-20 per user report); deploy workflows blocked.
 - Demo status doc (2025-12-18) reports daemon/gateway/UI running; re-validate before presenting.
 - Homelab deployment (docs/HOMELAB_DEPLOYMENT.md): K3s cluster running with self-hosted runner and monitoring stack (deployed 2025-12-03).

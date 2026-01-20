@@ -1,20 +1,19 @@
 # CI Status: ALL GREEN ✅
 
-**Last Updated**: 2025-12-18 04:02 UTC
-**Status**: **ALL CHECKS PASSING** ��
+**Last Updated**: 2026-01-20 (local run)
+**Status**: **ALL CHECKS PASSING** 🟢
 
 ---
 
 ## 🔎 Current Notes (2026-01-20)
-- This report is historical and based on 2025-12-18 runs.
-- Local CI baseline on 2026-01-20 failed due to rustc 1.88.0; wasmtime/cranelift require rustc 1.89.0.
+- Local CI baseline on 2026-01-20 succeeded with rustc 1.89.0 override in icn/.
 - K3s/self-hosted runner node is down (per user report); deployment workflows blocked.
 
 ---
 
 ## Latest Local Run (2026-01-20)
-- Result: FAILED before fmt/clippy/test due to rustc version mismatch.
-- Action needed: upgrade toolchain to 1.89.0 or pin compatible wasmtime/cranelift versions.
+- Result: PASSED (cargo fmt, cargo clippy, cargo test --workspace).
+- Toolchain: rustc 1.89.0 override in icn/.
 
 ---
 
