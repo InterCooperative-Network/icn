@@ -4,17 +4,40 @@
 
 import { test, expect } from '@playwright/test';
 
+test.use({ serviceWorkers: 'block' });
+
 // Mock API helper
 async function mockApiResponses(page) {
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
+    'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+  };
+
   await page.route('**/v1/**', route => {
     const url = route.request().url();
+    const now = Date.now();
+
+    if (route.request().method() === 'OPTIONS') {
+      return route.fulfill({ status: 204, headers: corsHeaders });
+    }
+
+    if (url.endsWith('/health')) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: corsHeaders,
+        body: JSON.stringify({ status: 'ok' }),
+      });
+    }
 
     // Mock balance endpoint
     if (url.includes('/ledger/') && url.includes('/balance/')) {
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ balance: 42.5, currency: 'hours' }),
+        headers: corsHeaders,
+        body: JSON.stringify({ balances: { hours: 42.5 } }),
       });
     }
 
@@ -23,25 +46,28 @@ async function mockApiResponses(page) {
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
+        headers: corsHeaders,
         body: JSON.stringify({
           transactions: [
             {
               id: '1',
-              from: 'did:icn:alice',
-              to: 'did:icn:bob',
-              amount: 5,
-              currency: 'hours',
+              timestamp: now - 1000 * 60 * 60,
+              author: 'did:icn:alice',
               memo: 'Garden work',
-              timestamp: Math.floor(Date.now() / 1000) - 1000,
+              accounts: [
+                { account_id: 'did:icn:alice', currency: 'hours', debit: 5 },
+                { account_id: 'did:icn:bob', currency: 'hours', credit: 5 },
+              ],
             },
             {
               id: '2',
-              from: 'did:icn:bob',
-              to: 'did:icn:alice',
-              amount: 3,
-              currency: 'hours',
+              timestamp: now - 1000 * 60 * 120,
+              author: 'did:icn:bob',
               memo: 'Tech support',
-              timestamp: Math.floor(Date.now() / 1000) - 2000,
+              accounts: [
+                { account_id: 'did:icn:bob', currency: 'hours', debit: 3 },
+                { account_id: 'did:icn:alice', currency: 'hours', credit: 3 },
+              ],
             },
           ],
         }),
@@ -49,10 +75,11 @@ async function mockApiResponses(page) {
     }
 
     // Mock cooperative members endpoint
-    if (url.includes('/coops/') && url.endsWith('/members')) {
+    if (url.includes('/coops/') && !url.includes('/members')) {
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
+        headers: corsHeaders,
         body: JSON.stringify({
           members: [
             { did: 'did:icn:alice', role: 'owner', balance: 42.5 },
@@ -65,18 +92,27 @@ async function mockApiResponses(page) {
 
     // Mock governance proposals endpoint
     if (url.includes('/gov/') && url.includes('/proposals')) {
+      if (url.includes('/votes')) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          headers: corsHeaders,
+          body: JSON.stringify({ for_votes: 5, against_votes: 2, abstain_votes: 1 }),
+        });
+      }
+
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
+        headers: corsHeaders,
         body: JSON.stringify({
-          proposals: [
+          data: [
             {
               id: '1',
               title: 'Update credit limit',
               description: 'Increase default credit limit to -100',
-              state: 'open',
-              deadline: Math.floor(Date.now() / 1000) + 86400,
-              votes: { for: 5, against: 2, abstain: 1 },
+              state: 'Open',
+              closes_at: new Date(now + 86400 * 1000).toISOString(),
             },
           ],
         }),
@@ -84,21 +120,21 @@ async function mockApiResponses(page) {
     }
 
     // Default: return 404
-    route.fulfill({ status: 404 });
+    route.fulfill({ status: 404, headers: corsHeaders });
   });
 }
 
 // Login helper
 async function loginToApp(page) {
+  // Mock the API responses
+  await mockApiResponses(page);
+
   await page.goto('/');
 
-  await page.fill('#gateway-url', 'http://localhost:8080');
+  await page.fill('#gateway-url', 'http://localhost:8000');
   await page.fill('#coop-id', 'test-coop');
   await page.fill('#did', 'did:icn:test123');
   await page.fill('#token', 'test-token-123');
-
-  // Mock the API responses
-  await mockApiResponses(page);
 
   await page.click('#login-btn');
 
@@ -272,7 +308,7 @@ test.describe('History Tab', () => {
     await page.waitForSelector('#history-filter');
 
     const filter = page.locator('#history-filter');
-    await filter.selectOption('7days');
+    await filter.selectOption('week');
 
     // Transactions should be filtered
     // (This would work with actual data)
