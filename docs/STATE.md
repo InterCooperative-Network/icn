@@ -45,6 +45,9 @@
 - ✅ icn-steward: message-level signatures implemented for VUI sync (icn-steward/src/gossip.rs).
 - icn-compute: federated task settlement TODO (icn-compute/src/actor/placement.rs:983-988).
 - ✅ icn-gossip storage challenge: ContentNotFound response implemented (icn-gossip/src/handlers/storage_challenge.rs).
+- ✅ icn-gossip storage challenge: timestamp validation for replay attack prevention added (icn-gossip/src/handlers/storage_challenge.rs).
+- ✅ icn-gossip storage challenge: comprehensive metrics added (icn-obs/src/metrics/storage.rs).
+- ✅ icn-gateway agreements: comprehensive input validation for all API types (icn-gateway/src/api/agreements.rs).
 - icnctl: automatic daemon start TODO (bins/icnctl/src/main.rs:6532-6541).
 - ✅ deny.toml: license field added to all crates (icn/deny.toml).
 
