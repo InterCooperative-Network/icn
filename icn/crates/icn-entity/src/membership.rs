@@ -855,6 +855,41 @@ mod tests {
     }
 
     #[test]
+    fn test_assignment_remove() {
+        let member = create_test_individual();
+        let coop = create_test_coop();
+        let mut membership = Membership::active(member, coop, MembershipRole::Worker);
+
+        membership.add_assignment("assign-001");
+        membership.add_assignment("assign-002");
+        assert_eq!(membership.assignments.len(), 2);
+
+        membership.remove_assignment("assign-001");
+        assert_eq!(membership.assignments.len(), 1);
+        assert!(!membership.assignments.contains(&"assign-001".to_string()));
+        assert!(membership.assignments.contains(&"assign-002".to_string()));
+    }
+
+    #[test]
+    fn test_assignment_duplicate_add() {
+        let member = create_test_individual();
+        let coop = create_test_coop();
+        let mut membership = Membership::active(member, coop, MembershipRole::Worker);
+
+        membership.add_assignment("assign-001");
+        let timestamp_after_first = membership.updated_at;
+
+        std::thread::sleep(std::time::Duration::from_millis(10));
+
+        membership.add_assignment("assign-001");
+        assert_eq!(membership.assignments.len(), 1);
+        assert_eq!(
+            membership.updated_at, timestamp_after_first,
+            "Duplicate add should not update timestamp"
+        );
+    }
+
+    #[test]
     fn test_is_primary_default() {
         let member = create_test_individual();
         let coop = create_test_coop();

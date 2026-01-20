@@ -3,6 +3,7 @@
 //! These types model cooperative labor assignments, labor pools, and credit routing
 //! for inter-cooperative work arrangements.
 
+use crate::error::{EntityError, Result};
 use serde::{Deserialize, Serialize};
 
 // ============================================================================
@@ -49,7 +50,7 @@ pub enum RoutingMode {
     ThroughHomeCoop,
     /// Credits go directly to the worker, home cooperative gets a fee.
     DirectToWorker,
-    /// Split between worker (direct) and home cooperative.
+    /// Split between worker (direct) and home cooperative (0-100).
     Split { worker_pct: u8 },
 }
 
@@ -58,7 +59,7 @@ pub enum RoutingMode {
 pub struct CreditRouting {
     /// How credits flow.
     pub routing_mode: RoutingMode,
-    /// Home cooperative's coordination fee in basis points.
+    /// Home cooperative's coordination fee in basis points (0-10000).
     pub admin_fee_bps: u16,
     /// Whether host contributes to worker's home cooperative shares.
     pub share_contribution: bool,
@@ -88,7 +89,7 @@ pub struct LaborAssignment {
     pub assignment_type: AssignmentType,
     /// Start date (unix timestamp).
     pub start_date: u64,
-    /// End date (None for open-ended).
+    /// End date (None for open-ended, must be greater than start date).
     pub end_date: Option<u64>,
     /// Credit routing configuration.
     pub credit_routing: CreditRouting,
@@ -96,6 +97,50 @@ pub struct LaborAssignment {
     pub status: AssignmentStatus,
     /// Governance proposals (from both cooperatives).
     pub approvals: AssignmentApprovals,
+}
+
+impl RoutingMode {
+    /// Validate routing configuration invariants.
+    pub fn validate(&self) -> Result<()> {
+        if let RoutingMode::Split { worker_pct } = self {
+            if *worker_pct > 100 {
+                return Err(EntityError::InvalidFormat(format!(
+                    "worker_pct must be between 0 and 100, got {worker_pct}"
+                )));
+            }
+        }
+        Ok(())
+    }
+}
+
+impl CreditRouting {
+    /// Validate routing configuration invariants.
+    pub fn validate(&self) -> Result<()> {
+        self.routing_mode.validate()?;
+        if self.admin_fee_bps > 10_000 {
+            return Err(EntityError::InvalidFormat(format!(
+                "admin_fee_bps must be between 0 and 10000, got {}",
+                self.admin_fee_bps
+            )));
+        }
+        Ok(())
+    }
+}
+
+impl LaborAssignment {
+    /// Validate assignment invariants.
+    pub fn validate(&self) -> Result<()> {
+        self.credit_routing.validate()?;
+        if let Some(end_date) = self.end_date {
+            if end_date <= self.start_date {
+                return Err(EntityError::InvalidFormat(format!(
+                    "end_date must be greater than start_date (start_date={}, end_date={})",
+                    self.start_date, end_date
+                )));
+            }
+        }
+        Ok(())
+    }
 }
 
 // ============================================================================
@@ -200,6 +245,113 @@ mod tests {
         let json = serde_json::to_string(&assignment).unwrap();
         let parsed: LaborAssignment = serde_json::from_str(&json).unwrap();
         assert_eq!(assignment, parsed);
+    }
+
+    #[test]
+    fn test_assignment_type_roundtrip_variants() {
+        let variants = vec![
+            AssignmentType::Project {
+                project_id: "project-xyz".to_string(),
+            },
+            AssignmentType::Seasonal {
+                season: "winter".to_string(),
+            },
+            AssignmentType::Trial { duration_days: 90 },
+            AssignmentType::DualMembership,
+        ];
+
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let parsed: AssignmentType = serde_json::from_str(&json).unwrap();
+            assert_eq!(variant, parsed);
+        }
+    }
+
+    #[test]
+    fn test_assignment_status_roundtrip_variants() {
+        let variants = vec![
+            AssignmentStatus::Proposed,
+            AssignmentStatus::Active,
+            AssignmentStatus::Completed {
+                completed_at: 1_700_000_000,
+            },
+            AssignmentStatus::Terminated {
+                at: 1_700_000_500,
+                reason: "mutual".to_string(),
+            },
+        ];
+
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let parsed: AssignmentStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(variant, parsed);
+        }
+    }
+
+    #[test]
+    fn test_routing_mode_roundtrip_variants() {
+        let variants = vec![
+            RoutingMode::ThroughHomeCoop,
+            RoutingMode::DirectToWorker,
+            RoutingMode::Split { worker_pct: 50 },
+        ];
+
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let parsed: RoutingMode = serde_json::from_str(&json).unwrap();
+            assert_eq!(variant, parsed);
+        }
+    }
+
+    #[test]
+    fn test_availability_roundtrip_variants() {
+        let variants = vec![
+            Availability::Immediate,
+            Availability::FromDate(1_700_000_000),
+            Availability::Seasonal {
+                seasons: vec!["winter".to_string(), "summer".to_string()],
+            },
+            Availability::PartTime { hours_per_week: 20 },
+        ];
+
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let parsed: Availability = serde_json::from_str(&json).unwrap();
+            assert_eq!(variant, parsed);
+        }
+    }
+
+    #[test]
+    fn test_credit_routing_validation() {
+        let routing = CreditRouting {
+            routing_mode: RoutingMode::Split { worker_pct: 80 },
+            admin_fee_bps: 150,
+            share_contribution: true,
+        };
+        routing.validate().unwrap();
+
+        let routing = CreditRouting {
+            routing_mode: RoutingMode::Split { worker_pct: 120 },
+            admin_fee_bps: 150,
+            share_contribution: false,
+        };
+        assert!(routing.validate().is_err());
+
+        let routing = CreditRouting {
+            routing_mode: RoutingMode::ThroughHomeCoop,
+            admin_fee_bps: 20_000,
+            share_contribution: false,
+        };
+        assert!(routing.validate().is_err());
+    }
+
+    #[test]
+    fn test_assignment_date_validation() {
+        let mut assignment = sample_assignment();
+        assignment.validate().unwrap();
+
+        assignment.end_date = Some(assignment.start_date);
+        assert!(assignment.validate().is_err());
     }
 
     #[test]
