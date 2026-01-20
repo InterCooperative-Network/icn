@@ -86,7 +86,7 @@ The CooperativeEntity model and Coop management code is **already implemented** 
 **Effort Breakdown**: Core tasks ~24 hours (3 days), plus integration testing, documentation, and buffer for unexpected issues = 2 weeks total.
 
 **Issues**:
-- #738: CooperativeEntity integration (tracking issue)
+- #738: CooperativeEntity integration (replaces deprecated #266; tracking issue)
 - Spawn CoopActor in supervisor (plan exists in COOP_INTEGRATION_PLAN.md)
 - Add entity gossip topic for multi-node sync
 - Wire SledEntityRegistry for persistence
@@ -556,11 +556,12 @@ Phase 19 (Entity Integration)
     │       │
     │       ├──► Phase 24 (SDIS Completion)
     │       │
+    │       ├──► Phase 25 (Inter-Cooperative Economics)
+    │       │       │
+    │       │       └──► Phase 29 (CCL & Contracts)
+    │       │
     │       └──► Phase 28 (Federation & Subsidiarity)
-    │
-    └──► Phase 25 (Inter-Coop Economics)
-            │
-            └──► Phase 29 (CCL & Contracts)
+    │               [also depends on Phase 25]
 
 Phase 20 (Testing) ──► Phase 27 (Observability) ──► Phase 32 (Infrastructure)
 

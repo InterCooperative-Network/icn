@@ -304,11 +304,12 @@ Phase 19 (Entity Integration)
     │
     ├──► Phase 22 (Protocol Governance)
     │       │
+    │       ├──► Phase 24 (SDIS Completion)
+    │       │
+    │       ├──► Phase 25 (Inter-Cooperative Economics)
+    │       │
     │       └──► Phase 28 (Federation & Subsidiarity)
-    │
-    ├──► Phase 24 (SDIS Completion)
-    │
-    └──► Phase 25 (Inter-Coop Economics)
+    │               [also depends on Phase 25]
 ```
 
 See [ROADMAP.md](ROADMAP.md) for complete dependency graph including infrastructure phases.

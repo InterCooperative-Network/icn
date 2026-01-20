@@ -68,7 +68,7 @@ Focus: **Entity Model → Self-Governance → Economics → Federation**
 - ROADMAP Phase 20 = Testing Foundation
 - Vision Phase 20 = Protocol Governance
 
-This creates confusion: What is "Phase 19" work?
+This creates confusion: What exactly counts as Phase 19 work (ROADMAP Release Infrastructure vs. Vision Cooperative Entity Foundation)?
 
 ---
 
@@ -220,9 +220,9 @@ Phase 28: Recursive Federation & Subsidiarity (6 weeks)
 Phase 29-32: Mobile, Infrastructure, CLI, Code Quality
   [From original ROADMAP]
 
-Phase 33: Release Candidate
+Phase 34: Release Candidate
 
-Phase 34: Pilot Deployment
+Phase 35: Pilot Deployment
 ```
 
 **Benefits**:
