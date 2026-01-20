@@ -22,6 +22,11 @@ pub mod commons;
 pub mod commons_store;
 pub mod keybundle;
 pub mod keystore;
+pub mod keystore_backend;
+#[cfg(feature = "hsm")]
+pub mod keystore_pkcs11;
+#[cfg(feature = "tpm")]
+pub mod keystore_tpm;
 pub mod multi_device;
 pub mod personhood;
 pub mod personhood_store;
@@ -49,6 +54,15 @@ pub use commons::{
 pub use commons_store::CommonsHolderStore;
 pub use keybundle::KeyBundle;
 pub use keystore::{AgeKeyStore, KeyRotation, KeyStore, RotationReason};
+pub use keystore_backend::{BackendConfig, KeyStoreBackend, SigningBackend};
+#[cfg(feature = "hsm")]
+pub use keystore_backend::Pkcs11Config;
+#[cfg(feature = "hsm")]
+pub use keystore_pkcs11::Pkcs11Backend;
+#[cfg(feature = "tpm")]
+pub use keystore_backend::TpmConfig;
+#[cfg(feature = "tpm")]
+pub use keystore_tpm::TpmBackend;
 pub use multi_device::{
     Capability, DidDocument, KeyType, RecoveryConfig, RecoveryMethod, RecoveryProof,
     RevocationReason, RotationEvent, RotationEventType, VerificationMethod,
