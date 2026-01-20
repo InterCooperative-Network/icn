@@ -20,6 +20,7 @@ pub mod batch_verify;
 pub mod bundle;
 pub mod commons;
 pub mod commons_store;
+pub mod did_signer;
 pub mod keybundle;
 pub mod keystore;
 pub mod keystore_backend;
@@ -52,6 +53,7 @@ pub use commons::{
     JurisdictionType, MembershipCapability, MembershipStatus,
 };
 pub use commons_store::CommonsHolderStore;
+pub use did_signer::{DidKey, DidSigner, SoftwareSigner};
 pub use keybundle::KeyBundle;
 pub use keystore::{AgeKeyStore, KeyRotation, KeyStore, RotationReason};
 pub use keystore_backend::{BackendConfig, KeyStoreBackend, SigningBackend};
