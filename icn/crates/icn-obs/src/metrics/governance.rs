@@ -125,10 +125,7 @@ pub fn init_descriptions() {
         "icn_governance_participation_percentage",
         "Participation percentage in proposals"
     );
-    describe_histogram!(
-        "icn_governance_quorum_margin",
-        "Margin to quorum threshold"
-    );
+    describe_histogram!("icn_governance_quorum_margin", "Margin to quorum threshold");
     describe_counter!(
         "icn_governance_quorum_not_met_total",
         "Total number of proposals failing quorum"
@@ -177,7 +174,8 @@ pub fn proposals_opened_inc() {
 
 /// Increment proposals closed counter with outcome label
 pub fn proposals_closed_inc(outcome: &str) {
-    counter!("icn_governance_proposals_closed_total", "outcome" => outcome.to_string()).increment(1);
+    counter!("icn_governance_proposals_closed_total", "outcome" => outcome.to_string())
+        .increment(1);
 }
 
 /// Set active proposals gauge
@@ -267,7 +265,8 @@ pub fn orphan_cleanup_failures_inc() {
 
 /// Record delegation reconciliation duration
 pub fn delegation_reconciliation_duration_observe(duration_seconds: f64) {
-    histogram!("icn_governance_delegation_reconciliation_duration_seconds").record(duration_seconds);
+    histogram!("icn_governance_delegation_reconciliation_duration_seconds")
+        .record(duration_seconds);
 }
 
 /// Increment delegation cycle detected counter
@@ -284,12 +283,14 @@ pub fn delegation_cycles_found_add(count: u64) {
 
 /// Increment execution failures counter with reason label
 pub fn execution_failures_inc(reason: &str) {
-    counter!("icn_governance_execution_failures_total", "reason" => reason.to_string()).increment(1);
+    counter!("icn_governance_execution_failures_total", "reason" => reason.to_string())
+        .increment(1);
 }
 
 /// Increment proposals executed counter with payload type label
 pub fn proposals_executed_inc(payload_type: &str) {
-    counter!("icn_governance_proposals_executed_total", "payload_type" => payload_type.to_string()).increment(1);
+    counter!("icn_governance_proposals_executed_total", "payload_type" => payload_type.to_string())
+        .increment(1);
 }
 
 /// Record proposal execution duration with payload type label
@@ -316,12 +317,14 @@ pub fn participation_percentage_observe(proposal_type: &str, percentage: f64) {
 
 /// Record quorum margin with proposal type label
 pub fn quorum_margin_observe(proposal_type: &str, margin: f64) {
-    histogram!("icn_governance_quorum_margin", "proposal_type" => proposal_type.to_string()).record(margin);
+    histogram!("icn_governance_quorum_margin", "proposal_type" => proposal_type.to_string())
+        .record(margin);
 }
 
 /// Increment quorum not met counter with proposal type label
 pub fn quorum_not_met_inc(proposal_type: &str) {
-    counter!("icn_governance_quorum_not_met_total", "proposal_type" => proposal_type.to_string()).increment(1);
+    counter!("icn_governance_quorum_not_met_total", "proposal_type" => proposal_type.to_string())
+        .increment(1);
 }
 
 /// Increment emergency quorum not met counter with emergency type label
