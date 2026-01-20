@@ -2203,7 +2203,9 @@ let profileData = {
         saturday: 'Not available',
         sunday: 'Not available'
     },
+    availabilitySummary: '',
     contact: {
+        info: '',
         email: '',
         phone: '',
         location: ''
@@ -2216,7 +2218,8 @@ let profileData = {
 
 // Load profile when Profile tab is opened
 document.addEventListener('click', (e) => {
-    if (e.target.dataset.tab === 'member-profile') {
+    const profileTab = e.target.closest?.('[data-tab="member-profile"]');
+    if (profileTab) {
         loadProfile();
     }
 });
@@ -2226,6 +2229,22 @@ function loadProfile() {
     const saved = localStorage.getItem('icn-profile');
     if (saved) {
         profileData = { ...profileData, ...JSON.parse(saved) };
+    }
+
+    if (typeof profileData.contact === 'string') {
+        profileData.contact = { info: profileData.contact };
+    }
+
+    profileData.contact = {
+        info: '',
+        email: '',
+        phone: '',
+        location: '',
+        ...profileData.contact,
+    };
+
+    if (typeof profileData.availability === 'string' && !profileData.availabilitySummary) {
+        profileData.availabilitySummary = profileData.availability;
     }
 
     // Update UI
@@ -2252,7 +2271,9 @@ function loadProfile() {
     renderContact();
 
     // Load service history
-    renderServiceHistory();
+    const activeHistoryTab = document.querySelector('.service-history-tabs .tab-btn.active');
+    const historyType = activeHistoryTab?.dataset?.history || 'given';
+    renderServiceHistory(historyType);
 }
 
 // Load profile statistics
@@ -2269,16 +2290,25 @@ function loadProfileStats() {
         .filter(tx => tx.to === state.did)
         .reduce((sum, tx) => sum + tx.amount, 0);
 
-    const totalHours = hoursGiven + hoursReceived;
+    const balanceEl = document.getElementById('profile-balance');
+    if (balanceEl) {
+        balanceEl.textContent = (hoursReceived - hoursGiven).toFixed(1);
+    }
 
-    document.getElementById('profile-hours-given').textContent = hoursGiven.toFixed(1);
-    document.getElementById('profile-hours-received').textContent = hoursReceived.toFixed(1);
-    document.getElementById('profile-total-hours').textContent = totalHours.toFixed(1);
+    const txCountEl = document.getElementById('profile-tx-count');
+    if (txCountEl) {
+        txCountEl.textContent = myTransactions.length.toString();
+    }
+
+    const memberSinceEl = document.getElementById('profile-member-since');
+    if (memberSinceEl && !memberSinceEl.textContent) {
+        memberSinceEl.textContent = '--';
+    }
 }
 
 // Render skills list
 function renderSkills() {
-    const container = document.getElementById('skills-list');
+    const container = document.getElementById('profile-skills');
     container.innerHTML = '';
 
     if (profileData.skills.length === 0) {
@@ -2296,8 +2326,17 @@ function renderSkills() {
 
 // Render availability
 function renderAvailability() {
-    const container = document.getElementById('availability-display');
+    const container = document.getElementById('profile-availability');
+    if (!container) return;
     container.innerHTML = '';
+
+    const summary = profileData.availabilitySummary ||
+        (typeof profileData.availability === 'string' ? profileData.availability : '');
+
+    if (summary) {
+        container.innerHTML = `<p class="availability-summary">${escapeHtml(summary)}</p>`;
+        return;
+    }
 
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
     const grid = document.createElement('div');
@@ -2308,7 +2347,7 @@ function renderAvailability() {
         dayDiv.className = 'availability-day';
 
         const dayKey = day.toLowerCase();
-        const time = profileData.availability[dayKey] || 'Not set';
+        const time = profileData.availability?.[dayKey] || 'Not set';
 
         dayDiv.innerHTML = `
             <strong>${day}</strong>
@@ -2323,42 +2362,42 @@ function renderAvailability() {
 
 // Render contact info
 function renderContact() {
-    const email = profileData.contact.email || 'Not provided';
-    const phone = profileData.contact.phone || 'Not provided';
-    const location = profileData.contact.location || 'Not provided';
+    const container = document.getElementById('profile-contact');
+    if (!container) return;
 
-    document.getElementById('contact-email').textContent = email;
-    document.getElementById('contact-phone').textContent = phone;
-    document.getElementById('contact-location').textContent = location;
+    const contactInfo = profileData.contact?.info || [
+        profileData.contact?.email,
+        profileData.contact?.phone,
+        profileData.contact?.location,
+    ].filter(Boolean).join(' • ');
+
+    if (!contactInfo) {
+        container.innerHTML = '<p class="empty-state">Contact information not provided.</p>';
+        return;
+    }
+
+    container.innerHTML = `<p>${escapeHtml(contactInfo)}</p>`;
 }
 
 // Render service history
-function renderServiceHistory() {
-    const givenContainer = document.getElementById('services-given');
-    const receivedContainer = document.getElementById('services-received');
+function renderServiceHistory(historyType = 'given') {
+    const container = document.getElementById('profile-service-history');
+    if (!container) return;
 
-    givenContainer.innerHTML = '';
-    receivedContainer.innerHTML = '';
+    container.innerHTML = '';
 
-    // Get transactions
     const given = state.transactions.filter(tx => tx.from === state.did).slice(0, 10);
     const received = state.transactions.filter(tx => tx.to === state.did).slice(0, 10);
+    const entries = historyType === 'received' ? received : given;
 
-    if (given.length === 0) {
-        givenContainer.innerHTML = '<p class="empty-state">No services given yet</p>';
-    } else {
-        given.forEach(tx => {
-            givenContainer.appendChild(createServiceHistoryItem(tx, 'given'));
-        });
+    if (entries.length === 0) {
+        container.innerHTML = `<p class="empty-state">No services ${historyType} yet</p>`;
+        return;
     }
 
-    if (received.length === 0) {
-        receivedContainer.innerHTML = '<p class="empty-state">No services received yet</p>';
-    } else {
-        received.forEach(tx => {
-            receivedContainer.appendChild(createServiceHistoryItem(tx, 'received'));
-        });
-    }
+    entries.forEach(tx => {
+        container.appendChild(createServiceHistoryItem(tx, historyType));
+    });
 }
 
 // Create service history item
@@ -2381,19 +2420,18 @@ function createServiceHistoryItem(tx, type) {
 }
 
 // Service history tabs
-const serviceTabBtns = document.querySelectorAll('.service-tab-btn');
-const serviceTabContents = document.querySelectorAll('.service-history-content');
+const serviceTabBtns = document.querySelectorAll('.service-history-tabs .tab-btn');
 
 serviceTabBtns.forEach(btn => {
     btn.addEventListener('click', () => {
-        const tabId = btn.dataset.tab;
+        const historyType = btn.dataset.history;
 
         serviceTabBtns.forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
 
-        serviceTabContents.forEach(content => {
-            content.classList.toggle('hidden', content.id !== tabId);
-        });
+        if (historyType) {
+            renderServiceHistory(historyType);
+        }
     });
 });
 
@@ -2401,15 +2439,22 @@ serviceTabBtns.forEach(btn => {
 const editProfileBtn = document.getElementById('edit-profile-btn');
 const editProfileModal = document.getElementById('edit-profile-modal');
 const closeEditProfile = document.getElementById('close-edit-profile');
-const saveProfileBtn = document.getElementById('save-profile-btn');
+const cancelEditProfile = document.getElementById('cancel-edit-profile');
+const editProfileForm = document.getElementById('edit-profile-form');
 
 if (editProfileBtn) {
     editProfileBtn.addEventListener('click', () => {
+        const contactInfo = profileData.contact?.info || [
+            profileData.contact?.email,
+            profileData.contact?.phone,
+            profileData.contact?.location,
+        ].filter(Boolean).join(' • ');
+
         // Populate form
-        document.getElementById('edit-bio').value = profileData.bio;
-        document.getElementById('edit-email').value = profileData.contact.email;
-        document.getElementById('edit-phone').value = profileData.contact.phone;
-        document.getElementById('edit-location').value = profileData.contact.location;
+        document.getElementById('edit-bio').value = profileData.bio || '';
+        document.getElementById('edit-skills').value = (profileData.skills || []).join(', ');
+        document.getElementById('edit-availability').value = profileData.availabilitySummary || '';
+        document.getElementById('edit-contact').value = contactInfo || '';
 
         editProfileModal.classList.remove('hidden');
     });
@@ -2421,13 +2466,28 @@ if (closeEditProfile) {
     });
 }
 
-if (saveProfileBtn) {
-    saveProfileBtn.addEventListener('click', () => {
+if (cancelEditProfile) {
+    cancelEditProfile.addEventListener('click', () => {
+        editProfileModal.classList.add('hidden');
+    });
+}
+
+if (editProfileForm) {
+    editProfileForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+
         // Save profile data
         profileData.bio = document.getElementById('edit-bio').value;
-        profileData.contact.email = document.getElementById('edit-email').value;
-        profileData.contact.phone = document.getElementById('edit-phone').value;
-        profileData.contact.location = document.getElementById('edit-location').value;
+        const skillsInput = document.getElementById('edit-skills').value;
+        profileData.skills = skillsInput
+            .split(',')
+            .map(skill => skill.trim())
+            .filter(Boolean);
+        profileData.availabilitySummary = document.getElementById('edit-availability').value;
+        profileData.contact = {
+            ...profileData.contact,
+            info: document.getElementById('edit-contact').value.trim(),
+        };
 
         // Save to localStorage
         localStorage.setItem('icn-profile', JSON.stringify(profileData));
@@ -2451,7 +2511,8 @@ let serviceListings = [];
 
 // Load service board when tab is opened
 document.addEventListener('click', (e) => {
-    if (e.target.dataset.tab === 'service-board') {
+    const serviceTab = e.target.closest?.('[data-tab="service-board"]');
+    if (serviceTab) {
         loadServiceBoard();
     }
 });
@@ -2585,7 +2646,8 @@ if (serviceSearch) {
 const postServiceBtn = document.getElementById('post-service-btn');
 const postServiceModal = document.getElementById('post-service-modal');
 const closePostService = document.getElementById('close-post-service');
-const submitServiceBtn = document.getElementById('submit-service-btn');
+const cancelPostService = document.getElementById('cancel-post-service');
+const postServiceForm = document.getElementById('post-service-form');
 
 if (postServiceBtn) {
     postServiceBtn.addEventListener('click', () => {
@@ -2599,8 +2661,15 @@ if (closePostService) {
     });
 }
 
-if (submitServiceBtn) {
-    submitServiceBtn.addEventListener('click', () => {
+if (cancelPostService) {
+    cancelPostService.addEventListener('click', () => {
+        postServiceModal.classList.add('hidden');
+    });
+}
+
+if (postServiceForm) {
+    postServiceForm.addEventListener('submit', (event) => {
+        event.preventDefault();
         const type = document.querySelector('input[name="service-type"]:checked')?.value;
         const category = document.getElementById('service-category').value;
         const title = document.getElementById('service-title').value;
@@ -2632,8 +2701,7 @@ if (submitServiceBtn) {
 
         // Close modal and reset form
         postServiceModal.classList.add('hidden');
-        document.getElementById('service-title').value = '';
-        document.getElementById('service-description').value = '';
+        postServiceForm.reset();
 
         showToast('Service posted successfully!', 'success');
     });

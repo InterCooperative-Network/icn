@@ -1,0 +1,72 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  "instructions": [
+    "AGENTS.md",
+    ".github/copilot-instructions.md",
+    ".github/instructions/*.md",
+    "docs/STATE.md",
+    "docs/TODO.md"
+  ],
+
+  "compaction": {
+    "auto": true,
+    "prune": true
+  },
+
+  "watcher": {
+    "ignore": [
+      "**/.git/**",
+      "**/.opencode/**",
+      "**/node_modules/**",
+      "**/target/**",
+      "**/dist/**",
+      "**/build/**",
+      "**/coverage/**",
+      "**/test-results/**",
+      "**/.venv/**",
+      "**/.mypy_cache/**",
+      "**/.pytest_cache/**",
+      "**/__pycache__/**",
+      "**/*.log",
+      "**/*.tmp"
+    ]
+  },
+
+  "permission": {
+    "bash": {
+      "*": "allow",
+
+      "git push*": "ask",
+      "git reset*": "ask",
+      "git rebase*": "ask",
+      "git cherry-pick*": "ask",
+
+      "rm *": "ask",
+      "rm -rf*": "ask",
+      "mv *": "ask",
+
+      "cargo publish*": "ask",
+      "npm publish*": "ask"
+    }
+  },
+
+  "agent": {
+    "review": {
+      "description": "Read-only reviewer (no file edits)",
+      "mode": "subagent",
+      "tools": { "write": false, "edit": false }
+    },
+
+    "implement": {
+      "description": "Implementation agent (edits allowed, runs tests)",
+      "mode": "subagent",
+      "tools": { "write": true, "edit": true }
+    },
+
+    "triage": {
+      "description": "Bug triage: reproduce, isolate, propose fix plan (minimal edits)",
+      "mode": "subagent"
+    }
+  }
+}
