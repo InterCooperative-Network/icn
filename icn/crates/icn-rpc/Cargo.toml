@@ -13,7 +13,7 @@ tracing.workspace = true
 hyper.workspace = true
 hyper-util = "0.1"
 http-body-util = "0.1"
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { workspace = true }
 sha2 = "0.10"
 hex = "0.4"
 base64 = "0.22"

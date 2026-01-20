@@ -52,7 +52,7 @@ tonic = "0.14"
 prost = "0.14"
 
 # Discovery
-mdns-sd = "0.11"
+mdns-sd = "0.17"
 
 # Identity & Crypto
 ed25519-dalek = { version = "2.1", features = ["rand_core", "batch"] }
@@ -95,6 +95,9 @@ sys-locale = "0.3"
 # Error handling
 anyhow = "1.0"
 thiserror = "2.0"
+
+# HTTP client
+reqwest = { version = "0.13", features = ["json", "form"] }
 
 # Utilities
 bytes = "1.11"

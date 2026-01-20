@@ -72,6 +72,17 @@ impl Default for SecurityConfig {
 }
 
 impl SecurityConfig {
+    /// Validate and set a custom CSP directive.
+    /// Returns an error if the directive contains invalid header characters.
+    #[must_use = "CSP directive validation result must be checked"]
+    pub fn with_csp_directive(mut self, directive: String) -> Result<Self, String> {
+        // Validate that the directive can be parsed as a header value
+        actix_web::http::header::HeaderValue::from_str(&directive)
+            .map_err(|e| format!("Invalid CSP directive: {}", e))?;
+        self.csp_directive = directive;
+        Ok(self)
+    }
+
     /// Development configuration (permissive CORS for local development)
     pub fn development() -> Self {
         Self {
@@ -231,9 +242,20 @@ where
                 let headers = res.headers_mut();
 
                 // Content Security Policy
-                // SAFETY: csp_directive is validated at config load time
-                #[allow(clippy::unwrap_used)]
-                let csp_value = HeaderValue::from_str(&config.csp_directive).unwrap();
+                // Custom directives should use with_csp_directive(), which validates the input.
+                // Using unwrap_or with a safe fallback rather than expect() due to crate lint rules.
+                let csp_value =
+                    HeaderValue::from_str(&config.csp_directive).unwrap_or_else(|err| {
+                        // This should never happen with configs constructed via with_csp_directive(),
+                        // but provide a safe fallback for any invalid custom values.
+                        tracing::error!(
+                            error = ?err,
+                            directive_len = config.csp_directive.len(),
+                            "Invalid CSP directive in config - using restrictive default. \
+                             Prefer with_csp_directive() to construct validated custom directives."
+                        );
+                        HeaderValue::from_static("default-src 'none'")
+                    });
                 headers.insert(
                     HeaderName::from_static("content-security-policy"),
                     csp_value,
@@ -521,5 +543,47 @@ mod tests {
             config.csp_directive.contains("'unsafe-eval'"),
             "Development CSP should allow unsafe-eval for HMR"
         );
+    }
+
+    #[test]
+    fn test_with_csp_directive_accepts_valid() {
+        let config = SecurityConfig::default();
+        let result = config.with_csp_directive("default-src 'self'".to_string());
+        assert!(result.is_ok());
+        let updated = result.unwrap();
+        assert_eq!(updated.csp_directive, "default-src 'self'");
+    }
+
+    #[test]
+    fn test_with_csp_directive_accepts_complex_policy() {
+        let config = SecurityConfig::default();
+        let complex_csp = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:".to_string();
+        let result = config.with_csp_directive(complex_csp.clone());
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().csp_directive, complex_csp);
+    }
+
+    #[test]
+    fn test_with_csp_directive_rejects_newline() {
+        let config = SecurityConfig::default();
+        let result = config.with_csp_directive("default-src 'self'\nmalicious".to_string());
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Invalid CSP directive"));
+    }
+
+    #[test]
+    fn test_with_csp_directive_rejects_carriage_return() {
+        let config = SecurityConfig::default();
+        let result = config.with_csp_directive("default-src 'self'\rmalicious".to_string());
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Invalid CSP directive"));
+    }
+
+    #[test]
+    fn test_with_csp_directive_rejects_null_byte() {
+        let config = SecurityConfig::default();
+        let result = config.with_csp_directive("default-src\x00".to_string());
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Invalid CSP directive"));
     }
 }

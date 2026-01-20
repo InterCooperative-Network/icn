@@ -147,8 +147,9 @@ impl Discovery {
                 // Extract DID from TXT properties
                 if let Some(did_str) = info.get_property_val_str("did") {
                     // Parse socket address
+                    // mdns-sd 0.17+ returns ScopedIp; extract the IpAddr for SocketAddr
                     let addr = match info.get_addresses().iter().next() {
-                        Some(ip) => SocketAddr::new(*ip, info.get_port()),
+                        Some(scoped_ip) => SocketAddr::new(scoped_ip.to_ip_addr(), info.get_port()),
                         None => {
                             debug!("No address for peer {}", did_str);
                             return;

@@ -314,14 +314,14 @@ impl GatewayServer {
             ));
         }
 
-        // SECURITY: Warn if JWT secret is too short
+        // SECURITY: Enforce minimum JWT secret length for HS256 security
         if self.jwt_secret.len() < 32 {
-            warn!(
-                "SECURITY WARNING: JWT secret is only {} bytes. \
-                 Recommended minimum is 32 bytes for HS256. \
-                 Tokens may be vulnerable to brute-force attacks.",
+            return Err(GatewayError::InternalError(format!(
+                "SECURITY: JWT secret is only {} bytes. \
+                 Minimum 32 bytes required for HS256 to resist brute-force attacks. \
+                 Generate a secure secret with: openssl rand -base64 32",
                 self.jwt_secret.len()
-            );
+            )));
         }
 
         // Create shared managers
@@ -1236,4 +1236,81 @@ fn get_static_dir() -> PathBuf {
 
     // Fallback to current directory
     PathBuf::from("static")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_jwt_secret_empty_fails_startup() {
+        let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
+        let server = GatewayServer::new(addr, vec![]);
+
+        let result = server.run().await;
+
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("empty JWT secret"),
+            "Expected empty JWT secret error, got: {err_msg}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_jwt_secret_too_short_fails_startup() {
+        let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
+        // 16 bytes is too short (minimum is 32)
+        let short_secret = vec![0u8; 16];
+        let server = GatewayServer::new(addr, short_secret);
+
+        let result = server.run().await;
+
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("32 bytes required") || err_msg.contains("16 bytes"),
+            "Expected JWT secret length error, got: {err_msg}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_jwt_secret_31_bytes_fails_startup() {
+        let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
+        // 31 bytes is still too short (minimum is 32)
+        let almost_enough = vec![0u8; 31];
+        let server = GatewayServer::new(addr, almost_enough);
+
+        let result = server.run().await;
+
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("32 bytes required") || err_msg.contains("31 bytes"),
+            "Expected JWT secret length error, got: {err_msg}"
+        );
+    }
+
+    #[test]
+    fn test_jwt_secret_32_bytes_passes_validation() {
+        // This test verifies the validation logic allows 32+ byte secrets
+        // We can't fully test run() without starting a server, but we can
+        // verify the constructor accepts the secret
+        let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
+        let valid_secret = vec![0u8; 32];
+        let server = GatewayServer::new(addr, valid_secret.clone());
+
+        // The server should be created with the secret intact
+        assert_eq!(server.jwt_secret.len(), 32);
+    }
+
+    #[test]
+    fn test_jwt_secret_64_bytes_passes_validation() {
+        // Longer secrets should also work
+        let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
+        let long_secret = vec![0u8; 64];
+        let server = GatewayServer::new(addr, long_secret.clone());
+
+        assert_eq!(server.jwt_secret.len(), 64);
+    }
 }

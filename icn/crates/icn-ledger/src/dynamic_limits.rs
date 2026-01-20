@@ -1025,9 +1025,14 @@ mod tests {
             let store = Arc::new(SledStore::open(temp_dir.path()).unwrap());
             let base_policy = CreditPolicy::conservative("hours".to_string());
             let config = DynamicLimitConfig::default();
-            let manager = DynamicCreditLimitManager::new(store, base_policy, config);
+            let manager = DynamicCreditLimitManager::new(store.clone(), base_policy, config);
 
             manager.record_activity(&did, "hours", 0.5, 1000).unwrap();
+
+            // Flush and explicitly drop store to release lock before reopening
+            store.flush().unwrap();
+            drop(manager);
+            drop(store);
         }
 
         // Create new manager with same store
