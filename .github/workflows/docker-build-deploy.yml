@@ -88,57 +88,51 @@ jobs:
           docker tag ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} ${{ env.IMAGE_NAME }}:latest
           echo "✓ Image built successfully"
 
-      - name: Save and distribute to all nodes
+      - name: Push to local registry
         run: |
-          echo "Saving Docker image..."
-          docker save ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} -o /tmp/icn-image.tar
+          REGISTRY="localhost:30500"
 
-          echo "Importing to control node..."
-          sudo k3s ctr images import /tmp/icn-image.tar
+          echo "Tagging for local registry..."
+          docker tag ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} ${REGISTRY}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          docker tag ${{ env.IMAGE_NAME }}:latest ${REGISTRY}/${{ env.IMAGE_NAME }}:latest
 
-          echo "Distributing to worker nodes..."
+          echo "Pushing to registry..."
+          docker push ${REGISTRY}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          docker push ${REGISTRY}/${{ env.IMAGE_NAME }}:latest
+
+          echo "✓ Image pushed to local registry"
+
+          # Pull on all nodes via containerd (K3s will do this automatically, but we can pre-pull)
+          echo "Pre-pulling on control node..."
+          sudo k3s ctr images pull --plain-http ${REGISTRY}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+
+          echo "Pre-pulling on worker nodes..."
           WORKERS="10.8.10.41 10.8.10.42"
           for WORKER in $WORKERS; do
-            echo "  → Importing to $WORKER..."
-            cat /tmp/icn-image.tar | ssh -o BatchMode=yes ubuntu@$WORKER "sudo k3s ctr images import -" || {
-              echo "  ⚠ Failed to import to $WORKER (node may be down)"
+            echo "  → Pulling on $WORKER..."
+            ssh -o BatchMode=yes ubuntu@$WORKER "sudo k3s ctr images pull --plain-http ${REGISTRY}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}" || {
+              echo "  ⚠ Failed to pull on $WORKER (node may be down, K3s will pull on deploy)"
             }
           done
 
-          # Also import latest tag
-          docker save ${{ env.IMAGE_NAME }}:latest -o /tmp/icn-latest.tar
-          sudo k3s ctr images import /tmp/icn-latest.tar
-          for WORKER in $WORKERS; do
-            cat /tmp/icn-latest.tar | ssh -o BatchMode=yes ubuntu@$WORKER "sudo k3s ctr images import -" 2>/dev/null || true
-          done
-
-          # Cleanup
-          rm -f /tmp/icn-image.tar /tmp/icn-latest.tar
-
           echo "✓ Image distributed to all nodes"
-
-          # Verify on all nodes
-          echo "Images on control:"
-          sudo k3s ctr images ls | grep "${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}" | head -1 || true
-          for WORKER in $WORKERS; do
-            echo "Images on $WORKER:"
-            ssh -o BatchMode=yes ubuntu@$WORKER "sudo k3s ctr images ls | grep '${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}' | head -1" || true
-          done
 
       - name: Deploy to K3s
         if: ${{ github.event.inputs.deploy != 'false' }}
         run: |
           echo "Deploying to K3s..."
+          REGISTRY="localhost:30500"
+          IMAGE="${REGISTRY}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
 
           # Update main daemon
-          sudo kubectl -n icn set image deployment/icn-daemon icnd=${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          sudo kubectl -n icn set image deployment/icn-daemon icnd=${IMAGE}
 
           # Update coop nodes
           for COOP in alpha beta gamma delta; do
             NS="icn-coop-${COOP}"
             if sudo kubectl get namespace ${NS} &>/dev/null; then
               echo "Updating icn-${COOP}..."
-              sudo kubectl -n ${NS} set image deployment/icn-${COOP} icnd=${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} 2>/dev/null || true
+              sudo kubectl -n ${NS} set image deployment/icn-${COOP} icnd=${IMAGE} 2>/dev/null || true
             fi
           done
 
