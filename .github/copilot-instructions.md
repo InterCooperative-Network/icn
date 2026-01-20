@@ -65,6 +65,11 @@ icn/
 └── examples/              # Usage examples
 ```
 
+## Current Working Context
+
+- See docs/STATE.md and docs/TODO.md for current status, known issues, and priorities.
+- Rust toolchain note: wasmtime/cranelift currently require rustc 1.89.0; upgrade toolchain or pin compatible versions before running cargo.
+
 ## Development Workflow
 
 ### Build & Test Commands
