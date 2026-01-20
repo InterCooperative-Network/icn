@@ -66,6 +66,7 @@
 //! # Modules
 //!
 //! - [`entity`] - Core types: `EntityId`, `EntityType`, `CooperativeEntity`
+//! - [`labor_exchange`] - Labor exchange types for worker mobility
 //! - [`membership`] - Membership types: `Membership`, `MembershipRole`
 //! - [`registry`] - Registry trait and in-memory implementation
 //! - [`lifecycle`] - Lifecycle events and state transitions
@@ -73,6 +74,7 @@
 
 pub mod entity;
 pub mod error;
+pub mod labor_exchange;
 pub mod lifecycle;
 pub mod membership;
 pub mod registry;
@@ -83,6 +85,10 @@ pub use entity::{
     AccountId, AccountReference, CooperativeEntity, EntityId, EntityStatus, EntityType,
 };
 pub use error::{EntityError, Result};
+pub use labor_exchange::{
+    AssignmentApprovals, AssignmentId, AssignmentStatus, AssignmentType, Availability,
+    CreditRouting, LaborAssignment, LaborNeed, LaborPool, PoolRegistration, RoutingMode,
+};
 pub use lifecycle::{EntityLifecycle, LifecycleEvent};
 pub use membership::{Membership, MembershipCapability, MembershipRole, MembershipStatus};
 pub use registry::{EntityRegistry, EntityRegistryHandle, InMemoryRegistry};

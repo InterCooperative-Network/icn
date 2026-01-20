@@ -50,6 +50,15 @@ pub struct Membership {
     pub notes: Option<String>,
 
     // ========================================
+    // Labor Exchange Fields (Issue #718)
+    // ========================================
+    /// Active labor assignments (working at other cooperatives).
+    ///
+    /// Stored as strings to avoid a dependency on labor exchange types.
+    #[serde(default)]
+    pub assignments: Vec<String>,
+
+    // ========================================
     // Labor Share Fields (Issue #390)
     // ========================================
     /// Labor share IDs held by this member (references `icn_ledger::ShareId`)
@@ -92,6 +101,7 @@ impl Membership {
             shares: 1, // Default to 1 share (one member, one vote)
             capabilities,
             notes: None,
+            assignments: Vec::new(),
             labor_shares: Vec::new(),
             is_primary: true, // Default to primary for single-coop workers
         }
@@ -164,6 +174,37 @@ impl Membership {
     }
 
     // ========================================
+    // Labor Assignment Methods (Issue #718)
+    // ========================================
+
+    /// Add an active labor assignment.
+    ///
+    /// Updates `updated_at` timestamp for audit trail accuracy.
+    pub fn add_assignment(&mut self, assignment_id: impl Into<String>) {
+        let assignment_id = assignment_id.into();
+        if !self.assignments.contains(&assignment_id) {
+            self.assignments.push(assignment_id);
+            self.updated_at = icn_time::current_timestamp_secs();
+        }
+    }
+
+    /// Remove a labor assignment.
+    ///
+    /// Updates `updated_at` timestamp for audit trail accuracy.
+    pub fn remove_assignment(&mut self, assignment_id: &str) {
+        let before_len = self.assignments.len();
+        self.assignments.retain(|id| id != assignment_id);
+        if self.assignments.len() != before_len {
+            self.updated_at = icn_time::current_timestamp_secs();
+        }
+    }
+
+    /// Check if member has any active labor assignments.
+    pub fn has_active_assignments(&self) -> bool {
+        !self.assignments.is_empty()
+    }
+
+    // ========================================
     // Labor Share Methods (Issue #390)
     // ========================================
 
@@ -229,6 +270,15 @@ impl Membership {
     /// update `updated_at`. Use `add_labor_share()` to modify after creation.
     pub fn with_labor_shares(mut self, shares: Vec<String>) -> Self {
         self.labor_shares = shares;
+        self
+    }
+
+    /// Builder method to add initial assignments.
+    ///
+    /// **Note:** Builder methods are for initial construction and do not
+    /// update `updated_at`. Use `add_assignment()` to modify after creation.
+    pub fn with_assignments(mut self, assignments: Vec<String>) -> Self {
+        self.assignments = assignments;
         self
     }
 }
@@ -699,6 +749,8 @@ mod tests {
         let coop = create_test_coop();
         let membership = Membership::new(member, coop, MembershipRole::Worker);
 
+        assert!(membership.assignments.is_empty());
+        assert!(!membership.has_active_assignments());
         assert!(membership.labor_shares.is_empty());
         assert!(!membership.has_labor_shares());
         assert_eq!(membership.labor_share_count(), 0);
@@ -778,6 +830,31 @@ mod tests {
     }
 
     #[test]
+    fn test_assignment_updates_timestamp() {
+        let member = create_test_individual();
+        let coop = create_test_coop();
+        let mut membership = Membership::active(member, coop, MembershipRole::Worker);
+        let original = membership.updated_at;
+
+        std::thread::sleep(std::time::Duration::from_millis(10));
+
+        membership.add_assignment("assign-123");
+        assert!(
+            membership.updated_at >= original,
+            "add_assignment should update timestamp"
+        );
+
+        let after_add = membership.updated_at;
+        std::thread::sleep(std::time::Duration::from_millis(10));
+
+        membership.remove_assignment("assign-123");
+        assert!(
+            membership.updated_at >= after_add,
+            "remove_assignment should update timestamp"
+        );
+    }
+
+    #[test]
     fn test_is_primary_default() {
         let member = create_test_individual();
         let coop = create_test_coop();
@@ -810,9 +887,11 @@ mod tests {
         let coop = create_test_coop();
         let membership = Membership::active(member, coop, MembershipRole::Worker)
             .with_labor_shares(vec!["share-001".to_string(), "share-002".to_string()])
+            .with_assignments(vec!["assign-001".to_string()])
             .with_primary(false);
 
         assert_eq!(membership.labor_share_count(), 2);
+        assert!(membership.has_active_assignments());
         assert!(!membership.is_primary);
     }
 
@@ -823,12 +902,14 @@ mod tests {
         let mut membership =
             Membership::active(member.clone(), coop.clone(), MembershipRole::Worker);
         membership.add_labor_share("share-xyz");
+        membership.add_assignment("assign-777");
         membership.set_primary(false);
 
         let json = serde_json::to_string(&membership).unwrap();
         let parsed: Membership = serde_json::from_str(&json).unwrap();
 
         assert_eq!(parsed.labor_shares, vec!["share-xyz".to_string()]);
+        assert_eq!(parsed.assignments, vec!["assign-777".to_string()]);
         assert!(!parsed.is_primary);
     }
 
@@ -851,6 +932,7 @@ mod tests {
         let parsed: Membership = serde_json::from_str(legacy_json).unwrap();
 
         // New fields should have defaults
+        assert!(parsed.assignments.is_empty());
         assert!(parsed.labor_shares.is_empty());
         assert!(parsed.is_primary);
     }
