@@ -17,7 +17,7 @@ A comprehensive audit of ICN's vision documents, GitHub issues, roadmap, and imp
 | **Phase Numbering** | Two conflicting Phase 19-24 definitions exist | CRITICAL |
 | **Untracked Work** | 43-56 weeks of vision work not in ROADMAP.md | HIGH |
 | **Implementation Gap** | Code is 75% done but tracking is 30% accurate | HIGH |
-| **Missing Foundation** | Issue #266 (CooperativeEntity) doesn't exist but is cited as dependency | CRITICAL |
+| **Obsolete Foundation** | Issue #266 (CooperativeEntity) was closed but scope is outdated | CRITICAL |
 | **Pilot Blocking** | #5 (Select Pilot Community) is CRITICAL but unphased | CRITICAL |
 
 ### Bottom Line
@@ -118,7 +118,7 @@ The Cooperative Middle Layer's "Phase 19: Entity Foundation" is **already 100% i
 - #269 SDIS ZK Voting
 - #270 Recursive Federation
 
-**But #266 doesn't exist.** It needs to be created, even though the code IS implemented.
+**Issue #266 exists but is obsolete.** It was created and closed on 2025-12-24, describing foundation work that is now complete. A new issue (#738) was created to track the remaining integration work.
 
 ### Untracked Work Items
 
@@ -249,9 +249,9 @@ Phase 35: Pilot Deployment
 
 1. **DECISION**: Which roadmap approach? (A, B, or C)
 
-2. **Create Issue #266**: "feat(entity): CooperativeEntity foundation"
-   - Even though code exists, create tracking issue
-   - Link #267-270 as dependents
+2. **Issue #738 Created**: "feat(entity): CooperativeEntity integration"
+   - Replaces obsolete #266 (foundation work complete)
+   - #267-270 linked as dependents
 
 3. **Spawn CoopActor**: 16 hours of work, plan exists
    - Located in `docs/dev-journal/COOP_INTEGRATION_PLAN.md`
