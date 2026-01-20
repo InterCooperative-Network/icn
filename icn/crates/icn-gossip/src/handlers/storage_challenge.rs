@@ -308,7 +308,24 @@ impl GossipActor {
         );
 
         // Validate timestamp to prevent replay attacks
+        // Use stricter clock skew for storage challenges (60s vs network's 300s)
+        const MAX_CLOCK_SKEW_SECS: u64 = 60;
         let now = icn_time::current_timestamp_secs();
+
+        // Check for future timestamps (possible clock manipulation)
+        if response.generated_at > now + MAX_CLOCK_SKEW_SECS {
+            warn!(
+                challenge_id = %hex::encode(response.challenge_id),
+                responder = %response.responder,
+                generated_at = response.generated_at,
+                now = now,
+                "Content-not-found response has future timestamp, rejecting"
+            );
+            proof_verification_inc(ProofVerifyResult::NotFoundExpired);
+            return Ok(());
+        }
+
+        // Check for stale timestamps (replay attack)
         let age = now.saturating_sub(response.generated_at);
         if age > DEFAULT_CHALLENGE_TIMEOUT_SECS {
             warn!(
@@ -321,26 +338,27 @@ impl GossipActor {
             return Ok(());
         }
 
-        // Verify signature if present (unsigned responses are suspicious)
-        if response.is_signed() {
-            if let Err(e) = response.verify_signature() {
-                warn!(
-                    challenge_id = %hex::encode(response.challenge_id),
-                    responder = %response.responder,
-                    error = %e,
-                    "Content-not-found signature verification failed"
-                );
-                proof_verification_inc(ProofVerifyResult::InvalidSignature);
-                return Ok(());
-            }
-        } else {
+        // Require signature on all content-not-found responses (security hardening)
+        if !response.is_signed() {
             warn!(
                 challenge_id = %hex::encode(response.challenge_id),
                 responder = %response.responder,
-                "Received unsigned content-not-found response"
+                "Received unsigned content-not-found response, rejecting"
             );
             proof_verification_inc(ProofVerifyResult::NotFoundUnsigned);
-            // Still forward to scheduler - it may want to track unsigned responses differently
+            return Ok(());
+        }
+
+        // Verify the signature
+        if let Err(e) = response.verify_signature() {
+            warn!(
+                challenge_id = %hex::encode(response.challenge_id),
+                responder = %response.responder,
+                error = %e,
+                "Content-not-found signature verification failed"
+            );
+            proof_verification_inc(ProofVerifyResult::InvalidSignature);
+            return Ok(());
         }
 
         // Forward to ChallengeScheduler for processing
