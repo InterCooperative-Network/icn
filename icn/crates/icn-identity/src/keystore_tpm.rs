@@ -1,13 +1,44 @@
 //! TPM 2.0 backend for hardware key storage
 //!
-//! This backend implements keystore operations using TPM 2.0 for:
-//! - Sealed key storage (bound to specific platform state)
-//! - Platform binding (keys only usable on this hardware)
-//! - Attestation (prove key authenticity and platform state)
+//! **⚠️ UNIMPLEMENTED / EXPERIMENTAL ONLY ⚠️**
 //!
-//! Keys are generated in the TPM and sealed to PCR values for tamper resistance.
+//! This backend is scaffolding only and does not provide actual TPM security.
+//! Key operations are placeholders that will fail at runtime.
+//!
+//! To prevent accidental use, this module requires the `tpm-experimental` feature
+//! flag in addition to `tpm`. This ensures no one can enable TPM support without
+//! explicitly acknowledging it is non-functional.
+//!
+//! ## Why this doesn't work yet
+//!
+//! - Sealing/unsealing operations are not implemented
+//! - Keys are generated fresh on each unlock (no persistence)
+//! - Signing operations immediately return errors
+//! - No actual TPM interaction occurs
+//!
+//! ## What needs to be implemented
+//!
+//! For actual TPM support:
+//! 1. Implement Ed25519 key sealing to TPM with PCR binding
+//! 2. Implement key unsealing with PCR verification
+//! 3. Implement software signing with unsealed key material
+//! 4. Add TPM attestation support
+//! 5. Test with real TPM 2.0 hardware or simulator
 
 #![cfg(feature = "tpm")]
+
+// Compile error unless explicit experimental flag is set
+#[cfg(not(feature = "tpm-experimental"))]
+compile_error!(
+    "TPM backend is not implemented and cannot be used. \n\
+     \n\
+     This backend is scaffolding only. Key operations are placeholders. \n\
+     \n\
+     If you want to work on TPM implementation, enable the \n\
+     'tpm-experimental' feature flag to acknowledge it is non-functional.\n\
+     \n\
+     DO NOT use this in production."
+);
 
 use crate::keystore_backend::{BackendConfig, KeyStoreBackend, SigningBackend, TpmConfig};
 use crate::{Did, IdentityBundle, KeyPair};
