@@ -30,6 +30,7 @@ pub type FederationGossipHandle = Arc<icn_federation::FederationGossipHandler>;
 pub type AttestationRateLimiterHandle = Arc<crate::trust_propagation::AttestationRateLimiter>;
 pub type ContractRegistryHolder = Arc<RwLock<Option<icn_ccl::ContractRegistryHandle>>>;
 pub type CommunityStoreHandle = Arc<icn_community::CommunityStore>;
+pub type EvidenceValidatorHandle = Arc<icn_trust::EvidenceValidator>;
 
 /// Dependencies required for notification callback handlers
 #[derive(Clone)]
@@ -72,6 +73,8 @@ pub struct NotificationDeps {
     pub contract_registry: ContractRegistryHolder,
     /// NAT dial configuration
     pub nat_dial_config: NatDialConfig,
+    /// Evidence validator for trust attestation verification
+    pub evidence_validator: Option<EvidenceValidatorHandle>,
 }
 
 /// Handle trust attestation entries
@@ -80,13 +83,14 @@ pub async fn handle_trust_attestation(
     trust_graph: &TrustGraphHandle,
     own_did: &Did,
     rate_limiter: &AttestationRateLimiterHandle,
+    evidence_validator: Option<&EvidenceValidatorHandle>,
 ) {
     if let Err(e) = crate::trust_propagation::handle_trust_attestation_entry(
         entry,
         trust_graph,
         own_did,
         Some(rate_limiter.as_ref()),
-        None, // TODO: Wire up evidence validator when EvidenceValidator is instantiated
+        evidence_validator.map(|v| v.as_ref()),
     )
     .await
     {
@@ -753,8 +757,16 @@ pub fn create_notification_callback(
             let trust_graph = deps.trust_graph.clone();
             let own_did = deps.own_did.clone();
             let rate_limiter = deps.attestation_rate_limiter.clone();
+            let evidence_validator = deps.evidence_validator.clone();
             tokio::spawn(async move {
-                handle_trust_attestation(&entry, &trust_graph, &own_did, &rate_limiter).await;
+                handle_trust_attestation(
+                    &entry,
+                    &trust_graph,
+                    &own_did,
+                    &rate_limiter,
+                    evidence_validator.as_ref(),
+                )
+                .await;
             });
         } else if topic == "contracts:deploy" {
             if let Some(data) = entry_data {
