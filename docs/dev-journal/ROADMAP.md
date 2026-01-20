@@ -84,7 +84,7 @@ See [PHASE_HISTORY.md](../PHASE_HISTORY.md) for details on completed phases.
 The CooperativeEntity model and Coop management code is **already implemented** (icn-entity: 4.6K LOC, icn-coop: 4.1K LOC). This phase completes integration into the runtime.
 
 **Issues**:
-- #266: CooperativeEntity integration (NEW - tracking issue)
+- #738: CooperativeEntity integration (tracking issue)
 - Spawn CoopActor in supervisor (plan exists in COOP_INTEGRATION_PLAN.md)
 - Add entity gossip topic for multi-node sync
 - Wire SledEntityRegistry for persistence
