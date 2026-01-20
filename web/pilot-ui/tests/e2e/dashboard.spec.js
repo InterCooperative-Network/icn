@@ -326,12 +326,10 @@ test.describe('History Tab', () => {
 
   test('should export to CSV', async ({ page }) => {
     const exportBtn = page.locator('#export-csv');
-
-    // Set up download listener
-    const downloadPromise = page.waitForEvent('download');
-    await exportBtn.click();
-
-    const download = await downloadPromise;
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      exportBtn.click(),
+    ]);
     expect(download.suggestedFilename()).toContain('.csv');
   });
 });
@@ -371,8 +369,8 @@ test.describe('Members Tab', () => {
     await copyBtn.click();
 
     // Should show toast
-    await expect(page.locator('.toast')).toBeVisible();
-    await expect(page.locator('.toast')).toContainText('copied');
+    const toast = page.locator('.toast', { hasText: 'DID copied' });
+    await expect(toast).toBeVisible();
   });
 });
 

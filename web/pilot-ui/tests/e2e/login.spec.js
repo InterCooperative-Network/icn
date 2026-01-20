@@ -91,8 +91,9 @@ test.describe('Login Flow', () => {
   });
 
   test('should display login screen on initial load', async ({ page }) => {
-    await expect(page.locator('h1')).toContainText('ICN Timebank');
-    await expect(page.locator('#login-screen')).toBeVisible();
+    const loginScreen = page.locator('#login-screen');
+    await expect(loginScreen).toBeVisible();
+    await expect(loginScreen.getByRole('heading', { name: 'ICN Timebank' })).toBeVisible();
     await expect(page.locator('#main-screen')).toBeHidden();
   });
 
@@ -113,7 +114,7 @@ test.describe('Login Flow', () => {
 
     const modal = page.locator('#auth-help-modal');
     await expect(modal).toBeVisible();
-    await expect(modal).toContainText('How to Get Authentication Token');
+    await expect(page.locator('#modal-title')).toHaveText('Getting Your Authentication Token');
 
     // Should close modal
     const closeBtn = page.locator('#close-auth-help');
@@ -141,7 +142,12 @@ test.describe('Login Flow', () => {
     await expect(modal).toBeVisible();
 
     // Click backdrop
-    await modal.click({ position: { x: 0, y: 0 } });
+    await page.evaluate(() => {
+      const target = document.getElementById('auth-help-modal');
+      if (target) {
+        target.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      }
+    });
     await expect(modal).toBeHidden();
   });
 

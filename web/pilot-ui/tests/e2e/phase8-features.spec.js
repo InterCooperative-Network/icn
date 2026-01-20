@@ -259,8 +259,8 @@ test.describe('Member Profile', () => {
     await expect(modal).toBeHidden();
 
     // Should show success toast
-    await expect(page.locator('.toast')).toBeVisible();
-    await expect(page.locator('.toast')).toContainText('Profile updated');
+    const toast = page.locator('.toast', { hasText: 'Profile updated' });
+    await expect(toast).toBeVisible();
 
     // Check localStorage
     const profileData = await page.evaluate(() =>

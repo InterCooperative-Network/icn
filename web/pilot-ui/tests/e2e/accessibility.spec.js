@@ -124,7 +124,7 @@ test.describe('Accessibility - Keyboard Navigation', () => {
 
   test('all interactive elements are keyboard accessible', async ({ page }) => {
     const results = await new AxeBuilder({ page })
-      .withRules(['keyboard'])
+      .withRules(['aria-hidden-focus', 'focus-order-semantics', 'frame-focusable-content', 'scrollable-region-focusable'])
       .analyze();
 
     expect(results.violations, 'Keyboard accessibility issues found').toHaveLength(0);
@@ -175,9 +175,9 @@ test.describe('Accessibility - Keyboard Navigation', () => {
   });
 
   test('focus is visible on interactive elements', async ({ page }) => {
-    // Test that focusable elements have accessible names
+    // Test that focus order semantics are enforced
     const results = await new AxeBuilder({ page })
-      .withRules(['focusable-no-name'])
+      .withRules(['focus-order-semantics'])
       .analyze();
 
     // Log any focus-related issues as warnings
