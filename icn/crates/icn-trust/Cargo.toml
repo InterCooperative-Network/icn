@@ -2,6 +2,7 @@
 name = "icn-trust"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 
 [dependencies]
 icn-identity.workspace = true

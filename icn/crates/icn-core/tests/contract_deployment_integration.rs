@@ -195,6 +195,9 @@ impl TestNode {
                                 "StorageChallengeMsg"
                             }
                             icn_gossip::GossipMessage::StorageProofMsg { .. } => "StorageProofMsg",
+                            icn_gossip::GossipMessage::StorageContentNotFoundMsg { .. } => {
+                                "StorageContentNotFoundMsg"
+                            }
                         };
 
                         let result = if let Some(target_did) = recipient {

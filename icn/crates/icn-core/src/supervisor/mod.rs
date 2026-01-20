@@ -601,6 +601,11 @@ impl Supervisor {
                 let attestation_rate_limiter =
                     Arc::new(crate::trust_propagation::AttestationRateLimiter::new());
 
+                // Create evidence validator for trust attestation verification
+                let evidence_validator_for_notifications = Some(Arc::new(
+                    icn_trust::EvidenceValidator::new(recovery_store.clone()),
+                ));
+
                 // Initialize federation services if enabled
                 let federation_services = init_federation::init_federation_services(
                     &self.config.federation,
@@ -657,6 +662,7 @@ impl Supervisor {
                         attestation_rate_limiter,
                         contract_registry: contract_registry_holder.clone(),
                         nat_dial_config: self.config.network.nat_dial.clone(),
+                        evidence_validator: evidence_validator_for_notifications,
                     },
                 );
 

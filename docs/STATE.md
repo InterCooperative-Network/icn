@@ -35,18 +35,29 @@
 
 ## Code review findings (2026-01-20)
 - Repo-wide TODO scan across icn/ captured items below.
-- icn-core supervisor: personhood store and anchor rate limit config are TODOs (icn-core/src/supervisor/mod.rs:499-500).
-- icn-core governance handlers: treasury disbursement/redemption/bond issuance TODOs (icn-core/src/supervisor/governance_handlers.rs:392-419).
-- icn-core notifications: evidence validator wiring TODO (icn-core/src/supervisor/init_notifications.rs:89).
-- icn-governance proposal cleanup: metrics TODO and archive store stub (icn-governance/src/proposal_cleanup.rs:303-357).
-- icn-gateway agreements: compensation_model parsing and terms fields TODOs (icn-gateway/src/api/agreements.rs:255-275, 721-725).
+- icn-core supervisor: personhood store and anchor rate limit config are TODOs (icn-core/src/supervisor/mod.rs:499-500). [Requires config schema extension]
+- ✅ icn-core governance handlers: treasury disbursement/redemption/bond issuance implemented (icn-core/src/supervisor/governance_handlers.rs).
+- ✅ icn-core notifications: evidence validator wired up (icn-core/src/supervisor/init_notifications.rs).
+- ✅ icn-governance proposal cleanup: metrics implemented, archive store stubbed (icn-governance/src/proposal_cleanup.rs).
+- ✅ icn-gateway agreements: compensation_model and terms parsing implemented (icn-gateway/src/api/agreements.rs).
 - icn-gateway governance domains: performance note for large domain counts (icn-gateway/src/api/governance.rs:174-176).
 - icn-gateway SDIS enrollment: temporary VUI hash and steward rate limit TODOs (icn-gateway/src/api/sdis/simple_enrollment.rs:11-77, 477-484).
-- icn-steward: message-level signatures TODO for VUI sync (icn-steward/src/actor.rs:679-689).
+- ✅ icn-steward: message-level signatures implemented for VUI sync (icn-steward/src/gossip.rs).
 - icn-compute: federated task settlement TODO (icn-compute/src/actor/placement.rs:983-988).
-- icn-gossip storage challenge: missing ContentNotFound response TODO (icn-gossip/src/handlers/storage_challenge.rs:94).
+- ✅ icn-gossip storage challenge: ContentNotFound response implemented (icn-gossip/src/handlers/storage_challenge.rs).
+- ✅ icn-gossip storage challenge: timestamp validation for replay attack prevention added (icn-gossip/src/handlers/storage_challenge.rs).
+- ✅ icn-gossip storage challenge: comprehensive metrics added (icn-obs/src/metrics/storage.rs).
+- ✅ icn-gateway agreements: comprehensive input validation for all API types (icn-gateway/src/api/agreements.rs).
 - icnctl: automatic daemon start TODO (bins/icnctl/src/main.rs:6532-6541).
-- deny.toml: add proper license field to all crates TODO (icn/deny.toml:68).
+- ✅ deny.toml: license field added to all crates (icn/deny.toml).
+
+## Code quality notes (2026-01-20)
+- No dead code warnings from clippy or rustc.
+- Large module candidates for future modularization:
+  - bins/icnctl/src/main.rs (9445 lines) - CLI should be split into subcommand modules
+  - crates/icn-ledger/src/ledger.rs (5447 lines)
+  - crates/icn-gateway/src/api/governance.rs (4650 lines)
+  - crates/icn-core/src/supervisor/governance_handlers.rs (4243 lines)
 
 ## References
 - docs/dev-journal/ROADMAP.md

@@ -4,6 +4,70 @@
 
 use metrics::{counter, describe_counter, describe_gauge, describe_histogram, gauge, histogram};
 
+/// Storage challenge result types
+pub enum ChallengeResult {
+    /// Proof was generated and sent successfully
+    ProofSent,
+    /// Content was not found, not-found response sent
+    ContentNotFound,
+    /// Challenge was expired
+    Expired,
+    /// Challenge was for a different target
+    WrongTarget,
+    /// Invalid protocol version
+    InvalidVersion,
+    /// Signature verification failed
+    SignatureFailed,
+    /// No keypair available to sign proof
+    NoKeypair,
+    /// Error generating Merkle proof
+    ProofError,
+}
+
+impl ChallengeResult {
+    fn as_str(&self) -> &'static str {
+        match self {
+            ChallengeResult::ProofSent => "proof_sent",
+            ChallengeResult::ContentNotFound => "content_not_found",
+            ChallengeResult::Expired => "expired",
+            ChallengeResult::WrongTarget => "wrong_target",
+            ChallengeResult::InvalidVersion => "invalid_version",
+            ChallengeResult::SignatureFailed => "signature_failed",
+            ChallengeResult::NoKeypair => "no_keypair",
+            ChallengeResult::ProofError => "proof_error",
+        }
+    }
+}
+
+/// Storage proof verification result types
+pub enum ProofVerifyResult {
+    /// Verification successful
+    Valid,
+    /// Signature verification failed
+    InvalidSignature,
+    /// Content-not-found response received
+    NotFound,
+    /// Content-not-found response too old (replay attack)
+    NotFoundExpired,
+    /// Content-not-found response unsigned
+    NotFoundUnsigned,
+    /// Scheduler not configured
+    NoScheduler,
+}
+
+impl ProofVerifyResult {
+    fn as_str(&self) -> &'static str {
+        match self {
+            ProofVerifyResult::Valid => "valid",
+            ProofVerifyResult::InvalidSignature => "invalid_signature",
+            ProofVerifyResult::NotFound => "not_found",
+            ProofVerifyResult::NotFoundExpired => "not_found_expired",
+            ProofVerifyResult::NotFoundUnsigned => "not_found_unsigned",
+            ProofVerifyResult::NoScheduler => "no_scheduler",
+        }
+    }
+}
+
 /// Initialize storage metric descriptions
 pub fn init_descriptions() {
     describe_gauge!(
@@ -46,6 +110,24 @@ pub fn init_descriptions() {
     describe_counter!(
         "icn_storage_maintenance_errors_total",
         "Total number of maintenance errors"
+    );
+
+    // Storage challenge metrics
+    describe_counter!(
+        "icn_storage_challenges_received_total",
+        "Total number of storage challenges received"
+    );
+    describe_counter!(
+        "icn_storage_challenge_results_total",
+        "Total challenge handling results by type (proof_sent, content_not_found, expired, etc.)"
+    );
+    describe_counter!(
+        "icn_storage_proofs_received_total",
+        "Total number of storage proofs received"
+    );
+    describe_counter!(
+        "icn_storage_proof_verification_total",
+        "Total proof verification results by type (valid, invalid_signature, not_found, etc.)"
     );
 }
 
@@ -123,4 +205,34 @@ pub fn maintenance_space_reclaimed_add(bytes: u64) {
 /// Increment maintenance errors counter
 pub fn maintenance_errors_inc() {
     counter!("icn_storage_maintenance_errors_total").increment(1);
+}
+
+// Storage challenge metrics
+
+/// Increment storage challenges received counter
+pub fn challenges_received_inc() {
+    counter!("icn_storage_challenges_received_total").increment(1);
+}
+
+/// Record a challenge handling result
+pub fn challenge_result_inc(result: ChallengeResult) {
+    counter!(
+        "icn_storage_challenge_results_total",
+        "result" => result.as_str().to_string()
+    )
+    .increment(1);
+}
+
+/// Increment storage proofs received counter
+pub fn proofs_received_inc() {
+    counter!("icn_storage_proofs_received_total").increment(1);
+}
+
+/// Record a proof verification result
+pub fn proof_verification_inc(result: ProofVerifyResult) {
+    counter!(
+        "icn_storage_proof_verification_total",
+        "result" => result.as_str().to_string()
+    )
+    .increment(1);
 }

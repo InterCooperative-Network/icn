@@ -2,7 +2,7 @@
 
 use crate::vector_clock::VectorClock;
 use icn_identity::Did;
-use icn_store::{StorageChallenge, StorageProof};
+use icn_store::{StorageChallenge, StorageContentNotFound, StorageProof};
 use icn_trust::TrustClass;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
@@ -362,6 +362,16 @@ pub enum GossipMessage {
         /// The storage proof
         proof: StorageProof,
     },
+
+    /// Content not found response from replica holder (Proof-of-Storage)
+    ///
+    /// Sent when a node receives a storage challenge but doesn't have the content.
+    /// This allows the challenger to distinguish between nodes that don't have the
+    /// content (honest) versus nodes that refuse to prove (potential misbehavior).
+    StorageContentNotFoundMsg {
+        /// The content-not-found response
+        response: StorageContentNotFound,
+    },
 }
 
 impl GossipMessage {
@@ -385,6 +395,7 @@ impl GossipMessage {
             GossipMessage::PartitionHealResponse { .. } => "PartitionHealResponse",
             GossipMessage::StorageChallengeMsg { .. } => "StorageChallengeMsg",
             GossipMessage::StorageProofMsg { .. } => "StorageProofMsg",
+            GossipMessage::StorageContentNotFoundMsg { .. } => "StorageContentNotFoundMsg",
         }
     }
 }

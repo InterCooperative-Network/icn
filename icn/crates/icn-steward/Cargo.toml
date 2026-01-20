@@ -3,7 +3,7 @@ name = "icn-steward"
 version = "0.1.0"
 edition = "2021"
 description = "SDIS Steward Network - enrollment ceremonies, VUI registry, token issuance"
-license = "Apache-2.0"
+license.workspace = true
 repository = "https://github.com/icn-foundation/icn"
 
 [dependencies]

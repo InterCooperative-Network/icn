@@ -532,6 +532,110 @@ impl StorageProof {
 }
 
 // ============================================================================
+// Content Not Found Response
+// ============================================================================
+
+/// Response indicating content was not found for a storage challenge
+///
+/// Sent by a node when it receives a storage challenge but doesn't have the
+/// requested content. This allows the challenger to distinguish between a
+/// node that doesn't have the content (honest behavior) versus a node that
+/// has the content but refuses to prove it (potential misbehavior).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StorageContentNotFound {
+    /// Protocol version (must match challenge version)
+    pub version: u8,
+
+    /// Challenge ID this response is for
+    pub challenge_id: [u8; 32],
+
+    /// Hash of the content that was not found
+    pub content_hash: [u8; 32],
+
+    /// DID of the node that doesn't have the content
+    pub responder: String,
+
+    /// Unix timestamp when this response was generated
+    pub generated_at: u64,
+
+    /// Ed25519 signature over the response payload
+    pub signature: Vec<u8>,
+}
+
+impl StorageContentNotFound {
+    /// Create a new content-not-found response (unsigned)
+    pub fn new(challenge_id: [u8; 32], content_hash: [u8; 32], responder: String) -> Self {
+        let now = match std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH) {
+            Ok(d) => d.as_secs(),
+            Err(_) => 0,
+        };
+
+        Self {
+            version: CHALLENGE_PROTOCOL_VERSION,
+            challenge_id,
+            content_hash,
+            responder,
+            generated_at: now,
+            signature: Vec::new(),
+        }
+    }
+
+    /// Get the signing payload
+    fn signing_payload(&self) -> Vec<u8> {
+        let mut payload = Vec::new();
+        payload.push(self.version);
+        payload.extend_from_slice(&self.challenge_id);
+        payload.extend_from_slice(&self.content_hash);
+        payload.extend_from_slice(self.responder.as_bytes());
+        payload.extend_from_slice(&self.generated_at.to_le_bytes());
+        payload
+    }
+
+    /// Sign this response with the responder's keypair
+    pub fn sign(&mut self, keypair: &KeyPair) -> Result<()> {
+        if keypair.did().as_str() != self.responder {
+            anyhow::bail!(
+                "Keypair DID {} does not match responder {}",
+                keypair.did(),
+                self.responder
+            );
+        }
+
+        let payload = self.signing_payload();
+        let signature = keypair.sign(&payload);
+        self.signature = signature.to_bytes().to_vec();
+        Ok(())
+    }
+
+    /// Verify the signature on this response
+    pub fn verify_signature(&self) -> Result<()> {
+        if self.signature.is_empty() {
+            anyhow::bail!("Response has no signature");
+        }
+
+        let did = Did::from_str(&self.responder).context("Invalid responder DID format")?;
+        let verifying_key = did
+            .to_verifying_key()
+            .context("Failed to extract verifying key from responder DID")?;
+
+        let signature =
+            Signature::from_slice(&self.signature).context("Invalid signature format")?;
+
+        let payload = self.signing_payload();
+        verifying_key
+            .verify(&payload, &signature)
+            .context("Response signature verification failed")?;
+
+        Ok(())
+    }
+
+    /// Check if this response is signed
+    pub fn is_signed(&self) -> bool {
+        !self.signature.is_empty()
+    }
+}
+
+// ============================================================================
 // Failure Reasons
 // ============================================================================
 

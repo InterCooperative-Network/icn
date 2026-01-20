@@ -389,7 +389,7 @@ impl GovernanceEventHandler {
                     allocation.currency,
                     allocation.allocations.len()
                 );
-                // TODO: Trigger treasury disbursement to shareholders
+                self.execute_surplus_allocation(proposal_id, allocation);
             }
             ProposalPayload::ShareRedemption {
                 member,
@@ -405,7 +405,7 @@ impl GovernanceEventHandler {
                     reason,
                     payout_schedule.len()
                 );
-                // TODO: Start redemption process and schedule payouts
+                self.execute_share_redemption(proposal_id, share_ids, payout_schedule);
             }
             ProposalPayload::BondIssuance { bond_offering } => {
                 info!(
@@ -416,7 +416,7 @@ impl GovernanceEventHandler {
                     bond_offering.interest_rate_bps,
                     bond_offering.term_days
                 );
-                // TODO: Open bond for subscription
+                self.execute_bond_issuance(proposal_id, bond_offering);
             }
             // Federation governance (Issue #514)
             ProposalPayload::Federation(federation_proposal) => {
@@ -3803,6 +3803,310 @@ impl GovernanceEventHandler {
         );
 
         icn_obs::metrics::governance::proposals_executed_inc("protocol_change_scheduled");
+    }
+
+    // =========================================================================
+    // Labor Share Operations (Issue #389)
+    // =========================================================================
+
+    /// Execute surplus allocation to shareholders
+    fn execute_surplus_allocation(
+        &self,
+        proposal_id: ProposalId,
+        allocation: icn_ledger::SurplusAllocation,
+    ) {
+        let treasury_manager = self.treasury_manager.clone();
+        let store = self.audit_store.clone();
+        let dlq = self.dlq.clone();
+
+        tokio::spawn(async move {
+            let start = std::time::Instant::now();
+
+            // Idempotency check
+            let audit_key = format!("gov:audit:surplus_allocation:{}", proposal_id.0);
+            match store.get(audit_key.as_bytes()) {
+                Ok(Some(_)) => {
+                    debug!(
+                        "Surplus allocation {} already executed, skipping",
+                        proposal_id.0
+                    );
+                    icn_obs::metrics::governance::idempotent_skips_inc();
+                    return;
+                }
+                Ok(None) => {}
+                Err(e) => {
+                    error!(
+                        "🚨 Failed to check audit trail for surplus allocation {}: {}",
+                        proposal_id.0, e
+                    );
+                }
+            }
+
+            let mut treasury_guard = treasury_manager.write().await;
+
+            match treasury_guard.execute_surplus_allocation(allocation.clone()) {
+                Ok(()) => {
+                    info!(
+                        "✅ Surplus allocation {} executed: {} {} to {} shareholders",
+                        proposal_id.0,
+                        allocation.total_surplus,
+                        allocation.currency,
+                        allocation.allocations.len()
+                    );
+
+                    // Record audit trail
+                    if let Err(e) = store.put(
+                        audit_key.as_bytes(),
+                        serde_json::to_vec(&serde_json::json!({
+                            "executed_at": icn_time::current_timestamp_secs(),
+                            "total_surplus": allocation.total_surplus,
+                            "currency": allocation.currency,
+                            "shareholder_count": allocation.allocations.len(),
+                        }))
+                        .unwrap_or_default()
+                        .as_slice(),
+                    ) {
+                        warn!("Failed to record audit trail for surplus allocation: {}", e);
+                    }
+
+                    icn_obs::metrics::governance::proposals_executed_inc("surplus_allocation");
+                    icn_obs::metrics::governance::execution_duration_record(
+                        "surplus_allocation",
+                        start.elapsed().as_secs_f64(),
+                    );
+                }
+                Err(e) => {
+                    error!(
+                        "❌ Failed to execute surplus allocation {}: {}",
+                        proposal_id.0, e
+                    );
+                    let failed_op = FailedOperation::new(
+                        format!("surplus_allocation:{}", proposal_id.0),
+                        FailureType::TreasuryOperationFailed,
+                        serde_json::json!({
+                            "proposal_id": proposal_id.0,
+                            "error": e.to_string(),
+                            "total_surplus": allocation.total_surplus,
+                            "currency": allocation.currency,
+                        }),
+                        format!("Surplus allocation failed: {e}"),
+                    );
+                    if let Err(dlq_err) = dlq.enqueue(failed_op) {
+                        error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                    }
+                    icn_obs::metrics::governance::execution_failures_inc("surplus_allocation");
+                }
+            }
+        });
+    }
+
+    /// Execute share redemption for one or more shares
+    fn execute_share_redemption(
+        &self,
+        proposal_id: ProposalId,
+        share_ids: Vec<icn_ledger::ShareId>,
+        payout_schedule: Vec<icn_ledger::ScheduledPayout>,
+    ) {
+        let treasury_manager = self.treasury_manager.clone();
+        let store = self.audit_store.clone();
+        let dlq = self.dlq.clone();
+
+        tokio::spawn(async move {
+            let start = std::time::Instant::now();
+
+            // Idempotency check
+            let audit_key = format!("gov:audit:share_redemption:{}", proposal_id.0);
+            match store.get(audit_key.as_bytes()) {
+                Ok(Some(_)) => {
+                    debug!(
+                        "Share redemption {} already executed, skipping",
+                        proposal_id.0
+                    );
+                    icn_obs::metrics::governance::idempotent_skips_inc();
+                    return;
+                }
+                Ok(None) => {}
+                Err(e) => {
+                    error!(
+                        "🚨 Failed to check audit trail for share redemption {}: {}",
+                        proposal_id.0, e
+                    );
+                }
+            }
+
+            let mut treasury_guard = treasury_manager.write().await;
+            let mut success_count = 0;
+            let mut error_count = 0;
+
+            for share_id in &share_ids {
+                match treasury_guard.start_share_redemption(
+                    share_id,
+                    payout_schedule.clone(),
+                    proposal_id.0.clone(),
+                ) {
+                    Ok(()) => {
+                        info!(
+                            "✅ Share redemption started for {} (proposal {})",
+                            share_id, proposal_id.0
+                        );
+                        success_count += 1;
+                    }
+                    Err(e) => {
+                        error!(
+                            "❌ Failed to start redemption for share {}: {}",
+                            share_id, e
+                        );
+                        error_count += 1;
+                        let failed_op = FailedOperation::new(
+                            format!("share_redemption:{}:{}", proposal_id.0, share_id),
+                            FailureType::TreasuryOperationFailed,
+                            serde_json::json!({
+                                "proposal_id": proposal_id.0,
+                                "share_id": share_id.to_string(),
+                                "error": e.to_string(),
+                            }),
+                            format!("Share redemption failed for {share_id}: {e}"),
+                        );
+                        if let Err(dlq_err) = dlq.enqueue(failed_op) {
+                            error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                        }
+                    }
+                }
+            }
+
+            // Record audit trail
+            if let Err(e) = store.put(
+                audit_key.as_bytes(),
+                serde_json::to_vec(&serde_json::json!({
+                    "executed_at": icn_time::current_timestamp_secs(),
+                    "share_count": share_ids.len(),
+                    "success_count": success_count,
+                    "error_count": error_count,
+                    "payout_count": payout_schedule.len(),
+                }))
+                .unwrap_or_default()
+                .as_slice(),
+            ) {
+                warn!("Failed to record audit trail for share redemption: {}", e);
+            }
+
+            if error_count > 0 {
+                icn_obs::metrics::governance::execution_failures_inc("share_redemption");
+            } else {
+                icn_obs::metrics::governance::proposals_executed_inc("share_redemption");
+            }
+            icn_obs::metrics::governance::execution_duration_record(
+                "share_redemption",
+                start.elapsed().as_secs_f64(),
+            );
+        });
+    }
+
+    /// Execute bond issuance to open a bond for subscription
+    fn execute_bond_issuance(&self, proposal_id: ProposalId, offering: icn_ledger::BondOffering) {
+        let treasury_manager = self.treasury_manager.clone();
+        let store = self.audit_store.clone();
+        let dlq = self.dlq.clone();
+        let treasury_did = self.treasury_did.clone();
+
+        tokio::spawn(async move {
+            let start = std::time::Instant::now();
+
+            // Idempotency check
+            let audit_key = format!("gov:audit:bond_issuance:{}", proposal_id.0);
+            match store.get(audit_key.as_bytes()) {
+                Ok(Some(_)) => {
+                    debug!("Bond issuance {} already executed, skipping", proposal_id.0);
+                    icn_obs::metrics::governance::idempotent_skips_inc();
+                    return;
+                }
+                Ok(None) => {}
+                Err(e) => {
+                    error!(
+                        "🚨 Failed to check audit trail for bond issuance {}: {}",
+                        proposal_id.0, e
+                    );
+                }
+            }
+
+            let mut treasury_guard = treasury_manager.write().await;
+
+            // Create the bond from the offering
+            let bond_id = icn_ledger::BondId::new(format!("bond-{}", proposal_id.0));
+            let now = icn_time::current_timestamp_secs();
+            let maturity_date = now + (offering.term_days as u64 * 86400);
+
+            let bond = icn_ledger::CooperativeBond::new_offering(
+                bond_id.clone(),
+                offering.issuer_id.clone(),
+                treasury_did.clone(), // Placeholder holder - will be updated on subscription
+                offering.principal_requested,
+                offering.interest_rate_bps,
+                maturity_date,
+                offering.payment_schedule.clone(),
+                offering.currency.clone(),
+                proposal_id.0.clone(),
+                now,
+            );
+
+            match treasury_guard.create_bond(bond) {
+                Ok(()) => {
+                    info!(
+                        "✅ Bond {} created for proposal {}: {} {} at {}bps for {} days",
+                        bond_id,
+                        proposal_id.0,
+                        offering.principal_requested,
+                        offering.currency,
+                        offering.interest_rate_bps,
+                        offering.term_days
+                    );
+
+                    // Record audit trail
+                    if let Err(e) = store.put(
+                        audit_key.as_bytes(),
+                        serde_json::to_vec(&serde_json::json!({
+                            "executed_at": now,
+                            "bond_id": bond_id.to_string(),
+                            "principal": offering.principal_requested,
+                            "currency": offering.currency,
+                            "interest_rate_bps": offering.interest_rate_bps,
+                            "term_days": offering.term_days,
+                        }))
+                        .unwrap_or_default()
+                        .as_slice(),
+                    ) {
+                        warn!("Failed to record audit trail for bond issuance: {}", e);
+                    }
+
+                    icn_obs::metrics::governance::proposals_executed_inc("bond_issuance");
+                    icn_obs::metrics::governance::execution_duration_record(
+                        "bond_issuance",
+                        start.elapsed().as_secs_f64(),
+                    );
+                }
+                Err(e) => {
+                    error!(
+                        "❌ Failed to create bond for proposal {}: {}",
+                        proposal_id.0, e
+                    );
+                    let failed_op = FailedOperation::new(
+                        format!("bond_issuance:{}", proposal_id.0),
+                        FailureType::TreasuryOperationFailed,
+                        serde_json::json!({
+                            "proposal_id": proposal_id.0,
+                            "error": e.to_string(),
+                            "principal": offering.principal_requested,
+                            "currency": offering.currency,
+                        }),
+                        format!("Bond issuance failed: {e}"),
+                    );
+                    if let Err(dlq_err) = dlq.enqueue(failed_op) {
+                        error!("   Failed to write to dead-letter queue: {}", dlq_err);
+                    }
+                    icn_obs::metrics::governance::execution_failures_inc("bond_issuance");
+                }
+            }
+        });
     }
 }
 

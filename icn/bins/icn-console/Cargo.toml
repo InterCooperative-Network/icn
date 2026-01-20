@@ -2,6 +2,7 @@
 name = "icn-console"
 version = "0.1.0"
 edition = "2021"
+license.workspace = true
 description = "Interactive TUI console for ICN cooperative management"
 
 [[bin]]

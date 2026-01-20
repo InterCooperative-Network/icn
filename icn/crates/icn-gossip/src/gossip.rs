@@ -34,6 +34,12 @@ pub type PeerSamplingCallback = Arc<dyn Fn(crate::types::Scope, usize) -> Vec<Di
 pub type StorageProofCallback =
     Arc<dyn Fn(icn_store::StorageProof) -> anyhow::Result<()> + Send + Sync>;
 
+/// Callback for handling content-not-found responses
+/// Parameters: (response)
+/// Called when a storage challenge target reports they don't have the content
+pub type StorageContentNotFoundCallback =
+    Arc<dyn Fn(icn_store::StorageContentNotFound) -> anyhow::Result<()> + Send + Sync>;
+
 /// Trust lookup function for resource limits
 /// Parameters: (did) -> `Option<TrustClass>`
 /// Returns the trust class for a DID to determine resource limits
@@ -184,6 +190,9 @@ pub struct GossipActor {
     /// Storage proof callback (optional, for forwarding proofs to ChallengeScheduler)
     pub(crate) storage_proof_callback: Option<StorageProofCallback>,
 
+    /// Storage content-not-found callback (optional, for forwarding to ChallengeScheduler)
+    pub(crate) storage_not_found_callback: Option<StorageContentNotFoundCallback>,
+
     /// Per-peer sync state manager
     pub(crate) peer_sync: PeerSyncManager,
 
@@ -246,6 +255,7 @@ impl GossipActor {
             notification_callback: None,
             peer_sampling: None,
             storage_proof_callback: None,
+            storage_not_found_callback: None,
             peer_sync: PeerSyncManager::new(300, 5000), // Default: 300-5000ms backoff
             store: None,                                // Phase 17: Set via set_store()
             misbehavior_detector: None, // Phase 18 Week 1-2: Set via set_misbehavior_detector()
@@ -345,6 +355,11 @@ impl GossipActor {
     /// Set the storage proof callback for forwarding proofs to ChallengeScheduler
     pub fn set_storage_proof_callback(&mut self, callback: StorageProofCallback) {
         self.storage_proof_callback = Some(callback);
+    }
+
+    /// Set the storage content-not-found callback for forwarding to ChallengeScheduler
+    pub fn set_storage_not_found_callback(&mut self, callback: StorageContentNotFoundCallback) {
+        self.storage_not_found_callback = Some(callback);
     }
 
     /// Set the store for replica metadata tracking (Phase 17)
@@ -1479,6 +1494,10 @@ impl GossipActor {
             }
 
             GossipMessage::StorageProofMsg { proof } => self.handle_storage_proof(sender, proof),
+
+            GossipMessage::StorageContentNotFoundMsg { response } => {
+                self.handle_storage_content_not_found(sender, response)
+            }
         }
     }
 

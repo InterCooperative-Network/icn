@@ -2998,6 +2998,7 @@ dependencies = [
  "icn-security",
  "icn-snapshot",
  "icn-store",
+ "icn-time",
  "icn-trust",
  "rand 0.8.5",
  "serde",

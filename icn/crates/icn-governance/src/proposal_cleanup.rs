@@ -300,9 +300,9 @@ impl<S: crate::GovernanceStore> ProposalCleanupTask<S> {
             );
         }
 
-        // TODO: Add metrics when icn-obs governance metrics are extended
-        // icn_obs::metrics::governance::proposals_archived_inc_by(stats.archived as u64);
-        // icn_obs::metrics::governance::archives_deleted_inc_by(stats.deleted as u64);
+        // Record metrics
+        icn_obs::metrics::governance::proposals_archived_inc_by(stats.archived as u64);
+        icn_obs::metrics::governance::archives_deleted_inc_by(stats.deleted as u64);
 
         Ok(stats)
     }

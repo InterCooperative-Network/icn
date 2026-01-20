@@ -31,6 +31,7 @@ pub mod action_items;
 pub mod agreement;
 pub mod exchange;
 pub mod gateway;
+pub mod governance;
 pub mod ledger;
 pub mod nat;
 pub mod network;
