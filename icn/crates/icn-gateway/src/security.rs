@@ -244,17 +244,18 @@ where
                 // Content Security Policy
                 // Custom directives should use with_csp_directive(), which validates the input.
                 // Using unwrap_or with a safe fallback rather than expect() due to crate lint rules.
-                let csp_value = HeaderValue::from_str(&config.csp_directive).unwrap_or_else(|err| {
-                    // This should never happen with configs constructed via with_csp_directive(),
-                    // but provide a safe fallback for any invalid custom values.
-                    tracing::error!(
-                        error = ?err,
-                        directive_len = config.csp_directive.len(),
-                        "Invalid CSP directive in config - using restrictive default. \
-                         Prefer with_csp_directive() to construct validated custom directives."
-                    );
-                    HeaderValue::from_static("default-src 'none'")
-                });
+                let csp_value =
+                    HeaderValue::from_str(&config.csp_directive).unwrap_or_else(|err| {
+                        // This should never happen with configs constructed via with_csp_directive(),
+                        // but provide a safe fallback for any invalid custom values.
+                        tracing::error!(
+                            error = ?err,
+                            directive_len = config.csp_directive.len(),
+                            "Invalid CSP directive in config - using restrictive default. \
+                             Prefer with_csp_directive() to construct validated custom directives."
+                        );
+                        HeaderValue::from_static("default-src 'none'")
+                    });
                 headers.insert(
                     HeaderName::from_static("content-security-policy"),
                     csp_value,
