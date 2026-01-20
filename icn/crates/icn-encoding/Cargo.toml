@@ -2,6 +2,7 @@
 name = "icn-encoding"
 version.workspace = true
 edition.workspace = true
+license = "Apache-2.0"
 description = "Encoding abstraction layer for ICN serialization (bincode → postcard migration)"
 
 [dependencies]

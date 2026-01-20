@@ -1,4 +1,4 @@
-//! Storage challenge handlers: StorageChallengeMsg, StorageProofMsg
+//! Storage challenge handlers: StorageChallengeMsg, StorageProofMsg, StorageContentNotFoundMsg
 //!
 //! These handlers implement proof-of-storage challenge protocol for
 //! verifying that replica holders actually store the data they claim.
@@ -8,7 +8,8 @@ use crate::types::GossipMessage;
 use anyhow::Result;
 use icn_identity::Did;
 use icn_store::{
-    ContentChunkTree, MerkleProofData, StorageChallenge, StorageProof, DEFAULT_CHUNK_SIZE,
+    ContentChunkTree, MerkleProofData, StorageChallenge, StorageContentNotFound, StorageProof,
+    DEFAULT_CHUNK_SIZE,
 };
 use tracing::{debug, info, warn};
 
@@ -86,12 +87,49 @@ impl GossipActor {
         }
 
         let Some(content) = content_data else {
-            warn!(
+            info!(
                 challenge_id = %hex::encode(challenge.id),
                 content_hash = %hex::encode(challenge.content_hash),
-                "Cannot respond to challenge - content not found"
+                "Content not found - sending ContentNotFound response"
             );
-            // TODO: Could send a "ContentNotFound" response
+
+            // Send ContentNotFound response to challenger
+            let challenger_did = match Did::from_str(&challenge.challenger) {
+                Ok(did) => did,
+                Err(e) => {
+                    warn!(
+                        challenger = %challenge.challenger,
+                        error = %e,
+                        "Invalid challenger DID in content-not-found response"
+                    );
+                    return Ok(());
+                }
+            };
+
+            // Create and sign the content-not-found response
+            let mut response = StorageContentNotFound::new(
+                challenge.id,
+                challenge.content_hash,
+                self.own_did.to_string(),
+            );
+
+            // Sign if we have a keypair
+            if let Some(kp) = &self.keypair {
+                if let Err(e) = response.sign(kp) {
+                    warn!(
+                        challenge_id = %hex::encode(challenge.id),
+                        error = %e,
+                        "Failed to sign content-not-found response"
+                    );
+                    return Ok(());
+                }
+            }
+
+            self.send_message(
+                Some(challenger_did),
+                GossipMessage::StorageContentNotFoundMsg { response },
+            );
+
             return Ok(());
         };
 
@@ -218,6 +256,69 @@ impl GossipActor {
                 challenge_id = %hex::encode(proof.challenge_id),
                 prover = %proof.prover,
                 "Storage proof received (ChallengeScheduler not configured)"
+            );
+        }
+
+        Ok(())
+    }
+
+    /// Handle a StorageContentNotFoundMsg - content not found response from replica holder
+    ///
+    /// When we receive a content-not-found response:
+    /// 1. Verify the signature (ensures authenticity)
+    /// 2. Forward to ChallengeScheduler (via callback)
+    /// 3. ChallengeScheduler handles:
+    ///    - Match to pending challenge
+    ///    - Record that replica no longer has the content
+    ///    - Update replica health status (may demote to Degraded)
+    ///    - Trigger re-replication if needed
+    pub(crate) fn handle_storage_content_not_found(
+        &mut self,
+        _sender: &Did,
+        response: StorageContentNotFound,
+    ) -> Result<()> {
+        debug!(
+            challenge_id = %hex::encode(response.challenge_id),
+            content_hash = %hex::encode(response.content_hash),
+            responder = %response.responder,
+            message_type = "StorageContentNotFoundMsg",
+            "Received content-not-found response"
+        );
+
+        // Verify signature if present (unsigned responses are suspicious)
+        if response.is_signed() {
+            if let Err(e) = response.verify_signature() {
+                warn!(
+                    challenge_id = %hex::encode(response.challenge_id),
+                    responder = %response.responder,
+                    error = %e,
+                    "Content-not-found signature verification failed"
+                );
+                return Ok(());
+            }
+        } else {
+            warn!(
+                challenge_id = %hex::encode(response.challenge_id),
+                responder = %response.responder,
+                "Received unsigned content-not-found response"
+            );
+            // Still forward to scheduler - it may want to track unsigned responses differently
+        }
+
+        // Forward to ChallengeScheduler for processing
+        if let Some(callback) = &self.storage_not_found_callback {
+            if let Err(e) = callback(response.clone()) {
+                warn!(
+                    challenge_id = %hex::encode(response.challenge_id),
+                    error = %e,
+                    "Error processing content-not-found in ChallengeScheduler"
+                );
+            }
+        } else {
+            info!(
+                challenge_id = %hex::encode(response.challenge_id),
+                responder = %response.responder,
+                "Content-not-found received (ChallengeScheduler not configured)"
             );
         }
 

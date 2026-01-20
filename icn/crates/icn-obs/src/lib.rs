@@ -106,6 +106,7 @@ pub fn init_metrics() -> Result<()> {
     metrics::agreement::init_descriptions();
     metrics::exchange::init_descriptions();
     metrics::gateway::init_descriptions();
+    metrics::governance::init_descriptions();
     metrics::ledger::init_descriptions();
     metrics::nat::init_descriptions();
     metrics::network::init_descriptions();

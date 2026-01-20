@@ -44,7 +44,7 @@ pub enum AgreementTypeRequest {
     ResourceSharing {
         resource_type: String,
         duration_days: u32,
-        compensation_model: String,
+        compensation_model: CompensationModelRequest,
     },
     FederationMembership {
         federation_id: String,
@@ -67,6 +67,42 @@ pub struct TradeItemRequest {
     pub currency: String,
 }
 
+/// Compensation model for resource sharing
+#[derive(Debug, Clone, Deserialize, ToSchema)]
+#[serde(tag = "model", rename_all = "snake_case")]
+pub enum CompensationModelRequest {
+    /// Fixed periodic payment
+    FixedRate {
+        /// Amount per period
+        amount: i64,
+        /// Currency code (e.g., "USD", "EUR", or cooperative currency)
+        currency: String,
+        /// Period in days
+        period_days: u32,
+    },
+    /// Pay per use
+    PerUse {
+        /// Amount per use
+        amount: i64,
+        /// Currency code
+        currency: String,
+        /// Unit of use measurement (e.g., "hour", "GB", "request")
+        unit: String,
+    },
+    /// Revenue sharing
+    RevenueShare {
+        /// Percentage of revenue (0-100)
+        percentage: u8,
+    },
+    /// Reciprocal exchange (no monetary compensation)
+    Reciprocal {
+        /// Description of reciprocal arrangement
+        description: String,
+    },
+    /// No compensation (donation/grant)
+    None,
+}
+
 /// Request to add a party to an agreement
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct AddPartyRequest {
@@ -87,12 +123,39 @@ pub struct SetTermsRequest {
     pub effective_date: Option<u64>,
     /// Expiration date (Unix timestamp)
     pub expiration_date: Option<u64>,
+    /// Auto-renewal configuration
+    pub auto_renewal: Option<AutoRenewalRequest>,
     /// Termination notice period in days
     pub termination_notice_days: Option<u32>,
     /// Dispute resolution method
     pub dispute_resolution: Option<String>,
+    /// Governing law jurisdiction (e.g., "California, USA", "EU")
+    pub governing_law: Option<String>,
     /// Additional terms
     pub additional_terms: Option<String>,
+}
+
+/// Auto-renewal configuration for agreements
+#[derive(Debug, Clone, Deserialize, ToSchema)]
+pub struct AutoRenewalRequest {
+    /// Whether auto-renewal is enabled
+    pub enabled: bool,
+    /// Renewal period in days (defaults to 365)
+    #[serde(default = "default_renewal_period")]
+    pub period_days: u32,
+    /// Maximum number of renewals (None = unlimited)
+    pub max_renewals: Option<u32>,
+    /// Days before expiration to notify parties (defaults to 30)
+    #[serde(default = "default_notification_days")]
+    pub notification_days: u32,
+}
+
+fn default_renewal_period() -> u32 {
+    365
+}
+
+fn default_notification_days() -> u32 {
+    30
 }
 
 /// Request to suspend an agreement
@@ -216,8 +279,8 @@ pub struct AmendmentResponse {
 
 use icn_federation::agreement::{
     Agreement, AgreementId, AgreementParty, AgreementTerms, AgreementType, AmendmentChange,
-    CompensationModel, DataSharingLevel, FederationMembershipTerms, PartyRole, ResourceType,
-    TerminationReason, TradeItem,
+    AutoRenewal, CompensationModel, DataSharingLevel, FederationMembershipTerms, PartyRole,
+    ResourceType, TerminationReason, TradeItem,
 };
 use icn_identity::Did;
 
@@ -252,7 +315,7 @@ fn to_domain_agreement_type(req_type: AgreementTypeRequest) -> Result<AgreementT
         AgreementTypeRequest::ResourceSharing {
             resource_type,
             duration_days,
-            compensation_model: _, // TODO: Parse compensation model from request
+            compensation_model,
         } => {
             // Parse resource_type string to enum, returning error for unknown values
             let resource_type_enum = match resource_type.as_str() {
@@ -265,12 +328,33 @@ fn to_domain_agreement_type(req_type: AgreementTypeRequest) -> Result<AgreementT
                 other => ResourceType::Other(other.to_string()),
             };
 
-            // Use fixed rate compensation model (simplified for MVP)
-            // TODO: Parse compensation_model from request once API schema is finalized
-            let compensation = CompensationModel::FixedRate {
-                amount: 0,
-                currency: "USD".to_string(),
-                period_days: 30,
+            // Convert compensation model request to domain type
+            let compensation = match compensation_model {
+                CompensationModelRequest::FixedRate {
+                    amount,
+                    currency,
+                    period_days,
+                } => CompensationModel::FixedRate {
+                    amount,
+                    currency,
+                    period_days,
+                },
+                CompensationModelRequest::PerUse {
+                    amount,
+                    currency,
+                    unit,
+                } => CompensationModel::PerUse {
+                    amount,
+                    currency,
+                    unit,
+                },
+                CompensationModelRequest::RevenueShare { percentage } => {
+                    CompensationModel::RevenueShare { percentage }
+                }
+                CompensationModelRequest::Reciprocal { description } => {
+                    CompensationModel::Reciprocal { description }
+                }
+                CompensationModelRequest::None => CompensationModel::None,
             };
 
             Ok(AgreementType::ResourceSharing {
@@ -715,13 +799,21 @@ pub async fn set_terms(
     let manager = get_manager(&agreement_mgr)?;
 
     // Build terms object
+    // Convert auto-renewal request to domain type
+    let auto_renewal = req.auto_renewal.clone().map(|ar| AutoRenewal {
+        enabled: ar.enabled,
+        period_days: ar.period_days,
+        max_renewals: ar.max_renewals,
+        notification_days: ar.notification_days,
+    });
+
     let terms = AgreementTerms {
         effective_date: req.effective_date,
         expiration_date: req.expiration_date,
-        auto_renewal: None, // TODO: Add to API request if needed
+        auto_renewal,
         termination_notice_days: req.termination_notice_days,
         dispute_resolution: req.dispute_resolution.clone(),
-        governing_law: None, // TODO: Add to API request if needed
+        governing_law: req.governing_law.clone(),
         additional_terms: req.additional_terms.clone(),
     };
 

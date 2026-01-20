@@ -2,6 +2,7 @@
 name = "icn-ccl"
 version.workspace = true
 edition.workspace = true
+license = "Apache-2.0"
 
 [dependencies]
 icn-encoding = { path = "../icn-encoding" }

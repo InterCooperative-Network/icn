@@ -37,8 +37,8 @@ pub use peer_cache::{CachedPeer, PeerCache, PeerSource, DEFAULT_PEER_TTL};
 // Re-export proof-of-storage types
 pub use pos::{
     ChallengeConfig, ChallengeState, ContentChunkTree, MerkleProof, MerkleProofData,
-    PendingChallenge, StorageChallenge, StorageFailureReason, StorageProof,
-    CHALLENGE_PROTOCOL_VERSION, DEFAULT_BLOCKS_PER_CHALLENGE, DEFAULT_CHUNK_SIZE,
+    PendingChallenge, StorageChallenge, StorageContentNotFound, StorageFailureReason,
+    StorageProof, CHALLENGE_PROTOCOL_VERSION, DEFAULT_BLOCKS_PER_CHALLENGE, DEFAULT_CHUNK_SIZE,
     MAX_BYTE_SAMPLE_SIZE,
 };
 
