@@ -50,7 +50,7 @@ pub enum RoutingMode {
     ThroughHomeCoop,
     /// Credits go directly to the worker, home cooperative gets a fee.
     DirectToWorker,
-    /// Split between worker (direct) and home cooperative (0-100).
+    /// Split between worker (direct) and home cooperative (1-100, inclusive).
     Split { worker_pct: u8 },
 }
 
@@ -59,7 +59,7 @@ pub enum RoutingMode {
 pub struct CreditRouting {
     /// How credits flow.
     pub routing_mode: RoutingMode,
-    /// Home cooperative's coordination fee in basis points (0-10000).
+    /// Home cooperative's coordination fee in basis points (0-10000, inclusive).
     pub admin_fee_bps: u16,
     /// Whether host contributes to worker's home cooperative shares.
     pub share_contribution: bool,
@@ -103,9 +103,9 @@ impl RoutingMode {
     /// Validate routing configuration invariants.
     pub fn validate(&self) -> Result<()> {
         if let RoutingMode::Split { worker_pct } = self {
-            if *worker_pct > 100 {
+            if *worker_pct == 0 || *worker_pct > 100 {
                 return Err(EntityError::InvalidFormat(format!(
-                    "worker_pct must be between 0 and 100, got {worker_pct}"
+                    "worker_pct must be between 1 and 100, got {worker_pct}"
                 )));
             }
         }
@@ -331,7 +331,7 @@ mod tests {
         routing.validate().unwrap();
 
         let routing = CreditRouting {
-            routing_mode: RoutingMode::Split { worker_pct: 120 },
+            routing_mode: RoutingMode::Split { worker_pct: 0 },
             admin_fee_bps: 150,
             share_contribution: false,
         };
@@ -343,11 +343,21 @@ mod tests {
             share_contribution: false,
         };
         assert!(routing.validate().is_err());
+
+        let routing = CreditRouting {
+            routing_mode: RoutingMode::Split { worker_pct: 120 },
+            admin_fee_bps: 150,
+            share_contribution: false,
+        };
+        assert!(routing.validate().is_err());
     }
 
     #[test]
     fn test_assignment_date_validation() {
         let mut assignment = sample_assignment();
+        assignment.validate().unwrap();
+
+        assignment.end_date = None;
         assignment.validate().unwrap();
 
         assignment.end_date = Some(assignment.start_date);
