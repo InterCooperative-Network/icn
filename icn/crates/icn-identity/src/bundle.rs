@@ -3,6 +3,61 @@
 //! This module provides IdentityBundle, which binds a DID identity to a TLS certificate
 //! through cryptographic signatures. This prevents MITM attacks by ensuring that the
 //! entity holding the TLS certificate also holds the private key for the claimed DID.
+//!
+//! # Hardware Signing Support
+//!
+//! IdentityBundle supports both software and hardware-backed signing:
+//!
+//! - **Software keys**: Private key in memory, signs directly
+//! - **Hardware keys**: Private key in HSM/TPM, signs via DidSigner backend
+//!
+//! ## Usage Examples
+//!
+//! ### Software Keys (Default)
+//!
+//! ```
+//! use icn_identity::IdentityBundle;
+//!
+//! // Generate bundle with software keys
+//! let bundle = IdentityBundle::generate().unwrap();
+//!
+//! // Sign directly without needing a signer
+//! let message = b"test message";
+//! let signature = bundle.sign(message).unwrap();
+//! ```
+//!
+//! ### Hardware Keys with Signer
+//!
+//! ```
+//! use icn_identity::{IdentityBundle, DidKey, SoftwareSigner};
+//! use std::sync::Arc;
+//! # use rand_core::OsRng;
+//! # use ed25519_dalek::SigningKey;
+//!
+//! # // For demo purposes, we use software keys
+//! # let signing_key = SigningKey::generate(&mut OsRng);
+//! # let secret_bytes = signing_key.to_bytes();
+//! # let public_bytes = signing_key.verifying_key().to_bytes();
+//! # let software_key = DidKey::from_software_bytes(secret_bytes, public_bytes).unwrap();
+//! # let signer = Arc::new(SoftwareSigner::new(software_key).unwrap());
+//! #
+//! // Create hardware key (normally from HSM/TPM)
+//! let hardware_key = DidKey::from_hardware(
+//!     signing_key.verifying_key(),
+//!     "pkcs11".to_string(),
+//!     "slot=0".to_string(),
+//! );
+//!
+//! // Create bundle with signer backend
+//! let bundle = IdentityBundle::from_did_key_with_signer(
+//!     hardware_key,
+//!     Some(signer)
+//! ).unwrap();
+//!
+//! // Sign using hardware backend
+//! let message = b"test message";
+//! let signature = bundle.sign(message).unwrap();
+//! ```
 
 use crate::{Did, DidKey, DidSigner, KeyPair};
 use anyhow::{Context, Result};
@@ -26,8 +81,15 @@ use icn_crypto_pq::{HybridKemKeypair, HybridKemPublicKey, MlKemKeypair};
 /// Also includes X25519 keys for end-to-end payload encryption.
 ///
 /// The bundle can contain either:
-/// - Software keys (private key in memory)
-/// - Hardware-backed keys (private key in HSM/TPM)
+/// - Software keys (private key in memory, no signer needed)
+/// - Hardware-backed keys (private key in HSM/TPM, requires DidSigner)
+///
+/// # Signing
+///
+/// Use the `sign()` method to sign messages. The bundle will automatically:
+/// - Use the DidSigner backend if available (hardware keys)
+/// - Fall back to software signing if no signer (software keys)
+/// - Return an error if hardware key is used without signer
 pub struct IdentityBundle {
     /// The DID for this identity
     did: Did,
