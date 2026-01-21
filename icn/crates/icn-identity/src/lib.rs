@@ -20,8 +20,14 @@ pub mod batch_verify;
 pub mod bundle;
 pub mod commons;
 pub mod commons_store;
+pub mod did_signer;
 pub mod keybundle;
 pub mod keystore;
+pub mod keystore_backend;
+#[cfg(feature = "hsm")]
+pub mod keystore_pkcs11;
+#[cfg(feature = "tpm-experimental")]
+pub mod keystore_tpm;
 pub mod multi_device;
 pub mod personhood;
 pub mod personhood_store;
@@ -47,8 +53,18 @@ pub use commons::{
     JurisdictionType, MembershipCapability, MembershipStatus,
 };
 pub use commons_store::CommonsHolderStore;
+pub use did_signer::{DidKey, DidSigner, SoftwareSigner};
 pub use keybundle::KeyBundle;
 pub use keystore::{AgeKeyStore, KeyRotation, KeyStore, RotationReason};
+#[cfg(feature = "hsm")]
+pub use keystore_backend::Pkcs11Config;
+#[cfg(feature = "tpm-experimental")]
+pub use keystore_backend::TpmConfig;
+pub use keystore_backend::{BackendConfig, KeyStoreBackend, SigningBackend};
+#[cfg(feature = "hsm")]
+pub use keystore_pkcs11::Pkcs11Backend;
+#[cfg(feature = "tpm-experimental")]
+pub use keystore_tpm::TpmBackend;
 pub use multi_device::{
     Capability, DidDocument, KeyType, RecoveryConfig, RecoveryMethod, RecoveryProof,
     RevocationReason, RotationEvent, RotationEventType, VerificationMethod,

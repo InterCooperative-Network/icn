@@ -70,8 +70,9 @@ pub async fn init_gossip_services(
 
     // Set keypair for signing outgoing gossip messages
     {
+        let keypair = deps.identity_bundle.keypair()?;
         let mut gossip = gossip_handle.write().await;
-        gossip.set_keypair(deps.identity_bundle.keypair().clone());
+        gossip.set_keypair(keypair);
     }
 
     info!("Gossip actor configured with signing keypair");

@@ -4746,7 +4746,8 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &Path) -> Result<()> {
             keystore.unlock(&passphrase)?;
 
             // Verify DID matches
-            let own_did = keystore.get_keypair()?.did();
+            let own_keypair = keystore.get_keypair()?;
+            let own_did = own_keypair.did();
             if own_did.as_str() != request.did {
                 bail!(
                     "DID mismatch: request is for {}, but your identity is {}",
@@ -6136,7 +6137,7 @@ async fn handle_auth_command(cmd: AuthCommands, data_dir: &Path) -> Result<()> {
                 .get_identity_bundle()
                 .context("Keystore is locked")?;
             let did = bundle.did().to_string();
-            let keypair = bundle.keypair();
+            let keypair = bundle.keypair()?;
 
             // Parse scopes
             let scope_list: Vec<String> = scopes.split(',').map(|s| s.trim().to_string()).collect();
@@ -8238,7 +8239,7 @@ async fn handle_charter_command(
             let signature_hex = hex::encode(signature.to_bytes());
 
             // Get auth token
-            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, keypair).await?;
+            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, &keypair).await?;
 
             // Build request
             let request = serde_json::json!({
@@ -8311,7 +8312,7 @@ async fn handle_charter_command(
             println!();
 
             // Get auth token
-            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, keypair).await?;
+            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, &keypair).await?;
 
             let client = reqwest::Client::new();
             let url = format!("{gateway}/v1/charter/{charter_id}/activate");
@@ -8392,7 +8393,7 @@ async fn handle_amendment_command(
             let url = format!("{gateway}/v1/constitutional/amendments");
 
             // Get auth token
-            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, keypair).await?;
+            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, &keypair).await?;
 
             match client
                 .post(&url)
@@ -8565,7 +8566,7 @@ async fn handle_amendment_command(
 
             let client = reqwest::Client::new();
             let url = format!("{gateway}/v1/constitutional/amendments/{amendment_id}/submit");
-            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, keypair).await?;
+            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, &keypair).await?;
 
             match client
                 .post(&url)
@@ -8613,7 +8614,7 @@ async fn handle_amendment_command(
 
             let client = reqwest::Client::new();
             let url = format!("{gateway}/v1/constitutional/amendments/{amendment_id}/vote");
-            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, keypair).await?;
+            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, &keypair).await?;
 
             match client
                 .post(&url)
@@ -8685,7 +8686,7 @@ async fn handle_amendment_command(
 
             let client = reqwest::Client::new();
             let url = format!("{gateway}/v1/constitutional/amendments/{amendment_id}/ratify");
-            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, keypair).await?;
+            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, &keypair).await?;
 
             match client
                 .post(&url)
@@ -8744,7 +8745,7 @@ async fn handle_amendment_command(
 
             let client = reqwest::Client::new();
             let url = format!("{gateway}/v1/constitutional/amendments/{amendment_id}/withdraw");
-            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, keypair).await?;
+            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, &keypair).await?;
 
             match client
                 .post(&url)
@@ -8813,7 +8814,7 @@ async fn handle_amendment_command(
 
             let client = reqwest::Client::new();
             let url = format!("{gateway}/v1/constitutional/amendments/{amendment_id}/changes");
-            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, keypair).await?;
+            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, &keypair).await?;
 
             match client
                 .post(&url)
@@ -8930,7 +8931,7 @@ async fn handle_appeal_command(
 
             let client = reqwest::Client::new();
             let url = format!("{gateway}/v1/constitutional/appeals");
-            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, keypair).await?;
+            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, &keypair).await?;
 
             match client
                 .post(&url)
@@ -9156,7 +9157,7 @@ async fn handle_appeal_command(
 
             let client = reqwest::Client::new();
             let url = format!("{gateway}/v1/constitutional/appeals/{appeal_id}/evidence");
-            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, keypair).await?;
+            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, &keypair).await?;
 
             match client
                 .post(&url)
@@ -9213,7 +9214,7 @@ async fn handle_appeal_command(
 
             let client = reqwest::Client::new();
             let url = format!("{gateway}/v1/constitutional/appeals/{appeal_id}/respond");
-            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, keypair).await?;
+            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, &keypair).await?;
 
             match client
                 .post(&url)
@@ -9267,7 +9268,7 @@ async fn handle_appeal_command(
 
             let client = reqwest::Client::new();
             let url = format!("{gateway}/v1/constitutional/appeals/{appeal_id}/withdraw");
-            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, keypair).await?;
+            let token = get_gateway_token(&gateway, &did.to_string(), &coop_id, &keypair).await?;
 
             match client
                 .post(&url)

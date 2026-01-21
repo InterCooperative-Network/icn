@@ -71,7 +71,7 @@ fn test_encrypt_sign_decrypt_flow() {
     // 4. Sign the encrypted envelope
     let signed_envelope = SignedEnvelope::new(
         alice_bundle.did(),
-        alice_bundle.keypair(),
+        &alice_bundle.keypair().unwrap(),
         sequence,
         PayloadType::Encrypted,
         encrypted_bytes.clone(),
@@ -211,7 +211,7 @@ fn test_signature_protects_encrypted_envelope() {
     let encrypted_bytes = icn_encoding::encode_bincode_legacy(&encrypted_envelope).unwrap();
     let mut signed_envelope = SignedEnvelope::new(
         alice_bundle.did(),
-        alice_bundle.keypair(),
+        &alice_bundle.keypair().unwrap(),
         1,
         PayloadType::Encrypted,
         encrypted_bytes,
@@ -461,7 +461,7 @@ async fn test_network_x25519_key_exchange_and_encrypted_message() -> Result<()> 
     let encrypted_bytes = icn_encoding::encode_bincode_legacy(&encrypted_envelope)?;
     let signed_envelope = SignedEnvelope::new(
         alice.identity_bundle.did(),
-        alice.identity_bundle.keypair(),
+        &alice.identity_bundle.keypair().unwrap(),
         sequence,
         PayloadType::Encrypted,
         encrypted_bytes,
@@ -565,7 +565,7 @@ async fn test_broadcast_path_not_encrypted() -> Result<()> {
     // Create signed envelope with PayloadType::Gossip (not Encrypted)
     let signed_envelope = SignedEnvelope::new(
         alice.identity_bundle.did(),
-        alice.identity_bundle.keypair(),
+        &alice.identity_bundle.keypair().unwrap(),
         1,
         PayloadType::Gossip, // NOT Encrypted
         plaintext.clone(),
@@ -703,7 +703,7 @@ async fn test_send_encrypted_message_convenience_api() -> Result<()> {
         .network_handle
         .send_encrypted_message(
             bob.identity_bundle.did(),
-            alice.identity_bundle.keypair(),
+            &alice.identity_bundle.keypair().unwrap(),
             &alice.identity_bundle.x25519_secret(),
             sequence,
             secret_payload,

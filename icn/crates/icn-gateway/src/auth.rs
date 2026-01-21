@@ -289,7 +289,7 @@ mod tests {
 
         // Sign nonce
         let nonce_bytes = hex::decode(&nonce).unwrap();
-        let signature = bundle.keypair().sign(&nonce_bytes);
+        let signature = bundle.keypair().unwrap().sign(&nonce_bytes);
         let signature_bytes = signature.to_bytes();
 
         // Verify and get token

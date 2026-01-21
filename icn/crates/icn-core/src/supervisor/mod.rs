@@ -398,7 +398,7 @@ impl Supervisor {
 
             // Spawn Identity actor (provides signing and trust graph access)
             let identity_handle = crate::identity::IdentityActor::spawn(
-                identity_bundle.keypair().clone(),
+                identity_bundle.keypair()?,
                 trust_graph_handle.clone(),
                 self.shutdown_tx.clone(),
             );
@@ -549,7 +549,7 @@ impl Supervisor {
                 init_send_callback::SendCallbackDeps {
                     network_handle: network_handle.clone(),
                     own_did: did.clone(),
-                    keypair: identity_bundle.keypair().clone(),
+                    keypair: identity_bundle.keypair()?,
                     x25519_secret_bytes: *identity_bundle.x25519_secret().as_bytes(),
                     gossip_store: gossip_store.clone(),
                     encryption_enabled: self.config.network.e2e_encryption_enabled,
@@ -612,7 +612,7 @@ impl Supervisor {
                     init_federation::FederationDeps {
                         gossip_handle: gossip_handle.clone(),
                         did: did.clone(),
-                        keypair: Arc::new(identity_bundle.keypair().clone()),
+                        keypair: Arc::new(identity_bundle.keypair()?),
                         store_path: self.config.store_path(),
                     },
                 )
@@ -735,7 +735,7 @@ impl Supervisor {
             // This verifies that replica holders actually store the data they claim
             let challenge_scheduler_handle = crate::storage_challenge::ChallengeScheduler::spawn(
                 did.clone(),
-                Arc::new(identity_bundle.keypair().clone()), // For signing challenges
+                Arc::new(identity_bundle.keypair()?), // For signing challenges
                 icn_store::ChallengeConfig::default(),
                 gossip_store.clone(), // Uses the gossip store for content/replica access
                 trust_graph_handle.clone(),
@@ -963,7 +963,7 @@ impl Supervisor {
                     gossip_handle: gossip_handle.clone(),
                     steward_handle_holder: steward_handle_holder.clone(),
                     did: did.clone(),
-                    keypair: identity_bundle.keypair().clone(),
+                    keypair: identity_bundle.keypair()?,
                     shutdown_tx: self.shutdown_tx.clone(),
                 },
             )
