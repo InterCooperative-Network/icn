@@ -11,7 +11,7 @@ use super::ConnectionContext;
 use crate::actor::PeerConnectionInfo;
 use crate::protocol::{NetworkMessage, PqBindingProof};
 use crate::topology::{NeighborLimitsConfig, PeerId, TopologyInfo};
-use anyhow::Result;
+use anyhow::{Context, Result};
 use icn_identity::Did;
 use std::collections::hash_map::Entry;
 use tracing::{debug, info, warn};

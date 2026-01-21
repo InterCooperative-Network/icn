@@ -232,8 +232,10 @@ impl IdentityBundle {
             let mut bundle = bundle;
             bundle.pq_signing_secret = pq_signing_secret;
             bundle.pq_signing_public = pq_signing_public;
-            return Ok(bundle);
+            Ok(bundle)
         }
+
+        #[cfg(not(feature = "post-quantum"))]
         Ok(bundle)
     }
 
