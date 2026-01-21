@@ -120,7 +120,8 @@ impl Pkcs11Backend {
 
         for attr in attributes {
             if let Attribute::EcPoint(data) = attr {
-                // EC point is DER-encoded, extract the 32-byte key
+                // EC point extraction is vendor-specific; this path is tested with SoftHSM2.
+                // Other HSMs may encode Ed25519 points differently.
                 if data.len() >= 32 {
                     let key_start = data.len() - 32;
                     let key_bytes: [u8; 32] = data[key_start..]

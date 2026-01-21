@@ -1,6 +1,7 @@
 //! Integration tests for backend abstraction layer
 
-use icn_identity::{BackendConfig, KeyStoreBackend};
+use icn_identity::{AgeKeyStore, BackendConfig, KeyStore, KeyStoreBackend};
+use tempfile::tempdir;
 
 #[test]
 fn test_backend_config_types() {
@@ -71,4 +72,21 @@ fn test_backend_abstraction() {
         // Would need actual TPM to test
         // accept_backend(TpmBackend::new(...));
     }
+}
+
+#[test]
+fn test_age_keystore_round_trip() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("keypair.age");
+    let passphrase = b"test-passphrase";
+
+    let mut keystore = AgeKeyStore::init(&path, passphrase).unwrap();
+    let did = keystore.get_keypair().unwrap().did().clone();
+
+    keystore.lock();
+    let mut reopened = AgeKeyStore::open(&path).unwrap();
+    assert!(reopened.is_locked());
+
+    reopened.unlock(passphrase).unwrap();
+    assert_eq!(reopened.get_keypair().unwrap().did(), &did);
 }

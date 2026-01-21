@@ -226,11 +226,13 @@ impl IdentityBundle {
             did: did_keypair.did().clone(),
         };
 
-        let mut bundle = Self::from_did_key(did_key)?;
+        let bundle = Self::from_did_key(did_key)?;
         #[cfg(feature = "post-quantum")]
         {
+            let mut bundle = bundle;
             bundle.pq_signing_secret = pq_signing_secret;
             bundle.pq_signing_public = pq_signing_public;
+            return Ok(bundle);
         }
         Ok(bundle)
     }

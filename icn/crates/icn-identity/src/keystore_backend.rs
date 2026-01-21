@@ -58,6 +58,8 @@ pub trait KeyStoreBackend: Send + Sync {
     ///
     /// Note: For hardware backends, the keypair in the bundle
     /// may have limited functionality (no secret key export).
+    /// Some backends may not support constructing bundles until
+    /// signer integration is implemented.
     fn get_identity_bundle(&self) -> Result<&IdentityBundle>;
 
     /// Get the storage path or identifier

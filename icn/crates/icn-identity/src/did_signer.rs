@@ -172,6 +172,7 @@ impl DidKey {
     ///
     /// This is only available for software keys and should be used
     /// sparingly (e.g., for keystore serialization).
+    #[allow(dead_code)]
     pub(crate) fn secret_bytes(&self) -> Result<&[u8; 32]> {
         match self {
             Self::Software { secret_bytes, .. } => Ok(secret_bytes),
