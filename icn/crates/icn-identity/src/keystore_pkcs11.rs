@@ -223,18 +223,12 @@ impl KeyStoreBackend for Pkcs11Backend {
         // Cannot create IdentityBundle with HSM keys until IdentityBundle
         // is refactored to use DidKey instead of KeyPair
         anyhow::bail!(
-            "PKCS#11 backend cannot create IdentityBundle: IdentityBundle \
-             currently requires KeyPair with secret material, but HSM keys \
-             never expose secrets. IdentityBundle refactor to DidKey required."
+            "PKCS#11 backend cannot create IdentityBundle for DID {}: \
+             IdentityBundle currently requires KeyPair with secret material, \
+             but HSM keys never expose secrets. IdentityBundle refactor to \
+             DidKey required.",
+            did
         )
-
-        // Cache state
-        self.session = Some(session);
-        self.identity_bundle = Some(identity_bundle);
-        self.did = Some(did);
-        self.verifying_key = Some(verifying_key);
-
-        Ok(())
     }
 
     fn lock(&mut self) {

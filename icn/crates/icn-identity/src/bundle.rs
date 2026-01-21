@@ -116,9 +116,23 @@ impl IdentityBundle {
     /// the cryptographic binding signature. Also generates X25519 keys for encryption.
     /// If the key has PQ keys, ML-KEM keys are also generated for hybrid encryption.
     ///
-    /// **Note:** For hardware-backed keys, the binding signature will be created
-    /// by calling the hardware's signing operation.
+    /// # Limitations
+    /// **Hardware keys:** Cannot create TLS binding signature without DidSigner.
+    /// Hardware keys require a DidSigner backend to perform signing operations.
+    /// This is tracked in follow-up Issue #1: "Add optional DidSigner to IdentityBundle"
+    ///
+    /// For hardware-backed keys, use the future `from_did_key_with_signer()` method
+    /// once Issue #1 is implemented.
     pub fn from_did_key(did_key: DidKey) -> Result<Self> {
+        // Hardware keys cannot sign without a DidSigner backend
+        if matches!(did_key, DidKey::Hardware { .. }) {
+            anyhow::bail!(
+                "Cannot create IdentityBundle from hardware DidKey: Hardware keys \
+                 require a DidSigner to perform TLS binding signature. Use \
+                 from_did_key_with_signer() once Issue #1 is implemented."
+            );
+        }
+
         let did = did_key.did().clone();
 
         // Generate TLS certificate with DID as subject

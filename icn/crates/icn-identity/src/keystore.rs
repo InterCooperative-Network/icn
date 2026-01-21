@@ -435,6 +435,11 @@ impl AgeKeyStore {
         )?;
 
         // Convert upgraded KeyPair to DidKey
+        // NOTE: DidKey::Software currently only stores Ed25519 signing keys.
+        // The PQ signing keys (ML-DSA) from upgraded_keypair.pq_keypair are not
+        // stored in DidKey and will be lost after save/reload. This is a known
+        // limitation tracked in follow-up Issue #7: "Extend DidKey to support PQ keys"
+        // For now, PQ KEM keys are preserved separately in IdentityBundle fields.
         let upgraded_did_key = DidKey::Software {
             secret_bytes: Zeroizing::new(upgraded_keypair.to_signing_key_bytes()),
             verifying_key: *upgraded_keypair.verifying_key(),
