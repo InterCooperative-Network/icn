@@ -221,6 +221,7 @@ impl IdentityBundle {
     ///
     /// # Errors
     /// * Returns error if hardware key is provided without signer
+    /// * Returns error if signer's DID/verifying key doesn't match did_key
     /// * Returns error if TLS certificate generation fails
     pub fn from_did_key_with_signer(
         did_key: DidKey,
@@ -233,6 +234,19 @@ impl IdentityBundle {
                  Hardware keys require a DidSigner to perform TLS binding signature. \
                  Use from_did_key_with_signer() with a signer implementation."
             );
+        }
+
+        // Validate that signer matches did_key if provided
+        if let Some(ref signer) = signer {
+            if signer.verifying_key() != did_key.verifying_key() {
+                anyhow::bail!(
+                    "Signer verifying key does not match DidKey: \
+                     signer DID={}, did_key DID={}. \
+                     The signer must correspond to the same key as did_key.",
+                    signer.did(),
+                    did_key.did()
+                );
+            }
         }
 
         let did = did_key.did().clone();
@@ -338,6 +352,14 @@ impl IdentityBundle {
     /// This is used by the keystore to restore a previously saved bundle.
     /// The TLS certificate and binding signature are already generated.
     /// Secret parameters are wrapped in Zeroizing to prevent copies.
+    ///
+    /// **Note:** This method only supports software keys. Hardware-backed keys
+    /// require a signer to be provided; use `from_stored_with_signer()` instead
+    /// (not yet implemented - hardware key persistence is planned for future).
+    ///
+    /// # Errors
+    /// * Returns error if did_key is hardware-backed
+    /// * Returns error if binding signature verification fails
     #[allow(clippy::too_many_arguments)]
     pub fn from_stored(
         did_key: DidKey,
@@ -348,6 +370,17 @@ impl IdentityBundle {
         x25519_secret_bytes: Zeroizing<Vec<u8>>,
         x25519_public_bytes: [u8; 32],
     ) -> Result<Self> {
+        // Reject hardware-backed keys since we cannot restore signing capability
+        // without a signer. Hardware key persistence requires a separate API
+        // that accepts a signer.
+        if did_key.is_hardware_backed() {
+            anyhow::bail!(
+                "Cannot restore hardware-backed IdentityBundle without signer. \
+                 Hardware-backed key persistence is not yet supported. \
+                 The bundle must be re-created with from_did_key_with_signer()."
+            );
+        }
+
         #[cfg(feature = "post-quantum")]
         return Self::from_stored_with_kem(
             did_key,
@@ -426,6 +459,13 @@ impl IdentityBundle {
 
     /// Reconstruct identity bundle from stored components with optional PQ signing keys
     /// and optional KEM keys.
+    ///
+    /// **Note:** This method only supports software keys. Hardware-backed keys
+    /// require a signer to be provided; hardware key persistence is planned for future.
+    ///
+    /// # Errors
+    /// * Returns error if did_key is hardware-backed
+    /// * Returns error if binding signature verification fails
     #[cfg(feature = "post-quantum")]
     #[allow(clippy::too_many_arguments)]
     pub fn from_stored_with_pq(
@@ -441,6 +481,16 @@ impl IdentityBundle {
         kem_pq_secret: Option<Zeroizing<Vec<u8>>>,
         kem_pq_public: Option<Vec<u8>>,
     ) -> Result<Self> {
+        // Reject hardware-backed keys since we cannot restore signing capability
+        // without a signer. Hardware key persistence requires a separate API.
+        if did_key.is_hardware_backed() {
+            anyhow::bail!(
+                "Cannot restore hardware-backed IdentityBundle without signer. \
+                 Hardware-backed key persistence is not yet supported. \
+                 The bundle must be re-created with from_did_key_with_signer()."
+            );
+        }
+
         let did = did_key.did().clone();
         let tls_cert = CertificateDer::from(tls_cert_der);
 
@@ -506,8 +556,15 @@ impl IdentityBundle {
 
     /// Get the optional signer backend
     ///
-    /// Returns the signing backend if this bundle uses hardware-backed keys,
-    /// or None if it uses software keys.
+    /// Returns the signing backend if one was configured for this bundle,
+    /// regardless of whether the underlying DID key is hardware-backed or
+    /// software-only. Callers should not rely on the presence or absence of
+    /// a signer to determine key storage type; use `did_key().is_hardware_backed()`
+    /// for that purpose instead.
+    ///
+    /// Typical usage:
+    /// - Hardware keys: signer is `Some` (provided at construction)
+    /// - Software keys: signer is `None` (signs directly via DidKey)
     pub fn signer(&self) -> Option<&Arc<dyn DidSigner>> {
         self.signer.as_ref()
     }
@@ -936,8 +993,7 @@ mod tests {
         let secret_bytes = signing_key.to_bytes();
         let public_bytes = signing_key.verifying_key().to_bytes();
 
-        let software_did_key =
-            DidKey::from_software_bytes(secret_bytes, public_bytes).unwrap();
+        let software_did_key = DidKey::from_software_bytes(secret_bytes, public_bytes).unwrap();
 
         // Create a signer from the software key
         let signer = Arc::new(SoftwareSigner::new(software_did_key.clone()).unwrap());
@@ -977,8 +1033,7 @@ mod tests {
         let secret_bytes = signing_key.to_bytes();
         let public_bytes = signing_key.verifying_key().to_bytes();
 
-        let software_did_key =
-            DidKey::from_software_bytes(secret_bytes, public_bytes).unwrap();
+        let software_did_key = DidKey::from_software_bytes(secret_bytes, public_bytes).unwrap();
 
         // Create a signer from the software key
         let signer = Arc::new(SoftwareSigner::new(software_did_key.clone()).unwrap());
@@ -1040,8 +1095,7 @@ mod tests {
         let secret_bytes = signing_key.to_bytes();
         let public_bytes = signing_key.verifying_key().to_bytes();
 
-        let software_did_key =
-            DidKey::from_software_bytes(secret_bytes, public_bytes).unwrap();
+        let software_did_key = DidKey::from_software_bytes(secret_bytes, public_bytes).unwrap();
         let signer = Arc::new(SoftwareSigner::new(software_did_key.clone()).unwrap());
 
         let hardware_did_key = DidKey::from_hardware(
@@ -1067,8 +1121,7 @@ mod tests {
         let secret_bytes = signing_key.to_bytes();
         let public_bytes = signing_key.verifying_key().to_bytes();
 
-        let software_did_key =
-            DidKey::from_software_bytes(secret_bytes, public_bytes).unwrap();
+        let software_did_key = DidKey::from_software_bytes(secret_bytes, public_bytes).unwrap();
         let signer = Arc::new(SoftwareSigner::new(software_did_key.clone()).unwrap());
 
         let hardware_did_key = DidKey::from_hardware(
@@ -1096,5 +1149,33 @@ mod tests {
         let verifying_key = bundle1.did().to_verifying_key().unwrap();
         assert!(verifying_key.verify(message, &sig1).is_ok());
         assert!(verifying_key.verify(message, &sig2).is_ok());
+    }
+
+    #[test]
+    fn test_signer_mismatch_rejected() {
+        use crate::SoftwareSigner;
+        use rand_core::OsRng;
+
+        // Create two different keys
+        let key1 = SigningKey::generate(&mut OsRng);
+        let key2 = SigningKey::generate(&mut OsRng);
+
+        // Create a signer from key1
+        let software_did_key1 =
+            DidKey::from_software_bytes(key1.to_bytes(), key1.verifying_key().to_bytes()).unwrap();
+        let signer1 = Arc::new(SoftwareSigner::new(software_did_key1).unwrap());
+
+        // Create a hardware key from key2 (different key!)
+        let hardware_did_key2 = DidKey::from_hardware(
+            key2.verifying_key(),
+            "test-hsm".to_string(),
+            "slot-0".to_string(),
+        );
+
+        // Should fail: signer's key doesn't match did_key
+        let result = IdentityBundle::from_did_key_with_signer(hardware_did_key2, Some(signer1));
+        assert!(result.is_err());
+        let err_msg = result.err().unwrap().to_string();
+        assert!(err_msg.contains("does not match"));
     }
 }
