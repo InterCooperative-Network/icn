@@ -9,7 +9,7 @@
 
 use crate::anchor::Anchor;
 use crate::keybundle::KeyBundle;
-use crate::{Did, DidDocument, IdentityBundle, KeyPair, RotationEvent};
+use crate::{Did, DidDocument, DidKey, IdentityBundle, KeyPair, RotationEvent};
 use anyhow::{Context, Result};
 use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
@@ -434,12 +434,8 @@ impl AgeKeyStore {
             pq_keypair.public_key().as_bytes(),
         )?;
 
-        // Convert upgraded KeyPair to DidKey
-        // NOTE: DidKey::Software currently only stores Ed25519 signing keys.
-        // The PQ signing keys (ML-DSA) from upgraded_keypair.pq_keypair are not
-        // stored in DidKey and will be lost after save/reload. This is a known
-        // limitation tracked in follow-up Issue #7: "Extend DidKey to support PQ keys"
-        // For now, PQ KEM keys are preserved separately in IdentityBundle fields.
+        // Convert upgraded KeyPair to DidKey.
+        // PQ signing keys are stored alongside the bundle for persistence.
         let upgraded_did_key = DidKey::Software {
             secret_bytes: Zeroizing::new(upgraded_keypair.to_signing_key_bytes()),
             verifying_key: *upgraded_keypair.verifying_key(),
@@ -451,7 +447,7 @@ impl AgeKeyStore {
             .map_err(|e| anyhow::anyhow!("Failed to generate ML-KEM keypair: {e}"))?;
 
         // Create new IdentityBundle with upgraded keypair and KEM keys
-        let upgraded_bundle = IdentityBundle::from_stored_with_kem(
+        let upgraded_bundle = IdentityBundle::from_stored_with_pq(
             upgraded_did_key,
             identity_bundle.tls_cert().as_ref().to_vec(),
             Zeroizing::new(identity_bundle.tls_key_der_bytes().to_vec()),
@@ -459,6 +455,8 @@ impl AgeKeyStore {
             identity_bundle.binding_info().created_at,
             Zeroizing::new(identity_bundle.x25519_secret_bytes().to_vec()),
             *identity_bundle.x25519_public_bytes(),
+            Some(Zeroizing::new(pq_keypair.secret_key_bytes().to_vec())),
+            Some(pq_keypair.public_key().as_bytes().to_vec()),
             Some(Zeroizing::new(kem_keypair.secret_key_bytes().to_vec())),
             Some(kem_keypair.public_key().as_bytes().to_vec()),
         )?;
@@ -545,9 +543,13 @@ impl AgeKeyStore {
             keybundles: stored_keybundles,
             current_keybundle_version: self.current_keybundle_version,
             #[cfg(feature = "post-quantum")]
-            pq_secret: None, // TODO: Extract PQ keys from DidKey when supported
+            pq_secret: identity_bundle
+                .pq_signing_secret_bytes()
+                .map(|s| Zeroizing::new(s.to_vec())),
             #[cfg(feature = "post-quantum")]
-            pq_public: None,
+            pq_public: identity_bundle
+                .pq_signing_public_bytes()
+                .map(|p| p.to_vec()),
             #[cfg(feature = "post-quantum")]
             kem_pq_secret: identity_bundle
                 .kem_pq_secret_bytes()
@@ -555,7 +557,7 @@ impl AgeKeyStore {
             #[cfg(feature = "post-quantum")]
             kem_pq_public: identity_bundle.kem_pq_public_bytes().map(|p| p.to_vec()),
             #[cfg(feature = "post-quantum")]
-            is_hybrid: false, // TODO: Determine from DidKey when PQ support is added
+            is_hybrid: identity_bundle.has_pq_signing_keys(),
         };
 
         Self::encrypt_and_save_v4(&self.path, &stored, passphrase)
@@ -986,7 +988,7 @@ impl KeyStore for AgeKeyStore {
 
             // Reconstruct IdentityBundle with optional KEM keys
             #[cfg(feature = "post-quantum")]
-            let identity_bundle = IdentityBundle::from_stored_with_kem(
+            let identity_bundle = IdentityBundle::from_stored_with_pq(
                 did_key,
                 stored_v4.tls_cert_der.clone(),
                 stored_v4.tls_key_der.clone(),
@@ -994,6 +996,8 @@ impl KeyStore for AgeKeyStore {
                 stored_v4.created_at,
                 stored_v4.x25519_secret.clone(),
                 stored_v4.x25519_public,
+                stored_v4.pq_secret.clone(),
+                stored_v4.pq_public.clone(),
                 stored_v4.kem_pq_secret.clone(),
                 stored_v4.kem_pq_public.clone(),
             )?;

@@ -60,6 +60,14 @@ pub struct IdentityBundle {
     /// ML-KEM public key for hybrid encryption (optional, feature-gated)
     #[cfg(feature = "post-quantum")]
     kem_pq_public: Option<Vec<u8>>,
+
+    /// ML-DSA secret key for hybrid signing (optional, feature-gated)
+    #[cfg(feature = "post-quantum")]
+    pq_signing_secret: Option<Zeroizing<Vec<u8>>>,
+
+    /// ML-DSA public key for hybrid signing (optional, feature-gated)
+    #[cfg(feature = "post-quantum")]
+    pq_signing_public: Option<Vec<u8>>,
 }
 
 impl Clone for IdentityBundle {
@@ -80,6 +88,13 @@ impl Clone for IdentityBundle {
                 .map(|s| Zeroizing::new(s.to_vec())),
             #[cfg(feature = "post-quantum")]
             kem_pq_public: self.kem_pq_public.clone(),
+            #[cfg(feature = "post-quantum")]
+            pq_signing_secret: self
+                .pq_signing_secret
+                .as_ref()
+                .map(|s| Zeroizing::new(s.to_vec())),
+            #[cfg(feature = "post-quantum")]
+            pq_signing_public: self.pq_signing_public.clone(),
         }
     }
 }
@@ -177,6 +192,10 @@ impl IdentityBundle {
             kem_pq_secret,
             #[cfg(feature = "post-quantum")]
             kem_pq_public,
+            #[cfg(feature = "post-quantum")]
+            pq_signing_secret: None,
+            #[cfg(feature = "post-quantum")]
+            pq_signing_public: None,
         })
     }
 
@@ -189,6 +208,17 @@ impl IdentityBundle {
     /// **Deprecated:** Use `from_did_key` for new code. This method exists for
     /// backward compatibility and converts the KeyPair to a DidKey::Software internally.
     pub fn from_keypair(did_keypair: KeyPair) -> Result<Self> {
+        #[cfg(feature = "post-quantum")]
+        let (pq_signing_secret, pq_signing_public) = did_keypair
+            .pq_keypair()
+            .map(|kp| {
+                (
+                    Some(Zeroizing::new(kp.secret_key_bytes().to_vec())),
+                    Some(kp.public_key().as_bytes().to_vec()),
+                )
+            })
+            .unwrap_or((None, None));
+
         // Convert KeyPair to DidKey::Software
         let did_key = DidKey::Software {
             secret_bytes: Zeroizing::new(did_keypair.to_signing_key_bytes()),
@@ -196,7 +226,13 @@ impl IdentityBundle {
             did: did_keypair.did().clone(),
         };
 
-        Self::from_did_key(did_key)
+        let mut bundle = Self::from_did_key(did_key)?;
+        #[cfg(feature = "post-quantum")]
+        {
+            bundle.pq_signing_secret = pq_signing_secret;
+            bundle.pq_signing_public = pq_signing_public;
+        }
+        Ok(bundle)
     }
 
     /// Reconstruct identity bundle from stored components
@@ -274,6 +310,38 @@ impl IdentityBundle {
         kem_pq_secret: Option<Zeroizing<Vec<u8>>>,
         kem_pq_public: Option<Vec<u8>>,
     ) -> Result<Self> {
+        Self::from_stored_with_pq(
+            did_key,
+            tls_cert_der,
+            tls_key_der,
+            tls_binding_sig,
+            created_at,
+            x25519_secret_bytes,
+            x25519_public_bytes,
+            None,
+            None,
+            kem_pq_secret,
+            kem_pq_public,
+        )
+    }
+
+    /// Reconstruct identity bundle from stored components with optional PQ signing keys
+    /// and optional KEM keys.
+    #[cfg(feature = "post-quantum")]
+    #[allow(clippy::too_many_arguments)]
+    pub fn from_stored_with_pq(
+        did_key: DidKey,
+        tls_cert_der: Vec<u8>,
+        tls_key_der: Zeroizing<Vec<u8>>,
+        tls_binding_sig: Vec<u8>,
+        created_at: u64,
+        x25519_secret_bytes: Zeroizing<Vec<u8>>,
+        x25519_public_bytes: [u8; 32],
+        pq_signing_secret: Option<Zeroizing<Vec<u8>>>,
+        pq_signing_public: Option<Vec<u8>>,
+        kem_pq_secret: Option<Zeroizing<Vec<u8>>>,
+        kem_pq_public: Option<Vec<u8>>,
+    ) -> Result<Self> {
         let did = did_key.did().clone();
         let tls_cert = CertificateDer::from(tls_cert_der);
 
@@ -299,6 +367,8 @@ impl IdentityBundle {
             x25519_public: x25519_public_bytes,
             kem_pq_secret,
             kem_pq_public,
+            pq_signing_secret,
+            pq_signing_public,
         })
     }
 
@@ -347,7 +417,20 @@ impl IdentityBundle {
                 secret_bytes,
                 verifying_key,
                 ..
-            } => KeyPair::from_bytes(secret_bytes, &verifying_key.to_bytes()),
+            } => {
+                #[cfg(feature = "post-quantum")]
+                if let (Some(pq_secret), Some(pq_public)) =
+                    (&self.pq_signing_secret, &self.pq_signing_public)
+                {
+                    return KeyPair::from_bytes_with_pq(
+                        secret_bytes,
+                        &verifying_key.to_bytes(),
+                        pq_secret.as_slice(),
+                        pq_public.as_slice(),
+                    );
+                }
+                KeyPair::from_bytes(secret_bytes, &verifying_key.to_bytes())
+            }
             DidKey::Hardware { backend_type, .. } => {
                 anyhow::bail!(
                     "Cannot get KeyPair from hardware-backed bundle (backend: {}). \
@@ -414,6 +497,24 @@ impl IdentityBundle {
     #[cfg(feature = "post-quantum")]
     pub fn kem_pq_public_bytes(&self) -> Option<&[u8]> {
         self.kem_pq_public.as_deref()
+    }
+
+    /// Get the PQ signing secret key bytes (if available)
+    #[cfg(feature = "post-quantum")]
+    pub(crate) fn pq_signing_secret_bytes(&self) -> Option<&[u8]> {
+        self.pq_signing_secret.as_ref().map(|s| s.as_slice())
+    }
+
+    /// Get the PQ signing public key bytes (if available)
+    #[cfg(feature = "post-quantum")]
+    pub(crate) fn pq_signing_public_bytes(&self) -> Option<&[u8]> {
+        self.pq_signing_public.as_deref()
+    }
+
+    /// Check if this bundle has PQ signing keys
+    #[cfg(feature = "post-quantum")]
+    pub fn has_pq_signing_keys(&self) -> bool {
+        self.pq_signing_secret.is_some() && self.pq_signing_public.is_some()
     }
 
     /// Construct a HybridKemKeypair from this bundle's keys
@@ -592,6 +693,7 @@ pub fn verify_binding_info(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ed25519_dalek::SigningKey;
 
     #[test]
     fn test_bundle_generation() {
@@ -654,5 +756,20 @@ mod tests {
         // Both should verify
         assert!(bundle1.verify_binding().is_ok());
         assert!(bundle2.verify_binding().is_ok());
+    }
+
+    #[test]
+    fn test_hardware_key_cannot_create_bundle() {
+        use rand_core::OsRng;
+
+        let signing_key = SigningKey::generate(&mut OsRng);
+        let did_key = DidKey::from_hardware(
+            signing_key.verifying_key(),
+            "test-backend".to_string(),
+            "hardware-id".to_string(),
+        );
+
+        let result = IdentityBundle::from_did_key(did_key);
+        assert!(result.is_err());
     }
 }

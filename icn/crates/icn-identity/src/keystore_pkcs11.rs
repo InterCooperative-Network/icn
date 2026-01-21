@@ -219,13 +219,12 @@ impl KeyStoreBackend for Pkcs11Backend {
 
         let did = Did::from_public_key(&verifying_key);
 
-        // Cannot create IdentityBundle with HSM keys until IdentityBundle
-        // is refactored to use DidKey instead of KeyPair
+        // Cannot create IdentityBundle yet because it requires a DidSigner
+        // to sign the TLS binding when using hardware-backed keys.
         anyhow::bail!(
             "PKCS#11 backend cannot create IdentityBundle for DID {}: \
-             IdentityBundle currently requires KeyPair with secret material, \
-             but HSM keys never expose secrets. IdentityBundle refactor to \
-             DidKey required.",
+             Hardware-backed keys require a DidSigner to create the TLS binding. \
+             Use software keys or wait for Issue #1 to add signer support.",
             did
         )
     }
