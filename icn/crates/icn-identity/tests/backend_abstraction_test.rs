@@ -75,6 +75,7 @@ fn test_backend_abstraction() {
 }
 
 #[test]
+#[allow(clippy::unwrap_used)]
 fn test_age_keystore_round_trip() {
     let dir = tempdir().unwrap();
     let path = dir.path().join("keypair.age");

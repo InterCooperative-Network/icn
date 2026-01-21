@@ -1278,6 +1278,9 @@ impl NetworkActor {
                         .await
                 };
 
+                // Allow bind_instead_of_map: when post-quantum feature is enabled,
+                // the closure uses `?` which requires and_then, not map
+                #[allow(clippy::bind_instead_of_map)]
                 let result = tokio::time::timeout(DIAL_TIMEOUT, dial_future)
                     .await
                     .context("Timeout dialing peer")
