@@ -9,7 +9,9 @@
 
 use crate::anchor::Anchor;
 use crate::keybundle::KeyBundle;
-use crate::{Did, DidDocument, DidKey, IdentityBundle, KeyPair, RotationEvent};
+use crate::{Did, DidDocument, IdentityBundle, KeyPair, RotationEvent};
+#[cfg(feature = "post-quantum")]
+use crate::DidKey;
 use anyhow::{Context, Result};
 use secrecy::SecretString;
 use serde::{Deserialize, Serialize};

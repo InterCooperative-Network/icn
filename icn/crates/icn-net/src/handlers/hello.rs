@@ -11,7 +11,9 @@ use super::ConnectionContext;
 use crate::actor::PeerConnectionInfo;
 use crate::protocol::{NetworkMessage, PqBindingProof};
 use crate::topology::{NeighborLimitsConfig, PeerId, TopologyInfo};
-use anyhow::{Context, Result};
+use anyhow::Result;
+#[cfg(feature = "post-quantum")]
+use anyhow::Context;
 use icn_identity::Did;
 use std::collections::hash_map::Entry;
 use tracing::{debug, info, warn};
