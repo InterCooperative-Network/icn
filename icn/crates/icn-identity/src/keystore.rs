@@ -437,7 +437,7 @@ impl AgeKeyStore {
         // Convert upgraded KeyPair to DidKey
         let upgraded_did_key = DidKey::Software {
             secret_bytes: Zeroizing::new(upgraded_keypair.to_signing_key_bytes()),
-            verifying_key: *upgraded_keypair?.verifying_key(),
+            verifying_key: *upgraded_keypair.verifying_key(),
             did: upgraded_keypair.did().clone(),
         };
 
@@ -505,10 +505,25 @@ impl AgeKeyStore {
             })
             .collect();
 
+        // Extract secret and public bytes from DidKey (only works for software keys)
+        let did_key = identity_bundle.did_key();
+        let (secret_bytes, public_bytes) = match did_key {
+            crate::DidKey::Software { secret_bytes, verifying_key, .. } => {
+                (Zeroizing::new(**secret_bytes), verifying_key.to_bytes())
+            }
+            crate::DidKey::Hardware { backend_type, .. } => {
+                anyhow::bail!(
+                    "Cannot save hardware-backed keystore to v4 format (backend: {}). \
+                     Hardware keys should be managed by their backend.",
+                    backend_type
+                )
+            }
+        };
+
         let stored = StoredKeyV4 {
             version: 4,
-            secret_bytes: Zeroizing::new(*identity_bundle.keypair()?.secret_bytes()),
-            public_bytes: identity_bundle.keypair()?.verifying_key().to_bytes(),
+            secret_bytes,
+            public_bytes,
             did: identity_bundle.did().as_str().to_string(),
             tls_cert_der: identity_bundle.tls_cert().as_ref().to_vec(),
             tls_key_der: Zeroizing::new(identity_bundle.tls_key_der_bytes().to_vec()),
@@ -523,17 +538,9 @@ impl AgeKeyStore {
             keybundles: stored_keybundles,
             current_keybundle_version: self.current_keybundle_version,
             #[cfg(feature = "post-quantum")]
-            pq_secret: identity_bundle
-                .keypair()
-                .pq_keypair
-                .as_ref()
-                .map(|kp| Zeroizing::new(kp.secret_key_bytes().to_vec())),
+            pq_secret: None, // TODO: Extract PQ keys from DidKey when supported
             #[cfg(feature = "post-quantum")]
-            pq_public: identity_bundle
-                .keypair()
-                .pq_keypair
-                .as_ref()
-                .map(|kp| kp.public_key().as_bytes().to_vec()),
+            pq_public: None,
             #[cfg(feature = "post-quantum")]
             kem_pq_secret: identity_bundle
                 .kem_pq_secret_bytes()
@@ -541,7 +548,7 @@ impl AgeKeyStore {
             #[cfg(feature = "post-quantum")]
             kem_pq_public: identity_bundle.kem_pq_public_bytes().map(|p| p.to_vec()),
             #[cfg(feature = "post-quantum")]
-            is_hybrid: identity_bundle.keypair().is_hybrid(),
+            is_hybrid: false, // TODO: Determine from DidKey when PQ support is added
         };
 
         Self::encrypt_and_save_v4(&self.path, &stored, passphrase)
@@ -675,12 +682,27 @@ impl AgeKeyStore {
         if let Some(event) = rotation_event {
             rotation_chain.push(event);
         }
+        
+        // Extract secret and public bytes from DidKey (only works for software keys)
+        let did_key = identity_bundle.did_key();
+        let (secret_bytes, public_bytes) = match did_key {
+            crate::DidKey::Software { secret_bytes, verifying_key, .. } => {
+                (Zeroizing::new(**secret_bytes), verifying_key.to_bytes())
+            }
+            crate::DidKey::Hardware { backend_type, .. } => {
+                anyhow::bail!(
+                    "Cannot save hardware-backed keystore to v3 format (backend: {}). \
+                     Hardware keys should be managed by their backend.",
+                    backend_type
+                )
+            }
+        };
+        
         // Save to disk
-        let keypair = identity_bundle.keypair()?;
         let stored_v3 = StoredKeyV3 {
             version: 3,
-            secret_bytes: Zeroizing::new(*keypair.secret_bytes()),
-            public_bytes: keypair.verifying_key().to_bytes(),
+            secret_bytes,
+            public_bytes,
             did: identity_bundle.did().as_str().to_string(),
             tls_cert_der: identity_bundle.tls_cert().as_ref().to_vec(),
             tls_key_der: Zeroizing::new(identity_bundle.tls_key_der_bytes().to_vec()),
@@ -725,17 +747,35 @@ impl AgeKeyStore {
         );
 
         // Create DID Document v2
+        let did_key = identity_bundle.did_key();
+        let verifying_key = match did_key {
+            crate::DidKey::Software { verifying_key, .. } => *verifying_key,
+            crate::DidKey::Hardware { .. } => {
+                anyhow::bail!("Cannot initialize keystore with hardware-backed key")
+            }
+        };
+        
         let did_document = DidDocument::new(
             identity_bundle.did().clone(),
-            identity_bundle.keypair()?.verifying_key(),
+            &verifying_key,
             identity_bundle.x25519_public_bytes(),
         );
-        // Save to disk (v2.1 format with X25519 keys)
-        let keypair = identity_bundle.keypair()?;
-        let stored = StoredKey {
-            version: 2,
-            secret_bytes: Zeroizing::new(*keypair.secret_bytes()),
-            public_bytes: keypair.verifying_key().to_bytes(),
+        
+        // Extract secret and public bytes from DidKey
+        let (secret_bytes, public_bytes) = match did_key {
+            crate::DidKey::Software { secret_bytes, verifying_key, .. } => {
+                (Zeroizing::new(**secret_bytes), verifying_key.to_bytes())
+            }
+            crate::DidKey::Hardware { .. } => {
+                anyhow::bail!("Cannot initialize keystore with hardware-backed key")
+            }
+        };
+        
+        // Save to disk (v3 format for multi-device)
+        let stored_v3 = StoredKeyV3 {
+            version: 3,
+            secret_bytes,
+            public_bytes,
             did: identity_bundle.did().as_str().to_string(),
             tls_cert_der: identity_bundle.tls_cert().as_ref().to_vec(),
             tls_key_der: Zeroizing::new(identity_bundle.tls_key_der_bytes().to_vec()),
@@ -1274,8 +1314,8 @@ mod tests {
         // Create a v1 keystore manually (no TLS binding fields, no X25519 keys)
         let keypair = KeyPair::generate().unwrap();
         let stored_v1 = StoredKey {
-            secret_bytes: *keypair?.secret_bytes(),
-            public_bytes: keypair?.verifying_key().to_bytes(),
+            secret_bytes: *keypair.secret_bytes(),
+            public_bytes: keypair.verifying_key().to_bytes(),
             did: keypair.did().as_str().to_string(),
             tls_cert_der: None,
             tls_key_der: None,
@@ -1381,8 +1421,8 @@ mod tests {
         let bundle = IdentityBundle::from_keypair(keypair.clone()).unwrap();
 
         let stored_v21 = StoredKey {
-            secret_bytes: *keypair?.secret_bytes(),
-            public_bytes: keypair?.verifying_key().to_bytes(),
+            secret_bytes: *keypair.secret_bytes(),
+            public_bytes: keypair.verifying_key().to_bytes(),
             did: bundle.did().as_str().to_string(),
             tls_cert_der: Some(bundle.tls_cert().as_ref().to_vec()),
             tls_key_der: Some(bundle.tls_key_der_bytes().to_vec()),
