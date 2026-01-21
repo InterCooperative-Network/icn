@@ -138,12 +138,20 @@ pub struct IdentityBundle {
     pq_signing_public: Option<Vec<u8>>,
 }
 
+/// Clone creates a shallow copy that shares the signer instance via Arc.
+///
+/// # Note on Signer Sharing
+/// The cloned bundle shares the same `Arc<dyn DidSigner>` as the original.
+/// This is correct for most use cases, but be aware that:
+/// - Both bundles will use the same underlying HSM/TPM connection
+/// - If the signer has mutable state or connection pooling, operations may interleave
+/// - For a deep copy with a fresh signer, create a new bundle with `from_did_key_with_signer()`
 impl Clone for IdentityBundle {
     fn clone(&self) -> Self {
         IdentityBundle {
             did: self.did.clone(),
             did_key: self.did_key.clone(),
-            signer: self.signer.clone(),
+            signer: self.signer.clone(), // Arc clone - shares underlying signer
             tls_cert: self.tls_cert.clone(),
             tls_key_der: Zeroizing::new(self.tls_key_der.to_vec()),
             tls_binding_sig: self.tls_binding_sig.clone(),
@@ -560,13 +568,27 @@ impl IdentityBundle {
     /// regardless of whether the underlying DID key is hardware-backed or
     /// software-only. Callers should not rely on the presence or absence of
     /// a signer to determine key storage type; use `did_key().is_hardware_backed()`
-    /// for that purpose instead.
+    /// or `requires_signer()` for that purpose instead.
     ///
-    /// Typical usage:
-    /// - Hardware keys: signer is `Some` (provided at construction)
-    /// - Software keys: signer is `None` (signs directly via DidKey)
+    /// # Expected Usage Patterns
+    /// - **Hardware keys**: signer will always be `Some` (enforced at construction)
+    /// - **Software keys**: signer is always `None` (no signer needed)
+    ///
+    /// While it's theoretically possible to provide a signer for software keys,
+    /// this is not a supported use case. The signer validation ensures the signer
+    /// matches the key, but software keys can sign directly without delegation.
     pub fn signer(&self) -> Option<&Arc<dyn DidSigner>> {
         self.signer.as_ref()
+    }
+
+    /// Check if this bundle requires a signer for signing operations
+    ///
+    /// Returns `true` for hardware-backed keys (which cannot sign without a signer),
+    /// and `false` for software keys (which can sign directly).
+    ///
+    /// This is a convenience method equivalent to `did_key().is_hardware_backed()`.
+    pub fn requires_signer(&self) -> bool {
+        self.did_key.is_hardware_backed()
     }
 
     /// Sign a message using the appropriate signing method
@@ -580,12 +602,13 @@ impl IdentityBundle {
     /// - Hardware key is used without a signer backend
     /// - Signing operation fails
     pub fn sign(&self, message: &[u8]) -> Result<ed25519_dalek::Signature> {
-        // Hardware keys require a signer
+        // Hardware keys require a signer - this is enforced at construction,
+        // so this check is defensive against invariant violations.
         if self.did_key.is_hardware_backed() && self.signer.is_none() {
             anyhow::bail!(
-                "Cannot sign with hardware-backed key without signer. \
-                 This bundle was created incorrectly - hardware keys require \
-                 a DidSigner backend."
+                "Invariant violation: hardware-backed key without signer. \
+                 This indicates a bug in IdentityBundle construction or \
+                 manual struct creation bypassing the public API."
             )
         }
 
@@ -1073,12 +1096,12 @@ mod tests {
             pq_signing_public: None,
         };
 
-        // Signing should fail
+        // Signing should fail with invariant violation
         let message = b"test message";
         let result = broken_bundle.sign(message);
         assert!(result.is_err());
         let err_msg = result.err().unwrap().to_string();
-        assert!(err_msg.contains("without signer"));
+        assert!(err_msg.contains("Invariant violation"));
     }
 
     #[test]
