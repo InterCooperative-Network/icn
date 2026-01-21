@@ -30,7 +30,7 @@ pub trait KeyStore: Send + Sync {
     fn is_locked(&self) -> bool;
 
     /// Get the keypair (fails if locked)
-    fn get_keypair(&self) -> Result<&KeyPair>;
+    fn get_keypair(&self) -> Result<KeyPair>;
 
     /// Rotate to a new keypair
     fn rotate(&mut self, new_keypair: KeyPair) -> Result<KeyRotation>;
@@ -404,8 +404,16 @@ impl AgeKeyStore {
             .as_ref()
             .ok_or_else(|| anyhow::anyhow!("Keystore must be unlocked to upgrade"))?;
 
+        // Only software keys can be upgraded to PQ
+        if identity_bundle.did_key().is_hardware_backed() {
+            anyhow::bail!("Cannot upgrade hardware-backed keys to PQ in software");
+        }
+
+        // Reconstruct KeyPair to check PQ status
+        let keypair = identity_bundle.keypair()?;
+
         // Check if already has PQ keys
-        if identity_bundle.keypair().has_pq_keys() {
+        if keypair.has_pq_keys() {
             info!("Identity already has post-quantum keys");
             return Ok(identity_bundle.did().clone());
         }
@@ -418,8 +426,7 @@ impl AgeKeyStore {
             .map_err(|e| anyhow::anyhow!("Failed to generate ML-DSA keypair: {e}"))?;
 
         // Create upgraded KeyPair with PQ signing keys
-        let old_keypair = identity_bundle.keypair();
-        let (secret_bytes, public_bytes) = old_keypair.export_for_upgrade();
+        let (secret_bytes, public_bytes) = keypair.export_for_upgrade();
         let upgraded_keypair = KeyPair::from_bytes_with_pq(
             &secret_bytes,
             &public_bytes,
@@ -427,13 +434,20 @@ impl AgeKeyStore {
             pq_keypair.public_key().as_bytes(),
         )?;
 
+        // Convert upgraded KeyPair to DidKey
+        let upgraded_did_key = DidKey::Software {
+            secret_bytes: Zeroizing::new(upgraded_keypair.to_signing_key_bytes()),
+            verifying_key: *upgraded_keypair?.verifying_key(),
+            did: upgraded_keypair.did().clone(),
+        };
+
         // Generate ML-KEM keypair for hybrid encryption
         let kem_keypair = icn_crypto_pq::MlKemKeypair::generate()
             .map_err(|e| anyhow::anyhow!("Failed to generate ML-KEM keypair: {e}"))?;
 
         // Create new IdentityBundle with upgraded keypair and KEM keys
         let upgraded_bundle = IdentityBundle::from_stored_with_kem(
-            upgraded_keypair,
+            upgraded_did_key,
             identity_bundle.tls_cert().as_ref().to_vec(),
             Zeroizing::new(identity_bundle.tls_key_der_bytes().to_vec()),
             identity_bundle.binding_info().tls_binding_sig.clone(),
@@ -493,8 +507,8 @@ impl AgeKeyStore {
 
         let stored = StoredKeyV4 {
             version: 4,
-            secret_bytes: Zeroizing::new(*identity_bundle.keypair().secret_bytes()),
-            public_bytes: identity_bundle.keypair().verifying_key().to_bytes(),
+            secret_bytes: Zeroizing::new(*identity_bundle.keypair()?.secret_bytes()),
+            public_bytes: identity_bundle.keypair()?.verifying_key().to_bytes(),
             did: identity_bundle.did().as_str().to_string(),
             tls_cert_der: identity_bundle.tls_cert().as_ref().to_vec(),
             tls_key_der: Zeroizing::new(identity_bundle.tls_key_der_bytes().to_vec()),
@@ -661,9 +675,8 @@ impl AgeKeyStore {
         if let Some(event) = rotation_event {
             rotation_chain.push(event);
         }
-
         // Save to disk
-        let keypair = identity_bundle.keypair();
+        let keypair = identity_bundle.keypair()?;
         let stored_v3 = StoredKeyV3 {
             version: 3,
             secret_bytes: Zeroizing::new(*keypair.secret_bytes()),
@@ -714,14 +727,13 @@ impl AgeKeyStore {
         // Create DID Document v2
         let did_document = DidDocument::new(
             identity_bundle.did().clone(),
-            identity_bundle.keypair().verifying_key(),
+            identity_bundle.keypair()?.verifying_key(),
             identity_bundle.x25519_public_bytes(),
         );
-
-        // Extract key material for storage (v3 format)
-        let keypair = identity_bundle.keypair();
-        let stored_v3 = StoredKeyV3 {
-            version: 3,
+        // Save to disk (v2.1 format with X25519 keys)
+        let keypair = identity_bundle.keypair()?;
+        let stored = StoredKey {
+            version: 2,
             secret_bytes: Zeroizing::new(*keypair.secret_bytes()),
             public_bytes: keypair.verifying_key().to_bytes(),
             did: identity_bundle.did().as_str().to_string(),
@@ -915,28 +927,16 @@ impl KeyStore for AgeKeyStore {
                 stored_v4.did
             );
 
-            // Reconstruct keypair
-            #[cfg(feature = "post-quantum")]
-            let keypair = if let (Some(pq_secret), Some(pq_public)) =
-                (stored_v4.pq_secret.as_ref(), stored_v4.pq_public.as_ref())
-            {
-                KeyPair::from_bytes_with_pq(
-                    &stored_v4.secret_bytes,
-                    &stored_v4.public_bytes,
-                    pq_secret,
-                    pq_public,
-                )?
-            } else {
-                KeyPair::from_bytes(&stored_v4.secret_bytes, &stored_v4.public_bytes)?
-            };
-
-            #[cfg(not(feature = "post-quantum"))]
-            let keypair = KeyPair::from_bytes(&stored_v4.secret_bytes, &stored_v4.public_bytes)?;
+            // Construct DidKey::Software from stored bytes
+            let did_key = crate::DidKey::from_software_bytes(
+                *stored_v4.secret_bytes,
+                stored_v4.public_bytes,
+            )?;
 
             // Reconstruct IdentityBundle with optional KEM keys
             #[cfg(feature = "post-quantum")]
             let identity_bundle = IdentityBundle::from_stored_with_kem(
-                keypair,
+                did_key,
                 stored_v4.tls_cert_der.clone(),
                 stored_v4.tls_key_der.clone(),
                 stored_v4.tls_binding_sig.clone(),
@@ -949,7 +949,7 @@ impl KeyStore for AgeKeyStore {
 
             #[cfg(not(feature = "post-quantum"))]
             let identity_bundle = IdentityBundle::from_stored(
-                keypair,
+                did_key,
                 stored_v4.tls_cert_der.clone(),
                 stored_v4.tls_key_der.clone(),
                 stored_v4.tls_binding_sig.clone(),
@@ -1014,12 +1014,15 @@ impl KeyStore for AgeKeyStore {
                 stored_v3.did
             );
 
-            // Reconstruct keypair
-            let keypair = KeyPair::from_bytes(&stored_v3.secret_bytes, &stored_v3.public_bytes)?;
+            // Construct DidKey::Software from stored bytes
+            let did_key = crate::DidKey::from_software_bytes(
+                *stored_v3.secret_bytes,
+                stored_v3.public_bytes,
+            )?;
 
             // Reconstruct IdentityBundle
             let identity_bundle = IdentityBundle::from_stored(
-                keypair,
+                did_key,
                 stored_v3.tls_cert_der.clone(),
                 stored_v3.tls_key_der.clone(),
                 stored_v3.tls_binding_sig.clone(),
@@ -1041,8 +1044,11 @@ impl KeyStore for AgeKeyStore {
         info!("Not a v3 keystore, trying legacy format...");
         let stored = Self::decrypt_and_load(&self.path, passphrase)?;
 
-        // Reconstruct keypair from stored bytes
-        let keypair = KeyPair::from_bytes(&stored.secret_bytes, &stored.public_bytes)?;
+        // Construct DidKey::Software from stored bytes
+        let did_key = crate::DidKey::from_software_bytes(
+            stored.secret_bytes,
+            stored.public_bytes,
+        )?;
 
         // Check if we have TLS binding info (v2+ keystore)
         let identity_bundle = if let (
@@ -1085,7 +1091,7 @@ impl KeyStore for AgeKeyStore {
 
             // Reconstruct IdentityBundle using the stored data
             IdentityBundle::from_stored(
-                keypair.clone(),
+                did_key.clone(),
                 tls_cert_der,
                 tls_key_der,
                 tls_binding_sig,
@@ -1098,22 +1104,22 @@ impl KeyStore for AgeKeyStore {
             info!("Unlocked v1 keystore, migrating to v3 with TLS binding and X25519 keys");
             warn!("⚠️  Generating TLS binding and X25519 encryption keys");
 
-            // Generate new IdentityBundle from the keypair (includes X25519 keys)
-            IdentityBundle::from_keypair(keypair.clone())?
+            // Generate new IdentityBundle from the did_key (includes X25519 keys)
+            IdentityBundle::from_did_key(did_key.clone())?
         };
 
         // Create DID Document v2 for this identity
         let did_document = DidDocument::new(
             identity_bundle.did().clone(),
-            identity_bundle.keypair().verifying_key(),
+            identity_bundle.did_key().verifying_key(),
             identity_bundle.x25519_public_bytes(),
         );
 
         // Save as v3 keystore
         let stored_v3 = StoredKeyV3 {
             version: 3,
-            secret_bytes: Zeroizing::new(*identity_bundle.keypair().secret_bytes()),
-            public_bytes: identity_bundle.keypair().verifying_key().to_bytes(),
+            secret_bytes: Zeroizing::new(*identity_bundle.keypair()?.secret_bytes()),
+            public_bytes: identity_bundle.keypair()?.verifying_key().to_bytes(),
             did: identity_bundle.did().as_str().to_string(),
             tls_cert_der: identity_bundle.tls_cert().as_ref().to_vec(),
             tls_key_der: Zeroizing::new(identity_bundle.tls_key_der_bytes().to_vec()),
@@ -1158,8 +1164,8 @@ impl KeyStore for AgeKeyStore {
         self.identity_bundle.is_none()
     }
 
-    fn get_keypair(&self) -> Result<&KeyPair> {
-        Ok(self.get_identity_bundle()?.keypair())
+    fn get_keypair(&self) -> Result<KeyPair> {
+        self.get_identity_bundle()?.keypair()
     }
 
     fn rotate(&mut self, new_keypair: KeyPair) -> Result<KeyRotation> {
@@ -1189,7 +1195,7 @@ impl KeyStore for AgeKeyStore {
         info!("Rotating key: {} -> {}", rotation.old_did, rotation.new_did);
 
         // Create new identity bundle with fresh TLS binding
-        let new_bundle = IdentityBundle::from_keypair(new_keypair)?;
+        let new_bundle = IdentityBundle::from_keypair(new_keypair.clone())?;
 
         // Replace identity bundle
         self.identity_bundle = Some(new_bundle);
@@ -1268,8 +1274,8 @@ mod tests {
         // Create a v1 keystore manually (no TLS binding fields, no X25519 keys)
         let keypair = KeyPair::generate().unwrap();
         let stored_v1 = StoredKey {
-            secret_bytes: *keypair.secret_bytes(),
-            public_bytes: keypair.verifying_key().to_bytes(),
+            secret_bytes: *keypair?.secret_bytes(),
+            public_bytes: keypair?.verifying_key().to_bytes(),
             did: keypair.did().as_str().to_string(),
             tls_cert_der: None,
             tls_key_der: None,
@@ -1375,8 +1381,8 @@ mod tests {
         let bundle = IdentityBundle::from_keypair(keypair.clone()).unwrap();
 
         let stored_v21 = StoredKey {
-            secret_bytes: *keypair.secret_bytes(),
-            public_bytes: keypair.verifying_key().to_bytes(),
+            secret_bytes: *keypair?.secret_bytes(),
+            public_bytes: keypair?.verifying_key().to_bytes(),
             did: bundle.did().as_str().to_string(),
             tls_cert_der: Some(bundle.tls_cert().as_ref().to_vec()),
             tls_key_der: Some(bundle.tls_key_der_bytes().to_vec()),

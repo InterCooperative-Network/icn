@@ -4,7 +4,7 @@
 //! through cryptographic signatures. This prevents MITM attacks by ensuring that the
 //! entity holding the TLS certificate also holds the private key for the claimed DID.
 
-use crate::{Did, KeyPair};
+use crate::{Did, DidKey, KeyPair};
 use anyhow::{Context, Result};
 use rcgen::CertificateParams;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
@@ -23,12 +23,16 @@ use icn_crypto_pq::{HybridKemKeypair, HybridKemPublicKey, MlKemKeypair};
 /// of the TLS certificate also controls the DID's private key.
 ///
 /// Also includes X25519 keys for end-to-end payload encryption.
+///
+/// The bundle can contain either:
+/// - Software keys (private key in memory)
+/// - Hardware-backed keys (private key in HSM/TPM)
 pub struct IdentityBundle {
     /// The DID for this identity
     did: Did,
 
-    /// Ed25519 keypair for DID operations
-    did_keypair: KeyPair,
+    /// DID signing key (software or hardware)
+    did_key: DidKey,
 
     /// Self-signed TLS certificate
     tls_cert: CertificateDer<'static>,
@@ -62,7 +66,7 @@ impl Clone for IdentityBundle {
     fn clone(&self) -> Self {
         IdentityBundle {
             did: self.did.clone(),
-            did_keypair: self.did_keypair.clone(),
+            did_key: self.did_key.clone(),
             tls_cert: self.tls_cert.clone(),
             tls_key_der: Zeroizing::new(self.tls_key_der.to_vec()),
             tls_binding_sig: self.tls_binding_sig.clone(),
@@ -102,24 +106,27 @@ impl IdentityBundle {
     /// 3. A cryptographic binding signature proving DID ownership
     pub fn generate() -> Result<Self> {
         // 1. Generate Ed25519 keypair for DID
-        let did_keypair = KeyPair::generate()?;
-        Self::from_keypair(did_keypair)
+        let keypair = KeyPair::generate()?;
+        Self::from_keypair(keypair)
     }
 
-    /// Create identity bundle from an existing keypair
+    /// Create identity bundle from a DidKey
     ///
-    /// This generates a new TLS certificate for the given keypair and creates
+    /// This generates a new TLS certificate for the given key and creates
     /// the cryptographic binding signature. Also generates X25519 keys for encryption.
-    /// If the keypair has PQ keys, ML-KEM keys are also generated for hybrid encryption.
-    pub fn from_keypair(did_keypair: KeyPair) -> Result<Self> {
-        let did = did_keypair.did().clone();
+    /// If the key has PQ keys, ML-KEM keys are also generated for hybrid encryption.
+    ///
+    /// **Note:** For hardware-backed keys, the binding signature will be created
+    /// by calling the hardware's signing operation.
+    pub fn from_did_key(did_key: DidKey) -> Result<Self> {
+        let did = did_key.did().clone();
 
         // Generate TLS certificate with DID as subject
         let (tls_cert, tls_key_der) = Self::generate_tls_cert(&did)?;
 
         // Compute cert hash and sign with DID key
         let cert_hash = Self::hash_certificate(&tls_cert);
-        let tls_binding_sig = did_keypair.sign(&cert_hash).to_vec();
+        let tls_binding_sig = did_key.sign_software(&cert_hash)?.to_vec();
 
         let created_at = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -129,9 +136,10 @@ impl IdentityBundle {
         // Generate X25519 keys for payload encryption
         let (x25519_secret, x25519_public) = Self::generate_x25519_keypair();
 
-        // Generate ML-KEM keys if keypair has PQ support
+        // Generate ML-KEM keys if needed (for now only for software keys)
         #[cfg(feature = "post-quantum")]
-        let (kem_pq_secret, kem_pq_public) = if did_keypair.is_hybrid() {
+        let (kem_pq_secret, kem_pq_public) = if matches!(did_key, DidKey::Software { .. }) {
+            // TODO: Support PQ keys for hardware backends
             let kem_keypair = MlKemKeypair::generate()
                 .map_err(|e| anyhow::anyhow!("Failed to generate ML-KEM keypair: {e}"))?;
             (
@@ -144,7 +152,7 @@ impl IdentityBundle {
 
         Ok(IdentityBundle {
             did,
-            did_keypair,
+            did_key,
             tls_cert,
             tls_key_der: Zeroizing::new(tls_key_der),
             tls_binding_sig,
@@ -158,6 +166,25 @@ impl IdentityBundle {
         })
     }
 
+    /// Create identity bundle from an existing keypair (backward compatibility)
+    ///
+    /// This generates a new TLS certificate for the given keypair and creates
+    /// the cryptographic binding signature. Also generates X25519 keys for encryption.
+    /// If the keypair has PQ keys, ML-KEM keys are also generated for hybrid encryption.
+    ///
+    /// **Deprecated:** Use `from_did_key` for new code. This method exists for
+    /// backward compatibility and converts the KeyPair to a DidKey::Software internally.
+    pub fn from_keypair(did_keypair: KeyPair) -> Result<Self> {
+        // Convert KeyPair to DidKey::Software
+        let did_key = DidKey::Software {
+            secret_bytes: Zeroizing::new(did_keypair.to_signing_key_bytes()),
+            verifying_key: *did_keypair.verifying_key(),
+            did: did_keypair.did().clone(),
+        };
+
+        Self::from_did_key(did_key)
+    }
+
     /// Reconstruct identity bundle from stored components
     ///
     /// This is used by the keystore to restore a previously saved bundle.
@@ -165,7 +192,7 @@ impl IdentityBundle {
     /// Secret parameters are wrapped in Zeroizing to prevent copies.
     #[allow(clippy::too_many_arguments)]
     pub fn from_stored(
-        did_keypair: KeyPair,
+        did_key: DidKey,
         tls_cert_der: Vec<u8>,
         tls_key_der: Zeroizing<Vec<u8>>,
         tls_binding_sig: Vec<u8>,
@@ -175,7 +202,7 @@ impl IdentityBundle {
     ) -> Result<Self> {
         #[cfg(feature = "post-quantum")]
         return Self::from_stored_with_kem(
-            did_keypair,
+            did_key,
             tls_cert_der,
             tls_key_der,
             tls_binding_sig,
@@ -188,7 +215,7 @@ impl IdentityBundle {
 
         #[cfg(not(feature = "post-quantum"))]
         {
-            let did = did_keypair.did().clone();
+            let did = did_key.did().clone();
             let tls_cert = CertificateDer::from(tls_cert_der);
 
             // Verify the binding is still valid
@@ -204,7 +231,7 @@ impl IdentityBundle {
 
             Ok(IdentityBundle {
                 did,
-                did_keypair,
+                did_key,
                 tls_cert,
                 tls_key_der,
                 tls_binding_sig,
@@ -223,7 +250,7 @@ impl IdentityBundle {
     #[cfg(feature = "post-quantum")]
     #[allow(clippy::too_many_arguments)]
     pub fn from_stored_with_kem(
-        did_keypair: KeyPair,
+        did_key: DidKey,
         tls_cert_der: Vec<u8>,
         tls_key_der: Zeroizing<Vec<u8>>,
         tls_binding_sig: Vec<u8>,
@@ -233,7 +260,7 @@ impl IdentityBundle {
         kem_pq_secret: Option<Zeroizing<Vec<u8>>>,
         kem_pq_public: Option<Vec<u8>>,
     ) -> Result<Self> {
-        let did = did_keypair.did().clone();
+        let did = did_key.did().clone();
         let tls_cert = CertificateDer::from(tls_cert_der);
 
         // Verify the binding is still valid
@@ -249,7 +276,7 @@ impl IdentityBundle {
 
         Ok(IdentityBundle {
             did,
-            did_keypair,
+            did_key,
             tls_cert,
             tls_key_der,
             tls_binding_sig,
@@ -288,9 +315,31 @@ impl IdentityBundle {
         &self.did
     }
 
-    /// Get the keypair
-    pub fn keypair(&self) -> &KeyPair {
-        &self.did_keypair
+    /// Get the DID key
+    pub fn did_key(&self) -> &DidKey {
+        &self.did_key
+    }
+
+    /// Get the keypair (backward compatibility, only works for software keys)
+    ///
+    /// **Deprecated:** Use `did_key()` for new code. This method exists for
+    /// backward compatibility and will return an error for hardware-backed keys.
+    ///
+    /// Returns an error if the bundle contains a hardware-backed key since
+    /// we cannot construct a KeyPair without exposing the private key.
+    pub fn keypair(&self) -> Result<KeyPair> {
+        match &self.did_key {
+            DidKey::Software { secret_bytes, verifying_key, .. } => {
+                KeyPair::from_bytes(secret_bytes, &verifying_key.to_bytes())
+            }
+            DidKey::Hardware { backend_type, .. } => {
+                anyhow::bail!(
+                    "Cannot get KeyPair from hardware-backed bundle (backend: {}). \
+                     Use did_key() instead",
+                    backend_type
+                )
+            }
+        }
     }
 
     /// Get the TLS certificate (DER encoded)
