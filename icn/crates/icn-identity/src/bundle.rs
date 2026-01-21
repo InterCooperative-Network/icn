@@ -523,18 +523,19 @@ impl IdentityBundle {
     /// - Hardware key is used without a signer backend
     /// - Signing operation fails
     pub fn sign(&self, message: &[u8]) -> Result<ed25519_dalek::Signature> {
-        if let Some(ref signer) = self.signer {
-            // Use signer backend for hardware keys
-            signer.sign(message)
-        } else if self.did_key.is_hardware_backed() {
-            // Hardware key without signer is an error
+        // Hardware keys require a signer
+        if self.did_key.is_hardware_backed() && self.signer.is_none() {
             anyhow::bail!(
                 "Cannot sign with hardware-backed key without signer. \
                  This bundle was created incorrectly - hardware keys require \
                  a DidSigner backend."
             )
+        }
+
+        // Use signer if available, otherwise use software key directly
+        if let Some(ref signer) = self.signer {
+            signer.sign(message)
         } else {
-            // Use software key directly
             self.did_key.sign_software(message)
         }
     }
