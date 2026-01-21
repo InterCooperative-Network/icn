@@ -513,9 +513,11 @@ impl AgeKeyStore {
         // Extract secret and public bytes from DidKey (only works for software keys)
         let did_key = identity_bundle.did_key();
         let (secret_bytes, public_bytes) = match did_key {
-            crate::DidKey::Software { secret_bytes, verifying_key, .. } => {
-                (Zeroizing::new(**secret_bytes), verifying_key.to_bytes())
-            }
+            crate::DidKey::Software {
+                secret_bytes,
+                verifying_key,
+                ..
+            } => (Zeroizing::new(**secret_bytes), verifying_key.to_bytes()),
             crate::DidKey::Hardware { backend_type, .. } => {
                 anyhow::bail!(
                     "Cannot save hardware-backed keystore to v4 format (backend: {}). \
@@ -687,13 +689,15 @@ impl AgeKeyStore {
         if let Some(event) = rotation_event {
             rotation_chain.push(event);
         }
-        
+
         // Extract secret and public bytes from DidKey (only works for software keys)
         let did_key = identity_bundle.did_key();
         let (secret_bytes, public_bytes) = match did_key {
-            crate::DidKey::Software { secret_bytes, verifying_key, .. } => {
-                (Zeroizing::new(**secret_bytes), verifying_key.to_bytes())
-            }
+            crate::DidKey::Software {
+                secret_bytes,
+                verifying_key,
+                ..
+            } => (Zeroizing::new(**secret_bytes), verifying_key.to_bytes()),
             crate::DidKey::Hardware { backend_type, .. } => {
                 anyhow::bail!(
                     "Cannot save hardware-backed keystore to v3 format (backend: {}). \
@@ -702,7 +706,7 @@ impl AgeKeyStore {
                 )
             }
         };
-        
+
         // Save to disk
         let stored_v3 = StoredKeyV3 {
             version: 3,
@@ -759,23 +763,25 @@ impl AgeKeyStore {
                 anyhow::bail!("Cannot initialize keystore with hardware-backed key")
             }
         };
-        
+
         let did_document = DidDocument::new(
             identity_bundle.did().clone(),
             &verifying_key,
             identity_bundle.x25519_public_bytes(),
         );
-        
+
         // Extract secret and public bytes from DidKey
         let (secret_bytes, public_bytes) = match did_key {
-            crate::DidKey::Software { secret_bytes, verifying_key, .. } => {
-                (Zeroizing::new(**secret_bytes), verifying_key.to_bytes())
-            }
+            crate::DidKey::Software {
+                secret_bytes,
+                verifying_key,
+                ..
+            } => (Zeroizing::new(**secret_bytes), verifying_key.to_bytes()),
             crate::DidKey::Hardware { .. } => {
                 anyhow::bail!("Cannot initialize keystore with hardware-backed key")
             }
         };
-        
+
         // Save to disk (v3 format for multi-device)
         let stored_v3 = StoredKeyV3 {
             version: 3,
@@ -1090,10 +1096,7 @@ impl KeyStore for AgeKeyStore {
         let stored = Self::decrypt_and_load(&self.path, passphrase)?;
 
         // Construct DidKey::Software from stored bytes
-        let did_key = crate::DidKey::from_software_bytes(
-            stored.secret_bytes,
-            stored.public_bytes,
-        )?;
+        let did_key = crate::DidKey::from_software_bytes(stored.secret_bytes, stored.public_bytes)?;
 
         // Check if we have TLS binding info (v2+ keystore)
         let identity_bundle = if let (

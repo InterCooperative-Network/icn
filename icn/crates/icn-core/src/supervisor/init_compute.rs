@@ -375,7 +375,7 @@ pub async fn init_compute_services(deps: ComputeDeps) -> anyhow::Result<ComputeS
     );
 
     // Set signing key
-    let signing_key_bytes = deps.identity_bundle.keypair().to_signing_key_bytes();
+    let signing_key_bytes = deps.identity_bundle.keypair()?.to_signing_key_bytes();
     compute_actor.set_signing_key(signing_key_bytes.to_vec());
 
     // Connect dispute system

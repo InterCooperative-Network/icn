@@ -56,13 +56,13 @@ pub use commons_store::CommonsHolderStore;
 pub use did_signer::{DidKey, DidSigner, SoftwareSigner};
 pub use keybundle::KeyBundle;
 pub use keystore::{AgeKeyStore, KeyRotation, KeyStore, RotationReason};
-pub use keystore_backend::{BackendConfig, KeyStoreBackend, SigningBackend};
 #[cfg(feature = "hsm")]
 pub use keystore_backend::Pkcs11Config;
-#[cfg(feature = "hsm")]
-pub use keystore_pkcs11::Pkcs11Backend;
 #[cfg(feature = "tpm-experimental")]
 pub use keystore_backend::TpmConfig;
+pub use keystore_backend::{BackendConfig, KeyStoreBackend, SigningBackend};
+#[cfg(feature = "hsm")]
+pub use keystore_pkcs11::Pkcs11Backend;
 #[cfg(feature = "tpm-experimental")]
 pub use keystore_tpm::TpmBackend;
 pub use multi_device::{

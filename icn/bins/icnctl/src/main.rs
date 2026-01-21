@@ -6136,7 +6136,7 @@ async fn handle_auth_command(cmd: AuthCommands, data_dir: &Path) -> Result<()> {
                 .get_identity_bundle()
                 .context("Keystore is locked")?;
             let did = bundle.did().to_string();
-            let keypair = bundle.keypair();
+            let keypair = bundle.keypair()?;
 
             // Parse scopes
             let scope_list: Vec<String> = scopes.split(',').map(|s| s.trim().to_string()).collect();

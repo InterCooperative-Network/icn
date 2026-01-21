@@ -261,14 +261,14 @@ impl ConnectionContext {
         }
 
         // Send Hello response
-        self.send_hello_response(connection, from).await;
+        self.send_hello_response(connection, from).await?;
 
         info!("Processed Hello from {}", from);
         Ok(())
     }
 
     /// Send Hello response with our identity info
-    async fn send_hello_response(&self, connection: &quinn::Connection, to: &Did) {
+    async fn send_hello_response(&self, connection: &quinn::Connection, to: &Did) -> Result<()> {
         let binding_info = self.identity_bundle.binding_info();
         let x25519_public = *self.identity_bundle.x25519_public_bytes();
         let version_info = crate::VersionInfo::new(format!("icnd-{}", env!("CARGO_PKG_VERSION")));
@@ -281,7 +281,10 @@ impl ConnectionContext {
         // Build Hello response with PQ binding proof if available
         #[cfg(feature = "post-quantum")]
         let hello_response = {
-            let keypair = self.identity_bundle.keypair();
+            let keypair = self
+                .identity_bundle
+                .keypair()
+                .context("Failed to load keypair for PQ binding")?;
             let ml_dsa = keypair.pq_public_key().map(|pk| pk.as_bytes().to_vec());
             let ml_kem = self
                 .identity_bundle
@@ -298,7 +301,7 @@ impl ConnectionContext {
                 x25519_public,
                 ml_dsa,
                 ml_kem,
-                keypair,
+                &keypair,
             )
         };
 
@@ -335,6 +338,8 @@ impl ConnectionContext {
                 }
             }
         });
+
+        Ok(())
     }
 
     /// Validate PQ key against negotiated capability

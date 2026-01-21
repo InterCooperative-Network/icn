@@ -59,8 +59,7 @@ impl Pkcs11Backend {
     /// A locked PKCS#11 backend ready to be unlocked
     pub fn new(config: Pkcs11Config) -> Result<Self> {
         // Initialize PKCS#11 context
-        let pkcs11 = Pkcs11::new(&config.library_path)
-            .context("Failed to load PKCS#11 library")?;
+        let pkcs11 = Pkcs11::new(&config.library_path).context("Failed to load PKCS#11 library")?;
 
         pkcs11
             .initialize(CInitializeArgs::OsThreads)
@@ -262,12 +261,25 @@ impl KeyStoreBackend for Pkcs11Backend {
             anyhow::bail!("PKCS#11 backend is locked");
         }
 
+        let session = self
+            .session
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("PKCS#11 backend session unavailable"))?
+            .handle();
+        let did = self
+            .did
+            .clone()
+            .ok_or_else(|| anyhow::anyhow!("PKCS#11 backend DID unavailable"))?;
+        let verifying_key = self
+            .verifying_key
+            .ok_or_else(|| anyhow::anyhow!("PKCS#11 backend verifying key unavailable"))?;
+
         Ok(Box::new(Pkcs11SigningBackend {
             pkcs11: Arc::clone(&self.pkcs11),
-            session: self.session.as_ref().unwrap().handle(),
+            session,
             key_label: self.key_label.clone(),
-            did: self.did.clone().unwrap(),
-            verifying_key: self.verifying_key.unwrap(),
+            did,
+            verifying_key,
         }))
     }
 
@@ -323,7 +335,9 @@ impl SigningBackend for Pkcs11SigningBackend {
             anyhow::bail!("Invalid signature length from HSM: {}", signature.len());
         }
 
-        let sig_bytes: [u8; 64] = signature.try_into().unwrap();
+        let sig_bytes: [u8; 64] = signature.try_into().map_err(|_| {
+            anyhow::anyhow!("Invalid signature length from HSM: {}", signature.len())
+        })?;
         Ok(ed25519_dalek::Signature::from_bytes(&sig_bytes))
     }
 

@@ -105,11 +105,10 @@ impl TpmBackend {
     /// The generated identity bundle
     pub fn init(&mut self, auth: &[u8]) -> Result<IdentityBundle> {
         // Connect to TPM
-        let tcti = TctiNameConf::from_str(&self.device_path)
-            .context("Failed to parse TPM device path")?;
+        let tcti =
+            TctiNameConf::from_str(&self.device_path).context("Failed to parse TPM device path")?;
 
-        let mut tpm_context =
-            TpmContext::new(tcti).context("Failed to connect to TPM device")?;
+        let mut tpm_context = TpmContext::new(tcti).context("Failed to connect to TPM device")?;
 
         info!("Generating Ed25519 keypair in TPM...");
 
@@ -215,8 +214,8 @@ impl KeyStoreBackend for TpmBackend {
         }
 
         // Connect to TPM
-        let tcti = TctiNameConf::from_str(&self.device_path)
-            .context("Failed to parse TPM device path")?;
+        let tcti =
+            TctiNameConf::from_str(&self.device_path).context("Failed to parse TPM device path")?;
 
         let tpm_context = TpmContext::new(tcti).context("Failed to connect to TPM device")?;
 
@@ -274,11 +273,19 @@ impl KeyStoreBackend for TpmBackend {
             anyhow::bail!("TPM backend is locked");
         }
 
+        let did = self
+            .did
+            .clone()
+            .ok_or_else(|| anyhow::anyhow!("TPM backend DID unavailable"))?;
+        let verifying_key = self
+            .verifying_key
+            .ok_or_else(|| anyhow::anyhow!("TPM backend verifying key unavailable"))?;
+
         // For TPM, signing is still done in software with the unsealed key
         // True TPM signing would require implementing TPM_Sign operations
         Ok(Box::new(TpmSigningBackend {
-            did: self.did.clone().unwrap(),
-            verifying_key: self.verifying_key.unwrap(),
+            did,
+            verifying_key,
             // In a real implementation, we would pass the TPM context
             // and key handle for TPM-based signing
         }))

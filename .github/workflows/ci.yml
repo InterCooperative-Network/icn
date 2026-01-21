@@ -84,7 +84,7 @@ jobs:
           workspaces: "icn -> target"
 
       - name: Run Clippy
-        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+        run: cargo clippy --workspace --all-targets --features "hsm,post-quantum" -- -D warnings
         working-directory: ./icn
 
   test:

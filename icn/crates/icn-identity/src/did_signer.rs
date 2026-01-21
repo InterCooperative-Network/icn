@@ -274,11 +274,8 @@ mod tests {
         let signing_key = SigningKey::generate(&mut OsRng);
         let verifying_key = signing_key.verifying_key();
 
-        let did_key = DidKey::from_hardware(
-            verifying_key,
-            "pkcs11".to_string(),
-            "slot=0".to_string(),
-        );
+        let did_key =
+            DidKey::from_hardware(verifying_key, "pkcs11".to_string(), "slot=0".to_string());
 
         let message = b"test message";
         let result = did_key.sign_software(message);

@@ -983,7 +983,7 @@ mod tests {
 
         // Sign nonce
         let nonce_bytes = hex::decode(&nonce).unwrap();
-        let signature = bundle.keypair().sign(&nonce_bytes);
+        let signature = bundle.keypair().unwrap().sign(&nonce_bytes);
         let signature_bytes = signature.to_bytes();
 
         // Verify and get token
@@ -1087,7 +1087,7 @@ mod tests {
         // Create and verify challenge
         let nonce = auth.create_challenge(bundle.did()).unwrap();
         let nonce_bytes = hex::decode(&nonce).unwrap();
-        let signature = bundle.keypair().sign(&nonce_bytes);
+        let signature = bundle.keypair().unwrap().sign(&nonce_bytes);
         let signature_bytes = signature.to_bytes();
 
         let token = auth
@@ -1115,7 +1115,7 @@ mod tests {
         // Create and verify challenge to get a token
         let nonce = auth.create_challenge(bundle.did()).unwrap();
         let nonce_bytes = hex::decode(&nonce).unwrap();
-        let signature = bundle.keypair().sign(&nonce_bytes);
+        let signature = bundle.keypair().unwrap().sign(&nonce_bytes);
         let signature_bytes = signature.to_bytes();
 
         let token = auth
@@ -1151,7 +1151,7 @@ mod tests {
         // Get a token
         let nonce = auth.create_challenge(bundle.did()).unwrap();
         let nonce_bytes = hex::decode(&nonce).unwrap();
-        let signature = bundle.keypair().sign(&nonce_bytes);
+        let signature = bundle.keypair().unwrap().sign(&nonce_bytes);
         let signature_bytes = signature.to_bytes();
 
         let token = auth
@@ -1186,7 +1186,7 @@ mod tests {
 
         // Should be able to verify the challenge
         let nonce_bytes = hex::decode(&nonce).unwrap();
-        let signature = bundle.keypair().sign(&nonce_bytes);
+        let signature = bundle.keypair().unwrap().sign(&nonce_bytes);
         let signature_bytes = signature.to_bytes();
 
         let token = auth2
@@ -1213,7 +1213,7 @@ mod tests {
             // Get a token
             let nonce = auth1.create_challenge(bundle.did()).unwrap();
             let nonce_bytes = hex::decode(&nonce).unwrap();
-            let signature = bundle.keypair().sign(&nonce_bytes);
+            let signature = bundle.keypair().unwrap().sign(&nonce_bytes);
             let signature_bytes = signature.to_bytes();
 
             token = auth1
@@ -1264,7 +1264,7 @@ mod tests {
         // Get a token
         let nonce = auth.create_challenge(bundle.did()).unwrap();
         let nonce_bytes = hex::decode(&nonce).unwrap();
-        let signature = bundle.keypair().sign(&nonce_bytes);
+        let signature = bundle.keypair().unwrap().sign(&nonce_bytes);
         let signature_bytes = signature.to_bytes();
 
         let token = auth

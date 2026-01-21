@@ -343,9 +343,11 @@ impl IdentityBundle {
     /// we cannot construct a KeyPair without exposing the private key.
     pub fn keypair(&self) -> Result<KeyPair> {
         match &self.did_key {
-            DidKey::Software { secret_bytes, verifying_key, .. } => {
-                KeyPair::from_bytes(secret_bytes, &verifying_key.to_bytes())
-            }
+            DidKey::Software {
+                secret_bytes,
+                verifying_key,
+                ..
+            } => KeyPair::from_bytes(secret_bytes, &verifying_key.to_bytes()),
             DidKey::Hardware { backend_type, .. } => {
                 anyhow::bail!(
                     "Cannot get KeyPair from hardware-backed bundle (backend: {}). \

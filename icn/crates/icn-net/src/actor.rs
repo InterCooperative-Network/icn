@@ -1282,7 +1282,7 @@ impl NetworkActor {
                     .await
                     .context("Timeout dialing peer")
                     .and_then(|r| r)
-                    .map(|connection| {
+                    .and_then(|connection| {
                         // Increment connection counter
                         let stats = self.stats.clone();
                         tokio::spawn(async move {
@@ -1344,7 +1344,10 @@ impl NetworkActor {
                         // Build Hello message with PQ binding proof if available
                         #[cfg(feature = "post-quantum")]
                         let hello_msg = {
-                            let keypair = self.identity_bundle.keypair();
+                            let keypair = self
+                                .identity_bundle
+                                .keypair()
+                                .context("Failed to load keypair for PQ binding")?;
                             let ml_dsa = keypair.pq_public_key().map(|pk| pk.as_bytes().to_vec());
                             let ml_kem = self
                                 .identity_bundle
@@ -1361,7 +1364,7 @@ impl NetworkActor {
                                 x25519_public,
                                 ml_dsa,
                                 ml_kem,
-                                keypair,
+                                &keypair,
                             )
                         };
 
@@ -1385,6 +1388,7 @@ impl NetworkActor {
                                 warn!("Failed to send Hello to {}: {}", did, e);
                             }
                         });
+                        Ok(())
                     });
 
                 let _ = response.send(result);

@@ -249,7 +249,7 @@ mod tests {
         // Create an inner signed message
         let inner_envelope = SignedEnvelope::new(
             sender_bundle.did(),
-            sender_bundle.keypair(),
+            &sender_bundle.keypair().unwrap(),
             1,
             PayloadType::Gossip,
             b"secret gossip data".to_vec(),
@@ -277,7 +277,7 @@ mod tests {
         let encrypted_bytes = icn_encoding::encode_bincode_legacy(&encrypted).unwrap();
         let outer_envelope = SignedEnvelope::new(
             sender_bundle.did(),
-            sender_bundle.keypair(),
+            &sender_bundle.keypair().unwrap(),
             1,
             PayloadType::Encrypted,
             encrypted_bytes,
@@ -326,7 +326,7 @@ mod tests {
         let encrypted_bytes = icn_encoding::encode_bincode_legacy(&encrypted).unwrap();
         let outer_envelope = SignedEnvelope::new(
             sender_bundle.did(),
-            sender_bundle.keypair(),
+            &sender_bundle.keypair().unwrap(),
             1,
             PayloadType::Encrypted,
             encrypted_bytes,
@@ -396,7 +396,7 @@ mod tests {
         let encrypted_bytes = icn_encoding::encode_bincode_legacy(&encrypted).unwrap();
         let outer_envelope = SignedEnvelope::new(
             sender_bundle.did(),
-            sender_bundle.keypair(),
+            &sender_bundle.keypair().unwrap(),
             1,
             PayloadType::Encrypted,
             encrypted_bytes,
@@ -457,7 +457,7 @@ mod tests {
         // Create an inner signed message
         let inner_envelope = SignedEnvelope::new(
             sender_bundle.did(),
-            sender_bundle.keypair(),
+            &sender_bundle.keypair().unwrap(),
             1,
             PayloadType::Gossip,
             b"secret gossip data".to_vec(),
@@ -490,7 +490,7 @@ mod tests {
         let encrypted_bytes = icn_encoding::encode_bincode_legacy(&encrypted).unwrap();
         let outer_envelope = SignedEnvelope::new(
             sender_bundle.did(),
-            sender_bundle.keypair(),
+            &sender_bundle.keypair().unwrap(),
             1,
             PayloadType::Encrypted,
             encrypted_bytes,
@@ -548,7 +548,7 @@ mod tests {
         // Create outer signed envelope with truncated/invalid payload
         let outer_envelope = SignedEnvelope::new(
             sender_bundle.did(),
-            sender_bundle.keypair(),
+            &sender_bundle.keypair().unwrap(),
             1,
             PayloadType::Encrypted,
             valid_bytes,
