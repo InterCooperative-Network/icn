@@ -3,9 +3,11 @@
 //! This module provides configuration types for all ICN subsystems,
 //! organized by domain into sub-modules.
 
+mod compute;
 mod cooperative;
 mod federation;
 mod gateway;
+mod gossip;
 mod identity;
 mod ledger;
 mod network;
@@ -13,11 +15,14 @@ mod observability;
 mod privacy;
 mod steward;
 mod supervisor;
+mod trust;
 
 // Re-export all types for backwards compatibility
+pub use compute::*;
 pub use cooperative::*;
 pub use federation::*;
 pub use gateway::*;
+pub use gossip::*;
 pub use identity::*;
 pub use ledger::*;
 pub use network::*;
@@ -25,6 +30,7 @@ pub use observability::*;
 pub use privacy::*;
 pub use steward::*;
 pub use supervisor::*;
+pub use trust::*;
 
 // Re-export topology types from icn-net to avoid circular dependencies
 pub use icn_net::{FanoutConfig, NeighborLimitsConfig, NodeRole, TopologyConfig};
@@ -83,6 +89,18 @@ pub struct Config {
     /// Identity backend configuration (keystore selection)
     #[serde(default)]
     pub identity: IdentityConfig,
+
+    /// Gossip protocol configuration
+    #[serde(default)]
+    pub gossip: GossipConfig,
+
+    /// Distributed compute configuration
+    #[serde(default)]
+    pub compute: ComputeConfig,
+
+    /// Trust graph configuration
+    #[serde(default)]
+    pub trust: TrustConfig,
 }
 
 impl Default for Config {
@@ -122,6 +140,9 @@ impl Default for Config {
             supervisor: SupervisorConfig::default(),
             ledger: LedgerConfig::default(),
             identity: IdentityConfig::default(),
+            gossip: GossipConfig::default(),
+            compute: ComputeConfig::default(),
+            trust: TrustConfig::default(),
         }
     }
 }
@@ -262,6 +283,70 @@ impl Config {
         // Topology validation
         if self.topology.fanout.local_cluster == 0 {
             errors.push("topology.fanout.local_cluster cannot be 0".to_string());
+        }
+
+        // Trust validation
+        if self.trust.attestation.min_attester_trust < 0.0
+            || self.trust.attestation.min_attester_trust > 1.0
+        {
+            errors.push(format!(
+                "trust.attestation.min_attester_trust must be 0.0-1.0, got {}",
+                self.trust.attestation.min_attester_trust
+            ));
+        }
+        if self.trust.propagation.decay_factor < 0.0 || self.trust.propagation.decay_factor > 1.0 {
+            errors.push(format!(
+                "trust.propagation.decay_factor must be 0.0-1.0, got {}",
+                self.trust.propagation.decay_factor
+            ));
+        }
+        if self.trust.propagation.min_edge_trust < 0.0
+            || self.trust.propagation.min_edge_trust > 1.0
+        {
+            errors.push(format!(
+                "trust.propagation.min_edge_trust must be 0.0-1.0, got {}",
+                self.trust.propagation.min_edge_trust
+            ));
+        }
+        if self.trust.sybil_resistance.max_trust_concentration < 0.0
+            || self.trust.sybil_resistance.max_trust_concentration > 1.0
+        {
+            errors.push(format!(
+                "trust.sybil_resistance.max_trust_concentration must be 0.0-1.0, got {}",
+                self.trust.sybil_resistance.max_trust_concentration
+            ));
+        }
+        if self.trust.propagation.max_path_length == 0 {
+            errors.push("trust.propagation.max_path_length cannot be 0".to_string());
+        }
+
+        // Gossip validation
+        if self.gossip.replication.target_replicas == 0 {
+            errors.push("gossip.replication.target_replicas cannot be 0".to_string());
+        }
+        if self.gossip.replication.min_replica_trust < 0.0
+            || self.gossip.replication.min_replica_trust > 1.0
+        {
+            errors.push(format!(
+                "gossip.replication.min_replica_trust must be 0.0-1.0, got {}",
+                self.gossip.replication.min_replica_trust
+            ));
+        }
+
+        // Compute validation
+        if self.compute.verification.consensus_threshold < 0.0
+            || self.compute.verification.consensus_threshold > 1.0
+        {
+            errors.push(format!(
+                "compute.verification.consensus_threshold must be 0.0-1.0, got {}",
+                self.compute.verification.consensus_threshold
+            ));
+        }
+        if self.compute.verification.high_value_quorum == 0 {
+            errors.push("compute.verification.high_value_quorum cannot be 0".to_string());
+        }
+        if self.compute.max_concurrent_tasks == 0 {
+            errors.push("compute.max_concurrent_tasks cannot be 0".to_string());
         }
 
         // Identity backend validation
@@ -799,5 +884,294 @@ log_level = "info"
         assert!(warnings
             .iter()
             .any(|w| w.contains("trust-gated TLS is disabled")));
+    }
+
+    #[test]
+    fn test_config_validation_trust_decay_factor_range() {
+        let mut config = Config::default();
+        config.trust.propagation.decay_factor = 1.5;
+
+        let result = config.validate();
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors.iter().any(|e| e.contains("decay_factor")));
+    }
+
+    #[test]
+    fn test_config_validation_gossip_replica_trust_range() {
+        let mut config = Config::default();
+        config.gossip.replication.min_replica_trust = -0.5;
+
+        let result = config.validate();
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors.iter().any(|e| e.contains("min_replica_trust")));
+    }
+
+    #[test]
+    fn test_config_validation_compute_consensus_threshold_range() {
+        let mut config = Config::default();
+        config.compute.verification.consensus_threshold = 2.0;
+
+        let result = config.validate();
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors.iter().any(|e| e.contains("consensus_threshold")));
+    }
+
+    #[test]
+    fn test_config_validation_zero_values() {
+        let mut config = Config::default();
+        config.trust.propagation.max_path_length = 0;
+
+        let result = config.validate();
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors.iter().any(|e| e.contains("max_path_length")));
+
+        let mut config = Config::default();
+        config.gossip.replication.target_replicas = 0;
+
+        let result = config.validate();
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors.iter().any(|e| e.contains("target_replicas")));
+
+        let mut config = Config::default();
+        config.compute.verification.high_value_quorum = 0;
+
+        let result = config.validate();
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors.iter().any(|e| e.contains("high_value_quorum")));
+    }
+
+    #[test]
+    fn test_gossip_config_defaults() {
+        let config = GossipConfig::default();
+
+        // Replication defaults
+        assert_eq!(config.replication.target_replicas, 3);
+        assert!((config.replication.min_replica_trust - 0.4).abs() < f64::EPSILON);
+        assert_eq!(config.replication.health_check_interval_secs, 60);
+        assert_eq!(config.replication.stale_threshold_secs, 300);
+        assert_eq!(config.replication.unreachable_threshold_secs, 900);
+
+        // Partition defaults
+        assert_eq!(config.partition.silence_threshold_secs, 300);
+        assert_eq!(config.partition.check_interval_secs, 30);
+        assert!(config.partition.auto_heal_enabled);
+        assert_eq!(config.partition.heal_interval_secs, 60);
+    }
+
+    #[test]
+    fn test_gossip_config_serialization() {
+        let toml_str = r#"
+[replication]
+target_replicas = 5
+min_replica_trust = 0.5
+health_check_interval_secs = 120
+
+[partition]
+silence_threshold_secs = 600
+check_interval_secs = 60
+auto_heal_enabled = false
+"#;
+
+        let config: GossipConfig = toml::from_str(toml_str).unwrap();
+
+        assert_eq!(config.replication.target_replicas, 5);
+        assert!((config.replication.min_replica_trust - 0.5).abs() < f64::EPSILON);
+        assert_eq!(config.replication.health_check_interval_secs, 120);
+        assert_eq!(config.partition.silence_threshold_secs, 600);
+        assert_eq!(config.partition.check_interval_secs, 60);
+        assert!(!config.partition.auto_heal_enabled);
+    }
+
+    #[test]
+    fn test_compute_config_defaults() {
+        let config = ComputeConfig::default();
+
+        assert_eq!(config.max_concurrent_tasks, 10);
+        assert!(!config.actor_model_enabled);
+        assert_eq!(config.max_actors, 100);
+
+        // Verification defaults
+        assert_eq!(config.verification.low_value_threshold, 100);
+        assert_eq!(config.verification.medium_value_threshold, 1000);
+        assert_eq!(config.verification.high_value_threshold, 10000);
+        assert_eq!(config.verification.high_value_quorum, 3);
+        assert!((config.verification.consensus_threshold - 0.67).abs() < f64::EPSILON);
+        assert_eq!(config.verification.collection_window_ms, 30_000);
+    }
+
+    #[test]
+    fn test_compute_config_serialization() {
+        let toml_str = r#"
+max_concurrent_tasks = 20
+actor_model_enabled = true
+max_actors = 200
+
+[verification]
+low_value_threshold = 50
+high_value_quorum = 5
+"#;
+
+        let config: ComputeConfig = toml::from_str(toml_str).unwrap();
+
+        assert_eq!(config.max_concurrent_tasks, 20);
+        assert!(config.actor_model_enabled);
+        assert_eq!(config.max_actors, 200);
+        assert_eq!(config.verification.low_value_threshold, 50);
+        assert_eq!(config.verification.high_value_quorum, 5);
+        // Other fields should use defaults
+        assert_eq!(config.verification.medium_value_threshold, 1000);
+    }
+
+    #[test]
+    fn test_trust_config_defaults() {
+        let config = TrustConfig::default();
+
+        // Attestation defaults
+        assert!((config.attestation.min_attester_trust - 0.3).abs() < f64::EPSILON);
+        assert_eq!(config.attestation.max_attestations_per_day, 10);
+        assert!(config.attestation.evidence_required);
+        assert!((config.attestation.min_evidence_score - 0.5).abs() < f64::EPSILON);
+
+        // Propagation defaults
+        assert_eq!(config.propagation.max_path_length, 3);
+        assert!((config.propagation.decay_factor - 0.8).abs() < f64::EPSILON);
+        assert!((config.propagation.min_edge_trust - 0.1).abs() < f64::EPSILON);
+        assert!(config.propagation.cache_enabled);
+        assert_eq!(config.propagation.cache_ttl_secs, 300);
+
+        // Sybil resistance defaults
+        assert!(config.sybil_resistance.enabled);
+        assert!((config.sybil_resistance.max_trust_concentration - 0.3).abs() < f64::EPSILON);
+        assert_eq!(config.sybil_resistance.sample_size, 100);
+        assert!((config.sybil_resistance.min_diversity_ratio - 0.2).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_trust_config_serialization() {
+        let toml_str = r#"
+[attestation]
+min_attester_trust = 0.5
+max_attestations_per_day = 20
+evidence_required = false
+
+[propagation]
+max_path_length = 5
+decay_factor = 0.9
+
+[sybil_resistance]
+enabled = false
+"#;
+
+        let config: TrustConfig = toml::from_str(toml_str).unwrap();
+
+        assert!((config.attestation.min_attester_trust - 0.5).abs() < f64::EPSILON);
+        assert_eq!(config.attestation.max_attestations_per_day, 20);
+        assert!(!config.attestation.evidence_required);
+        assert_eq!(config.propagation.max_path_length, 5);
+        assert!((config.propagation.decay_factor - 0.9).abs() < f64::EPSILON);
+        assert!(!config.sybil_resistance.enabled);
+        // Other fields should use defaults
+        assert_eq!(config.propagation.cache_ttl_secs, 300);
+    }
+
+    #[test]
+    fn test_config_with_new_subsystems() {
+        let config = Config::default();
+
+        // Verify new configs are present and have defaults
+        assert_eq!(config.gossip.replication.target_replicas, 3);
+        assert_eq!(config.compute.max_concurrent_tasks, 10);
+        assert!((config.trust.attestation.min_attester_trust - 0.3).abs() < f64::EPSILON);
+
+        // Serialize to TOML
+        let toml_str = toml::to_string_pretty(&config).unwrap();
+
+        // Note: Default values may not appear in serialized TOML due to #[serde(default)]
+        // So we test deserialization to ensure defaults work correctly
+        let deserialized: Config = toml::from_str(&toml_str).unwrap();
+
+        // Verify defaults are properly restored
+        assert_eq!(deserialized.gossip.replication.target_replicas, 3);
+        assert_eq!(deserialized.compute.max_concurrent_tasks, 10);
+        assert!((deserialized.trust.attestation.min_attester_trust - 0.3).abs() < f64::EPSILON);
+
+        // Test with explicit values to ensure they serialize
+        let mut custom_config = Config::default();
+        custom_config.gossip.replication.target_replicas = 5;
+        custom_config.compute.max_concurrent_tasks = 20;
+        custom_config.trust.attestation.min_attester_trust = 0.5;
+
+        let custom_toml = toml::to_string_pretty(&custom_config).unwrap();
+        let custom_deserialized: Config = toml::from_str(&custom_toml).unwrap();
+
+        assert_eq!(custom_deserialized.gossip.replication.target_replicas, 5);
+        assert_eq!(custom_deserialized.compute.max_concurrent_tasks, 20);
+        assert!(
+            (custom_deserialized.trust.attestation.min_attester_trust - 0.5).abs() < f64::EPSILON
+        );
+    }
+
+    #[test]
+    fn test_gossip_config_conversion() {
+        let config = GossipConfig::default();
+
+        // Test ReplicationConfig conversion
+        let manager_config = config.replication.to_manager_config();
+        assert_eq!(manager_config.target_replicas, 3);
+        assert_eq!(manager_config.health_check_interval_secs, 60);
+        assert_eq!(manager_config.stale_threshold_secs, 300);
+        assert_eq!(manager_config.unreachable_threshold_secs, 900);
+
+        // Test PartitionConfig conversion
+        let partition_config = config.partition.to_gossip_config();
+        assert_eq!(partition_config.partition_threshold.as_secs(), 300);
+        assert_eq!(partition_config.check_interval.as_secs(), 30);
+    }
+
+    #[test]
+    fn test_compute_config_conversion() {
+        let config = ComputeConfig::default();
+
+        // Test VerificationConfig conversion
+        let verification = config.verification.to_compute_config();
+        assert_eq!(verification.low_value_threshold, 100);
+        assert_eq!(verification.medium_value_threshold, 1000);
+        assert_eq!(verification.high_value_threshold, 10000);
+        assert_eq!(verification.high_value_quorum, 3);
+        assert!((verification.consensus_threshold - 0.67).abs() < f64::EPSILON);
+        assert_eq!(verification.collection_window_ms, 30_000);
+    }
+
+    #[test]
+    fn test_gossip_config_conversion_trust_class_semantic() {
+        // Verify that default min_replica_trust (0.4) converts to Partner class
+        let config = GossipConfig::default();
+        let manager_config = config.replication.to_manager_config();
+
+        // Partner class is for scores >= 0.4 and < 0.7
+        assert_eq!(
+            manager_config.min_trust_class,
+            icn_trust::TrustClass::Partner
+        );
+
+        // Test boundary cases
+        let mut config_known = GossipConfig::default();
+        config_known.replication.min_replica_trust = 0.3; // Should be Known class
+        let manager_known = config_known.replication.to_manager_config();
+        assert_eq!(manager_known.min_trust_class, icn_trust::TrustClass::Known);
+
+        let mut config_federated = GossipConfig::default();
+        config_federated.replication.min_replica_trust = 0.8; // Should be Federated class
+        let manager_federated = config_federated.replication.to_manager_config();
+        assert_eq!(
+            manager_federated.min_trust_class,
+            icn_trust::TrustClass::Federated
+        );
     }
 }
