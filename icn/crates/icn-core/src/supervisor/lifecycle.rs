@@ -110,7 +110,8 @@ pub async fn run_supervisor(
 
     // Wait for background tasks to complete gracefully (with timeout)
     info!("Waiting for background tasks to complete...");
-    let shutdown_timeout = tokio::time::Duration::from_secs(config.supervisor.shutdown_timeout_secs);
+    let shutdown_timeout =
+        tokio::time::Duration::from_secs(config.supervisor.shutdown_timeout_secs);
     match tokio::time::timeout(shutdown_timeout, async {
         while background_tasks.join_next().await.is_some() {
             // Task completed successfully
@@ -333,7 +334,12 @@ async fn spawn_actors_with_identity(
     )
     .await?;
 
-    let (federation_registry_for_rpc, clearing_manager_for_governance, attestation_store_for_governance, federation_handler_for_notifications) = if let Some(ref services) = federation_services {
+    let (
+        federation_registry_for_rpc,
+        clearing_manager_for_governance,
+        attestation_store_for_governance,
+        federation_handler_for_notifications,
+    ) = if let Some(ref services) = federation_services {
         gateway_handles.agreement_manager = Some(services.agreement_manager.clone());
         (
             Some(services.registry.clone()),
@@ -355,9 +361,7 @@ async fn spawn_actors_with_identity(
             x25519_secret_bytes: *identity_bundle.x25519_secret().as_bytes(),
             gossip_store: gossip_store.clone(),
             encryption_enabled: config.network.e2e_encryption_enabled,
-            circuit_breaker_threshold: config
-                .network
-                .encryption_cleanup_circuit_breaker_threshold,
+            circuit_breaker_threshold: config.network.encryption_cleanup_circuit_breaker_threshold,
             shutdown_tx: shutdown_tx.clone(),
         },
         background_tasks,
@@ -488,21 +492,22 @@ async fn spawn_actors_with_identity(
     info!("✓ Governance event handlers registered");
 
     // Initialize contract registry
-    let contract_registry_services = super::init_contract_registry::init_contract_registry_services(
-        config,
-        did.clone(),
-        super::init_contract_registry::ContractRegistryDeps {
-            gossip_handle: gossip_handle.clone(),
-        },
-    )
-    .await?;
+    let contract_registry_services =
+        super::init_contract_registry::init_contract_registry_services(
+            config,
+            did.clone(),
+            super::init_contract_registry::ContractRegistryDeps {
+                gossip_handle: gossip_handle.clone(),
+            },
+        )
+        .await?;
     let contract_registry_handle = contract_registry_services.registry_handle;
     *contract_registry_holder.write().await = Some(contract_registry_handle.clone());
     info!("✓ Contract registry handle available for gossip routing");
 
     // Initialize compute actor
-    let compute_services = super::init_compute::init_compute_services(
-        super::init_compute::ComputeDeps {
+    let compute_services =
+        super::init_compute::init_compute_services(super::init_compute::ComputeDeps {
             trust_graph: trust_graph_handle.clone(),
             ledger: ledger_handle.clone(),
             gossip_handle: gossip_handle.clone(),
@@ -514,9 +519,8 @@ async fn spawn_actors_with_identity(
             identity_bundle: identity_bundle.clone(),
             store_path: config.store_path(),
             contract_registry: Some(contract_registry_handle.clone()),
-        },
-    )
-    .await?;
+        })
+        .await?;
 
     let compute_handle = compute_services.compute_handle;
     let broadcaster = compute_services.broadcaster;
@@ -786,11 +790,13 @@ async fn configure_gossip_actor(
     let candidate_cache_for_cleanup = candidate_cache.clone();
 
     // Create profile cache for peer capability discovery
-    let profile_cache: Arc<RwLock<std::collections::HashMap<icn_identity::Did, crate::node::NodeProfile>>> =
-        Arc::new(RwLock::new(std::collections::HashMap::new()));
+    let profile_cache: Arc<
+        RwLock<std::collections::HashMap<icn_identity::Did, crate::node::NodeProfile>>,
+    > = Arc::new(RwLock::new(std::collections::HashMap::new()));
 
     // Create rate limiter for trust attestation anti-flood protection
-    let attestation_rate_limiter = Arc::new(crate::trust_propagation::AttestationRateLimiter::new());
+    let attestation_rate_limiter =
+        Arc::new(crate::trust_propagation::AttestationRateLimiter::new());
 
     // Create evidence validator
     let evidence_validator = Some(Arc::new(icn_trust::EvidenceValidator::new(
@@ -827,15 +833,13 @@ async fn configure_gossip_actor(
 
     // Set up peer sampling callback
     let network_handle_for_sampling = network_handle.clone();
-    let peer_sampling_callback: icn_gossip::PeerSamplingCallback =
-        Arc::new(move |scope, count| {
-            let net_handle = network_handle_for_sampling.clone();
-            tokio::task::block_in_place(move || {
-                tokio::runtime::Handle::current().block_on(async move {
-                    net_handle.sample_peers(scope, count).await
-                })
-            })
-        });
+    let peer_sampling_callback: icn_gossip::PeerSamplingCallback = Arc::new(move |scope, count| {
+        let net_handle = network_handle_for_sampling.clone();
+        tokio::task::block_in_place(move || {
+            tokio::runtime::Handle::current()
+                .block_on(async move { net_handle.sample_peers(scope, count).await })
+        })
+    });
 
     gossip.set_peer_sampling(peer_sampling_callback);
 
@@ -895,9 +899,16 @@ fn spawn_storage_challenge_scheduler(
     shutdown_tx: &ShutdownTx,
     _background_tasks: &mut JoinSet<()>,
 ) {
+    let keypair = match identity_bundle.keypair() {
+        Ok(keypair) => keypair,
+        Err(err) => {
+            warn!("Failed to obtain keypair for storage challenge scheduler: {err}");
+            return;
+        }
+    };
     let challenge_scheduler_handle = crate::storage_challenge::ChallengeScheduler::spawn(
         did.clone(),
-        Arc::new(identity_bundle.keypair().unwrap()),
+        Arc::new(keypair),
         icn_store::ChallengeConfig::default(),
         gossip_store.clone(),
         trust_graph_handle.clone(),
@@ -908,10 +919,9 @@ fn spawn_storage_challenge_scheduler(
 
     // Wire up proof callback
     {
-        let proof_callback =
-            super::background_tasks::storage_challenge::create_proof_callback(
-                challenge_scheduler_handle,
-            );
+        let proof_callback = super::background_tasks::storage_challenge::create_proof_callback(
+            challenge_scheduler_handle,
+        );
         let mut gossip = tokio::task::block_in_place(|| {
             tokio::runtime::Handle::current().block_on(gossip_handle.write())
         });
@@ -954,11 +964,8 @@ fn spawn_background_tasks(
     info!("Digest emitter spawned");
 
     // Partition checker
-    let _partition_checker_handle = icn_gossip::start_partition_checker(
-        gossip_handle.clone(),
-        30_000,
-        shutdown_tx.subscribe(),
-    );
+    let _partition_checker_handle =
+        icn_gossip::start_partition_checker(gossip_handle.clone(), 30_000, shutdown_tx.subscribe());
     info!("Partition checker spawned");
 
     // Clock sync
@@ -1004,10 +1011,7 @@ fn spawn_background_tasks(
     // Candidate announcement
     let candidate_announce_config = super::background_tasks::CandidateAnnouncementConfig {
         announce_interval: std::time::Duration::from_secs(
-            config
-                .network
-                .nat_dial
-                .candidate_announce_interval_secs,
+            config.network.nat_dial.candidate_announce_interval_secs,
         ),
     };
     let _candidate_announce_handle = super::background_tasks::spawn_candidate_announcement_task(
@@ -1018,9 +1022,6 @@ fn spawn_background_tasks(
     );
     info!(
         "Connection candidate announcement task spawned (interval: {} seconds)",
-        config
-            .network
-            .nat_dial
-            .candidate_announce_interval_secs
+        config.network.nat_dial.candidate_announce_interval_secs
     );
 }

@@ -7,6 +7,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 /// Handle types collected during actor initialization for gateway integration
+#[derive(Default)]
 pub struct GatewayActorHandles {
     pub event_broadcaster: Option<Arc<icn_gateway::EventBroadcaster>>,
     pub compute: Option<icn_compute::ComputeHandle>,
@@ -21,67 +22,24 @@ pub struct GatewayActorHandles {
     pub agreement_manager: Option<icn_federation::agreement::AgreementManagerHandle>,
 }
 
-impl Default for GatewayActorHandles {
-    fn default() -> Self {
-        Self {
-            event_broadcaster: None,
-            compute: None,
-            coop: None,
-            community: None,
-            trust_graph: None,
-            governance: None,
-            treasury: None,
-            ledger: None,
-            entity: None,
-            steward: None,
-            agreement_manager: None,
-        }
-    }
-}
-
 /// Core actor handles returned from initialization
+#[derive(Default)]
 pub struct CoreActorHandles {
     pub network: Option<icn_net::NetworkHandle>,
     pub gossip: Option<Arc<RwLock<icn_gossip::GossipActor>>>,
     pub ledger: Option<icn_gateway::LedgerHandle>,
 }
 
-impl Default for CoreActorHandles {
-    fn default() -> Self {
-        Self {
-            network: None,
-            gossip: None,
-            ledger: None,
-        }
-    }
-}
-
 /// Shutdown-related handles that need to persist state
+#[derive(Default)]
 pub struct ShutdownHandles {
     pub misbehavior_detector: Option<Arc<RwLock<icn_security::MisbehaviorDetector>>>,
     pub security_store: Option<Arc<dyn icn_store::Store>>,
 }
 
-impl Default for ShutdownHandles {
-    fn default() -> Self {
-        Self {
-            misbehavior_detector: None,
-            security_store: None,
-        }
-    }
-}
-
 /// Event subscription handles that must persist for daemon lifetime
+#[derive(Default)]
 pub struct EventSubscriptionHandles {
     pub governance_event_subscription: Option<crate::events::SubscriptionHandle>,
     pub policy_governance_subscription: Option<crate::events::SubscriptionHandle>,
-}
-
-impl Default for EventSubscriptionHandles {
-    fn default() -> Self {
-        Self {
-            governance_event_subscription: None,
-            policy_governance_subscription: None,
-        }
-    }
 }
