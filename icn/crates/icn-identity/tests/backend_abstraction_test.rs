@@ -39,6 +39,7 @@ fn test_backend_config_types() {
             key_handle: 0x81000001,
             platform_binding: true,
             attestation: true,
+            sealed_blob_dir: None,
         });
 
         assert_eq!(tpm_config.backend_type(), "tpm");

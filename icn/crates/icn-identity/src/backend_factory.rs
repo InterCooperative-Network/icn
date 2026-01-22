@@ -166,6 +166,7 @@ mod tests {
             key_handle: 0x8100_0000,
             platform_binding: true,
             attestation: false,
+            sealed_blob_dir: None,
         });
 
         assert_eq!(config.backend_type(), "tpm");
