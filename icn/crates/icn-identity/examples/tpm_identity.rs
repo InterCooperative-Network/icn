@@ -24,7 +24,7 @@
 
 #[cfg(feature = "tpm-experimental")]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    use icn_identity::{TpmBackend, TpmConfig};
+    use icn_identity::{KeyStoreBackend, TpmBackend, TpmConfig};
     use ed25519_dalek::Verifier;
 
     println!("=== ICN TPM Identity Example ===\n");
