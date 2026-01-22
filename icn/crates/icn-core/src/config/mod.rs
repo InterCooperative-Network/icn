@@ -285,6 +285,70 @@ impl Config {
             errors.push("topology.fanout.local_cluster cannot be 0".to_string());
         }
 
+        // Trust validation
+        if self.trust.attestation.min_attester_trust < 0.0
+            || self.trust.attestation.min_attester_trust > 1.0
+        {
+            errors.push(format!(
+                "trust.attestation.min_attester_trust must be 0.0-1.0, got {}",
+                self.trust.attestation.min_attester_trust
+            ));
+        }
+        if self.trust.propagation.decay_factor < 0.0 || self.trust.propagation.decay_factor > 1.0 {
+            errors.push(format!(
+                "trust.propagation.decay_factor must be 0.0-1.0, got {}",
+                self.trust.propagation.decay_factor
+            ));
+        }
+        if self.trust.propagation.min_edge_trust < 0.0
+            || self.trust.propagation.min_edge_trust > 1.0
+        {
+            errors.push(format!(
+                "trust.propagation.min_edge_trust must be 0.0-1.0, got {}",
+                self.trust.propagation.min_edge_trust
+            ));
+        }
+        if self.trust.sybil_resistance.max_trust_concentration < 0.0
+            || self.trust.sybil_resistance.max_trust_concentration > 1.0
+        {
+            errors.push(format!(
+                "trust.sybil_resistance.max_trust_concentration must be 0.0-1.0, got {}",
+                self.trust.sybil_resistance.max_trust_concentration
+            ));
+        }
+        if self.trust.propagation.max_path_length == 0 {
+            errors.push("trust.propagation.max_path_length cannot be 0".to_string());
+        }
+
+        // Gossip validation
+        if self.gossip.replication.target_replicas == 0 {
+            errors.push("gossip.replication.target_replicas cannot be 0".to_string());
+        }
+        if self.gossip.replication.min_replica_trust < 0.0
+            || self.gossip.replication.min_replica_trust > 1.0
+        {
+            errors.push(format!(
+                "gossip.replication.min_replica_trust must be 0.0-1.0, got {}",
+                self.gossip.replication.min_replica_trust
+            ));
+        }
+
+        // Compute validation
+        if self.compute.verification.consensus_threshold < 0.0
+            || self.compute.verification.consensus_threshold > 1.0
+        {
+            errors.push(format!(
+                "compute.verification.consensus_threshold must be 0.0-1.0, got {}",
+                self.compute.verification.consensus_threshold
+            ));
+        }
+        if self.compute.verification.high_value_quorum == 0 {
+            errors.push("compute.verification.high_value_quorum cannot be 0".to_string());
+        }
+        if self.compute.max_concurrent_tasks == 0 {
+            errors.push("compute.max_concurrent_tasks cannot be 0".to_string());
+        }
+
         // Identity backend validation
         match self.identity.validate() {
             Ok(id_warnings) => warnings.extend(id_warnings),
@@ -820,6 +884,66 @@ log_level = "info"
         assert!(warnings
             .iter()
             .any(|w| w.contains("trust-gated TLS is disabled")));
+    }
+
+    #[test]
+    fn test_config_validation_trust_decay_factor_range() {
+        let mut config = Config::default();
+        config.trust.propagation.decay_factor = 1.5;
+
+        let result = config.validate();
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors.iter().any(|e| e.contains("decay_factor")));
+    }
+
+    #[test]
+    fn test_config_validation_gossip_replica_trust_range() {
+        let mut config = Config::default();
+        config.gossip.replication.min_replica_trust = -0.5;
+
+        let result = config.validate();
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors.iter().any(|e| e.contains("min_replica_trust")));
+    }
+
+    #[test]
+    fn test_config_validation_compute_consensus_threshold_range() {
+        let mut config = Config::default();
+        config.compute.verification.consensus_threshold = 2.0;
+
+        let result = config.validate();
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors.iter().any(|e| e.contains("consensus_threshold")));
+    }
+
+    #[test]
+    fn test_config_validation_zero_values() {
+        let mut config = Config::default();
+        config.trust.propagation.max_path_length = 0;
+
+        let result = config.validate();
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors.iter().any(|e| e.contains("max_path_length")));
+
+        let mut config = Config::default();
+        config.gossip.replication.target_replicas = 0;
+
+        let result = config.validate();
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors.iter().any(|e| e.contains("target_replicas")));
+
+        let mut config = Config::default();
+        config.compute.verification.high_value_quorum = 0;
+
+        let result = config.validate();
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors.iter().any(|e| e.contains("high_value_quorum")));
     }
 
     #[test]

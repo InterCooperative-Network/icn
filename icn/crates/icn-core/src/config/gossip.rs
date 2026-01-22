@@ -1,4 +1,24 @@
 //! Gossip protocol configuration
+//!
+//! # Example TOML Configuration
+//!
+//! ```toml
+//! [gossip]
+//! # Replication settings for data durability
+//! [gossip.replication]
+//! target_replicas = 3              # Number of replicas per content hash
+//! min_replica_trust = 0.4          # Partner trust class required
+//! health_check_interval_secs = 60  # How often to check replica health
+//! stale_threshold_secs = 300       # Mark stale after 5 minutes
+//! unreachable_threshold_secs = 900 # Mark unreachable after 15 minutes
+//!
+//! # Partition detection for split-brain prevention
+//! [gossip.partition]
+//! silence_threshold_secs = 300     # Suspect partition after 5 min silence
+//! check_interval_secs = 30         # How often to check for partitions
+//! auto_heal_enabled = true         # Automatically attempt healing
+//! heal_interval_secs = 60          # How often to attempt healing
+//! ```
 
 use serde::{Deserialize, Serialize};
 

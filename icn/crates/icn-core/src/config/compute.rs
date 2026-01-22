@@ -1,4 +1,22 @@
 //! Distributed compute configuration
+//!
+//! # Example TOML Configuration
+//!
+//! ```toml
+//! [compute]
+//! max_concurrent_tasks = 10    # Maximum parallel task execution
+//! actor_model_enabled = false  # Enable stateful compute actors
+//! max_actors = 100             # Maximum hosted actors
+//!
+//! # Task result verification settings
+//! [compute.verification]
+//! low_value_threshold = 100    # Credits below this: single executor
+//! medium_value_threshold = 1000 # Credits below this: 2 executors
+//! high_value_threshold = 10000 # Credits above this: max quorum
+//! high_value_quorum = 3        # Executors for high-value tasks
+//! consensus_threshold = 0.67   # 2/3 majority required
+//! collection_window_ms = 30000 # Time window to collect results
+//! ```
 
 use serde::{Deserialize, Serialize};
 

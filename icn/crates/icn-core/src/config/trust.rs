@@ -1,4 +1,31 @@
 //! Trust graph configuration
+//!
+//! # Example TOML Configuration
+//!
+//! ```toml
+//! [trust]
+//! # Attestation settings
+//! [trust.attestation]
+//! min_attester_trust = 0.3      # Minimum trust to create attestations
+//! max_attestations_per_day = 10 # Rate limit per attester
+//! evidence_required = true      # Require proof for attestations
+//! min_evidence_score = 0.5      # Minimum evidence quality
+//!
+//! # Trust propagation settings
+//! [trust.propagation]
+//! max_path_length = 3           # Maximum hops for transitive trust
+//! decay_factor = 0.8            # 20% decay per hop
+//! min_edge_trust = 0.1          # Minimum edge weight to include
+//! cache_enabled = true          # Enable trust caching
+//! cache_ttl_secs = 300          # Cache lifetime (5 minutes)
+//!
+//! # Sybil resistance settings
+//! [trust.sybil_resistance]
+//! enabled = true                # Enable sybil detection
+//! max_trust_concentration = 0.3 # Max trust from single attester
+//! sample_size = 100             # Network sampling size
+//! min_diversity_ratio = 0.2     # Required attester diversity
+//! ```
 
 use serde::{Deserialize, Serialize};
 
