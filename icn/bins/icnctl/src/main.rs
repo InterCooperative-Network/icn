@@ -24,6 +24,9 @@ use std::sync::Arc;
 use tar::{Archive, Builder};
 use zeroize::Zeroizing;
 
+/// Maximum QR code data size in bytes for reliable scanning
+const MAX_RELIABLE_QR_SIZE: usize = 2000;
+
 #[derive(Parser, Debug)]
 #[command(name = "icnctl")]
 #[command(about = "ICN control CLI", long_about = None)]
@@ -392,6 +395,14 @@ enum DeviceCommands {
     Add {
         /// Device name/label
         name: String,
+
+        /// Display QR code in terminal
+        #[arg(long)]
+        qr: bool,
+
+        /// Save QR code as image file (implies --qr)
+        #[arg(long)]
+        qr_image: Option<PathBuf>,
     },
 
     /// Approve a device-add request (from an existing authorized device)
@@ -4642,7 +4653,7 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &Path) -> Result<()> {
             }
         }
 
-        DeviceCommands::Add { name } => {
+        DeviceCommands::Add { name, qr, qr_image } => {
             println!("{} '{name}'...\n", t!("cli.device.add.creating"));
 
             // Prompt for the target DID (the identity to add this device to)
@@ -4678,6 +4689,10 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &Path) -> Result<()> {
             println!();
 
             // Create request
+            // Note: created_at timestamp is recorded for auditing purposes but expiration/replay
+            // validation is intentionally deferred to the approval workflow on the authorized device.
+            // This allows flexibility in transfer timing while the approval step provides the
+            // security boundary (user must explicitly approve on an already-authorized device).
             let request = DeviceAddRequest {
                 did: target_did.to_string(),
                 label: name.clone(),
@@ -4700,14 +4715,82 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &Path) -> Result<()> {
 
             println!("✓ Device-add request created: {}", request_file.display());
             println!();
+
+            // Generate QR code if requested
+            let qr_requested = qr || qr_image.is_some();
+            if qr_requested {
+                use qrcode::QrCode;
+
+                // Use compact JSON for QR code (no pretty printing)
+                let qr_data = serde_json::to_string(&request)?;
+                let qr_data_len = qr_data.len();
+
+                println!("QR code data size: {} bytes", qr_data_len);
+
+                if qr_data_len > MAX_RELIABLE_QR_SIZE {
+                    eprintln!(
+                        "⚠️  Warning: QR code data is large ({} bytes). May not scan reliably.",
+                        qr_data_len
+                    );
+                }
+
+                let code = QrCode::new(qr_data.as_bytes()).with_context(|| {
+                    format!("Failed to generate QR code ({} bytes)", qr_data_len)
+                })?;
+
+                // Display QR in terminal if --qr is set, or if no image output was requested
+                if qr || qr_image.is_none() {
+                    println!("\n{}", "═".repeat(60));
+                    println!("QR CODE - Scan with approving device");
+                    println!("{}", "═".repeat(60));
+
+                    let qr_string = code
+                        .render::<char>()
+                        .quiet_zone(false)
+                        .module_dimensions(2, 1)
+                        .build();
+
+                    println!("{}", qr_string);
+                    println!("{}\n", "═".repeat(60));
+
+                    println!("⚠️  SECURITY WARNING:");
+                    println!("  • Do not let unauthorized parties scan this QR code");
+                    println!("  • Ensure no cameras or recording devices can capture it");
+                    println!(
+                        "  • This request should be deleted after use (no automatic expiration)"
+                    );
+                    println!();
+                }
+
+                // Save QR as image if --qr-image is set
+                if let Some(image_path) = qr_image {
+                    use image::Luma;
+
+                    let image = code.render::<Luma<u8>>().build();
+                    image.save(&image_path).with_context(|| {
+                        format!("Failed to save QR code image to {}", image_path.display())
+                    })?;
+
+                    println!("✓ QR code image saved: {}", image_path.display());
+                    println!();
+                }
+            }
+
             println!("Next steps:");
+            if qr_requested {
+                println!("  Option 1 (QR Code):");
+                println!("    1. On authorized device, scan the QR code above");
+                println!("    2. Approve the device-add request");
+                println!();
+                println!("  Option 2 (File Transfer):");
+            }
             println!(
-                "  1. Transfer {} to an authorized device for identity {}",
+                "    1. Transfer {} to an authorized device for identity {}",
                 request_file.display(),
                 target_did
             );
-            println!("  2. On authorized device, run:");
-            println!("     icnctl device approve {}", request_file.display());
+            println!("    2. On authorized device, run:");
+            println!("       icnctl device approve {}", request_file.display());
             println!();
             println!("⚠️  IMPORTANT:");
             println!("  • This device will be added to identity: {target_did}");

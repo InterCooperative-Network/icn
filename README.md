@@ -379,6 +379,40 @@ Generate shell completions for enhanced CLI experience:
 ./target/release/icnctl id import backup.age
 ```
 
+### Device Management
+
+Multi-device support allows you to use the same identity across multiple devices (phone, laptop, tablet).
+
+```bash
+# List all devices for this identity
+./target/release/icnctl device list
+
+# Create device-add request for a new device
+# This creates a request file that must be approved by an existing device
+./target/release/icnctl device add "My Phone"
+
+# Create device-add request with QR code (for easy mobile pairing)
+./target/release/icnctl device add "My Phone" --qr
+
+# Create device-add request with QR code saved as PNG image
+./target/release/icnctl device add "My Phone" --qr-image device-qr.png
+
+# Approve a device-add request (run on authorized device)
+./target/release/icnctl device approve /path/to/device-add-request.json
+
+# Revoke a device
+./target/release/icnctl device revoke <device-id> --reason "Lost device"
+```
+
+**Device Pairing Workflow:**
+
+1. **New device**: Run `icnctl device add "Device Name" --qr` to generate a request
+2. **Authorized device**: Scan the QR code or transfer the JSON file
+3. **Authorized device**: Run `icnctl device approve <request-file>` to authorize
+4. **New device**: Import the approved credentials to complete pairing
+
+> ⚠️ **Security Note**: QR codes contain only public keys - no secrets are exposed. However, ensure unauthorized parties cannot scan the code, as it would allow them to impersonate the device request.
+
 ### Trust Management
 
 ```bash
