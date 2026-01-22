@@ -573,15 +573,11 @@ impl TpmBackend {
         Ok(bundle)
     }
 
-    /// Seal key material to TPM
-    ///
-    /// For Phase 1, we implement a simplified sealing without PCR binding.
-    /// PCR binding will be added in a future phase.
     /// Seal key material to TPM using TPM2_Create
     ///
     /// This creates a sealed object under the primary key that contains
-    /// the sensitive key material. The sealed object can only be unsealed
-    /// when PCR values match (if platform binding is enabled).
+    /// the sensitive key material. In the current implementation, no PCR policy
+    /// is attached - PCR binding is planned for a future phase.
     fn seal_key(&mut self, key_bytes: &[u8]) -> Result<(Vec<u8>, Vec<u8>)> {
         info!("Sealing key to TPM with real TPM2_Create");
 
@@ -671,15 +667,12 @@ impl TpmBackend {
         Ok(blob)
     }
 
-    /// Unseal key material from TPM
-    ///
-    /// For Phase 1, we implement a simplified unsealing without PCR verification.
-    /// PCR verification will be added in a future phase.
     /// Unseal key material from TPM using TPM2_Load and TPM2_Unseal
     ///
     /// This loads the sealed object into the TPM and unseals it to recover
-    /// the original key material. If PCR binding was used during sealing,
-    /// unsealing will fail if PCR values have changed.
+    /// the original key material. Currently, no PCR policy is attached to sealed
+    /// objects, so unsealing does not enforce PCR values. PCR binding and
+    /// enforcement are planned for a future phase.
     fn unseal_key_from_blob(&mut self, blob: &SealedKeyBlob) -> Result<Zeroizing<[u8; 32]>> {
         info!("Unsealing key from TPM with real TPM2_Unseal");
 
@@ -716,10 +709,18 @@ impl TpmBackend {
             .execute_with_nullauth_session(|ctx| ctx.load(primary_handle, tpm_private, tpm_public))
             .map_err(|e| TpmError::TpmUnseal(format!("TPM2_Load failed: {e}")))?;
 
+        // Convert to ObjectHandle for unseal and later flushing
+        let loaded_object_handle: tss_esapi::handles::ObjectHandle = loaded_key.into();
+
         // Unseal the data
         let unsealed_data = context
-            .execute_with_nullauth_session(|ctx| ctx.unseal(loaded_key.into()))
+            .execute_with_nullauth_session(|ctx| ctx.unseal(loaded_object_handle))
             .map_err(|e| TpmError::TpmUnseal(format!("TPM2_Unseal failed: {e}")))?;
+
+        // Flush the loaded key handle to prevent TPM resource exhaustion
+        context
+            .flush_context(loaded_object_handle)
+            .map_err(|e| TpmError::TpmUnseal(format!("Failed to flush key handle: {e}")))?;
 
         // Convert to fixed-size array (SensitiveData implements Deref<Target=Vec<u8>>)
         let unsealed_bytes: &[u8] = &unsealed_data;
@@ -841,7 +842,16 @@ impl KeyStoreBackend for TpmBackend {
 
 impl Drop for TpmBackend {
     fn drop(&mut self) {
+        // Lock the backend to zeroize key material
         self.lock();
+
+        // Flush the primary key handle to prevent TPM resource exhaustion
+        if let (Some(ctx), Some(handle)) = (&mut self.tpm_context, self.primary_key_handle) {
+            if let Err(e) = ctx.flush_context(handle.into()) {
+                // Log but don't panic on cleanup errors
+                debug!("Failed to flush TPM primary key handle on drop: {e}");
+            }
+        }
     }
 }
 
