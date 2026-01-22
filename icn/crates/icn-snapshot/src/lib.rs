@@ -5,6 +5,7 @@
 //! This crate provides:
 //! - Local state serialization for daemon restarts
 //! - Distributed snapshot protocol (Chandy-Lamport) for network-wide consistency
+//! - Hardware key support (HSM/TPM) with public-only serialization
 //!
 //! ## Local Snapshot Usage
 //!
@@ -15,6 +16,7 @@
 //! let mut snapshot = StateSnapshot::new();
 //! snapshot.gossip_state = Some(gossip_actor.export_state());
 //! snapshot.network_state = Some(network_actor.export_state());
+//! snapshot.identity_state = Some(identity_bundle.export_state());
 //! save_snapshot(&snapshot, "/path/to/data")?;
 //!
 //! // On startup
@@ -25,7 +27,68 @@
 //!     if let Some(network_state) = snapshot.network_state {
 //!         network_actor.restore_state(network_state)?;
 //!     }
+//!     if let Some(identity_state) = snapshot.identity_state {
+//!         // Software keys can be restored automatically
+//!         // Hardware keys require backend reconnection
+//!         identity_bundle.restore_state(identity_state)?;
+//!     }
 //! }
+//! ```
+//!
+//! ## Hardware Key Support
+//!
+//! Hardware-backed keys (HSM/TPM) cannot serialize private key material.
+//! The snapshot system handles this by:
+//!
+//! 1. **Software keys**: Serialize complete key material (secret + public)
+//! 2. **Hardware keys**: Serialize only public key + backend metadata
+//! 3. **Restore**: Software keys work automatically; hardware keys require backend
+//!
+//! ### Software Key Example
+//!
+//! ```rust,ignore
+//! use icn_identity::IdentityBundle;
+//! use icn_snapshot::DidKeySnapshot;
+//!
+//! // Generate software key
+//! let bundle = IdentityBundle::generate()?;
+//! let did_key = bundle.did_key();
+//!
+//! // Snapshot includes secret material
+//! let snapshot = DidKeySnapshot::from_did_key(did_key);
+//! assert!(!snapshot.is_hardware_backed());
+//!
+//! // Restore works automatically
+//! let restored = snapshot.try_into_did_key()?;
+//! ```
+//!
+//! ### Hardware Key Example
+//!
+//! ```rust,ignore
+//! use icn_identity::{DidKey, DidSigner};
+//! use icn_snapshot::DidKeySnapshot;
+//!
+//! // Hardware key (from HSM/TPM)
+//! let hardware_key = DidKey::from_hardware(
+//!     verifying_key,
+//!     "pkcs11".to_string(),
+//!     "slot=0,label=mykey".to_string(),
+//! );
+//!
+//! // Snapshot contains only public key + metadata
+//! let snapshot = DidKeySnapshot::from_did_key(&hardware_key);
+//! assert!(snapshot.is_hardware_backed());
+//! assert_eq!(snapshot.backend_type(), Some("pkcs11"));
+//!
+//! // Restore requires backend reconnection
+//! // (try_into_did_key() will fail with instructions)
+//! let restored = snapshot.restore_hardware_key()?;
+//!
+//! // Must provide DidSigner backend for signing operations
+//! let bundle = IdentityBundle::from_did_key_with_signer(
+//!     restored,
+//!     Some(Arc::new(hardware_signer)),
+//! )?;
 //! ```
 //!
 //! ## Distributed Snapshot Usage
@@ -37,6 +100,14 @@
 //! let (snapshot_id, init_msg) = coordinator.initiate_snapshot(participants).await?;
 //! // Broadcast init_msg via gossip
 //! ```
+//!
+//! ## Security Considerations
+//!
+//! - **Software keys**: Secret material is stored in snapshot. Encrypt at rest!
+//! - **Hardware keys**: Only public key stored. Private key never leaves HSM/TPM.
+//! - **Snapshots contain sensitive data**: Use appropriate file permissions.
+//! - **Checksums verified**: Load operation validates SHA256 checksums.
+//!
 
 pub mod coordinator;
 pub mod protocol;
@@ -71,6 +142,10 @@ pub struct StateSnapshot {
 
     /// Network actor state
     pub network_state: Option<NetworkState>,
+
+    /// Identity state (optional for backward compatibility)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub identity_state: Option<IdentityState>,
 }
 
 impl StateSnapshot {
@@ -81,6 +156,7 @@ impl StateSnapshot {
             created_at: icn_time::current_timestamp_secs(),
             gossip_state: None,
             network_state: None,
+            identity_state: None,
         }
     }
 }
@@ -158,6 +234,215 @@ pub struct NetworkState {
     /// Note: These may be stale after restart, but can help with reconnection
     #[serde(default)]
     pub peer_addresses: HashMap<String, String>,
+}
+
+/// Identity state for persistence
+///
+/// Contains the serializable representation of identity keys and TLS certificates.
+/// Hardware keys only store public information; private keys remain in HSM/TPM.
+///
+/// # Security Notes
+///
+/// - **Software keys**: All secret material is serialized. Snapshots must be encrypted at rest!
+/// - **Hardware keys**: Only public keys and metadata stored. Secrets never leave hardware.
+/// - **File permissions**: Snapshot files should be readable only by the daemon user.
+///
+/// # Hardware Key Behavior
+///
+/// When `did_key.is_hardware_backed()` is true:
+/// - `tls_key_der` will be `None` (TLS uses separate certificate)
+/// - `x25519_secret` may be `None` (encryption may delegate to hardware)
+/// - Restore requires reconnection to HSM/TPM backend
+///
+/// # Example: Software Key
+///
+/// ```rust,ignore
+/// let state = IdentityState {
+///     did: bundle.did().to_string(),
+///     did_key: DidKeySnapshot::from_did_key(bundle.did_key()),
+///     tls_cert: bundle.tls_cert().to_vec(),
+///     tls_key_der: Some(bundle.tls_key_der().to_vec()),  // Present for software
+///     tls_binding_sig: bundle.tls_binding_sig().to_vec(),
+///     created_at: bundle.created_at(),
+///     x25519_secret: Some(bundle.x25519_secret().to_vec()),  // Present for software
+///     x25519_public: *bundle.x25519_public(),
+///     // PQ fields...
+/// };
+/// ```
+///
+/// # Example: Hardware Key
+///
+/// ```rust,ignore
+/// let state = IdentityState {
+///     did: bundle.did().to_string(),
+///     did_key: DidKeySnapshot::from_did_key(bundle.did_key()),  // Public only
+///     tls_cert: bundle.tls_cert().to_vec(),
+///     tls_key_der: None,  // Hardware key - no TLS secret
+///     tls_binding_sig: bundle.tls_binding_sig().to_vec(),
+///     created_at: bundle.created_at(),
+///     x25519_secret: None,  // Hardware key - encryption in hardware
+///     x25519_public: *bundle.x25519_public(),
+///     // PQ fields...
+/// };
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IdentityState {
+    /// DID (decentralized identifier)
+    pub did: String,
+
+    /// DID signing key (software or hardware)
+    pub did_key: DidKeySnapshot,
+
+    /// Self-signed TLS certificate (DER format)
+    pub tls_cert: Vec<u8>,
+
+    /// TLS private key (PKCS8 DER format)
+    /// Only for software keys; hardware keys use HSM/TPM
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tls_key_der: Option<Vec<u8>>,
+
+    /// Binding signature proving DID ownership of TLS cert
+    pub tls_binding_sig: Vec<u8>,
+
+    /// Timestamp when binding was created (Unix epoch seconds)
+    pub created_at: u64,
+
+    /// X25519 secret key for encryption (32 bytes)
+    /// Only for software keys; hardware keys may delegate encryption
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub x25519_secret: Option<Vec<u8>>,
+
+    /// X25519 public key for encryption (32 bytes)
+    pub x25519_public: [u8; 32],
+
+    /// ML-KEM secret key for hybrid encryption (optional, post-quantum)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kem_pq_secret: Option<Vec<u8>>,
+
+    /// ML-KEM public key for hybrid encryption (optional, post-quantum)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kem_pq_public: Option<Vec<u8>>,
+
+    /// ML-DSA secret key for hybrid signing (optional, post-quantum)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pq_signing_secret: Option<Vec<u8>>,
+
+    /// ML-DSA public key for hybrid signing (optional, post-quantum)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pq_signing_public: Option<Vec<u8>>,
+}
+
+/// Serializable representation of DidKey
+///
+/// This is separate from the runtime DidKey to enable safe serialization.
+/// Hardware keys serialize only public information; private keys remain in hardware.
+///
+/// # Variants
+///
+/// - **Software**: Contains full key material (secret + public). Can be restored automatically.
+/// - **Hardware**: Contains only public key + metadata. Requires backend reconnection on restore.
+///
+/// # Usage
+///
+/// ## Capturing State
+///
+/// ```rust,ignore
+/// use icn_snapshot::DidKeySnapshot;
+///
+/// // From runtime DidKey
+/// let snapshot = DidKeySnapshot::from_did_key(&bundle.did_key());
+///
+/// // Check type
+/// if snapshot.is_hardware_backed() {
+///     println!("Hardware key: {}", snapshot.backend_type().unwrap());
+/// }
+///
+/// // Serialize to JSON
+/// let json = serde_json::to_string(&snapshot)?;
+/// ```
+///
+/// ## Restoring State
+///
+/// ### Software Keys (Automatic)
+///
+/// ```rust,ignore
+/// // Load from snapshot
+/// let snapshot: DidKeySnapshot = serde_json::from_str(&json)?;
+///
+/// // Restore (works for software keys)
+/// let did_key = snapshot.try_into_did_key()?;
+/// ```
+///
+/// ### Hardware Keys (Requires Backend)
+///
+/// ```rust,ignore
+/// // Load from snapshot
+/// let snapshot: DidKeySnapshot = serde_json::from_str(&json)?;
+///
+/// // Attempt automatic restore fails with instructions
+/// match snapshot.clone().try_into_did_key() {
+///     Err(e) => {
+///         // Error message explains hardware key requires backend
+///         println!("Expected: {}", e);
+///     }
+///     _ => unreachable!(),
+/// }
+///
+/// // Correct approach: restore hardware key
+/// let did_key = snapshot.restore_hardware_key()?;
+///
+/// // Provide signer backend for operations
+/// let signer = Arc::new(hardware_backend);
+/// let bundle = IdentityBundle::from_did_key_with_signer(did_key, Some(signer))?;
+/// ```
+///
+/// # Security
+///
+/// - Software keys: Secret material in snapshot. **Encrypt at rest!**
+/// - Hardware keys: Only public key stored. Secrets never leave hardware boundary.
+///
+/// # JSON Format
+///
+/// Software key:
+/// ```json
+/// {
+///   "type": "software",
+///   "secret_bytes": [1, 2, 3, ...],
+///   "public_bytes": [4, 5, 6, ...]
+/// }
+/// ```
+///
+/// Hardware key:
+/// ```json
+/// {
+///   "type": "hardware",
+///   "public_bytes": [4, 5, 6, ...],
+///   "backend_type": "pkcs11",
+///   "hardware_id": "slot=0,label=mykey"
+/// }
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "lowercase")]
+pub enum DidKeySnapshot {
+    /// Software key with private key material
+    Software {
+        /// Ed25519 secret key bytes (32 bytes)
+        secret_bytes: Vec<u8>,
+        /// Ed25519 public key bytes (32 bytes)
+        public_bytes: Vec<u8>,
+    },
+    /// Hardware-backed key (HSM/TPM)
+    ///
+    /// Private key never exists in application memory.
+    /// On restore, must reconnect to hardware backend.
+    Hardware {
+        /// Ed25519 public key bytes (32 bytes)
+        public_bytes: Vec<u8>,
+        /// Backend type identifier (e.g., "pkcs11", "tpm")
+        backend_type: String,
+        /// Hardware-specific identifier (slot/handle/etc)
+        hardware_id: String,
+    },
 }
 
 /// Save state snapshot to disk with SHA256 checksum
@@ -467,6 +752,152 @@ fn snapshot_path(data_dir: impl AsRef<Path>) -> PathBuf {
 /// Get the checksum file path
 fn checksum_path(data_dir: impl AsRef<Path>) -> PathBuf {
     data_dir.as_ref().join(CHECKSUM_FILENAME)
+}
+
+// ===== DidKeySnapshot Conversions =====
+
+impl DidKeySnapshot {
+    /// Convert from a runtime DidKey reference
+    ///
+    /// For software keys, captures the secret material.
+    /// For hardware keys, captures only public key and backend metadata.
+    pub fn from_did_key(did_key: &icn_identity::DidKey) -> Self {
+        use icn_identity::DidKey;
+
+        match did_key {
+            DidKey::Software {
+                secret_bytes,
+                verifying_key,
+                ..
+            } => Self::Software {
+                secret_bytes: secret_bytes.to_vec(),
+                public_bytes: verifying_key.to_bytes().to_vec(),
+            },
+            DidKey::Hardware {
+                verifying_key,
+                backend_type,
+                hardware_id,
+                ..
+            } => Self::Hardware {
+                public_bytes: verifying_key.to_bytes().to_vec(),
+                backend_type: backend_type.clone(),
+                hardware_id: hardware_id.clone(),
+            },
+        }
+    }
+
+    /// Try to reconstruct a runtime DidKey from this snapshot
+    ///
+    /// For software keys, this succeeds and returns a fully functional key.
+    /// For hardware keys, this returns an error - hardware keys require
+    /// external backend reconnection via `restore_hardware_key()`.
+    pub fn try_into_did_key(self) -> Result<icn_identity::DidKey> {
+        use icn_identity::DidKey;
+
+        match self {
+            Self::Software {
+                secret_bytes,
+                public_bytes,
+            } => {
+                if secret_bytes.len() != 32 {
+                    anyhow::bail!(
+                        "Invalid secret key length: expected 32, got {}",
+                        secret_bytes.len()
+                    );
+                }
+                if public_bytes.len() != 32 {
+                    anyhow::bail!(
+                        "Invalid public key length: expected 32, got {}",
+                        public_bytes.len()
+                    );
+                }
+
+                let mut secret_array = [0u8; 32];
+                let mut public_array = [0u8; 32];
+                secret_array.copy_from_slice(&secret_bytes);
+                public_array.copy_from_slice(&public_bytes);
+
+                DidKey::from_software_bytes(secret_array, public_array)
+                    .context("Failed to create DidKey from software bytes")
+            }
+            Self::Hardware {
+                backend_type,
+                hardware_id,
+                ..
+            } => {
+                anyhow::bail!(
+                    "Cannot restore hardware key automatically. Hardware key requires \
+                     backend reconnection. Backend type: {}, Hardware ID: {}. \
+                     Use restore_hardware_key() with an appropriate hardware backend.",
+                    backend_type,
+                    hardware_id
+                )
+            }
+        }
+    }
+
+    /// Restore a hardware key by reconnecting to the backend
+    ///
+    /// This method reconstructs a `DidKey::Hardware` from the snapshot metadata
+    /// stored in this value (including `backend_type`, `hardware_id`, and
+    /// `public_bytes`). The caller must ensure that an appropriate hardware
+    /// backend is available that can access the underlying key.
+    ///
+    /// # Returns
+    /// A `DidKey::Hardware` that delegates signing to the hardware backend.
+    ///
+    /// # Errors
+    /// Returns an error if this snapshot represents a software key.
+    pub fn restore_hardware_key(self) -> Result<icn_identity::DidKey> {
+        use ed25519_dalek::VerifyingKey;
+        use icn_identity::DidKey;
+
+        match self {
+            Self::Hardware {
+                public_bytes,
+                backend_type,
+                hardware_id,
+            } => {
+                if public_bytes.len() != 32 {
+                    anyhow::bail!(
+                        "Invalid public key length: expected 32, got {}",
+                        public_bytes.len()
+                    );
+                }
+
+                let mut public_array = [0u8; 32];
+                public_array.copy_from_slice(&public_bytes);
+
+                let verifying_key = VerifyingKey::from_bytes(&public_array)
+                    .context("Failed to deserialize Ed25519 public key")?;
+
+                Ok(DidKey::from_hardware(
+                    verifying_key,
+                    backend_type,
+                    hardware_id,
+                ))
+            }
+            Self::Software { .. } => {
+                anyhow::bail!(
+                    "Cannot restore software key as hardware key. \
+                     Use try_into_did_key() for software keys."
+                )
+            }
+        }
+    }
+
+    /// Check if this is a hardware key snapshot
+    pub fn is_hardware_backed(&self) -> bool {
+        matches!(self, Self::Hardware { .. })
+    }
+
+    /// Get the backend type if this is a hardware key
+    pub fn backend_type(&self) -> Option<&str> {
+        match self {
+            Self::Hardware { backend_type, .. } => Some(backend_type),
+            Self::Software { .. } => None,
+        }
+    }
 }
 
 // Re-export coordinator and protocol types
@@ -938,6 +1369,7 @@ mod tests {
                 created_at,
                 gossip_state: if has_gossip { Some(gossip_state) } else { None },
                 network_state: if has_network { Some(network_state) } else { None },
+                identity_state: None,
             }
         }
     }
@@ -1206,5 +1638,272 @@ mod tests {
         // Should deserialize without panic
         let deserialized: StateSnapshot = serde_json::from_slice(&json).unwrap();
         assert!(deserialized.gossip_state.is_some());
+    }
+
+    // ===== DidKeySnapshot Tests =====
+
+    #[test]
+    fn test_did_key_snapshot_software_roundtrip() {
+        use icn_identity::IdentityBundle;
+
+        // Create a software key
+        let bundle = IdentityBundle::generate().unwrap();
+        let did_key = bundle.did_key();
+
+        // Convert to snapshot
+        let snapshot = DidKeySnapshot::from_did_key(did_key);
+
+        // Verify it's software
+        assert!(!snapshot.is_hardware_backed());
+        assert_eq!(snapshot.backend_type(), None);
+
+        // Restore from snapshot
+        let restored = snapshot.try_into_did_key().unwrap();
+
+        // Verify DIDs match
+        assert_eq!(did_key.did(), restored.did());
+        assert_eq!(
+            did_key.verifying_key().to_bytes(),
+            restored.verifying_key().to_bytes()
+        );
+    }
+
+    #[test]
+    fn test_did_key_snapshot_hardware_serialization() {
+        use ed25519_dalek::VerifyingKey;
+        use icn_identity::DidKey;
+
+        // Create a hardware key
+        let public_bytes = [42u8; 32];
+        let verifying_key = VerifyingKey::from_bytes(&public_bytes).unwrap();
+        let hardware_key = DidKey::from_hardware(
+            verifying_key,
+            "pkcs11".to_string(),
+            "slot=0,label=test".to_string(),
+        );
+
+        // Convert to snapshot
+        let snapshot = DidKeySnapshot::from_did_key(&hardware_key);
+
+        // Verify it's hardware
+        assert!(snapshot.is_hardware_backed());
+        assert_eq!(snapshot.backend_type(), Some("pkcs11"));
+
+        // Verify serialization doesn't include secret material
+        let json = serde_json::to_string(&snapshot).unwrap();
+        assert!(json.contains("\"type\":\"hardware\""));
+        assert!(json.contains("\"backend_type\":\"pkcs11\""));
+        assert!(json.contains("\"hardware_id\":\"slot=0,label=test\""));
+        // Should NOT contain any "secret" field
+        assert!(!json.contains("secret"));
+    }
+
+    #[test]
+    fn test_did_key_snapshot_hardware_restore_requires_backend() {
+        use ed25519_dalek::VerifyingKey;
+        use icn_identity::DidKey;
+
+        // Create a hardware key
+        let public_bytes = [42u8; 32];
+        let verifying_key = VerifyingKey::from_bytes(&public_bytes).unwrap();
+        let hardware_key =
+            DidKey::from_hardware(verifying_key, "pkcs11".to_string(), "slot=0".to_string());
+
+        // Convert to snapshot
+        let snapshot = DidKeySnapshot::from_did_key(&hardware_key);
+
+        // Try to restore without backend - should fail
+        let result = snapshot.clone().try_into_did_key();
+        assert!(
+            result.is_err(),
+            "Hardware key restore without backend should fail"
+        );
+        if let Err(err) = result {
+            let err_msg = err.to_string();
+            assert!(
+                err_msg.contains("hardware key"),
+                "Error should mention hardware key"
+            );
+            assert!(
+                err_msg.contains("backend reconnection"),
+                "Error should mention backend reconnection"
+            );
+            assert!(
+                err_msg.contains("pkcs11"),
+                "Error should mention backend type"
+            );
+        }
+
+        // Restore with hardware key method
+        let restored = snapshot.restore_hardware_key().unwrap();
+        assert!(restored.is_hardware_backed());
+        assert_eq!(restored.did(), hardware_key.did());
+    }
+
+    #[test]
+    fn test_did_key_snapshot_software_contains_secret() {
+        use icn_identity::IdentityBundle;
+
+        // Create a software key
+        let bundle = IdentityBundle::generate().unwrap();
+        let did_key = bundle.did_key();
+
+        // Convert to snapshot
+        let snapshot = DidKeySnapshot::from_did_key(did_key);
+
+        // Verify serialization includes secret material for software keys
+        let json = serde_json::to_string(&snapshot).unwrap();
+        assert!(json.contains("\"type\":\"software\""));
+        assert!(json.contains("\"secret_bytes\""));
+        assert!(json.contains("\"public_bytes\""));
+    }
+
+    #[test]
+    fn test_did_key_snapshot_invalid_key_lengths() {
+        // Test software key with invalid secret length
+        let snapshot = DidKeySnapshot::Software {
+            secret_bytes: vec![0u8; 16], // Wrong length
+            public_bytes: vec![0u8; 32],
+        };
+        assert!(snapshot.try_into_did_key().is_err());
+
+        // Test software key with invalid public length
+        let snapshot = DidKeySnapshot::Software {
+            secret_bytes: vec![0u8; 32],
+            public_bytes: vec![0u8; 16], // Wrong length
+        };
+        assert!(snapshot.try_into_did_key().is_err());
+
+        // Test hardware key with invalid public length
+        let snapshot = DidKeySnapshot::Hardware {
+            public_bytes: vec![0u8; 16], // Wrong length
+            backend_type: "pkcs11".to_string(),
+            hardware_id: "slot=0".to_string(),
+        };
+        assert!(snapshot.restore_hardware_key().is_err());
+    }
+
+    #[test]
+    fn test_did_key_snapshot_software_as_hardware_fails() {
+        use icn_identity::IdentityBundle;
+
+        let bundle = IdentityBundle::generate().unwrap();
+        let did_key = bundle.did_key();
+        let snapshot = DidKeySnapshot::from_did_key(did_key);
+
+        // Try to restore software key as hardware - should fail
+        let result = snapshot.restore_hardware_key();
+        assert!(
+            result.is_err(),
+            "Software key cannot be restored as hardware"
+        );
+        if let Err(err) = result {
+            let err_msg = err.to_string();
+            assert!(
+                err_msg.contains("software key"),
+                "Error should mention software key"
+            );
+            assert!(
+                err_msg.contains("try_into_did_key"),
+                "Error should suggest correct method"
+            );
+        }
+    }
+
+    #[test]
+    fn test_identity_state_serialization() {
+        let identity_state = IdentityState {
+            did: "did:icn:test123".to_string(),
+            did_key: DidKeySnapshot::Software {
+                secret_bytes: vec![1u8; 32],
+                public_bytes: vec![2u8; 32],
+            },
+            tls_cert: vec![3u8; 100],
+            tls_key_der: Some(vec![4u8; 100]),
+            tls_binding_sig: vec![5u8; 64],
+            created_at: 1234567890,
+            x25519_secret: Some(vec![6u8; 32]),
+            x25519_public: [7u8; 32],
+            kem_pq_secret: None,
+            kem_pq_public: None,
+            pq_signing_secret: None,
+            pq_signing_public: None,
+        };
+
+        // Serialize
+        let json = serde_json::to_string(&identity_state).unwrap();
+
+        // Deserialize
+        let restored: IdentityState = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.did, "did:icn:test123");
+        assert_eq!(restored.created_at, 1234567890);
+    }
+
+    #[test]
+    fn test_state_snapshot_with_identity_state() {
+        let temp = std::env::temp_dir().join("icn-snapshot-identity-test");
+        std::fs::create_dir_all(&temp).unwrap();
+
+        let mut snapshot = StateSnapshot::new();
+        snapshot.identity_state = Some(IdentityState {
+            did: "did:icn:test".to_string(),
+            did_key: DidKeySnapshot::Hardware {
+                public_bytes: vec![42u8; 32],
+                backend_type: "tpm".to_string(),
+                hardware_id: "pcr=0,1,2,3".to_string(),
+            },
+            tls_cert: vec![1u8; 100],
+            tls_key_der: None, // Hardware key - no TLS private key
+            tls_binding_sig: vec![2u8; 64],
+            created_at: 1234567890,
+            x25519_secret: None, // Hardware key - no encryption secret
+            x25519_public: [3u8; 32],
+            kem_pq_secret: None,
+            kem_pq_public: None,
+            pq_signing_secret: None,
+            pq_signing_public: None,
+        });
+
+        // Save
+        save_snapshot(&snapshot, &temp).unwrap();
+
+        // Load
+        let loaded = load_snapshot(&temp).unwrap().unwrap();
+        assert!(loaded.identity_state.is_some());
+
+        let identity = loaded.identity_state.unwrap();
+        assert_eq!(identity.did, "did:icn:test");
+        assert!(identity.did_key.is_hardware_backed());
+        assert_eq!(identity.did_key.backend_type(), Some("tpm"));
+        assert!(identity.tls_key_der.is_none()); // Hardware key has no TLS private key
+        assert!(identity.x25519_secret.is_none()); // Hardware key has no encryption secret
+
+        // Cleanup
+        std::fs::remove_dir_all(&temp).unwrap();
+    }
+
+    #[test]
+    fn test_state_snapshot_backward_compatible() {
+        // Old snapshot without identity_state should still load
+        let temp = std::env::temp_dir().join("icn-snapshot-backward-compat");
+        std::fs::create_dir_all(&temp).unwrap();
+
+        let mut snapshot = StateSnapshot::new();
+        snapshot.gossip_state = Some(GossipState {
+            vector_clock: HashMap::new(),
+            subscriptions: HashMap::new(),
+            topics: HashMap::new(),
+        });
+
+        // Save
+        save_snapshot(&snapshot, &temp).unwrap();
+
+        // Load
+        let loaded = load_snapshot(&temp).unwrap().unwrap();
+        assert!(loaded.identity_state.is_none());
+        assert!(loaded.gossip_state.is_some());
+
+        // Cleanup
+        std::fs::remove_dir_all(&temp).unwrap();
     }
 }
