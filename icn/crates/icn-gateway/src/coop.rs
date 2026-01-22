@@ -11,6 +11,7 @@ use std::sync::{Arc, RwLock};
 
 use icn_identity::Did;
 use serde::{Deserialize, Serialize};
+use tracing::warn;
 
 use crate::error::{GatewayError, Result};
 
@@ -378,6 +379,11 @@ impl CoopManager {
     /// Persists to CoopActor first (if connected), then updates local cache.
     /// If actor write succeeds but cache update fails, the cache entry is
     /// invalidated to force a reload from the actor on next access.
+    ///
+    /// Note: The `timestamp` parameter is used for the local cache entry. The actor
+    /// generates its own timestamp (`Utc::now()`) for the persisted record. This is
+    /// acceptable since the actor is the source of truth and cache entries are
+    /// invalidated/reloaded as needed.
     pub async fn add_member_atomic(
         &self,
         coop_id: &CoopId,
@@ -407,8 +413,16 @@ impl CoopManager {
 
         // If actor succeeded but cache failed, invalidate cache to force reload
         if actor_persisted && cache_result.is_err() {
-            if let Ok(mut coops) = self.coops.write() {
-                coops.remove(coop_id);
+            match self.coops.write() {
+                Ok(mut coops) => {
+                    coops.remove(coop_id);
+                }
+                Err(_) => {
+                    warn!(
+                        coop_id = %coop_id,
+                        "Failed to invalidate cache after actor write succeeded but cache update failed"
+                    );
+                }
             }
         }
 
@@ -464,8 +478,16 @@ impl CoopManager {
 
         // If actor succeeded but cache failed, invalidate cache to force reload
         if actor_persisted && cache_result.is_err() {
-            if let Ok(mut coops) = self.coops.write() {
-                coops.remove(coop_id);
+            match self.coops.write() {
+                Ok(mut coops) => {
+                    coops.remove(coop_id);
+                }
+                Err(_) => {
+                    warn!(
+                        coop_id = %coop_id,
+                        "Failed to invalidate cache after actor write succeeded but cache update failed"
+                    );
+                }
             }
         }
 
@@ -521,8 +543,16 @@ impl CoopManager {
 
         // If actor succeeded but cache failed, invalidate cache to force reload
         if actor_persisted && cache_result.is_err() {
-            if let Ok(mut coops) = self.coops.write() {
-                coops.remove(coop_id);
+            match self.coops.write() {
+                Ok(mut coops) => {
+                    coops.remove(coop_id);
+                }
+                Err(_) => {
+                    warn!(
+                        coop_id = %coop_id,
+                        "Failed to invalidate cache after actor write succeeded but cache update failed"
+                    );
+                }
             }
         }
 
