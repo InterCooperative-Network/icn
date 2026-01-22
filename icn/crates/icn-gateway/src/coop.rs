@@ -373,8 +373,11 @@ impl CoopManager {
         Ok(coops.len())
     }
 
-    /// Atomically add a member to a cooperative
-    /// This prevents race conditions by holding the write lock during the entire operation
+    /// Add a member to a cooperative with persistence.
+    ///
+    /// Persists to CoopActor first (if connected), then updates local cache.
+    /// If actor write succeeds but cache update fails, the cache entry is
+    /// invalidated to force a reload from the actor on next access.
     pub async fn add_member_atomic(
         &self,
         coop_id: &CoopId,
@@ -382,16 +385,44 @@ impl CoopManager {
         role: MemberRole,
         timestamp: u64,
     ) -> Result<Coop> {
-        // If connected to daemon, persist via actor first
-        if let Some(ref handle) = self.coop_handle {
+        // If connected to daemon, persist via actor first (source of truth)
+        let actor_persisted = if let Some(ref handle) = self.coop_handle {
             let actor_role = convert_gateway_role_to_actor(&role);
             handle
                 .add_member(coop_id.clone(), did.clone(), actor_role)
                 .await
-                .map_err(|e| GatewayError::InternalError(format!("CoopActor error: {e}")))?;
+                .map_err(|e| {
+                    GatewayError::InternalError(format!(
+                        "Failed to add member {} to coop {}: {}",
+                        did, coop_id, e
+                    ))
+                })?;
+            true
+        } else {
+            false
+        };
+
+        // Update local cache (for fast reads and standalone mode)
+        let cache_result = self.update_cache_add_member(coop_id, did.clone(), role, timestamp);
+
+        // If actor succeeded but cache failed, invalidate cache to force reload
+        if actor_persisted && cache_result.is_err() {
+            if let Ok(mut coops) = self.coops.write() {
+                coops.remove(coop_id);
+            }
         }
 
-        // Also update local cache (for fast reads and standalone mode)
+        cache_result
+    }
+
+    /// Helper to update cache for add_member operation
+    fn update_cache_add_member(
+        &self,
+        coop_id: &CoopId,
+        did: Did,
+        role: MemberRole,
+        timestamp: u64,
+    ) -> Result<Coop> {
         let mut coops = self
             .coops
             .write()
@@ -399,24 +430,50 @@ impl CoopManager {
 
         let coop = coops
             .get_mut(coop_id)
-            .ok_or_else(|| GatewayError::NotFound("Coop not found".to_string()))?;
+            .ok_or_else(|| GatewayError::NotFound(format!("Coop {} not found", coop_id)))?;
 
         coop.add_member(did, role, timestamp)?;
 
         Ok(coop.clone())
     }
 
-    /// Atomically remove a member from a cooperative
+    /// Remove a member from a cooperative with persistence.
+    ///
+    /// Persists to CoopActor first (if connected), then updates local cache.
+    /// If actor write succeeds but cache update fails, the cache entry is
+    /// invalidated to force a reload from the actor on next access.
     pub async fn remove_member_atomic(&self, coop_id: &CoopId, did: &Did) -> Result<Coop> {
-        // If connected to daemon, persist via actor first
-        if let Some(ref handle) = self.coop_handle {
+        // If connected to daemon, persist via actor first (source of truth)
+        let actor_persisted = if let Some(ref handle) = self.coop_handle {
             handle
                 .remove_member(coop_id.clone(), did.clone())
                 .await
-                .map_err(|e| GatewayError::InternalError(format!("CoopActor error: {e}")))?;
+                .map_err(|e| {
+                    GatewayError::InternalError(format!(
+                        "Failed to remove member {} from coop {}: {}",
+                        did, coop_id, e
+                    ))
+                })?;
+            true
+        } else {
+            false
+        };
+
+        // Update local cache
+        let cache_result = self.update_cache_remove_member(coop_id, did);
+
+        // If actor succeeded but cache failed, invalidate cache to force reload
+        if actor_persisted && cache_result.is_err() {
+            if let Ok(mut coops) = self.coops.write() {
+                coops.remove(coop_id);
+            }
         }
 
-        // Also update local cache (for fast reads and standalone mode)
+        cache_result
+    }
+
+    /// Helper to update cache for remove_member operation
+    fn update_cache_remove_member(&self, coop_id: &CoopId, did: &Did) -> Result<Coop> {
         let mut coops = self
             .coops
             .write()
@@ -424,30 +481,61 @@ impl CoopManager {
 
         let coop = coops
             .get_mut(coop_id)
-            .ok_or_else(|| GatewayError::NotFound("Coop not found".to_string()))?;
+            .ok_or_else(|| GatewayError::NotFound(format!("Coop {} not found", coop_id)))?;
 
         coop.remove_member(did)?;
 
         Ok(coop.clone())
     }
 
-    /// Atomically update a member's role
+    /// Update a member's role with persistence.
+    ///
+    /// Persists to CoopActor first (if connected), then updates local cache.
+    /// If actor write succeeds but cache update fails, the cache entry is
+    /// invalidated to force a reload from the actor on next access.
     pub async fn update_role_atomic(
         &self,
         coop_id: &CoopId,
         did: &Did,
         new_role: MemberRole,
     ) -> Result<Coop> {
-        // If connected to daemon, persist via actor first
-        if let Some(ref handle) = self.coop_handle {
+        // If connected to daemon, persist via actor first (source of truth)
+        let actor_persisted = if let Some(ref handle) = self.coop_handle {
             let actor_role = convert_gateway_role_to_actor(&new_role);
             handle
                 .update_member_role(coop_id.clone(), did.clone(), actor_role)
                 .await
-                .map_err(|e| GatewayError::InternalError(format!("CoopActor error: {e}")))?;
+                .map_err(|e| {
+                    GatewayError::InternalError(format!(
+                        "Failed to update role for member {} in coop {}: {}",
+                        did, coop_id, e
+                    ))
+                })?;
+            true
+        } else {
+            false
+        };
+
+        // Update local cache
+        let cache_result = self.update_cache_update_role(coop_id, did, new_role);
+
+        // If actor succeeded but cache failed, invalidate cache to force reload
+        if actor_persisted && cache_result.is_err() {
+            if let Ok(mut coops) = self.coops.write() {
+                coops.remove(coop_id);
+            }
         }
 
-        // Also update local cache (for fast reads and standalone mode)
+        cache_result
+    }
+
+    /// Helper to update cache for update_role operation
+    fn update_cache_update_role(
+        &self,
+        coop_id: &CoopId,
+        did: &Did,
+        new_role: MemberRole,
+    ) -> Result<Coop> {
         let mut coops = self
             .coops
             .write()
@@ -455,7 +543,7 @@ impl CoopManager {
 
         let coop = coops
             .get_mut(coop_id)
-            .ok_or_else(|| GatewayError::NotFound("Coop not found".to_string()))?;
+            .ok_or_else(|| GatewayError::NotFound(format!("Coop {} not found", coop_id)))?;
 
         coop.update_role(did, new_role)?;
 
