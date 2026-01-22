@@ -193,7 +193,9 @@ pub async fn add_member(
 
     // Note: Member count limit is checked atomically inside add_member()
     // to prevent TOCTOU race condition
-    let coop = coop_mgr.add_member_atomic(&id, did.clone(), role.clone(), timestamp())?;
+    let coop = coop_mgr
+        .add_member_atomic(&id, did.clone(), role.clone(), timestamp())
+        .await?;
 
     // Track member addition
     gateway::members_added_inc();
@@ -232,7 +234,7 @@ pub async fn remove_member(
         .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
 
     // Use atomic operation to prevent race conditions
-    let coop = coop_mgr.remove_member_atomic(&coop_id, &did)?;
+    let coop = coop_mgr.remove_member_atomic(&coop_id, &did).await?;
 
     // Track member removal
     gateway::members_removed_inc();
@@ -273,7 +275,9 @@ pub async fn update_member_role(
     let new_role = parse_role(&req.role)?;
 
     // Use atomic operation to prevent race conditions
-    let coop = coop_mgr.update_role_atomic(&coop_id, &did, new_role.clone())?;
+    let coop = coop_mgr
+        .update_role_atomic(&coop_id, &did, new_role.clone())
+        .await?;
 
     // Broadcast role updated event
     let event = GatewayEvent::RoleUpdated {
