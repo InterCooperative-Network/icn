@@ -97,11 +97,9 @@ impl TpmBackend {
         );
 
         // Determine sealed blob path from key handle
-        let sealed_blob_path = PathBuf::from(format!(
-            "/tmp/icn-tpm-sealed-{:#x}.blob",
-            config.key_handle
-        ));
-        
+        let sealed_blob_path =
+            PathBuf::from(format!("/tmp/icn-tpm-sealed-{:#x}.blob", config.key_handle));
+
         let storage_id = PathBuf::from(format!("tpm://handle={:#x}", config.key_handle));
 
         Ok(Self {
@@ -138,7 +136,7 @@ impl TpmBackend {
 
         // Seal the private key to TPM
         let sealed_data = self.seal_key(&secret_bytes)?;
-        
+
         // Store sealed blob
         let blob = SealedKeyBlob {
             sealed_data,
@@ -151,9 +149,8 @@ impl TpmBackend {
             key_handle: None,
         };
 
-        let blob_json = serde_json::to_vec(&blob)
-            .context("Failed to serialize sealed key blob")?;
-        
+        let blob_json = serde_json::to_vec(&blob).context("Failed to serialize sealed key blob")?;
+
         fs::write(&self.sealed_blob_path, &blob_json)
             .context("Failed to write sealed key blob to disk")?;
 
@@ -193,7 +190,7 @@ impl TpmBackend {
         // For now, just encrypt the key with a simple wrapper
         // In a real implementation, this would use TPM_Create with unsealing policy
         // TODO: Implement actual TPM sealing with tss-esapi::Context::create
-        
+
         // Simplified approach: Store key encrypted (placeholder for actual TPM sealing)
         let sealed_data = key_bytes.to_vec();
 
@@ -211,18 +208,21 @@ impl TpmBackend {
         info!("Unsealing key from TPM (simplified - no PCR verification)");
 
         // Load sealed blob from disk
-        let blob_json = fs::read(&self.sealed_blob_path)
-            .context("Failed to read sealed key blob from disk")?;
-        
-        let blob: SealedKeyBlob = serde_json::from_slice(&blob_json)
-            .context("Failed to deserialize sealed key blob")?;
+        let blob_json =
+            fs::read(&self.sealed_blob_path).context("Failed to read sealed key blob from disk")?;
+
+        let blob: SealedKeyBlob =
+            serde_json::from_slice(&blob_json).context("Failed to deserialize sealed key blob")?;
 
         // For now, just decrypt the key from the simple wrapper
         // In a real implementation, this would use TPM_Unseal with policy session
         // TODO: Implement actual TPM unsealing with tss-esapi::Context::unseal
-        
+
         if blob.sealed_data.len() != 32 {
-            anyhow::bail!("Sealed key has wrong size: {} (expected 32)", blob.sealed_data.len());
+            anyhow::bail!(
+                "Sealed key has wrong size: {} (expected 32)",
+                blob.sealed_data.len()
+            );
         }
 
         let mut key_bytes = [0u8; 32];
@@ -262,11 +262,11 @@ impl KeyStoreBackend for TpmBackend {
         info!("Unlocking TPM backend by unsealing key");
 
         // Load sealed blob to get public key
-        let blob_json = fs::read(&self.sealed_blob_path)
-            .context("Failed to read sealed key blob from disk")?;
-        
-        let blob: SealedKeyBlob = serde_json::from_slice(&blob_json)
-            .context("Failed to deserialize sealed key blob")?;
+        let blob_json =
+            fs::read(&self.sealed_blob_path).context("Failed to read sealed key blob from disk")?;
+
+        let blob: SealedKeyBlob =
+            serde_json::from_slice(&blob_json).context("Failed to deserialize sealed key blob")?;
 
         // Unseal the private key
         let secret_bytes = self.unseal_key()?;
@@ -323,9 +323,11 @@ impl KeyStoreBackend for TpmBackend {
     }
 
     fn signing_backend(&self) -> Result<Box<dyn SigningBackend>> {
-        let signer = self.signer.as_ref()
+        let signer = self
+            .signer
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("TPM backend is locked"))?;
-        
+
         Ok(Box::new(TpmSigningBackend {
             signer: Arc::clone(signer),
         }))
@@ -402,8 +404,7 @@ mod tests {
 
     /// Helper to check if TPM device is available
     fn tpm_available() -> bool {
-        std::path::Path::new("/dev/tpmrm0").exists() || 
-        std::path::Path::new("/dev/tpm0").exists()
+        std::path::Path::new("/dev/tpmrm0").exists() || std::path::Path::new("/dev/tpm0").exists()
     }
 
     /// Get TPM device path
@@ -429,7 +430,7 @@ mod tests {
 
         let backend = TpmBackend::new(config);
         assert!(backend.is_ok());
-        
+
         let backend = backend.unwrap();
         assert!(backend.is_locked());
         assert!(backend.is_hardware_backed());
@@ -458,14 +459,18 @@ mod tests {
         assert!(!backend.is_locked());
 
         let did = bundle.did().clone();
-        
+
         // Test signing
         let message = b"test message for TPM signing";
         let signature = bundle.sign(message).expect("Failed to sign message");
-        
+
         // Verify signature
         use ed25519_dalek::Verifier;
-        assert!(bundle.did_key().verifying_key().verify(message, &signature).is_ok());
+        assert!(bundle
+            .did_key()
+            .verifying_key()
+            .verify(message, &signature)
+            .is_ok());
 
         // Lock and unlock
         backend.lock();
@@ -479,8 +484,14 @@ mod tests {
         assert_eq!(unlocked_bundle.did(), &did);
 
         // Test signing after unlock
-        let signature2 = unlocked_bundle.sign(message).expect("Failed to sign after unlock");
-        assert!(unlocked_bundle.did_key().verifying_key().verify(message, &signature2).is_ok());
+        let signature2 = unlocked_bundle
+            .sign(message)
+            .expect("Failed to sign after unlock");
+        assert!(unlocked_bundle
+            .did_key()
+            .verifying_key()
+            .verify(message, &signature2)
+            .is_ok());
 
         // Clean up
         let _ = fs::remove_file(&backend.sealed_blob_path);
@@ -505,17 +516,23 @@ mod tests {
 
         // Initialize with PCR binding
         let bundle = backend.init(&[]).expect("Failed to init with PCR binding");
-        
+
         // Test signing works
         let message = b"test with PCR binding";
         let signature = bundle.sign(message).expect("Failed to sign");
-        
+
         use ed25519_dalek::Verifier;
-        assert!(bundle.did_key().verifying_key().verify(message, &signature).is_ok());
+        assert!(bundle
+            .did_key()
+            .verifying_key()
+            .verify(message, &signature)
+            .is_ok());
 
         // Lock and unlock should succeed (PCRs haven't changed)
         backend.lock();
-        backend.unlock(&[]).expect("Failed to unlock with PCR binding");
+        backend
+            .unlock(&[])
+            .expect("Failed to unlock with PCR binding");
 
         // Clean up
         let _ = fs::remove_file(&backend.sealed_blob_path);
@@ -541,14 +558,16 @@ mod tests {
         let bundle1 = backend1.init(&[]).expect("Failed to init");
         let did1 = bundle1.did().clone();
         let public_key1 = bundle1.did_key().verifying_key().to_bytes();
-        
+
         let sealed_path = backend1.sealed_blob_path.clone();
         drop(backend1);
 
         // Second session: unlock existing
         let mut backend2 = TpmBackend::new(config).unwrap();
-        backend2.unlock(&[]).expect("Failed to unlock in second session");
-        
+        backend2
+            .unlock(&[])
+            .expect("Failed to unlock in second session");
+
         let bundle2 = backend2.get_identity_bundle().unwrap();
         let did2 = bundle2.did();
         let public_key2 = bundle2.did_key().verifying_key().to_bytes();

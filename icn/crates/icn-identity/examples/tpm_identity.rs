@@ -24,8 +24,8 @@
 
 #[cfg(feature = "tpm-experimental")]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    use icn_identity::{KeyStoreBackend, TpmBackend, TpmConfig};
     use ed25519_dalek::Verifier;
+    use icn_identity::{KeyStoreBackend, TpmBackend, TpmConfig};
 
     println!("=== ICN TPM Identity Example ===\n");
 
@@ -48,7 +48,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize new identity
     println!("2. Initializing new identity...");
     let bundle = backend.init(&[])?;
-    
+
     println!("   DID: {}", bundle.did());
     println!("   Hardware-backed: {}", backend.is_hardware_backed());
     println!("   Backend type: {}", backend.backend_type());
@@ -58,14 +58,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("3. Signing a message...");
     let message = b"Hello from ICN with TPM!";
     println!("   Message: {}", String::from_utf8_lossy(message));
-    
+
     let signature = bundle.sign(message)?;
     println!("   ✓ Message signed\n");
 
     // Verify signature
     println!("4. Verifying signature...");
     let verifying_key = bundle.did_key().verifying_key();
-    
+
     match verifying_key.verify(message, &signature) {
         Ok(_) => println!("   ✓ Signature verified successfully\n"),
         Err(e) => println!("   ✗ Signature verification failed: {}\n", e),
@@ -88,7 +88,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let unlocked_bundle = backend.get_identity_bundle()?;
     let message2 = b"Second message after unlock";
     let signature2 = unlocked_bundle.sign(message2)?;
-    
+
     let verifying_key2 = unlocked_bundle.did_key().verifying_key();
     match verifying_key2.verify(message2, &signature2) {
         Ok(_) => println!("   ✓ Second signature verified successfully\n"),
@@ -96,7 +96,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     println!("=== Example completed successfully ===\n");
-    
+
     println!("Note: This is a placeholder implementation.");
     println!("Real TPM sealing will be implemented in Phase 2.");
     println!("See docs/tpm-setup.md for more information.");
