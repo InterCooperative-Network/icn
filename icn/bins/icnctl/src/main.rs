@@ -24,6 +24,9 @@ use std::sync::Arc;
 use tar::{Archive, Builder};
 use zeroize::Zeroizing;
 
+/// Maximum QR code data size in bytes for reliable scanning
+const MAX_RELIABLE_QR_SIZE: usize = 2000;
+
 #[derive(Parser, Debug)]
 #[command(name = "icnctl")]
 #[command(about = "ICN control CLI", long_about = None)]
@@ -4720,7 +4723,7 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &Path) -> Result<()> {
                 
                 println!("QR code data size: {} bytes", qr_data_len);
                 
-                if qr_data_len > 2000 {
+                if qr_data_len > MAX_RELIABLE_QR_SIZE {
                     eprintln!("⚠️  Warning: QR code data is large ({} bytes). May not scan reliably.", qr_data_len);
                 }
                 
