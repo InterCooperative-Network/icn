@@ -12,15 +12,12 @@ use anyhow::{Context, Result};
 use std::path::Path;
 use tracing::info;
 
-#[cfg(feature = "hsm")]
+// Note: Hardware backends are scaffolding only. These imports are used by tests
+// and will be used when hardware backends are fully implemented.
+#[cfg(all(feature = "hsm", test))]
 use crate::keystore_backend::Pkcs11Config;
-#[cfg(feature = "hsm")]
-use crate::keystore_pkcs11::Pkcs11Backend;
-
-#[cfg(feature = "tpm-experimental")]
+#[cfg(all(feature = "tpm-experimental", test))]
 use crate::keystore_backend::TpmConfig;
-#[cfg(feature = "tpm-experimental")]
-use crate::keystore_tpm::TpmBackend;
 
 /// Open a keystore backend based on configuration
 ///
