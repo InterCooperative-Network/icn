@@ -441,8 +441,7 @@ mod tests {
         let hardware_key =
             DidKey::from_hardware(verifying_key, "pkcs11".to_string(), "slot=0".to_string());
 
-        let bundle =
-            IdentityBundle::from_did_key_with_signer(hardware_key, Some(signer)).unwrap();
+        let bundle = IdentityBundle::from_did_key_with_signer(hardware_key, Some(signer)).unwrap();
 
         // Create challenge
         let nonce = auth.create_challenge(bundle.did()).unwrap();
