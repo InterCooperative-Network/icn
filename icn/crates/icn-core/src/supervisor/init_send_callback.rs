@@ -173,7 +173,7 @@ fn create_send_callback(
                 // Unicast
                 if should_encrypt {
                     // Try to encrypt the message
-                    match super::try_encrypt_envelope(
+                    match super::bridge::try_encrypt_envelope(
                         &net_handle,
                         &from_did,
                         &target_did,
