@@ -3,9 +3,11 @@
 //! This module provides configuration types for all ICN subsystems,
 //! organized by domain into sub-modules.
 
+mod compute;
 mod cooperative;
 mod federation;
 mod gateway;
+mod gossip;
 mod identity;
 mod ledger;
 mod network;
@@ -13,14 +15,14 @@ mod observability;
 mod privacy;
 mod steward;
 mod supervisor;
-mod gossip;
-mod compute;
 mod trust;
 
 // Re-export all types for backwards compatibility
+pub use compute::*;
 pub use cooperative::*;
 pub use federation::*;
 pub use gateway::*;
+pub use gossip::*;
 pub use identity::*;
 pub use ledger::*;
 pub use network::*;
@@ -28,8 +30,6 @@ pub use observability::*;
 pub use privacy::*;
 pub use steward::*;
 pub use supervisor::*;
-pub use gossip::*;
-pub use compute::*;
 pub use trust::*;
 
 // Re-export topology types from icn-net to avoid circular dependencies
@@ -923,13 +923,9 @@ high_value_quorum = 5
 
         // Sybil resistance defaults
         assert!(config.sybil_resistance.enabled);
-        assert!(
-            (config.sybil_resistance.max_trust_concentration - 0.3).abs() < f64::EPSILON
-        );
+        assert!((config.sybil_resistance.max_trust_concentration - 0.3).abs() < f64::EPSILON);
         assert_eq!(config.sybil_resistance.sample_size, 100);
-        assert!(
-            (config.sybil_resistance.min_diversity_ratio - 0.2).abs() < f64::EPSILON
-        );
+        assert!((config.sybil_resistance.min_diversity_ratio - 0.2).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -971,33 +967,29 @@ enabled = false
 
         // Serialize to TOML
         let toml_str = toml::to_string_pretty(&config).unwrap();
-        
+
         // Note: Default values may not appear in serialized TOML due to #[serde(default)]
         // So we test deserialization to ensure defaults work correctly
         let deserialized: Config = toml::from_str(&toml_str).unwrap();
-        
+
         // Verify defaults are properly restored
-        assert_eq!(
-            deserialized.gossip.replication.target_replicas,
-            3
-        );
+        assert_eq!(deserialized.gossip.replication.target_replicas, 3);
         assert_eq!(deserialized.compute.max_concurrent_tasks, 10);
-        assert!(
-            (deserialized.trust.attestation.min_attester_trust - 0.3).abs()
-                < f64::EPSILON
-        );
-        
+        assert!((deserialized.trust.attestation.min_attester_trust - 0.3).abs() < f64::EPSILON);
+
         // Test with explicit values to ensure they serialize
         let mut custom_config = Config::default();
         custom_config.gossip.replication.target_replicas = 5;
         custom_config.compute.max_concurrent_tasks = 20;
         custom_config.trust.attestation.min_attester_trust = 0.5;
-        
+
         let custom_toml = toml::to_string_pretty(&custom_config).unwrap();
         let custom_deserialized: Config = toml::from_str(&custom_toml).unwrap();
-        
+
         assert_eq!(custom_deserialized.gossip.replication.target_replicas, 5);
         assert_eq!(custom_deserialized.compute.max_concurrent_tasks, 20);
-        assert!((custom_deserialized.trust.attestation.min_attester_trust - 0.5).abs() < f64::EPSILON);
+        assert!(
+            (custom_deserialized.trust.attestation.min_attester_trust - 0.5).abs() < f64::EPSILON
+        );
     }
 }
