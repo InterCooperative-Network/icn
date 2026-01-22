@@ -179,7 +179,9 @@ mod tests {
 
         // Sign the nonce
         let nonce_bytes = hex::decode(&nonce).unwrap();
-        let signature = bundle.keypair().unwrap().sign(&nonce_bytes);
+        let signature = bundle
+            .sign(&nonce_bytes)
+            .expect("test setup: bundle must be able to sign nonce (software key or hardware signer configured)");
         let signature_bytes = signature.to_bytes();
 
         let app = test::init_service(
@@ -367,7 +369,9 @@ mod tests {
         // Create a valid challenge/signature for test
         let nonce = auth.create_challenge(bundle.did()).unwrap();
         let nonce_bytes = hex::decode(&nonce).unwrap();
-        let signature = bundle.keypair().unwrap().sign(&nonce_bytes);
+        let signature = bundle
+            .sign(&nonce_bytes)
+            .expect("test setup: bundle must be able to sign nonce (software key or hardware signer configured)");
         let signature_bytes = signature.to_bytes();
 
         let app = test::init_service(

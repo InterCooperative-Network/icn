@@ -7,6 +7,79 @@
 //! 4. Client submits signed nonce
 //! 5. Server verifies signature using DID public key
 //! 6. Server issues JWT capability token
+//!
+//! # Hardware-Backed Signing Support
+//!
+//! This module supports both software and hardware-backed signing:
+//!
+//! - **Software keys**: Private key in memory, signs directly via `IdentityBundle::sign()`
+//! - **Hardware keys**: Private key in HSM/TPM, signs via `DidSigner` backend
+//!
+//! The authentication flow is agnostic to key storage. Clients use `IdentityBundle::sign()`
+//! which automatically routes to the appropriate signing method:
+//! - For software keys: uses in-memory private key
+//! - For hardware keys: delegates to `DidSigner` backend (HSM/TPM)
+//!
+//! ## Example (Software Key)
+//!
+//! ```rust,no_run
+//! # use icn_identity::IdentityBundle;
+//! # use icn_gateway::auth::AuthManager;
+//! let bundle = IdentityBundle::generate().unwrap();
+//! let auth = AuthManager::new(b"secret".to_vec());
+//!
+//! // Get challenge
+//! let nonce = auth.create_challenge(bundle.did()).unwrap();
+//!
+//! // Sign with software key (private key in memory)
+//! let nonce_bytes = hex::decode(&nonce).unwrap();
+//! let signature = bundle.sign(&nonce_bytes).unwrap();
+//!
+//! // Verify
+//! let token = auth.verify_challenge(
+//!     bundle.did(),
+//!     &signature.to_bytes(),
+//!     "test-coop",
+//!     vec!["ledger:read".to_string()],
+//! ).unwrap();
+//! ```
+//!
+//! ## Example (Hardware Key)
+//!
+//! ```rust,no_run
+//! # use icn_identity::{IdentityBundle, DidKey, SoftwareSigner};
+//! # use icn_gateway::auth::AuthManager;
+//! # use std::sync::Arc;
+//! # use ed25519_dalek::SigningKey;
+//! # use rand::rngs::OsRng;
+//! let auth = AuthManager::new(b"secret".to_vec());
+//!
+//! // Hardware-backed key (private key in HSM/TPM)
+//! # let sk = SigningKey::generate(&mut OsRng);
+//! # let vk = sk.verifying_key();
+//! let did_key = DidKey::from_hardware(
+//!     vk,
+//!     "pkcs11".to_string(),
+//!     "slot=0".to_string(),
+//! );
+//!
+//! // Create signer backend for hardware
+//! # let software_key = DidKey::from_software_bytes(sk.to_bytes(), vk.to_bytes()).unwrap();
+//! # let signer = Arc::new(SoftwareSigner::new(software_key).unwrap());
+//! let bundle = IdentityBundle::from_did_key_with_signer(did_key, Some(signer)).unwrap();
+//!
+//! // Same authentication flow - signing is abstracted
+//! let nonce = auth.create_challenge(bundle.did()).unwrap();
+//! let nonce_bytes = hex::decode(&nonce).unwrap();
+//! let signature = bundle.sign(&nonce_bytes).unwrap(); // Routes to hardware signer
+//!
+//! let token = auth.verify_challenge(
+//!     bundle.did(),
+//!     &signature.to_bytes(),
+//!     "test-coop",
+//!     vec!["ledger:read".to_string()],
+//! ).unwrap();
+//! ```
 
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
@@ -289,7 +362,9 @@ mod tests {
 
         // Sign nonce
         let nonce_bytes = hex::decode(&nonce).unwrap();
-        let signature = bundle.keypair().unwrap().sign(&nonce_bytes);
+        let signature = bundle
+            .sign(&nonce_bytes)
+            .expect("test setup: bundle must be able to sign nonce (software key or hardware signer configured)");
         let signature_bytes = signature.to_bytes();
 
         // Verify and get token
@@ -341,5 +416,49 @@ mod tests {
 
         let removed = auth.cleanup_expired_challenges().unwrap();
         assert_eq!(removed, 1);
+    }
+
+    #[test]
+    fn test_verify_challenge_success_with_hardware_backed_bundle() {
+        use ed25519_dalek::SigningKey;
+        use icn_identity::{DidKey, IdentityBundle, SoftwareSigner};
+        use rand::rngs::OsRng;
+        use std::sync::Arc;
+
+        let auth = AuthManager::new(b"test_secret".to_vec());
+
+        // Create a software signing key (for the backend), but present it as "hardware" to the bundle
+        let signing_key = SigningKey::generate(&mut OsRng);
+        let secret_bytes = signing_key.to_bytes();
+        let verifying_key = signing_key.verifying_key();
+
+        // Signer backend uses software key material (stand-in for PKCS#11/TPM signer)
+        let software_did_key =
+            DidKey::from_software_bytes(secret_bytes, verifying_key.to_bytes()).unwrap();
+        let signer = Arc::new(SoftwareSigner::new(software_did_key).unwrap());
+
+        // Bundle DID key is "hardware" (no secret in memory at the bundle level)
+        let hardware_key =
+            DidKey::from_hardware(verifying_key, "pkcs11".to_string(), "slot=0".to_string());
+
+        let bundle = IdentityBundle::from_did_key_with_signer(hardware_key, Some(signer)).unwrap();
+
+        // Create challenge
+        let nonce = auth.create_challenge(bundle.did()).unwrap();
+        let nonce_bytes = hex::decode(&nonce).unwrap();
+
+        // This MUST work via signer (and would fail if code tried keypair())
+        let signature = bundle.sign(&nonce_bytes).unwrap();
+
+        let token = auth
+            .verify_challenge(
+                bundle.did(),
+                &signature.to_bytes(),
+                "test-coop",
+                vec!["ledger:read".to_string()],
+            )
+            .unwrap();
+
+        assert!(!token.is_empty());
     }
 }
