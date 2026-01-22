@@ -337,10 +337,34 @@ impl TpmBackend {
                 err.log_debug_context(Some(&self.sealed_blob_path));
                 err
             })?;
+            // Ensure durable persistence for security-critical sealed blob
+            file.sync_all().map_err(|e| {
+                let err = TpmError::SealedBlobWrite(e);
+                err.log_debug_context(Some(&self.sealed_blob_path));
+                err
+            })?;
         }
         #[cfg(not(unix))]
         {
-            fs::write(&self.sealed_blob_path, &blob_json).map_err(|e| {
+            use std::io::Write;
+
+            let mut file = fs::OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .open(&self.sealed_blob_path)
+                .map_err(|e| {
+                    let err = TpmError::SealedBlobWrite(e);
+                    err.log_debug_context(Some(&self.sealed_blob_path));
+                    err
+                })?;
+            file.write_all(&blob_json).map_err(|e| {
+                let err = TpmError::SealedBlobWrite(e);
+                err.log_debug_context(Some(&self.sealed_blob_path));
+                err
+            })?;
+            // Ensure durable persistence for security-critical sealed blob
+            file.sync_all().map_err(|e| {
                 let err = TpmError::SealedBlobWrite(e);
                 err.log_debug_context(Some(&self.sealed_blob_path));
                 err
