@@ -547,6 +547,22 @@ impl<S: Store + 'static> RpcAuthManager<S> {
         signature: &[u8],
         scopes: Vec<String>,
     ) -> Result<String, AuthError> {
+        self.verify_challenge_with_coop(did, signature, scopes, None)
+    }
+
+    /// Verify signed challenge and issue token with optional coop context
+    ///
+    /// When `coop_id` is provided, the token will include the coop_id claim,
+    /// enabling coop isolation checks in RPC handlers. The caller is responsible
+    /// for validating that the DID is a member of the cooperative before calling
+    /// this method.
+    pub fn verify_challenge_with_coop(
+        &self,
+        did: &Did,
+        signature: &[u8],
+        scopes: Vec<String>,
+        coop_id: Option<String>,
+    ) -> Result<String, AuthError> {
         let auth_error =
             || AuthError::AuthenticationFailed("Invalid challenge or signature".to_string());
 
@@ -589,11 +605,16 @@ impl<S: Store + 'static> RpcAuthManager<S> {
         }
 
         // Issue JWT token
-        self.issue_token(did, scopes)
+        self.issue_token(did, scopes, coop_id)
     }
 
     /// Issue a JWT token
-    fn issue_token(&self, did: &Did, scopes: Vec<String>) -> Result<String, AuthError> {
+    fn issue_token(
+        &self,
+        did: &Did,
+        scopes: Vec<String>,
+        coop_id: Option<String>,
+    ) -> Result<String, AuthError> {
         let now = Self::current_timestamp()?;
         let jti = Uuid::new_v4().to_string();
 
@@ -603,7 +624,7 @@ impl<S: Store + 'static> RpcAuthManager<S> {
             iat: now,
             exp: now + self.token_ttl.as_secs(),
             scopes,
-            coop_id: None, // Can be set later via token refresh with coop context
+            coop_id,
         };
 
         let token = encode(

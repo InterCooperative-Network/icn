@@ -36,6 +36,7 @@ icn-compute.workspace = true
 icn-trust.workspace = true
 icn-store.workspace = true
 icn-federation.workspace = true
+icn-coop.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }

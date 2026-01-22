@@ -45,6 +45,7 @@ use tracing::{debug, error, info, warn};
 
 use icn_ccl::ContractRuntime;
 use icn_compute::ComputeHandle;
+use icn_coop::CoopHandle;
 use icn_federation::CooperativeRegistry;
 use icn_governance::GovernanceOps;
 use icn_identity::Did;
@@ -54,6 +55,7 @@ use icn_store::Store;
 use icn_trust::TrustGraph;
 
 use crate::auth::{required_scope_for_method, RpcAuthManager, RpcTokenClaims};
+use crate::context::RpcContext;
 use crate::handler;
 use crate::receipt::ReceiptStore;
 use crate::types::{RpcRequest, RpcResponse};
@@ -109,6 +111,8 @@ pub struct RpcServer {
     auth_manager: Option<Arc<RpcAuthManager>>,
     /// Trust-gated rate limiter for API requests (C8: Trust-based API rate limiting)
     rate_limiter: Option<Arc<RateLimiter>>,
+    /// Cooperative handle for membership validation (coop isolation)
+    coop_handle: Option<CoopHandle>,
     listen_addr: SocketAddr,
 }
 
@@ -130,6 +134,7 @@ impl RpcServer {
             receipt_store: Arc::new(ReceiptStore::new(10_000, 86400)), // 10k receipts, 24h TTL
             auth_manager: None,
             rate_limiter: None,
+            coop_handle: None,
             listen_addr,
         }
     }
@@ -155,6 +160,7 @@ impl RpcServer {
             receipt_store: Arc::new(ReceiptStore::new(10_000, 86400)),
             auth_manager: Some(Arc::new(RpcAuthManager::new(jwt_secret, true))),
             rate_limiter: None,
+            coop_handle: None,
             listen_addr,
         }
     }
@@ -267,6 +273,11 @@ impl RpcServer {
         self.federation_registry = Some(registry);
     }
 
+    /// Set the cooperative handle (for coop membership validation)
+    pub fn set_coop_handle(&mut self, handle: CoopHandle) {
+        self.coop_handle = Some(handle);
+    }
+
     // =========================================================================
     // Accessor methods for handler modules
     // =========================================================================
@@ -339,6 +350,11 @@ impl RpcServer {
     /// Get federation registry (for handler modules)
     pub fn federation_registry(&self) -> Option<&Arc<CooperativeRegistry>> {
         self.federation_registry.as_ref()
+    }
+
+    /// Get coop handle (for handler modules)
+    pub fn coop_handle(&self) -> Option<&CoopHandle> {
+        self.coop_handle.as_ref()
     }
 
     /// Start the RPC server
@@ -554,6 +570,14 @@ async fn dispatch_request(
     state: &Arc<RpcServer>,
     claims: Option<&RpcTokenClaims>,
 ) -> RpcResponse {
+    // Build RpcContext from claims for coop-scoped handlers
+    let ctx = claims.and_then(|c| {
+        // Parse the DID from claims.sub
+        c.sub.parse::<Did>().ok().map(|caller_did| {
+            RpcContext::new(caller_did, c.coop_id.clone(), c.scopes.clone())
+        })
+    });
+
     match req.method.as_str() {
         // Authentication methods (no auth required - bootstrap)
         "auth.challenge" => handler::auth::handle_auth_challenge(req.id, &req.params, state).await,
@@ -569,27 +593,30 @@ async fn dispatch_request(
         "network.stats" => handler::network::handle_network_stats(req.id, state).await,
         "network.status" => handler::network::handle_network_status(req.id, state).await,
 
-        // Ledger methods
-        "ledger.head" => handler::ledger::handle_ledger_head(req.id, state).await,
+        // Ledger methods (coop-scoped, ctx passed for future isolation)
+        "ledger.head" => handler::ledger::handle_ledger_head(req.id, state, ctx.as_ref()).await,
         "ledger.balance" => {
-            handler::ledger::handle_ledger_balance(req.id, &req.params, state).await
+            handler::ledger::handle_ledger_balance(req.id, &req.params, state, ctx.as_ref()).await
         }
         "ledger.history" => {
-            handler::ledger::handle_ledger_history(req.id, &req.params, state).await
+            handler::ledger::handle_ledger_history(req.id, &req.params, state, ctx.as_ref()).await
         }
         "ledger.quarantine.list" => {
-            handler::ledger::handle_quarantine_list(req.id, &req.params, state).await
+            handler::ledger::handle_quarantine_list(req.id, &req.params, state, ctx.as_ref()).await
         }
         "ledger.quarantine.get" => {
-            handler::ledger::handle_quarantine_get(req.id, &req.params, state).await
+            handler::ledger::handle_quarantine_get(req.id, &req.params, state, ctx.as_ref()).await
         }
         "ledger.quarantine.release" => {
-            handler::ledger::handle_quarantine_release(req.id, &req.params, state).await
+            handler::ledger::handle_quarantine_release(req.id, &req.params, state, ctx.as_ref())
+                .await
         }
         "ledger.quarantine.drop" => {
-            handler::ledger::handle_quarantine_drop(req.id, &req.params, state).await
+            handler::ledger::handle_quarantine_drop(req.id, &req.params, state, ctx.as_ref()).await
         }
-        "ledger.quarantine.purge" => handler::ledger::handle_quarantine_purge(req.id, state).await,
+        "ledger.quarantine.purge" => {
+            handler::ledger::handle_quarantine_purge(req.id, state, ctx.as_ref()).await
+        }
 
         // Contract methods
         "contract.deploy" => {
@@ -601,35 +628,74 @@ async fn dispatch_request(
         "contract.list" => {
             handler::contract::handle_contract_list(req.id, &req.params, state).await
         }
-        "receipt.get" => handler::ledger::handle_receipt_get(req.id, &req.params, state).await,
+        "receipt.get" => {
+            handler::ledger::handle_receipt_get(req.id, &req.params, state, ctx.as_ref()).await
+        }
 
-        // Governance methods
+        // Governance methods (coop-scoped, ctx passed for future isolation)
         "governance.domain.list" => {
-            handler::governance::handle_governance_domain_list(req.id, state).await
+            handler::governance::handle_governance_domain_list(req.id, state, ctx.as_ref()).await
         }
         "governance.domain.get" => {
-            handler::governance::handle_governance_domain_get(req.id, &req.params, state).await
+            handler::governance::handle_governance_domain_get(req.id, &req.params, state, ctx.as_ref())
+                .await
         }
         "governance.domain.create" => {
-            handler::governance::handle_governance_domain_create(req.id, &req.params, state).await
+            handler::governance::handle_governance_domain_create(
+                req.id,
+                &req.params,
+                state,
+                ctx.as_ref(),
+            )
+            .await
         }
         "governance.proposal.list" => {
-            handler::governance::handle_governance_proposal_list(req.id, state).await
+            handler::governance::handle_governance_proposal_list(req.id, state, ctx.as_ref()).await
         }
         "governance.proposal.get" => {
-            handler::governance::handle_governance_proposal_get(req.id, &req.params, state).await
+            handler::governance::handle_governance_proposal_get(
+                req.id,
+                &req.params,
+                state,
+                ctx.as_ref(),
+            )
+            .await
         }
         "governance.proposal.create" => {
-            handler::governance::handle_governance_proposal_create(req.id, &req.params, state).await
+            handler::governance::handle_governance_proposal_create(
+                req.id,
+                &req.params,
+                state,
+                ctx.as_ref(),
+            )
+            .await
         }
         "governance.proposal.open" => {
-            handler::governance::handle_governance_proposal_open(req.id, &req.params, state).await
+            handler::governance::handle_governance_proposal_open(
+                req.id,
+                &req.params,
+                state,
+                ctx.as_ref(),
+            )
+            .await
         }
         "governance.proposal.close" => {
-            handler::governance::handle_governance_proposal_close(req.id, &req.params, state).await
+            handler::governance::handle_governance_proposal_close(
+                req.id,
+                &req.params,
+                state,
+                ctx.as_ref(),
+            )
+            .await
         }
         "governance.vote.cast" => {
-            handler::governance::handle_governance_vote_cast(req.id, &req.params, state).await
+            handler::governance::handle_governance_vote_cast(
+                req.id,
+                &req.params,
+                state,
+                ctx.as_ref(),
+            )
+            .await
         }
 
         // Compute methods (pass claims for authenticated submitter)

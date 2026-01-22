@@ -3269,6 +3269,7 @@ dependencies = [
  "hyper-util",
  "icn-ccl",
  "icn-compute",
+ "icn-coop",
  "icn-federation",
  "icn-gossip",
  "icn-governance",

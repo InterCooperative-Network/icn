@@ -2,13 +2,30 @@
 
 use std::sync::Arc;
 
-use crate::error_codes::{INTERNAL_ERROR, INVALID_PARAMS, RESOURCE_NOT_AVAILABLE};
+use crate::context::RpcContext;
+use crate::error_codes::{INVALID_PARAMS, RESOURCE_NOT_AVAILABLE};
 use crate::pagination::{paginate, PageRequest, DEFAULT_MAX_PAGE_SIZE};
 use crate::server::RpcServer;
 use crate::types::{LedgerAccountDelta, LedgerBalance, LedgerEntry, RpcResponse};
 
 /// Handle ledger.head RPC call - get the most recent ledger entry
-pub async fn handle_ledger_head(id: u64, state: &Arc<RpcServer>) -> RpcResponse {
+///
+/// Note: Currently returns the global ledger head. When multi-coop ledgers
+/// are implemented, this will respect the coop context for isolation.
+pub async fn handle_ledger_head(
+    id: u64,
+    state: &Arc<RpcServer>,
+    ctx: Option<&RpcContext>,
+) -> RpcResponse {
+    // Log context for future coop isolation (currently ledger is global)
+    if let Some(ctx) = ctx {
+        tracing::debug!(
+            caller = %ctx.caller_did,
+            coop_id = ?ctx.coop_id,
+            "ledger.head called"
+        );
+    }
+
     let ledger_handle = match state.ledger_handle() {
         Some(handle) => handle,
         None => {
@@ -48,28 +65,35 @@ pub async fn handle_ledger_head(id: u64, state: &Arc<RpcServer>) -> RpcResponse 
 
                 match serde_json::to_value(&rpc_entry) {
                     Ok(value) => RpcResponse::success(id, value),
-                    Err(e) => {
-                        RpcResponse::error(id, INTERNAL_ERROR, format!("Internal error: {e}"))
-                    }
+                    Err(e) => RpcResponse::internal_error(id, e),
                 }
             } else {
                 RpcResponse::success(id, serde_json::json!(null))
             }
         }
-        Err(e) => RpcResponse::error(
-            id,
-            RESOURCE_NOT_AVAILABLE,
-            format!("Failed to get entries: {e}"),
-        ),
+        Err(e) => RpcResponse::internal_error(id, e),
     }
 }
 
 /// Handle ledger.balance RPC call - get balance for an account
+///
+/// Note: Currently returns global balances. When multi-coop ledgers
+/// are implemented, this will respect the coop context for isolation.
 pub async fn handle_ledger_balance(
     id: u64,
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
+    ctx: Option<&RpcContext>,
 ) -> RpcResponse {
+    // Log context for future coop isolation
+    if let Some(ctx) = ctx {
+        tracing::debug!(
+            caller = %ctx.caller_did,
+            coop_id = ?ctx.coop_id,
+            "ledger.balance called"
+        );
+    }
+
     let ledger_handle = match state.ledger_handle() {
         Some(handle) => handle,
         None => {
@@ -117,7 +141,7 @@ pub async fn handle_ledger_balance(
 
         match serde_json::to_value(&balance) {
             Ok(value) => RpcResponse::success(id, value),
-            Err(e) => RpcResponse::error(id, INTERNAL_ERROR, format!("Internal error: {e}")),
+            Err(e) => RpcResponse::internal_error(id, e),
         }
     } else {
         // Get all balances for account
@@ -134,7 +158,7 @@ pub async fn handle_ledger_balance(
 
         match serde_json::to_value(&balances) {
             Ok(value) => RpcResponse::success(id, value),
-            Err(e) => RpcResponse::error(id, INTERNAL_ERROR, format!("Internal error: {e}")),
+            Err(e) => RpcResponse::internal_error(id, e),
         }
     }
 }
@@ -143,11 +167,24 @@ pub async fn handle_ledger_balance(
 ///
 /// Uses the ledger's efficient pagination API to avoid loading all entries
 /// into memory when only a subset is requested.
+///
+/// Note: Currently returns global history. When multi-coop ledgers
+/// are implemented, this will respect the coop context for isolation.
 pub async fn handle_ledger_history(
     id: u64,
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
+    ctx: Option<&RpcContext>,
 ) -> RpcResponse {
+    // Log context for future coop isolation
+    if let Some(ctx) = ctx {
+        tracing::debug!(
+            caller = %ctx.caller_did,
+            coop_id = ?ctx.coop_id,
+            "ledger.history called"
+        );
+    }
+
     let ledger_handle = match state.ledger_handle() {
         Some(handle) => handle,
         None => {
@@ -226,14 +263,10 @@ pub async fn handle_ledger_history(
 
             match serde_json::to_value(&response) {
                 Ok(value) => RpcResponse::success(id, value),
-                Err(e) => RpcResponse::error(id, INTERNAL_ERROR, format!("Internal error: {e}")),
+                Err(e) => RpcResponse::internal_error(id, e),
             }
         }
-        Err(e) => RpcResponse::error(
-            id,
-            RESOURCE_NOT_AVAILABLE,
-            format!("Failed to get entries: {e}"),
-        ),
+        Err(e) => RpcResponse::internal_error(id, e),
     }
 }
 
@@ -242,7 +275,16 @@ pub async fn handle_quarantine_list(
     id: u64,
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
+    ctx: Option<&RpcContext>,
 ) -> RpcResponse {
+    if let Some(ctx) = ctx {
+        tracing::debug!(
+            caller = %ctx.caller_did,
+            coop_id = ?ctx.coop_id,
+            "ledger.quarantine.list called"
+        );
+    }
+
     let ledger_handle = match state.ledger_handle() {
         Some(handle) => handle,
         None => {
@@ -293,14 +335,10 @@ pub async fn handle_quarantine_list(
 
             match serde_json::to_value(&page) {
                 Ok(value) => RpcResponse::success(id, value),
-                Err(e) => RpcResponse::error(id, INTERNAL_ERROR, format!("Internal error: {e}")),
+                Err(e) => RpcResponse::internal_error(id, e),
             }
         }
-        Err(e) => RpcResponse::error(
-            id,
-            RESOURCE_NOT_AVAILABLE,
-            format!("Failed to list quarantine: {e}"),
-        ),
+        Err(e) => RpcResponse::internal_error(id, e),
     }
 }
 
@@ -309,8 +347,17 @@ pub async fn handle_quarantine_get(
     id: u64,
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
+    ctx: Option<&RpcContext>,
 ) -> RpcResponse {
     use crate::error_codes::NOT_FOUND;
+
+    if let Some(ctx) = ctx {
+        tracing::debug!(
+            caller = %ctx.caller_did,
+            coop_id = ?ctx.coop_id,
+            "ledger.quarantine.get called"
+        );
+    }
 
     let ledger_handle = match state.ledger_handle() {
         Some(handle) => handle,
@@ -375,11 +422,7 @@ pub async fn handle_quarantine_get(
             RpcResponse::success(id, result)
         }
         Ok(None) => RpcResponse::error(id, NOT_FOUND, "Entry not found in quarantine".to_string()),
-        Err(e) => RpcResponse::error(
-            id,
-            RESOURCE_NOT_AVAILABLE,
-            format!("Failed to get quarantine entry: {e}"),
-        ),
+        Err(e) => RpcResponse::internal_error(id, e),
     }
 }
 
@@ -388,8 +431,17 @@ pub async fn handle_quarantine_release(
     id: u64,
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
+    ctx: Option<&RpcContext>,
 ) -> RpcResponse {
     use crate::error_codes::{LEDGER_ERROR, NOT_FOUND};
+
+    if let Some(ctx) = ctx {
+        tracing::debug!(
+            caller = %ctx.caller_did,
+            coop_id = ?ctx.coop_id,
+            "ledger.quarantine.release called"
+        );
+    }
 
     let ledger_handle = match state.ledger_handle() {
         Some(handle) => handle,
@@ -455,11 +507,7 @@ pub async fn handle_quarantine_release(
             }
         }
         Ok(None) => RpcResponse::error(id, NOT_FOUND, "Entry not found in quarantine".to_string()),
-        Err(e) => RpcResponse::error(
-            id,
-            RESOURCE_NOT_AVAILABLE,
-            format!("Failed to release entry: {e}"),
-        ),
+        Err(e) => RpcResponse::internal_error(id, e),
     }
 }
 
@@ -468,8 +516,17 @@ pub async fn handle_quarantine_drop(
     id: u64,
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
+    ctx: Option<&RpcContext>,
 ) -> RpcResponse {
     use crate::error_codes::NOT_FOUND;
+
+    if let Some(ctx) = ctx {
+        tracing::debug!(
+            caller = %ctx.caller_did,
+            coop_id = ?ctx.coop_id,
+            "ledger.quarantine.drop called"
+        );
+    }
 
     let ledger_handle = match state.ledger_handle() {
         Some(handle) => handle,
@@ -522,16 +579,24 @@ pub async fn handle_quarantine_drop(
             }),
         ),
         Ok(false) => RpcResponse::error(id, NOT_FOUND, "Entry not found in quarantine".to_string()),
-        Err(e) => RpcResponse::error(
-            id,
-            RESOURCE_NOT_AVAILABLE,
-            format!("Failed to drop entry: {e}"),
-        ),
+        Err(e) => RpcResponse::internal_error(id, e),
     }
 }
 
 /// Handle ledger.quarantine.purge RPC call - purge all expired entries
-pub async fn handle_quarantine_purge(id: u64, state: &Arc<RpcServer>) -> RpcResponse {
+pub async fn handle_quarantine_purge(
+    id: u64,
+    state: &Arc<RpcServer>,
+    ctx: Option<&RpcContext>,
+) -> RpcResponse {
+    if let Some(ctx) = ctx {
+        tracing::debug!(
+            caller = %ctx.caller_did,
+            coop_id = ?ctx.coop_id,
+            "ledger.quarantine.purge called"
+        );
+    }
+
     let ledger_handle = match state.ledger_handle() {
         Some(handle) => handle,
         None => {
@@ -551,11 +616,7 @@ pub async fn handle_quarantine_purge(id: u64, state: &Arc<RpcServer>) -> RpcResp
                 "purged": purged
             }),
         ),
-        Err(e) => RpcResponse::error(
-            id,
-            RESOURCE_NOT_AVAILABLE,
-            format!("Failed to purge expired entries: {e}"),
-        ),
+        Err(e) => RpcResponse::internal_error(id, e),
     }
 }
 
@@ -564,8 +625,17 @@ pub async fn handle_receipt_get(
     id: u64,
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
+    ctx: Option<&RpcContext>,
 ) -> RpcResponse {
     use crate::error_codes::NOT_FOUND;
+
+    if let Some(ctx) = ctx {
+        tracing::debug!(
+            caller = %ctx.caller_did,
+            coop_id = ?ctx.coop_id,
+            "receipt.get called"
+        );
+    }
 
     // Parse parameters
     #[derive(serde::Deserialize)]
@@ -585,7 +655,7 @@ pub async fn handle_receipt_get(
     match state.receipt_store().get(&receipt_id).await {
         Some(receipt) => match serde_json::to_value(&receipt) {
             Ok(value) => RpcResponse::success(id, value),
-            Err(e) => RpcResponse::error(id, INTERNAL_ERROR, format!("Internal error: {e}")),
+            Err(e) => RpcResponse::internal_error(id, e),
         },
         None => RpcResponse::error(id, NOT_FOUND, "Receipt not found".to_string()),
     }

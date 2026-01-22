@@ -60,6 +60,10 @@ pub async fn handle_auth_challenge(
 }
 
 /// Handle auth.verify RPC call - verify signed challenge and get JWT token
+///
+/// When `coop_id` is provided in params, validates that the DID is a member
+/// of that cooperative before issuing the token. The token will include the
+/// coop_id claim, enabling coop isolation in subsequent RPC calls.
 pub async fn handle_auth_verify(
     id: u64,
     params: &serde_json::Value,
@@ -81,6 +85,10 @@ pub async fn handle_auth_verify(
         did: String,
         signature: String, // hex-encoded
         scopes: Vec<String>,
+        /// Optional cooperative ID to bind the token to.
+        /// If provided, membership will be validated before issuing the token.
+        #[serde(default)]
+        coop_id: Option<String>,
     }
 
     let params: VerifyParams = match serde_json::from_value(params.clone()) {
@@ -106,16 +114,67 @@ pub async fn handle_auth_verify(
         }
     };
 
+    // Validate coop membership if coop_id is provided
+    let validated_coop_id = if let Some(ref coop_id) = params.coop_id {
+        if let Some(coop_handle) = state.coop_handle() {
+            // Verify the DID is a member of the cooperative
+            match coop_handle.get_member_coops(did.clone()).await {
+                Ok(member_coops) => {
+                    if member_coops.contains(coop_id) {
+                        Some(coop_id.clone())
+                    } else {
+                        tracing::warn!(
+                            did = %did,
+                            requested_coop = %coop_id,
+                            "Coop membership validation failed: DID is not a member"
+                        );
+                        counter!("icn_rpc_auth_failures_total", "reason" => "coop_access_denied")
+                            .increment(1);
+                        return RpcResponse::error(
+                            id,
+                            crate::error_codes::COOP_ACCESS_DENIED,
+                            "Access denied: you are not a member of this cooperative".to_string(),
+                        );
+                    }
+                }
+                Err(e) => {
+                    tracing::error!(error = %e, "Failed to validate coop membership");
+                    return RpcResponse::internal_error(id, e);
+                }
+            }
+        } else {
+            // No coop handle configured - cannot validate membership
+            // For security, reject requests with coop_id if we can't validate
+            tracing::warn!("Coop membership validation requested but CoopHandle not configured");
+            return RpcResponse::error(
+                id,
+                crate::error_codes::RESOURCE_NOT_AVAILABLE,
+                "Coop membership validation not available".to_string(),
+            );
+        }
+    } else {
+        None
+    };
+
     // Verify challenge and issue token
     counter!("icn_rpc_auth_verifications_total").increment(1);
-    match auth_manager.verify_challenge(&did, &signature_bytes, params.scopes) {
+    match auth_manager.verify_challenge_with_coop(
+        &did,
+        &signature_bytes,
+        params.scopes,
+        validated_coop_id.clone(),
+    ) {
         Ok(token) => {
             counter!("icn_rpc_auth_successes_total").increment(1);
-            let response = serde_json::json!({
+            let mut response = serde_json::json!({
                 "token": token,
                 "token_type": "Bearer",
                 "expires_in_seconds": 86400
             });
+            // Include coop_id in response if present
+            if let Some(coop_id) = validated_coop_id {
+                response["coop_id"] = serde_json::Value::String(coop_id);
+            }
             RpcResponse::success(id, response)
         }
         Err(e) => {

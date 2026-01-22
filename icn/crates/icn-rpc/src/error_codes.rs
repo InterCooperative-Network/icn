@@ -75,6 +75,12 @@ pub const TIMEOUT: i32 = -32007;
 /// Service unavailable (temporary)
 pub const SERVICE_UNAVAILABLE: i32 = -32008;
 
+/// Coop access denied (cross-coop isolation violation)
+pub const COOP_ACCESS_DENIED: i32 = -32009;
+
+/// Coop not found
+pub const COOP_NOT_FOUND: i32 = -32010;
+
 // =============================================================================
 // ICN Application Error Codes (-31999 to -31000)
 // =============================================================================
@@ -147,6 +153,10 @@ pub enum RpcErrorCode {
     Timeout,
     /// Service unavailable
     ServiceUnavailable,
+    /// Coop access denied (cross-coop isolation violation)
+    CoopAccessDenied,
+    /// Coop not found
+    CoopNotFound,
 
     // Application errors
     /// Ledger operation failed
@@ -192,6 +202,8 @@ impl RpcErrorCode {
             RpcErrorCode::ValidationFailed => VALIDATION_FAILED,
             RpcErrorCode::Timeout => TIMEOUT,
             RpcErrorCode::ServiceUnavailable => SERVICE_UNAVAILABLE,
+            RpcErrorCode::CoopAccessDenied => COOP_ACCESS_DENIED,
+            RpcErrorCode::CoopNotFound => COOP_NOT_FOUND,
 
             // Application errors
             RpcErrorCode::LedgerError => LEDGER_ERROR,
@@ -227,6 +239,8 @@ impl RpcErrorCode {
             RpcErrorCode::ValidationFailed => "Validation failed",
             RpcErrorCode::Timeout => "Operation timeout",
             RpcErrorCode::ServiceUnavailable => "Service unavailable",
+            RpcErrorCode::CoopAccessDenied => "Coop access denied",
+            RpcErrorCode::CoopNotFound => "Coop not found",
 
             // Application errors
             RpcErrorCode::LedgerError => "Ledger error",
