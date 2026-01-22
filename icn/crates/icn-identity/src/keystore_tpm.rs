@@ -235,19 +235,22 @@ impl TpmBackend {
             .unwrap_or_else(default_sealed_blob_dir);
 
         // Ensure the directory exists with appropriate permissions
-        if !sealed_blob_dir.exists() {
-            fs::create_dir_all(&sealed_blob_dir).map_err(|e| {
-                let err = TpmError::DirectoryCreation(e);
-                err.log_debug_context(Some(&sealed_blob_dir));
-                err
-            })?;
-            // Set directory permissions to 0700 (owner only)
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                fs::set_permissions(&sealed_blob_dir, fs::Permissions::from_mode(0o700))
-                    .map_err(TpmError::PermissionError)?;
-            }
+        // Note: create_dir_all is idempotent, and we always set permissions
+        // to avoid TOCTOU race conditions
+        fs::create_dir_all(&sealed_blob_dir).map_err(|e| {
+            let err = TpmError::DirectoryCreation(e);
+            err.log_debug_context(Some(&sealed_blob_dir));
+            err
+        })?;
+
+        // Always ensure permissions are correct, even if directory already existed
+        // This prevents TOCTOU races where another process creates the directory
+        // with different permissions between our exists() check and mkdir
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&sealed_blob_dir, fs::Permissions::from_mode(0o700))
+                .map_err(TpmError::PermissionError)?;
         }
 
         let sealed_blob_path =
@@ -310,17 +313,62 @@ impl TpmBackend {
 
         let blob_json = serde_json::to_vec(&blob).map_err(TpmError::Serialization)?;
 
-        // Write with restrictive permissions
-        fs::write(&self.sealed_blob_path, &blob_json).map_err(|e| {
-            let err = TpmError::SealedBlobWrite(e);
-            err.log_debug_context(Some(&self.sealed_blob_path));
-            err
-        })?;
+        // Write with restrictive permissions using OpenOptions for atomic permission setting
+        // This ensures the file is created with correct permissions from the start,
+        // avoiding a window where the file exists with default (potentially insecure) permissions
         #[cfg(unix)]
         {
-            use std::os::unix::fs::PermissionsExt;
-            fs::set_permissions(&self.sealed_blob_path, fs::Permissions::from_mode(0o600))
-                .map_err(TpmError::PermissionError)?;
+            use std::io::Write;
+            use std::os::unix::fs::OpenOptionsExt;
+
+            let mut file = fs::OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .mode(0o600) // Set permissions atomically at creation
+                .open(&self.sealed_blob_path)
+                .map_err(|e| {
+                    let err = TpmError::SealedBlobWrite(e);
+                    err.log_debug_context(Some(&self.sealed_blob_path));
+                    err
+                })?;
+            file.write_all(&blob_json).map_err(|e| {
+                let err = TpmError::SealedBlobWrite(e);
+                err.log_debug_context(Some(&self.sealed_blob_path));
+                err
+            })?;
+            // Ensure durable persistence for security-critical sealed blob
+            file.sync_all().map_err(|e| {
+                let err = TpmError::SealedBlobWrite(e);
+                err.log_debug_context(Some(&self.sealed_blob_path));
+                err
+            })?;
+        }
+        #[cfg(not(unix))]
+        {
+            use std::io::Write;
+
+            let mut file = fs::OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .open(&self.sealed_blob_path)
+                .map_err(|e| {
+                    let err = TpmError::SealedBlobWrite(e);
+                    err.log_debug_context(Some(&self.sealed_blob_path));
+                    err
+                })?;
+            file.write_all(&blob_json).map_err(|e| {
+                let err = TpmError::SealedBlobWrite(e);
+                err.log_debug_context(Some(&self.sealed_blob_path));
+                err
+            })?;
+            // Ensure durable persistence for security-critical sealed blob
+            file.sync_all().map_err(|e| {
+                let err = TpmError::SealedBlobWrite(e);
+                err.log_debug_context(Some(&self.sealed_blob_path));
+                err
+            })?;
         }
 
         info!("Sealed key blob written");
@@ -1132,5 +1180,44 @@ mod tests {
 
         let err = TpmError::AttestationNotEnabled;
         assert_eq!(err.to_string(), "Attestation not enabled for this backend");
+    }
+
+    #[test]
+    fn test_same_handle_overwrites_previous() {
+        // Test that initializing a second backend with the same handle
+        // overwrites the previous identity (important behavior to document)
+        let test_dir = test_sealed_blob_dir();
+        let config = TpmConfig {
+            device_path: tpm_device(),
+            key_handle: 0x81000060,
+            platform_binding: false,
+            attestation: false,
+            sealed_blob_dir: Some(test_dir.clone()),
+        };
+
+        // First backend: create and init
+        let mut backend1 = TpmBackend::new(config.clone()).unwrap();
+        let bundle1 = backend1.init(&[]).unwrap();
+        let did1 = bundle1.did().clone();
+
+        // Second backend with SAME handle: init should overwrite
+        let mut backend2 = TpmBackend::new(config.clone()).unwrap();
+        let bundle2 = backend2.init(&[]).unwrap();
+        let did2 = bundle2.did().clone();
+
+        // Different DIDs because different key material was generated
+        assert_ne!(did1, did2);
+
+        // Now if we create a third backend and unlock (not init), it should get backend2's identity
+        let mut backend3 = TpmBackend::new(config).unwrap();
+        backend3.unlock(&[]).unwrap();
+        let bundle3 = backend3.get_identity_bundle().unwrap();
+
+        // backend3 should have backend2's DID (the overwritten one)
+        assert_eq!(bundle3.did(), &did2);
+        assert_ne!(bundle3.did(), &did1);
+
+        // Clean up
+        let _ = fs::remove_dir_all(&test_dir);
     }
 }
