@@ -43,6 +43,7 @@ cryptoki = { version = "0.8", optional = true }
 
 # TPM support (optional)
 tss-esapi = { version = "7.6", optional = true }
+bincode.workspace = true
 
 [dev-dependencies]
 tempfile = "3.24"
