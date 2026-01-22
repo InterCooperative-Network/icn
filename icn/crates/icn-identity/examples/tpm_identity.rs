@@ -30,11 +30,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== ICN TPM Identity Example ===\n");
 
     // Configure TPM backend
+    // NOTE: key_handle must be unique across the system. Choose a handle in the
+    // persistent range (0x81000000 - 0x81FFFFFF). If running multiple instances
+    // or on shared systems, use different handles to avoid conflicts.
     let config = TpmConfig {
         device_path: "/dev/tpmrm0".to_string(), // or "swtpm:host=localhost,port=2321"
         key_handle: 0x81000100,
         platform_binding: false, // Set to true for PCR binding (when implemented)
         attestation: false,
+        sealed_blob_dir: None, // Uses XDG_DATA_HOME/icn/tpm/ by default
     };
 
     println!("1. Creating TPM backend...");

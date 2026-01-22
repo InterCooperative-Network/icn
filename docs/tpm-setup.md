@@ -186,12 +186,19 @@ lsmod | grep tpm
 ### Permission denied
 
 ```bash
-# Add user to tss group
+# Add user to tss group (log out and back in after this)
 sudo usermod -a -G tss $USER
 
-# Set permissions
-sudo chmod 666 /dev/tpmrm0
+# Ensure TPM device is owned by tss group with restrictive permissions
+# Check current permissions:
+ls -l /dev/tpmrm0
+
+# If needed, set group ownership and mode (do NOT use 666):
+sudo chgrp tss /dev/tpmrm0
+sudo chmod 660 /dev/tpmrm0   # Group-only access, not world-writable
 ```
+
+**Security Note**: Never use `chmod 666` on TPM devices as this makes them world-readable and world-writable, allowing any local user or process to access TPM-protected keys.
 
 ### swtpm connection refused
 

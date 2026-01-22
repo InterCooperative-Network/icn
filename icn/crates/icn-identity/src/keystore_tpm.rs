@@ -39,6 +39,54 @@ const DEFAULT_PCR_SLOTS: &[PcrSlot] = &[
     PcrSlot::Slot7, // Secure Boot policy
 ];
 
+/// Convert PcrSlot enum to its numeric value
+///
+/// The PcrSlot enum values correspond to their slot numbers:
+/// Slot0 = 0, Slot1 = 1, ..., Slot23 = 23
+fn pcr_slot_to_u8(slot: &PcrSlot) -> u8 {
+    match slot {
+        PcrSlot::Slot0 => 0,
+        PcrSlot::Slot1 => 1,
+        PcrSlot::Slot2 => 2,
+        PcrSlot::Slot3 => 3,
+        PcrSlot::Slot4 => 4,
+        PcrSlot::Slot5 => 5,
+        PcrSlot::Slot6 => 6,
+        PcrSlot::Slot7 => 7,
+        PcrSlot::Slot8 => 8,
+        PcrSlot::Slot9 => 9,
+        PcrSlot::Slot10 => 10,
+        PcrSlot::Slot11 => 11,
+        PcrSlot::Slot12 => 12,
+        PcrSlot::Slot13 => 13,
+        PcrSlot::Slot14 => 14,
+        PcrSlot::Slot15 => 15,
+        PcrSlot::Slot16 => 16,
+        PcrSlot::Slot17 => 17,
+        PcrSlot::Slot18 => 18,
+        PcrSlot::Slot19 => 19,
+        PcrSlot::Slot20 => 20,
+        PcrSlot::Slot21 => 21,
+        PcrSlot::Slot22 => 22,
+        PcrSlot::Slot23 => 23,
+    }
+}
+
+/// Get the default sealed blob directory
+///
+/// Uses XDG_DATA_HOME if set, otherwise falls back to ~/.local/share/icn/tpm/
+fn default_sealed_blob_dir() -> PathBuf {
+    std::env::var("XDG_DATA_HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| {
+            std::env::var("HOME")
+                .map(|h| PathBuf::from(h).join(".local").join("share"))
+                .unwrap_or_else(|_| PathBuf::from("."))
+        })
+        .join("icn")
+        .join("tpm")
+}
+
 /// Sealed key blob with metadata
 #[derive(serde::Serialize, serde::Deserialize)]
 struct SealedKeyBlob {
@@ -57,15 +105,10 @@ struct SealedKeyBlob {
 /// This backend stores keys in a TPM 2.0 device with optional platform binding.
 /// Keys are sealed to PCR values and can only be used on the same platform.
 pub struct TpmBackend {
-    /// TPM device path
-    #[allow(dead_code)] // Will be used when implementing actual TPM operations
-    device_path: String,
+    /// TPM configuration
+    config: TpmConfig,
     /// Path to sealed key blob file
     sealed_blob_path: PathBuf,
-    /// Platform binding enabled
-    platform_binding: bool,
-    /// Attestation enabled
-    attestation: bool,
     /// Cached identity bundle (None when locked)
     identity_bundle: Option<IdentityBundle>,
     /// Cached signer for hardware signing
@@ -96,21 +139,43 @@ impl TpmBackend {
             config.device_path, config.platform_binding
         );
 
-        // Determine sealed blob path from key handle
-        let sealed_blob_path =
-            PathBuf::from(format!("/tmp/icn-tpm-sealed-{:#x}.blob", config.key_handle));
+        // Determine sealed blob directory: use config or default to XDG_DATA_HOME/icn/tpm/
+        let sealed_blob_dir = config
+            .sealed_blob_dir
+            .clone()
+            .unwrap_or_else(default_sealed_blob_dir);
 
+        // Ensure the directory exists with appropriate permissions
+        if !sealed_blob_dir.exists() {
+            fs::create_dir_all(&sealed_blob_dir)
+                .context("Failed to create sealed blob directory")?;
+            // Set directory permissions to 0700 (owner only)
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                fs::set_permissions(&sealed_blob_dir, fs::Permissions::from_mode(0o700))
+                    .context("Failed to set sealed blob directory permissions")?;
+            }
+        }
+
+        let sealed_blob_path =
+            sealed_blob_dir.join(format!("sealed-{:#x}.blob", config.key_handle));
         let storage_id = PathBuf::from(format!("tpm://handle={:#x}", config.key_handle));
 
         Ok(Self {
-            device_path: config.device_path,
+            config,
             sealed_blob_path,
-            platform_binding: config.platform_binding,
-            attestation: config.attestation,
             identity_bundle: None,
             signer: None,
             storage_id,
         })
+    }
+
+    /// Get the hardware identifier for this backend
+    ///
+    /// Uses the key handle as the stable identifier, not the file path.
+    fn hardware_id(&self) -> String {
+        format!("handle={:#x}", self.config.key_handle)
     }
 
     /// Initialize a new keypair and seal to TPM
@@ -141,27 +206,31 @@ impl TpmBackend {
         let blob = SealedKeyBlob {
             sealed_data,
             public_key: public_bytes,
-            pcr_slots: if self.platform_binding {
-                DEFAULT_PCR_SLOTS.iter().map(|s| *s as u8).collect()
+            pcr_slots: if self.config.platform_binding {
+                // Convert PcrSlot enum to slot numbers
+                // PcrSlot::Slot0 = 0, PcrSlot::Slot7 = 7, etc.
+                DEFAULT_PCR_SLOTS.iter().map(pcr_slot_to_u8).collect()
             } else {
                 vec![]
             },
-            key_handle: None,
+            key_handle: Some(self.config.key_handle),
         };
 
         let blob_json = serde_json::to_vec(&blob).context("Failed to serialize sealed key blob")?;
 
-        fs::write(&self.sealed_blob_path, &blob_json)
-            .context("Failed to write sealed key blob to disk")?;
+        // Write with restrictive permissions
+        fs::write(&self.sealed_blob_path, &blob_json).context("Failed to write sealed key blob")?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&self.sealed_blob_path, fs::Permissions::from_mode(0o600))
+                .context("Failed to set sealed blob file permissions")?;
+        }
 
-        info!("Sealed key blob written to {:?}", self.sealed_blob_path);
+        info!("Sealed key blob written");
 
-        // Create hardware DidKey
-        let did_key = DidKey::from_hardware(
-            verifying_key,
-            "tpm".to_string(),
-            format!("sealed_blob={}", self.sealed_blob_path.display()),
-        );
+        // Create hardware DidKey using stable handle-based identifier
+        let did_key = DidKey::from_hardware(verifying_key, "tpm".to_string(), self.hardware_id());
 
         // Create signer
         let signer = Arc::new(TpmDidSigner {
@@ -200,23 +269,31 @@ impl TpmBackend {
         Ok(sealed_data)
     }
 
+    /// Load sealed key blob from disk
+    ///
+    /// Returns the deserialized blob structure for use by unseal and other operations.
+    fn load_sealed_blob(&self) -> Result<SealedKeyBlob> {
+        // Use generic error message to avoid path leakage in logs/error reports
+        let blob_json =
+            fs::read(&self.sealed_blob_path).context("Failed to read sealed key blob")?;
+
+        serde_json::from_slice(&blob_json).context("Failed to deserialize sealed key blob")
+    }
+
     /// Unseal key material from TPM
     ///
     /// For Phase 1, we implement a simplified unsealing without PCR verification.
     /// PCR verification will be added in a future phase.
-    fn unseal_key(&mut self) -> Result<Zeroizing<[u8; 32]>> {
+    fn unseal_key_from_blob(&self, blob: &SealedKeyBlob) -> Result<Zeroizing<[u8; 32]>> {
         info!("Unsealing key from TPM (simplified - no PCR verification)");
-
-        // Load sealed blob from disk
-        let blob_json =
-            fs::read(&self.sealed_blob_path).context("Failed to read sealed key blob from disk")?;
-
-        let blob: SealedKeyBlob =
-            serde_json::from_slice(&blob_json).context("Failed to deserialize sealed key blob")?;
 
         // For now, just decrypt the key from the simple wrapper
         // In a real implementation, this would use TPM_Unseal with policy session
         // TODO: Implement actual TPM unsealing with tss-esapi::Context::unseal
+
+        if blob.sealed_data.is_empty() {
+            anyhow::bail!("Sealed key blob is empty");
+        }
 
         if blob.sealed_data.len() != 32 {
             anyhow::bail!(
@@ -261,26 +338,18 @@ impl KeyStoreBackend for TpmBackend {
 
         info!("Unlocking TPM backend by unsealing key");
 
-        // Load sealed blob to get public key
-        let blob_json =
-            fs::read(&self.sealed_blob_path).context("Failed to read sealed key blob from disk")?;
+        // Load sealed blob once to get both public key and sealed data
+        let blob = self.load_sealed_blob()?;
 
-        let blob: SealedKeyBlob =
-            serde_json::from_slice(&blob_json).context("Failed to deserialize sealed key blob")?;
-
-        // Unseal the private key
-        let secret_bytes = self.unseal_key()?;
+        // Unseal the private key using the loaded blob
+        let secret_bytes = self.unseal_key_from_blob(&blob)?;
 
         // Reconstruct verifying key
         let verifying_key = VerifyingKey::from_bytes(&blob.public_key)
             .context("Failed to reconstruct verifying key")?;
 
-        // Create hardware DidKey
-        let did_key = DidKey::from_hardware(
-            verifying_key,
-            "tpm".to_string(),
-            format!("sealed_blob={}", self.sealed_blob_path.display()),
-        );
+        // Create hardware DidKey using stable handle-based identifier
+        let did_key = DidKey::from_hardware(verifying_key, "tpm".to_string(), self.hardware_id());
 
         // Create signer
         let signer = Arc::new(TpmDidSigner {
@@ -375,7 +444,8 @@ impl DidSigner for TpmDidSigner {
 
 impl Drop for TpmDidSigner {
     fn drop(&mut self) {
-        // Zeroizing handles cleanup automatically
+        // Zeroizing<[u8; 32]> automatically zeroizes `secret_key` on drop,
+        // ensuring key material is securely cleared from memory.
     }
 }
 
@@ -419,6 +489,13 @@ mod tests {
         }
     }
 
+    /// Create a test-specific temp directory for sealed blobs
+    fn test_sealed_blob_dir() -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("icn-tpm-test-{}", std::process::id()));
+        let _ = fs::create_dir_all(&dir);
+        dir
+    }
+
     #[test]
     fn test_tpm_backend_creation() {
         let config = TpmConfig {
@@ -426,6 +503,7 @@ mod tests {
             key_handle: 0x81000001,
             platform_binding: true,
             attestation: false,
+            sealed_blob_dir: Some(test_sealed_blob_dir()),
         };
 
         let backend = TpmBackend::new(config);
@@ -445,11 +523,13 @@ mod tests {
             return;
         }
 
+        let test_dir = test_sealed_blob_dir();
         let config = TpmConfig {
             device_path: tpm_device(),
             key_handle: 0x81000002,
             platform_binding: false, // Disable PCR binding for test
             attestation: false,
+            sealed_blob_dir: Some(test_dir.clone()),
         };
 
         let mut backend = TpmBackend::new(config).unwrap();
@@ -494,7 +574,7 @@ mod tests {
             .is_ok());
 
         // Clean up
-        let _ = fs::remove_file(&backend.sealed_blob_path);
+        let _ = fs::remove_dir_all(&test_dir);
     }
 
     #[test]
@@ -505,11 +585,13 @@ mod tests {
             return;
         }
 
+        let test_dir = test_sealed_blob_dir();
         let config = TpmConfig {
             device_path: tpm_device(),
             key_handle: 0x81000003,
             platform_binding: true, // Enable PCR binding
             attestation: false,
+            sealed_blob_dir: Some(test_dir.clone()),
         };
 
         let mut backend = TpmBackend::new(config).unwrap();
@@ -535,7 +617,7 @@ mod tests {
             .expect("Failed to unlock with PCR binding");
 
         // Clean up
-        let _ = fs::remove_file(&backend.sealed_blob_path);
+        let _ = fs::remove_dir_all(&test_dir);
     }
 
     #[test]
@@ -546,11 +628,13 @@ mod tests {
             return;
         }
 
+        let test_dir = test_sealed_blob_dir();
         let config = TpmConfig {
             device_path: tpm_device(),
             key_handle: 0x81000004,
             platform_binding: false,
             attestation: false,
+            sealed_blob_dir: Some(test_dir.clone()),
         };
 
         // First session: create and seal
@@ -559,7 +643,6 @@ mod tests {
         let did1 = bundle1.did().clone();
         let public_key1 = bundle1.did_key().verifying_key().to_bytes();
 
-        let sealed_path = backend1.sealed_blob_path.clone();
         drop(backend1);
 
         // Second session: unlock existing
@@ -577,7 +660,7 @@ mod tests {
         assert_eq!(public_key1, public_key2);
 
         // Clean up
-        let _ = fs::remove_file(&sealed_path);
+        let _ = fs::remove_dir_all(&test_dir);
     }
 
     #[test]
@@ -625,5 +708,227 @@ mod tests {
         assert_eq!(blob.public_key, deserialized.public_key);
         assert_eq!(blob.pcr_slots, deserialized.pcr_slots);
         assert_eq!(blob.key_handle, deserialized.key_handle);
+    }
+
+    #[test]
+    fn test_pcr_slot_to_u8() {
+        assert_eq!(pcr_slot_to_u8(&PcrSlot::Slot0), 0);
+        assert_eq!(pcr_slot_to_u8(&PcrSlot::Slot7), 7);
+        assert_eq!(pcr_slot_to_u8(&PcrSlot::Slot23), 23);
+    }
+
+    #[test]
+    fn test_unseal_key_from_blob_wrong_size() {
+        let test_dir = test_sealed_blob_dir();
+        let config = TpmConfig {
+            device_path: tpm_device(),
+            key_handle: 0x81000010,
+            platform_binding: false,
+            attestation: false,
+            sealed_blob_dir: Some(test_dir.clone()),
+        };
+
+        let backend = TpmBackend::new(config).unwrap();
+
+        // Test with wrong size sealed data
+        let blob = SealedKeyBlob {
+            sealed_data: vec![1, 2, 3], // Only 3 bytes, should be 32
+            public_key: [0u8; 32],
+            pcr_slots: vec![],
+            key_handle: Some(0x81000010),
+        };
+
+        let result = backend.unseal_key_from_blob(&blob);
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("wrong size"));
+
+        // Clean up - intentionally ignore errors as dir may not exist
+        let _ = fs::remove_dir_all(&test_dir);
+    }
+
+    #[test]
+    fn test_unseal_key_from_blob_empty() {
+        let test_dir = test_sealed_blob_dir();
+        let config = TpmConfig {
+            device_path: tpm_device(),
+            key_handle: 0x81000011,
+            platform_binding: false,
+            attestation: false,
+            sealed_blob_dir: Some(test_dir.clone()),
+        };
+
+        let backend = TpmBackend::new(config).unwrap();
+
+        // Test with empty sealed data
+        let blob = SealedKeyBlob {
+            sealed_data: vec![], // Empty
+            public_key: [0u8; 32],
+            pcr_slots: vec![],
+            key_handle: Some(0x81000011),
+        };
+
+        let result = backend.unseal_key_from_blob(&blob);
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("empty"));
+
+        // Clean up - intentionally ignore errors as dir may not exist
+        let _ = fs::remove_dir_all(&test_dir);
+    }
+
+    #[test]
+    fn test_unlock_before_init_fails() {
+        let test_dir = test_sealed_blob_dir();
+        let config = TpmConfig {
+            device_path: tpm_device(),
+            key_handle: 0x81000020,
+            platform_binding: false,
+            attestation: false,
+            sealed_blob_dir: Some(test_dir.clone()),
+        };
+
+        let mut backend = TpmBackend::new(config).unwrap();
+
+        // Attempt to unlock without init should fail
+        let result = backend.unlock(&[]);
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("Failed to read sealed key blob"));
+
+        // Clean up - intentionally ignore errors as dir may not exist
+        let _ = fs::remove_dir_all(&test_dir);
+    }
+
+    #[test]
+    fn test_get_identity_bundle_when_locked_fails() {
+        let test_dir = test_sealed_blob_dir();
+        let config = TpmConfig {
+            device_path: tpm_device(),
+            key_handle: 0x81000021,
+            platform_binding: false,
+            attestation: false,
+            sealed_blob_dir: Some(test_dir.clone()),
+        };
+
+        let backend = TpmBackend::new(config).unwrap();
+
+        // Backend is locked by default
+        assert!(backend.is_locked());
+
+        // Should fail to get identity bundle when locked
+        let result = backend.get_identity_bundle();
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("locked"));
+
+        // Clean up - intentionally ignore errors as dir may not exist
+        let _ = fs::remove_dir_all(&test_dir);
+    }
+
+    #[test]
+    fn test_signing_backend_when_locked_fails() {
+        let test_dir = test_sealed_blob_dir();
+        let config = TpmConfig {
+            device_path: tpm_device(),
+            key_handle: 0x81000022,
+            platform_binding: false,
+            attestation: false,
+            sealed_blob_dir: Some(test_dir.clone()),
+        };
+
+        let backend = TpmBackend::new(config).unwrap();
+
+        // Backend is locked by default
+        assert!(backend.is_locked());
+
+        // Should fail to get signing backend when locked
+        let result = backend.signing_backend();
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("locked"));
+
+        // Clean up - intentionally ignore errors as dir may not exist
+        let _ = fs::remove_dir_all(&test_dir);
+    }
+
+    #[test]
+    fn test_load_corrupted_sealed_blob() {
+        let test_dir = test_sealed_blob_dir();
+        let config = TpmConfig {
+            device_path: tpm_device(),
+            key_handle: 0x81000023,
+            platform_binding: false,
+            attestation: false,
+            sealed_blob_dir: Some(test_dir.clone()),
+        };
+
+        let backend = TpmBackend::new(config).unwrap();
+
+        // Write corrupted JSON to the sealed blob path
+        fs::write(&backend.sealed_blob_path, b"not valid json").unwrap();
+
+        // Should fail to load corrupted blob
+        let result = backend.load_sealed_blob();
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("deserialize"));
+
+        // Clean up - intentionally ignore errors
+        let _ = fs::remove_dir_all(&test_dir);
+    }
+
+    #[test]
+    fn test_hardware_id_format() {
+        let test_dir = test_sealed_blob_dir();
+        let config = TpmConfig {
+            device_path: tpm_device(),
+            key_handle: 0x81000042,
+            platform_binding: false,
+            attestation: false,
+            sealed_blob_dir: Some(test_dir.clone()),
+        };
+
+        let backend = TpmBackend::new(config).unwrap();
+
+        // Hardware ID should use handle format, not file path
+        let hw_id = backend.hardware_id();
+        assert_eq!(hw_id, "handle=0x81000042");
+        assert!(!hw_id.contains("/")); // Should not contain path separator
+
+        // Clean up - intentionally ignore errors as dir may not exist
+        let _ = fs::remove_dir_all(&test_dir);
+    }
+
+    #[test]
+    fn test_default_sealed_blob_dir() {
+        let dir = default_sealed_blob_dir();
+        // Should end with icn/tpm
+        assert!(dir.ends_with("icn/tpm") || dir.ends_with("icn\\tpm"));
+        // Should not be in /tmp
+        assert!(!dir.starts_with("/tmp"));
+    }
+
+    #[test]
+    fn test_attestation_not_enabled_error() {
+        let test_dir = test_sealed_blob_dir();
+        let config = TpmConfig {
+            device_path: tpm_device(),
+            key_handle: 0x81000030,
+            platform_binding: false,
+            attestation: false, // Attestation disabled
+            sealed_blob_dir: Some(test_dir.clone()),
+        };
+
+        let mut backend = TpmBackend::new(config).unwrap();
+
+        // Should fail because attestation is not enabled
+        let result = backend.generate_attestation();
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("not enabled"));
+
+        // Clean up - intentionally ignore errors as dir may not exist
+        let _ = fs::remove_dir_all(&test_dir);
     }
 }

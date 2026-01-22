@@ -109,6 +109,10 @@ pub struct TpmConfig {
     pub platform_binding: bool,
     /// Whether to enable attestation
     pub attestation: bool,
+    /// Optional directory for sealed blob storage.
+    /// If None, defaults to XDG_DATA_HOME/icn/tpm/ (~/.local/share/icn/tpm/ on Linux).
+    /// Using /tmp is insecure as it's world-readable and cleared on reboot.
+    pub sealed_blob_dir: Option<std::path::PathBuf>,
 }
 
 /// Backend configuration enum

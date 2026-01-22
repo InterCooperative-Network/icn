@@ -3099,7 +3099,6 @@ dependencies = [
  "age",
  "anyhow",
  "base64 0.22.1",
- "bincode",
  "cryptoki",
  "ed25519-dalek",
  "hex",
