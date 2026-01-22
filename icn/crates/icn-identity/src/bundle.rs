@@ -3,13 +3,69 @@
 //! This module provides IdentityBundle, which binds a DID identity to a TLS certificate
 //! through cryptographic signatures. This prevents MITM attacks by ensuring that the
 //! entity holding the TLS certificate also holds the private key for the claimed DID.
+//!
+//! # Hardware Signing Support
+//!
+//! IdentityBundle supports both software and hardware-backed signing:
+//!
+//! - **Software keys**: Private key in memory, signs directly
+//! - **Hardware keys**: Private key in HSM/TPM, signs via DidSigner backend
+//!
+//! ## Usage Examples
+//!
+//! ### Software Keys (Default)
+//!
+//! ```
+//! use icn_identity::IdentityBundle;
+//!
+//! // Generate bundle with software keys
+//! let bundle = IdentityBundle::generate().unwrap();
+//!
+//! // Sign directly without needing a signer
+//! let message = b"test message";
+//! let signature = bundle.sign(message).unwrap();
+//! ```
+//!
+//! ### Hardware Keys with Signer
+//!
+//! ```
+//! use icn_identity::{IdentityBundle, DidKey, SoftwareSigner};
+//! use std::sync::Arc;
+//! # use rand_core::OsRng;
+//! # use ed25519_dalek::SigningKey;
+//!
+//! # // For demo purposes, we use software keys
+//! # let signing_key = SigningKey::generate(&mut OsRng);
+//! # let secret_bytes = signing_key.to_bytes();
+//! # let public_bytes = signing_key.verifying_key().to_bytes();
+//! # let software_key = DidKey::from_software_bytes(secret_bytes, public_bytes).unwrap();
+//! # let signer = Arc::new(SoftwareSigner::new(software_key).unwrap());
+//! #
+//! // Create hardware key (normally from HSM/TPM)
+//! let hardware_key = DidKey::from_hardware(
+//!     signing_key.verifying_key(),
+//!     "pkcs11".to_string(),
+//!     "slot=0".to_string(),
+//! );
+//!
+//! // Create bundle with signer backend
+//! let bundle = IdentityBundle::from_did_key_with_signer(
+//!     hardware_key,
+//!     Some(signer)
+//! ).unwrap();
+//!
+//! // Sign using hardware backend
+//! let message = b"test message";
+//! let signature = bundle.sign(message).unwrap();
+//! ```
 
-use crate::{Did, DidKey, KeyPair};
+use crate::{Did, DidKey, DidSigner, KeyPair};
 use anyhow::{Context, Result};
 use rcgen::CertificateParams;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use x25519_dalek::{PublicKey, StaticSecret};
 use zeroize::Zeroizing;
@@ -25,14 +81,26 @@ use icn_crypto_pq::{HybridKemKeypair, HybridKemPublicKey, MlKemKeypair};
 /// Also includes X25519 keys for end-to-end payload encryption.
 ///
 /// The bundle can contain either:
-/// - Software keys (private key in memory)
-/// - Hardware-backed keys (private key in HSM/TPM)
+/// - Software keys (private key in memory, no signer needed)
+/// - Hardware-backed keys (private key in HSM/TPM, requires DidSigner)
+///
+/// # Signing
+///
+/// Use the `sign()` method to sign messages. The bundle will automatically:
+/// - Use the DidSigner backend if available (hardware keys)
+/// - Fall back to software signing if no signer (software keys)
+/// - Return an error if hardware key is used without signer
 pub struct IdentityBundle {
     /// The DID for this identity
     did: Did,
 
     /// DID signing key (software or hardware)
     did_key: DidKey,
+
+    /// Optional signing backend for hardware keys
+    /// - None for software keys (use did_key directly)
+    /// - Some for hardware keys (delegate to HSM/TPM)
+    signer: Option<Arc<dyn DidSigner>>,
 
     /// Self-signed TLS certificate
     tls_cert: CertificateDer<'static>,
@@ -70,11 +138,20 @@ pub struct IdentityBundle {
     pq_signing_public: Option<Vec<u8>>,
 }
 
+/// Clone creates a shallow copy that shares the signer instance via Arc.
+///
+/// # Note on Signer Sharing
+/// The cloned bundle shares the same `Arc<dyn DidSigner>` as the original.
+/// This is correct for most use cases, but be aware that:
+/// - Both bundles will use the same underlying HSM/TPM connection
+/// - If the signer has mutable state or connection pooling, operations may interleave
+/// - For a deep copy with a fresh signer, create a new bundle with `from_did_key_with_signer()`
 impl Clone for IdentityBundle {
     fn clone(&self) -> Self {
         IdentityBundle {
             did: self.did.clone(),
             did_key: self.did_key.clone(),
+            signer: self.signer.clone(), // Arc clone - shares underlying signer
             tls_cert: self.tls_cert.clone(),
             tls_key_der: Zeroizing::new(self.tls_key_der.to_vec()),
             tls_binding_sig: self.tls_binding_sig.clone(),
@@ -134,18 +211,50 @@ impl IdentityBundle {
     /// # Limitations
     /// **Hardware keys:** Cannot create TLS binding signature without DidSigner.
     /// Hardware keys require a DidSigner backend to perform signing operations.
-    /// This is tracked in follow-up Issue #1: "Add optional DidSigner to IdentityBundle"
     ///
-    /// For hardware-backed keys, use the future `from_did_key_with_signer()` method
-    /// once Issue #1 is implemented.
+    /// For hardware-backed keys, use `from_did_key_with_signer()` instead.
     pub fn from_did_key(did_key: DidKey) -> Result<Self> {
-        // Hardware keys cannot sign without a DidSigner backend
-        if matches!(did_key, DidKey::Hardware { .. }) {
+        Self::from_did_key_with_signer(did_key, None)
+    }
+
+    /// Create identity bundle from a DidKey with optional signer
+    ///
+    /// This generates a new TLS certificate for the given key and creates
+    /// the cryptographic binding signature. Also generates X25519 keys for encryption.
+    /// If the key has PQ keys, ML-KEM keys are also generated for hybrid encryption.
+    ///
+    /// # Arguments
+    /// * `did_key` - The DID key (software or hardware)
+    /// * `signer` - Optional signer for hardware keys (None for software keys)
+    ///
+    /// # Errors
+    /// * Returns error if hardware key is provided without signer
+    /// * Returns error if signer's DID/verifying key doesn't match did_key
+    /// * Returns error if TLS certificate generation fails
+    pub fn from_did_key_with_signer(
+        did_key: DidKey,
+        signer: Option<Arc<dyn DidSigner>>,
+    ) -> Result<Self> {
+        // Hardware keys require a DidSigner backend
+        if did_key.is_hardware_backed() && signer.is_none() {
             anyhow::bail!(
-                "Cannot create IdentityBundle from hardware DidKey: Hardware keys \
-                 require a DidSigner to perform TLS binding signature. Use \
-                 from_did_key_with_signer() once Issue #1 is implemented."
+                "Cannot create IdentityBundle from hardware DidKey without signer: \
+                 Hardware keys require a DidSigner to perform TLS binding signature. \
+                 Use from_did_key_with_signer() with a signer implementation."
             );
+        }
+
+        // Validate that signer matches did_key if provided
+        if let Some(ref signer) = signer {
+            if signer.verifying_key() != did_key.verifying_key() {
+                anyhow::bail!(
+                    "Signer verifying key does not match DidKey: \
+                     signer DID={}, did_key DID={}. \
+                     The signer must correspond to the same key as did_key.",
+                    signer.did(),
+                    did_key.did()
+                );
+            }
         }
 
         let did = did_key.did().clone();
@@ -155,7 +264,13 @@ impl IdentityBundle {
 
         // Compute cert hash and sign with DID key
         let cert_hash = Self::hash_certificate(&tls_cert);
-        let tls_binding_sig = did_key.sign_software(&cert_hash)?.to_vec();
+        let tls_binding_sig = if let Some(ref signer) = signer {
+            // Use signer for hardware keys
+            signer.sign(&cert_hash)?.to_vec()
+        } else {
+            // Use software key directly
+            did_key.sign_software(&cert_hash)?.to_vec()
+        };
 
         let created_at = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -182,6 +297,7 @@ impl IdentityBundle {
         Ok(IdentityBundle {
             did,
             did_key,
+            signer,
             tls_cert,
             tls_key_der: Zeroizing::new(tls_key_der),
             tls_binding_sig,
@@ -244,6 +360,14 @@ impl IdentityBundle {
     /// This is used by the keystore to restore a previously saved bundle.
     /// The TLS certificate and binding signature are already generated.
     /// Secret parameters are wrapped in Zeroizing to prevent copies.
+    ///
+    /// **Note:** This method only supports software keys. Hardware-backed keys
+    /// require a signer to be provided; use `from_stored_with_signer()` instead
+    /// (not yet implemented - hardware key persistence is planned for future).
+    ///
+    /// # Errors
+    /// * Returns error if did_key is hardware-backed
+    /// * Returns error if binding signature verification fails
     #[allow(clippy::too_many_arguments)]
     pub fn from_stored(
         did_key: DidKey,
@@ -254,6 +378,17 @@ impl IdentityBundle {
         x25519_secret_bytes: Zeroizing<Vec<u8>>,
         x25519_public_bytes: [u8; 32],
     ) -> Result<Self> {
+        // Reject hardware-backed keys since we cannot restore signing capability
+        // without a signer. Hardware key persistence requires a separate API
+        // that accepts a signer.
+        if did_key.is_hardware_backed() {
+            anyhow::bail!(
+                "Cannot restore hardware-backed IdentityBundle without signer. \
+                 Hardware-backed key persistence is not yet supported. \
+                 The bundle must be re-created with from_did_key_with_signer()."
+            );
+        }
+
         #[cfg(feature = "post-quantum")]
         return Self::from_stored_with_kem(
             did_key,
@@ -286,6 +421,7 @@ impl IdentityBundle {
             Ok(IdentityBundle {
                 did,
                 did_key,
+                signer: None,
                 tls_cert,
                 tls_key_der,
                 tls_binding_sig,
@@ -331,6 +467,13 @@ impl IdentityBundle {
 
     /// Reconstruct identity bundle from stored components with optional PQ signing keys
     /// and optional KEM keys.
+    ///
+    /// **Note:** This method only supports software keys. Hardware-backed keys
+    /// require a signer to be provided; hardware key persistence is planned for future.
+    ///
+    /// # Errors
+    /// * Returns error if did_key is hardware-backed
+    /// * Returns error if binding signature verification fails
     #[cfg(feature = "post-quantum")]
     #[allow(clippy::too_many_arguments)]
     pub fn from_stored_with_pq(
@@ -346,6 +489,16 @@ impl IdentityBundle {
         kem_pq_secret: Option<Zeroizing<Vec<u8>>>,
         kem_pq_public: Option<Vec<u8>>,
     ) -> Result<Self> {
+        // Reject hardware-backed keys since we cannot restore signing capability
+        // without a signer. Hardware key persistence requires a separate API.
+        if did_key.is_hardware_backed() {
+            anyhow::bail!(
+                "Cannot restore hardware-backed IdentityBundle without signer. \
+                 Hardware-backed key persistence is not yet supported. \
+                 The bundle must be re-created with from_did_key_with_signer()."
+            );
+        }
+
         let did = did_key.did().clone();
         let tls_cert = CertificateDer::from(tls_cert_der);
 
@@ -363,6 +516,7 @@ impl IdentityBundle {
         Ok(IdentityBundle {
             did,
             did_key,
+            signer: None,
             tls_cert,
             tls_key_der,
             tls_binding_sig,
@@ -406,6 +560,64 @@ impl IdentityBundle {
     /// Get the DID key
     pub fn did_key(&self) -> &DidKey {
         &self.did_key
+    }
+
+    /// Get the optional signer backend
+    ///
+    /// Returns the signing backend if one was configured for this bundle,
+    /// regardless of whether the underlying DID key is hardware-backed or
+    /// software-only. Callers should not rely on the presence or absence of
+    /// a signer to determine key storage type; use `did_key().is_hardware_backed()`
+    /// or `requires_signer()` for that purpose instead.
+    ///
+    /// # Expected Usage Patterns
+    /// - **Hardware keys**: signer will always be `Some` (enforced at construction)
+    /// - **Software keys**: signer is always `None` (no signer needed)
+    ///
+    /// While it's theoretically possible to provide a signer for software keys,
+    /// this is not a supported use case. The signer validation ensures the signer
+    /// matches the key, but software keys can sign directly without delegation.
+    pub fn signer(&self) -> Option<&Arc<dyn DidSigner>> {
+        self.signer.as_ref()
+    }
+
+    /// Check if this bundle requires a signer for signing operations
+    ///
+    /// Returns `true` for hardware-backed keys (which cannot sign without a signer),
+    /// and `false` for software keys (which can sign directly).
+    ///
+    /// This is a convenience method equivalent to `did_key().is_hardware_backed()`.
+    pub fn requires_signer(&self) -> bool {
+        self.did_key.is_hardware_backed()
+    }
+
+    /// Sign a message using the appropriate signing method
+    ///
+    /// This method delegates signing to:
+    /// - The signer backend if available (for hardware keys)
+    /// - Direct software signing if no signer (for software keys)
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// - Hardware key is used without a signer backend
+    /// - Signing operation fails
+    pub fn sign(&self, message: &[u8]) -> Result<ed25519_dalek::Signature> {
+        // Hardware keys require a signer - this is enforced at construction,
+        // so this check is defensive against invariant violations.
+        if self.did_key.is_hardware_backed() && self.signer.is_none() {
+            anyhow::bail!(
+                "Invariant violation: hardware-backed key without signer. \
+                 This indicates a bug in IdentityBundle construction or \
+                 manual struct creation bypassing the public API."
+            )
+        }
+
+        // Use signer if available, otherwise use software key directly
+        if let Some(ref signer) = self.signer {
+            signer.sign(message)
+        } else {
+            self.did_key.sign_software(message)
+        }
     }
 
     /// Get the keypair (backward compatibility, only works for software keys)
@@ -775,5 +987,218 @@ mod tests {
 
         let result = IdentityBundle::from_did_key(did_key);
         assert!(result.is_err());
+        let err_msg = result.err().unwrap().to_string();
+        assert!(err_msg.contains("without signer"));
+    }
+
+    #[test]
+    fn test_software_key_sign_without_signer() {
+        // Software keys should work without signer
+        let bundle = IdentityBundle::generate().unwrap();
+        assert!(bundle.signer().is_none());
+
+        let message = b"test message";
+        let signature = bundle.sign(message).unwrap();
+
+        // Verify signature
+        use ed25519_dalek::Verifier;
+        let verifying_key = bundle.did().to_verifying_key().unwrap();
+        assert!(verifying_key.verify(message, &signature).is_ok());
+    }
+
+    #[test]
+    fn test_hardware_key_with_signer() {
+        use crate::SoftwareSigner;
+        use rand_core::OsRng;
+
+        // Create a software key for testing
+        let signing_key = SigningKey::generate(&mut OsRng);
+        let secret_bytes = signing_key.to_bytes();
+        let public_bytes = signing_key.verifying_key().to_bytes();
+
+        let software_did_key = DidKey::from_software_bytes(secret_bytes, public_bytes).unwrap();
+
+        // Create a signer from the software key
+        let signer = Arc::new(SoftwareSigner::new(software_did_key.clone()).unwrap());
+
+        // Create hardware key with same public key
+        let hardware_did_key = DidKey::from_hardware(
+            signing_key.verifying_key(),
+            "test-hsm".to_string(),
+            "slot-0".to_string(),
+        );
+
+        // Create bundle with signer
+        let bundle =
+            IdentityBundle::from_did_key_with_signer(hardware_did_key, Some(signer.clone()))
+                .unwrap();
+
+        assert!(bundle.signer().is_some());
+        assert_eq!(bundle.did_key().backend_type(), "test-hsm");
+
+        // Test signing works
+        let message = b"test message";
+        let signature = bundle.sign(message).unwrap();
+
+        // Verify signature
+        use ed25519_dalek::Verifier;
+        let verifying_key = bundle.did().to_verifying_key().unwrap();
+        assert!(verifying_key.verify(message, &signature).is_ok());
+    }
+
+    #[test]
+    fn test_hardware_key_without_signer_fails() {
+        use crate::SoftwareSigner;
+        use rand_core::OsRng;
+
+        // Create a software key for testing
+        let signing_key = SigningKey::generate(&mut OsRng);
+        let secret_bytes = signing_key.to_bytes();
+        let public_bytes = signing_key.verifying_key().to_bytes();
+
+        let software_did_key = DidKey::from_software_bytes(secret_bytes, public_bytes).unwrap();
+
+        // Create a signer from the software key
+        let signer = Arc::new(SoftwareSigner::new(software_did_key.clone()).unwrap());
+
+        // Create hardware key with same public key
+        let hardware_did_key = DidKey::from_hardware(
+            signing_key.verifying_key(),
+            "test-hsm".to_string(),
+            "slot-0".to_string(),
+        );
+
+        // Create bundle with signer first
+        let bundle =
+            IdentityBundle::from_did_key_with_signer(hardware_did_key.clone(), Some(signer))
+                .unwrap();
+
+        // Manually create a bundle without signer (simulating incorrect usage)
+        // This would be caught by from_did_key_with_signer, but we test the sign() method
+        let did = bundle.did().clone();
+        let broken_bundle = IdentityBundle {
+            did: did.clone(),
+            did_key: hardware_did_key,
+            signer: None, // Hardware key without signer
+            tls_cert: bundle.tls_cert.clone(),
+            tls_key_der: bundle.tls_key_der.clone(),
+            tls_binding_sig: bundle.tls_binding_sig.clone(),
+            created_at: bundle.created_at,
+            x25519_secret: bundle.x25519_secret.clone(),
+            x25519_public: bundle.x25519_public,
+            #[cfg(feature = "post-quantum")]
+            kem_pq_secret: None,
+            #[cfg(feature = "post-quantum")]
+            kem_pq_public: None,
+            #[cfg(feature = "post-quantum")]
+            pq_signing_secret: None,
+            #[cfg(feature = "post-quantum")]
+            pq_signing_public: None,
+        };
+
+        // Signing should fail with invariant violation
+        let message = b"test message";
+        let result = broken_bundle.sign(message);
+        assert!(result.is_err());
+        let err_msg = result.err().unwrap().to_string();
+        assert!(err_msg.contains("Invariant violation"));
+    }
+
+    #[test]
+    fn test_signer_getter() {
+        use crate::SoftwareSigner;
+        use rand_core::OsRng;
+
+        // Software bundle should have no signer
+        let bundle = IdentityBundle::generate().unwrap();
+        assert!(bundle.signer().is_none());
+
+        // Hardware bundle with signer should return signer
+        let signing_key = SigningKey::generate(&mut OsRng);
+        let secret_bytes = signing_key.to_bytes();
+        let public_bytes = signing_key.verifying_key().to_bytes();
+
+        let software_did_key = DidKey::from_software_bytes(secret_bytes, public_bytes).unwrap();
+        let signer = Arc::new(SoftwareSigner::new(software_did_key.clone()).unwrap());
+
+        let hardware_did_key = DidKey::from_hardware(
+            signing_key.verifying_key(),
+            "test-hsm".to_string(),
+            "slot-0".to_string(),
+        );
+
+        let bundle =
+            IdentityBundle::from_did_key_with_signer(hardware_did_key, Some(signer.clone()))
+                .unwrap();
+
+        assert!(bundle.signer().is_some());
+        assert_eq!(bundle.signer().unwrap().backend_type(), "software");
+    }
+
+    #[test]
+    fn test_bundle_clone_with_signer() {
+        use crate::SoftwareSigner;
+        use rand_core::OsRng;
+
+        let signing_key = SigningKey::generate(&mut OsRng);
+        let secret_bytes = signing_key.to_bytes();
+        let public_bytes = signing_key.verifying_key().to_bytes();
+
+        let software_did_key = DidKey::from_software_bytes(secret_bytes, public_bytes).unwrap();
+        let signer = Arc::new(SoftwareSigner::new(software_did_key.clone()).unwrap());
+
+        let hardware_did_key = DidKey::from_hardware(
+            signing_key.verifying_key(),
+            "test-hsm".to_string(),
+            "slot-0".to_string(),
+        );
+
+        let bundle1 =
+            IdentityBundle::from_did_key_with_signer(hardware_did_key, Some(signer)).unwrap();
+        let bundle2 = bundle1.clone();
+
+        // Both should have same DID and signer
+        assert_eq!(bundle1.did(), bundle2.did());
+        assert!(bundle1.signer().is_some());
+        assert!(bundle2.signer().is_some());
+
+        // Both should be able to sign
+        let message = b"test message";
+        let sig1 = bundle1.sign(message).unwrap();
+        let sig2 = bundle2.sign(message).unwrap();
+
+        // Signatures should verify
+        use ed25519_dalek::Verifier;
+        let verifying_key = bundle1.did().to_verifying_key().unwrap();
+        assert!(verifying_key.verify(message, &sig1).is_ok());
+        assert!(verifying_key.verify(message, &sig2).is_ok());
+    }
+
+    #[test]
+    fn test_signer_mismatch_rejected() {
+        use crate::SoftwareSigner;
+        use rand_core::OsRng;
+
+        // Create two different keys
+        let key1 = SigningKey::generate(&mut OsRng);
+        let key2 = SigningKey::generate(&mut OsRng);
+
+        // Create a signer from key1
+        let software_did_key1 =
+            DidKey::from_software_bytes(key1.to_bytes(), key1.verifying_key().to_bytes()).unwrap();
+        let signer1 = Arc::new(SoftwareSigner::new(software_did_key1).unwrap());
+
+        // Create a hardware key from key2 (different key!)
+        let hardware_did_key2 = DidKey::from_hardware(
+            key2.verifying_key(),
+            "test-hsm".to_string(),
+            "slot-0".to_string(),
+        );
+
+        // Should fail: signer's key doesn't match did_key
+        let result = IdentityBundle::from_did_key_with_signer(hardware_did_key2, Some(signer1));
+        assert!(result.is_err());
+        let err_msg = result.err().unwrap().to_string();
+        assert!(err_msg.contains("does not match"));
     }
 }
