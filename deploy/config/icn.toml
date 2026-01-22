@@ -66,3 +66,24 @@ burst_capacity = 20
 [rate_limiting.federated]
 max_messages_per_second = 200
 burst_capacity = 50
+
+# Identity backend configuration
+# Selects which keystore backend to use for identity storage
+[identity]
+backend = "age"  # Options: "age" (default, software), "pkcs11" (HSM), "tpm" (TPM 2.0)
+
+# PKCS#11 HSM backend configuration (only used when backend = "pkcs11")
+# Note: PKCS#11 backend is scaffolding only and not yet functional
+# [identity.pkcs11]
+# library_path = "/usr/lib/softhsm/libsofthsm2.so"
+# slot_id = 0
+# key_label = "icn-identity"
+# token_label = "softhsm"  # Optional
+
+# TPM 2.0 backend configuration (only used when backend = "tpm")
+# Note: TPM backend is scaffolding only and not yet functional
+# [identity.tpm]
+# device_path = "/dev/tpmrm0"
+# key_handle = 0x81000000
+# platform_binding = true
+# attestation = false

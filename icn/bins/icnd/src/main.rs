@@ -9,7 +9,11 @@ use anyhow::Context;
 use anyhow::Result;
 use clap::Parser;
 use icn_core::{Config, Runtime};
-use icn_identity::{AgeKeyStore, KeyStore};
+use icn_identity::{AgeKeyStore, BackendConfig, KeyStore};
+#[cfg(feature = "hsm")]
+use icn_identity::Pkcs11Config;
+#[cfg(feature = "tpm-experimental")]
+use icn_identity::TpmConfig;
 use std::io::{self, Write};
 use std::path::PathBuf;
 use zeroize::Zeroizing;
@@ -213,6 +217,7 @@ async fn main() -> Result<()> {
     let keystore_path = config.keystore_path();
     let identity_bundle = if keystore_path.exists() {
         tracing::info!("Identity keystore found at: {:?}", keystore_path);
+        tracing::info!("Using identity backend: {}", config.identity.backend);
 
         // Get passphrase: tries ICN_KEYSTORE_PASSPHRASE env var first, then ICN_PASSPHRASE,
         // then falls back to interactive prompt. For automated deployments (systemd, Docker, K8s),
@@ -222,7 +227,24 @@ async fn main() -> Result<()> {
             read_passphrase("Enter keystore passphrase: ").context("Failed to read passphrase")?;
 
         // Load and unlock keystore
-        let mut keystore = AgeKeyStore::open(&keystore_path).context("Failed to open keystore")?;
+        // Check backend type and use appropriate loading strategy
+        let mut keystore = match config.identity.backend.as_str() {
+            "age" => {
+                // Age backend: use direct AgeKeyStore
+                AgeKeyStore::open(&keystore_path).context("Failed to open Age keystore")?
+            }
+            "pkcs11" | "tpm" => {
+                // Hardware backends: fail with clear error
+                let backend_cfg = backend_config_from_runtime_config(&config)?;
+                // This will bail with "scaffolding only" error
+                let _ = icn_identity::open_keystore(backend_cfg)?;
+                unreachable!("Hardware backend should have bailed");
+            }
+            other => {
+                anyhow::bail!("Unknown identity backend '{}'", other);
+            }
+        };
+        
         keystore
             .unlock(&passphrase)
             .context("Failed to unlock keystore - incorrect passphrase?")?;
@@ -295,6 +317,66 @@ async fn wait_for_sigterm() -> Result<()> {
 async fn wait_for_sigterm() -> Result<()> {
     // On non-Unix systems, just wait forever
     std::future::pending().await
+}
+
+/// Convert icn-core Config to identity BackendConfig
+///
+/// This bridges the gap between the high-level configuration structure
+/// and the backend-specific types needed by the factory.
+fn backend_config_from_runtime_config(cfg: &Config) -> Result<BackendConfig> {
+    match cfg.identity.backend.as_str() {
+        "age" => Ok(BackendConfig::Age {
+            path: cfg.keystore_path().display().to_string(),
+        }),
+
+        #[cfg(feature = "hsm")]
+        "pkcs11" => {
+            let p = cfg
+                .identity
+                .pkcs11
+                .as_ref()
+                .ok_or_else(|| {
+                    anyhow::anyhow!("identity.backend=pkcs11 but identity.pkcs11 config missing")
+                })?;
+            Ok(BackendConfig::Pkcs11(Pkcs11Config {
+                library_path: p.library_path.clone(),
+                slot_id: p.slot_id,
+                key_label: p.key_label.clone(),
+                token_label: p.token_label.clone(),
+            }))
+        }
+
+        #[cfg(not(feature = "hsm"))]
+        "pkcs11" => {
+            anyhow::bail!(
+                "PKCS#11 backend selected but 'hsm' feature not enabled. \
+                 Recompile with --features hsm to enable HSM support."
+            );
+        }
+
+        #[cfg(feature = "tpm-experimental")]
+        "tpm" => {
+            let t = cfg.identity.tpm.as_ref().ok_or_else(|| {
+                anyhow::anyhow!("identity.backend=tpm but identity.tpm config missing")
+            })?;
+            Ok(BackendConfig::Tpm(TpmConfig {
+                device_path: t.device_path.clone(),
+                key_handle: t.key_handle,
+                platform_binding: t.platform_binding,
+                attestation: t.attestation,
+            }))
+        }
+
+        #[cfg(not(feature = "tpm-experimental"))]
+        "tpm" => {
+            anyhow::bail!(
+                "TPM backend selected but 'tpm-experimental' feature not enabled. \
+                 Recompile with --features tpm-experimental to enable TPM support."
+            );
+        }
+
+        other => anyhow::bail!("Unknown identity backend '{}'", other),
+    }
 }
 
 /// Read passphrase from environment or stdin
