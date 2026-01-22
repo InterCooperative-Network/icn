@@ -5,6 +5,7 @@
 //! This crate provides:
 //! - Local state serialization for daemon restarts
 //! - Distributed snapshot protocol (Chandy-Lamport) for network-wide consistency
+//! - Hardware key support (HSM/TPM) with public-only serialization
 //!
 //! ## Local Snapshot Usage
 //!
@@ -15,6 +16,7 @@
 //! let mut snapshot = StateSnapshot::new();
 //! snapshot.gossip_state = Some(gossip_actor.export_state());
 //! snapshot.network_state = Some(network_actor.export_state());
+//! snapshot.identity_state = Some(identity_bundle.export_state());
 //! save_snapshot(&snapshot, "/path/to/data")?;
 //!
 //! // On startup
@@ -25,7 +27,68 @@
 //!     if let Some(network_state) = snapshot.network_state {
 //!         network_actor.restore_state(network_state)?;
 //!     }
+//!     if let Some(identity_state) = snapshot.identity_state {
+//!         // Software keys can be restored automatically
+//!         // Hardware keys require backend reconnection
+//!         identity_bundle.restore_state(identity_state)?;
+//!     }
 //! }
+//! ```
+//!
+//! ## Hardware Key Support
+//!
+//! Hardware-backed keys (HSM/TPM) cannot serialize private key material.
+//! The snapshot system handles this by:
+//!
+//! 1. **Software keys**: Serialize complete key material (secret + public)
+//! 2. **Hardware keys**: Serialize only public key + backend metadata
+//! 3. **Restore**: Software keys work automatically; hardware keys require backend
+//!
+//! ### Software Key Example
+//!
+//! ```rust,ignore
+//! use icn_identity::IdentityBundle;
+//! use icn_snapshot::DidKeySnapshot;
+//!
+//! // Generate software key
+//! let bundle = IdentityBundle::generate()?;
+//! let did_key = bundle.did_key();
+//!
+//! // Snapshot includes secret material
+//! let snapshot = DidKeySnapshot::from_did_key(did_key);
+//! assert!(!snapshot.is_hardware_backed());
+//!
+//! // Restore works automatically
+//! let restored = snapshot.try_into_did_key()?;
+//! ```
+//!
+//! ### Hardware Key Example
+//!
+//! ```rust,ignore
+//! use icn_identity::{DidKey, DidSigner};
+//! use icn_snapshot::DidKeySnapshot;
+//!
+//! // Hardware key (from HSM/TPM)
+//! let hardware_key = DidKey::from_hardware(
+//!     verifying_key,
+//!     "pkcs11".to_string(),
+//!     "slot=0,label=mykey".to_string(),
+//! );
+//!
+//! // Snapshot contains only public key + metadata
+//! let snapshot = DidKeySnapshot::from_did_key(&hardware_key);
+//! assert!(snapshot.is_hardware_backed());
+//! assert_eq!(snapshot.backend_type(), Some("pkcs11"));
+//!
+//! // Restore requires backend reconnection
+//! // (try_into_did_key() will fail with instructions)
+//! let restored = snapshot.restore_hardware_key()?;
+//!
+//! // Must provide DidSigner backend for signing operations
+//! let bundle = IdentityBundle::from_did_key_with_signer(
+//!     restored,
+//!     Some(Arc::new(hardware_signer)),
+//! )?;
 //! ```
 //!
 //! ## Distributed Snapshot Usage
@@ -37,6 +100,14 @@
 //! let (snapshot_id, init_msg) = coordinator.initiate_snapshot(participants).await?;
 //! // Broadcast init_msg via gossip
 //! ```
+//!
+//! ## Security Considerations
+//!
+//! - **Software keys**: Secret material is stored in snapshot. Encrypt at rest!
+//! - **Hardware keys**: Only public key stored. Private key never leaves HSM/TPM.
+//! - **Snapshots contain sensitive data**: Use appropriate file permissions.
+//! - **Checksums verified**: Load operation validates SHA256 checksums.
+//!
 
 pub mod coordinator;
 pub mod protocol;
@@ -169,6 +240,51 @@ pub struct NetworkState {
 ///
 /// Contains the serializable representation of identity keys and TLS certificates.
 /// Hardware keys only store public information; private keys remain in HSM/TPM.
+///
+/// # Security Notes
+///
+/// - **Software keys**: All secret material is serialized. Snapshots must be encrypted at rest!
+/// - **Hardware keys**: Only public keys and metadata stored. Secrets never leave hardware.
+/// - **File permissions**: Snapshot files should be readable only by the daemon user.
+///
+/// # Hardware Key Behavior
+///
+/// When `did_key.is_hardware_backed()` is true:
+/// - `tls_key_der` will be `None` (TLS uses separate certificate)
+/// - `x25519_secret` may be `None` (encryption may delegate to hardware)
+/// - Restore requires reconnection to HSM/TPM backend
+///
+/// # Example: Software Key
+///
+/// ```rust,ignore
+/// let state = IdentityState {
+///     did: bundle.did().to_string(),
+///     did_key: DidKeySnapshot::from_did_key(bundle.did_key()),
+///     tls_cert: bundle.tls_cert().to_vec(),
+///     tls_key_der: Some(bundle.tls_key_der().to_vec()),  // Present for software
+///     tls_binding_sig: bundle.tls_binding_sig().to_vec(),
+///     created_at: bundle.created_at(),
+///     x25519_secret: Some(bundle.x25519_secret().to_vec()),  // Present for software
+///     x25519_public: *bundle.x25519_public(),
+///     // PQ fields...
+/// };
+/// ```
+///
+/// # Example: Hardware Key
+///
+/// ```rust,ignore
+/// let state = IdentityState {
+///     did: bundle.did().to_string(),
+///     did_key: DidKeySnapshot::from_did_key(bundle.did_key()),  // Public only
+///     tls_cert: bundle.tls_cert().to_vec(),
+///     tls_key_der: None,  // Hardware key - no TLS secret
+///     tls_binding_sig: bundle.tls_binding_sig().to_vec(),
+///     created_at: bundle.created_at(),
+///     x25519_secret: None,  // Hardware key - encryption in hardware
+///     x25519_public: *bundle.x25519_public(),
+///     // PQ fields...
+/// };
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IdentityState {
     /// DID (decentralized identifier)
@@ -220,6 +336,91 @@ pub struct IdentityState {
 ///
 /// This is separate from the runtime DidKey to enable safe serialization.
 /// Hardware keys serialize only public information; private keys remain in hardware.
+///
+/// # Variants
+///
+/// - **Software**: Contains full key material (secret + public). Can be restored automatically.
+/// - **Hardware**: Contains only public key + metadata. Requires backend reconnection on restore.
+///
+/// # Usage
+///
+/// ## Capturing State
+///
+/// ```rust,ignore
+/// use icn_snapshot::DidKeySnapshot;
+///
+/// // From runtime DidKey
+/// let snapshot = DidKeySnapshot::from_did_key(&bundle.did_key());
+///
+/// // Check type
+/// if snapshot.is_hardware_backed() {
+///     println!("Hardware key: {}", snapshot.backend_type().unwrap());
+/// }
+///
+/// // Serialize to JSON
+/// let json = serde_json::to_string(&snapshot)?;
+/// ```
+///
+/// ## Restoring State
+///
+/// ### Software Keys (Automatic)
+///
+/// ```rust,ignore
+/// // Load from snapshot
+/// let snapshot: DidKeySnapshot = serde_json::from_str(&json)?;
+///
+/// // Restore (works for software keys)
+/// let did_key = snapshot.try_into_did_key()?;
+/// ```
+///
+/// ### Hardware Keys (Requires Backend)
+///
+/// ```rust,ignore
+/// // Load from snapshot
+/// let snapshot: DidKeySnapshot = serde_json::from_str(&json)?;
+///
+/// // Attempt automatic restore fails with instructions
+/// match snapshot.clone().try_into_did_key() {
+///     Err(e) => {
+///         // Error message explains hardware key requires backend
+///         println!("Expected: {}", e);
+///     }
+///     _ => unreachable!(),
+/// }
+///
+/// // Correct approach: restore hardware key
+/// let did_key = snapshot.restore_hardware_key()?;
+///
+/// // Provide signer backend for operations
+/// let signer = Arc::new(hardware_backend);
+/// let bundle = IdentityBundle::from_did_key_with_signer(did_key, Some(signer))?;
+/// ```
+///
+/// # Security
+///
+/// - Software keys: Secret material in snapshot. **Encrypt at rest!**
+/// - Hardware keys: Only public key stored. Secrets never leave hardware boundary.
+///
+/// # JSON Format
+///
+/// Software key:
+/// ```json
+/// {
+///   "type": "software",
+///   "secret_bytes": [1, 2, 3, ...],
+///   "public_bytes": [4, 5, 6, ...]
+/// }
+/// ```
+///
+/// Hardware key:
+/// ```json
+/// {
+///   "type": "hardware",
+///   "public_bytes": [4, 5, 6, ...],
+///   "backend_type": "pkcs11",
+///   "hardware_id": "slot=0,label=mykey"
+/// }
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum DidKeySnapshot {
