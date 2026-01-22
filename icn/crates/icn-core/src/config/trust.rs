@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Trust graph configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct TrustConfig {
     /// Trust attestation settings
     #[serde(default)]
@@ -16,16 +16,6 @@ pub struct TrustConfig {
     /// Sybil resistance settings
     #[serde(default)]
     pub sybil_resistance: SybilResistanceConfig,
-}
-
-impl Default for TrustConfig {
-    fn default() -> Self {
-        Self {
-            attestation: AttestationConfig::default(),
-            propagation: PropagationConfig::default(),
-            sybil_resistance: SybilResistanceConfig::default(),
-        }
-    }
 }
 
 /// Trust attestation configuration

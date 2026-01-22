@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Gossip protocol configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct GossipConfig {
     /// Replication settings for data durability
     #[serde(default)]
@@ -12,15 +12,6 @@ pub struct GossipConfig {
     /// Partition detection settings for split-brain prevention
     #[serde(default)]
     pub partition: PartitionConfig,
-}
-
-impl Default for GossipConfig {
-    fn default() -> Self {
-        Self {
-            replication: ReplicationConfig::default(),
-            partition: PartitionConfig::default(),
-        }
-    }
 }
 
 /// Replication configuration for data durability
