@@ -1,21 +1,17 @@
 //! TPM Identity Example
 //!
-//! # ⚠️ WARNING: Phase 1 Placeholder Implementation
-//!
-//! **This is Phase 1 scaffolding with placeholder sealing. Keys are NOT actually
-//! sealed to TPM hardware - they are stored on disk with file permissions only.
-//! Do NOT use in production until Phase 2 (real TPM operations) is complete.**
-//!
-//! See issue #745 for Phase 2 implementation status.
-//!
-//! ---
-//!
 //! This example demonstrates how to use the TPM backend to create and manage
-//! ICN identities with hardware-backed key storage.
+//! ICN identities with hardware-backed key storage using real TPM operations.
+//!
+//! # Implementation Status
+//!
+//! Phase 2 is complete: Keys are sealed to TPM hardware using TPM2_Create and
+//! unsealed using TPM2_Unseal. PCR policy binding is planned for a future phase.
 //!
 //! # Requirements
 //!
 //! - TPM 2.0 hardware or swtpm simulator
+//! - libtss2-dev installed
 //! - Build with `--features tpm-experimental`
 //!
 //! # Usage
@@ -60,13 +56,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   ✓ Backend created\n");
 
     // Initialize new identity
-    println!("2. Initializing new identity...");
+    println!("2. Initializing new identity (sealing key to TPM)...");
     let bundle = backend.init(&[])?;
 
     println!("   DID: {}", bundle.did());
     println!("   Hardware-backed: {}", backend.is_hardware_backed());
     println!("   Backend type: {}", backend.backend_type());
-    println!("   ✓ Identity initialized\n");
+    println!("   ✓ Identity initialized and sealed to TPM\n");
 
     // Sign a message
     println!("3. Signing a message...");
@@ -91,11 +87,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   Is locked: {}", backend.is_locked());
     println!("   ✓ Backend locked\n");
 
-    // Unlock the backend
-    println!("6. Unlocking backend...");
+    // Unlock the backend (unseal from TPM)
+    println!("6. Unlocking backend (unsealing from TPM)...");
     backend.unlock(&[])?;
     println!("   Is locked: {}", backend.is_locked());
-    println!("   ✓ Backend unlocked\n");
+    println!("   ✓ Backend unlocked (key unsealed from TPM)\n");
 
     // Sign another message after unlock
     println!("7. Signing after unlock...");
@@ -111,10 +107,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("=== Example completed successfully ===\n");
 
-    println!("⚠️  WARNING: This is a PLACEHOLDER implementation.");
-    println!("   Keys are NOT actually sealed to TPM hardware.");
-    println!("   Do NOT use in production until Phase 2 is complete.");
-    println!("   See issue #745 and docs/tpm-setup.md for more information.");
+    println!("Note: Keys are sealed to TPM hardware using TPM2_Create/TPM2_Unseal.");
+    println!("      PCR binding for platform integrity is planned for a future phase.");
+    println!("      See issue #745 and docs/tpm-setup.md for more information.");
 
     Ok(())
 }
