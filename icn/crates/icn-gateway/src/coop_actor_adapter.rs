@@ -4,7 +4,7 @@
 //! and the CoopActor from icn-coop. It converts between gateway types
 //! and actor types, providing a smooth migration path.
 
-use crate::coop::{Coop, CoopId, CoopMember, CoopSettings, MemberRole};
+use crate::coop::{convert_gateway_role_to_actor, Coop, CoopId, CoopMember, CoopSettings, MemberRole};
 use crate::error::{GatewayError, Result};
 use icn_coop::CoopHandle;
 use icn_identity::Did;
@@ -105,12 +105,7 @@ impl ActorCoopManager {
         role: MemberRole,
         timestamp: u64,
     ) -> Result<Coop> {
-        // Map gateway MemberRole to icn-coop MemberRole
-        let actor_role = match role {
-            MemberRole::Steward => icn_coop::MemberRole::Founder,
-            MemberRole::Facilitator => icn_coop::MemberRole::Officer,
-            MemberRole::Participant => icn_coop::MemberRole::Member,
-        };
+        let actor_role = convert_gateway_role_to_actor(&role);
 
         let _member = self
             .handle
@@ -151,12 +146,7 @@ impl ActorCoopManager {
         did: &Did,
         new_role: MemberRole,
     ) -> Result<Coop> {
-        // Map gateway MemberRole to icn-coop MemberRole
-        let actor_role = match new_role {
-            MemberRole::Steward => icn_coop::MemberRole::Founder,
-            MemberRole::Facilitator => icn_coop::MemberRole::Officer,
-            MemberRole::Participant => icn_coop::MemberRole::Member,
-        };
+        let actor_role = convert_gateway_role_to_actor(&new_role);
 
         self.handle
             .update_member_role(coop_id.clone(), did.clone(), actor_role)

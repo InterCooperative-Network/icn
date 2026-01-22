@@ -720,11 +720,13 @@ mod tests {
         let performer_keypair = KeyPair::generate().expect("keypair");
         let performer = EntityId::from_did(performer_keypair.did());
 
-        // Create 3 records with small delays to ensure distinct timestamps
+        // Create 3 records with small delays to ensure distinct timestamps.
+        // Note: Storage uses millisecond precision for ordering, but record IDs
+        // only have second precision. We verify ordering via timestamps, not IDs.
         let mut ids = Vec::new();
         for i in 0..3 {
-            // Sleep to ensure distinct timestamps (seconds precision)
-            std::thread::sleep(std::time::Duration::from_millis(1100));
+            // Sleep to ensure distinct timestamps (millisecond precision in storage)
+            std::thread::sleep(std::time::Duration::from_millis(50));
             let record = mgr
                 .record_audit(
                     &entity_id,
@@ -744,9 +746,33 @@ mod tests {
             .get_audit_trail(&entity_id, 10, 0)
             .expect("Failed to get audit trail");
         assert_eq!(trail.records.len(), 3, "Should have 3 records");
-        assert_eq!(trail.records[0].id, ids[2], "Most recent should be first");
-        assert_eq!(trail.records[1].id, ids[1], "Second most recent");
-        assert_eq!(trail.records[2].id, ids[0], "Oldest should be last");
+
+        // Verify all created records are present in the result
+        let result_ids: Vec<&String> = trail.records.iter().map(|r| &r.id).collect();
+        for id in &ids {
+            assert!(
+                result_ids.contains(&id),
+                "Created record {id} should be in results"
+            );
+        }
+
+        // Verify records are returned in reverse creation order.
+        // The last-created record (ids[2]) should be first in results,
+        // and the first-created record (ids[0]) should be last.
+        // Note: Since storage uses millisecond precision but IDs use second precision,
+        // we verify order by checking that the result order is the reverse of creation order.
+        assert_eq!(
+            trail.records[0].id, ids[2],
+            "Most recent should be first (created last)"
+        );
+        assert_eq!(
+            trail.records[1].id, ids[1],
+            "Second most recent (created second)"
+        );
+        assert_eq!(
+            trail.records[2].id, ids[0],
+            "Oldest should be last (created first)"
+        );
 
         // Verify timestamps are descending (most recent first)
         assert!(
