@@ -1147,4 +1147,31 @@ enabled = false
         assert!((verification.consensus_threshold - 0.67).abs() < f64::EPSILON);
         assert_eq!(verification.collection_window_ms, 30_000);
     }
+
+    #[test]
+    fn test_gossip_config_conversion_trust_class_semantic() {
+        // Verify that default min_replica_trust (0.4) converts to Partner class
+        let config = GossipConfig::default();
+        let manager_config = config.replication.to_manager_config();
+
+        // Partner class is for scores >= 0.4 and < 0.7
+        assert_eq!(
+            manager_config.min_trust_class,
+            icn_trust::TrustClass::Partner
+        );
+
+        // Test boundary cases
+        let mut config_known = GossipConfig::default();
+        config_known.replication.min_replica_trust = 0.3; // Should be Known class
+        let manager_known = config_known.replication.to_manager_config();
+        assert_eq!(manager_known.min_trust_class, icn_trust::TrustClass::Known);
+
+        let mut config_federated = GossipConfig::default();
+        config_federated.replication.min_replica_trust = 0.8; // Should be Federated class
+        let manager_federated = config_federated.replication.to_manager_config();
+        assert_eq!(
+            manager_federated.min_trust_class,
+            icn_trust::TrustClass::Federated
+        );
+    }
 }
