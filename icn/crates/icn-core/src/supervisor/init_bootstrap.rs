@@ -65,7 +65,7 @@ pub async fn dial_bootstrap_peers(
     let mut connected_peers = Vec::new();
 
     for peer_url in &config.bootstrap_peers {
-        match super::parse_bootstrap_peer(peer_url).await {
+        match super::bridge::parse_bootstrap_peer(peer_url).await {
             Ok((peer_did, peer_addr)) => {
                 info!(
                     "Connecting to bootstrap peer: {} at {}",
