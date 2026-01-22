@@ -420,66 +420,41 @@ mod tests {
 
     #[test]
     fn test_verify_challenge_success_with_hardware_backed_bundle() {
-        use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
-        use icn_identity::{Did, DidKey, DidSigner};
+        use ed25519_dalek::SigningKey;
+        use icn_identity::{DidKey, IdentityBundle, SoftwareSigner};
+        use rand::rngs::OsRng;
         use std::sync::Arc;
-
-        // Mock hardware signer for testing
-        struct MockHardwareSigner {
-            did: Did,
-            vk: VerifyingKey,
-            sk: SigningKey,
-        }
-
-        impl DidSigner for MockHardwareSigner {
-            fn did(&self) -> &Did {
-                &self.did
-            }
-            fn verifying_key(&self) -> &VerifyingKey {
-                &self.vk
-            }
-            fn sign(&self, message: &[u8]) -> anyhow::Result<Signature> {
-                Ok(self.sk.sign(message))
-            }
-            fn is_hardware_backed(&self) -> bool {
-                true
-            }
-            fn backend_type(&self) -> &str {
-                "mock-hsm"
-            }
-        }
 
         let auth = AuthManager::new(b"test_secret".to_vec());
 
-        // Generate a signing key, but pretend the key is hardware-backed
-        let sk = SigningKey::generate(&mut rand::thread_rng());
-        let vk = sk.verifying_key();
-        let did = Did::from_public_key(&vk);
+        // Create a software signing key (for the backend), but present it as "hardware" to the bundle
+        let signing_key = SigningKey::generate(&mut OsRng);
+        let secret_bytes = signing_key.to_bytes();
+        let verifying_key = signing_key.verifying_key();
 
-        let did_key = DidKey::from_hardware(vk, "mock-hsm".to_string(), "slot=0".to_string());
-        let signer = Arc::new(MockHardwareSigner {
-            did: did.clone(),
-            vk,
-            sk,
-        });
+        // Signer backend uses software key material (stand-in for PKCS#11/TPM signer)
+        let software_did_key =
+            DidKey::from_software_bytes(secret_bytes, verifying_key.to_bytes()).unwrap();
+        let signer = Arc::new(SoftwareSigner::new(software_did_key).unwrap());
 
-        // Create bundle with hardware key + signer
-        let bundle = IdentityBundle::from_did_key_with_signer(did_key, Some(signer))
-            .expect("bundle should construct with signer");
+        // Bundle DID key is "hardware" (no secret in memory at the bundle level)
+        let hardware_key =
+            DidKey::from_hardware(verifying_key, "pkcs11".to_string(), "slot=0".to_string());
 
-        // Challenge
+        let bundle =
+            IdentityBundle::from_did_key_with_signer(hardware_key, Some(signer)).unwrap();
+
+        // Create challenge
         let nonce = auth.create_challenge(bundle.did()).unwrap();
         let nonce_bytes = hex::decode(&nonce).unwrap();
 
-        // Hardware-backed signing path - this is the critical test
-        let sig = bundle
-            .sign(&nonce_bytes)
-            .expect("hardware signer should sign");
+        // This MUST work via signer (and would fail if code tried keypair())
+        let signature = bundle.sign(&nonce_bytes).unwrap();
 
         let token = auth
             .verify_challenge(
                 bundle.did(),
-                &sig.to_bytes(),
+                &signature.to_bytes(),
                 "test-coop",
                 vec!["ledger:read".to_string()],
             )
