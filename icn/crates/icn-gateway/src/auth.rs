@@ -51,7 +51,7 @@
 //! # use icn_gateway::auth::AuthManager;
 //! # use std::sync::Arc;
 //! # use ed25519_dalek::SigningKey;
-//! # use rand_core::OsRng;
+//! # use rand::rngs::OsRng;
 //! let auth = AuthManager::new(b"secret".to_vec());
 //!
 //! // Hardware-backed key (private key in HSM/TPM)
