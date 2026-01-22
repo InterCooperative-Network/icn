@@ -38,7 +38,7 @@ tempfile = "3.24"
 reqwest = { workspace = true, features = ["blocking"] }
 uuid = { version = "1.7", features = ["v4"] }
 qrcode = "0.14"
-image = "0.25"
+image = { version = "0.25", default-features = false, features = ["png"] }
 
 # ICN crates
 icn-core.workspace = true

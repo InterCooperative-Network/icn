@@ -4707,7 +4707,7 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &Path) -> Result<()> {
             ));
             let request_json = serde_json::to_string_pretty(&request)?;
             std::fs::create_dir_all(data_dir)?;
-            std::fs::write(&request_file, request_json.clone())?;
+            std::fs::write(&request_file, request_json)?;
 
             println!("✓ Device-add request created: {}", request_file.display());
             println!();
@@ -4716,50 +4716,55 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &Path) -> Result<()> {
             let qr_requested = qr || qr_image.is_some();
             if qr_requested {
                 use qrcode::QrCode;
-                
+
                 // Use compact JSON for QR code (no pretty printing)
                 let qr_data = serde_json::to_string(&request)?;
                 let qr_data_len = qr_data.len();
-                
+
                 println!("QR code data size: {} bytes", qr_data_len);
-                
+
                 if qr_data_len > MAX_RELIABLE_QR_SIZE {
-                    eprintln!("⚠️  Warning: QR code data is large ({} bytes). May not scan reliably.", qr_data_len);
+                    eprintln!(
+                        "⚠️  Warning: QR code data is large ({} bytes). May not scan reliably.",
+                        qr_data_len
+                    );
                 }
-                
-                let code = QrCode::new(qr_data.as_bytes())
-                    .context("Failed to generate QR code")?;
-                
-                // Display QR in terminal if --qr is set
+
+                let code = QrCode::new(qr_data.as_bytes()).context("Failed to generate QR code")?;
+
+                // Display QR in terminal if --qr is set, or if no image output was requested
                 if qr || qr_image.is_none() {
                     println!("\n{}", "═".repeat(60));
                     println!("QR CODE - Scan with approving device");
                     println!("{}", "═".repeat(60));
-                    
+
                     let qr_string = code
                         .render::<char>()
                         .quiet_zone(false)
                         .module_dimensions(2, 1)
                         .build();
-                    
+
                     println!("{}", qr_string);
                     println!("{}\n", "═".repeat(60));
-                    
+
                     println!("⚠️  SECURITY WARNING:");
                     println!("  • Do not let unauthorized parties scan this QR code");
                     println!("  • Ensure no cameras or recording devices can capture it");
-                    println!("  • This request expires after approval or manual deletion");
+                    println!(
+                        "  • This request should be deleted after use (no automatic expiration)"
+                    );
                     println!();
                 }
-                
+
                 // Save QR as image if --qr-image is set
                 if let Some(image_path) = qr_image {
                     use image::Luma;
-                    
+
                     let image = code.render::<Luma<u8>>().build();
-                    image.save(&image_path)
-                        .with_context(|| format!("Failed to save QR code image to {}", image_path.display()))?;
-                    
+                    image.save(&image_path).with_context(|| {
+                        format!("Failed to save QR code image to {}", image_path.display())
+                    })?;
+
                     println!("✓ QR code image saved: {}", image_path.display());
                     println!();
                 }
