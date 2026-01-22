@@ -63,9 +63,9 @@ impl IdentityConfig {
             }
             "tpm" => {
                 if self.tpm.is_none() {
-                    errors
-                        .push("identity.backend=tpm requires [identity.tpm] config section"
-                            .to_string());
+                    errors.push(
+                        "identity.backend=tpm requires [identity.tpm] config section".to_string(),
+                    );
                 } else if let Some(ref tpm_config) = self.tpm {
                     validate_tpm(tpm_config, &mut warnings, &mut errors);
                 }
@@ -158,6 +158,7 @@ fn default_key_handle() -> u32 {
     0x8100_0000 // Default persistent handle in user range
 }
 
+#[allow(clippy::ptr_arg)] // Consistent signature with validate_pkcs11, may use warnings in future
 fn validate_tpm(cfg: &TpmBackendConfig, _warnings: &mut Vec<String>, errors: &mut Vec<String>) {
     if cfg.device_path.trim().is_empty() {
         errors.push("identity.tpm.device_path cannot be empty".to_string());

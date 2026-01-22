@@ -56,8 +56,8 @@ pub fn open_keystore(config: BackendConfig) -> Result<Box<dyn KeyStore>> {
     match config {
         BackendConfig::Age { path } => {
             info!("Opening Age keystore backend: {}", path);
-            let backend = AgeKeyStore::open(Path::new(&path))
-                .context("Failed to open Age keystore")?;
+            let backend =
+                AgeKeyStore::open(Path::new(&path)).context("Failed to open Age keystore")?;
             Ok(Box::new(backend))
         }
 
@@ -106,10 +106,7 @@ pub fn open_keystore(config: BackendConfig) -> Result<Box<dyn KeyStore>> {
 /// - The backend type is not supported
 /// - Initialization fails
 /// - The keystore already exists (for file-based backends)
-pub fn init_keystore(
-    config: BackendConfig,
-    credentials: &[u8],
-) -> Result<Box<dyn KeyStore>> {
+pub fn init_keystore(config: BackendConfig, credentials: &[u8]) -> Result<Box<dyn KeyStore>> {
     match config {
         BackendConfig::Age { path } => {
             info!("Initializing Age keystore: {}", path);

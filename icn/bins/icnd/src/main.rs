@@ -4,16 +4,18 @@
 //! This binary denies panicking on unwrap/expect to prevent runtime crashes.
 #![deny(clippy::unwrap_used)]
 #![deny(clippy::expect_used)]
+// Allow cfg checks for optional HSM/TPM features defined in Cargo.toml
+#![allow(unexpected_cfgs)]
 
 use anyhow::Context;
 use anyhow::Result;
 use clap::Parser;
 use icn_core::{Config, Runtime};
-use icn_identity::{AgeKeyStore, BackendConfig, KeyStore};
 #[cfg(feature = "hsm")]
 use icn_identity::Pkcs11Config;
 #[cfg(feature = "tpm-experimental")]
 use icn_identity::TpmConfig;
+use icn_identity::{AgeKeyStore, BackendConfig, KeyStore};
 use std::io::{self, Write};
 use std::path::PathBuf;
 use zeroize::Zeroizing;
@@ -244,7 +246,7 @@ async fn main() -> Result<()> {
                 anyhow::bail!("Unknown identity backend '{}'", other);
             }
         };
-        
+
         keystore
             .unlock(&passphrase)
             .context("Failed to unlock keystore - incorrect passphrase?")?;
@@ -331,13 +333,9 @@ fn backend_config_from_runtime_config(cfg: &Config) -> Result<BackendConfig> {
 
         #[cfg(feature = "hsm")]
         "pkcs11" => {
-            let p = cfg
-                .identity
-                .pkcs11
-                .as_ref()
-                .ok_or_else(|| {
-                    anyhow::anyhow!("identity.backend=pkcs11 but identity.pkcs11 config missing")
-                })?;
+            let p = cfg.identity.pkcs11.as_ref().ok_or_else(|| {
+                anyhow::anyhow!("identity.backend=pkcs11 but identity.pkcs11 config missing")
+            })?;
             Ok(BackendConfig::Pkcs11(Pkcs11Config {
                 library_path: p.library_path.clone(),
                 slot_id: p.slot_id,
