@@ -375,13 +375,23 @@ impl CoopManager {
 
     /// Atomically add a member to a cooperative
     /// This prevents race conditions by holding the write lock during the entire operation
-    pub fn add_member_atomic(
+    pub async fn add_member_atomic(
         &self,
         coop_id: &CoopId,
         did: Did,
         role: MemberRole,
         timestamp: u64,
     ) -> Result<Coop> {
+        // If connected to daemon, persist via actor first
+        if let Some(ref handle) = self.coop_handle {
+            let actor_role = convert_gateway_role_to_actor(&role);
+            handle
+                .add_member(coop_id.clone(), did.clone(), actor_role)
+                .await
+                .map_err(|e| GatewayError::InternalError(format!("CoopActor error: {e}")))?;
+        }
+
+        // Also update local cache (for fast reads and standalone mode)
         let mut coops = self
             .coops
             .write()
@@ -397,7 +407,16 @@ impl CoopManager {
     }
 
     /// Atomically remove a member from a cooperative
-    pub fn remove_member_atomic(&self, coop_id: &CoopId, did: &Did) -> Result<Coop> {
+    pub async fn remove_member_atomic(&self, coop_id: &CoopId, did: &Did) -> Result<Coop> {
+        // If connected to daemon, persist via actor first
+        if let Some(ref handle) = self.coop_handle {
+            handle
+                .remove_member(coop_id.clone(), did.clone())
+                .await
+                .map_err(|e| GatewayError::InternalError(format!("CoopActor error: {e}")))?;
+        }
+
+        // Also update local cache (for fast reads and standalone mode)
         let mut coops = self
             .coops
             .write()
@@ -413,12 +432,22 @@ impl CoopManager {
     }
 
     /// Atomically update a member's role
-    pub fn update_role_atomic(
+    pub async fn update_role_atomic(
         &self,
         coop_id: &CoopId,
         did: &Did,
         new_role: MemberRole,
     ) -> Result<Coop> {
+        // If connected to daemon, persist via actor first
+        if let Some(ref handle) = self.coop_handle {
+            let actor_role = convert_gateway_role_to_actor(&new_role);
+            handle
+                .update_member_role(coop_id.clone(), did.clone(), actor_role)
+                .await
+                .map_err(|e| GatewayError::InternalError(format!("CoopActor error: {e}")))?;
+        }
+
+        // Also update local cache (for fast reads and standalone mode)
         let mut coops = self
             .coops
             .write()
@@ -519,6 +548,15 @@ fn convert_actor_role_to_gateway(role: &icn_coop::MemberRole) -> MemberRole {
         icn_coop::MemberRole::Worker => MemberRole::Participant,
         icn_coop::MemberRole::Consumer => MemberRole::Participant,
         icn_coop::MemberRole::Producer => MemberRole::Participant,
+    }
+}
+
+/// Convert gateway role to actor role
+fn convert_gateway_role_to_actor(role: &MemberRole) -> icn_coop::MemberRole {
+    match role {
+        MemberRole::Steward => icn_coop::MemberRole::Founder,
+        MemberRole::Facilitator => icn_coop::MemberRole::Officer,
+        MemberRole::Participant => icn_coop::MemberRole::Member,
     }
 }
 
