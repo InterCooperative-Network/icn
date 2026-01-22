@@ -790,7 +790,7 @@ impl DidKeySnapshot {
     ///
     /// For software keys, this succeeds and returns a fully functional key.
     /// For hardware keys, this returns an error - hardware keys require
-    /// external backend reconnection via `restore_with_backend()`.
+    /// external backend reconnection via `restore_hardware_key()`.
     pub fn try_into_did_key(self) -> Result<icn_identity::DidKey> {
         use icn_identity::DidKey;
 
@@ -800,10 +800,16 @@ impl DidKeySnapshot {
                 public_bytes,
             } => {
                 if secret_bytes.len() != 32 {
-                    anyhow::bail!("Invalid secret key length: expected 32, got {}", secret_bytes.len());
+                    anyhow::bail!(
+                        "Invalid secret key length: expected 32, got {}",
+                        secret_bytes.len()
+                    );
                 }
                 if public_bytes.len() != 32 {
-                    anyhow::bail!("Invalid public key length: expected 32, got {}", public_bytes.len());
+                    anyhow::bail!(
+                        "Invalid public key length: expected 32, got {}",
+                        public_bytes.len()
+                    );
                 }
 
                 let mut secret_array = [0u8; 32];
@@ -822,7 +828,7 @@ impl DidKeySnapshot {
                 anyhow::bail!(
                     "Cannot restore hardware key automatically. Hardware key requires \
                      backend reconnection. Backend type: {}, Hardware ID: {}. \
-                     Use restore_with_backend() with an appropriate hardware backend.",
+                     Use restore_hardware_key() with an appropriate hardware backend.",
                     backend_type,
                     hardware_id
                 )
@@ -832,15 +838,16 @@ impl DidKeySnapshot {
 
     /// Restore a hardware key by reconnecting to the backend
     ///
-    /// This method reconstructs a DidKey::Hardware from the snapshot metadata.
-    /// The caller must provide a valid hardware backend that can access the key.
-    ///
-    /// # Arguments
-    /// * `backend_type` - Backend identifier from snapshot (e.g., "pkcs11", "tpm")
-    /// * `hardware_id` - Hardware-specific identifier (slot/handle/etc)
+    /// This method reconstructs a `DidKey::Hardware` from the snapshot metadata
+    /// stored in this value (including `backend_type`, `hardware_id`, and
+    /// `public_bytes`). The caller must ensure that an appropriate hardware
+    /// backend is available that can access the underlying key.
     ///
     /// # Returns
-    /// A DidKey::Hardware that delegates signing to the hardware backend
+    /// A `DidKey::Hardware` that delegates signing to the hardware backend.
+    ///
+    /// # Errors
+    /// Returns an error if this snapshot represents a software key.
     pub fn restore_hardware_key(self) -> Result<icn_identity::DidKey> {
         use ed25519_dalek::VerifyingKey;
         use icn_identity::DidKey;
@@ -852,7 +859,10 @@ impl DidKeySnapshot {
                 hardware_id,
             } => {
                 if public_bytes.len() != 32 {
-                    anyhow::bail!("Invalid public key length: expected 32, got {}", public_bytes.len());
+                    anyhow::bail!(
+                        "Invalid public key length: expected 32, got {}",
+                        public_bytes.len()
+                    );
                 }
 
                 let mut public_array = [0u8; 32];
@@ -861,7 +871,11 @@ impl DidKeySnapshot {
                 let verifying_key = VerifyingKey::from_bytes(&public_array)
                     .context("Failed to deserialize Ed25519 public key")?;
 
-                Ok(DidKey::from_hardware(verifying_key, backend_type, hardware_id))
+                Ok(DidKey::from_hardware(
+                    verifying_key,
+                    backend_type,
+                    hardware_id,
+                ))
             }
             Self::Software { .. } => {
                 anyhow::bail!(
@@ -1692,23 +1706,32 @@ mod tests {
         // Create a hardware key
         let public_bytes = [42u8; 32];
         let verifying_key = VerifyingKey::from_bytes(&public_bytes).unwrap();
-        let hardware_key = DidKey::from_hardware(
-            verifying_key,
-            "pkcs11".to_string(),
-            "slot=0".to_string(),
-        );
+        let hardware_key =
+            DidKey::from_hardware(verifying_key, "pkcs11".to_string(), "slot=0".to_string());
 
         // Convert to snapshot
         let snapshot = DidKeySnapshot::from_did_key(&hardware_key);
 
         // Try to restore without backend - should fail
         let result = snapshot.clone().try_into_did_key();
-        assert!(result.is_err(), "Hardware key restore without backend should fail");
+        assert!(
+            result.is_err(),
+            "Hardware key restore without backend should fail"
+        );
         if let Err(err) = result {
             let err_msg = err.to_string();
-            assert!(err_msg.contains("hardware key"), "Error should mention hardware key");
-            assert!(err_msg.contains("backend reconnection"), "Error should mention backend reconnection");
-            assert!(err_msg.contains("pkcs11"), "Error should mention backend type");
+            assert!(
+                err_msg.contains("hardware key"),
+                "Error should mention hardware key"
+            );
+            assert!(
+                err_msg.contains("backend reconnection"),
+                "Error should mention backend reconnection"
+            );
+            assert!(
+                err_msg.contains("pkcs11"),
+                "Error should mention backend type"
+            );
         }
 
         // Restore with hardware key method
@@ -1770,11 +1793,20 @@ mod tests {
 
         // Try to restore software key as hardware - should fail
         let result = snapshot.restore_hardware_key();
-        assert!(result.is_err(), "Software key cannot be restored as hardware");
+        assert!(
+            result.is_err(),
+            "Software key cannot be restored as hardware"
+        );
         if let Err(err) = result {
             let err_msg = err.to_string();
-            assert!(err_msg.contains("software key"), "Error should mention software key");
-            assert!(err_msg.contains("try_into_did_key"), "Error should suggest correct method");
+            assert!(
+                err_msg.contains("software key"),
+                "Error should mention software key"
+            );
+            assert!(
+                err_msg.contains("try_into_did_key"),
+                "Error should suggest correct method"
+            );
         }
     }
 
