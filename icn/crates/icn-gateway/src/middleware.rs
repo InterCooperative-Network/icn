@@ -198,7 +198,9 @@ mod tests {
         // Create challenge and get token
         let nonce = auth.create_challenge(bundle.did()).unwrap();
         let nonce_bytes = hex::decode(&nonce).unwrap();
-        let signature = bundle.keypair().unwrap().sign(&nonce_bytes);
+        let signature = bundle
+            .sign(&nonce_bytes)
+            .expect("test setup: bundle must be able to sign nonce (software key or hardware signer configured)");
 
         let token = auth
             .verify_challenge(
@@ -233,7 +235,9 @@ mod tests {
         let bundle = IdentityBundle::generate().unwrap();
         let nonce = auth1.create_challenge(bundle.did()).unwrap();
         let nonce_bytes = hex::decode(&nonce).unwrap();
-        let signature = bundle.keypair().unwrap().sign(&nonce_bytes);
+        let signature = bundle
+            .sign(&nonce_bytes)
+            .expect("test setup: bundle must be able to sign nonce (software key or hardware signer configured)");
 
         let token = auth1
             .verify_challenge(bundle.did(), &signature.to_bytes(), "test-coop", vec![])

@@ -289,7 +289,9 @@ mod tests {
 
         // Sign nonce
         let nonce_bytes = hex::decode(&nonce).unwrap();
-        let signature = bundle.keypair().unwrap().sign(&nonce_bytes);
+        let signature = bundle
+            .sign(&nonce_bytes)
+            .expect("test setup: bundle must be able to sign nonce (software key or hardware signer configured)");
         let signature_bytes = signature.to_bytes();
 
         // Verify and get token
@@ -341,5 +343,75 @@ mod tests {
 
         let removed = auth.cleanup_expired_challenges().unwrap();
         assert_eq!(removed, 1);
+    }
+
+    #[test]
+    fn test_verify_challenge_success_with_hardware_backed_bundle() {
+        use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
+        use icn_identity::{Did, DidKey, DidSigner};
+        use std::sync::Arc;
+
+        // Mock hardware signer for testing
+        struct MockHardwareSigner {
+            did: Did,
+            vk: VerifyingKey,
+            sk: SigningKey,
+        }
+
+        impl DidSigner for MockHardwareSigner {
+            fn did(&self) -> &Did {
+                &self.did
+            }
+            fn verifying_key(&self) -> &VerifyingKey {
+                &self.vk
+            }
+            fn sign(&self, message: &[u8]) -> anyhow::Result<Signature> {
+                Ok(self.sk.sign(message))
+            }
+            fn is_hardware_backed(&self) -> bool {
+                true
+            }
+            fn backend_type(&self) -> &str {
+                "mock-hsm"
+            }
+        }
+
+        let auth = AuthManager::new(b"test_secret".to_vec());
+
+        // Generate a signing key, but pretend the key is hardware-backed
+        let sk = SigningKey::generate(&mut rand::thread_rng());
+        let vk = sk.verifying_key();
+        let did = Did::from_public_key(&vk);
+
+        let did_key = DidKey::from_hardware(vk, "mock-hsm".to_string(), "slot=0".to_string());
+        let signer = Arc::new(MockHardwareSigner {
+            did: did.clone(),
+            vk,
+            sk,
+        });
+
+        // Create bundle with hardware key + signer
+        let bundle = IdentityBundle::from_did_key_with_signer(did_key, Some(signer))
+            .expect("bundle should construct with signer");
+
+        // Challenge
+        let nonce = auth.create_challenge(bundle.did()).unwrap();
+        let nonce_bytes = hex::decode(&nonce).unwrap();
+
+        // Hardware-backed signing path - this is the critical test
+        let sig = bundle
+            .sign(&nonce_bytes)
+            .expect("hardware signer should sign");
+
+        let token = auth
+            .verify_challenge(
+                bundle.did(),
+                &sig.to_bytes(),
+                "test-coop",
+                vec!["ledger:read".to_string()],
+            )
+            .unwrap();
+
+        assert!(!token.is_empty());
     }
 }
