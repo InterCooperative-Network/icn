@@ -4689,6 +4689,10 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &Path) -> Result<()> {
             println!();
 
             // Create request
+            // Note: created_at timestamp is recorded for auditing purposes but expiration/replay
+            // validation is intentionally deferred to the approval workflow on the authorized device.
+            // This allows flexibility in transfer timing while the approval step provides the
+            // security boundary (user must explicitly approve on an already-authorized device).
             let request = DeviceAddRequest {
                 did: target_did.to_string(),
                 label: name.clone(),
@@ -4730,7 +4734,9 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &Path) -> Result<()> {
                     );
                 }
 
-                let code = QrCode::new(qr_data.as_bytes()).context("Failed to generate QR code")?;
+                let code = QrCode::new(qr_data.as_bytes()).with_context(|| {
+                    format!("Failed to generate QR code ({} bytes)", qr_data_len)
+                })?;
 
                 // Display QR in terminal if --qr is set, or if no image output was requested
                 if qr || qr_image.is_none() {
