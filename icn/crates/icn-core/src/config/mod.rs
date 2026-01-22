@@ -992,4 +992,35 @@ enabled = false
             (custom_deserialized.trust.attestation.min_attester_trust - 0.5).abs() < f64::EPSILON
         );
     }
+
+    #[test]
+    fn test_gossip_config_conversion() {
+        let config = GossipConfig::default();
+
+        // Test ReplicationConfig conversion
+        let manager_config = config.replication.to_manager_config();
+        assert_eq!(manager_config.target_replicas, 3);
+        assert_eq!(manager_config.health_check_interval_secs, 60);
+        assert_eq!(manager_config.stale_threshold_secs, 300);
+        assert_eq!(manager_config.unreachable_threshold_secs, 900);
+
+        // Test PartitionConfig conversion
+        let partition_config = config.partition.to_gossip_config();
+        assert_eq!(partition_config.partition_threshold.as_secs(), 300);
+        assert_eq!(partition_config.check_interval.as_secs(), 30);
+    }
+
+    #[test]
+    fn test_compute_config_conversion() {
+        let config = ComputeConfig::default();
+
+        // Test VerificationConfig conversion
+        let verification = config.verification.to_compute_config();
+        assert_eq!(verification.low_value_threshold, 100);
+        assert_eq!(verification.medium_value_threshold, 1000);
+        assert_eq!(verification.high_value_threshold, 10000);
+        assert_eq!(verification.high_value_quorum, 3);
+        assert!((verification.consensus_threshold - 0.67).abs() < f64::EPSILON);
+        assert_eq!(verification.collection_window_ms, 30_000);
+    }
 }
