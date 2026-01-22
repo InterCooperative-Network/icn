@@ -137,21 +137,22 @@ backend.unlock(&[])?;
 
 ## Current Implementation Status
 
-### Phase 1: Basic Sealing/Unsealing ✅
+### Phase 1: Basic Scaffolding ✅
 
 - [x] Key generation
 - [x] Backend trait implementation
 - [x] TpmDidSigner implementation
-- [x] Seal/unseal cycle
 - [x] Integration tests
-- [x] Placeholder sealing (not using actual TPM yet)
 
-### Phase 2: Real TPM Operations (Planned)
+### Phase 2: Real TPM Operations ✅
 
-- [ ] Actual TPM sealing with tss-esapi
-- [ ] PCR policy binding
-- [ ] PCR verification on unseal
-- [ ] Persistent handle management
+- [x] Actual TPM sealing with `tss-esapi::Context::create()`
+- [x] Actual TPM unsealing with `tss-esapi::Context::unseal()`
+- [x] Marshall/Unmarshall TPM structures for persistence
+- [x] Lazy TPM context initialization
+- [ ] PCR policy binding (planned)
+- [ ] PCR verification on unseal (planned)
+- [ ] Persistent handle management (planned)
 
 ### Phase 3: Advanced Features (Future)
 
@@ -162,11 +163,11 @@ backend.unlock(&[])?;
 
 ## Known Limitations
 
-⚠️ **Current Phase 1 Implementation**:
+**Current Phase 2 Implementation**:
 
-The current implementation uses placeholder sealing that stores keys on disk without actual TPM protection. This is scaffolding for development and testing.
-
-**Do not use in production** until Phase 2 (real TPM operations) is complete.
+- Keys are sealed to TPM hardware using real TPM2_Create/TPM2_Unseal operations
+- PCR policy binding is not yet implemented - keys can be unsealed without platform integrity verification
+- Persistent handle management is not yet implemented - sealed blobs are stored in files
 
 ## Troubleshooting
 
