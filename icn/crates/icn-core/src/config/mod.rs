@@ -6,6 +6,7 @@
 mod cooperative;
 mod federation;
 mod gateway;
+mod identity;
 mod ledger;
 mod network;
 mod observability;
@@ -17,6 +18,7 @@ mod supervisor;
 pub use cooperative::*;
 pub use federation::*;
 pub use gateway::*;
+pub use identity::*;
 pub use ledger::*;
 pub use network::*;
 pub use observability::*;
@@ -77,6 +79,10 @@ pub struct Config {
     /// Ledger configuration for mutual credit and exchange rate oracle
     #[serde(default)]
     pub ledger: LedgerConfig,
+
+    /// Identity backend configuration (keystore selection)
+    #[serde(default)]
+    pub identity: IdentityConfig,
 }
 
 impl Default for Config {
@@ -115,6 +121,7 @@ impl Default for Config {
             steward: StewardNodeConfig::default(),
             supervisor: SupervisorConfig::default(),
             ledger: LedgerConfig::default(),
+            identity: IdentityConfig::default(),
         }
     }
 }
@@ -255,6 +262,12 @@ impl Config {
         // Topology validation
         if self.topology.fanout.local_cluster == 0 {
             errors.push("topology.fanout.local_cluster cannot be 0".to_string());
+        }
+
+        // Identity backend validation
+        match self.identity.validate() {
+            Ok(id_warnings) => warnings.extend(id_warnings),
+            Err(id_errors) => errors.extend(id_errors),
         }
 
         if errors.is_empty() {

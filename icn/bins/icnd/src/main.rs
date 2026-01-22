@@ -4,6 +4,8 @@
 //! This binary denies panicking on unwrap/expect to prevent runtime crashes.
 #![deny(clippy::unwrap_used)]
 #![deny(clippy::expect_used)]
+// Allow cfg checks for optional HSM/TPM features defined in Cargo.toml
+#![allow(unexpected_cfgs)]
 
 use anyhow::Context;
 use anyhow::Result;
@@ -213,6 +215,7 @@ async fn main() -> Result<()> {
     let keystore_path = config.keystore_path();
     let identity_bundle = if keystore_path.exists() {
         tracing::info!("Identity keystore found at: {:?}", keystore_path);
+        tracing::info!("Using identity backend: {}", config.identity.backend);
 
         // Get passphrase: tries ICN_KEYSTORE_PASSPHRASE env var first, then ICN_PASSPHRASE,
         // then falls back to interactive prompt. For automated deployments (systemd, Docker, K8s),
@@ -222,7 +225,26 @@ async fn main() -> Result<()> {
             read_passphrase("Enter keystore passphrase: ").context("Failed to read passphrase")?;
 
         // Load and unlock keystore
-        let mut keystore = AgeKeyStore::open(&keystore_path).context("Failed to open keystore")?;
+        // Check backend type and use appropriate loading strategy
+        let mut keystore = match config.identity.backend.as_str() {
+            "age" => {
+                // Age backend: use direct AgeKeyStore
+                AgeKeyStore::open(&keystore_path).context("Failed to open Age keystore")?
+            }
+            "pkcs11" | "tpm" => {
+                // Hardware backends: not yet implemented
+                // Return explicit error instead of calling unimplemented factory
+                anyhow::bail!(
+                    "Hardware identity backend '{}' is not yet implemented. \
+                     See docs/identity-backend-configuration.md for status.",
+                    config.identity.backend
+                );
+            }
+            other => {
+                anyhow::bail!("Unknown identity backend '{}'", other);
+            }
+        };
+
         keystore
             .unlock(&passphrase)
             .context("Failed to unlock keystore - incorrect passphrase?")?;

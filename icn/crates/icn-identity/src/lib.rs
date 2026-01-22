@@ -16,6 +16,7 @@
 //! - VUI (Verifiable Unique Identifier) types
 
 pub mod anchor;
+pub mod backend_factory;
 pub mod batch_verify;
 pub mod bundle;
 pub mod commons;
@@ -44,6 +45,7 @@ use serde::{Deserialize, Serialize};
 use zeroize::Zeroizing;
 
 pub use anchor::{Anchor, EnrollmentPathway};
+pub use backend_factory::{init_keystore, open_keystore};
 pub use batch_verify::{
     verify_signatures_batched, BatchVerifier, BatchVerifyResult, SignatureToVerify,
 };

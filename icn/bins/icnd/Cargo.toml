@@ -8,6 +8,13 @@ license.workspace = true
 name = "icnd"
 path = "src/main.rs"
 
+[features]
+default = []
+# HSM support via PKCS#11 (requires cryptoki system library)
+hsm = ["icn-identity/hsm"]
+# TPM 2.0 support (experimental, requires tss2 system libraries)
+tpm-experimental = ["icn-identity/tpm-experimental"]
+
 [dependencies]
 tokio.workspace = true
 tracing.workspace = true
