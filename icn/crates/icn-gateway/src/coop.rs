@@ -640,7 +640,9 @@ fn convert_actor_role_to_gateway(role: &icn_coop::MemberRole) -> MemberRole {
 }
 
 /// Convert gateway role to actor role
-fn convert_gateway_role_to_actor(role: &MemberRole) -> icn_coop::MemberRole {
+///
+/// Used by both CoopManager and CoopActorAdapter for consistent role mapping.
+pub(crate) fn convert_gateway_role_to_actor(role: &MemberRole) -> icn_coop::MemberRole {
     match role {
         MemberRole::Steward => icn_coop::MemberRole::Founder,
         MemberRole::Facilitator => icn_coop::MemberRole::Officer,
