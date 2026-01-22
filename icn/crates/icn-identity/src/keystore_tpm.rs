@@ -4,12 +4,24 @@
 //! Since TPM 2.0 does not natively support Ed25519, we use TPM for sealed storage
 //! and perform signing operations in software with unsealed key material.
 //!
-//! ## Security Properties
+//! # ⚠️ IMPORTANT: Phase 1 Implementation
 //!
-//! - Keys are sealed to TPM, bound to platform PCRs
-//! - PCR verification prevents unauthorized unsealing
-//! - Sealed blobs are stored on disk
-//! - Private key material is zeroized after use
+//! **This is Phase 1 scaffolding with placeholder sealing. Keys are NOT actually
+//! sealed to TPM hardware - they are stored on disk with file permissions only.
+//! Do NOT use in production until Phase 2 (real TPM operations) is complete.**
+//!
+//! Phase 2 will implement:
+//! - Actual TPM sealing with `tss-esapi::Context::create()`
+//! - PCR policy binding and verification
+//! - Persistent handle management
+//!
+//! ## Security Properties (Phase 1 - Limited)
+//!
+//! - ✅ Restrictive file permissions (0600) on sealed blobs
+//! - ✅ Zeroization of key material in memory
+//! - ❌ NO actual TPM sealing (keys in plaintext on disk)
+//! - ❌ NO PCR binding enforcement
+//! - ❌ NO protection against offline disk access
 //!
 //! ## Requirements
 //!
@@ -134,6 +146,12 @@ impl TpmBackend {
     /// # Returns
     /// A locked TPM backend ready to be unlocked
     pub fn new(config: TpmConfig) -> Result<Self> {
+        // CRITICAL: Phase 1 placeholder warning
+        warn!(
+            "TPM backend using PLACEHOLDER implementation - keys are NOT sealed to TPM hardware. \
+             Do NOT use in production. See issue #745 for Phase 2 implementation status."
+        );
+
         info!(
             "Initializing TPM 2.0 backend: device={}, platform_binding={}",
             config.device_path, config.platform_binding

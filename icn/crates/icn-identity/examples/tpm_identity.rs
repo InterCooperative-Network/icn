@@ -1,5 +1,15 @@
 //! TPM Identity Example
 //!
+//! # ⚠️ WARNING: Phase 1 Placeholder Implementation
+//!
+//! **This is Phase 1 scaffolding with placeholder sealing. Keys are NOT actually
+//! sealed to TPM hardware - they are stored on disk with file permissions only.
+//! Do NOT use in production until Phase 2 (real TPM operations) is complete.**
+//!
+//! See issue #745 for Phase 2 implementation status.
+//!
+//! ---
+//!
 //! This example demonstrates how to use the TPM backend to create and manage
 //! ICN identities with hardware-backed key storage.
 //!
@@ -101,9 +111,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("=== Example completed successfully ===\n");
 
-    println!("Note: This is a placeholder implementation.");
-    println!("Real TPM sealing will be implemented in Phase 2.");
-    println!("See docs/tpm-setup.md for more information.");
+    println!("⚠️  WARNING: This is a PLACEHOLDER implementation.");
+    println!("   Keys are NOT actually sealed to TPM hardware.");
+    println!("   Do NOT use in production until Phase 2 is complete.");
+    println!("   See issue #745 and docs/tpm-setup.md for more information.");
 
     Ok(())
 }
