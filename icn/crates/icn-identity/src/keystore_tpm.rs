@@ -41,9 +41,80 @@ use rand_core::OsRng;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tracing::{info, warn};
+use thiserror::Error;
+use tracing::{debug, info, warn};
 use tss_esapi::structures::PcrSlot;
 use zeroize::Zeroizing;
+
+/// TPM backend errors with structured context for debugging
+///
+/// These errors provide detailed context while avoiding sensitive information
+/// (like file paths) in user-facing messages. Debug context is available via
+/// the `source()` chain for logging and debugging purposes.
+#[derive(Debug, Error)]
+pub enum TpmError {
+    /// Failed to read sealed key blob from disk
+    #[error("Failed to read sealed key blob")]
+    SealedBlobRead(#[source] std::io::Error),
+
+    /// Failed to write sealed key blob to disk
+    #[error("Failed to write sealed key blob")]
+    SealedBlobWrite(#[source] std::io::Error),
+
+    /// Failed to serialize sealed key blob
+    #[error("Failed to serialize sealed key blob")]
+    Serialization(#[source] serde_json::Error),
+
+    /// Failed to deserialize sealed key blob
+    #[error("Failed to deserialize sealed key blob")]
+    Deserialization(#[source] serde_json::Error),
+
+    /// Sealed key has invalid size
+    #[error("Sealed key has invalid size: {actual} bytes (expected {expected})")]
+    InvalidKeySize { expected: usize, actual: usize },
+
+    /// Sealed key blob is empty
+    #[error("Sealed key blob is empty")]
+    EmptySealedBlob,
+
+    /// Backend is locked
+    #[error("TPM backend is locked")]
+    BackendLocked,
+
+    /// Attestation not enabled
+    #[error("Attestation not enabled for this backend")]
+    AttestationNotEnabled,
+
+    /// Failed to create storage directory
+    #[error("Failed to create sealed blob directory")]
+    DirectoryCreation(#[source] std::io::Error),
+
+    /// Failed to set file/directory permissions
+    #[error("Failed to set permissions")]
+    PermissionError(#[source] std::io::Error),
+
+    /// Failed to reconstruct verifying key
+    #[error("Failed to reconstruct verifying key")]
+    InvalidPublicKey(#[source] ed25519_dalek::SignatureError),
+
+    /// Failed to create identity bundle
+    #[error("Failed to create identity bundle")]
+    BundleCreation(#[source] anyhow::Error),
+}
+
+impl TpmError {
+    /// Log debug context for this error
+    ///
+    /// This logs additional context that may be useful for debugging
+    /// but should not be exposed in user-facing error messages.
+    pub fn log_debug_context(&self, path: Option<&Path>) {
+        if let Some(p) = path {
+            debug!(error = %self, path = %p.display(), "TPM error with path context");
+        } else {
+            debug!(error = %self, "TPM error");
+        }
+    }
+}
 
 /// PCR slots to bind for platform integrity
 const DEFAULT_PCR_SLOTS: &[PcrSlot] = &[
@@ -165,14 +236,17 @@ impl TpmBackend {
 
         // Ensure the directory exists with appropriate permissions
         if !sealed_blob_dir.exists() {
-            fs::create_dir_all(&sealed_blob_dir)
-                .context("Failed to create sealed blob directory")?;
+            fs::create_dir_all(&sealed_blob_dir).map_err(|e| {
+                let err = TpmError::DirectoryCreation(e);
+                err.log_debug_context(Some(&sealed_blob_dir));
+                err
+            })?;
             // Set directory permissions to 0700 (owner only)
             #[cfg(unix)]
             {
                 use std::os::unix::fs::PermissionsExt;
                 fs::set_permissions(&sealed_blob_dir, fs::Permissions::from_mode(0o700))
-                    .context("Failed to set sealed blob directory permissions")?;
+                    .map_err(TpmError::PermissionError)?;
             }
         }
 
@@ -234,15 +308,19 @@ impl TpmBackend {
             key_handle: Some(self.config.key_handle),
         };
 
-        let blob_json = serde_json::to_vec(&blob).context("Failed to serialize sealed key blob")?;
+        let blob_json = serde_json::to_vec(&blob).map_err(TpmError::Serialization)?;
 
         // Write with restrictive permissions
-        fs::write(&self.sealed_blob_path, &blob_json).context("Failed to write sealed key blob")?;
+        fs::write(&self.sealed_blob_path, &blob_json).map_err(|e| {
+            let err = TpmError::SealedBlobWrite(e);
+            err.log_debug_context(Some(&self.sealed_blob_path));
+            err
+        })?;
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
             fs::set_permissions(&self.sealed_blob_path, fs::Permissions::from_mode(0o600))
-                .context("Failed to set sealed blob file permissions")?;
+                .map_err(TpmError::PermissionError)?;
         }
 
         info!("Sealed key blob written");
@@ -259,7 +337,7 @@ impl TpmBackend {
 
         // Create identity bundle
         let bundle = IdentityBundle::from_did_key_with_signer(did_key, Some(signer.clone()))
-            .context("Failed to create identity bundle")?;
+            .map_err(TpmError::BundleCreation)?;
 
         self.identity_bundle = Some(bundle.clone());
         self.signer = Some(signer);
@@ -291,11 +369,20 @@ impl TpmBackend {
     ///
     /// Returns the deserialized blob structure for use by unseal and other operations.
     fn load_sealed_blob(&self) -> Result<SealedKeyBlob> {
-        // Use generic error message to avoid path leakage in logs/error reports
-        let blob_json =
-            fs::read(&self.sealed_blob_path).context("Failed to read sealed key blob")?;
+        // Read blob, logging path only at debug level to avoid path leakage
+        let blob_json = fs::read(&self.sealed_blob_path).map_err(|e| {
+            let err = TpmError::SealedBlobRead(e);
+            err.log_debug_context(Some(&self.sealed_blob_path));
+            err
+        })?;
 
-        serde_json::from_slice(&blob_json).context("Failed to deserialize sealed key blob")
+        let blob = serde_json::from_slice(&blob_json).map_err(|e| {
+            let err = TpmError::Deserialization(e);
+            err.log_debug_context(Some(&self.sealed_blob_path));
+            err
+        })?;
+
+        Ok(blob)
     }
 
     /// Unseal key material from TPM
@@ -310,14 +397,15 @@ impl TpmBackend {
         // TODO: Implement actual TPM unsealing with tss-esapi::Context::unseal
 
         if blob.sealed_data.is_empty() {
-            anyhow::bail!("Sealed key blob is empty");
+            return Err(TpmError::EmptySealedBlob.into());
         }
 
         if blob.sealed_data.len() != 32 {
-            anyhow::bail!(
-                "Sealed key has wrong size: {} (expected 32)",
-                blob.sealed_data.len()
-            );
+            return Err(TpmError::InvalidKeySize {
+                expected: 32,
+                actual: blob.sealed_data.len(),
+            }
+            .into());
         }
 
         let mut key_bytes = [0u8; 32];
@@ -331,8 +419,8 @@ impl TpmBackend {
 
     /// Generate attestation quote for the key
     pub fn generate_attestation(&mut self) -> Result<Vec<u8>> {
-        if !self.attestation {
-            anyhow::bail!("Attestation not enabled for this backend");
+        if !self.config.attestation {
+            return Err(TpmError::AttestationNotEnabled.into());
         }
 
         // TODO: Implement TPM attestation in future phase
@@ -363,8 +451,8 @@ impl KeyStoreBackend for TpmBackend {
         let secret_bytes = self.unseal_key_from_blob(&blob)?;
 
         // Reconstruct verifying key
-        let verifying_key = VerifyingKey::from_bytes(&blob.public_key)
-            .context("Failed to reconstruct verifying key")?;
+        let verifying_key =
+            VerifyingKey::from_bytes(&blob.public_key).map_err(TpmError::InvalidPublicKey)?;
 
         // Create hardware DidKey using stable handle-based identifier
         let did_key = DidKey::from_hardware(verifying_key, "tpm".to_string(), self.hardware_id());
@@ -378,7 +466,7 @@ impl KeyStoreBackend for TpmBackend {
 
         // Create identity bundle
         let bundle = IdentityBundle::from_did_key_with_signer(did_key, Some(signer.clone()))
-            .context("Failed to create identity bundle")?;
+            .map_err(TpmError::BundleCreation)?;
 
         self.identity_bundle = Some(bundle);
         self.signer = Some(signer);
@@ -402,7 +490,7 @@ impl KeyStoreBackend for TpmBackend {
     fn get_identity_bundle(&self) -> Result<&IdentityBundle> {
         self.identity_bundle
             .as_ref()
-            .ok_or_else(|| anyhow::anyhow!("TPM backend is locked"))
+            .ok_or_else(|| TpmError::BackendLocked.into())
     }
 
     fn path(&self) -> &Path {
@@ -413,7 +501,7 @@ impl KeyStoreBackend for TpmBackend {
         let signer = self
             .signer
             .as_ref()
-            .ok_or_else(|| anyhow::anyhow!("TPM backend is locked"))?;
+            .ok_or_else(|| TpmError::BackendLocked)?;
 
         Ok(Box::new(TpmSigningBackend {
             signer: Arc::clone(signer),
@@ -948,5 +1036,101 @@ mod tests {
 
         // Clean up - intentionally ignore errors as dir may not exist
         let _ = fs::remove_dir_all(&test_dir);
+    }
+
+    #[test]
+    fn test_handle_uniqueness_same_dir() {
+        // Test that two backends with the same handle in the same directory
+        // will use the same sealed blob path (potential conflict)
+        let test_dir = test_sealed_blob_dir();
+        let handle = 0x81000050;
+
+        let config1 = TpmConfig {
+            device_path: tpm_device(),
+            key_handle: handle,
+            platform_binding: false,
+            attestation: false,
+            sealed_blob_dir: Some(test_dir.clone()),
+        };
+
+        let config2 = TpmConfig {
+            device_path: tpm_device(),
+            key_handle: handle, // Same handle
+            platform_binding: false,
+            attestation: false,
+            sealed_blob_dir: Some(test_dir.clone()),
+        };
+
+        let backend1 = TpmBackend::new(config1).unwrap();
+        let backend2 = TpmBackend::new(config2).unwrap();
+
+        // Same handle in same directory = same sealed blob path (conflict!)
+        assert_eq!(backend1.sealed_blob_path, backend2.sealed_blob_path);
+
+        // Clean up
+        let _ = fs::remove_dir_all(&test_dir);
+    }
+
+    #[test]
+    fn test_handle_uniqueness_different_handles() {
+        // Test that two backends with different handles have different sealed blob paths
+        let test_dir = test_sealed_blob_dir();
+
+        let config1 = TpmConfig {
+            device_path: tpm_device(),
+            key_handle: 0x81000051,
+            platform_binding: false,
+            attestation: false,
+            sealed_blob_dir: Some(test_dir.clone()),
+        };
+
+        let config2 = TpmConfig {
+            device_path: tpm_device(),
+            key_handle: 0x81000052, // Different handle
+            platform_binding: false,
+            attestation: false,
+            sealed_blob_dir: Some(test_dir.clone()),
+        };
+
+        let backend1 = TpmBackend::new(config1).unwrap();
+        let backend2 = TpmBackend::new(config2).unwrap();
+
+        // Different handles = different sealed blob paths (no conflict)
+        assert_ne!(backend1.sealed_blob_path, backend2.sealed_blob_path);
+
+        // Verify paths contain the handle hex values
+        assert!(backend1
+            .sealed_blob_path
+            .to_string_lossy()
+            .contains("0x81000051"));
+        assert!(backend2
+            .sealed_blob_path
+            .to_string_lossy()
+            .contains("0x81000052"));
+
+        // Clean up
+        let _ = fs::remove_dir_all(&test_dir);
+    }
+
+    #[test]
+    fn test_tpm_error_display() {
+        // Test that TpmError variants display properly
+        let err = TpmError::BackendLocked;
+        assert_eq!(err.to_string(), "TPM backend is locked");
+
+        let err = TpmError::EmptySealedBlob;
+        assert_eq!(err.to_string(), "Sealed key blob is empty");
+
+        let err = TpmError::InvalidKeySize {
+            expected: 32,
+            actual: 16,
+        };
+        assert_eq!(
+            err.to_string(),
+            "Sealed key has invalid size: 16 bytes (expected 32)"
+        );
+
+        let err = TpmError::AttestationNotEnabled;
+        assert_eq!(err.to_string(), "Attestation not enabled for this backend");
     }
 }
