@@ -24,7 +24,7 @@ use icn_gossip::{
 use icn_identity::{Did, KeyPair};
 use icn_ledger::{balance::compute_all_balances, entry::JournalEntryBuilder, Ledger};
 use icn_store::SledStore;
-use icn_trust::{TrustEdge, TrustGraph};
+use icn_trust::{TrustEdge, TrustGraph, TrustScore};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Duration;
@@ -110,7 +110,7 @@ impl MultiStateNode {
     /// Set trust for a peer
     async fn set_trust(&self, peer: &Did, score: f64) -> Result<()> {
         let mut graph = self.trust_graph.write().await;
-        let edge = TrustEdge::new(self.did.clone(), peer.clone(), score);
+        let edge = TrustEdge::new(self.did.clone(), peer.clone(), TrustScore::unchecked(score));
         graph.add_edge(edge)?;
         Ok(())
     }
@@ -122,7 +122,7 @@ impl MultiStateNode {
             .get_outgoing_edges(&self.did)
             .unwrap_or_default()
             .into_iter()
-            .map(|e| (e.source.clone(), e.target.clone(), e.score))
+            .map(|e| (e.source.clone(), e.target.clone(), e.score.value()))
             .collect()
     }
 

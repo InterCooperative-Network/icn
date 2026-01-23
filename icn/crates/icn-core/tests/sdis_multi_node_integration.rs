@@ -13,7 +13,7 @@ use icn_gossip::{AccessControl, GossipActor, Topic};
 use icn_identity::{IdentityBundle, KeyPair, RecoveryAttestation};
 use icn_steward::{StewardConfig, StewardHandle};
 use icn_store::SledStore;
-use icn_trust::{TrustClass, TrustEdge, TrustGraph};
+use icn_trust::{TrustClass, TrustEdge, TrustGraph, TrustScore};
 use std::sync::Arc;
 use tempfile::TempDir;
 use tokio::sync::RwLock;
@@ -104,7 +104,7 @@ impl SdisTestNode {
         trust.add_edge(TrustEdge::new(
             self.did.clone(),
             other.did.clone(),
-            weight as f64,
+            TrustScore::unchecked(weight as f64),
         ))?;
         Ok(())
     }

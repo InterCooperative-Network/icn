@@ -13,7 +13,7 @@ use icn_core::replication::{ReplicationConfig, ReplicationManager};
 use icn_gossip::{AccessControl, GossipActor, Topic};
 use icn_identity::{Did, KeyPair};
 use icn_store::{ReplicaHealth, SledStore, Store};
-use icn_trust::{TrustClass, TrustEdge, TrustGraph};
+use icn_trust::{TrustClass, TrustEdge, TrustGraph, TrustScore};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
@@ -72,7 +72,7 @@ impl TestNode {
 
     /// Add a trust edge to another node
     async fn trust_peer(&self, peer_did: &Did, score: f64) -> Result<()> {
-        let edge = TrustEdge::new(self.did.clone(), peer_did.clone(), score);
+        let edge = TrustEdge::new(self.did.clone(), peer_did.clone(), TrustScore::unchecked(score));
         let mut graph = self.trust_graph_handle.write().await;
         graph.add_edge(edge)?;
         Ok(())

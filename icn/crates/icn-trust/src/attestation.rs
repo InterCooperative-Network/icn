@@ -4,7 +4,7 @@
 //! over the gossip network to build distributed trust webs.
 
 use crate::types::TrustGraphType;
-use crate::TrustEdge;
+use crate::{TrustEdge, TrustScore};
 use anyhow::Result;
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use hex;
@@ -340,7 +340,7 @@ impl TrustAttestation {
             source: self.issuer.clone(),
             target: self.subject.clone(),
             labels: self.labels.clone(),
-            score: self.score,
+            score: TrustScore::unchecked(self.score),
             evidence: typed_evidence,
             legacy_evidence: Vec::new(), // Converted to typed evidence above
             expires_at: Some(self.expires_at()),
@@ -360,7 +360,7 @@ impl TrustAttestation {
             source: self.issuer.clone(),
             target: self.subject.clone(),
             labels: self.labels.clone(),
-            score: self.score,
+            score: TrustScore::unchecked(self.score),
             evidence,
             legacy_evidence: Vec::new(),
             expires_at: Some(self.expires_at()),
@@ -435,7 +435,7 @@ impl TrustAttestation {
         Self {
             issuer: edge.source.clone(),
             subject: edge.target.clone(),
-            score: edge.score,
+            score: edge.score.value(),
             labels: edge.labels.clone(),
             evidence,
             ttl_seconds,
@@ -569,7 +569,7 @@ mod tests {
 
         assert_eq!(edge.source, attestation.issuer);
         assert_eq!(edge.target, attestation.subject);
-        assert_eq!(edge.score, attestation.score);
+        assert_eq!(edge.score.value(), attestation.score);
         assert_eq!(edge.labels, attestation.labels);
         assert_eq!(edge.expires_at, Some(attestation.expires_at()));
     }
@@ -588,7 +588,7 @@ mod tests {
             executed_at: 12345,
         };
 
-        let mut edge = TrustEdge::new(alice.did().clone(), bob.did().clone(), 0.8)
+        let mut edge = TrustEdge::new(alice.did().clone(), bob.did().clone(), TrustScore::unchecked(0.8))
             .with_label("partner")
             .with_evidence(evidence);
 
@@ -599,7 +599,7 @@ mod tests {
 
         assert_eq!(attestation.issuer, edge.source);
         assert_eq!(attestation.subject, edge.target);
-        assert_eq!(attestation.score, edge.score);
+        assert_eq!(attestation.score, edge.score.value());
         assert_eq!(attestation.labels, edge.labels);
         // Attestation extracts string references from typed evidence
         assert_eq!(attestation.evidence.len(), 1);

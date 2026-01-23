@@ -346,7 +346,7 @@ pub async fn handle_trust_attestation_entry(
     match graph.get_edge(&edge.source, &edge.target) {
         Ok(Some(existing)) => {
             // Use should_supersede to handle clock skew and score tiebreaking
-            if !attestation.should_supersede(existing.created_at, existing.score) {
+            if !attestation.should_supersede(existing.created_at, existing.score.value()) {
                 debug!(
                     "Rejecting outdated trust attestation: {} -> {} (existing: ts={}, score={:.2}; incoming: ts={}, score={:.2})",
                     edge.source, edge.target,
@@ -444,7 +444,7 @@ mod tests {
     use super::*;
     use icn_identity::KeyPair;
     use icn_store::SledStore;
-    use icn_trust::TrustClass;
+    use icn_trust::{TrustClass, TrustScore};
     use std::sync::Arc;
 
     #[tokio::test]
@@ -470,7 +470,7 @@ mod tests {
         let _bob_gossip = icn_gossip::GossipActor::spawn(bob.did().clone(), trust_lookup);
 
         // Alice trusts Bob
-        let edge = TrustEdge::new(alice.did().clone(), bob.did().clone(), 0.75);
+        let edge = TrustEdge::new(alice.did().clone(), bob.did().clone(), TrustScore::unchecked(0.75));
         add_edge_and_broadcast(&alice_graph, edge.clone(), &alice, &alice_gossip)
             .await
             .unwrap();

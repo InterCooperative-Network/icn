@@ -10,7 +10,7 @@ use icn_identity::{IdentityBundle, KeyPair};
 use icn_ledger::{ContentHash, Ledger};
 use icn_net::NetworkActor;
 use icn_store::SledStore;
-use icn_trust::TrustGraph;
+use icn_trust::{TrustGraph, TrustScore};
 use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
@@ -313,7 +313,7 @@ impl TestNode {
     /// Establish trust with another node
     async fn trust_peer(&self, peer_did: &icn_identity::Did, score: f64) -> anyhow::Result<()> {
         let mut graph = self.trust_graph.write().await;
-        let edge = icn_trust::TrustEdge::new(self.did.clone(), peer_did.clone(), score);
+        let edge = icn_trust::TrustEdge::new(self.did.clone(), peer_did.clone(), TrustScore::unchecked(score));
         graph.add_edge(edge)?;
         Ok(())
     }

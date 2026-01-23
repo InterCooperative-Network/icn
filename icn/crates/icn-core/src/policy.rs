@@ -300,7 +300,7 @@ impl PolicySource for DefaultPolicySource {
 mod tests {
     use super::*;
     use icn_identity::KeyPair;
-    use icn_trust::TrustEdge;
+    use icn_trust::{TrustEdge, TrustScore};
 
     #[test]
     fn test_policy_isolated() {
@@ -393,7 +393,7 @@ mod tests {
 
         {
             let mut tg = trust_graph.write().await;
-            let _ = tg.add_edge(TrustEdge::new(alice.clone(), bob.clone(), 0.5));
+            let _ = tg.add_edge(TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.5)));
         }
 
         let policy = policy_source.policy_for(&bob).await;

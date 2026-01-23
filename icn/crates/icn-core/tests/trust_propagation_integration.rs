@@ -14,7 +14,7 @@ use icn_gossip::GossipActor;
 use icn_identity::{IdentityBundle, KeyPair};
 use icn_net::{IncomingMessageHandler, MessagePayload, NetworkActor, NetworkMessage};
 use icn_store::SledStore;
-use icn_trust::{TrustAttestation, TrustEdge, TrustEvidence, TrustGraph};
+use icn_trust::{TrustAttestation, TrustEdge, TrustEvidence, TrustGraph, TrustScore};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -238,7 +238,7 @@ async fn test_trust_attestation_propagation() -> Result<()> {
 
     // Alice creates a trust edge for Bob with score 0.75
     info!("Alice creating trust edge for Bob...");
-    let edge = TrustEdge::new(alice.did.clone(), bob.did.clone(), 0.75)
+    let edge = TrustEdge::new(alice.did.clone(), bob.did.clone(), TrustScore::unchecked(0.75))
         .with_label("test-partner")
         .with_evidence(TrustEvidence::from_legacy_string(
             "integration-test".to_string(),
@@ -334,7 +334,7 @@ async fn test_three_node_transitive_trust() -> Result<()> {
 
     // Alice trusts Bob (0.8)
     info!("Alice trusting Bob...");
-    let edge_alice_bob = TrustEdge::new(alice.did.clone(), bob.did.clone(), 0.8);
+    let edge_alice_bob = TrustEdge::new(alice.did.clone(), bob.did.clone(), TrustScore::unchecked(0.8));
     {
         let mut alice_graph = alice.trust_graph.write().await;
         alice_graph.add_edge(edge_alice_bob.clone())?;
@@ -349,7 +349,7 @@ async fn test_three_node_transitive_trust() -> Result<()> {
 
     // Bob trusts Carol (0.6)
     info!("Bob trusting Carol...");
-    let edge_bob_carol = TrustEdge::new(bob.did.clone(), carol.did.clone(), 0.6);
+    let edge_bob_carol = TrustEdge::new(bob.did.clone(), carol.did.clone(), TrustScore::unchecked(0.6));
     {
         let mut bob_graph = bob.trust_graph.write().await;
         bob_graph.add_edge(edge_bob_carol.clone())?;

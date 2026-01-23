@@ -16,7 +16,7 @@ use icn_federation::{
 use icn_gossip::{AccessControl, GossipActor, Topic};
 use icn_identity::{Did, KeyPair};
 use icn_store::SledStore;
-use icn_trust::{TrustClass, TrustEdge, TrustGraph};
+use icn_trust::{TrustClass, TrustEdge, TrustGraph, TrustScore};
 use std::sync::Arc;
 use tempfile::TempDir;
 use tokio::sync::RwLock;
@@ -145,7 +145,7 @@ impl FederationTestNode {
     /// Establish local trust edge
     async fn add_trust_edge(&self, other: &FederationTestNode, weight: f64) -> Result<()> {
         let mut trust = self.trust_graph.write().await;
-        trust.add_edge(TrustEdge::new(self.did.clone(), other.did.clone(), weight))?;
+        trust.add_edge(TrustEdge::new(self.did.clone(), other.did.clone(), TrustScore::unchecked(weight)))?;
 
         info!(
             "Node '{}' added trust edge to '{}' (weight: {:.2})",

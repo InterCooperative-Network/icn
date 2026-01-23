@@ -2863,7 +2863,7 @@ mod tests {
         let mut trust_graph = icn_trust::TrustGraph::new(store, owner.clone());
 
         // Add trust edge: owner trusts Alice with score 0.05 (below threshold)
-        let edge = icn_trust::TrustEdge::new(owner.clone(), alice.clone(), 0.05);
+        let edge = icn_trust::TrustEdge::new(owner.clone(), alice.clone(), icn_trust::TrustScore::unchecked(0.05));
         trust_graph.add_edge(edge).unwrap();
 
         let trust_graph_handle = Arc::new(RwLock::new(trust_graph));
@@ -2912,7 +2912,7 @@ mod tests {
         let mut trust_graph = icn_trust::TrustGraph::new(store, owner.clone());
 
         // Add trust edge: owner trusts Alice with score 0.6 (final score: 0.6 * 0.7 = 0.42)
-        let edge = icn_trust::TrustEdge::new(owner.clone(), alice.clone(), 0.6);
+        let edge = icn_trust::TrustEdge::new(owner.clone(), alice.clone(), icn_trust::TrustScore::unchecked(0.6));
         trust_graph.add_edge(edge).unwrap();
 
         let trust_graph_handle = Arc::new(RwLock::new(trust_graph));
@@ -2951,7 +2951,7 @@ mod tests {
         let mut trust_graph = icn_trust::TrustGraph::new(store, owner.clone());
 
         // Add trust edge: owner trusts Alice with score 0.58 (final score: 0.58 * 0.7 = 0.406)
-        let edge = icn_trust::TrustEdge::new(owner.clone(), alice.clone(), 0.58);
+        let edge = icn_trust::TrustEdge::new(owner.clone(), alice.clone(), icn_trust::TrustScore::unchecked(0.58));
         trust_graph.add_edge(edge).unwrap();
 
         let trust_graph_handle = Arc::new(RwLock::new(trust_graph));
@@ -3012,7 +3012,7 @@ mod tests {
         let store: Arc<dyn icn_store::Store> = Arc::new(icn_store::SledStore::temporary().unwrap());
         let mut trust_graph = icn_trust::TrustGraph::new(store, owner.clone());
 
-        let edge = icn_trust::TrustEdge::new(owner.clone(), alice.clone(), 1.0);
+        let edge = icn_trust::TrustEdge::new(owner.clone(), alice.clone(), icn_trust::TrustScore::unchecked(1.0));
         trust_graph.add_edge(edge).unwrap();
 
         let trust_graph_handle = Arc::new(RwLock::new(trust_graph));

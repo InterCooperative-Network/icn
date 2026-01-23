@@ -320,6 +320,7 @@ impl MultiTrustGraph {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::TrustScore;
     use icn_identity::KeyPair;
     use icn_store::SledStore;
 
@@ -379,15 +380,15 @@ mod tests {
         // Add different scores to different graphs
         multi
             .social_mut()
-            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), 0.9))
+            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.9)))
             .unwrap();
         multi
             .economic_mut()
-            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), 0.5))
+            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.5)))
             .unwrap();
         multi
             .technical_mut()
-            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), 0.3))
+            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.3)))
             .unwrap();
 
         // Verify isolation
@@ -395,9 +396,9 @@ mod tests {
         let economic_edge = multi.economic().get_edge(&alice, &bob).unwrap().unwrap();
         let technical_edge = multi.technical().get_edge(&alice, &bob).unwrap().unwrap();
 
-        assert!((social_edge.score - 0.9).abs() < 0.001);
-        assert!((economic_edge.score - 0.5).abs() < 0.001);
-        assert!((technical_edge.score - 0.3).abs() < 0.001);
+        assert!((social_edge.score.value() - 0.9).abs() < 0.001);
+        assert!((economic_edge.score.value() - 0.5).abs() < 0.001);
+        assert!((technical_edge.score.value() - 0.3).abs() < 0.001);
     }
 
     #[test]
@@ -414,15 +415,15 @@ mod tests {
         // Technical: 0.4 direct → 0.4 * 0.9 = 0.36 score
         multi
             .social_mut()
-            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), 0.8))
+            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.8)))
             .unwrap();
         multi
             .economic_mut()
-            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), 0.6))
+            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.6)))
             .unwrap();
         multi
             .technical_mut()
-            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), 0.4))
+            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.4)))
             .unwrap();
 
         // Combined: 0.48 * 0.5 + 0.48 * 0.3 + 0.36 * 0.2
@@ -443,7 +444,7 @@ mod tests {
         multi
             .add_edge_to(
                 TrustGraphType::EconomicReliability,
-                TrustEdge::new(alice.clone(), bob.clone(), 0.7),
+                TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.7)),
             )
             .unwrap();
 
@@ -466,15 +467,15 @@ mod tests {
         // Add different DIDs to different graphs
         multi
             .social_mut()
-            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), 0.5))
+            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.5)))
             .unwrap();
         multi
             .economic_mut()
-            .add_edge(TrustEdge::new(alice.clone(), carol.clone(), 0.5))
+            .add_edge(TrustEdge::new(alice.clone(), carol.clone(), TrustScore::unchecked(0.5)))
             .unwrap();
         multi
             .technical_mut()
-            .add_edge(TrustEdge::new(alice.clone(), dave.clone(), 0.5))
+            .add_edge(TrustEdge::new(alice.clone(), dave.clone(), TrustScore::unchecked(0.5)))
             .unwrap();
 
         // Get all DIDs
@@ -500,11 +501,11 @@ mod tests {
         // Add edges from alice in all graphs
         multi
             .social_mut()
-            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), 0.8))
+            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.8)))
             .unwrap();
         multi
             .economic_mut()
-            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), 0.6))
+            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.6)))
             .unwrap();
 
         // Perform recovery

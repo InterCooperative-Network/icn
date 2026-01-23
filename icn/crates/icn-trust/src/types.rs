@@ -396,6 +396,74 @@ impl std::ops::Sub<TrustScore> for TrustScore {
     }
 }
 
+impl std::ops::Mul<f64> for TrustScore {
+    type Output = f64;
+
+    fn mul(self, rhs: f64) -> Self::Output {
+        self.0 * rhs
+    }
+}
+
+impl std::ops::Mul<TrustScore> for f64 {
+    type Output = f64;
+
+    fn mul(self, rhs: TrustScore) -> Self::Output {
+        self * rhs.0
+    }
+}
+
+impl std::ops::Mul<TrustScore> for TrustScore {
+    type Output = f64;
+
+    fn mul(self, rhs: TrustScore) -> Self::Output {
+        self.0 * rhs.0
+    }
+}
+
+impl std::ops::Add<TrustScore> for f64 {
+    type Output = f64;
+
+    fn add(self, rhs: TrustScore) -> Self::Output {
+        self + rhs.0
+    }
+}
+
+impl std::ops::AddAssign<TrustScore> for f64 {
+    fn add_assign(&mut self, rhs: TrustScore) {
+        *self += rhs.0;
+    }
+}
+
+impl PartialEq<TrustScore> for f64 {
+    fn eq(&self, other: &TrustScore) -> bool {
+        *self == other.0
+    }
+}
+
+impl PartialEq<f64> for TrustScore {
+    fn eq(&self, other: &f64) -> bool {
+        self.0 == *other
+    }
+}
+
+impl PartialOrd<TrustScore> for f64 {
+    fn partial_cmp(&self, other: &TrustScore) -> Option<std::cmp::Ordering> {
+        self.partial_cmp(&other.0)
+    }
+}
+
+impl PartialOrd<f64> for TrustScore {
+    fn partial_cmp(&self, other: &f64) -> Option<std::cmp::Ordering> {
+        self.0.partial_cmp(other)
+    }
+}
+
+impl std::iter::Sum<TrustScore> for f64 {
+    fn sum<I: Iterator<Item = TrustScore>>(iter: I) -> Self {
+        iter.map(|s| s.0).sum()
+    }
+}
+
 impl Serialize for TrustScore {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where

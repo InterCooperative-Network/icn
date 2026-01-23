@@ -12,7 +12,7 @@ use anyhow::Result;
 use icn_identity::{Did, KeyPair};
 use icn_ledger::{entry::JournalEntryBuilder, Ledger};
 use icn_store::SledStore;
-use icn_trust::{TrustEdge, TrustGraph};
+use icn_trust::{TrustEdge, TrustGraph, TrustScore};
 use std::sync::Arc;
 use tempfile::TempDir;
 use tokio::sync::RwLock;
@@ -86,7 +86,7 @@ async fn test_trust_edge_migration_on_rotation() -> Result<()> {
     // Bob records a trust edge for Alice in his graph
     {
         let mut bob_trust = bob.trust_graph.write().await;
-        bob_trust.add_edge(TrustEdge::new(bob.did.clone(), alice_old_did.clone(), 0.9))?;
+        bob_trust.add_edge(TrustEdge::new(bob.did.clone(), alice_old_did.clone(), TrustScore::unchecked(0.9)))?;
     }
 
     // Alice rotates her identity
@@ -95,7 +95,7 @@ async fn test_trust_edge_migration_on_rotation() -> Result<()> {
     // Bob adds a trust edge for Alice's new DID
     {
         let mut bob_trust = bob.trust_graph.write().await;
-        bob_trust.add_edge(TrustEdge::new(bob.did.clone(), alice_new_did.clone(), 0.9))?;
+        bob_trust.add_edge(TrustEdge::new(bob.did.clone(), alice_new_did.clone(), TrustScore::unchecked(0.9)))?;
     }
 
     // Verify both edges exist in Bob's trust graph
@@ -179,7 +179,7 @@ async fn test_complete_rotation_flow() -> Result<()> {
     // Setup: Bob and Charlie both add trust edges for Alice
     for node in [&bob, &charlie] {
         let mut trust = node.trust_graph.write().await;
-        trust.add_edge(TrustEdge::new(node.did.clone(), alice_old_did.clone(), 0.9))?;
+        trust.add_edge(TrustEdge::new(node.did.clone(), alice_old_did.clone(), TrustScore::unchecked(0.9)))?;
     }
 
     // Setup: Alice has balance
@@ -203,7 +203,7 @@ async fn test_complete_rotation_flow() -> Result<()> {
     // Simulate each node adding trust edge for new DID
     for node in [&bob, &charlie] {
         let mut trust = node.trust_graph.write().await;
-        trust.add_edge(TrustEdge::new(node.did.clone(), alice_new_did.clone(), 0.9))?;
+        trust.add_edge(TrustEdge::new(node.did.clone(), alice_new_did.clone(), TrustScore::unchecked(0.9)))?;
     }
 
     // Migrate ledger balance
