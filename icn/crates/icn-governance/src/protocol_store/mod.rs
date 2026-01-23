@@ -60,12 +60,14 @@
 //! store.prune_history("governance.min_quorum", 50)?;
 //! ```
 
-// Module structure
-pub mod inmemory;
-pub mod sled;
-pub mod state;
+// Module structure (all public for direct access when needed)
+pub mod inmemory; // In-memory implementation for testing
+pub mod sled; // Persistent Sled implementation for production
+pub mod state; // Core trait definition, error types, and struct definitions
 
-// Re-export public API
+// Re-export commonly used types for convenience.
+// Users can access types via `protocol_store::ProtocolParameterStore` or
+// directly via `protocol_store::inmemory::InMemoryParameterStore` etc.
 pub use state::{
     InMemoryParameterStore, ParameterStoreError, ProtocolParameterStore, SledParameterStore,
     GLOBAL_HISTORY_WARNING_THRESHOLD, MAX_HISTORY_ENTRIES_PER_PARAM,
