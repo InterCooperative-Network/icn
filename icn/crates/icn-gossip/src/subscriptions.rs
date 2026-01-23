@@ -1,4 +1,22 @@
 //! Topic subscription management
+//!
+//! This module handles topic subscription lifecycle with trust-based authorization.
+//! It enforces per-peer and per-topic limits to prevent resource exhaustion.
+//!
+//! # Authorization Layers
+//!
+//! 1. **Trust threshold** - Fine-grained trust score check (if configured)
+//! 2. **Access control** - Coarse-grained ACL check based on trust class
+//! 3. **Rate limits** - Per-peer subscription limits (trust-weighted)
+//! 4. **Capacity limits** - Per-topic subscriber limits
+//!
+//! # Key Functions
+//!
+//! - [`GossipActor::subscribe`] - Subscribe a DID to a topic (with authorization)
+//! - [`GossipActor::unsubscribe`] - Remove a subscription
+//! - [`GossipActor::get_subscribers`] - List subscribers for a topic
+//! - [`GossipActor::get_subscriptions`] - List topics a DID is subscribed to
+//! - [`GossipActor::is_subscribed`] - Check if a DID is subscribed to a topic
 
 use crate::gossip::{
     spawn_violation_recording, topics_per_peer_limit, GossipActor, MAX_SUBSCRIBERS_PER_TOPIC,

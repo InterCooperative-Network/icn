@@ -1,4 +1,18 @@
 //! Message protocol handling
+//!
+//! This module handles incoming gossip protocol messages with trust-gated validation.
+//! It provides the central message dispatcher that routes messages to appropriate handlers.
+//!
+//! # Message Flow
+//!
+//! 1. Messages arrive via `handle_message()`
+//! 2. Sender trust is validated against minimum threshold
+//! 3. Messages are dispatched to type-specific handlers (in `handlers/` module)
+//!
+//! # Trust Gating
+//!
+//! All messages are validated against the sender's trust score before processing.
+//! Messages from low-trust senders are rejected with appropriate metrics tracking.
 
 use crate::gossip::GossipActor;
 use crate::types::GossipMessage;

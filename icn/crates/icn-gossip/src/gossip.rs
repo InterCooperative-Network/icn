@@ -172,10 +172,14 @@ pub struct GossipActor {
     pub(crate) trust_lookup: TrustLookup,
 
     /// Trust graph for fine-grained trust score computation (optional)
-    /// When provided, enables trust-gated subscription authorization
+    ///
+    /// When provided, enables trust-gated subscription authorization.
+    /// Accessed by the `subscriptions` module for authorization checks.
     pub(crate) trust_graph: Option<Arc<RwLock<icn_trust::TrustGraph>>>,
 
     /// Trust score cache to avoid blocking async operations
+    ///
+    /// Accessed by the `subscriptions` module for cached trust lookups.
     pub(crate) trust_cache: TrustScoreCache,
 
     /// Send message callback (optional, for sending responses)
@@ -200,6 +204,8 @@ pub struct GossipActor {
     pub(crate) store: Option<Arc<dyn icn_store::Store>>,
 
     /// Byzantine fault detector (Phase 18 Week 1-2 - optional)
+    ///
+    /// Accessed by `subscriptions` and `protocol` modules for violation recording.
     pub(crate) misbehavior_detector: Option<Arc<RwLock<icn_security::MisbehaviorDetector>>>,
 
     /// Network partition detector (Phase 18 Week 3 - optional)

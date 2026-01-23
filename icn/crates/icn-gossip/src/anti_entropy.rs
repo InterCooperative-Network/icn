@@ -1,4 +1,20 @@
 //! Anti-entropy and bloom filter synchronization
+//!
+//! This module provides bloom filter-based synchronization primitives for
+//! detecting and resolving entry differences between gossip peers.
+//!
+//! # Anti-Entropy Protocol
+//!
+//! 1. Peers periodically exchange bloom filters via `emit_digest()`
+//! 2. Receiving peer checks for missing entries using `find_missing()`
+//! 3. Missing entries are requested and transferred
+//!
+//! # Key Functions
+//!
+//! - [`GossipActor::get_bloom_filter`] - Get local bloom filter for a topic
+//! - [`GossipActor::find_missing`] - Find entries we have that remote doesn't
+//! - [`GossipActor::emit_digest`] - Broadcast our state to peers
+//! - [`GossipActor::emit_all_digests`] - Broadcast all topic states
 
 use crate::bloom::BloomFilter;
 use crate::gossip::GossipActor;
