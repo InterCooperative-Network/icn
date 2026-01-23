@@ -179,6 +179,41 @@ impl Default for ScoringWeights {
     }
 }
 
+/// Error type for invalid trust scores
+///
+/// This error is returned when attempting to create a `TrustScore` with an
+/// invalid value.
+#[derive(Debug, Clone, PartialEq)]
+pub enum TrustScoreError {
+    /// The value was NaN
+    NaN,
+    /// The value was outside the valid range [0.0, 1.0]
+    OutOfRange {
+        /// The invalid value
+        value: f64,
+        /// Minimum valid value (0.0)
+        min: f64,
+        /// Maximum valid value (1.0)
+        max: f64,
+    },
+}
+
+impl fmt::Display for TrustScoreError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::NaN => write!(f, "Trust score cannot be NaN"),
+            Self::OutOfRange { value, min, max } => {
+                write!(
+                    f,
+                    "Trust score must be in range [{min}, {max}], got {value}"
+                )
+            }
+        }
+    }
+}
+
+impl std::error::Error for TrustScoreError {}
+
 /// A trust score in the range [0.0, 1.0]
 ///
 /// This newtype wrapper provides compile-time type safety for trust scores,
@@ -211,6 +246,13 @@ impl TrustScore {
     /// The maximum valid trust score
     pub const MAX: f64 = 1.0;
 
+    /// Threshold for Known trust class (>= 0.1)
+    pub const KNOWN_THRESHOLD: f64 = 0.1;
+    /// Threshold for Partner trust class (>= 0.4)
+    pub const PARTNER_THRESHOLD: f64 = 0.4;
+    /// Threshold for Federated trust class (>= 0.7)
+    pub const FEDERATED_THRESHOLD: f64 = 0.7;
+
     /// Create a new trust score with validation
     ///
     /// # Errors
@@ -229,16 +271,15 @@ impl TrustScore {
     /// assert!(TrustScore::new(1.5).is_err());
     /// assert!(TrustScore::new(-0.1).is_err());
     /// ```
-    pub fn new(value: f64) -> Result<Self, String> {
+    pub fn new(value: f64) -> Result<Self, TrustScoreError> {
         if value.is_nan() {
-            Err("Trust score cannot be NaN".to_string())
-        } else if value < Self::MIN || value > Self::MAX {
-            Err(format!(
-                "Trust score must be in range [{}, {}], got {}",
-                Self::MIN,
-                Self::MAX,
-                value
-            ))
+            Err(TrustScoreError::NaN)
+        } else if !(Self::MIN..=Self::MAX).contains(&value) {
+            Err(TrustScoreError::OutOfRange {
+                value,
+                min: Self::MIN,
+                max: Self::MAX,
+            })
         } else {
             Ok(Self(value))
         }
@@ -246,7 +287,7 @@ impl TrustScore {
 
     /// Create a trust score without validation (for constants and trusted sources)
     ///
-    /// # Safety
+    /// # Correctness requirements
     ///
     /// The caller must ensure the value is in range [0.0, 1.0] and not NaN.
     /// This is intended for use with constants where the value is known to be valid.
@@ -292,22 +333,22 @@ impl TrustScore {
 
     /// Check if this score meets the isolated threshold (>= 0.0)
     pub fn is_isolated_or_better(&self) -> bool {
-        self.0 >= 0.0
+        self.0 >= Self::MIN
     }
 
     /// Check if this score meets the known threshold (>= 0.1)
     pub fn is_known_or_better(&self) -> bool {
-        self.0 >= 0.1
+        self.0 >= Self::KNOWN_THRESHOLD
     }
 
     /// Check if this score meets the partner threshold (>= 0.4)
     pub fn is_partner_or_better(&self) -> bool {
-        self.0 >= 0.4
+        self.0 >= Self::PARTNER_THRESHOLD
     }
 
     /// Check if this score meets the federated threshold (>= 0.7)
     pub fn is_federated(&self) -> bool {
-        self.0 >= 0.7
+        self.0 >= Self::FEDERATED_THRESHOLD
     }
 }
 
@@ -324,10 +365,34 @@ impl From<TrustScore> for f64 {
 }
 
 impl TryFrom<f64> for TrustScore {
-    type Error = String;
+    type Error = TrustScoreError;
 
     fn try_from(value: f64) -> Result<Self, Self::Error> {
         Self::new(value)
+    }
+}
+
+impl std::ops::Sub<f64> for TrustScore {
+    type Output = f64;
+
+    fn sub(self, rhs: f64) -> Self::Output {
+        self.0 - rhs
+    }
+}
+
+impl std::ops::Sub<TrustScore> for f64 {
+    type Output = f64;
+
+    fn sub(self, rhs: TrustScore) -> Self::Output {
+        self - rhs.0
+    }
+}
+
+impl std::ops::Sub<TrustScore> for TrustScore {
+    type Output = f64;
+
+    fn sub(self, rhs: TrustScore) -> Self::Output {
+        self.0 - rhs.0
     }
 }
 
@@ -509,10 +574,7 @@ mod tests {
             TrustScore::new(0.05).unwrap().to_class(),
             TrustClass::Isolated
         );
-        assert_eq!(
-            TrustScore::new(0.2).unwrap().to_class(),
-            TrustClass::Known
-        );
+        assert_eq!(TrustScore::new(0.2).unwrap().to_class(), TrustClass::Known);
         assert_eq!(
             TrustScore::new(0.5).unwrap().to_class(),
             TrustClass::Partner

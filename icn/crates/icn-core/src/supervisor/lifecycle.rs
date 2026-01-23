@@ -685,7 +685,7 @@ async fn spawn_network_actor(
                 Some(
                     config
                         .rate_limiting
-                        .to_trust_gated_config(config.network.min_trust_threshold),
+                        .to_trust_gated_config(config.network.min_trust_threshold.value()),
                 ),
                 Some(config.rate_limiting.to_fallback_config()),
             )

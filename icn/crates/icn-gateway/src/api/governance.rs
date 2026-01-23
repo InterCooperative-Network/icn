@@ -2667,6 +2667,7 @@ mod tests {
         Proposal, ProposalState,
     };
     use icn_identity::IdentityBundle;
+    use icn_trust::TrustScore;
 
     fn create_test_claims(did: &str, scopes: Vec<&str>) -> TokenClaims {
         TokenClaims {
@@ -3969,7 +3970,7 @@ mod tests {
             description: "Proposal to join the regional food cooperative federation".to_string(),
             federation_id: "regional-food-fed".to_string(),
             terms: crate::models::FederationTermsRequest {
-                min_trust_threshold: 0.6,
+                min_trust_threshold: TrustScore::unchecked(0.6),
                 governance_binding: true,
                 data_sharing_level: "metadata_only".to_string(),
                 dispute_resolution: "federation_mediation".to_string(),
@@ -4284,7 +4285,7 @@ mod tests {
             title: "Update Federation Policy".to_string(),
             description: "Adjust auto-accept threshold and rate limits".to_string(),
             auto_accept_vouch_threshold: Some(0.7),
-            trust_decay_factor: Some(0.05),
+            trust_decay_factor: Some(TrustScore::unchecked(0.05)),
             max_attestations_per_minute: Some(30),
         };
 
@@ -4330,30 +4331,30 @@ mod tests {
         )
         .await;
 
-        // Trust score too high (> 1.0)
-        let req_body = JoinFederationProposalRequest {
-            domain_id: "coop:food".to_string(),
-            title: "Join Federation".to_string(),
-            description: "Test proposal".to_string(),
-            federation_id: "test-fed".to_string(),
-            terms: crate::models::FederationTermsRequest {
-                min_trust_threshold: 1.5, // Invalid - too high
-                governance_binding: true,
-                data_sharing_level: "metadata_only".to_string(),
-                dispute_resolution: "federation_mediation".to_string(),
+        // Trust score too high (> 1.0) - use raw JSON to test deserialization rejection
+        let invalid_json = serde_json::json!({
+            "domain_id": "coop:food",
+            "title": "Join Federation",
+            "description": "Test proposal",
+            "federation_id": "test-fed",
+            "terms": {
+                "min_trust_threshold": 1.5,  // Invalid - too high
+                "governance_binding": true,
+                "data_sharing_level": "metadata_only",
+                "dispute_resolution": "federation_mediation"
             },
-            sponsor_coop_id: None,
-        };
+            "sponsor_coop_id": null
+        });
 
         let claims = create_test_claims(&alice.did().to_string(), vec!["gov:write"]);
         let req = test::TestRequest::post()
             .uri("/gov/proposals/federation/join")
-            .set_json(&req_body)
+            .set_json(&invalid_json)
             .to_request();
         req.extensions_mut().insert(claims);
 
         let resp = test::call_service(&app, req).await;
-        assert_eq!(resp.status(), 400); // Bad Request
+        assert_eq!(resp.status(), 400); // Bad Request - TrustScore validation rejects 1.5
     }
 
     #[actix_web::test]
@@ -4481,7 +4482,7 @@ mod tests {
             description: "Test proposal".to_string(),
             federation_id: "test-fed".to_string(),
             terms: crate::models::FederationTermsRequest {
-                min_trust_threshold: 0.5,
+                min_trust_threshold: TrustScore::unchecked(0.5),
                 governance_binding: true,
                 data_sharing_level: "metadata_only".to_string(),
                 dispute_resolution: "federation_mediation".to_string(),
@@ -4531,7 +4532,7 @@ mod tests {
             description: "Test proposal".to_string(),
             federation_id: "test-fed".to_string(),
             terms: crate::models::FederationTermsRequest {
-                min_trust_threshold: 0.5,
+                min_trust_threshold: TrustScore::unchecked(0.5),
                 governance_binding: true,
                 data_sharing_level: "metadata_only".to_string(),
                 dispute_resolution: "federation_mediation".to_string(),
@@ -4629,7 +4630,7 @@ mod tests {
             description: "Using arbitrator for dispute resolution".to_string(),
             federation_id: "test-fed".to_string(),
             terms: crate::models::FederationTermsRequest {
-                min_trust_threshold: 0.5,
+                min_trust_threshold: TrustScore::unchecked(0.5),
                 governance_binding: true,
                 data_sharing_level: "full".to_string(),
                 dispute_resolution: "arbitrator:neutral-coop".to_string(),

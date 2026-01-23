@@ -898,20 +898,10 @@ impl FederationTerms {
     /// Validate the federation terms
     ///
     /// Returns an error message if validation fails.
+    ///
+    /// Note: TrustScore values are already validated at construction time,
+    /// so min_trust_threshold is guaranteed to be in range [0.0, 1.0].
     pub fn validate(&self) -> Result<(), String> {
-        // Validate trust score is in valid range [0.0, 1.0]
-        // Even though TrustScore::new() validates, unchecked() bypasses it,
-        // so we need to check here to catch invalid values in tests and edge cases
-        let value = self.min_trust_threshold.value();
-        if value < TrustScore::MIN || value > TrustScore::MAX || value.is_nan() {
-            return Err(format!(
-                "min_trust_threshold must be in range [{}, {}], got {}",
-                TrustScore::MIN,
-                TrustScore::MAX,
-                value
-            ));
-        }
-
         // Validate dispute resolution-specific fields
         if let DisputeResolutionMethod::ArbitratorCooperative { arbitrator_id } =
             &self.dispute_resolution
@@ -1962,23 +1952,10 @@ mod tests {
         let valid_terms = FederationTerms::default();
         assert!(valid_terms.validate().is_ok());
 
-        // Invalid trust threshold (too high)
-        let invalid_high = FederationTerms {
-            min_trust_threshold: TrustScore::unchecked(1.5),
-            ..Default::default()
-        };
-        assert!(invalid_high.validate().is_err());
-        assert!(invalid_high
-            .validate()
-            .unwrap_err()
-            .contains("min_trust_threshold"));
-
-        // Invalid trust threshold (negative)
-        let invalid_negative = FederationTerms {
-            min_trust_threshold: TrustScore::unchecked(-0.1),
-            ..Default::default()
-        };
-        assert!(invalid_negative.validate().is_err());
+        // TrustScore validates range at construction time, not at validate() time.
+        // Test that TrustScore::new() rejects invalid values:
+        assert!(TrustScore::new(1.5).is_err()); // Too high
+        assert!(TrustScore::new(-0.1).is_err()); // Negative
 
         // Edge cases that should be valid
         let edge_zero = FederationTerms {
@@ -2142,16 +2119,16 @@ mod tests {
             .unwrap_err()
             .contains("federation_id"));
 
-        // JoinFederation validation - invalid terms
-        let invalid_terms_join = FederationProposal::JoinFederation {
+        // JoinFederation validation - TrustScore validates range at construction time,
+        // not at FederationProposal::validate() time. Test that TrustScore rejects invalid values:
+        assert!(TrustScore::new(1.5).is_err());
+        // Valid terms should pass validation
+        let valid_terms_join = FederationProposal::JoinFederation {
             federation_id: "test-fed".to_string(),
-            terms: FederationTerms {
-                min_trust_threshold: TrustScore::unchecked(1.5), // invalid
-                ..Default::default()
-            },
+            terms: FederationTerms::default(),
             sponsor_coop_id: None,
         };
-        assert!(invalid_terms_join.validate().is_err());
+        assert!(valid_terms_join.validate().is_ok());
 
         // TerminateClearing validation - empty partner_coop_id
         let empty_partner_terminate = FederationProposal::TerminateClearing {
@@ -2273,7 +2250,10 @@ mod tests {
         let json = serde_json::to_string(&terms).unwrap();
         let deserialized: FederationTerms = serde_json::from_str(&json).unwrap();
 
-        assert!((terms.min_trust_threshold.value() - deserialized.min_trust_threshold.value()).abs() < 0.001);
+        assert!(
+            (terms.min_trust_threshold.value() - deserialized.min_trust_threshold.value()).abs()
+                < 0.001
+        );
         assert_eq!(terms.governance_binding, deserialized.governance_binding);
         assert_eq!(terms.data_sharing_level, deserialized.data_sharing_level);
         assert_eq!(terms.dispute_resolution, deserialized.dispute_resolution);

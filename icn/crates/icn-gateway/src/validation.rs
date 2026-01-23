@@ -559,7 +559,7 @@ pub fn validate_federation_id(id: &str) -> Result<()> {
 /// Validate trust score (must be in [0.0, 1.0])
 pub fn validate_trust_score(score: f64) -> Result<()> {
     // Convert f64 to TrustScore to validate
-    TrustScore::new(score).map_err(|e| GatewayError::BadRequest(e))?;
+    TrustScore::new(score).map_err(|e| GatewayError::BadRequest(e.to_string()))?;
     Ok(())
 }
 
@@ -703,10 +703,10 @@ pub fn validate_auto_accept_threshold(threshold: Option<f64>) -> Result<()> {
 }
 
 /// Validate trust decay factor (0.0-1.0)
-pub fn validate_trust_decay_factor(factor: Option<TrustScore>) -> Result<()> {
-    // TrustScore already validates during construction, so this is now a no-op
-    // Keep the function for API compatibility
-    let _ = factor;
+///
+/// TrustScore already validates during construction, so this validator is a no-op.
+/// Keep the function for API compatibility.
+pub fn validate_trust_decay_factor(_factor: Option<TrustScore>) -> Result<()> {
     Ok(())
 }
 

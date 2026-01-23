@@ -80,7 +80,7 @@ pub use sybil::{
 };
 pub use trust_cache::TrustCache;
 pub use typed_graph::TypedTrustGraph;
-pub use types::{ScoringWeights, TrustGraphType, TrustScore};
+pub use types::{ScoringWeights, TrustGraphType, TrustScore, TrustScoreError};
 
 use anyhow::Result;
 use icn_identity::Did;
