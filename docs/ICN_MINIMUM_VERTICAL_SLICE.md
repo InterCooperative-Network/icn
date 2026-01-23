@@ -126,12 +126,12 @@ This is the bridge between "architecture docs" and "the actual repo."
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │ CLIENT CALL (Application)                                                    │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│ POST /coops/{coop_id}/members/apply                                         │
+│ POST /membership/apply                                                       │
 │ Authorization: Bearer <jwt>                                                 │
 │ {                                                                            │
-│   "invite_code": "ABC123",                                                  │
-│   "name": "Alice Smith",                                                    │
-│   "email": "alice@example.com"                                              │
+│   "jurisdiction_id": "jurisdiction:icn:food-coop-123",                      │
+│   "capabilities_requested": ["member"],                                     │
+│   "invite_code": "ABC123"                                                   │
 │ }                                                                            │
 └─────────────────────────────────────────────────────────────────────────────┘
                     │
@@ -154,9 +154,14 @@ This is the bridge between "architecture docs" and "the actual repo."
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │ CLIENT CALL (Admin Approval)                                                 │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│ POST /coops/{coop_id}/members/{did}/approve                                 │
+│ POST /membership/approve                                                     │
 │ Authorization: Bearer <admin-jwt>                                           │
-│ { "roles": ["member"], "initial_credit_limit": 100 }                        │
+│ {                                                                            │
+│   "member_did": "did:icn:alice...",                                         │
+│   "jurisdiction_id": "jurisdiction:icn:food-coop-123",                      │
+│   "capabilities": ["member"],                                               │
+│   "initial_credit_limit": 100                                               │
+│ }                                                                            │
 └─────────────────────────────────────────────────────────────────────────────┘
                     │
                     ▼
@@ -237,7 +242,7 @@ This is the bridge between "architecture docs" and "the actual repo."
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │ GATEWAY ENDPOINT                                                             │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│ File: icn-gateway/src/api/ledger.rs:51                                      │
+│ File: icn-gateway/src/api/ledger.rs                                         │
 │                                                                              │
 │ #[post("/{coop_id}/payment")]                                               │
 │ pub async fn create_payment(...)                                            │
@@ -396,9 +401,10 @@ This is the bridge between "architecture docs" and "the actual repo."
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │ CLIENT CALL                                                                  │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│ POST /gov/domains/{domain_id}/proposals                                     │
+│ POST /gov/proposals                                                          │
 │ Authorization: Bearer <jwt>                                                 │
 │ {                                                                            │
+│   "domain_id": "domain-123",                                                │
 │   "title": "Increase new member credit limit",                              │
 │   "description": "Raise from 50 to 100 hours...",                           │
 │   "payload": {                                                              │
@@ -493,7 +499,7 @@ This is the bridge between "architecture docs" and "the actual repo."
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │ CLIENT CALL                                                                  │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│ POST /gov/domains/{domain_id}/proposals/{proposal_id}/vote                  │
+│ POST /gov/proposals/{proposal_id}/vote                                       │
 │ Authorization: Bearer <jwt>                                                 │
 │ {                                                                            │
 │   "choice": "For",                                                          │
@@ -648,11 +654,12 @@ This is the bridge between "architecture docs" and "the actual repo."
 |------------------|--------------|--------------|
 | `/auth/*` | `api/auth.rs` | `icn-identity` |
 | `/identity/*` | `api/identity.rs`, `api/devices.rs` | `icn-identity` |
+| `/membership/*` | `api/membership/mod.rs` | `icn-entity` |
 | `/ledger/{coop_id}/*` | `api/ledger.rs` | `icn-ledger` |
 | `/gov/*` | `api/governance.rs` | `icn-governance` |
 | `/trust/*` | `api/trust.rs` | `icn-trust` |
 | `/compute/*` | `api/compute.rs` | `icn-compute` |
-| `/coops/*` | `api/coops.rs`, `api/members.rs` | `icn-coop` |
+| `/coops/*` | `api/coops.rs` | `icn-coop` |
 | `/communities/*` | `api/communities.rs` | `icn-community` |
 | `/federation/*` | `api/federation.rs` | `icn-federation` |
 | `/ws/{coop_id}` | `api/websocket.rs` | (gateway-only) |

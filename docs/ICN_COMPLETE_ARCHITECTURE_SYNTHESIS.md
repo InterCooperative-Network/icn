@@ -547,10 +547,9 @@ Good behavior gradually restores score
 
 ```rust
 enum AccessControl {
-    Open,                           // Anyone can publish/subscribe
-    TrustGated { min_trust: f64 },  // Trust threshold required
-    MembersOnly { members: Vec<Did> }, // Whitelist
-    CooperativeOnly { coop_id },    // Same cooperative only
+    Public,                         // Anyone can publish/subscribe
+    TrustClass(TrustClass),         // Requires minimum trust class
+    Participants(Vec<Did>),         // Only specific participants (whitelist)
 }
 ```
 
@@ -672,11 +671,11 @@ More coops → [compound forever]
 
 | Category | Crates |
 |----------|--------|
-| **Core** | icn-core, icn-common |
+| **Core** | icn-core |
 | **Identity** | icn-identity, icn-steward, icn-zkp, icn-crypto-pq |
 | **Trust** | icn-trust |
 | **Network** | icn-net, icn-gossip |
-| **Storage** | icn-store, icn-encoding |
+| **Storage** | icn-store, icn-encoding, icn-snapshot |
 | **Compute** | icn-compute |
 | **Economy** | icn-ledger, icn-ccl |
 | **Governance** | icn-governance |
@@ -684,6 +683,7 @@ More coops → [compound forever]
 | **Security** | icn-security, icn-privacy |
 | **API** | icn-gateway, icn-rpc, icn-api |
 | **Observability** | icn-obs |
+| **Infrastructure** | icn-time |
 | **Testing** | icn-testkit |
 
 ---
