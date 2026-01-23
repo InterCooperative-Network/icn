@@ -204,9 +204,17 @@ Both were successful and improved code maintainability.
 - [ ] Team review
 
 ### Short Term (If Approved)
-- [ ] Split ledger.rs (follow implementation guide)
-- [ ] Validate with full test suite
-- [ ] Document lessons learned
+- [ ] Split ledger.rs Phase 1: Query operations (#778)
+- [ ] Split ledger.rs Phase 2: Balance operations (#779)
+- [ ] Split ledger.rs Phase 3: Fork operations (#780)
+- [ ] Split ledger.rs Phase 4: Freeze operations (#781)
+- [ ] Split ledger.rs Phase 5: Witness operations (#782)
+
+### Medium Term
+- [ ] Split gossip.rs (#783)
+- [ ] Split protocol_store.rs (#784)
+- [ ] Split treasury.rs (#785)
+- [ ] Split net/actor.rs (#786)
 
 ### Long Term
 - [ ] Apply learnings to other modules
