@@ -9,7 +9,7 @@ use crate::error::{GatewayError, Result};
 use crate::events::{EventBroadcaster, GatewayEvent};
 use crate::trust_mgr::TrustManager;
 use icn_identity::Did;
-use icn_trust::TrustEdge;
+use icn_trust::{TrustEdge, TrustScore};
 
 /// Trust score response
 #[derive(Debug, Serialize, ToSchema)]
@@ -113,15 +113,12 @@ pub async fn create_trust_attestation(
         .parse::<Did>()
         .map_err(|e| GatewayError::BadRequest(format!("Invalid target DID: {e}")))?;
 
-    // Validate score range
-    if req.score < 0.0 || req.score > 1.0 {
-        return Err(GatewayError::BadRequest(
-            "Trust score must be between 0.0 and 1.0".to_string(),
-        ));
-    }
+    // Validate score range and create TrustScore
+    let trust_score = TrustScore::new(req.score)
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid trust score: {e}")))?;
 
     let from = from_did.into_inner();
-    let mut edge = TrustEdge::new(from.clone(), to_did.clone(), req.score);
+    let mut edge = TrustEdge::new(from.clone(), to_did.clone(), trust_score);
 
     // Add memo as label if provided
     if let Some(ref memo) = req.memo {
@@ -237,7 +234,7 @@ mod tests {
         let alice = KeyPair::generate().unwrap().did().clone();
         let bob = KeyPair::generate().unwrap().did().clone();
 
-        let edge = TrustEdge::new(alice.clone(), bob.clone(), 0.7);
+        let edge = TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.7));
         trust_manager.add_edge_async(edge).await.unwrap();
 
         let app = test::init_service(

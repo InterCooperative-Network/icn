@@ -27,6 +27,7 @@
 //! min_diversity_ratio = 0.2     # Required attester diversity
 //! ```
 
+use icn_trust::TrustScore;
 use serde::{Deserialize, Serialize};
 
 /// Trust graph configuration
@@ -51,7 +52,7 @@ pub struct AttestationConfig {
     /// Minimum trust score required to create attestations (0.0-1.0)
     /// Default: 0.3 (basic trust relationship)
     #[serde(default = "default_min_attester_trust")]
-    pub min_attester_trust: f64,
+    pub min_attester_trust: TrustScore,
 
     /// Maximum attestations per day per attester
     #[serde(default = "default_max_attestations_per_day")]
@@ -63,7 +64,7 @@ pub struct AttestationConfig {
 
     /// Minimum evidence score for attestations (0.0-1.0)
     #[serde(default = "default_min_evidence_score")]
-    pub min_evidence_score: f64,
+    pub min_evidence_score: TrustScore,
 }
 
 impl Default for AttestationConfig {
@@ -77,16 +78,16 @@ impl Default for AttestationConfig {
     }
 }
 
-fn default_min_attester_trust() -> f64 {
-    0.3 // Require moderate trust to attest
+fn default_min_attester_trust() -> TrustScore {
+    TrustScore::unchecked(0.3) // Require moderate trust to attest
 }
 
 fn default_max_attestations_per_day() -> usize {
     10 // Prevent spam while allowing legitimate use
 }
 
-fn default_min_evidence_score() -> f64 {
-    0.5 // Require reasonable evidence quality
+fn default_min_evidence_score() -> TrustScore {
+    TrustScore::unchecked(0.5) // Require reasonable evidence quality
 }
 
 /// Trust propagation configuration
@@ -99,11 +100,11 @@ pub struct PropagationConfig {
     /// Decay factor per hop (0.0-1.0)
     /// Trust score is multiplied by this factor for each hop
     #[serde(default = "default_decay_factor")]
-    pub decay_factor: f64,
+    pub decay_factor: TrustScore,
 
     /// Minimum edge trust to include in propagation (0.0-1.0)
     #[serde(default = "default_min_edge_trust")]
-    pub min_edge_trust: f64,
+    pub min_edge_trust: TrustScore,
 
     /// Enable trust caching for performance
     #[serde(default = "default_true")]
@@ -130,12 +131,12 @@ fn default_max_path_length() -> usize {
     3 // Balance reach and computation cost
 }
 
-fn default_decay_factor() -> f64 {
-    0.8 // 20% decay per hop
+fn default_decay_factor() -> TrustScore {
+    TrustScore::unchecked(0.8) // 20% decay per hop
 }
 
-fn default_min_edge_trust() -> f64 {
-    0.1 // Include weak edges but not zero trust
+fn default_min_edge_trust() -> TrustScore {
+    TrustScore::unchecked(0.1) // Include weak edges but not zero trust
 }
 
 fn default_cache_ttl_secs() -> u64 {
@@ -153,7 +154,7 @@ pub struct SybilResistanceConfig {
     /// If an attester vouches for entities with combined trust exceeding this,
     /// additional attestations have reduced weight
     #[serde(default = "default_max_trust_concentration")]
-    pub max_trust_concentration: f64,
+    pub max_trust_concentration: TrustScore,
 
     /// Network sampling size for sybil detection
     #[serde(default = "default_sample_size")]
@@ -162,7 +163,7 @@ pub struct SybilResistanceConfig {
     /// Minimum network diversity ratio (0.0-1.0)
     /// Entities with low diversity (few unique attesters) have reduced trust
     #[serde(default = "default_min_diversity_ratio")]
-    pub min_diversity_ratio: f64,
+    pub min_diversity_ratio: TrustScore,
 }
 
 impl Default for SybilResistanceConfig {
@@ -176,16 +177,16 @@ impl Default for SybilResistanceConfig {
     }
 }
 
-fn default_max_trust_concentration() -> f64 {
-    0.3 // Prevent single attester from dominating
+fn default_max_trust_concentration() -> TrustScore {
+    TrustScore::unchecked(0.3) // Prevent single attester from dominating
 }
 
 fn default_sample_size() -> usize {
     100 // Sample size for network analysis
 }
 
-fn default_min_diversity_ratio() -> f64 {
-    0.2 // Require 20% unique attesters
+fn default_min_diversity_ratio() -> TrustScore {
+    TrustScore::unchecked(0.2) // Require 20% unique attesters
 }
 
 fn default_true() -> bool {

@@ -12,7 +12,7 @@ use icn_identity::KeyPair;
 use icn_store::SledStore;
 use icn_trust::{
     EvidenceValidator, EvidenceValidatorConfig, MultiTrustGraph, ScoringWeights, TrustAttestation,
-    TrustCache, TrustClass, TrustEdge, TrustEvidence, TrustGraph, TrustGraphType,
+    TrustCache, TrustClass, TrustEdge, TrustEvidence, TrustGraph, TrustGraphType, TrustScore,
 };
 use std::sync::Arc;
 use std::time::Duration;
@@ -35,21 +35,37 @@ fn test_multi_graph_complete_trust_network() {
     // Social connections: Alice knows Bob well, Bob knows Carol
     multi
         .social_mut()
-        .add_edge(TrustEdge::new(alice.did().clone(), bob.did().clone(), 0.8))
+        .add_edge(TrustEdge::new(
+            alice.did().clone(),
+            bob.did().clone(),
+            TrustScore::unchecked(0.8),
+        ))
         .unwrap();
     multi
         .social_mut()
-        .add_edge(TrustEdge::new(bob.did().clone(), carol.did().clone(), 0.7))
+        .add_edge(TrustEdge::new(
+            bob.did().clone(),
+            carol.did().clone(),
+            TrustScore::unchecked(0.7),
+        ))
         .unwrap();
 
     // Economic reliability: Alice has done business with Bob, Bob with Dave
     multi
         .economic_mut()
-        .add_edge(TrustEdge::new(alice.did().clone(), bob.did().clone(), 0.9))
+        .add_edge(TrustEdge::new(
+            alice.did().clone(),
+            bob.did().clone(),
+            TrustScore::unchecked(0.9),
+        ))
         .unwrap();
     multi
         .economic_mut()
-        .add_edge(TrustEdge::new(bob.did().clone(), dave.did().clone(), 0.6))
+        .add_edge(TrustEdge::new(
+            bob.did().clone(),
+            dave.did().clone(),
+            TrustScore::unchecked(0.6),
+        ))
         .unwrap();
 
     // Technical reliability: Alice trusts Carol's node, Carol trusts Dave's node
@@ -58,12 +74,16 @@ fn test_multi_graph_complete_trust_network() {
         .add_edge(TrustEdge::new(
             alice.did().clone(),
             carol.did().clone(),
-            0.7,
+            TrustScore::unchecked(0.7),
         ))
         .unwrap();
     multi
         .technical_mut()
-        .add_edge(TrustEdge::new(carol.did().clone(), dave.did().clone(), 0.8))
+        .add_edge(TrustEdge::new(
+            carol.did().clone(),
+            dave.did().clone(),
+            TrustScore::unchecked(0.8),
+        ))
         .unwrap();
 
     // Verify graph isolation - each graph has different trust profiles
@@ -113,21 +133,33 @@ fn test_multi_graph_dimension_specific_operations() {
     multi
         .add_edge_to(
             TrustGraphType::Social,
-            TrustEdge::new(alice.did().clone(), bob.did().clone(), 0.9),
+            TrustEdge::new(
+                alice.did().clone(),
+                bob.did().clone(),
+                TrustScore::unchecked(0.9),
+            ),
         )
         .unwrap();
 
     multi
         .add_edge_to(
             TrustGraphType::EconomicReliability,
-            TrustEdge::new(alice.did().clone(), bob.did().clone(), 0.3),
+            TrustEdge::new(
+                alice.did().clone(),
+                bob.did().clone(),
+                TrustScore::unchecked(0.3),
+            ),
         )
         .unwrap();
 
     multi
         .add_edge_to(
             TrustGraphType::TechnicalReliability,
-            TrustEdge::new(alice.did().clone(), bob.did().clone(), 0.5),
+            TrustEdge::new(
+                alice.did().clone(),
+                bob.did().clone(),
+                TrustScore::unchecked(0.5),
+            ),
         )
         .unwrap();
 
@@ -338,23 +370,39 @@ fn test_complex_transitive_trust_network() {
     // Bob -> Eve (0.5)
 
     graph
-        .add_edge(TrustEdge::new(alice.did().clone(), bob.did().clone(), 0.8))
+        .add_edge(TrustEdge::new(
+            alice.did().clone(),
+            bob.did().clone(),
+            TrustScore::unchecked(0.8),
+        ))
         .unwrap();
     graph
         .add_edge(TrustEdge::new(
             alice.did().clone(),
             carol.did().clone(),
-            0.6,
+            TrustScore::unchecked(0.6),
         ))
         .unwrap();
     graph
-        .add_edge(TrustEdge::new(bob.did().clone(), dave.did().clone(), 0.7))
+        .add_edge(TrustEdge::new(
+            bob.did().clone(),
+            dave.did().clone(),
+            TrustScore::unchecked(0.7),
+        ))
         .unwrap();
     graph
-        .add_edge(TrustEdge::new(carol.did().clone(), dave.did().clone(), 0.9))
+        .add_edge(TrustEdge::new(
+            carol.did().clone(),
+            dave.did().clone(),
+            TrustScore::unchecked(0.9),
+        ))
         .unwrap();
     graph
-        .add_edge(TrustEdge::new(bob.did().clone(), eve.did().clone(), 0.5))
+        .add_edge(TrustEdge::new(
+            bob.did().clone(),
+            eve.did().clone(),
+            TrustScore::unchecked(0.5),
+        ))
         .unwrap();
 
     // Direct trust scores (70% direct, 30% transitive)
@@ -395,10 +443,18 @@ fn test_custom_scoring_weights() {
 
     // Alice trusts Bob directly, Bob trusts Carol
     graph
-        .add_edge(TrustEdge::new(alice.did().clone(), bob.did().clone(), 1.0))
+        .add_edge(TrustEdge::new(
+            alice.did().clone(),
+            bob.did().clone(),
+            TrustScore::unchecked(1.0),
+        ))
         .unwrap();
     graph
-        .add_edge(TrustEdge::new(bob.did().clone(), carol.did().clone(), 1.0))
+        .add_edge(TrustEdge::new(
+            bob.did().clone(),
+            carol.did().clone(),
+            TrustScore::unchecked(1.0),
+        ))
         .unwrap();
 
     // With 100% direct weight, Carol gets 0 (no direct edge)
@@ -454,17 +510,25 @@ fn test_trust_class_from_graph() {
 
     // Different trust levels
     graph
-        .add_edge(TrustEdge::new(alice.did().clone(), bob.did().clone(), 0.95))
+        .add_edge(TrustEdge::new(
+            alice.did().clone(),
+            bob.did().clone(),
+            TrustScore::unchecked(0.95),
+        ))
         .unwrap(); // → Federated
     graph
         .add_edge(TrustEdge::new(
             alice.did().clone(),
             carol.did().clone(),
-            0.5,
+            TrustScore::unchecked(0.5),
         ))
         .unwrap(); // → Known
     graph
-        .add_edge(TrustEdge::new(alice.did().clone(), dave.did().clone(), 0.1))
+        .add_edge(TrustEdge::new(
+            alice.did().clone(),
+            dave.did().clone(),
+            TrustScore::unchecked(0.1),
+        ))
         .unwrap(); // → Isolated
 
     assert_eq!(graph.trust_class(bob.did()).unwrap(), TrustClass::Partner); // 0.95 * 0.7 = 0.665
@@ -559,21 +623,21 @@ fn test_did_recovery_single_graph() {
         .add_edge(TrustEdge::new(
             alice_old.did().clone(),
             bob.did().clone(),
-            0.8,
+            TrustScore::unchecked(0.8),
         ))
         .unwrap();
     graph
         .add_edge(TrustEdge::new(
             bob.did().clone(),
             alice_old.did().clone(),
-            0.7,
+            TrustScore::unchecked(0.7),
         ))
         .unwrap();
     graph
         .add_edge(TrustEdge::new(
             carol.did().clone(),
             alice_old.did().clone(),
-            0.9,
+            TrustScore::unchecked(0.9),
         ))
         .unwrap();
 
@@ -622,7 +686,7 @@ fn test_did_recovery_multi_graph() {
         .add_edge(TrustEdge::new(
             alice_old.did().clone(),
             bob.did().clone(),
-            0.8,
+            TrustScore::unchecked(0.8),
         ))
         .unwrap();
     multi
@@ -630,7 +694,7 @@ fn test_did_recovery_multi_graph() {
         .add_edge(TrustEdge::new(
             alice_old.did().clone(),
             bob.did().clone(),
-            0.7,
+            TrustScore::unchecked(0.7),
         ))
         .unwrap();
     multi
@@ -638,7 +702,7 @@ fn test_did_recovery_multi_graph() {
         .add_edge(TrustEdge::new(
             alice_old.did().clone(),
             bob.did().clone(),
-            0.6,
+            TrustScore::unchecked(0.6),
         ))
         .unwrap();
 
@@ -691,8 +755,12 @@ fn test_edge_expiry_filtering() {
         .as_secs();
 
     // Add expired edge
-    let expired_edge =
-        TrustEdge::new(alice.did().clone(), bob.did().clone(), 0.8).with_expiry(now - 100); // Expired 100 seconds ago
+    let expired_edge = TrustEdge::new(
+        alice.did().clone(),
+        bob.did().clone(),
+        TrustScore::unchecked(0.8),
+    )
+    .with_expiry(now - 100); // Expired 100 seconds ago
 
     graph.add_edge(expired_edge).unwrap();
 
@@ -722,13 +790,23 @@ fn test_outgoing_edges_expiry_filtering() {
     // Add valid and expired edges
     graph
         .add_edge(
-            TrustEdge::new(alice.did().clone(), bob.did().clone(), 0.8).with_expiry(now + 3600), // Valid for 1 hour
+            TrustEdge::new(
+                alice.did().clone(),
+                bob.did().clone(),
+                TrustScore::unchecked(0.8),
+            )
+            .with_expiry(now + 3600), // Valid for 1 hour
         )
         .unwrap();
 
     graph
         .add_edge(
-            TrustEdge::new(alice.did().clone(), carol.did().clone(), 0.7).with_expiry(now - 100), // Already expired
+            TrustEdge::new(
+                alice.did().clone(),
+                carol.did().clone(),
+                TrustScore::unchecked(0.7),
+            )
+            .with_expiry(now - 100), // Already expired
         )
         .unwrap();
 
@@ -757,20 +835,24 @@ fn test_get_dids_above_threshold() {
     // Carol: 0.5 * 0.7 = 0.35 (Known)
     // Dave: 0.15 * 0.7 = 0.105 (Known, barely)
     graph
-        .add_edge(TrustEdge::new(alice.did().clone(), bob.did().clone(), 0.9))
+        .add_edge(TrustEdge::new(
+            alice.did().clone(),
+            bob.did().clone(),
+            TrustScore::unchecked(0.9),
+        ))
         .unwrap();
     graph
         .add_edge(TrustEdge::new(
             alice.did().clone(),
             carol.did().clone(),
-            0.5,
+            TrustScore::unchecked(0.5),
         ))
         .unwrap();
     graph
         .add_edge(TrustEdge::new(
             alice.did().clone(),
             dave.did().clone(),
-            0.15,
+            TrustScore::unchecked(0.15),
         ))
         .unwrap();
 
@@ -803,25 +885,37 @@ fn test_get_all_known_dids_multi_graph() {
     // Add different DIDs to different graphs (with some overlap)
     multi
         .social_mut()
-        .add_edge(TrustEdge::new(alice.did().clone(), bob.did().clone(), 0.5))
+        .add_edge(TrustEdge::new(
+            alice.did().clone(),
+            bob.did().clone(),
+            TrustScore::unchecked(0.5),
+        ))
         .unwrap();
     multi
         .economic_mut()
         .add_edge(TrustEdge::new(
             alice.did().clone(),
             carol.did().clone(),
-            0.5,
+            TrustScore::unchecked(0.5),
         ))
         .unwrap();
     multi
         .technical_mut()
-        .add_edge(TrustEdge::new(alice.did().clone(), dave.did().clone(), 0.5))
+        .add_edge(TrustEdge::new(
+            alice.did().clone(),
+            dave.did().clone(),
+            TrustScore::unchecked(0.5),
+        ))
         .unwrap();
 
     // Bob also appears in economic
     multi
         .economic_mut()
-        .add_edge(TrustEdge::new(alice.did().clone(), bob.did().clone(), 0.3))
+        .add_edge(TrustEdge::new(
+            alice.did().clone(),
+            bob.did().clone(),
+            TrustScore::unchecked(0.3),
+        ))
         .unwrap();
 
     // Get all unique DIDs across all graphs
@@ -915,13 +1009,25 @@ fn test_trust_graph_type_storage_isolation() {
 
     // Add different scores to each
     social
-        .add_edge(TrustEdge::new(alice.did().clone(), bob.did().clone(), 0.9))
+        .add_edge(TrustEdge::new(
+            alice.did().clone(),
+            bob.did().clone(),
+            TrustScore::unchecked(0.9),
+        ))
         .unwrap();
     economic
-        .add_edge(TrustEdge::new(alice.did().clone(), bob.did().clone(), 0.5))
+        .add_edge(TrustEdge::new(
+            alice.did().clone(),
+            bob.did().clone(),
+            TrustScore::unchecked(0.5),
+        ))
         .unwrap();
     technical
-        .add_edge(TrustEdge::new(alice.did().clone(), bob.did().clone(), 0.3))
+        .add_edge(TrustEdge::new(
+            alice.did().clone(),
+            bob.did().clone(),
+            TrustScore::unchecked(0.3),
+        ))
         .unwrap();
 
     // Verify isolation
@@ -954,9 +1060,14 @@ fn test_add_edge_validated_with_legacy_evidence() {
     let validator = EvidenceValidator::with_config(store, config);
 
     // Create edge with legacy evidence
-    let edge = TrustEdge::new(alice.did().clone(), bob.did().clone(), 0.7).with_evidence(
-        TrustEvidence::from_legacy_string("test-evidence".to_string()),
-    );
+    let edge = TrustEdge::new(
+        alice.did().clone(),
+        bob.did().clone(),
+        TrustScore::unchecked(0.7),
+    )
+    .with_evidence(TrustEvidence::from_legacy_string(
+        "test-evidence".to_string(),
+    ));
 
     // Add with validation
     let result = graph.add_edge_validated(edge, &validator).unwrap();
@@ -986,9 +1097,14 @@ fn test_add_edge_validated_reject_legacy_evidence() {
     let validator = EvidenceValidator::with_config(store, config);
 
     // Create edge with legacy evidence
-    let edge = TrustEdge::new(alice.did().clone(), bob.did().clone(), 0.7).with_evidence(
-        TrustEvidence::from_legacy_string("test-evidence".to_string()),
-    );
+    let edge = TrustEdge::new(
+        alice.did().clone(),
+        bob.did().clone(),
+        TrustScore::unchecked(0.7),
+    )
+    .with_evidence(TrustEvidence::from_legacy_string(
+        "test-evidence".to_string(),
+    ));
 
     // Add with validation
     let result = graph.add_edge_validated(edge, &validator).unwrap();
@@ -1014,7 +1130,11 @@ fn test_add_edge_validated_empty_evidence() {
     let validator = EvidenceValidator::new(store);
 
     // Create edge without evidence
-    let edge = TrustEdge::new(alice.did().clone(), bob.did().clone(), 0.5);
+    let edge = TrustEdge::new(
+        alice.did().clone(),
+        bob.did().clone(),
+        TrustScore::unchecked(0.5),
+    );
 
     // Add with validation
     let result = graph.add_edge_validated(edge, &validator).unwrap();

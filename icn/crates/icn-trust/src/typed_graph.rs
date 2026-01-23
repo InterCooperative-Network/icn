@@ -206,6 +206,7 @@ impl TypedTrustGraph {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::TrustScore;
     use icn_identity::KeyPair;
     use icn_store::SledStore;
 
@@ -252,7 +253,7 @@ mod tests {
         );
 
         // Add edge to social graph
-        let edge = TrustEdge::new(alice.clone(), bob.clone(), 0.8);
+        let edge = TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.8));
         social.add_edge(edge).unwrap();
 
         // Verify edge exists in social graph
@@ -262,12 +263,28 @@ mod tests {
         assert!(economic.get_edge(&alice, &bob).unwrap().is_none());
 
         // Add different edge to economic graph
-        let economic_edge = TrustEdge::new(alice.clone(), bob.clone(), 0.5);
+        let economic_edge = TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.5));
         economic.add_edge(economic_edge).unwrap();
 
         // Both graphs now have edges, but with different scores
-        assert_eq!(social.get_edge(&alice, &bob).unwrap().unwrap().score, 0.8);
-        assert_eq!(economic.get_edge(&alice, &bob).unwrap().unwrap().score, 0.5);
+        assert_eq!(
+            social
+                .get_edge(&alice, &bob)
+                .unwrap()
+                .unwrap()
+                .score
+                .value(),
+            0.8
+        );
+        assert_eq!(
+            economic
+                .get_edge(&alice, &bob)
+                .unwrap()
+                .unwrap()
+                .score
+                .value(),
+            0.5
+        );
     }
 
     #[test]
@@ -280,7 +297,7 @@ mod tests {
         let mut social = TypedTrustGraph::new(store.clone(), alice.clone(), TrustGraphType::Social);
 
         // Add direct edge with score 0.5
-        let edge = TrustEdge::new(alice.clone(), bob.clone(), 0.5);
+        let edge = TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.5));
         social.add_edge(edge).unwrap();
 
         // Compute score: 0.5 * 0.6 (direct) + 0 * 0.4 (no transitive) = 0.3
@@ -295,7 +312,7 @@ mod tests {
         );
 
         // Add same edge
-        let edge = TrustEdge::new(alice.clone(), bob.clone(), 0.5);
+        let edge = TrustEdge::new(alice.clone(), bob.clone(), TrustScore::unchecked(0.5));
         technical.add_edge(edge).unwrap();
 
         // Compute score: 0.5 * 0.9 (direct) + 0 * 0.1 (no transitive) = 0.45

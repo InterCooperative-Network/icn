@@ -649,7 +649,7 @@ pub async fn complete_enrollment(
             let edge = icn_trust::TrustEdge::new(
                 steward_did.clone(),
                 ephemeral_did.clone(),
-                0.5, // Initial trust from vouch
+                icn_trust::TrustScore::unchecked(0.5), // Initial trust from vouch
             )
             .with_label("enrollment-vouch");
             let _ = trust_mgr.add_edge_async(edge).await;

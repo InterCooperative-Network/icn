@@ -8,7 +8,7 @@ use anyhow::Result;
 use icn_identity::{IdentityBundle, KeyPair};
 use icn_net::NetworkActor;
 use icn_store::SledStore;
-use icn_trust::{TrustEdge, TrustGraph};
+use icn_trust::{TrustEdge, TrustGraph, TrustScore};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -49,7 +49,11 @@ async fn test_trusted_peer_connection_accepted() -> Result<()> {
     let mut alice_trust_graph = TrustGraph::new(alice_store, alice_did.clone());
 
     // Alice trusts Bob with high score (0.8)
-    let trust_edge = TrustEdge::new(alice_did.clone(), bob_did.clone(), 0.8);
+    let trust_edge = TrustEdge::new(
+        alice_did.clone(),
+        bob_did.clone(),
+        TrustScore::unchecked(0.8),
+    );
     alice_trust_graph.add_edge(trust_edge)?;
 
     let alice_trust = Arc::new(RwLock::new(alice_trust_graph));
@@ -262,7 +266,11 @@ async fn test_trust_threshold_boundary() -> Result<()> {
     // Create Alice's trust graph with Bob at exact threshold (0.4 = Partner minimum)
     let alice_store: Arc<dyn icn_store::Store> = Arc::new(SledStore::temporary()?);
     let mut alice_trust_graph = TrustGraph::new(alice_store, alice_did.clone());
-    let trust_edge = TrustEdge::new(alice_did.clone(), bob_did.clone(), 0.4);
+    let trust_edge = TrustEdge::new(
+        alice_did.clone(),
+        bob_did.clone(),
+        TrustScore::unchecked(0.4),
+    );
     alice_trust_graph.add_edge(trust_edge)?;
     let alice_trust = Arc::new(RwLock::new(alice_trust_graph));
 

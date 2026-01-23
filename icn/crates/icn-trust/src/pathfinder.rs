@@ -111,7 +111,7 @@ impl TrustPathfinder {
         // Fast path: check direct edge first
         let direct_score = graph
             .get_edge(own_did, target)?
-            .map(|e| e.score)
+            .map(|e| e.score.value())
             .unwrap_or(0.0);
 
         // If we have high direct trust and threshold is set, maybe early exit
@@ -156,7 +156,7 @@ impl TrustPathfinder {
                 continue; // Skip direct edge to target (handled separately)
             }
             queue.push(PathEntry {
-                score: OrderedFloat(edge.score),
+                score: OrderedFloat(edge.score.value()),
                 did: edge.target,
                 hops: 1,
             });
@@ -176,7 +176,7 @@ impl TrustPathfinder {
             // Check for edge to target
             if let Some(edge_to_target) = graph.get_edge(current_did, target)? {
                 // Found a path: own -> current -> target
-                let path_trust = current_score * edge_to_target.score;
+                let path_trust = current_score * edge_to_target.score.value();
                 path_sum += path_trust;
                 path_count += 1;
 
@@ -206,7 +206,7 @@ impl TrustPathfinder {
                 for edge in edges {
                     if !visited.contains(&edge.target) && edge.target != *target {
                         // Diminish trust along the path
-                        let path_score = current_score * edge.score;
+                        let path_score = current_score * edge.score.value();
 
                         // Only add if score is still meaningful
                         if path_score > 0.01 {
@@ -239,7 +239,7 @@ impl Default for TrustPathfinder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::TrustEdge;
+    use crate::{TrustEdge, TrustScore};
     use icn_identity::KeyPair;
     use icn_store::SledStore;
     use std::sync::Arc;
@@ -265,7 +265,11 @@ mod tests {
 
         // Alice directly trusts Bob with 0.8
         graph
-            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), 0.8))
+            .add_edge(TrustEdge::new(
+                alice.clone(),
+                bob.clone(),
+                TrustScore::unchecked(0.8),
+            ))
             .unwrap();
 
         let pathfinder = TrustPathfinder::new();
@@ -281,10 +285,18 @@ mod tests {
 
         // Alice -> Bob (0.8), Bob -> Carol (0.6)
         graph
-            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), 0.8))
+            .add_edge(TrustEdge::new(
+                alice.clone(),
+                bob.clone(),
+                TrustScore::unchecked(0.8),
+            ))
             .unwrap();
         graph
-            .add_edge(TrustEdge::new(bob.clone(), carol.clone(), 0.6))
+            .add_edge(TrustEdge::new(
+                bob.clone(),
+                carol.clone(),
+                TrustScore::unchecked(0.6),
+            ))
             .unwrap();
 
         let pathfinder = TrustPathfinder::new();
@@ -301,13 +313,25 @@ mod tests {
         // Alice -> Carol directly (0.4)
         // Alice -> Bob (0.8), Bob -> Carol (0.9)
         graph
-            .add_edge(TrustEdge::new(alice.clone(), carol.clone(), 0.4))
+            .add_edge(TrustEdge::new(
+                alice.clone(),
+                carol.clone(),
+                TrustScore::unchecked(0.4),
+            ))
             .unwrap();
         graph
-            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), 0.8))
+            .add_edge(TrustEdge::new(
+                alice.clone(),
+                bob.clone(),
+                TrustScore::unchecked(0.8),
+            ))
             .unwrap();
         graph
-            .add_edge(TrustEdge::new(bob.clone(), carol.clone(), 0.9))
+            .add_edge(TrustEdge::new(
+                bob.clone(),
+                carol.clone(),
+                TrustScore::unchecked(0.9),
+            ))
             .unwrap();
 
         let pathfinder = TrustPathfinder::new();
@@ -325,14 +349,26 @@ mod tests {
 
         // High direct trust
         graph
-            .add_edge(TrustEdge::new(alice.clone(), carol.clone(), 0.9))
+            .add_edge(TrustEdge::new(
+                alice.clone(),
+                carol.clone(),
+                TrustScore::unchecked(0.9),
+            ))
             .unwrap();
         // Also transitive path that won't be explored
         graph
-            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), 0.8))
+            .add_edge(TrustEdge::new(
+                alice.clone(),
+                bob.clone(),
+                TrustScore::unchecked(0.8),
+            ))
             .unwrap();
         graph
-            .add_edge(TrustEdge::new(bob.clone(), carol.clone(), 0.7))
+            .add_edge(TrustEdge::new(
+                bob.clone(),
+                carol.clone(),
+                TrustScore::unchecked(0.7),
+            ))
             .unwrap();
 
         let config = PathfinderConfig::default().with_threshold(0.5);
@@ -360,13 +396,25 @@ mod tests {
 
         // Create a cycle: Alice -> Bob -> Carol -> Alice
         graph
-            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), 0.8))
+            .add_edge(TrustEdge::new(
+                alice.clone(),
+                bob.clone(),
+                TrustScore::unchecked(0.8),
+            ))
             .unwrap();
         graph
-            .add_edge(TrustEdge::new(bob.clone(), carol.clone(), 0.7))
+            .add_edge(TrustEdge::new(
+                bob.clone(),
+                carol.clone(),
+                TrustScore::unchecked(0.7),
+            ))
             .unwrap();
         graph
-            .add_edge(TrustEdge::new(carol.clone(), alice.clone(), 0.6))
+            .add_edge(TrustEdge::new(
+                carol.clone(),
+                alice.clone(),
+                TrustScore::unchecked(0.6),
+            ))
             .unwrap();
 
         let pathfinder = TrustPathfinder::new();
@@ -382,13 +430,25 @@ mod tests {
 
         // Chain: Alice -> Bob -> Carol -> Dave
         graph
-            .add_edge(TrustEdge::new(alice.clone(), bob.clone(), 0.9))
+            .add_edge(TrustEdge::new(
+                alice.clone(),
+                bob.clone(),
+                TrustScore::unchecked(0.9),
+            ))
             .unwrap();
         graph
-            .add_edge(TrustEdge::new(bob.clone(), carol.clone(), 0.9))
+            .add_edge(TrustEdge::new(
+                bob.clone(),
+                carol.clone(),
+                TrustScore::unchecked(0.9),
+            ))
             .unwrap();
         graph
-            .add_edge(TrustEdge::new(carol.clone(), dave.clone(), 0.9))
+            .add_edge(TrustEdge::new(
+                carol.clone(),
+                dave.clone(),
+                TrustScore::unchecked(0.9),
+            ))
             .unwrap();
 
         // With max_hops=2, shouldn't reach Dave

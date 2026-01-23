@@ -18,7 +18,7 @@ use icn_identity::{
 use icn_ledger::{entry::JournalEntryBuilder, Ledger};
 use icn_net::{IncomingMessageHandler, MessagePayload, NetworkActor, NetworkMessage};
 use icn_store::{SledStore, Store};
-use icn_trust::{TrustClass, TrustEdge, TrustGraph, TrustGraphType};
+use icn_trust::{TrustClass, TrustEdge, TrustGraph, TrustGraphType, TrustScore};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -456,7 +456,7 @@ async fn test_full_recovery_flow() -> Result<()> {
             source: alice_did.clone(),
             target: bob_did.clone(),
             labels: vec!["friend".to_string()],
-            score: 0.8,
+            score: TrustScore::unchecked(0.8),
             evidence: vec![],
             legacy_evidence: vec![],
             expires_at: None,
@@ -467,7 +467,7 @@ async fn test_full_recovery_flow() -> Result<()> {
             source: alice_did.clone(),
             target: carol_did.clone(),
             labels: vec!["colleague".to_string()],
-            score: 0.7,
+            score: TrustScore::unchecked(0.7),
             evidence: vec![],
             legacy_evidence: vec![],
             expires_at: None,

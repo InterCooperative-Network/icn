@@ -20,6 +20,7 @@
 //! heal_interval_secs = 60          # How often to attempt healing
 //! ```
 
+use icn_trust::TrustScore;
 use serde::{Deserialize, Serialize};
 
 /// Gossip protocol configuration
@@ -44,7 +45,7 @@ pub struct ReplicationConfig {
     /// Minimum trust class required to serve as replica (Known = 0.1, Partner = 0.4, Federated = 0.7)
     /// Default: 0.4 (Partner)
     #[serde(default = "default_min_replica_trust")]
-    pub min_replica_trust: f64,
+    pub min_replica_trust: TrustScore,
 
     /// Health check interval in seconds
     #[serde(default = "default_health_check_interval_secs")]
@@ -75,8 +76,8 @@ fn default_target_replicas() -> usize {
     3
 }
 
-fn default_min_replica_trust() -> f64 {
-    0.4 // Partner trust class
+fn default_min_replica_trust() -> TrustScore {
+    TrustScore::unchecked(0.4) // Partner trust class
 }
 
 fn default_health_check_interval_secs() -> u64 {
@@ -143,7 +144,7 @@ impl ReplicationConfig {
     pub fn to_manager_config(&self) -> crate::replication::ReplicationConfig {
         crate::replication::ReplicationConfig {
             target_replicas: self.target_replicas,
-            min_trust_class: icn_trust::TrustClass::from_score(self.min_replica_trust),
+            min_trust_class: self.min_replica_trust.to_class(),
             health_check_interval_secs: self.health_check_interval_secs,
             stale_threshold_secs: self.stale_threshold_secs,
             unreachable_threshold_secs: self.unreachable_threshold_secs,

@@ -11,7 +11,7 @@
 use std::sync::Arc;
 
 use icn_identity::Did;
-use icn_trust::TrustEdge;
+use icn_trust::{TrustEdge, TrustScore};
 
 use crate::context::RpcContext;
 use crate::server::RpcServer;
@@ -69,8 +69,16 @@ pub async fn handle_trust_add(
     let mut graph = trust_graph.write().await;
     let own_did = graph.own_did().clone();
 
+    // Validate and create the trust score
+    let score = match TrustScore::new(params.score) {
+        Ok(s) => s,
+        Err(e) => {
+            return RpcResponse::error(id, -32602, format!("Invalid trust score: {e}"));
+        }
+    };
+
     // Create the trust edge
-    let mut edge = TrustEdge::new(own_did, target_did, params.score);
+    let mut edge = TrustEdge::new(own_did, target_did, score);
     if let Some(label) = params.label {
         edge = edge.with_label(label);
     }
