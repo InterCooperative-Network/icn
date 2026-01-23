@@ -573,9 +573,10 @@ async fn dispatch_request(
     // Build RpcContext from claims for coop-scoped handlers
     let ctx = claims.and_then(|c| {
         // Parse the DID from claims.sub
-        c.sub.parse::<Did>().ok().map(|caller_did| {
-            RpcContext::new(caller_did, c.coop_id.clone(), c.scopes.clone())
-        })
+        c.sub
+            .parse::<Did>()
+            .ok()
+            .map(|caller_did| RpcContext::new(caller_did, c.coop_id.clone(), c.scopes.clone()))
     });
 
     match req.method.as_str() {
@@ -638,8 +639,13 @@ async fn dispatch_request(
             handler::governance::handle_governance_domain_list(req.id, state, ctx.as_ref()).await
         }
         "governance.domain.get" => {
-            handler::governance::handle_governance_domain_get(req.id, &req.params, state, ctx.as_ref())
-                .await
+            handler::governance::handle_governance_domain_get(
+                req.id,
+                &req.params,
+                state,
+                ctx.as_ref(),
+            )
+            .await
         }
         "governance.domain.create" => {
             handler::governance::handle_governance_domain_create(
@@ -751,7 +757,9 @@ async fn dispatch_request(
             handler::recovery::handle_recovery_attest(req.id, &req.params, state, ctx.as_ref())
                 .await
         }
-        "recovery.list" => handler::recovery::handle_recovery_list(req.id, state, ctx.as_ref()).await,
+        "recovery.list" => {
+            handler::recovery::handle_recovery_list(req.id, state, ctx.as_ref()).await
+        }
         "recovery.status" => {
             handler::recovery::handle_recovery_status(req.id, &req.params, state, ctx.as_ref())
                 .await

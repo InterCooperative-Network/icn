@@ -1760,7 +1760,9 @@ async fn test_auth_verify_coop_id_without_coop_handle() {
     );
     let error_msg = verify_resp["error"]["message"].as_str().unwrap_or("");
     assert!(
-        error_msg.contains("Coop") || error_msg.contains("coop") || error_msg.contains("membership"),
+        error_msg.contains("Coop")
+            || error_msg.contains("coop")
+            || error_msg.contains("membership"),
         "Expected coop-related error message, got: {}",
         error_msg
     );
@@ -1836,7 +1838,11 @@ async fn test_auth_verify_without_coop_id_succeeds() {
     );
     // Should NOT have coop_id in response (not requested)
     assert!(
-        verify_resp["result"]["coop_id"].is_null() || !verify_resp["result"].as_object().unwrap().contains_key("coop_id"),
+        verify_resp["result"]["coop_id"].is_null()
+            || !verify_resp["result"]
+                .as_object()
+                .unwrap()
+                .contains_key("coop_id"),
         "Token response should not include coop_id when not requested"
     );
 
@@ -1876,7 +1882,9 @@ async fn test_internal_error_sanitization() {
     // Error message should be generic, not expose internal details
     // Should NOT contain stack traces, file paths, or internal function names
     assert!(
-        !error_msg.contains(".rs:") && !error_msg.contains("panicked") && !error_msg.contains("unwrap"),
+        !error_msg.contains(".rs:")
+            && !error_msg.contains("panicked")
+            && !error_msg.contains("unwrap"),
         "Error message should not expose internal implementation details: {}",
         error_msg
     );
