@@ -220,12 +220,12 @@ pub type ValidationHook = Box<dyn Fn(&JournalEntry) -> Result<()> + Send + Sync>
 pub type PaginationCursor = (u64, String);
 
 /// Key prefix for journal entries in storage
-const JOURNAL_PREFIX: &str = "ledger:journal:";
+pub(crate) const JOURNAL_PREFIX: &str = "ledger:journal:";
 
 /// Key prefix for timestamp-ordered index (for efficient pagination)
 /// Format: ledger:journal_ts:{timestamp:020}:{hash}
 /// The timestamp is zero-padded to 20 digits for proper lexicographic ordering
-const JOURNAL_TS_PREFIX: &str = "ledger:journal_ts:";
+pub(crate) const JOURNAL_TS_PREFIX: &str = "ledger:journal_ts:";
 
 /// Statistics about forks in the ledger
 #[derive(Debug, Clone)]
@@ -246,13 +246,17 @@ const BALANCE_PREFIX: &str = "ledger:balance:";
 const CLEARED_VOLUME_PREFIX: &str = "ledger:cleared_volume:";
 
 /// Key prefix for archived entries (from rollback operations)
-const ARCHIVE_PREFIX: &str = "ledger:archive:";
+pub(crate) const ARCHIVE_PREFIX: &str = "ledger:archive:";
 
 /// Key prefix for witness signatures (for fork resolution)
 /// Format: ledger:witnesses:{entry_hash_hex}
 const WITNESS_PREFIX: &str = "ledger:witnesses:";
 
 /// Record of an archived entry (from rollback operations)
+///
+/// This struct is public because it's part of the `Ledger` API - callers may need
+/// to inspect archived entries from rollback operations. It's also used internally
+/// by [`crate::ledger_impl::queries::get_archived_entries`].
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ArchiveRecord {
     /// The archived journal entry
@@ -273,7 +277,7 @@ const JOURNAL_VERSION_KEY: &str = "ledger:journal_version";
 /// Ledger manager for double-entry mutual credit accounting
 pub struct Ledger {
     /// Storage backend
-    store: Arc<dyn Store>,
+    pub(crate) store: Arc<dyn Store>,
 
     /// Cached balances (in-memory for fast queries)
     cached_balances: HashMap<Did, AccountBalances>,
@@ -2180,35 +2184,16 @@ impl Ledger {
         }
     }
 
+    // === Query Operations (delegated to ledger_impl::queries) ===
+
     /// Get a journal entry by its hash
     pub fn get_entry(&self, hash: &ContentHash) -> Result<Option<JournalEntry>> {
-        let key = format!("{}{}", JOURNAL_PREFIX, hash.to_hex());
-        let value = self.store.get(key.as_bytes())?;
-
-        match value {
-            Some(bytes) => {
-                let entry: JournalEntry = serde_json::from_slice(&bytes)?;
-                Ok(Some(entry))
-            }
-            None => Ok(None),
-        }
+        crate::ledger_impl::queries::get_entry(self, hash)
     }
 
     /// Get all journal entries
     pub fn get_all_entries(&self) -> Result<Vec<JournalEntry>> {
-        let prefix = JOURNAL_PREFIX.as_bytes();
-        let pairs = self.store.scan(prefix)?;
-
-        let mut entries = Vec::new();
-        for (_key, value) in pairs {
-            let entry: JournalEntry = serde_json::from_slice(&value)?;
-            entries.push(entry);
-        }
-
-        // Sort by timestamp for deterministic ordering
-        entries.sort_by_key(|e| e.timestamp);
-
-        Ok(entries)
+        crate::ledger_impl::queries::get_all_entries(self)
     }
 
     /// Count the total number of journal entries
@@ -2216,8 +2201,7 @@ impl Ledger {
     /// More efficient than `get_all_entries().len()` as it doesn't
     /// deserialize entries.
     pub fn count_entries(&self) -> Result<usize> {
-        let prefix = JOURNAL_PREFIX.as_bytes();
-        self.store.scan_count(prefix)
+        crate::ledger_impl::queries::count_entries(self)
     }
 
     /// Get journal entries with pagination (newest first)
@@ -2239,45 +2223,7 @@ impl Ledger {
         offset: usize,
         limit: usize,
     ) -> Result<(Vec<JournalEntry>, usize)> {
-        // Use timestamp index for efficient pagination (entries sorted by timestamp)
-        let ts_prefix = JOURNAL_TS_PREFIX.as_bytes();
-        let total = self.store.scan_count(ts_prefix)?;
-
-        // Early return if offset is beyond total
-        if offset >= total {
-            return Ok((Vec::new(), total));
-        }
-
-        // For descending order (newest first), we need to read from the end
-        // Calculate the starting position from the ascending index
-        let items_from_end = offset + limit;
-        let skip_from_start = total.saturating_sub(items_from_end);
-        let take_count = limit.min(total.saturating_sub(offset));
-
-        // Scan the timestamp index with calculated offset
-        let (ts_pairs, _) = self
-            .store
-            .scan_paginated(ts_prefix, skip_from_start, take_count)?;
-
-        // Look up entries by hash (values in timestamp index are hashes)
-        let mut entries = Vec::with_capacity(ts_pairs.len());
-        for (_key, hash_bytes) in ts_pairs {
-            let hash_hex = hex::encode(&hash_bytes);
-            let entry_key = format!("{}{}", JOURNAL_PREFIX, &hash_hex);
-            if let Some(entry_data) = self.store.get(entry_key.as_bytes())? {
-                let mut entry: JournalEntry = serde_json::from_slice(&entry_data)?;
-                // Restore the id from the hash (not serialized due to #[serde(skip)])
-                if let Ok(hash_arr) = <[u8; 32]>::try_from(hash_bytes.as_slice()) {
-                    entry.id = Some(ContentHash::from_bytes(hash_arr));
-                }
-                entries.push(entry);
-            }
-        }
-
-        // Reverse to get descending order (newest first)
-        entries.reverse();
-
-        Ok((entries, total))
+        crate::ledger_impl::queries::get_entries_paginated(self, offset, limit)
     }
 
     /// Get journal entries with pagination (oldest first)
@@ -2299,33 +2245,7 @@ impl Ledger {
         offset: usize,
         limit: usize,
     ) -> Result<(Vec<JournalEntry>, usize)> {
-        // Use timestamp index for efficient pagination (already sorted by timestamp ASC)
-        let ts_prefix = JOURNAL_TS_PREFIX.as_bytes();
-
-        // Scan with pagination - this efficiently skips and takes from the sorted index
-        let (ts_pairs, total) = self.store.scan_paginated(ts_prefix, offset, limit)?;
-
-        // Early return if offset is beyond total
-        if offset >= total {
-            return Ok((Vec::new(), total));
-        }
-
-        // Look up entries by hash (values in timestamp index are hashes)
-        let mut entries = Vec::with_capacity(ts_pairs.len());
-        for (_key, hash_bytes) in ts_pairs {
-            let hash_hex = hex::encode(&hash_bytes);
-            let entry_key = format!("{}{}", JOURNAL_PREFIX, &hash_hex);
-            if let Some(entry_data) = self.store.get(entry_key.as_bytes())? {
-                let mut entry: JournalEntry = serde_json::from_slice(&entry_data)?;
-                // Restore the id from the hash (not serialized due to #[serde(skip)])
-                if let Ok(hash_arr) = <[u8; 32]>::try_from(hash_bytes.as_slice()) {
-                    entry.id = Some(ContentHash::from_bytes(hash_arr));
-                }
-                entries.push(entry);
-            }
-        }
-
-        Ok((entries, total))
+        crate::ledger_impl::queries::get_entries_paginated_asc(self, offset, limit)
     }
 
     /// Get journal entries with filtered pagination (oldest first)
@@ -2361,137 +2281,17 @@ impl Ledger {
         cursor: Option<(u64, Option<String>)>,
         limit: usize,
     ) -> Result<(Vec<JournalEntry>, Option<PaginationCursor>)> {
-        // Fast path: No filter AND no cursor - use efficient offset-based pagination
-        if filter_did.is_none() && cursor.is_none() {
-            let (entries, _total) = self.get_entries_paginated_asc(0, limit + 1)?;
-            let has_more = entries.len() > limit;
-            let entries: Vec<_> = entries.into_iter().take(limit).collect();
-            let next_cursor = if has_more {
-                entries.last().map(|e| {
-                    let hash = e.id.as_ref().map(|h| h.to_hex()).unwrap_or_default();
-                    (e.timestamp, hash)
-                })
-            } else {
-                None
-            };
-            return Ok((entries, next_cursor));
-        }
+        crate::ledger_impl::queries::get_entries_filtered_paginated(self, filter_did, cursor, limit)
+    }
 
-        // Extract cursor components
-        let cursor_ts = cursor.as_ref().map(|(ts, _)| *ts);
-        let cursor_hash = cursor.as_ref().and_then(|(_, h)| h.clone());
+    /// Get archived entries for a specific rollback timestamp
+    pub fn get_archived_entries(&self, archive_timestamp: u64) -> Result<Vec<JournalEntry>> {
+        crate::ledger_impl::queries::get_archived_entries(self, archive_timestamp)
+    }
 
-        // Streaming path: Either has filter OR has cursor (or both)
-        // Stream through timestamp index, applying filter and cursor, stopping early
-        let ts_prefix = JOURNAL_TS_PREFIX.as_bytes();
-        let ts_pairs = self.store.scan(ts_prefix)?;
-
-        let mut entries = Vec::with_capacity(limit);
-
-        for (key, hash_bytes) in ts_pairs {
-            // Extract timestamp and hash from key
-            // Key format: "ledger:journal_ts:{timestamp:020}:{hash}"
-            // Timestamp is stored as zero-padded decimal (not hex)
-            let key_str = String::from_utf8_lossy(&key);
-            let entry_hash = hex::encode(&hash_bytes);
-
-            // Parse timestamp from key - log errors instead of silently skipping
-            let entry_ts = match key_str.strip_prefix(JOURNAL_TS_PREFIX) {
-                Some(ts_str) => match ts_str.split(':').next() {
-                    Some(ts_decimal) => match ts_decimal.parse::<u64>() {
-                        Ok(ts) => ts,
-                        Err(e) => {
-                            warn!(
-                                key = %key_str,
-                                error = %e,
-                                "Malformed timestamp in journal index key - skipping entry"
-                            );
-                            continue;
-                        }
-                    },
-                    None => {
-                        warn!(
-                            key = %key_str,
-                            "Missing timestamp component in journal index key - skipping entry"
-                        );
-                        continue;
-                    }
-                },
-                None => {
-                    warn!(
-                        key = %key_str,
-                        expected_prefix = JOURNAL_TS_PREFIX,
-                        "Unexpected key format in journal timestamp index - skipping entry"
-                    );
-                    continue;
-                }
-            };
-
-            // Skip entries at or before the cursor (using hash for tie-breaking)
-            // Entries are sorted by (timestamp ASC, hash ASC) in the index.
-            //
-            // The cursor points to the LAST entry returned in the previous page.
-            // We use <= (not <) for the hash comparison because:
-            // - If entry_hash == cursor_hash: this is the same entry, skip to avoid duplicates
-            // - If entry_hash < cursor_hash: this entry was already returned, skip it
-            // - If entry_hash > cursor_hash: this is a new entry, include it
-            if let Some(cursor) = cursor_ts {
-                if entry_ts < cursor {
-                    continue;
-                }
-                if entry_ts == cursor {
-                    // Same timestamp - use hash for tie-breaking
-                    if let Some(ref cursor_h) = cursor_hash {
-                        if entry_hash <= *cursor_h {
-                            continue;
-                        }
-                    }
-                }
-            }
-
-            // Look up the full entry
-            let entry_key = format!("{}{}", JOURNAL_PREFIX, &entry_hash);
-            if let Some(entry_data) = self.store.get(entry_key.as_bytes())? {
-                let mut entry: JournalEntry = serde_json::from_slice(&entry_data)?;
-                // Restore the id from the hash (not serialized due to #[serde(skip)])
-                if let Ok(hash_arr) = <[u8; 32]>::try_from(hash_bytes.as_slice()) {
-                    entry.id = Some(ContentHash::from_bytes(hash_arr));
-                }
-
-                // Apply DID filter if present
-                let matches_filter = match filter_did {
-                    Some(did) => entry.accounts.iter().any(|delta| &delta.account_id == did),
-                    None => true, // No filter means all entries match
-                };
-
-                if matches_filter {
-                    entries.push(entry);
-
-                    // Stop once we have enough + 1 (to check if there are more)
-                    if entries.len() > limit {
-                        break;
-                    }
-                }
-            }
-        }
-
-        // Check if there are more entries
-        let has_more = entries.len() > limit;
-        if has_more {
-            entries.pop(); // Remove the extra entry
-        }
-
-        // Next cursor includes both timestamp and hash for proper tie-breaking
-        let next_cursor = if has_more {
-            entries.last().map(|e| {
-                let hash = e.id.as_ref().map(|h| h.to_hex()).unwrap_or_default();
-                (e.timestamp, hash)
-            })
-        } else {
-            None
-        };
-
-        Ok((entries, next_cursor))
+    /// List all rollback timestamps (for recovery purposes)
+    pub fn list_rollback_timestamps(&self) -> Result<Vec<u64>> {
+        crate::ledger_impl::queries::list_rollback_timestamps(self)
     }
 
     // === Phase 18 Week 5: Fork Detection and Resolution ===
@@ -3508,42 +3308,6 @@ impl Ledger {
     }
 
     /// Get archived entries for a specific rollback timestamp
-    pub fn get_archived_entries(&self, archive_timestamp: u64) -> Result<Vec<JournalEntry>> {
-        let prefix = format!("{ARCHIVE_PREFIX}{archive_timestamp}:");
-        let pairs = self.store.scan(prefix.as_bytes())?;
-
-        let mut entries = Vec::new();
-        for (_key, value) in pairs {
-            let record: ArchiveRecord = serde_json::from_slice(&value)?;
-            entries.push(record.entry);
-        }
-
-        Ok(entries)
-    }
-
-    /// List all rollback timestamps (for recovery purposes)
-    pub fn list_rollback_timestamps(&self) -> Result<Vec<u64>> {
-        let prefix = ARCHIVE_PREFIX.as_bytes();
-        let pairs = self.store.scan(prefix)?;
-
-        let mut timestamps = std::collections::HashSet::new();
-        for (key, _value) in pairs {
-            // Key format: "ledger:archive:{timestamp}:{hash}"
-            let key_str = String::from_utf8_lossy(&key);
-            if let Some(rest) = key_str.strip_prefix(ARCHIVE_PREFIX) {
-                if let Some(ts_str) = rest.split(':').next() {
-                    if let Ok(ts) = ts_str.parse::<u64>() {
-                        timestamps.insert(ts);
-                    }
-                }
-            }
-        }
-
-        let mut sorted: Vec<_> = timestamps.into_iter().collect();
-        sorted.sort();
-        Ok(sorted)
-    }
-
     /// Validate a journal entry before accepting it
     ///
     /// This validates:
