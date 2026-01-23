@@ -13,36 +13,31 @@ Analyzed 9 large Rust modules (>2000 lines each) in the ICN codebase. Recommende
 
 - **Full Analysis**: [module-splitting-analysis.md](module-splitting-analysis.md)
 - **Implementation Guide**: [module-splitting-implementation-guide.md](module-splitting-implementation-guide.md)
-- **Related Issue**: [refactor: Analyze large modules for potential splitting](#)
+- **Related Issue**: [refactor: Analyze large modules for potential splitting](https://github.com/icn/icn/issues/766)
 
 ## Key Findings
 
 ### 🔴 High Priority
 
 **icn-ledger/src/ledger.rs** (5,447 lines)
-- ✅ Natural boundaries identified: 5 submodains
+- ✅ Natural boundaries identified: 5 subdomains
 - ✅ Low-medium risk with incremental approach
 - ✅ Backward compatibility via re-exports
 - **Recommendation**: Split into 5 submodules
-- **Estimated effort**: 2-3 days
 
 ### 🟡 Medium Priority
 
 **icn-gossip/src/gossip.rs** (3,672 lines)
 - Split by protocol phase (push/pull/anti-entropy)
-- **Estimated effort**: 2-3 days
 
 **icn-governance/src/protocol_store.rs** (3,452 lines)
 - Extract state management layer
-- **Estimated effort**: 2-3 days
 
 **icn-ledger/src/treasury.rs** (3,048 lines)
 - Split by operation type (budgets/approvals/audit)
-- **Estimated effort**: 2 days
 
 **icn-net/src/actor.rs** (2,506 lines)
 - Split by message type handlers
-- **Estimated effort**: 2 days
 
 ### 🟢 Low Priority / Defer
 
@@ -64,13 +59,13 @@ Analyzed 9 large Rust modules (>2000 lines each) in the ICN codebase. Recommende
 
 ## Recommended Action Plan
 
-### Option A: Full Implementation (2 weeks)
-1. Split ledger.rs (2-3 days)
-2. Split gossip.rs (2-3 days)
-3. Split protocol_store.rs (2-3 days)
-4. Split treasury.rs (2 days)
-5. Split net/actor.rs (2 days)
-6. Final validation (1 day)
+### Option A: Full Implementation
+1. Split ledger.rs
+2. Split gossip.rs
+3. Split protocol_store.rs
+4. Split treasury.rs
+5. Split net/actor.rs
+6. Final validation
 
 ### Option B: Incremental (Start with ledger.rs)
 1. Review analysis documents
@@ -132,7 +127,7 @@ icn-ledger/src/
 ```
 icn-ledger/src/
 ├── ledger.rs (~2,700 lines) ✅ Manageable
-├── ledger/
+├── ledger_impl/
 │   ├── mod.rs
 │   ├── queries.rs (~600 lines)
 │   ├── balances.rs (~400 lines)
@@ -142,6 +137,8 @@ icn-ledger/src/
 ├── treasury.rs (3,048 lines)
 └── ... (other modules)
 ```
+
+**Note**: Submodule directory named `ledger_impl/` to avoid Rust naming conflict with `ledger.rs`.
 
 ### API Compatibility
 ```rust

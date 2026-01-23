@@ -1,7 +1,7 @@
 # Module Splitting Analysis
 
 **Date**: 2026-01-23  
-**Issue**: [Analyze large modules for potential splitting](#)  
+**Issue**: [Analyze large modules for potential splitting](https://github.com/icn/icn/issues/766)  
 **Status**: Analysis Complete - Ready for Implementation
 
 ## Executive Summary
@@ -58,7 +58,7 @@ Functions that read from the ledger without modifying state:
 **Stability**: ✅ Stable API, minimal changes expected  
 **Risk**: 🟡 Medium - Core functionality but well-isolated
 
-**Recommendation**: Extract to `ledger/queries.rs`
+**Recommendation**: Extract to `ledger_impl/queries.rs`
 
 #### 2. **Balance Operations** (~400 lines)
 Functions managing account balances and cleared volume:
@@ -73,7 +73,7 @@ Functions managing account balances and cleared volume:
 **Stability**: ✅ Mature, well-tested  
 **Risk**: 🟡 Medium - Critical for correctness but self-contained
 
-**Recommendation**: Extract to `ledger/balances.rs`
+**Recommendation**: Extract to `ledger_impl/balances.rs`
 
 #### 3. **Fork Resolution** (~500 lines)
 Functions for detecting and resolving ledger forks:
@@ -87,7 +87,7 @@ Functions for detecting and resolving ledger forks:
 **Stability**: ✅ Implemented in Phase 18, stable since  
 **Risk**: 🟢 Low - Uses existing `fork_resolution` module types
 
-**Recommendation**: Extract to `ledger/fork_ops.rs`
+**Recommendation**: Extract to `ledger_impl/fork_ops.rs`
 
 #### 4. **Freeze Operations** (~300 lines)
 Functions for emergency member freezing:
@@ -102,7 +102,7 @@ Functions for emergency member freezing:
 **Stability**: ✅ Mature feature (Issue #25)  
 **Risk**: 🟢 Low - Delegates to `FreezeManager`
 
-**Recommendation**: Extract to `ledger/freeze_ops.rs`
+**Recommendation**: Extract to `ledger_impl/freeze_ops.rs`
 
 #### 5. **Witness Operations** (~400 lines)
 Functions for multi-signature witness validation:
@@ -117,7 +117,7 @@ Functions for multi-signature witness validation:
 **Stability**: ✅ Stable since Issue #676  
 **Risk**: 🟡 Medium - Security-critical but well-encapsulated
 
-**Recommendation**: Extract to `ledger/witness_ops.rs`
+**Recommendation**: Extract to `ledger_impl/witness_ops.rs`
 
 ### Remaining Core (~3200 lines)
 
@@ -135,7 +135,7 @@ This brings the core module to ~2700 lines, which is still large but more manage
 ```
 icn-ledger/src/
 ├── ledger.rs          (~2700 lines) - Core ledger logic
-├── ledger/
+├── ledger_impl/
 │   ├── mod.rs         - Re-export submodules
 │   ├── queries.rs     (~600 lines) - Entry queries
 │   ├── balances.rs    (~400 lines) - Balance operations
@@ -145,6 +145,8 @@ icn-ledger/src/
 ├── lib.rs             - Public API re-exports (no changes)
 └── ... (other existing modules)
 ```
+
+**Note**: The submodule directory is named `ledger_impl/` to avoid naming conflict with `ledger.rs`.
 
 ### Implementation Strategy
 
@@ -183,18 +185,14 @@ All public functions will be re-exported from `ledger.rs` via:
 
 ```rust
 // In ledger.rs
-mod queries;
-mod balances;
-mod fork_ops;
-mod freeze_ops;
-mod witness_ops;
+mod ledger_impl;
 
-// Re-export all public functions
-pub use queries::*;
-pub use balances::*;
-pub use fork_ops::*;
-pub use freeze_ops::*;
-pub use witness_ops::*;
+// Re-export all public functions from submodules
+pub use ledger_impl::queries::*;
+pub use ledger_impl::balances::*;
+pub use ledger_impl::fork_ops::*;
+pub use ledger_impl::freeze_ops::*;
+pub use ledger_impl::witness_ops::*;
 ```
 
 This ensures zero API breakage for external consumers.
@@ -263,12 +261,11 @@ After splitting, we expect:
 - ✅ Improved compile times (parallel module compilation)
 - ✅ Easier code navigation and review
 
-## Timeline Estimate
+## Scope
 
-- **ledger.rs splitting**: 2-3 days
-- **Testing and validation**: 1 day
-- **Other modules (if approved)**: 1 week
-- **Total**: 1-2 weeks
+- **ledger.rs splitting**: 5 phases (queries → balances → forks → freeze → witness)
+- **Testing and validation**: Full test suite after each phase
+- **Other modules (if approved)**: Separate PRs per module
 
 ## Approval Required
 

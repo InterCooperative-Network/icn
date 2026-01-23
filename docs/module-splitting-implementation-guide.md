@@ -19,20 +19,19 @@ Before starting any module split:
 
 ### Phase 1: Extract Query Operations (Lowest Risk)
 
-**Estimated Time**: 2-3 hours  
 **Risk**: 🟢 Low
 
 #### Step 1.1: Create Module Directory
 
 ```bash
 cd icn/crates/icn-ledger/src
-mkdir -p ledger
+mkdir -p ledger_impl
 ```
 
 #### Step 1.2: Create queries.rs
 
 ```bash
-touch ledger/queries.rs
+touch ledger_impl/queries.rs
 ```
 
 Add this content:
@@ -51,8 +50,8 @@ use icn_store::Store;
 use std::sync::Arc;
 use tracing::warn;
 
-// Re-export pagination types
-pub use crate::ledger::PaginationCursor;
+// Re-export pagination types from parent
+pub use super::PaginationCursor;
 
 // Constants (copy from ledger.rs)
 const JOURNAL_PREFIX: &str = "ledger:journal:";
@@ -103,9 +102,11 @@ Copy these functions from `ledger.rs` to `ledger/queries.rs`:
 In `ledger.rs`, add at the top of the file (after existing module declarations):
 
 ```rust
-mod ledger;
-pub use ledger::queries::LedgerQueries;
+mod ledger_impl;
+pub use ledger_impl::queries::LedgerQueries;
 ```
+
+**Note**: The submodule directory should be named `ledger_impl/` to avoid naming conflict with `ledger.rs`.
 
 Then in the `impl Ledger` block, replace the moved functions with delegation:
 
@@ -123,16 +124,16 @@ impl Ledger {
 }
 ```
 
-#### Step 1.5: Create ledger/mod.rs
+#### Step 1.5: Create ledger_impl/mod.rs
 
 ```bash
-touch ledger/mod.rs
+touch ledger_impl/mod.rs
 ```
 
 Add this content:
 
 ```rust
-//! Ledger submodules
+//! Ledger implementation submodules
 
 pub mod queries;
 
@@ -162,7 +163,6 @@ git commit -m "refactor(ledger): Extract query operations to submodule
 
 ### Phase 2: Extract Balance Operations
 
-**Estimated Time**: 2-3 hours  
 **Risk**: 🟡 Medium
 
 Follow similar pattern as Phase 1, extracting:
@@ -177,14 +177,13 @@ Follow similar pattern as Phase 1, extracting:
 - `load_cleared_volume_index()`
 - `save_cleared_volume_index()`
 
-Create `ledger/balances.rs` and follow steps 1.2-1.7.
+Create `ledger_impl/balances.rs` and follow steps 1.2-1.7.
 
 ### Phase 3: Extract Fork Operations
 
-**Estimated Time**: 2-3 hours  
 **Risk**: 🟢 Low
 
-Extract fork-related functions to `ledger/fork_ops.rs`:
+Extract fork-related functions to `ledger_impl/fork_ops.rs`:
 - `detect_forks()`
 - `has_fork()`
 - `detect_and_resolve_forks()`
@@ -195,10 +194,9 @@ Extract fork-related functions to `ledger/fork_ops.rs`:
 
 ### Phase 4: Extract Freeze Operations
 
-**Estimated Time**: 2 hours  
 **Risk**: 🟢 Low
 
-Extract freeze-related functions to `ledger/freeze_ops.rs`:
+Extract freeze-related functions to `ledger_impl/freeze_ops.rs`:
 - `freeze_member()`
 - `freeze_member_with_metadata()`
 - `unfreeze_member()`
@@ -211,10 +209,9 @@ Extract freeze-related functions to `ledger/freeze_ops.rs`:
 
 ### Phase 5: Extract Witness Operations
 
-**Estimated Time**: 2-3 hours  
 **Risk**: 🟡 Medium
 
-Extract witness-related functions to `ledger/witness_ops.rs`:
+Extract witness-related functions to `ledger_impl/witness_ops.rs`:
 - `requires_witnesses()`
 - `effective_witness_policy()`
 - `validate_witness_signatures()`
@@ -225,7 +222,6 @@ Extract witness-related functions to `ledger/witness_ops.rs`:
 
 ### Phase 6: Final Validation
 
-**Estimated Time**: 1 hour  
 **Risk**: 🟢 Low
 
 1. Run full test suite:
