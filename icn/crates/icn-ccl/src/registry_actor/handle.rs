@@ -219,7 +219,7 @@ impl ContractRegistryHandle {
     /// Called by the supervisor when a message arrives on contract registry topics.
     pub async fn handle_gossip(&self, msg: ContractRegistryMessage) -> Result<(), ActorError> {
         self.tx
-            .send(ContractRegistryCommand::GossipMessage(msg))
+            .send(ContractRegistryCommand::GossipMessage(Box::new(msg)))
             .await
             .map_err(|_| ActorError::ChannelClosed)
     }

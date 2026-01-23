@@ -187,9 +187,18 @@ pub struct ContractMetadata {
     /// Note: Metadata-only in this version. Not enforced at runtime yet.
     #[serde(default)]
     pub min_interpreter_version: Option<SemanticVersion>,
-    /// List of versions this contract is explicitly compatible with
-    /// Note: Metadata-only in this version. Use `set_semantic_version()` to control
-    /// compatibility via standard semver rules instead.
+    /// List of specific contract versions this release is explicitly compatible with.
+    ///
+    /// This field is for declaring compatibility exceptions that go beyond what
+    /// standard semantic versioning would infer (e.g., cherry-picked fixes or
+    /// cross-major compatibility).
+    ///
+    /// The primary version used for standard semver compatibility is
+    /// [`semantic_version`], which should be set via [`set_semantic_version()`].
+    /// Use this `compatible_versions` list as an additional, explicit override
+    /// where semver rules alone are not sufficient.
+    ///
+    /// Note: Metadata-only in this version. Not enforced at runtime yet.
     #[serde(default)]
     pub compatible_versions: Vec<SemanticVersion>,
     /// Whether this version is deprecated
@@ -221,7 +230,7 @@ impl ContractMetadata {
     /// Create metadata from a contract and deployer info
     ///
     /// Returns an error if the contract cannot be hashed.
-    /// 
+    ///
     /// Note: Semantic version defaults to `0.{version}.0` (pre-1.0 development convention).
     /// Use `with_semantic_version()` or `set_semantic_version()` to set an explicit semver.
     pub fn from_contract(contract: &Contract, owner: &str, version: u32) -> Result<Self> {
@@ -229,7 +238,7 @@ impl ContractMetadata {
         // Default semantic version to 0.<version>.0 for pre-1.0 development
         // Per semver: 0.x versions are incompatible with each other (0.1.0 -> 0.2.0 is a breaking change)
         let semantic_version = SemanticVersion::new(0, version, 0);
-        
+
         Ok(ContractMetadata {
             code_hash,
             name: contract.name.clone(),
@@ -572,7 +581,7 @@ impl ContractRegistry {
     }
 
     /// Get full metadata for all versions of a contract by name
-    /// 
+    ///
     /// Store-aware: loads metadata from persistent storage on cache miss.
     pub async fn list_versions_metadata(&self, name: &str) -> Result<Vec<ContractMetadata>> {
         // Clone hash list to avoid holding lock across await
@@ -711,7 +720,7 @@ impl ContractRegistry {
     /// Get the upgrade path from one version to another
     ///
     /// Returns a list of versions to upgrade through, or None if no path exists.
-    /// 
+    ///
     /// An upgrade is considered valid if:
     /// - Neither version is unset (0.0.0)
     /// - The target version can be used in place of the source version (backwards compatible)
@@ -1139,7 +1148,10 @@ mod tests {
             .unwrap();
 
         // List all versions with metadata
-        let versions = registry.list_versions_metadata("MultiVersion").await.unwrap();
+        let versions = registry
+            .list_versions_metadata("MultiVersion")
+            .await
+            .unwrap();
         assert_eq!(versions.len(), 2);
         assert_eq!(versions[0].version, 1);
         assert_eq!(versions[1].version, 2);
@@ -1234,11 +1246,9 @@ mod tests {
         // Deploy v1.1.0 (compatible - same major version)
         let contract2 = Contract::new("UpgradePath".to_string())
             .add_participant(icn_identity::KeyPair::generate().unwrap().did().clone())
-            .add_rule(
-                Rule::new("new_rule".to_string()).add_stmt(Stmt::Return {
-                    value: Expr::Literal(Value::Int(99)),
-                }),
-            );
+            .add_rule(Rule::new("new_rule".to_string()).add_stmt(Stmt::Return {
+                value: Expr::Literal(Value::Int(99)),
+            }));
         let hash2 = registry
             .deploy(contract2, "did:icn:owner", Some(2))
             .await
@@ -1265,10 +1275,16 @@ mod tests {
     async fn test_get_upgrade_path_incompatible() {
         let registry = ContractRegistry::new();
 
-        // Deploy v1.0.0
+        // Deploy v1.0.0 explicitly
         let contract1 = create_test_contract("IncompatibleUpgrade");
-        registry
+        let hash1 = registry
             .deploy(contract1, "did:icn:owner", Some(1))
+            .await
+            .unwrap();
+
+        // Set explicit semantic version 1.0.0 using public API
+        registry
+            .set_semantic_version(&hash1, SemanticVersion::new(1, 0, 0))
             .await
             .unwrap();
 
@@ -1280,8 +1296,14 @@ mod tests {
                     value: Expr::Literal(Value::String("new".to_string())),
                 }),
             );
-        registry
+        let hash2 = registry
             .deploy(contract2, "did:icn:owner", Some(2))
+            .await
+            .unwrap();
+
+        // Set explicit semantic version 2.0.0 using public API
+        registry
+            .set_semantic_version(&hash2, SemanticVersion::new(2, 0, 0))
             .await
             .unwrap();
 
@@ -1336,10 +1358,7 @@ mod tests {
         assert_eq!(meta.compatible_versions.len(), 2);
         assert!(meta.deprecated);
         assert_eq!(meta.deprecated_reason, Some("Replaced by v3".to_string()));
-        assert_eq!(
-            meta.successor_version,
-            Some(SemanticVersion::new(3, 0, 0))
-        );
+        assert_eq!(meta.successor_version, Some(SemanticVersion::new(3, 0, 0)));
     }
 
     #[test]
@@ -1364,8 +1383,8 @@ mod tests {
             "visibility": "Private"
         }"#;
 
-        let meta: ContractMetadata = serde_json::from_str(old_metadata_json)
-            .expect("Failed to deserialize old metadata");
+        let meta: ContractMetadata =
+            serde_json::from_str(old_metadata_json).expect("Failed to deserialize old metadata");
 
         // Verify defaults were applied (0.0.0 represents "unset" for legacy metadata)
         assert_eq!(meta.semantic_version, SemanticVersion::default());
