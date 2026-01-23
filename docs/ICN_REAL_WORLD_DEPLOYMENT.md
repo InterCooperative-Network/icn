@@ -345,7 +345,7 @@ Trained as steward:
 1. Alice loses her phone (device: "iphone-12")
 
 2. Alice uses her laptop (device: "macbook-1") to:
-   POST /identity/devices/iphone-12/revoke
+   DELETE /devices/{alice-did}/iphone-12
    { reason: "lost", signature: <signed-by-macbook-1> }
 
 3. Gateway adds "iphone-12" to revoked devices list
@@ -356,7 +356,7 @@ Trained as steward:
    - They can't sign new transactions
 
 5. Alice buys new phone, registers it:
-   POST /identity/devices
+   POST /devices/{alice-did}
    { device_id: "iphone-14", public_key: "...", signature: <signed-by-macbook-1> }
 
 6. Alice's membership is unaffected—her DID didn't change

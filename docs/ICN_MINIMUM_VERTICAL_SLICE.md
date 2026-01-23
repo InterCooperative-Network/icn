@@ -65,7 +65,7 @@ This is the bridge between "architecture docs" and "the actual repo."
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │ CLIENT CALL                                                                  │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│ POST /identity/devices                                                       │
+│ POST /devices/{did}                                                          │
 │ Authorization: Bearer <jwt-from-existing-device>                            │
 │ {                                                                            │
 │   "device_id": "iphone-14",                                                 │
@@ -82,7 +82,7 @@ This is the bridge between "architecture docs" and "the actual repo."
 ├─────────────────────────────────────────────────────────────────────────────┤
 │ File: icn-gateway/src/api/devices.rs                                        │
 │                                                                              │
-│ #[post("/identity/devices")]                                                │
+│ #[post("/{did}")]                                                           │
 │ pub async fn register_device(...)                                           │
 │   1. require_scope("identity:write")                                        │
 │   2. Verify authorizing device is valid for this DID                        │
@@ -653,7 +653,8 @@ This is the bridge between "architecture docs" and "the actual repo."
 | Endpoint Pattern | Gateway File | Daemon Crate |
 |------------------|--------------|--------------|
 | `/auth/*` | `api/auth.rs` | `icn-identity` |
-| `/identity/*` | `api/identity.rs`, `api/devices.rs` | `icn-identity` |
+| `/identity/*` | `api/identity.rs` | `icn-identity` |
+| `/devices/{did}/*` | `api/devices.rs` | `icn-identity` |
 | `/membership/*` | `api/membership/mod.rs` | `icn-entity` |
 | `/ledger/{coop_id}/*` | `api/ledger.rs` | `icn-ledger` |
 | `/gov/*` | `api/governance.rs` | `icn-governance` |
