@@ -30,6 +30,9 @@ pub type ContentHash = [u8; 32];
 /// - MAJOR: Incompatible API changes
 /// - MINOR: Backwards-compatible functionality additions
 /// - PATCH: Backwards-compatible bug fixes
+///
+/// Note: The default value (0.0.0) represents an "unset" version,
+/// typically from legacy metadata before semantic versioning was added.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct SemanticVersion {
     pub major: u32,
@@ -38,6 +41,7 @@ pub struct SemanticVersion {
 }
 
 impl Default for SemanticVersion {
+    /// Returns 0.0.0, which represents an unset/unknown version
     fn default() -> Self {
         Self::new(0, 0, 0)
     }
@@ -51,6 +55,14 @@ impl SemanticVersion {
             minor,
             patch,
         }
+    }
+
+    /// Check if this version is unset (0.0.0)
+    ///
+    /// Returns true for the default value, which represents legacy metadata
+    /// or explicitly unset versions.
+    pub const fn is_unset(&self) -> bool {
+        self.major == 0 && self.minor == 0 && self.patch == 0
     }
 
     /// Parse a semantic version from a string (e.g., "1.2.3")
@@ -168,13 +180,16 @@ pub struct ContractMetadata {
     /// Version number (incrementing, for backwards compatibility)
     pub version: u32,
     /// Semantic version (e.g., 1.2.3)
-    /// Defaults to 0.<version>.0 for pre-1.0 development if not explicitly set
+    /// Defaults to `0.{version}.0` for pre-1.0 development if not explicitly set
     #[serde(default)]
     pub semantic_version: SemanticVersion,
     /// Minimum interpreter version required to execute this contract
+    /// Note: Metadata-only in this version. Not enforced at runtime yet.
     #[serde(default)]
     pub min_interpreter_version: Option<SemanticVersion>,
-    /// List of versions this contract is compatible with
+    /// List of versions this contract is explicitly compatible with
+    /// Note: Metadata-only in this version. Use `set_semantic_version()` to control
+    /// compatibility via standard semver rules instead.
     #[serde(default)]
     pub compatible_versions: Vec<SemanticVersion>,
     /// Whether this version is deprecated
@@ -560,20 +575,23 @@ impl ContractRegistry {
     /// 
     /// Store-aware: loads metadata from persistent storage on cache miss.
     pub async fn list_versions_metadata(&self, name: &str) -> Result<Vec<ContractMetadata>> {
-        let name_index = self.name_index.read().await;
+        // Clone hash list to avoid holding lock across await
+        let hashes: Vec<ContentHash> = {
+            let name_index = self.name_index.read().await;
+            name_index
+                .get(name)
+                .map(|versions| versions.iter().map(|(_, h)| *h).collect())
+                .unwrap_or_default()
+        };
 
-        if let Some(versions) = name_index.get(name) {
-            let mut result = Vec::new();
-            for (_, hash) in versions {
-                // Use get_metadata which is store-aware
-                if let Some(meta) = self.get_metadata(hash).await? {
-                    result.push(meta);
-                }
+        let mut result = Vec::new();
+        for hash in hashes {
+            // Use get_metadata which is store-aware (no lock held here)
+            if let Some(meta) = self.get_metadata(&hash).await? {
+                result.push(meta);
             }
-            Ok(result)
-        } else {
-            Ok(vec![])
         }
+        Ok(result)
     }
 
     /// Resolve contract by name and semantic version
@@ -585,15 +603,20 @@ impl ContractRegistry {
         name: &str,
         version: &SemanticVersion,
     ) -> Result<Option<ContentHash>> {
-        let name_index = self.name_index.read().await;
+        // Clone hash list to avoid holding lock across await
+        let hashes: Vec<ContentHash> = {
+            let name_index = self.name_index.read().await;
+            name_index
+                .get(name)
+                .map(|versions| versions.iter().map(|(_, h)| *h).collect())
+                .unwrap_or_default()
+        };
 
-        if let Some(versions) = name_index.get(name) {
-            for (_, hash) in versions {
-                // Use get_metadata which is store-aware
-                if let Some(meta) = self.get_metadata(hash).await? {
-                    if meta.semantic_version == *version {
-                        return Ok(Some(*hash));
-                    }
+        for hash in hashes {
+            // Use get_metadata which is store-aware (no lock held here)
+            if let Some(meta) = self.get_metadata(&hash).await? {
+                if meta.semantic_version == *version {
+                    return Ok(Some(hash));
                 }
             }
         }
@@ -690,9 +713,13 @@ impl ContractRegistry {
     /// Returns a list of versions to upgrade through, or None if no path exists.
     /// 
     /// An upgrade is considered valid if:
+    /// - Neither version is unset (0.0.0)
     /// - The target version can be used in place of the source version (backwards compatible)
     /// - For major >= 1.0: same major version and target >= source
     /// - For major == 0: same major and minor versions and target >= source
+    ///
+    /// Note: Unset versions (0.0.0) from legacy metadata are not eligible for
+    /// automatic upgrades. Use `set_semantic_version()` to assign explicit versions first.
     ///
     /// Currently returns direct upgrade if compatible, or None.
     /// Future: Could implement multi-step migration paths.
@@ -702,6 +729,11 @@ impl ContractRegistry {
         from_version: &SemanticVersion,
         to_version: &SemanticVersion,
     ) -> Result<Option<Vec<SemanticVersion>>> {
+        // Reject unset versions
+        if from_version.is_unset() || to_version.is_unset() {
+            return Ok(None);
+        }
+
         let metadata = self.metadata.read().await;
         let name_index = self.name_index.read().await;
 
@@ -1314,6 +1346,11 @@ mod tests {
     fn test_backwards_compatible_deserialization() {
         // Test that old metadata (without new fields) can still deserialize
         // This simulates stored metadata from before the version management feature
+        //
+        // Note: This tests serde schema evolution (JSON deserialization with missing fields).
+        // The persistent store uses icn_encoding::encode_versioned/decode_versioned which
+        // should handle the same schema evolution via serde, but wire format testing would
+        // require encoding an old struct snapshot.
         let old_metadata_json = r#"{
             "code_hash": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
             "name": "OldContract",
@@ -1330,8 +1367,9 @@ mod tests {
         let meta: ContractMetadata = serde_json::from_str(old_metadata_json)
             .expect("Failed to deserialize old metadata");
 
-        // Verify defaults were applied
+        // Verify defaults were applied (0.0.0 represents "unset" for legacy metadata)
         assert_eq!(meta.semantic_version, SemanticVersion::default());
+        assert!(meta.semantic_version.is_unset());
         assert_eq!(meta.min_interpreter_version, None);
         assert_eq!(meta.compatible_versions.len(), 0);
         assert!(!meta.deprecated);
@@ -1341,5 +1379,40 @@ mod tests {
         // Verify original fields are intact
         assert_eq!(meta.name, "OldContract");
         assert_eq!(meta.version, 1);
+    }
+
+    #[tokio::test]
+    async fn test_upgrade_path_rejects_unset_versions() {
+        let registry = ContractRegistry::new();
+
+        // Deploy a contract
+        let contract = create_test_contract("UnsetTest");
+        let hash = registry
+            .deploy(contract, "did:icn:owner", Some(1))
+            .await
+            .unwrap();
+
+        // Set explicit semantic version
+        registry
+            .set_semantic_version(&hash, SemanticVersion::new(1, 0, 0))
+            .await
+            .unwrap();
+
+        let v1_0_0 = SemanticVersion::new(1, 0, 0);
+        let v0_0_0 = SemanticVersion::new(0, 0, 0); // Unset
+
+        // Upgrade from unset should be rejected
+        let path = registry
+            .get_upgrade_path("UnsetTest", &v0_0_0, &v1_0_0)
+            .await
+            .unwrap();
+        assert!(path.is_none());
+
+        // Upgrade to unset should be rejected
+        let path = registry
+            .get_upgrade_path("UnsetTest", &v1_0_0, &v0_0_0)
+            .await
+            .unwrap();
+        assert!(path.is_none());
     }
 }
