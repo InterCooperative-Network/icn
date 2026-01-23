@@ -800,11 +800,10 @@ impl NetworkMessage {
     /// Serialize to bytes with encoding and compression negotiation
     ///
     /// Wire format: [format_byte: 1 byte][payload: variable]
-    /// - format_byte high nibble (bits 4-7): encoding format (0=bincode, 1=postcard)
+    /// - format_byte high nibble (bits 4-7): encoding format (1=postcard)
     /// - format_byte low nibble (bits 0-3): compression format (0=none, 1=zstd)
     ///
-    /// Use this for peers that support POSTCARD_ENCODING capability.
-    /// Falls back to bincode for peers without this capability.
+    /// Note: Legacy bincode support has been removed. All encoding uses postcard.
     pub fn to_bytes_negotiated(
         &self,
         use_postcard: bool,
@@ -813,14 +812,11 @@ impl NetworkMessage {
         let encoding = if use_postcard {
             EncodingFormat::Postcard
         } else {
-            EncodingFormat::Bincode
+            EncodingFormat::Bincode  // Legacy enum value for backward compat
         };
 
-        let raw_bytes = if use_postcard {
-            icn_encoding::encode(self).context("Failed to serialize with postcard")?
-        } else {
-            icn_encoding::encode(self).context("Failed to serialize with bincode")?
-        };
+        // Note: Both paths use postcard now; bincode support has been removed
+        let raw_bytes = icn_encoding::encode(self).context("Failed to serialize message")?;
 
         let bytes_before = raw_bytes.len();
 
