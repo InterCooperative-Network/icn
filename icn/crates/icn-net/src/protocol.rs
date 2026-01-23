@@ -67,9 +67,9 @@ fn decompress_bounded(compressed: &[u8], max_size: usize) -> Result<Vec<u8>> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum CompressionFormat {
-    /// No compression - raw bincode follows
+    /// No compression - raw postcard follows
     None = 0,
-    /// Zstd compression - compressed bincode follows
+    /// Zstd compression - compressed postcard follows
     Zstd = 1,
 }
 
@@ -92,14 +92,14 @@ impl TryFrom<u8> for CompressionFormat {
 /// - Low nibble (bits 0-3): compression format
 /// - High nibble (bits 4-7): encoding format
 ///
-/// This allows backward compatibility: old nodes only check the low nibble,
-/// while new nodes can distinguish between bincode and postcard.
+/// Note: ICN now exclusively uses postcard encoding. The Bincode variant is
+/// retained only for wire format byte detection (to reject legacy messages).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum EncodingFormat {
-    /// Bincode encoding (legacy, compatible with all nodes)
+    /// Legacy encoding marker (no longer supported, will be decoded as postcard)
     Bincode = 0,
-    /// Postcard encoding (more compact, requires POSTCARD_ENCODING capability)
+    /// Postcard encoding (current standard)
     Postcard = 1,
 }
 
@@ -260,7 +260,7 @@ pub struct NetworkMessage {
     ///
     /// `#[serde(default)]` ensures that **new** code can deserialize **old** messages
     /// that don't have this field (it will simply be `None`). We deliberately do
-    /// **not** use `skip_serializing_if` here because bincode uses positional
+    /// **not** use `skip_serializing_if` here because postcard uses positional
     /// encoding: if **new** code were to skip serializing this field, **old**
     /// deserializers expecting a value in this position would fail to decode.
     /// Always serializing the field (even when `None`) preserves compatibility.
@@ -665,7 +665,7 @@ impl NetworkMessage {
         )
     }
 
-    /// Serialize to bytes using bincode (legacy format, no compression header)
+    /// Serialize to bytes using postcard (no compression header)
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         let bytes = icn_encoding::encode(self).context("Failed to serialize network message")?;
 
@@ -744,7 +744,7 @@ impl NetworkMessage {
         Ok(result)
     }
 
-    /// Deserialize from bytes using bincode (legacy format, no compression header)
+    /// Deserialize from bytes using postcard (no compression header)
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() > MAX_MESSAGE_SIZE {
             anyhow::bail!(
@@ -812,7 +812,7 @@ impl NetworkMessage {
         let encoding = if use_postcard {
             EncodingFormat::Postcard
         } else {
-            EncodingFormat::Bincode  // Legacy enum value for backward compat
+            EncodingFormat::Bincode // Legacy enum value for backward compat
         };
 
         // Note: Both paths use postcard now; bincode support has been removed
@@ -873,11 +873,9 @@ impl NetworkMessage {
 
     /// Deserialize from bytes with encoding and compression negotiation
     ///
-    /// Auto-detects encoding format from wire format byte and handles both
-    /// bincode and postcard encoded messages.
-    ///
-    /// This method is backward-compatible: it can decode messages from both
-    /// old nodes (bincode-only) and new nodes (postcard-capable).
+    /// Auto-detects encoding format from wire format byte. Note that ICN now
+    /// exclusively uses postcard encoding; both legacy (0x0X) and new (0x1X)
+    /// wire format markers are decoded using postcard.
     pub fn from_bytes_negotiated(bytes: &[u8]) -> Result<Self> {
         if bytes.is_empty() {
             anyhow::bail!("Empty message");
@@ -899,12 +897,12 @@ impl NetworkMessage {
             CompressionFormat::Zstd => decompress_bounded(payload, MAX_MESSAGE_SIZE)?,
         };
 
+        // Note: Both variants use postcard decoding; bincode support was removed
         let msg: NetworkMessage = match encoding {
-            EncodingFormat::Bincode => {
-                icn_encoding::decode(&decompressed).context("Failed to deserialize with bincode")?
+            EncodingFormat::Bincode | EncodingFormat::Postcard => {
+                icn_encoding::decode(&decompressed)
+                    .context("Failed to deserialize with postcard")?
             }
-            EncodingFormat::Postcard => icn_encoding::decode(&decompressed)
-                .context("Failed to deserialize with postcard")?,
         };
 
         Self::validate_version(msg.version)?;
@@ -1923,15 +1921,18 @@ mod tests {
     }
 
     #[test]
-    fn test_negotiated_bincode_roundtrip() {
+    fn test_negotiated_legacy_format_roundtrip() {
         let alice = KeyPair::generate().unwrap().did().clone();
         let bob = KeyPair::generate().unwrap().did().clone();
 
         let msg = NetworkMessage::ping(alice.clone(), bob.clone());
 
-        // Bincode without compression
+        // Legacy wire format (0x00) without compression
         let bytes = msg.to_bytes_negotiated(false, false).unwrap();
-        assert_eq!(bytes[0], 0x00, "Should be bincode without compression");
+        assert_eq!(
+            bytes[0], 0x00,
+            "Should be legacy format without compression"
+        );
 
         let decoded = NetworkMessage::from_bytes_negotiated(&bytes).unwrap();
         assert_eq!(decoded.from, alice);
@@ -1957,28 +1958,28 @@ mod tests {
     }
 
     #[test]
-    fn test_postcard_is_more_compact() {
+    fn test_wire_format_comparison() {
         let alice = KeyPair::generate().unwrap().did().clone();
         let bob = KeyPair::generate().unwrap().did().clone();
 
         let msg = NetworkMessage::ping(alice, bob);
 
-        let bincode_bytes = msg.to_bytes_negotiated(false, false).unwrap();
+        let legacy_bytes = msg.to_bytes_negotiated(false, false).unwrap();
         let postcard_bytes = msg.to_bytes_negotiated(true, false).unwrap();
 
-        // Postcard is typically more compact
+        // Compare wire format sizes (both use postcard encoding now)
         println!(
-            "Bincode: {} bytes, Postcard: {} bytes",
-            bincode_bytes.len(),
+            "Legacy format: {} bytes, Postcard format: {} bytes",
+            legacy_bytes.len(),
             postcard_bytes.len()
         );
 
         // Both should decode correctly
-        let decoded_bincode = NetworkMessage::from_bytes_negotiated(&bincode_bytes).unwrap();
+        let decoded_legacy = NetworkMessage::from_bytes_negotiated(&legacy_bytes).unwrap();
         let decoded_postcard = NetworkMessage::from_bytes_negotiated(&postcard_bytes).unwrap();
 
         assert!(matches!(
-            decoded_bincode.payload,
+            decoded_legacy.payload,
             MessagePayload::Ping { .. }
         ));
         assert!(matches!(
@@ -2031,7 +2032,7 @@ mod tests {
     }
 
     #[test]
-    fn test_negotiated_bincode_with_compression() {
+    fn test_negotiated_legacy_format_with_compression() {
         let alice = KeyPair::generate().unwrap().did().clone();
         let bob = KeyPair::generate().unwrap().did().clone();
 
@@ -2055,9 +2056,12 @@ mod tests {
 
         let msg = NetworkMessage::gossip(alice.clone(), Some(bob.clone()), gossip_msg);
 
-        // Bincode with compression
+        // Legacy format with compression
         let bytes = msg.to_bytes_negotiated(false, true).unwrap();
-        assert_eq!(bytes[0], 0x01, "Should be bincode with zstd compression");
+        assert_eq!(
+            bytes[0], 0x01,
+            "Should be legacy format with zstd compression"
+        );
 
         let decoded = NetworkMessage::from_bytes_negotiated(&bytes).unwrap();
         assert_eq!(decoded.from, alice);
@@ -2093,47 +2097,45 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::erasing_op)] // Intentional: documenting that old nodes see compression = 0
-    fn test_backward_compatible_wire_byte() {
-        // Verify that old nodes reading new wire format bytes correctly parse
-        // the compression format (low nibble) even if they ignore the encoding (high nibble)
+    #[allow(clippy::erasing_op)] // Intentional: documenting wire byte layout
+    fn test_wire_byte_layout() {
+        // Verify wire format byte structure:
+        // - Low nibble (bits 0-3): compression format
+        // - High nibble (bits 4-7): encoding format marker
 
-        // 0x00 = bincode + none -> old nodes see compression = 0 (none)
+        // 0x00 = legacy format + none compression
         assert_eq!(0x00 & 0x0F, 0);
 
-        // 0x01 = bincode + zstd -> old nodes see compression = 1 (zstd)
+        // 0x01 = legacy format + zstd compression
         assert_eq!(0x01 & 0x0F, 1);
 
-        // 0x10 = postcard + none -> old nodes see compression = 0 (none)
-        // They'll fail to decode postcard, but at least won't crash on decompression
+        // 0x10 = postcard format + none compression
         assert_eq!(0x10 & 0x0F, 0);
 
-        // 0x11 = postcard + zstd -> old nodes see compression = 1 (zstd)
-        // They'll decompress successfully, then fail to decode postcard
+        // 0x11 = postcard format + zstd compression
         assert_eq!(0x11 & 0x0F, 1);
     }
 
     #[test]
-    fn test_forward_compatible_postcard_node_decodes_bincode() {
-        // Verify that a postcard-capable node can decode bincode messages from old nodes.
-        // This tests forward compatibility: new nodes must understand old wire format.
+    fn test_decode_legacy_format_message() {
+        // Verify that messages with legacy wire format marker (0x0X) decode correctly.
         let alice = KeyPair::generate().unwrap().did().clone();
         let bob = KeyPair::generate().unwrap().did().clone();
 
         let msg = NetworkMessage::ping(alice.clone(), bob.clone());
 
-        // Simulate old node: sends bincode-encoded message (use_postcard = false)
-        let bincode_bytes = msg.to_bytes_negotiated(false, false).unwrap();
+        // Create message with legacy wire format marker (use_postcard = false)
+        let legacy_bytes = msg.to_bytes_negotiated(false, false).unwrap();
 
-        // Verify wire byte indicates bincode encoding (high nibble = 0)
+        // Verify wire byte indicates legacy format (high nibble = 0)
         assert_eq!(
-            bincode_bytes[0] >> 4,
+            legacy_bytes[0] >> 4,
             0,
-            "Old node should use bincode encoding"
+            "Should use legacy wire format marker"
         );
 
-        // New postcard-capable node should decode it via from_bytes_negotiated
-        let decoded = NetworkMessage::from_bytes_negotiated(&bincode_bytes).unwrap();
+        // Decoder should handle legacy format marker correctly
+        let decoded = NetworkMessage::from_bytes_negotiated(&legacy_bytes).unwrap();
 
         assert_eq!(decoded.from, alice);
         assert_eq!(decoded.to, Some(bob));
@@ -2141,8 +2143,8 @@ mod tests {
     }
 
     #[test]
-    fn test_forward_compatible_postcard_node_decodes_bincode_compressed() {
-        // Same as above but with compression enabled
+    fn test_decode_legacy_format_compressed_message() {
+        // Test decoding legacy wire format with compression enabled
         let alice = KeyPair::generate().unwrap().did().clone();
         let bob = KeyPair::generate().unwrap().did().clone();
 
@@ -2166,17 +2168,17 @@ mod tests {
 
         let msg = NetworkMessage::gossip(alice.clone(), Some(bob), gossip_msg);
 
-        // Simulate old node: sends bincode + zstd (use_postcard = false, compression = true)
-        let bincode_compressed = msg.to_bytes_negotiated(false, true).unwrap();
+        // Create message with legacy wire format + zstd (use_postcard = false, compression = true)
+        let legacy_compressed = msg.to_bytes_negotiated(false, true).unwrap();
 
-        // Verify wire byte indicates bincode + zstd (high nibble = 0, low nibble = 1)
+        // Verify wire byte indicates legacy format + zstd (high nibble = 0, low nibble = 1)
         assert_eq!(
-            bincode_compressed[0], 0x01,
-            "Old node should use bincode + zstd"
+            legacy_compressed[0], 0x01,
+            "Should use legacy format + zstd"
         );
 
-        // New postcard-capable node should decode it
-        let decoded = NetworkMessage::from_bytes_negotiated(&bincode_compressed).unwrap();
+        // Decoder should handle legacy format with compression correctly
+        let decoded = NetworkMessage::from_bytes_negotiated(&legacy_compressed).unwrap();
         assert_eq!(decoded.from, alice);
         assert!(matches!(decoded.payload, MessagePayload::Gossip(_)));
     }

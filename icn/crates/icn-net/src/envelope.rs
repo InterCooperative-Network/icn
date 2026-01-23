@@ -87,7 +87,7 @@ pub struct SignedEnvelope {
 
     /// ML-DSA (post-quantum) signature (only present for Hybrid type)
     /// When present, both this and `signature` must verify
-    /// Note: Using `#[serde(default)]` without `skip_serializing_if` for bincode compatibility
+    /// Note: Using `#[serde(default)]` without `skip_serializing_if` for positional encoding compatibility
     #[serde(default)]
     pub pq_signature: Option<Vec<u8>>,
 }
