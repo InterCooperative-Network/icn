@@ -154,7 +154,7 @@ impl ComputeManager {
 
         // We need an API context for the service call - use anonymous for get_status
         let api_ctx = icn_api::ApiContext {
-            caller_did: "gateway:anonymous".to_string(),
+            caller_did: "did:icn:gateway-anonymous".to_string(),
             coop_id: None,
         };
 

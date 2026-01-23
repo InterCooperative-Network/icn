@@ -51,7 +51,7 @@ pub async fn handle_compute_submit(
     let api_ctx = icn_api::ApiContext {
         caller_did: ctx
             .map(|c| c.caller_did.to_string())
-            .unwrap_or_else(|| "rpc:anonymous".to_string()),
+            .unwrap_or_else(|| "did:icn:rpc-anonymous".to_string()),
         coop_id: request
             .coop_id
             .clone()
@@ -158,7 +158,7 @@ pub async fn handle_compute_status(
     let api_ctx = icn_api::ApiContext {
         caller_did: ctx
             .map(|c| c.caller_did.to_string())
-            .unwrap_or_else(|| "rpc:anonymous".to_string()),
+            .unwrap_or_else(|| "did:icn:rpc-anonymous".to_string()),
         coop_id: ctx.and_then(|c| c.coop_id.clone()),
     };
 
@@ -240,7 +240,7 @@ pub async fn handle_compute_cancel(
     let api_ctx = icn_api::ApiContext {
         caller_did: ctx
             .map(|c| c.caller_did.to_string())
-            .unwrap_or_else(|| "rpc:anonymous".to_string()),
+            .unwrap_or_else(|| "did:icn:rpc-anonymous".to_string()),
         coop_id: ctx.and_then(|c| c.coop_id.clone()),
     };
 

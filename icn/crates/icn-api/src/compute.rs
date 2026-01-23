@@ -83,6 +83,10 @@ impl ComputeService {
         // Get coop_id: prefer request, fallback to context
         let coop_id = params.coop_id.or_else(|| ctx.coop_id.clone());
 
+        // Convert relative deadline to absolute timestamp
+        let now = icn_time::current_timestamp_millis();
+        let deadline = params.deadline_ms.map(|relative_ms| now + relative_ms);
+
         // Build the compute task
         let task = ComputeTask {
             id: params.task_id,
@@ -93,8 +97,8 @@ impl ComputeService {
             fuel_limit: FuelLimit(params.fuel_limit),
             required_capabilities,
             priority,
-            created_at: icn_time::current_timestamp_millis(),
-            deadline: params.deadline_ms,
+            created_at: now,
+            deadline,
             payment_rate: params.payment_rate,
             payment_currency: params.payment_currency,
             resource_profile,
@@ -172,6 +176,22 @@ impl SubmitTaskParams {
             return Err(ApiError::ValidationError(
                 "Task ID too long (max 256 chars)".into(),
             ));
+        }
+
+        // Validate code is not empty (if provided)
+        if let Some(ref code) = self.code {
+            if code.is_empty() {
+                return Err(ApiError::ValidationError("Code cannot be empty".into()));
+            }
+        }
+
+        // Validate wasm_bytes is not empty (if provided)
+        if let Some(ref wasm) = self.wasm_bytes {
+            if wasm.is_empty() {
+                return Err(ApiError::ValidationError(
+                    "WASM bytes cannot be empty".into(),
+                ));
+            }
         }
 
         // Validate fuel limit (100 to 10M)
