@@ -207,12 +207,12 @@ impl ContractMetadata {
     ///
     /// Returns an error if the contract cannot be hashed.
     /// 
-    /// Note: Semantic version defaults to 0.<version>.0 (pre-1.0 development).
-    /// Use `with_semantic_version()` to set an explicit semver.
+    /// Note: Semantic version defaults to `0.{version}.0` (pre-1.0 development convention).
+    /// Use `with_semantic_version()` or `set_semantic_version()` to set an explicit semver.
     pub fn from_contract(contract: &Contract, owner: &str, version: u32) -> Result<Self> {
         let code_hash = compute_hash(contract)?;
         // Default semantic version to 0.<version>.0 for pre-1.0 development
-        // This allows compatible minor version upgrades (0.1.0 -> 0.2.0 are incompatible per semver)
+        // Per semver: 0.x versions are incompatible with each other (0.1.0 -> 0.2.0 is a breaking change)
         let semantic_version = SemanticVersion::new(0, version, 0);
         
         Ok(ContractMetadata {
