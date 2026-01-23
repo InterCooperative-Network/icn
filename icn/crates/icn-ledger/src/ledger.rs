@@ -2663,7 +2663,6 @@ impl Ledger {
     }
 
     /// Load cached balances from storage
-    /// Load cached balances from storage
     fn load_cached_balances(&mut self) -> Result<()> {
         crate::ledger_impl::balances::load_cached_balances(self)
     }

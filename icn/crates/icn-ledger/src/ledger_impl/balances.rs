@@ -178,20 +178,25 @@ pub(crate) fn recompute_balances_with_retry(ledger: &mut Ledger, max_retries: us
     for attempt in 0..=max_retries {
         match recompute_balances(ledger) {
             Ok(()) => return Ok(()),
-            Err(e) if attempt < max_retries && e.to_string().contains("Journal modified") => {
-                warn!(
-                    attempt = attempt + 1,
-                    max_retries, "Balance recomputation retry due to concurrent modification"
-                );
-                // Small delay to reduce contention
-                std::thread::sleep(std::time::Duration::from_millis(10));
+            Err(e) if e.to_string().contains("Journal modified") => {
+                if attempt < max_retries {
+                    warn!(
+                        attempt = attempt + 1,
+                        max_retries, "Balance recomputation retry due to concurrent modification"
+                    );
+                    // Small delay to reduce contention
+                    std::thread::sleep(std::time::Duration::from_millis(10));
+                } else {
+                    // All retries exhausted with retryable error
+                    return Err(anyhow::anyhow!(
+                        "Balance recomputation failed after {max_retries} retries due to concurrent modifications"
+                    ));
+                }
             }
             Err(e) => return Err(e),
         }
     }
-    anyhow::bail!(
-        "Balance recomputation failed after {max_retries} retries due to concurrent modifications"
-    );
+    unreachable!("All code paths should return within the loop")
 }
 
 /// Load cached balances from storage
