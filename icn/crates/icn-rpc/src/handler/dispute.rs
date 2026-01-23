@@ -1,4 +1,12 @@
 //! Dispute-related RPC handlers
+//!
+//! # Coop Isolation
+//!
+//! TODO(#769): Add `ctx.require_coop()` enforcement for coop-scoped disputes.
+//! When per-coop dispute resolution exists, handlers should:
+//! 1. Require `ctx` to be `Some` for all operations
+//! 2. Call `ctx.require_coop(dispute_coop_id)` to validate access
+//! 3. Restrict dispute queries to the caller's coop scope
 
 use icn_time;
 use std::sync::Arc;
@@ -8,7 +16,7 @@ use tracing::info;
 use icn_identity::Did;
 use icn_ledger::{ContentHash, Dispute, DisputeOutcome, DisputeStatus};
 
-use crate::auth::RpcTokenClaims;
+use crate::context::RpcContext;
 use crate::server::RpcServer;
 use crate::types::RpcResponse;
 
@@ -17,8 +25,16 @@ pub async fn handle_dispute_file(
     id: u64,
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
-    claims: Option<&RpcTokenClaims>,
+    ctx: Option<&RpcContext>,
 ) -> RpcResponse {
+    if let Some(ctx) = ctx {
+        tracing::debug!(
+            caller = %ctx.caller_did,
+            coop_id = ?ctx.coop_id,
+            "dispute.file called"
+        );
+    }
+
     let dispute_manager = match state.dispute_manager() {
         Some(dm) => dm,
         None => {
@@ -27,8 +43,8 @@ pub async fn handle_dispute_file(
     };
 
     // Get authenticated DID (filer)
-    let filer_did_str = claims
-        .map(|c| c.sub.clone())
+    let filer_did_str = ctx
+        .map(|c| c.caller_did.to_string())
         .unwrap_or_else(|| "rpc:anonymous".to_string());
 
     #[derive(serde::Deserialize)]
@@ -93,7 +109,7 @@ pub async fn handle_dispute_file(
                 }),
             )
         }
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to file dispute: {e}")),
+        Err(e) => RpcResponse::internal_error(id, e),
     }
 }
 
@@ -102,7 +118,15 @@ pub async fn handle_dispute_list(
     id: u64,
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
+    ctx: Option<&RpcContext>,
 ) -> RpcResponse {
+    if let Some(ctx) = ctx {
+        tracing::debug!(
+            caller = %ctx.caller_did,
+            coop_id = ?ctx.coop_id,
+            "dispute.list called"
+        );
+    }
     let dispute_manager = match state.dispute_manager() {
         Some(dm) => dm,
         None => {
@@ -170,7 +194,15 @@ pub async fn handle_dispute_get(
     id: u64,
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
+    ctx: Option<&RpcContext>,
 ) -> RpcResponse {
+    if let Some(ctx) = ctx {
+        tracing::debug!(
+            caller = %ctx.caller_did,
+            coop_id = ?ctx.coop_id,
+            "dispute.get called"
+        );
+    }
     let dispute_manager = match state.dispute_manager() {
         Some(dm) => dm,
         None => {
@@ -217,8 +249,15 @@ pub async fn handle_dispute_add_evidence(
     id: u64,
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
-    _claims: Option<&RpcTokenClaims>,
+    ctx: Option<&RpcContext>,
 ) -> RpcResponse {
+    if let Some(ctx) = ctx {
+        tracing::debug!(
+            caller = %ctx.caller_did,
+            coop_id = ?ctx.coop_id,
+            "dispute.add_evidence called"
+        );
+    }
     let dispute_manager = match state.dispute_manager() {
         Some(dm) => dm,
         None => {
@@ -266,7 +305,7 @@ pub async fn handle_dispute_add_evidence(
                 }),
             )
         }
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to add evidence: {e}")),
+        Err(e) => RpcResponse::internal_error(id, e),
     }
 }
 
@@ -275,8 +314,15 @@ pub async fn handle_dispute_assign_mediator(
     id: u64,
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
-    _claims: Option<&RpcTokenClaims>,
+    ctx: Option<&RpcContext>,
 ) -> RpcResponse {
+    if let Some(ctx) = ctx {
+        tracing::debug!(
+            caller = %ctx.caller_did,
+            coop_id = ?ctx.coop_id,
+            "dispute.assign_mediator called"
+        );
+    }
     let dispute_manager = match state.dispute_manager() {
         Some(dm) => dm,
         None => {
@@ -336,7 +382,7 @@ pub async fn handle_dispute_assign_mediator(
                 }),
             )
         }
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to assign mediator: {e}")),
+        Err(e) => RpcResponse::internal_error(id, e),
     }
 }
 
@@ -345,8 +391,16 @@ pub async fn handle_dispute_resolve(
     id: u64,
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
-    claims: Option<&RpcTokenClaims>,
+    ctx: Option<&RpcContext>,
 ) -> RpcResponse {
+    if let Some(ctx) = ctx {
+        tracing::debug!(
+            caller = %ctx.caller_did,
+            coop_id = ?ctx.coop_id,
+            "dispute.resolve called"
+        );
+    }
+
     let dispute_manager = match state.dispute_manager() {
         Some(dm) => dm,
         None => {
@@ -355,8 +409,8 @@ pub async fn handle_dispute_resolve(
     };
 
     // Get authenticated DID (mediator)
-    let mediator_did_str = claims
-        .map(|c| c.sub.clone())
+    let mediator_did_str = ctx
+        .map(|c| c.caller_did.to_string())
         .unwrap_or_else(|| "rpc:anonymous".to_string());
 
     #[derive(serde::Deserialize)]
@@ -448,7 +502,7 @@ pub async fn handle_dispute_resolve(
                 }),
             )
         }
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to resolve dispute: {e}")),
+        Err(e) => RpcResponse::internal_error(id, e),
     }
 }
 

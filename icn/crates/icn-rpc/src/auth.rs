@@ -62,7 +62,7 @@ pub struct RpcTokenClaims {
     pub exp: u64,
     /// Scopes/permissions
     pub scopes: Vec<String>,
-    /// Cooperative ID (optional, for compute task attribution)
+    /// Cooperative ID (optional, for coop isolation and compute task attribution)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub coop_id: Option<String>,
 }
@@ -547,6 +547,62 @@ impl<S: Store + 'static> RpcAuthManager<S> {
         signature: &[u8],
         scopes: Vec<String>,
     ) -> Result<String, AuthError> {
+        self.verify_challenge_with_coop(did, signature, scopes, None)
+    }
+
+    /// Verify signed challenge and issue token with optional coop context
+    ///
+    /// When `coop_id` is provided, the token will include the coop_id claim,
+    /// enabling coop isolation checks in RPC handlers.
+    ///
+    /// SECURITY NOTE: This method only verifies the cryptographic challenge.
+    /// For coop-scoped tokens, use `verify_challenge_then_validate` which
+    /// ensures membership is validated AFTER identity is proven, preventing
+    /// membership enumeration attacks.
+    pub fn verify_challenge_with_coop(
+        &self,
+        did: &Did,
+        signature: &[u8],
+        scopes: Vec<String>,
+        coop_id: Option<String>,
+    ) -> Result<String, AuthError> {
+        self.verify_challenge_internal(did, signature, scopes, coop_id, || Ok(()))
+    }
+
+    /// Verify signed challenge with post-verification validation
+    ///
+    /// This method verifies the challenge signature FIRST, then calls the
+    /// provided validator. This ensures identity is proven before any
+    /// membership checks, preventing enumeration attacks.
+    ///
+    /// The validator is called only after the signature is verified successfully.
+    /// If the validator returns an error, no token is issued.
+    pub fn verify_challenge_then_validate<F>(
+        &self,
+        did: &Did,
+        signature: &[u8],
+        scopes: Vec<String>,
+        coop_id: Option<String>,
+        validator: F,
+    ) -> Result<String, AuthError>
+    where
+        F: FnOnce() -> Result<(), AuthError>,
+    {
+        self.verify_challenge_internal(did, signature, scopes, coop_id, validator)
+    }
+
+    /// Internal implementation for challenge verification with optional validation
+    fn verify_challenge_internal<F>(
+        &self,
+        did: &Did,
+        signature: &[u8],
+        scopes: Vec<String>,
+        coop_id: Option<String>,
+        post_verify_validator: F,
+    ) -> Result<String, AuthError>
+    where
+        F: FnOnce() -> Result<(), AuthError>,
+    {
         let auth_error =
             || AuthError::AuthenticationFailed("Invalid challenge or signature".to_string());
 
@@ -588,12 +644,37 @@ impl<S: Store + 'static> RpcAuthManager<S> {
             return Err(auth_error());
         }
 
+        // Run post-verification validator (e.g., membership check)
+        // This happens AFTER signature verification to prevent enumeration
+        post_verify_validator()?;
+
         // Issue JWT token
-        self.issue_token(did, scopes)
+        self.issue_token(did, scopes, coop_id)
     }
 
-    /// Issue a JWT token
-    fn issue_token(&self, did: &Did, scopes: Vec<String>) -> Result<String, AuthError> {
+    /// Issue a JWT token for a DID that has already been verified
+    ///
+    /// This is used when identity has been proven through other means
+    /// (e.g., challenge-response already completed) and we need to issue
+    /// a token with additional claims like coop_id.
+    ///
+    /// SECURITY: Only call this after the DID's identity has been verified.
+    pub fn issue_token_for_did(
+        &self,
+        did: &Did,
+        scopes: Vec<String>,
+        coop_id: Option<String>,
+    ) -> Result<String, AuthError> {
+        self.issue_token(did, scopes, coop_id)
+    }
+
+    /// Issue a JWT token (internal)
+    fn issue_token(
+        &self,
+        did: &Did,
+        scopes: Vec<String>,
+        coop_id: Option<String>,
+    ) -> Result<String, AuthError> {
         let now = Self::current_timestamp()?;
         let jti = Uuid::new_v4().to_string();
 
@@ -603,7 +684,7 @@ impl<S: Store + 'static> RpcAuthManager<S> {
             iat: now,
             exp: now + self.token_ttl.as_secs(),
             scopes,
-            coop_id: None, // Can be set later via token refresh with coop context
+            coop_id,
         };
 
         let token = encode(

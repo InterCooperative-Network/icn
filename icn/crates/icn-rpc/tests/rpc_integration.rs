@@ -1688,3 +1688,206 @@ async fn test_auth_revoke_invalid_token() {
 
     handle.abort();
 }
+
+// === Coop Isolation Tests ===
+
+/// Test that auth.verify with coop_id fails gracefully when CoopHandle is not configured.
+/// This ensures proper error handling for deployments without coop membership validation.
+#[tokio::test]
+async fn test_auth_verify_coop_id_without_coop_handle() {
+    let (addr, handle) = start_test_server(true).await.unwrap();
+
+    let keypair = KeyPair::generate().unwrap();
+    let did = keypair.did().to_string();
+
+    let client_http = reqwest::Client::new();
+
+    // Get challenge
+    let challenge_req = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "auth.challenge",
+        "params": { "did": did },
+        "id": 1
+    });
+
+    let response = client_http
+        .post(format!("http://{}", addr))
+        .json(&challenge_req)
+        .send()
+        .await
+        .unwrap();
+
+    let challenge_resp: serde_json::Value = response.json().await.unwrap();
+    let nonce = challenge_resp["result"]["nonce"].as_str().unwrap();
+
+    // Sign the challenge (nonce is hex-encoded, decode first)
+    let nonce_bytes = hex::decode(nonce).unwrap();
+    let signature = keypair.sign(&nonce_bytes);
+    let signature_hex = hex::encode(signature.to_bytes());
+
+    // Try to verify with coop_id - should fail since no CoopHandle configured
+    let verify_req = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "auth.verify",
+        "params": {
+            "did": did,
+            "signature": signature_hex,
+            "scopes": ["network:read"],
+            "coop_id": "test-coop-123"
+        },
+        "id": 2
+    });
+
+    let response = client_http
+        .post(format!("http://{}", addr))
+        .json(&verify_req)
+        .send()
+        .await
+        .unwrap();
+
+    let verify_resp: serde_json::Value = response.json().await.unwrap();
+
+    // Should fail with RESOURCE_NOT_AVAILABLE (-32000) since CoopHandle not configured
+    assert!(
+        verify_resp["error"].is_object(),
+        "Expected error when coop_id provided but CoopHandle not configured"
+    );
+    let error_code = verify_resp["error"]["code"].as_i64().unwrap_or(0);
+    assert_eq!(
+        error_code, -32000,
+        "Expected -32000 (RESOURCE_NOT_AVAILABLE), got: {}",
+        error_code
+    );
+    let error_msg = verify_resp["error"]["message"].as_str().unwrap_or("");
+    assert!(
+        error_msg.contains("Coop")
+            || error_msg.contains("coop")
+            || error_msg.contains("membership"),
+        "Expected coop-related error message, got: {}",
+        error_msg
+    );
+
+    handle.abort();
+}
+
+/// Test that auth.verify without coop_id still works normally.
+/// This validates that the coop_id parameter is truly optional.
+#[tokio::test]
+async fn test_auth_verify_without_coop_id_succeeds() {
+    let (addr, handle) = start_test_server(true).await.unwrap();
+
+    let keypair = KeyPair::generate().unwrap();
+    let did = keypair.did().to_string();
+
+    let client_http = reqwest::Client::new();
+
+    // Get challenge
+    let challenge_req = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "auth.challenge",
+        "params": { "did": did },
+        "id": 1
+    });
+
+    let response = client_http
+        .post(format!("http://{}", addr))
+        .json(&challenge_req)
+        .send()
+        .await
+        .unwrap();
+
+    let challenge_resp: serde_json::Value = response.json().await.unwrap();
+    let nonce = challenge_resp["result"]["nonce"].as_str().unwrap();
+
+    // Sign the challenge (nonce is hex-encoded, decode first)
+    let nonce_bytes = hex::decode(nonce).unwrap();
+    let signature = keypair.sign(&nonce_bytes);
+    let signature_hex = hex::encode(signature.to_bytes());
+
+    // Verify WITHOUT coop_id - should succeed
+    let verify_req = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "auth.verify",
+        "params": {
+            "did": did,
+            "signature": signature_hex,
+            "scopes": ["network:read"]
+            // No coop_id
+        },
+        "id": 2
+    });
+
+    let response = client_http
+        .post(format!("http://{}", addr))
+        .json(&verify_req)
+        .send()
+        .await
+        .unwrap();
+
+    let verify_resp: serde_json::Value = response.json().await.unwrap();
+
+    // Should succeed and return a token
+    assert!(
+        verify_resp["result"].is_object(),
+        "Expected success when no coop_id provided, got: {:?}",
+        verify_resp
+    );
+    assert!(
+        verify_resp["result"]["token"].is_string(),
+        "Expected token in response"
+    );
+    // Should NOT have coop_id in response (not requested)
+    assert!(
+        verify_resp["result"]["coop_id"].is_null()
+            || !verify_resp["result"]
+                .as_object()
+                .unwrap()
+                .contains_key("coop_id"),
+        "Token response should not include coop_id when not requested"
+    );
+
+    handle.abort();
+}
+
+/// Test that internal errors are properly sanitized.
+/// This ensures we don't leak implementation details to clients.
+#[tokio::test]
+async fn test_internal_error_sanitization() {
+    let (addr, handle) = start_test_server(false).await.unwrap();
+
+    let client_http = reqwest::Client::new();
+
+    // Request ledger.head without ledger handle (will cause internal error path)
+    let request = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "ledger.head",
+        "params": {},
+        "id": 1
+    });
+
+    let response = client_http
+        .post(format!("http://{}", addr))
+        .json(&request)
+        .send()
+        .await
+        .unwrap();
+
+    let resp: serde_json::Value = response.json().await.unwrap();
+
+    // Should return error about resource not available
+    assert!(resp["error"].is_object(), "Expected error response");
+
+    let error_msg = resp["error"]["message"].as_str().unwrap_or("");
+
+    // Error message should be generic, not expose internal details
+    // Should NOT contain stack traces, file paths, or internal function names
+    assert!(
+        !error_msg.contains(".rs:")
+            && !error_msg.contains("panicked")
+            && !error_msg.contains("unwrap"),
+        "Error message should not expose internal implementation details: {}",
+        error_msg
+    );
+
+    handle.abort();
+}

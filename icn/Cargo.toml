@@ -129,6 +129,7 @@ icn-crypto-pq = { path = "crates/icn-crypto-pq" }
 icn-steward = { path = "crates/icn-steward" }
 icn-zkp = { path = "crates/icn-zkp" }
 icn-encoding = { path = "crates/icn-encoding" }
+icn-coop = { path = "crates/icn-coop" }
 
 [workspace.lints.clippy]
 # Error handling - warn for now, will be upgraded to deny after cleanup

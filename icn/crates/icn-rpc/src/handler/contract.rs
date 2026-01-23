@@ -1,4 +1,12 @@
 //! Contract-related RPC handlers
+//!
+//! # Coop Isolation
+//!
+//! TODO(#769): Add `ctx.require_coop()` enforcement for coop-scoped contracts.
+//! When per-coop contract storage exists, handlers should:
+//! 1. Require `ctx` to be `Some` for all operations
+//! 2. Call `ctx.require_coop(contract_coop_id)` to validate access
+//! 3. Route requests to the appropriate coop-scoped contract registry
 
 use icn_time;
 use std::sync::Arc;
@@ -6,6 +14,7 @@ use std::time::Instant;
 
 use tracing::{error, info};
 
+use crate::context::RpcContext;
 use crate::pagination::{paginate, PageRequest, DEFAULT_MAX_PAGE_SIZE};
 use crate::receipt::{Operation, Outcome, Receipt, Resources};
 use crate::server::RpcServer;
@@ -16,7 +25,16 @@ pub async fn handle_contract_deploy(
     id: u64,
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
+    ctx: Option<&RpcContext>,
 ) -> RpcResponse {
+    if let Some(ctx) = ctx {
+        tracing::debug!(
+            caller = %ctx.caller_did,
+            coop_id = ?ctx.coop_id,
+            "contract.deploy called"
+        );
+    }
+
     let gossip_handle = match state.gossip_handle() {
         Some(handle) => handle,
         None => {
@@ -61,7 +79,7 @@ pub async fn handle_contract_deploy(
     let message_bytes = match serde_json::to_vec(&deployment_msg) {
         Ok(bytes) => bytes,
         Err(e) => {
-            return RpcResponse::error(id, -32603, format!("Failed to serialize deployment: {e}"));
+            return RpcResponse::internal_error(id, e);
         }
     };
 
@@ -105,7 +123,7 @@ pub async fn handle_contract_deploy(
             );
             state.receipt_store().insert(receipt).await;
 
-            RpcResponse::error(id, -32000, format!("Failed to publish deployment: {e}"))
+            RpcResponse::internal_error(id, e)
         }
     }
 }
@@ -115,7 +133,16 @@ pub async fn handle_contract_call(
     id: u64,
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
+    ctx: Option<&RpcContext>,
 ) -> RpcResponse {
+    if let Some(ctx) = ctx {
+        tracing::debug!(
+            caller = %ctx.caller_did,
+            coop_id = ?ctx.coop_id,
+            "contract.call called"
+        );
+    }
+
     let contract_runtime = match state.contract_runtime() {
         Some(handle) => handle,
         None => {
@@ -250,7 +277,7 @@ pub async fn handle_contract_call(
             );
             state.receipt_store().insert(receipt).await;
 
-            RpcResponse::error(id, -32000, format!("Contract execution failed: {e}"))
+            RpcResponse::internal_error(id, e)
         }
     }
 }
@@ -260,7 +287,16 @@ pub async fn handle_contract_list(
     id: u64,
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
+    ctx: Option<&RpcContext>,
 ) -> RpcResponse {
+    if let Some(ctx) = ctx {
+        tracing::debug!(
+            caller = %ctx.caller_did,
+            coop_id = ?ctx.coop_id,
+            "contract.list called"
+        );
+    }
+
     let contract_runtime = match state.contract_runtime() {
         Some(handle) => handle,
         None => {
@@ -295,6 +331,6 @@ pub async fn handle_contract_list(
 
     match serde_json::to_value(&page) {
         Ok(value) => RpcResponse::success(id, value),
-        Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {e}")),
+        Err(e) => RpcResponse::internal_error(id, e),
     }
 }

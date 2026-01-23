@@ -350,6 +350,20 @@ impl RpcResponse {
             id,
         }
     }
+
+    /// Create an internal error response with sanitized message.
+    ///
+    /// This logs the actual error details for debugging but returns a
+    /// generic "Internal server error" message to the client, preventing
+    /// information leakage about internal implementation details.
+    pub fn internal_error(id: u64, err: impl std::fmt::Display) -> Self {
+        tracing::error!(error = %err, "RPC internal error");
+        Self::error(
+            id,
+            crate::error_codes::INTERNAL_ERROR,
+            "Internal server error".to_string(),
+        )
+    }
 }
 
 // ============================================================================

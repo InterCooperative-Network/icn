@@ -1,9 +1,19 @@
 //! Governance-related RPC handlers
+//!
+//! # Coop Isolation
+//!
+//! TODO(#769): Add `ctx.require_coop()` enforcement when multi-coop governance is implemented.
+//! Currently domains are global. When per-coop governance domains exist, handlers should:
+//! 1. Require `ctx` to be `Some` for write operations (already done for vote.cast)
+//! 2. Call `ctx.require_coop(domain_coop_id)` to validate access
+//! 3. Route requests to the appropriate coop-scoped governance instance
 
 use std::sync::Arc;
 
 use icn_governance::{MembershipSource, ProposalPayload, ProposalState, VoteChoice};
 
+use crate::context::RpcContext;
+use crate::error_codes::{NOT_FOUND, RESOURCE_NOT_AVAILABLE};
 use crate::server::RpcServer;
 use crate::types::{
     CastVoteRequest, CloseProposalRequest, CreateDomainRequest, CreateProposalRequest,
@@ -12,11 +22,27 @@ use crate::types::{
 };
 
 /// Handle governance.domain.list RPC call - list all governance domains
-pub async fn handle_governance_domain_list(id: u64, state: &Arc<RpcServer>) -> RpcResponse {
+pub async fn handle_governance_domain_list(
+    id: u64,
+    state: &Arc<RpcServer>,
+    ctx: Option<&RpcContext>,
+) -> RpcResponse {
+    if let Some(ctx) = ctx {
+        tracing::debug!(
+            caller = %ctx.caller_did,
+            coop_id = ?ctx.coop_id,
+            "governance.domain.list called"
+        );
+    }
+
     let governance_handle = match state.governance_handle() {
         Some(handle) => handle,
         None => {
-            return RpcResponse::error(id, -32000, "Governance not available".to_string());
+            return RpcResponse::error(
+                id,
+                RESOURCE_NOT_AVAILABLE,
+                "Governance not available".to_string(),
+            );
         }
     };
 
@@ -46,10 +72,10 @@ pub async fn handle_governance_domain_list(id: u64, state: &Arc<RpcServer>) -> R
 
             match serde_json::to_value(&domain_infos) {
                 Ok(value) => RpcResponse::success(id, value),
-                Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {e}")),
+                Err(e) => RpcResponse::internal_error(id, e),
             }
         }
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to list domains: {e}")),
+        Err(e) => RpcResponse::internal_error(id, e),
     }
 }
 
@@ -58,11 +84,24 @@ pub async fn handle_governance_domain_get(
     id: u64,
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
+    ctx: Option<&RpcContext>,
 ) -> RpcResponse {
+    if let Some(ctx) = ctx {
+        tracing::debug!(
+            caller = %ctx.caller_did,
+            coop_id = ?ctx.coop_id,
+            "governance.domain.get called"
+        );
+    }
+
     let governance_handle = match state.governance_handle() {
         Some(handle) => handle,
         None => {
-            return RpcResponse::error(id, -32000, "Governance not available".to_string());
+            return RpcResponse::error(
+                id,
+                RESOURCE_NOT_AVAILABLE,
+                "Governance not available".to_string(),
+            );
         }
     };
 
@@ -100,20 +139,36 @@ pub async fn handle_governance_domain_get(
 
             match serde_json::to_value(&domain_info) {
                 Ok(value) => RpcResponse::success(id, value),
-                Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {e}")),
+                Err(e) => RpcResponse::internal_error(id, e),
             }
         }
-        Ok(None) => RpcResponse::error(id, -32000, "Domain not found".to_string()),
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to get domain: {e}")),
+        Ok(None) => RpcResponse::error(id, NOT_FOUND, "Domain not found".to_string()),
+        Err(e) => RpcResponse::internal_error(id, e),
     }
 }
 
 /// Handle governance.proposal.list RPC call - list all proposals
-pub async fn handle_governance_proposal_list(id: u64, state: &Arc<RpcServer>) -> RpcResponse {
+pub async fn handle_governance_proposal_list(
+    id: u64,
+    state: &Arc<RpcServer>,
+    ctx: Option<&RpcContext>,
+) -> RpcResponse {
+    if let Some(ctx) = ctx {
+        tracing::debug!(
+            caller = %ctx.caller_did,
+            coop_id = ?ctx.coop_id,
+            "governance.proposal.list called"
+        );
+    }
+
     let governance_handle = match state.governance_handle() {
         Some(handle) => handle,
         None => {
-            return RpcResponse::error(id, -32000, "Governance not available".to_string());
+            return RpcResponse::error(
+                id,
+                RESOURCE_NOT_AVAILABLE,
+                "Governance not available".to_string(),
+            );
         }
     };
 
@@ -175,10 +230,10 @@ pub async fn handle_governance_proposal_list(id: u64, state: &Arc<RpcServer>) ->
 
             match serde_json::to_value(&proposal_infos) {
                 Ok(value) => RpcResponse::success(id, value),
-                Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {e}")),
+                Err(e) => RpcResponse::internal_error(id, e),
             }
         }
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to list proposals: {e}")),
+        Err(e) => RpcResponse::internal_error(id, e),
     }
 }
 
@@ -187,11 +242,24 @@ pub async fn handle_governance_proposal_get(
     id: u64,
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
+    ctx: Option<&RpcContext>,
 ) -> RpcResponse {
+    if let Some(ctx) = ctx {
+        tracing::debug!(
+            caller = %ctx.caller_did,
+            coop_id = ?ctx.coop_id,
+            "governance.proposal.get called"
+        );
+    }
+
     let governance_handle = match state.governance_handle() {
         Some(handle) => handle,
         None => {
-            return RpcResponse::error(id, -32000, "Governance not available".to_string());
+            return RpcResponse::error(
+                id,
+                RESOURCE_NOT_AVAILABLE,
+                "Governance not available".to_string(),
+            );
         }
     };
 
@@ -262,11 +330,11 @@ pub async fn handle_governance_proposal_get(
 
             match serde_json::to_value(&proposal_info) {
                 Ok(value) => RpcResponse::success(id, value),
-                Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {e}")),
+                Err(e) => RpcResponse::internal_error(id, e),
             }
         }
-        Ok(None) => RpcResponse::error(id, -32000, "Proposal not found".to_string()),
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to get proposal: {e}")),
+        Ok(None) => RpcResponse::error(id, NOT_FOUND, "Proposal not found".to_string()),
+        Err(e) => RpcResponse::internal_error(id, e),
     }
 }
 
@@ -275,11 +343,24 @@ pub async fn handle_governance_domain_create(
     id: u64,
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
+    ctx: Option<&RpcContext>,
 ) -> RpcResponse {
+    if let Some(ctx) = ctx {
+        tracing::debug!(
+            caller = %ctx.caller_did,
+            coop_id = ?ctx.coop_id,
+            "governance.domain.create called"
+        );
+    }
+
     let governance_handle = match state.governance_handle() {
         Some(handle) => handle,
         None => {
-            return RpcResponse::error(id, -32000, "Governance not available".to_string());
+            return RpcResponse::error(
+                id,
+                RESOURCE_NOT_AVAILABLE,
+                "Governance not available".to_string(),
+            );
         }
     };
 
@@ -337,7 +418,7 @@ pub async fn handle_governance_domain_create(
             let result = serde_json::json!({ "success": true });
             RpcResponse::success(id, result)
         }
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to create domain: {e}")),
+        Err(e) => RpcResponse::internal_error(id, e),
     }
 }
 
@@ -346,11 +427,24 @@ pub async fn handle_governance_proposal_create(
     id: u64,
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
+    ctx: Option<&RpcContext>,
 ) -> RpcResponse {
+    if let Some(ctx) = ctx {
+        tracing::debug!(
+            caller = %ctx.caller_did,
+            coop_id = ?ctx.coop_id,
+            "governance.proposal.create called"
+        );
+    }
+
     let governance_handle = match state.governance_handle() {
         Some(handle) => handle,
         None => {
-            return RpcResponse::error(id, -32000, "Governance not available".to_string());
+            return RpcResponse::error(
+                id,
+                RESOURCE_NOT_AVAILABLE,
+                "Governance not available".to_string(),
+            );
         }
     };
 
@@ -423,10 +517,10 @@ pub async fn handle_governance_proposal_create(
             };
             match serde_json::to_value(&response) {
                 Ok(value) => RpcResponse::success(id, value),
-                Err(e) => RpcResponse::error(id, -32603, format!("Internal error: {e}")),
+                Err(e) => RpcResponse::internal_error(id, e),
             }
         }
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to create proposal: {e}")),
+        Err(e) => RpcResponse::internal_error(id, e),
     }
 }
 
@@ -435,11 +529,24 @@ pub async fn handle_governance_proposal_open(
     id: u64,
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
+    ctx: Option<&RpcContext>,
 ) -> RpcResponse {
+    if let Some(ctx) = ctx {
+        tracing::debug!(
+            caller = %ctx.caller_did,
+            coop_id = ?ctx.coop_id,
+            "governance.proposal.open called"
+        );
+    }
+
     let governance_handle = match state.governance_handle() {
         Some(handle) => handle,
         None => {
-            return RpcResponse::error(id, -32000, "Governance not available".to_string());
+            return RpcResponse::error(
+                id,
+                RESOURCE_NOT_AVAILABLE,
+                "Governance not available".to_string(),
+            );
         }
     };
 
@@ -460,20 +567,58 @@ pub async fn handle_governance_proposal_open(
             let result = serde_json::json!({ "success": true });
             RpcResponse::success(id, result)
         }
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to open proposal: {e}")),
+        Err(e) => RpcResponse::internal_error(id, e),
     }
 }
 
 /// Handle governance.vote.cast RPC call - cast a vote on a proposal
+///
+/// Requires scope: `governance:vote` or `governance:*`
 pub async fn handle_governance_vote_cast(
     id: u64,
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
+    ctx: Option<&RpcContext>,
 ) -> RpcResponse {
+    // Require authentication with governance:vote scope
+    let ctx = match ctx {
+        Some(c) => c,
+        None => {
+            return RpcResponse::error(
+                id,
+                crate::error_codes::AUTHENTICATION_REQUIRED,
+                "Authentication required to cast votes".to_string(),
+            );
+        }
+    };
+
+    // Verify caller has required scope
+    if !ctx.has_scope("governance:vote") {
+        tracing::warn!(
+            caller = %ctx.caller_did,
+            "Vote attempt denied: missing governance:vote scope"
+        );
+        return RpcResponse::error(
+            id,
+            crate::error_codes::SCOPE_INSUFFICIENT,
+            "Insufficient scope: governance:vote required".to_string(),
+        );
+    }
+
+    tracing::debug!(
+        caller = %ctx.caller_did,
+        coop_id = ?ctx.coop_id,
+        "governance.vote.cast called"
+    );
+
     let governance_handle = match state.governance_handle() {
         Some(handle) => handle,
         None => {
-            return RpcResponse::error(id, -32000, "Governance not available".to_string());
+            return RpcResponse::error(
+                id,
+                RESOURCE_NOT_AVAILABLE,
+                "Governance not available".to_string(),
+            );
         }
     };
 
@@ -511,7 +656,7 @@ pub async fn handle_governance_vote_cast(
             let result = serde_json::json!({ "success": true });
             RpcResponse::success(id, result)
         }
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to cast vote: {e}")),
+        Err(e) => RpcResponse::internal_error(id, e),
     }
 }
 
@@ -520,11 +665,24 @@ pub async fn handle_governance_proposal_close(
     id: u64,
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
+    ctx: Option<&RpcContext>,
 ) -> RpcResponse {
+    if let Some(ctx) = ctx {
+        tracing::debug!(
+            caller = %ctx.caller_did,
+            coop_id = ?ctx.coop_id,
+            "governance.proposal.close called"
+        );
+    }
+
     let governance_handle = match state.governance_handle() {
         Some(handle) => handle,
         None => {
-            return RpcResponse::error(id, -32000, "Governance not available".to_string());
+            return RpcResponse::error(
+                id,
+                RESOURCE_NOT_AVAILABLE,
+                "Governance not available".to_string(),
+            );
         }
     };
 
@@ -542,6 +700,6 @@ pub async fn handle_governance_proposal_close(
             let result = serde_json::json!({ "success": true });
             RpcResponse::success(id, result)
         }
-        Err(e) => RpcResponse::error(id, -32000, format!("Failed to close proposal: {e}")),
+        Err(e) => RpcResponse::internal_error(id, e),
     }
 }
