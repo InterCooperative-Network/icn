@@ -712,8 +712,9 @@ Every layer integrates with every other layer through the trust graph. The compu
 | **DID** | Decentralized Identifier. Format: `did:icn:<base58-ed25519-pubkey>`. Self-sovereign identity anchor. |
 | **VC** | Verifiable Credential. Signed attestation (e.g., membership) issued by an entity, stored in wallet. |
 | **VUI** | Verifiable Unique Identity. Proof-of-personhood via steward ceremony. Prevents Sybil attacks. |
-| **Entity** | Any ICN participant: Individual, Cooperative, Community, Federation. Recursive structure. |
-| **EntityId** | Identifier for non-individual entities. Format: `entity:icn:<type>:<identifier>`. |
+| **Entity** | Any ICN participant: Individual, Cooperative, Community, Federation. Recursive structure. Not to be confused with Jurisdiction. |
+| **EntityId** | Identifier for entities. Format: `entity:icn:<type>:<identifier>` (e.g., `entity:icn:coop:food-coop-123`). |
+| **Jurisdiction** | Governance domain within an entity. Not an entity type itself—it's where governance decisions are scoped. |
 | **Gateway** | HTTP/WebSocket API server. Bridges client apps to ICN daemon. Not a custodian. |
 | **Full Node** | Complete ICN daemon with ledger, gossip, compute. Run by cooperatives. |
 | **Light Client** | Wallet app that signs locally, calls gateway APIs. No local ledger copy. |

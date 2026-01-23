@@ -129,7 +129,7 @@ This is the bridge between "architecture docs" and "the actual repo."
 │ POST /membership/apply                                                       │
 │ Authorization: Bearer <jwt>                                                 │
 │ {                                                                            │
-│   "jurisdiction_id": "jurisdiction:icn:food-coop-123",                      │
+│   "entity_id": "entity:icn:coop:food-coop-123",                             │
 │   "capabilities_requested": ["member"],                                     │
 │   "invite_code": "ABC123"                                                   │
 │ }                                                                            │
@@ -158,7 +158,7 @@ This is the bridge between "architecture docs" and "the actual repo."
 │ Authorization: Bearer <admin-jwt>                                           │
 │ {                                                                            │
 │   "member_did": "did:icn:alice...",                                         │
-│   "jurisdiction_id": "jurisdiction:icn:food-coop-123",                      │
+│   "entity_id": "entity:icn:coop:food-coop-123",                             │
 │   "capabilities": ["member"],                                               │
 │   "initial_credit_limit": 100                                               │
 │ }                                                                            │
@@ -668,6 +668,8 @@ This is the bridge between "architecture docs" and "the actual repo."
 
 ## Quick Reference: Gossip Topics
 
+**Note**: Most gossip topics are dynamically constructed at runtime with parameters (coop_id, domain_id, etc.) rather than predefined constants. Only a few topics like `key:rotation`, `steward:announce`, and `steward:vui-sync` are hardcoded.
+
 | Topic Pattern | Purpose | Scope |
 |---------------|---------|-------|
 | `ledger:{coop_id}:entries` | Ledger transactions | CooperativeOnly |
@@ -680,6 +682,9 @@ This is the bridge between "architecture docs" and "the actual repo."
 | `compute:submit` | Task submissions | TrustGated(0.1) |
 | `compute:result` | Task results | TrustGated(0.1) |
 | `federation:clearing` | Cross-coop settlement | Federation |
+| `key:rotation` | Key rotation announcements | Global |
+| `steward:announce` | Steward availability | Global |
+| `steward:vui-sync` | VUI state synchronization | Stewards only |
 
 ---
 

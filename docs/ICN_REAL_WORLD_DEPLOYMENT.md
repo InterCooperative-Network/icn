@@ -569,25 +569,30 @@ function CoopDashboard() {
   const [balance, setBalance] = useState<number>(0);
 
   useEffect(() => {
-    const icn = createClient({
-      baseUrl: 'https://gateway.mycoop.org',
-      autoRefresh: true,
-    });
+    let sub: any = null;
 
-    // Authenticate with wallet
-    await icn.authenticate(did, walletSigner, 'my-coop');
-    setClient(icn);
+    async function init() {
+      const icn = createClient({
+        baseUrl: 'https://gateway.mycoop.org',
+        autoRefresh: true,
+      });
 
-    // Subscribe to real-time updates
-    const sub = icn.subscribe('my-coop', {
-      onEvent: (event) => {
-        if (event.type === 'Payment') {
-          refreshBalance();
-        }
-      },
-    });
+      // Authenticate with wallet
+      await icn.authenticate(did, walletSigner, 'my-coop');
+      setClient(icn);
 
-    return () => sub.close();
+      // Subscribe to real-time updates
+      sub = icn.subscribe('my-coop', {
+        onEvent: (event) => {
+          if (event.type === 'Payment') {
+            refreshBalance();
+          }
+        },
+      });
+    }
+
+    init();
+    return () => { if (sub) sub.close(); };
   }, []);
 
   async function refreshBalance() {
