@@ -3,7 +3,7 @@
 ## 🚀 Fastest Way to Start
 
 ```bash
-cd /home/matt/projects/icn/icn
+cd icn
 
 # Option 1: Use the startup script (recommended)
 ./start-gateway.sh
@@ -168,7 +168,7 @@ Edit these files and reload the browser to see changes (no build step needed).
 - Check server logs in the terminal where `icnd` is running
 - Browser console (F12) shows JavaScript errors
 - API errors appear as toast notifications in the UI
-- See `/home/matt/projects/icn/icn/crates/icn-gateway/static/README.md` for UI details
+- See `crates/icn-gateway/static/README.md` for UI details
 
 ---
 

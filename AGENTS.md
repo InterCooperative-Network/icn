@@ -4,7 +4,6 @@ Instructions for agentic coding agents operating in this repo.
 
 ## Repo layout (critical)
 
-- Repo root: `/home/matt/projects/icn`.
 - Rust workspace is in `icn/` (repo root is NOT a Cargo workspace).
 - Non-Rust projects:
   - `sdk/typescript/` (TypeScript SDK)

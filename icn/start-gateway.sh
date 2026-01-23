@@ -1,6 +1,6 @@
 #!/bin/bash
 # ICN Gateway - Production Startup Script
-# Run from: /home/matt/projects/icn/icn
+# Run from the icn/ workspace directory (e.g., cd icn)
 
 set -e
 
@@ -12,7 +12,7 @@ echo ""
 # Check we're in the right directory
 if [ ! -f "Cargo.toml" ]; then
     echo "❌ Error: Must run from icn workspace directory"
-    echo "   cd /home/matt/projects/icn/icn"
+    echo "   cd icn  # (from repo root)"
     exit 1
 fi
 

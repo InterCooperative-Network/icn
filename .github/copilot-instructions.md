@@ -54,10 +54,13 @@ icn/
 │   │   ├── icn-zkp/       # Zero-knowledge proofs for SDIS
 │   │   ├── icn-time/      # Clock synchronization (Rough Time Protocol)
 │   │   ├── icn-snapshot/  # State snapshots for restarts
+│   │   ├── icn-api/       # API types and definitions
+│   │   ├── icn-encoding/  # Serialization utilities
 │   │   └── icn-testkit/   # Testing utilities
 │   └── bins/              # Binaries
 │       ├── icnd/          # ICN daemon
-│       └── icnctl/        # CLI management tool
+│       ├── icnctl/        # CLI management tool
+│       └── icn-console/   # Interactive TUI for cooperative management
 ├── docs/                  # Comprehensive documentation
 ├── deploy/                # Kubernetes & deployment configs
 ├── web/                   # Web UIs (pilot-ui, etc.)

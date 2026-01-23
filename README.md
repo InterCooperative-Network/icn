@@ -482,6 +482,14 @@ Access health: `curl http://localhost:8080/health`
 - `icn-security` - Byzantine fault detection
 - `icn-time` - Clock synchronization
 - `icn-snapshot` - State persistence
+- `icn-crypto-pq` - Post-quantum hybrid cryptography
+- `icn-steward` - SDIS steward network & VUI computation
+- `icn-zkp` - Zero-knowledge proofs for SDIS
+- `icn-coop` - Cooperative management & lifecycle
+- `icn-community` - Community structures & civic engine
+- `icn-entity` - Unified entity model (individuals/coops/federations)
+- `icn-api` - API types and definitions
+- `icn-encoding` - Serialization utilities
 - `icn-testkit` - Test utilities
 
 ### Binaries
