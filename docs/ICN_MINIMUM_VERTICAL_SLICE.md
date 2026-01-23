@@ -16,6 +16,8 @@ Client Call → Gateway Endpoint → Manager/Service → Daemon Action → Gossi
 
 This is the bridge between "architecture docs" and "the actual repo."
 
+**Note on Endpoint Paths**: Paths shown are conceptual (e.g., `/devices/{did}`). Actual gateway may version endpoints (e.g., `/v1/devices/{did}`) depending on deployment configuration. See `icn-gateway/src/server.rs` for current routing.
+
 ---
 
 ## 1. Create DID in Wallet
@@ -686,6 +688,26 @@ This is the bridge between "architecture docs" and "the actual repo."
 | `key:rotation` | Key rotation announcements | Global |
 | `steward:announce` | Steward availability | Global |
 | `steward:vui-sync` | VUI state synchronization | Stewards only |
+
+---
+
+## Integration Tests Reference
+
+To see these operations tested in code, refer to these integration test files:
+
+| Operation | Test File |
+|-----------|-----------|
+| Identity & Devices | `icn-identity/tests/multi_device_integration.rs` |
+| Membership | `icn-community/tests/membership_tests.rs` |
+| Payments/Ledger | `icn-ledger/tests/` (unit tests in `ledger.rs`) |
+| Governance | `icn-governance/tests/` (347 tests) |
+| Compute | `icn-compute/tests/compute_integration.rs` |
+| Federation | `icn-federation/tests/federation_integration.rs` |
+| Gossip | `icn-gossip/tests/gossip_integration.rs` |
+| Privacy | `icn-privacy/tests/privacy_integration.rs` |
+| Full Stack | `icn-testkit/tests/example_integration.rs` |
+
+Run tests with: `cargo test -p <crate-name>`
 
 ---
 

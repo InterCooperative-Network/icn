@@ -18,6 +18,21 @@ ICN is infrastructure for a **parallel political economy** where democratic orga
 
 ---
 
+## Implementation Status
+
+Features throughout this document are marked with status indicators:
+
+| Symbol | Meaning |
+|--------|---------|
+| ✅ | **Implemented** - Merged, tested, deployed |
+| 🚧 | **Partial** - Core functionality exists, edge cases pending |
+| 📋 | **Designed** - Architecture defined, implementation planned |
+| 🔮 | **Future** - Conceptual, not yet designed in detail |
+
+**Current overall status**: ~75% implemented (272K LOC, 2,287 tests across 27 crates)
+
+---
+
 ## Invariants (Non-Negotiables)
 
 These are the protocol's hard constraints. They prevent scope drift and define what ICN *is*.
@@ -154,7 +169,7 @@ Protocol Commons (ICN itself)
 
 ## Layer-by-Layer Architecture
 
-### Layer 0: Identity (icn-identity, icn-steward, icn-zkp)
+### Layer 0: Identity (icn-identity, icn-steward, icn-zkp) ✅
 
 **DIDs**: `did:icn:<base58-ed25519-pubkey>`
 
@@ -186,7 +201,7 @@ Protocol Commons (ICN itself)
 
 ---
 
-### Layer 1: Trust (icn-trust)
+### Layer 1: Trust (icn-trust) ✅
 
 **Web-of-participation** with transitive computation:
 
@@ -210,7 +225,7 @@ Protocol Commons (ICN itself)
 
 ---
 
-### Layer 2: Cooperative Contract Language (icn-ccl)
+### Layer 2: Cooperative Contract Language (icn-ccl) ✅
 
 **Purpose**: Express cooperative agreements in deterministic, auditable code.
 
@@ -268,7 +283,7 @@ Return { value }
 
 ---
 
-### Layer 3: Distributed Compute (icn-compute)
+### Layer 3: Distributed Compute (icn-compute) ✅
 
 **The most sophisticated layer** - trust-gated task distribution with BFT verification.
 
@@ -435,7 +450,7 @@ Source Executor                     Target Executor
 
 ---
 
-### Layer 4: Privacy (icn-privacy)
+### Layer 4: Privacy (icn-privacy) ✅
 
 **Purpose**: Protect metadata, prevent traffic analysis, ensure plausible deniability.
 
@@ -488,7 +503,7 @@ ObfuscationConfig {
 
 ---
 
-### Layer 5: Security (icn-security)
+### Layer 5: Security (icn-security) ✅
 
 **Purpose**: Detect Byzantine faults, manage reputation, quarantine bad actors.
 
@@ -527,9 +542,11 @@ Good behavior gradually restores score
 
 ---
 
-### Layer 6: Gossip (icn-gossip)
+### Layer 6: Gossip (icn-gossip) ✅
 
 **Protocol**: Hybrid push/pull with causal ordering.
+
+**Note**: Most gossip topics are dynamically constructed at runtime with parameters (coop_id, domain_id, etc.). Only a few topics like `key:rotation`, `steward:announce`, and `steward:vui-sync` are hardcoded constants.
 
 #### Vector Clocks (vector_clock.rs)
 
@@ -569,7 +586,7 @@ enum AccessControl {
 
 ---
 
-### Layer 7: Ledger (icn-ledger)
+### Layer 7: Ledger (icn-ledger) ✅
 
 **Double-entry mutual credit** with cryptographic auditability.
 
@@ -596,7 +613,7 @@ credit_limit = f(
 
 ---
 
-### Layer 8: Governance (icn-governance)
+### Layer 8: Governance (icn-governance) ✅
 
 **25,438 LOC, 347 tests** - Comprehensive governance primitives.
 
@@ -617,7 +634,7 @@ credit_limit = f(
 
 ---
 
-### Layer 9: Federation (icn-federation)
+### Layer 9: Federation (icn-federation) 🚧
 
 **Multi-level hierarchy** with trust bridging.
 

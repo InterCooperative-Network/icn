@@ -866,6 +866,8 @@ spec:
 
 ### Performance Targets
 
+**Note**: These are design targets, not measured benchmarks. Actual performance depends on hardware, network conditions, and load. See [docs/performance/](performance/) for benchmark methodology and results.
+
 | Metric | Target | Notes |
 |--------|--------|-------|
 | Payment latency | < 2 seconds | End-to-end, same coop |
@@ -873,6 +875,11 @@ spec:
 | WebSocket event delivery | < 100ms | After ledger commit |
 | Gateway API p99 | < 200ms | Most endpoints |
 | Mobile app startup | < 3 seconds | Cold start to usable |
+
+**Benchmarking resources**:
+- `docs/performance/BENCHMARKS.md` - Benchmark suite and results
+- `docs/performance/PROFILING.md` - CPU/memory profiling guides
+- `docs/performance/TARGETS.md` - Detailed target specifications
 
 ---
 
