@@ -2,7 +2,7 @@
 
 use crate::bloom::BloomFilter;
 use crate::sync::PeerSyncManager;
-use crate::types::{AccessControl, ContentHash, GossipEntry, GossipMessage, Subscription, Topic};
+use crate::types::{AccessControl, ContentHash, GossipEntry, GossipMessage, Topic};
 use crate::vector_clock::VectorClock;
 use anyhow::{bail, Context as _, Result};
 use icn_identity::{Did, KeyPair};
@@ -46,7 +46,7 @@ pub type StorageContentNotFoundCallback =
 pub type TrustLookup = Arc<dyn Fn(&Did) -> Option<TrustClass> + Send + Sync>;
 
 /// Maximum subscribers per topic to prevent unbounded memory growth
-const MAX_SUBSCRIBERS_PER_TOPIC: usize = 10_000;
+pub(crate) const MAX_SUBSCRIBERS_PER_TOPIC: usize = 10_000;
 
 /// Maximum topics per peer (base limit) to prevent subscription spam
 /// This can be increased for higher-trust peers via trust-weighted multipliers
@@ -54,7 +54,7 @@ const MAX_TOPICS_PER_PEER_BASE: usize = 100;
 
 /// Trust multipliers for per-peer topic limits
 /// Higher trust classes get higher subscription limits
-fn topics_per_peer_limit(trust_class: Option<TrustClass>) -> usize {
+pub(crate) fn topics_per_peer_limit(trust_class: Option<TrustClass>) -> usize {
     match trust_class {
         Some(TrustClass::Federated) => MAX_TOPICS_PER_PEER_BASE * 4, // 400 topics
         Some(TrustClass::Partner) => MAX_TOPICS_PER_PEER_BASE * 2,   // 200 topics
@@ -65,7 +65,7 @@ fn topics_per_peer_limit(trust_class: Option<TrustClass>) -> usize {
 
 /// Cache for trust scores to avoid blocking async operations
 /// Uses std::sync::Mutex for synchronous access from non-async code
-struct TrustScoreCache {
+pub(crate) struct TrustScoreCache {
     scores: std::sync::Mutex<HashMap<Did, (f64, Instant)>>,
     ttl: Duration,
 }
@@ -79,7 +79,7 @@ impl TrustScoreCache {
     }
 
     /// Get cached trust score if still valid
-    fn get(&self, did: &Did) -> Option<f64> {
+    pub(crate) fn get(&self, did: &Did) -> Option<f64> {
         if let Ok(cache) = self.scores.lock() {
             if let Some((score, cached_at)) = cache.get(did) {
                 if cached_at.elapsed() < self.ttl {
@@ -91,7 +91,7 @@ impl TrustScoreCache {
     }
 
     /// Insert a trust score into the cache
-    fn insert(&self, did: &Did, score: f64) {
+    pub(crate) fn insert(&self, did: &Did, score: f64) {
         if let Ok(mut cache) = self.scores.lock() {
             cache.insert(did.clone(), (score, Instant::now()));
             // Limit cache size to prevent unbounded growth
@@ -129,7 +129,7 @@ const TRUST_CACHE_TTL: Duration = Duration::from_secs(5);
 
 /// Spawn a violation recording task without blocking
 /// This is fire-and-forget - we don't wait for the result
-fn spawn_violation_recording(
+pub(crate) fn spawn_violation_recording(
     detector: Arc<RwLock<icn_security::MisbehaviorDetector>>,
     did: Did,
     violation: icn_security::Violation,
@@ -166,17 +166,17 @@ pub struct GossipActor {
     pub(crate) bloom_filters: HashMap<String, BloomFilter>,
 
     /// Subscriptions (topic -> subscribers)
-    subscriptions: HashMap<String, Vec<Did>>,
+    pub(crate) subscriptions: HashMap<String, Vec<Did>>,
 
     /// Trust lookup function (returns trust class for resource limits)
     pub(crate) trust_lookup: TrustLookup,
 
     /// Trust graph for fine-grained trust score computation (optional)
     /// When provided, enables trust-gated subscription authorization
-    trust_graph: Option<Arc<RwLock<icn_trust::TrustGraph>>>,
+    pub(crate) trust_graph: Option<Arc<RwLock<icn_trust::TrustGraph>>>,
 
     /// Trust score cache to avoid blocking async operations
-    trust_cache: TrustScoreCache,
+    pub(crate) trust_cache: TrustScoreCache,
 
     /// Send message callback (optional, for sending responses)
     send_callback: Option<SendMessageCallback>,
@@ -200,7 +200,7 @@ pub struct GossipActor {
     pub(crate) store: Option<Arc<dyn icn_store::Store>>,
 
     /// Byzantine fault detector (Phase 18 Week 1-2 - optional)
-    misbehavior_detector: Option<Arc<RwLock<icn_security::MisbehaviorDetector>>>,
+    pub(crate) misbehavior_detector: Option<Arc<RwLock<icn_security::MisbehaviorDetector>>>,
 
     /// Network partition detector (Phase 18 Week 3 - optional)
     pub(crate) partition_detector: Option<Arc<RwLock<crate::partition::PartitionDetector>>>,
@@ -213,10 +213,10 @@ pub struct GossipActor {
     storage_quota_manager: Option<Arc<RwLock<icn_store::StorageQuotaManager>>>,
 
     /// Bloom filter resize configuration (M2 - dynamic sizing)
-    bloom_resize_config: crate::bloom::BloomResizeConfig,
+    pub(crate) bloom_resize_config: crate::bloom::BloomResizeConfig,
 
     /// Adaptive fanout configuration (M2 #484 - dynamic fanout based on network size)
-    adaptive_fanout_config: crate::types::AdaptiveFanoutConfig,
+    pub(crate) adaptive_fanout_config: crate::types::AdaptiveFanoutConfig,
 
     /// Topic auto-creation policy (Issue #473 - strict defaults)
     /// Controls what happens when publishing to an undeclared topic
@@ -776,7 +776,7 @@ impl GossipActor {
 
     /// Send a message with scope-aware peer selection
     /// If peer_sampling is set, samples peers based on scope. Otherwise falls back to broadcast.
-    fn send_message_scoped(
+    pub(crate) fn send_message_scoped(
         &self,
         scope: crate::types::Scope,
         fanout: usize,
@@ -1067,266 +1067,9 @@ impl GossipActor {
             .and_then(|entries| entries.get(hash).cloned())
     }
 
-    /// Subscribe to a topic
-    #[instrument(skip(self), fields(topic = %topic, subscriber = %subscriber))]
-    pub async fn subscribe(&mut self, topic: &str, subscriber: Did) -> Result<Subscription> {
-        let topic_obj = self.topics.get(topic).context("Topic not found")?;
-
-        // Priority 1: Check fine-grained trust threshold (if configured)
-        if let Some(threshold) = topic_obj.min_trust_threshold {
-            if let Some(trust_graph) = &self.trust_graph {
-                // Get trust score from cache or compute it async
-                let trust_score = if let Some(cached) = self.trust_cache.get(&subscriber) {
-                    cached
-                } else {
-                    // Compute async and cache
-                    let graph = trust_graph.read().await;
-                    let score = graph.compute_trust_score(&subscriber).unwrap_or(0.0);
-                    self.trust_cache.insert(&subscriber, score);
-                    score
-                };
-
-                // Enforce trust threshold
-                if trust_score < threshold {
-                    warn!(
-                        "🔒 Subscription rejected: DID {} to topic {} (trust score: {:.3} < threshold: {:.3})",
-                        subscriber, topic, trust_score, threshold
-                    );
-
-                    // Track rejection metrics
-                    icn_obs::metrics::gossip::subscriptions_rejected_inc(topic, trust_score);
-
-                    // Record misbehavior violation (fire-and-forget, non-blocking)
-                    if let Some(ref detector) = self.misbehavior_detector {
-                        use sha2::{Digest, Sha256};
-                        let mut hasher = Sha256::new();
-                        hasher.update(subscriber.as_str().as_bytes());
-                        hasher.update(topic.as_bytes());
-                        hasher.update(b"unauthorized_subscription");
-                        let evidence = hasher.finalize().to_vec();
-
-                        let violation = icn_security::Violation::ExcessiveResourceUse {
-                            metric: format!("unauthorized_subscription:{topic}"),
-                            observed: 1,
-                            limit: 0,
-                        };
-
-                        spawn_violation_recording(
-                            Arc::clone(detector),
-                            subscriber.clone(),
-                            violation,
-                            evidence,
-                        );
-                    }
-
-                    bail!("Insufficient trust: score {trust_score:.3} < required {threshold:.3}");
-                }
-
-                info!(
-                    "✅ Subscription authorized: DID {} to topic {} (trust score: {:.3})",
-                    subscriber, topic, trust_score
-                );
-            } else {
-                warn!(
-                    "Topic {} has min_trust_threshold {:.3} but GossipActor has no trust_graph - falling back to ACL check",
-                    topic, threshold
-                );
-            }
-        }
-
-        // Priority 2: Check AccessControl-based ACL (coarse-grained)
-        let trust_class = (self.trust_lookup)(&subscriber);
-        if !topic_obj.can_subscribe(&subscriber, trust_class) {
-            // Record misbehavior violation (fire-and-forget, non-blocking)
-            if let Some(ref detector) = self.misbehavior_detector {
-                use sha2::{Digest, Sha256};
-                let mut hasher = Sha256::new();
-                hasher.update(subscriber.as_str().as_bytes());
-                hasher.update(topic.as_bytes());
-                hasher.update(b"acl_violation");
-                let evidence = hasher.finalize().to_vec();
-
-                let violation = icn_security::Violation::ExcessiveResourceUse {
-                    metric: format!("acl_violation:{topic}"),
-                    observed: 1,
-                    limit: 0,
-                };
-
-                spawn_violation_recording(
-                    Arc::clone(detector),
-                    subscriber.clone(),
-                    violation,
-                    evidence,
-                );
-            }
-
-            bail!("Not authorized to subscribe to topic: {topic}");
-        }
-
-        // Check per-peer subscription limit (trust-weighted)
-        // This prevents a single peer from subscribing to too many topics
-        let peer_topics = self.get_subscriptions(&subscriber);
-        let peer_limit = topics_per_peer_limit(trust_class);
-        if peer_topics.len() >= peer_limit {
-            // Record misbehavior violation (fire-and-forget, non-blocking)
-            if let Some(ref detector) = self.misbehavior_detector {
-                use sha2::{Digest, Sha256};
-                let mut hasher = Sha256::new();
-                hasher.update(subscriber.as_str().as_bytes());
-                hasher.update(b"peer_subscription_limit");
-                let evidence = hasher.finalize().to_vec();
-
-                let violation = icn_security::Violation::ExcessiveResourceUse {
-                    metric: "peer_subscriptions".to_string(),
-                    observed: (peer_topics.len() + 1) as u64,
-                    limit: peer_limit as u64,
-                };
-
-                spawn_violation_recording(
-                    Arc::clone(detector),
-                    subscriber.clone(),
-                    violation,
-                    evidence,
-                );
-            }
-
-            warn!(
-                "Per-peer subscription limit reached: {} has {} subscriptions (max {})",
-                subscriber,
-                peer_topics.len(),
-                peer_limit
-            );
-            icn_obs::metrics::gossip::subscriptions_rejected_inc(topic, 0.0);
-            bail!(
-                "Peer subscription limit reached: {} subscriptions (max {})",
-                peer_topics.len(),
-                peer_limit
-            );
-        }
-
-        // Add subscriber
-        let subscribers = self.subscriptions.entry(topic.to_string()).or_default();
-
-        if !subscribers.contains(&subscriber) {
-            // Check per-topic subscriber limit to prevent unbounded growth
-            if subscribers.len() >= MAX_SUBSCRIBERS_PER_TOPIC {
-                // Record misbehavior violation (fire-and-forget, non-blocking)
-                if let Some(ref detector) = self.misbehavior_detector {
-                    use sha2::{Digest, Sha256};
-                    let mut hasher = Sha256::new();
-                    hasher.update(subscriber.as_str().as_bytes());
-                    hasher.update(topic.as_bytes());
-                    hasher.update(b"subscriber_limit");
-                    let evidence = hasher.finalize().to_vec();
-
-                    let violation = icn_security::Violation::ExcessiveResourceUse {
-                        metric: format!("topic_subscribers:{topic}"),
-                        observed: (subscribers.len() + 1) as u64,
-                        limit: MAX_SUBSCRIBERS_PER_TOPIC as u64,
-                    };
-
-                    spawn_violation_recording(
-                        Arc::clone(detector),
-                        subscriber.clone(),
-                        violation,
-                        evidence,
-                    );
-                }
-
-                bail!(
-                    "Topic subscription limit reached: {} (max {})",
-                    subscribers.len(),
-                    MAX_SUBSCRIBERS_PER_TOPIC
-                );
-            }
-
-            subscribers.push(subscriber.clone());
-            info!(
-                subscriber_did = %subscriber,
-                topic = %topic,
-                subscriber_count = subscribers.len(),
-                "Subscribed to topic"
-            );
-
-            // Update metrics
-            self.update_gauge_metrics();
-        }
-
-        Ok(Subscription {
-            topic: topic.to_string(),
-            subscriber,
-        })
-    }
-
-    /// Unsubscribe from a topic
-    pub fn unsubscribe(&mut self, topic: &str, subscriber: &Did) -> Result<()> {
-        let subscribers = self
-            .subscriptions
-            .get_mut(topic)
-            .context("Topic not found")?;
-
-        if let Some(pos) = subscribers.iter().position(|did| did == subscriber) {
-            subscribers.remove(pos);
-            info!(
-                subscriber_did = %subscriber,
-                topic = %topic,
-                subscriber_count = subscribers.len(),
-                "Unsubscribed from topic"
-            );
-
-            // Update metrics
-            self.update_gauge_metrics();
-        }
-
-        Ok(())
-    }
-
-    /// Get all subscribers for a topic
-    pub fn get_subscribers(&self, topic: &str) -> Vec<Did> {
-        self.subscriptions.get(topic).cloned().unwrap_or_default()
-    }
-
-    /// Get all topics a DID is subscribed to
-    pub fn get_subscriptions(&self, did: &Did) -> Vec<String> {
-        self.subscriptions
-            .iter()
-            .filter_map(|(topic, subscribers)| {
-                if subscribers.contains(did) {
-                    Some(topic.clone())
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
-
-    /// Check if a DID is subscribed to a topic
-    pub fn is_subscribed(&self, topic: &str, did: &Did) -> bool {
-        self.subscriptions
-            .get(topic)
-            .map(|subs| subs.contains(did))
-            .unwrap_or(false)
-    }
-
-    /// Get bloom filter for a topic
-    pub fn get_bloom_filter(&self, topic: &str) -> Option<BloomFilter> {
-        self.bloom_filters.get(topic).cloned()
-    }
-
-    /// Find missing entries based on remote bloom filter
-    pub fn find_missing(&self, topic: &str, remote_filter: &BloomFilter) -> Vec<ContentHash> {
-        let mut missing = Vec::new();
-
-        if let Some(entries) = self.entries.get(topic) {
-            for hash in entries.keys() {
-                if !remote_filter.contains(hash) {
-                    missing.push(*hash);
-                }
-            }
-        }
-
-        missing
-    }
+    // Subscription methods moved to subscriptions.rs module
+    // Anti-entropy methods moved to anti_entropy.rs module
+    // Message handling moved to protocol.rs module
 
     // Note: Legacy dead code removed in Phase 29 (#155):
     // - get_topic_hashes() - unused helper
@@ -1334,172 +1077,6 @@ impl GossipActor {
     // - find_entries_to_pull() - incomplete implementation, never used
     // The gossip protocol uses Digest → PullRequest → PullResponse flow.
     // See handle_digest(), handle_pull_request(), handle_pull_response().
-
-    /// Handle incoming gossip message from network
-    #[instrument(skip(self, message), fields(peer_did = %sender, message_type = message.variant_name()))]
-    pub async fn handle_message(&mut self, sender: &Did, message: GossipMessage) -> Result<()> {
-        // Issue #181: Track message processing latency
-        let start = std::time::Instant::now();
-        let result = self.handle_message_inner(sender, message).await;
-        let elapsed = start.elapsed().as_secs_f64();
-        icn_obs::metrics::gossip::message_latency_record(elapsed);
-        result
-    }
-
-    /// Inner implementation of handle_message (for latency tracking)
-    async fn handle_message_inner(&mut self, sender: &Did, message: GossipMessage) -> Result<()> {
-        // H7 fix: Trust-gated message handling
-        // Check sender's trust score before processing messages
-        const MIN_TRUST_FOR_MESSAGE: f64 = 0.1; // Known trust class minimum
-
-        if let Some(ref trust_graph) = self.trust_graph {
-            if let Ok(tg) = trust_graph.try_read() {
-                match tg.compute_trust_score(sender) {
-                    Ok(score) if score < MIN_TRUST_FOR_MESSAGE => {
-                        warn!(
-                            peer_did = %sender,
-                            trust_score = score,
-                            min_required = MIN_TRUST_FOR_MESSAGE,
-                            message_type = message.variant_name(),
-                            "Rejecting message from low-trust sender"
-                        );
-                        icn_obs::metrics::gossip::messages_rejected_low_trust_inc();
-                        anyhow::bail!(
-                            "Message sender {sender} has insufficient trust ({score:.3} < {MIN_TRUST_FOR_MESSAGE:.3})"
-                        );
-                    }
-                    Ok(_) => {
-                        // Trust validated successfully
-                    }
-                    Err(e) => {
-                        // Unknown sender - reject by default
-                        debug!(
-                            peer_did = %sender,
-                            error = %e,
-                            "Cannot compute trust score for message sender"
-                        );
-                        icn_obs::metrics::gossip::messages_rejected_low_trust_inc();
-                        anyhow::bail!("Cannot verify trust for message sender {sender}: {e}");
-                    }
-                }
-            }
-            // If we can't acquire lock, skip trust check (avoid blocking)
-        }
-
-        // Phase 18 Week 3: Record contact for partition detection
-        if let Some(ref detector) = self.partition_detector {
-            if let Ok(mut d) = detector.try_write() {
-                d.record_contact(sender);
-            }
-        }
-
-        // Dispatch to handler methods (extracted to handlers/ module)
-        match message {
-            GossipMessage::Announce {
-                hash,
-                author,
-                clock: _,
-                topic,
-            } => self.handle_announce(sender, hash, author, topic),
-
-            GossipMessage::Request { hash } => self.handle_request(sender, hash),
-
-            GossipMessage::Response { entry } => self.handle_response(sender, entry).await,
-
-            GossipMessage::RequestBloomFilter { topic } => {
-                self.handle_request_bloom_filter(sender, topic)
-            }
-
-            GossipMessage::SendBloomFilter { topic, filter } => {
-                self.handle_send_bloom_filter(sender, topic, filter)
-            }
-
-            GossipMessage::RequestMissing { hashes } => self.handle_request_missing(sender, hashes),
-
-            GossipMessage::Digest {
-                topic,
-                vector,
-                bloom,
-                hint_count,
-                nonce,
-            } => self.handle_digest(sender, topic, vector, bloom, hint_count, nonce),
-
-            GossipMessage::PullRequest {
-                topic,
-                want_ids,
-                max_bytes,
-                nonce,
-                cursor,
-            } => self.handle_pull_request(sender, topic, want_ids, max_bytes, nonce, cursor),
-
-            GossipMessage::PullResponse {
-                topic,
-                entries,
-                truncated,
-                nonce,
-                next_cursor,
-            } => {
-                self.handle_pull_response(sender, topic, entries, truncated, nonce, next_cursor)
-                    .await
-            }
-
-            GossipMessage::BlobAnnounce {
-                blob_hash,
-                peer_did,
-                size_bytes,
-            } => self.handle_blob_announce(sender, blob_hash, peer_did, size_bytes),
-
-            GossipMessage::ReplicaRequest {
-                content_hash,
-                requesting_peer,
-            } => self.handle_replica_request(sender, content_hash, requesting_peer),
-
-            GossipMessage::ReplicaOffer {
-                content_hash,
-                offering_peer,
-                health,
-            } => self.handle_replica_offer(sender, content_hash, offering_peer, health),
-
-            GossipMessage::ReplicaStatus {
-                content_hash,
-                replicas,
-            } => self.handle_replica_status(sender, content_hash, replicas),
-
-            GossipMessage::PartitionHealRequest {
-                requesting_peer,
-                vector_clock,
-                last_contact_ms,
-            } => self.handle_partition_heal_request(
-                sender,
-                requesting_peer,
-                vector_clock,
-                last_contact_ms,
-            ),
-
-            GossipMessage::PartitionHealResponse {
-                responding_peer,
-                vector_clock,
-                diverged_topics,
-                entries_behind,
-            } => self.handle_partition_heal_response(
-                sender,
-                responding_peer,
-                vector_clock,
-                diverged_topics,
-                entries_behind,
-            ),
-
-            GossipMessage::StorageChallengeMsg { challenge } => {
-                self.handle_storage_challenge(sender, challenge)
-            }
-
-            GossipMessage::StorageProofMsg { proof } => self.handle_storage_proof(sender, proof),
-
-            GossipMessage::StorageContentNotFoundMsg { response } => {
-                self.handle_storage_content_not_found(sender, response)
-            }
-        }
-    }
 
     /// Initiate partition healing with a peer (Phase 18 Week 3)
     ///
@@ -1549,28 +1126,6 @@ impl GossipActor {
 
     /// Perform anti-entropy for a specific topic
     ///
-    /// Returns the bloom filter for the topic and a list of missing hashes
-    /// to request from the remote peer.
-    pub fn anti_entropy_check(
-        &self,
-        topic: &str,
-        remote_filter_data: &crate::types::BloomFilterData,
-    ) -> Result<(crate::types::BloomFilterData, Vec<ContentHash>)> {
-        // Get our bloom filter
-        let local_filter = self.get_bloom_filter(topic).context("Topic not found")?;
-
-        // Reconstruct remote bloom filter
-        let remote_filter = BloomFilter::from_data(remote_filter_data);
-
-        // Find entries we have that remote doesn't
-        let missing_on_remote = self.find_missing(topic, &remote_filter);
-
-        // Serialize our bloom filter for sending
-        let local_filter_data = local_filter.to_data();
-
-        Ok((local_filter_data, missing_on_remote))
-    }
-
     /// Update gauge metrics for topics and entries
     pub(crate) fn update_gauge_metrics(&self) {
         // Count total topics
@@ -1583,95 +1138,6 @@ impl GossipActor {
         // Count total subscriptions across all topics
         let total_subscriptions: usize = self.subscriptions.values().map(|subs| subs.len()).sum();
         icn_obs::metrics::gossip::subscriptions_total_set(total_subscriptions as u64);
-    }
-
-    /// Emit a Digest message for a topic to all peers
-    ///
-    /// This broadcasts our current state (vector clock + bloom filter) to help peers
-    /// discover what entries we have. Peers can then send PullRequests for entries
-    /// they're missing.
-    pub fn emit_digest(&mut self, topic: &str) -> Result<()> {
-        // Check if topic exists
-        if !self.topics.contains_key(topic) {
-            debug!("Skipping digest for non-existent topic: {}", topic);
-            return Ok(());
-        }
-
-        // Get entry count for adaptive bloom sizing
-        let entry_count = self.entries.get(topic).map(|e| e.len()).unwrap_or(0);
-
-        if entry_count == 0 {
-            debug!("Skipping digest for empty topic: {}", topic);
-            return Ok(());
-        }
-
-        // Build adaptive bloom filter
-        let bloom = BloomFilter::new_adaptive(entry_count);
-        let mut bloom_with_entries = bloom;
-
-        // Add all entry hashes to bloom filter
-        if let Some(entries) = self.entries.get(topic) {
-            for hash in entries.keys() {
-                bloom_with_entries.insert(hash);
-            }
-        }
-
-        // Convert to BloomFilterData for transmission
-        let bloom_data = bloom_with_entries.to_data();
-
-        // Generate nonce for this digest (using own DID as peer state key)
-        let nonce = self
-            .peer_sync
-            .get_or_create(self.own_did.clone())
-            .next_nonce();
-
-        // Create Digest message
-        let digest = GossipMessage::Digest {
-            topic: topic.to_string(),
-            vector: self.clock.clone(),
-            bloom: bloom_data,
-            hint_count: entry_count as u32,
-            nonce,
-        };
-
-        // Get topic scope and calculate adaptive fanout (#484)
-        // SAFETY: topic existence was checked above via contains_key()
-        #[allow(clippy::unwrap_used)]
-        let topic_obj = self.topics.get(topic).unwrap();
-        let scope = topic_obj.scope;
-
-        // M2 #484: Calculate adaptive fanout based on network size
-        let network_size = self.peer_sync.peer_count();
-        let fanout = self
-            .adaptive_fanout_config
-            .calculate_fanout(network_size, &scope);
-
-        // Send with scope-aware peer selection
-        debug!(
-            "Emitting digest for topic {} ({:?} scope, fanout={}, peers={}): {} entries, nonce={}",
-            topic, scope, fanout, network_size, entry_count, nonce
-        );
-        self.send_message_scoped(scope, fanout, digest);
-
-        // Track metrics
-        icn_obs::metrics::gossip::digests_sent_inc();
-        icn_obs::metrics::gossip::adaptive_fanout_record(&scope.to_string(), fanout, network_size);
-
-        Ok(())
-    }
-
-    /// Emit digests for all topics
-    ///
-    /// This is typically called periodically by a background task to broadcast
-    /// our current state to all peers.
-    pub fn emit_all_digests(&mut self) -> Result<()> {
-        let topics: Vec<String> = self.topics.keys().cloned().collect();
-
-        for topic in topics {
-            self.emit_digest(&topic)?;
-        }
-
-        Ok(())
     }
 
     /// Hash data to create content hash
