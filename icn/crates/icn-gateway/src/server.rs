@@ -413,7 +413,8 @@ impl GatewayServer {
 
         let compute_manager = if let Some(handle) = self.compute_handle {
             info!("Compute manager connected to daemon");
-            Arc::new(ComputeManager::with_handle(handle))
+            let service = Arc::new(icn_api::ComputeService::new(handle));
+            Arc::new(ComputeManager::with_service(service))
         } else {
             info!("Compute manager running standalone (no daemon connection)");
             Arc::new(ComputeManager::new())

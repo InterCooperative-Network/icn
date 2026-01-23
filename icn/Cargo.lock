@@ -3025,6 +3025,7 @@ dependencies = [
  "futures",
  "futures-util",
  "hex",
+ "icn-api",
  "icn-ccl",
  "icn-community",
  "icn-compute",
