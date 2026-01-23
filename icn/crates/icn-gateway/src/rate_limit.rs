@@ -523,15 +523,20 @@ impl TrustRateLimiter {
 
     /// Check if request should be allowed for a DID
     pub async fn check(&self, did: &str) -> Result<(), GatewayError> {
-        // Parse DID for trust lookup
-        let did_parsed = Did::from_str(did)
-            .map_err(|e| GatewayError::InternalError(format!("Invalid DID: {e}")))?;
+        // Handle synthetic anonymous DIDs specially (always Isolated class)
+        // Format: did:icn:anonymous:{ip} - used by middleware for unauthenticated requests
+        let trust_score = if did.starts_with("did:icn:anonymous:") {
+            0.0 // Anonymous users are always Isolated
+        } else {
+            // Parse DID for trust lookup
+            let did_parsed = Did::from_str(did)
+                .map_err(|e| GatewayError::InternalError(format!("Invalid DID: {e}")))?;
 
-        // Get trust score for this DID from the node's perspective
-        let trust_score = self
-            .trust_manager
-            .compute_trust_score_for_velocity(&did_parsed)
-            .await;
+            // Get trust score for this DID from the node's perspective
+            self.trust_manager
+                .compute_trust_score_for_velocity(&did_parsed)
+                .await
+        };
 
         // Get appropriate limits for this trust class
         let (capacity, refill_rate) = self.config.params_for_trust(trust_score);
@@ -548,8 +553,18 @@ impl TrustRateLimiter {
             .or_insert_with(|| (TokenBucket::new(capacity, refill_rate), trust_score));
 
         // If trust class changed, update bucket configuration
-        if (*last_trust - trust_score).abs() >= 0.1 {
+        let old_class = TrustRateLimitConfig::trust_class_name(*last_trust);
+        let new_class = TrustRateLimitConfig::trust_class_name(trust_score);
+        if old_class != new_class {
             // Trust class boundary crossed, reconfigure bucket
+            tracing::debug!(
+                did = %did,
+                old_class = %old_class,
+                new_class = %new_class,
+                old_trust = %*last_trust,
+                new_trust = %trust_score,
+                "Trust class changed, reconfiguring rate limit bucket"
+            );
             *bucket = TokenBucket::new(capacity, refill_rate);
             *last_trust = trust_score;
         }
@@ -619,8 +634,14 @@ pub async fn trust_rate_limit_middleware(
         Some(d) => d,
         None => {
             // No claims means unauthenticated request
-            // Use synthetic anonymous DID (treated as Isolated)
-            "did:icn:anonymous".to_string()
+            // Use synthetic anonymous DID with IP suffix (treated as Isolated)
+            // Each IP gets its own bucket to prevent sharing across anonymous users
+            let ip = req
+                .connection_info()
+                .peer_addr()
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| "unknown".to_string());
+            format!("did:icn:anonymous:{ip}")
         }
     };
 

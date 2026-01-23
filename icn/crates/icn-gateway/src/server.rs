@@ -873,6 +873,15 @@ impl GatewayServer {
                 .app_data(web::Data::new(rate_limiter.clone()))
                 .app_data(web::Data::new(ip_rate_limiter.clone()))
                 .app_data(web::Data::new(velocity_limiter.clone()))
+                // Trust rate limiter (conditional - for trust-gated rate limiting)
+                .configure({
+                    let trust_limiter = trust_rate_limiter.clone();
+                    move |cfg| {
+                        if let Some(ref limiter) = trust_limiter {
+                            cfg.app_data(web::Data::new(limiter.clone()));
+                        }
+                    }
+                })
                 // Contract registry (optional - for contract management API)
                 .app_data(web::Data::new(contract_registry.clone()))
                 // Agreement manager (optional - for inter-cooperative agreements)

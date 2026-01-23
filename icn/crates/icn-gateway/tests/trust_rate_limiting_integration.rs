@@ -136,10 +136,12 @@ async fn test_trust_rate_limiter_partner_peer() {
     let (_self_kp, self_did) = create_test_did("self");
     let mut trust_graph = create_test_trust_graph(self_did.clone()).await;
 
-    // Create a partner peer with trust score 0.5 (Partner class: 0.4-0.7)
+    // Create a partner peer with trust score in Partner class (0.4-0.7)
+    // Note: compute_trust_score uses weights: direct * 0.7 + transitive * 0.3
+    // So edge score 0.7 → actual score 0.7 * 0.7 = 0.49 (Partner class)
     let (_peer_kp, peer_did) = create_test_did("partner_peer");
     trust_graph
-        .add_edge(TrustEdge::new(self_did.clone(), peer_did.clone(), 0.5))
+        .add_edge(TrustEdge::new(self_did.clone(), peer_did.clone(), 0.7))
         .expect("Failed to add trust edge");
 
     let trust_graph = Arc::new(RwLock::new(trust_graph));
@@ -180,10 +182,12 @@ async fn test_trust_rate_limiter_federated_peer() {
     let (_self_kp, self_did) = create_test_did("self");
     let mut trust_graph = create_test_trust_graph(self_did.clone()).await;
 
-    // Create a federated peer with trust score 0.8 (Federated class: >= 0.7)
+    // Create a federated peer with trust score in Federated class (>= 0.7)
+    // Note: compute_trust_score uses weights: direct * 0.7 + transitive * 0.3
+    // So edge score 1.0 → actual score 1.0 * 0.7 = 0.7 (Federated class)
     let (_peer_kp, peer_did) = create_test_did("federated_peer");
     trust_graph
-        .add_edge(TrustEdge::new(self_did.clone(), peer_did.clone(), 0.8))
+        .add_edge(TrustEdge::new(self_did.clone(), peer_did.clone(), 1.0))
         .expect("Failed to add trust edge");
 
     let trust_graph = Arc::new(RwLock::new(trust_graph));
@@ -222,7 +226,7 @@ async fn test_trust_rate_limiter_federated_peer() {
 async fn test_trust_rate_limiter_trust_upgrade() {
     // Create trust graph with self-DID
     let (_self_kp, self_did) = create_test_did("self");
-    let mut trust_graph = create_test_trust_graph(self_did.clone()).await;
+    let trust_graph = create_test_trust_graph(self_did.clone()).await;
 
     // Create a peer starting as Isolated (no trust edge)
     let (_peer_kp, peer_did) = create_test_did("upgrading_peer");
@@ -251,11 +255,13 @@ async fn test_trust_rate_limiter_trust_upgrade() {
         "Should be rate limited as Isolated"
     );
 
-    // Now upgrade the peer to Partner (0.5)
+    // Now upgrade the peer to Partner class
+    // Note: compute_trust_score uses weights: direct * 0.7 + transitive * 0.3
+    // So edge score 0.7 → actual score 0.7 * 0.7 = 0.49 (Partner class)
     {
         let mut graph = trust_graph.write().await;
         graph
-            .add_edge(TrustEdge::new(self_did.clone(), peer_did.clone(), 0.5))
+            .add_edge(TrustEdge::new(self_did.clone(), peer_did.clone(), 0.7))
             .expect("Failed to add trust edge");
     }
 
@@ -299,10 +305,9 @@ async fn test_trust_rate_limiter_anonymous_request() {
     };
     let rate_limiter = TrustRateLimiter::new(trust_manager, config);
 
-    // Use a valid DID format for anonymous (synthetic keypair with all zeros)
-    let anonymous_kp =
-        KeyPair::from_bytes(&[0u8; 32], &[0u8; 32]).expect("Failed to create anonymous keypair");
-    let anonymous_did = anonymous_kp.did().to_string();
+    // Use synthetic anonymous DID format (matches middleware behavior)
+    // In the middleware, anonymous users get did:icn:anonymous:{ip}
+    let anonymous_did = "did:icn:anonymous:127.0.0.1".to_string();
 
     // Should use Isolated limits (burst = 2)
     let result1 = rate_limiter.check(&anonymous_did).await;
