@@ -242,6 +242,7 @@ pub enum TaskPriorityParam {
 
 impl TaskPriorityParam {
     /// Parse from string (case-insensitive)
+    #[allow(clippy::should_implement_trait)] // Returns Self, not Result, so FromStr doesn't fit
     pub fn from_str(s: &str) -> Self {
         match s.to_lowercase().as_str() {
             "low" => TaskPriorityParam::Low,
