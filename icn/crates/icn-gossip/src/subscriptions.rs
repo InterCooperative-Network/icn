@@ -1,13 +1,17 @@
 //! Topic subscription management
 
-use crate::gossip::{spawn_violation_recording, topics_per_peer_limit, GossipActor, MAX_SUBSCRIBERS_PER_TOPIC};
+use crate::gossip::{
+    spawn_violation_recording, topics_per_peer_limit, GossipActor, MAX_SUBSCRIBERS_PER_TOPIC,
+};
 use crate::types::Subscription;
 use anyhow::{bail, Context as _, Result};
 use icn_identity::Did;
-use tracing::{info, warn};
+use std::sync::Arc;
+use tracing::{info, instrument, warn};
 
 impl GossipActor {
     /// Subscribe to a topic
+    #[instrument(skip(self), fields(topic = %topic, subscriber = %subscriber))]
     pub async fn subscribe(&mut self, topic: &str, subscriber: Did) -> Result<Subscription> {
         let topic_obj = self.topics.get(topic).context("Topic not found")?;
 
@@ -51,7 +55,7 @@ impl GossipActor {
                         };
 
                         spawn_violation_recording(
-                            std::sync::Arc::clone(detector),
+                            Arc::clone(detector),
                             subscriber.clone(),
                             violation,
                             evidence,
@@ -92,7 +96,7 @@ impl GossipActor {
                 };
 
                 spawn_violation_recording(
-                    std::sync::Arc::clone(detector),
+                    Arc::clone(detector),
                     subscriber.clone(),
                     violation,
                     evidence,
@@ -122,7 +126,7 @@ impl GossipActor {
                 };
 
                 spawn_violation_recording(
-                    std::sync::Arc::clone(detector),
+                    Arc::clone(detector),
                     subscriber.clone(),
                     violation,
                     evidence,
@@ -165,7 +169,7 @@ impl GossipActor {
                     };
 
                     spawn_violation_recording(
-                        std::sync::Arc::clone(detector),
+                        Arc::clone(detector),
                         subscriber.clone(),
                         violation,
                         evidence,
