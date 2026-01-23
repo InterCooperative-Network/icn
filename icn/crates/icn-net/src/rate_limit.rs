@@ -763,7 +763,7 @@ mod tests {
     #[tokio::test]
     async fn test_trust_gated_rate_limiting_different_classes() {
         use icn_store::SledStore;
-        use icn_trust::{TrustEdge, TrustGraph};
+        use icn_trust::{TrustEdge, TrustGraph, TrustScore};
 
         // Create temporary store and trust graph
         let store = Arc::new(SledStore::temporary().unwrap());
@@ -784,21 +784,21 @@ mod tests {
             .add_edge(TrustEdge::new(
                 own_keypair.did().clone(),
                 known_peer.clone(),
-                0.3,
+                TrustScore::unchecked(0.3),
             ))
             .unwrap();
         graph
             .add_edge(TrustEdge::new(
                 own_keypair.did().clone(),
                 partner_peer.clone(),
-                0.7,
+                TrustScore::unchecked(0.7),
             ))
             .unwrap();
         graph
             .add_edge(TrustEdge::new(
                 own_keypair.did().clone(),
                 federated_peer.clone(),
-                1.0,
+                TrustScore::unchecked(1.0),
             ))
             .unwrap();
 
@@ -834,7 +834,7 @@ mod tests {
     #[tokio::test]
     async fn test_trust_gated_rate_limiting_trust_class_change() {
         use icn_store::SledStore;
-        use icn_trust::{TrustEdge, TrustGraph};
+        use icn_trust::{TrustEdge, TrustGraph, TrustScore};
 
         // Create temporary store and trust graph
         let store = Arc::new(SledStore::temporary().unwrap());
@@ -847,7 +847,11 @@ mod tests {
         // Start with low trust (Known = burst 10)
         // Direct score 0.3 -> final 0.21 = Known class
         graph
-            .add_edge(TrustEdge::new(own_keypair.did().clone(), peer.clone(), 0.3))
+            .add_edge(TrustEdge::new(
+                own_keypair.did().clone(),
+                peer.clone(),
+                TrustScore::unchecked(0.3),
+            ))
             .unwrap();
 
         // Create trust-gated rate limiter
@@ -868,7 +872,11 @@ mod tests {
         {
             let mut graph = graph_handle.write().await;
             graph
-                .add_edge(TrustEdge::new(own_keypair.did().clone(), peer.clone(), 1.0))
+                .add_edge(TrustEdge::new(
+                    own_keypair.did().clone(),
+                    peer.clone(),
+                    TrustScore::unchecked(1.0),
+                ))
                 .unwrap();
         }
 

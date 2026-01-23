@@ -10,7 +10,7 @@ use anyhow::Result;
 use icn_identity::{IdentityBundle, KeyPair};
 use icn_net::{IncomingMessageHandler, NetworkActor, NetworkMessage};
 use icn_store::SledStore;
-use icn_trust::{TrustEdge, TrustGraph};
+use icn_trust::{TrustEdge, TrustGraph, TrustScore};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -215,7 +215,11 @@ async fn test_client_cert_verification_allows_trusted_peer() -> Result<()> {
     // Create Alice with trust graph that trusts Bob
     let alice_store: Arc<dyn icn_store::Store> = Arc::new(SledStore::temporary()?);
     let mut alice_trust_graph = TrustGraph::new(alice_store, alice_did.clone());
-    alice_trust_graph.add_edge(TrustEdge::new(alice_did.clone(), bob_did.clone(), 0.8))?;
+    alice_trust_graph.add_edge(TrustEdge::new(
+        alice_did.clone(),
+        bob_did.clone(),
+        TrustScore::unchecked(0.8),
+    ))?;
     let alice_trust = Arc::new(RwLock::new(alice_trust_graph));
 
     let (alice_shutdown_tx, _) = broadcast::channel(1);
@@ -486,7 +490,11 @@ async fn test_did_tls_binding_verified_on_hello() -> Result<()> {
     // Alice trusts Bob
     let alice_store: Arc<dyn icn_store::Store> = Arc::new(SledStore::temporary()?);
     let mut alice_trust_graph = TrustGraph::new(alice_store, alice_did.clone());
-    alice_trust_graph.add_edge(TrustEdge::new(alice_did.clone(), bob_did.clone(), 0.9))?;
+    alice_trust_graph.add_edge(TrustEdge::new(
+        alice_did.clone(),
+        bob_did.clone(),
+        TrustScore::unchecked(0.9),
+    ))?;
     let alice_trust = Arc::new(RwLock::new(alice_trust_graph));
 
     let (alice_shutdown_tx, _) = broadcast::channel(1);
@@ -515,7 +523,11 @@ async fn test_did_tls_binding_verified_on_hello() -> Result<()> {
     // Bob with valid binding and trust graph (Bob trusts Alice)
     let bob_store: Arc<dyn icn_store::Store> = Arc::new(SledStore::temporary()?);
     let mut bob_trust_graph = TrustGraph::new(bob_store, bob_did.clone());
-    bob_trust_graph.add_edge(TrustEdge::new(bob_did.clone(), alice_did.clone(), 0.9))?;
+    bob_trust_graph.add_edge(TrustEdge::new(
+        bob_did.clone(),
+        alice_did.clone(),
+        TrustScore::unchecked(0.9),
+    ))?;
     let bob_trust = Arc::new(RwLock::new(bob_trust_graph));
 
     let (bob_shutdown_tx, _) = broadcast::channel(1);

@@ -9,7 +9,7 @@ use tracing::{debug, info, warn};
 use icn_identity::Did;
 use icn_security::{MisbehaviorDetector, MisbehaviorThresholds, TrustPenaltyCallback};
 use icn_store::SledStore;
-use icn_trust::{TrustClass, TrustEdge, TrustGraph};
+use icn_trust::{TrustClass, TrustEdge, TrustGraph, TrustScore};
 
 use crate::config::Config;
 
@@ -130,11 +130,15 @@ fn create_trust_penalty_callback(
             rt.block_on(async {
                 // Map reputation (0.0-1.0) to trust score (0.0-1.0)
                 // Reputation below 0.5 becomes untrusted (<0.1)
-                let trust_score = if reputation_score < 0.5 {
-                    reputation_score * 0.2 // 0.5 → 0.1, 0.0 → 0.0
+                // Clamp to valid range to be defensive
+                let reputation_clamped = reputation_score.clamp(0.0, 1.0);
+                let trust_value = if reputation_clamped < 0.5 {
+                    reputation_clamped * 0.2 // 0.5 → 0.1, 0.0 → 0.0
                 } else {
-                    reputation_score // Keep 0.5-1.0 range
+                    reputation_clamped // Keep 0.5-1.0 range
                 };
+                // Safe to use unchecked because trust_value is guaranteed to be in [0.0, 1.0]
+                let trust_score = TrustScore::unchecked(trust_value);
 
                 let mut graph = graph.write().await;
                 let edge = TrustEdge::new(own.clone(), peer.clone(), trust_score);

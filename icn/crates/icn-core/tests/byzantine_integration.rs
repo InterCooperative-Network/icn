@@ -11,7 +11,7 @@ use icn_gossip::{AccessControl, GossipActor, Topic};
 use icn_identity::{Did, KeyPair};
 use icn_security::{MisbehaviorDetector, MisbehaviorThresholds, Violation};
 use icn_store::SledStore;
-use icn_trust::{TrustClass, TrustEdge, TrustGraph};
+use icn_trust::{TrustClass, TrustEdge, TrustGraph, TrustScore};
 use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
@@ -89,7 +89,7 @@ impl TestNode {
     /// Set trust edge for a peer
     async fn set_trust(&self, peer: &Did, score: f64) -> Result<()> {
         let mut graph = self.trust_graph.write().await;
-        let edge = TrustEdge::new(self.did.clone(), peer.clone(), score);
+        let edge = TrustEdge::new(self.did.clone(), peer.clone(), TrustScore::unchecked(score));
         graph.add_edge(edge)?;
         Ok(())
     }

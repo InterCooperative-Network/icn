@@ -240,7 +240,16 @@ impl IdentityActor {
                 labels,
                 response,
             } => {
-                let mut edge = icn_trust::TrustEdge::new(self.keypair.did().clone(), target, score);
+                // Validate and convert score to TrustScore
+                let trust_score = match icn_trust::TrustScore::new(score) {
+                    Ok(s) => s,
+                    Err(e) => {
+                        let _ = response.send(Err(anyhow::anyhow!("Invalid trust score: {}", e)));
+                        return;
+                    }
+                };
+                let mut edge =
+                    icn_trust::TrustEdge::new(self.keypair.did().clone(), target, trust_score);
 
                 for label in labels {
                     edge = edge.with_label(label);

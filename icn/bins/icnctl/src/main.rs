@@ -14,7 +14,7 @@ use icn_identity::{
     RecoveryConfig as IdentityRecoveryConfig, RecoveryMethod,
 };
 use icn_store::SledStore;
-use icn_trust::{TrustEdge, TrustGraph};
+use icn_trust::{TrustEdge, TrustGraph, TrustScore};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fs::File;
@@ -6571,7 +6571,11 @@ token_expiry_hours = 24
     for member_did in &member_dids {
         if member_did != &my_did {
             // Add bidirectional trust at "partner" level (0.5)
-            let edge = TrustEdge::new(my_did.clone(), member_did.clone(), 0.5);
+            let edge = TrustEdge::new(
+                my_did.clone(),
+                member_did.clone(),
+                TrustScore::unchecked(0.5),
+            );
             trust_graph.add_edge(edge)?;
         }
     }

@@ -6,6 +6,7 @@
 //! - Invalid formats
 
 use crate::error::{GatewayError, Result};
+use icn_trust::TrustScore;
 
 /// Maximum length for cooperative ID
 pub const MAX_COOP_ID_LEN: usize = 64;
@@ -557,18 +558,8 @@ pub fn validate_federation_id(id: &str) -> Result<()> {
 
 /// Validate trust score (must be in [0.0, 1.0])
 pub fn validate_trust_score(score: f64) -> Result<()> {
-    if !score.is_finite() {
-        return Err(GatewayError::BadRequest(
-            "Trust score must be a finite number".to_string(),
-        ));
-    }
-
-    if !(0.0..=1.0).contains(&score) {
-        return Err(GatewayError::BadRequest(
-            "Trust score must be between 0.0 and 1.0".to_string(),
-        ));
-    }
-
+    // Convert f64 to TrustScore to validate
+    TrustScore::new(score).map_err(|e| GatewayError::BadRequest(e.to_string()))?;
     Ok(())
 }
 
@@ -712,20 +703,10 @@ pub fn validate_auto_accept_threshold(threshold: Option<f64>) -> Result<()> {
 }
 
 /// Validate trust decay factor (0.0-1.0)
-pub fn validate_trust_decay_factor(factor: Option<f64>) -> Result<()> {
-    if let Some(f) = factor {
-        if !f.is_finite() {
-            return Err(GatewayError::BadRequest(
-                "Trust decay factor must be a finite number".to_string(),
-            ));
-        }
-        if !(0.0..=1.0).contains(&f) {
-            return Err(GatewayError::BadRequest(
-                "Trust decay factor must be between 0.0 and 1.0".to_string(),
-            ));
-        }
-    }
-
+///
+/// TrustScore already validates during construction, so this validator is a no-op.
+/// Keep the function for API compatibility.
+pub fn validate_trust_decay_factor(_factor: Option<TrustScore>) -> Result<()> {
     Ok(())
 }
 
@@ -1130,16 +1111,16 @@ mod tests {
 
     #[test]
     fn test_validate_trust_decay_factor() {
+        use icn_trust::TrustScore;
+
         // Valid factors
         assert!(validate_trust_decay_factor(None).is_ok());
-        assert!(validate_trust_decay_factor(Some(0.0)).is_ok());
-        assert!(validate_trust_decay_factor(Some(0.05)).is_ok());
-        assert!(validate_trust_decay_factor(Some(1.0)).is_ok());
+        assert!(validate_trust_decay_factor(Some(TrustScore::new(0.0).unwrap())).is_ok());
+        assert!(validate_trust_decay_factor(Some(TrustScore::new(0.05).unwrap())).is_ok());
+        assert!(validate_trust_decay_factor(Some(TrustScore::new(1.0).unwrap())).is_ok());
 
-        // Invalid factors
-        assert!(validate_trust_decay_factor(Some(-0.1)).is_err()); // Negative
-        assert!(validate_trust_decay_factor(Some(1.1)).is_err()); // Too high
-        assert!(validate_trust_decay_factor(Some(f64::NAN)).is_err()); // NaN
+        // Invalid factors would be rejected during TrustScore construction
+        // so they can't be passed to validate_trust_decay_factor
     }
 
     #[test]

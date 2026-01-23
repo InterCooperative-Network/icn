@@ -214,7 +214,7 @@ mod tests {
     use crate::{GovernanceConfig, MembershipConfig};
     use icn_identity::KeyPair;
     use icn_store::SledStore;
-    use icn_trust::TrustEdge;
+    use icn_trust::{TrustEdge, TrustScore};
 
     #[test]
     fn test_static_resolver_with_static_list() {
@@ -364,17 +364,29 @@ mod tests {
 
         // Owner trusts did1 highly (0.8 direct = 0.56 score)
         graph
-            .add_edge(TrustEdge::new(owner_did.clone(), did1.clone(), 0.8))
+            .add_edge(TrustEdge::new(
+                owner_did.clone(),
+                did1.clone(),
+                TrustScore::unchecked(0.8),
+            ))
             .unwrap();
 
         // Owner trusts did2 moderately (0.5 direct = 0.35 score)
         graph
-            .add_edge(TrustEdge::new(owner_did.clone(), did2.clone(), 0.5))
+            .add_edge(TrustEdge::new(
+                owner_did.clone(),
+                did2.clone(),
+                TrustScore::unchecked(0.5),
+            ))
             .unwrap();
 
         // Owner has low trust in did3 (0.2 direct = 0.14 score)
         graph
-            .add_edge(TrustEdge::new(owner_did.clone(), did3.clone(), 0.2))
+            .add_edge(TrustEdge::new(
+                owner_did.clone(),
+                did3.clone(),
+                TrustScore::unchecked(0.2),
+            ))
             .unwrap();
 
         let trust_graph = Arc::new(RwLock::new(graph));
@@ -410,12 +422,20 @@ mod tests {
 
         // Owner trusts did1 highly (0.8 direct = 0.56 score)
         graph
-            .add_edge(TrustEdge::new(owner_did.clone(), did1.clone(), 0.8))
+            .add_edge(TrustEdge::new(
+                owner_did.clone(),
+                did1.clone(),
+                TrustScore::unchecked(0.8),
+            ))
             .unwrap();
 
         // Owner has low trust in did2 (0.2 direct = 0.14 score)
         graph
-            .add_edge(TrustEdge::new(owner_did.clone(), did2.clone(), 0.2))
+            .add_edge(TrustEdge::new(
+                owner_did.clone(),
+                did2.clone(),
+                TrustScore::unchecked(0.2),
+            ))
             .unwrap();
 
         let trust_graph = Arc::new(RwLock::new(graph));
@@ -446,7 +466,11 @@ mod tests {
 
         // Owner trusts did1 (0.8 direct = 0.56 score)
         graph
-            .add_edge(TrustEdge::new(owner_did.clone(), did1.clone(), 0.8))
+            .add_edge(TrustEdge::new(
+                owner_did.clone(),
+                did1.clone(),
+                TrustScore::unchecked(0.8),
+            ))
             .unwrap();
 
         let trust_graph = Arc::new(RwLock::new(graph));

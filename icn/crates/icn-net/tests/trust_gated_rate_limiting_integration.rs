@@ -11,7 +11,7 @@ use anyhow::Result;
 use icn_identity::{Did, KeyPair};
 use icn_net::{RateLimiter, TrustGatedRateLimitConfig};
 use icn_store::SledStore;
-use icn_trust::{TrustEdge, TrustGraph};
+use icn_trust::{TrustEdge, TrustGraph, TrustScore};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -33,9 +33,17 @@ async fn test_trust_gated_rate_limiting_full_scenario() -> Result<()> {
     // Establish trust relationships (direct score * 0.7 = final score)
     // Bob: Isolated (0.0 final score)
     // Carol: Partner (direct 0.7 -> final 0.49)
-    graph.add_edge(TrustEdge::new(alice.clone(), carol.clone(), 0.7))?;
+    graph.add_edge(TrustEdge::new(
+        alice.clone(),
+        carol.clone(),
+        TrustScore::unchecked(0.7),
+    ))?;
     // Dave: Federated (direct 1.0 -> final 0.7)
-    graph.add_edge(TrustEdge::new(alice.clone(), dave.clone(), 1.0))?;
+    graph.add_edge(TrustEdge::new(
+        alice.clone(),
+        dave.clone(),
+        TrustScore::unchecked(1.0),
+    ))?;
 
     let trust_graph = Arc::new(RwLock::new(graph));
 
@@ -75,7 +83,11 @@ async fn test_trust_gated_rate_limiting_full_scenario() -> Result<()> {
 
     {
         let mut graph = trust_graph.write().await;
-        graph.add_edge(TrustEdge::new(alice.clone(), bob.clone(), 1.0))?;
+        graph.add_edge(TrustEdge::new(
+            alice.clone(),
+            bob.clone(),
+            TrustScore::unchecked(1.0),
+        ))?;
     }
 
     // Bob should now have Federated limits (burst 50)
@@ -191,7 +203,11 @@ async fn test_cache_performance() -> Result<()> {
 
     let store = Arc::new(SledStore::temporary()?);
     let mut graph = TrustGraph::new(store, alice.clone());
-    graph.add_edge(TrustEdge::new(alice.clone(), bob.clone(), 0.8))?;
+    graph.add_edge(TrustEdge::new(
+        alice.clone(),
+        bob.clone(),
+        TrustScore::unchecked(0.8),
+    ))?;
 
     // First lookup - cache miss
     let start = std::time::Instant::now();
