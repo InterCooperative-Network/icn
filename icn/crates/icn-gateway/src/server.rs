@@ -709,7 +709,7 @@ impl GatewayServer {
                             if removed > 0 {
                                 info!("Cleaned up {} inactive rate limiter buckets", removed);
                             }
-                            
+
                             // Clean up trust rate limit buckets if enabled
                             if let Some(ref trust_limiter) = trust_rate_limiter_clone {
                                 let removed: usize = trust_limiter.cleanup_inactive_buckets(Duration::from_secs(3600));

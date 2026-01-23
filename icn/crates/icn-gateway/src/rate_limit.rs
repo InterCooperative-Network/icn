@@ -435,15 +435,15 @@ pub struct TrustRateLimitConfig {
     /// Limits for isolated peers (untrusted, score < 0.1)
     pub isolated_requests_per_sec: f64,
     pub isolated_burst: f64,
-    
+
     /// Limits for known peers (limited trust, score 0.1-0.4)
     pub known_requests_per_sec: f64,
     pub known_burst: f64,
-    
+
     /// Limits for partner peers (trusted, score 0.4-0.7)
     pub partner_requests_per_sec: f64,
     pub partner_burst: f64,
-    
+
     /// Limits for federated peers (highly trusted, score 0.7+)
     pub federated_requests_per_sec: f64,
     pub federated_burst: f64,
@@ -477,7 +477,7 @@ impl TrustRateLimitConfig {
             (self.isolated_burst, self.isolated_requests_per_sec)
         }
     }
-    
+
     /// Get trust class name for a score (for metrics)
     fn trust_class_name(trust_score: f64) -> &'static str {
         if trust_score >= 0.7 {
@@ -500,55 +500,60 @@ impl TrustRateLimitConfig {
 pub struct TrustRateLimiter {
     /// Trust graph for trust score lookups
     trust_manager: Arc<crate::trust_mgr::TrustManager>,
-    
+
     /// Token buckets per DID
     buckets: Arc<RwLock<HashMap<String, (TokenBucket, f64)>>>, // (bucket, last_trust_score)
-    
+
     /// Configuration
     config: TrustRateLimitConfig,
 }
 
 impl TrustRateLimiter {
     /// Create a new trust-gated rate limiter
-    pub fn new(trust_manager: Arc<crate::trust_mgr::TrustManager>, config: TrustRateLimitConfig) -> Self {
+    pub fn new(
+        trust_manager: Arc<crate::trust_mgr::TrustManager>,
+        config: TrustRateLimitConfig,
+    ) -> Self {
         Self {
             trust_manager,
             buckets: Arc::new(RwLock::new(HashMap::new())),
             config,
         }
     }
-    
+
     /// Check if request should be allowed for a DID
     pub async fn check(&self, did: &str) -> Result<(), GatewayError> {
         // Parse DID for trust lookup
         let did_parsed = Did::from_str(did)
             .map_err(|e| GatewayError::InternalError(format!("Invalid DID: {e}")))?;
-        
+
         // Get trust score for this DID from the node's perspective
-        let trust_score = self.trust_manager.compute_trust_score_for_velocity(&did_parsed).await;
-        
+        let trust_score = self
+            .trust_manager
+            .compute_trust_score_for_velocity(&did_parsed)
+            .await;
+
         // Get appropriate limits for this trust class
         let (capacity, refill_rate) = self.config.params_for_trust(trust_score);
         let trust_class = TrustRateLimitConfig::trust_class_name(trust_score);
-        
+
         // Get or create bucket for this DID
-        let mut buckets = self.buckets
+        let mut buckets = self
+            .buckets
             .write()
             .map_err(|e| GatewayError::InternalError(format!("Lock poisoned: {e}")))?;
-        
+
         let (bucket, last_trust) = buckets
             .entry(did.to_string())
-            .or_insert_with(|| {
-                (TokenBucket::new(capacity, refill_rate), trust_score)
-            });
-        
+            .or_insert_with(|| (TokenBucket::new(capacity, refill_rate), trust_score));
+
         // If trust class changed, update bucket configuration
         if (*last_trust - trust_score).abs() >= 0.1 {
             // Trust class boundary crossed, reconfigure bucket
             *bucket = TokenBucket::new(capacity, refill_rate);
             *last_trust = trust_score;
         }
-        
+
         // Try to consume a token
         if bucket.try_consume(1.0) {
             Ok(())
@@ -558,31 +563,31 @@ impl TrustRateLimiter {
                 "Trust-gated rate limit exceeded for DID: {} (trust: {:.2}, class: {}, available: {:.2})",
                 did, trust_score, trust_class, available
             );
-            
+
             // Track rate limit exceeded with trust class
             gateway::trust_rate_limit_exceeded_inc(trust_class);
-            
+
             Err(GatewayError::RateLimitExceeded(format!(
                 "{did} (trust class: {trust_class})"
             )))
         }
     }
-    
+
     /// Clean up old buckets to prevent unbounded memory growth
     pub fn cleanup_inactive_buckets(&self, inactive_duration: Duration) -> usize {
         let mut buckets = match self.buckets.write() {
             Ok(b) => b,
             Err(_) => return 0,
         };
-        
+
         let now = Instant::now();
         let initial_count = buckets.len();
-        
+
         buckets.retain(|_, (bucket, _)| {
             let elapsed = now.duration_since(bucket.last_refill);
             elapsed < inactive_duration
         });
-        
+
         initial_count - buckets.len()
     }
 }
@@ -603,13 +608,13 @@ pub async fn trust_rate_limit_middleware(
             return next.call(req).await;
         }
     };
-    
+
     // Get DID from token claims (inserted by jwt_auth middleware)
     let did_opt = {
         let extensions = req.extensions();
         extensions.get::<TokenClaims>().map(|c| c.sub.clone())
     };
-    
+
     let did = match did_opt {
         Some(d) => d,
         None => {
@@ -618,7 +623,7 @@ pub async fn trust_rate_limit_middleware(
             "did:icn:anonymous".to_string()
         }
     };
-    
+
     // Check rate limit
     match rate_limiter.check(&did).await {
         Ok(()) => next.call(req).await,

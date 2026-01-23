@@ -14,8 +14,12 @@ use std::time::Duration;
 use tokio::sync::RwLock;
 
 /// Helper to create a test trust manager with a given trust graph
-fn create_trust_manager(trust_graph: Arc<RwLock<TrustGraph>>) -> Arc<icn_gateway::trust_mgr::TrustManager> {
-    Arc::new(icn_gateway::trust_mgr::TrustManager::with_handle(trust_graph))
+fn create_trust_manager(
+    trust_graph: Arc<RwLock<TrustGraph>>,
+) -> Arc<icn_gateway::trust_mgr::TrustManager> {
+    Arc::new(icn_gateway::trust_mgr::TrustManager::with_handle(
+        trust_graph,
+    ))
 }
 
 /// Helper to create a DID for testing
@@ -296,8 +300,8 @@ async fn test_trust_rate_limiter_anonymous_request() {
     let rate_limiter = TrustRateLimiter::new(trust_manager, config);
 
     // Use a valid DID format for anonymous (synthetic keypair with all zeros)
-    let anonymous_kp = KeyPair::from_bytes(&[0u8; 32], &[0u8; 32])
-        .expect("Failed to create anonymous keypair");
+    let anonymous_kp =
+        KeyPair::from_bytes(&[0u8; 32], &[0u8; 32]).expect("Failed to create anonymous keypair");
     let anonymous_did = anonymous_kp.did().to_string();
 
     // Should use Isolated limits (burst = 2)
@@ -307,14 +311,14 @@ async fn test_trust_rate_limiter_anonymous_request() {
         "First anonymous request should succeed: {:?}",
         result1.err()
     );
-    
+
     let result2 = rate_limiter.check(&anonymous_did).await;
     assert!(
         result2.is_ok(),
         "Second anonymous request should succeed: {:?}",
         result2.err()
     );
-    
+
     let result3 = rate_limiter.check(&anonymous_did).await;
     assert!(
         result3.is_err(),
@@ -341,20 +345,14 @@ async fn test_trust_rate_limiter_cleanup() {
 
     // Clean up buckets inactive for > 0 seconds (should remove all)
     let removed = rate_limiter.cleanup_inactive_buckets(Duration::from_secs(0));
-    assert_eq!(
-        removed, 5,
-        "Should clean up all inactive buckets"
-    );
+    assert_eq!(removed, 5, "Should clean up all inactive buckets");
 
     // Make a request and verify bucket is still there after short cleanup window
     let (_kp, did) = create_test_did("active_peer");
     rate_limiter.check(&did.to_string()).await.ok();
-    
+
     let removed = rate_limiter.cleanup_inactive_buckets(Duration::from_secs(3600));
-    assert_eq!(
-        removed, 0,
-        "Should not clean up recently active buckets"
-    );
+    assert_eq!(removed, 0, "Should not clean up recently active buckets");
 }
 
 #[tokio::test]
