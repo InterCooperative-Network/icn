@@ -97,6 +97,7 @@ async fn test_entity_manager_direct() {
     // Register it
     entity_mgr
         .register(entity)
+        .await
         .expect("Registration should work");
 
     // Record audit
@@ -114,7 +115,7 @@ async fn test_entity_manager_direct() {
         .expect("Audit recording should work");
 
     // Verify it exists
-    let retrieved = entity_mgr.get(&entity_id).expect("Get should work");
+    let retrieved = entity_mgr.get(&entity_id).await.expect("Get should work");
     assert!(retrieved.is_some());
 }
 
@@ -187,7 +188,7 @@ async fn test_register_entity_founder_added() {
 
     // Verify creator was added as founder
     let entity_id = EntityId::cooperative("founder-test").unwrap();
-    let members = entity_mgr.get_members(&entity_id).unwrap();
+    let members = entity_mgr.get_members(&entity_id).await.unwrap();
     assert_eq!(members.len(), 1);
     assert!(matches!(members[0].role, MembershipRole::Founder));
 }
@@ -509,6 +510,7 @@ async fn test_delete_entity_as_founder() {
     let alice_entity_id = EntityId::from_did(alice.did());
     entity_mgr
         .remove_membership(&entity_id, &alice_entity_id)
+        .await
         .unwrap();
 
     // After membership removal, alice is no longer a founder, so deletion should fail with 403

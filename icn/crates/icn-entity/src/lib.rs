@@ -70,10 +70,14 @@
 //! - [`membership`] - Membership types: `Membership`, `MembershipRole`
 //! - [`registry`] - Registry trait and in-memory implementation
 //! - [`lifecycle`] - Lifecycle events and state transitions
+//! - [`actor`] - EntityActor for async operations with gossip sync
+//! - [`handle`] - EntityHandle for interacting with the actor
 //! - [`error`] - Error types
 
+pub mod actor;
 pub mod entity;
 pub mod error;
+pub mod handle;
 pub mod labor_exchange;
 pub mod lifecycle;
 pub mod membership;
@@ -81,10 +85,12 @@ pub mod registry;
 pub mod sled_registry;
 
 // Re-export main types at crate root
+pub use actor::{EntityActor, GossipHandle, ENTITY_TOPIC};
 pub use entity::{
     AccountId, AccountReference, CooperativeEntity, EntityId, EntityStatus, EntityType,
 };
 pub use error::{EntityError, Result};
+pub use handle::EntityHandle;
 pub use labor_exchange::{
     AssignmentApprovals, AssignmentId, AssignmentStatus, AssignmentType, Availability,
     CreditRouting, LaborAssignment, LaborNeed, LaborPool, PoolRegistration, RoutingMode,

@@ -11,6 +11,7 @@ default = []
 
 [dependencies]
 icn-encoding = { path = "../icn-encoding" }
+icn-gossip = { path = "../icn-gossip" }
 icn-identity = { path = "../icn-identity" }
 icn-time = { path = "../icn-time" }
 serde.workspace = true

@@ -169,6 +169,7 @@ fn format_entity_status(status: &icn_entity::EntityStatus) -> String {
         EntityStatus::Dissolved { .. } => "dissolved".to_string(),
         EntityStatus::Merged { into, .. } => format!("merged:{into}"),
         EntityStatus::Split { .. } => "split".to_string(),
+        EntityStatus::Deleted => "deleted".to_string(),
     }
 }
 
@@ -234,13 +235,14 @@ fn membership_to_response(m: &Membership) -> MembershipResponse {
 /// - The caller is the entity itself (for individual entities)
 ///
 /// Returns Err if the caller lacks permission.
-fn require_entity_write_access(
+async fn require_entity_write_access(
     entity_mgr: &EntityManager,
     entity_id: &EntityId,
     caller_id: &EntityId,
 ) -> Result<()> {
     let members = entity_mgr
         .get_members(entity_id)
+        .await
         .map_err(|e| GatewayError::InternalError(format!("Failed to check permissions: {e}")))?;
 
     // Check if caller is a founder or board member
@@ -293,6 +295,7 @@ pub async fn register_entity(
     let individual_entity = CooperativeEntity::individual(&creator_did, &claims.sub);
     let _ = entity_mgr
         .ensure_entity_exists(individual_entity)
+        .await
         .map_err(|e| {
             GatewayError::InternalError(format!("Failed to auto-register individual entity: {e}"))
         })?;
@@ -361,6 +364,7 @@ pub async fn register_entity(
     // Register the entity
     entity_mgr
         .register(entity.clone())
+        .await
         .map_err(|e| GatewayError::InternalError(format!("Failed to register entity: {e}")))?;
 
     // Add the creator as a founder member
@@ -370,9 +374,9 @@ pub async fn register_entity(
         entity_id.clone(),
         MembershipRole::Founder,
     );
-    if let Err(e) = entity_mgr.add_membership(founder_membership) {
+    if let Err(e) = entity_mgr.add_membership(founder_membership).await {
         // Cleanup: remove the entity we just registered
-        if let Err(cleanup_err) = entity_mgr.remove(&entity_id) {
+        if let Err(cleanup_err) = entity_mgr.remove(&entity_id).await {
             tracing::error!(
                 entity_id = %entity_id,
                 error = %cleanup_err,
@@ -406,7 +410,7 @@ pub async fn register_entity(
         // If we removed membership first and entity removal failed, we'd have an orphaned entity.
         // Track rollback failures for operational alerting
         let mut rollback_errors = Vec::new();
-        if let Err(cleanup_err) = entity_mgr.remove(&entity_id) {
+        if let Err(cleanup_err) = entity_mgr.remove(&entity_id).await {
             rollback_errors.push(format!("entity: {cleanup_err}"));
             tracing::error!(
                 entity_id = %entity_id,
@@ -414,7 +418,7 @@ pub async fn register_entity(
                 "Failed to cleanup entity after audit failure"
             );
         }
-        if let Err(cleanup_err) = entity_mgr.remove_membership(&entity_id, &creator_id) {
+        if let Err(cleanup_err) = entity_mgr.remove_membership(&entity_id, &creator_id).await {
             rollback_errors.push(format!("membership: {cleanup_err}"));
             tracing::error!(
                 entity_id = %entity_id,
@@ -436,7 +440,7 @@ pub async fn register_entity(
         )));
     }
 
-    let members = entity_mgr.get_members(&entity_id).unwrap_or_default();
+    let members = entity_mgr.get_members(&entity_id).await.unwrap_or_default();
     let response = entity_to_response(&entity, members.len());
 
     Ok(HttpResponse::Created().json(response))
@@ -458,6 +462,7 @@ pub async fn get_entity(
 
     let entity = entity_mgr
         .get(&entity_id)
+        .await
         .map_err(|e| GatewayError::InternalError(format!("Failed to get entity: {e}")))?;
 
     let Some(entity) = entity else {
@@ -466,7 +471,7 @@ pub async fn get_entity(
         )));
     };
 
-    let members = entity_mgr.get_members(&entity_id).unwrap_or_default();
+    let members = entity_mgr.get_members(&entity_id).await.unwrap_or_default();
     let response = entity_to_response(&entity, members.len());
 
     Ok(HttpResponse::Ok().json(response))
@@ -499,11 +504,12 @@ pub async fn update_entity(
 
     let mut entity = entity_mgr
         .get(&entity_id)
+        .await
         .map_err(|e| GatewayError::InternalError(format!("Failed to get entity: {e}")))?
         .ok_or_else(|| GatewayError::NotFound(format!("Entity not found: {entity_id}")))?;
 
     // Check caller has permission to modify this entity
-    require_entity_write_access(&entity_mgr, &entity_id, &caller_id)?;
+    require_entity_write_access(&entity_mgr, &entity_id, &caller_id).await?;
 
     // Store previous entity state BEFORE mutation for potential rollback
     // This ensures we capture the true pre-mutation state even if EntityManager
@@ -533,7 +539,7 @@ pub async fn update_entity(
 
     // Skip no-op updates - return early if no changes were requested
     if changed_fields.is_empty() {
-        let members = entity_mgr.get_members(&entity_id).unwrap_or_default();
+        let members = entity_mgr.get_members(&entity_id).await.unwrap_or_default();
         let response = entity_to_response(&entity, members.len());
         return Ok(HttpResponse::Ok().json(response));
     }
@@ -546,6 +552,7 @@ pub async fn update_entity(
 
     entity_mgr
         .update(entity.clone())
+        .await
         .map_err(|e| GatewayError::InternalError(format!("Failed to update entity: {e}")))?;
 
     // Record audit trail - fail the request if audit logging fails for compliance
@@ -567,7 +574,7 @@ pub async fn update_entity(
             "Failed to record entity update audit - attempting rollback"
         );
         // Attempt compensation: restore pre-mutation state (cloned BEFORE applying updates)
-        if let Err(rollback_err) = entity_mgr.update(previous_entity) {
+        if let Err(rollback_err) = entity_mgr.update(previous_entity).await {
             gateway_metrics::entity_audit_rollback_failure_inc("update_entity");
             tracing::error!(
                 entity_id = %entity_id,
@@ -583,7 +590,7 @@ pub async fn update_entity(
         )));
     }
 
-    let members = entity_mgr.get_members(&entity_id).unwrap_or_default();
+    let members = entity_mgr.get_members(&entity_id).await.unwrap_or_default();
     let response = entity_to_response(&entity, members.len());
 
     Ok(HttpResponse::Ok().json(response))
@@ -616,18 +623,19 @@ pub async fn delete_entity(
     // Verify entity exists and store for potential restoration
     let entity = entity_mgr
         .get(&entity_id)
+        .await
         .map_err(|e| GatewayError::InternalError(format!("Failed to get entity: {e}")))?
         .ok_or_else(|| GatewayError::NotFound(format!("Entity not found: {entity_id}")))?;
 
     // Check caller has permission to delete this entity (Founders only for deletion)
-    require_entity_write_access(&entity_mgr, &entity_id, &caller_id)?;
+    require_entity_write_access(&entity_mgr, &entity_id, &caller_id).await?;
 
     info!(
         entity_id = %entity_id,
         "Deleting entity"
     );
 
-    entity_mgr.remove(&entity_id).map_err(|e| {
+    entity_mgr.remove(&entity_id).await.map_err(|e| {
         if e.to_string().contains("active members") {
             GatewayError::BadRequest(e.to_string())
         } else {
@@ -651,7 +659,7 @@ pub async fn delete_entity(
         );
         // Attempt compensation: re-register the entity (no memberships to restore
         // since remove() only succeeds when entity has no members)
-        if let Err(restore_err) = entity_mgr.register(entity.clone()) {
+        if let Err(restore_err) = entity_mgr.register(entity.clone()).await {
             gateway_metrics::entity_audit_rollback_failure_inc("delete_entity");
             tracing::error!(
                 entity_id = %entity_id,
@@ -699,11 +707,13 @@ pub async fn list_members(
     // Verify entity exists
     let _entity = entity_mgr
         .get(&entity_id)
+        .await
         .map_err(|e| GatewayError::InternalError(format!("Failed to get entity: {e}")))?
         .ok_or_else(|| GatewayError::NotFound(format!("Entity not found: {entity_id}")))?;
 
     let members = entity_mgr
         .get_members(&entity_id)
+        .await
         .map_err(|e| GatewayError::InternalError(format!("Failed to get members: {e}")))?;
 
     // Convert to response type
@@ -814,11 +824,12 @@ pub async fn add_membership(
     // Verify entity exists
     let _entity = entity_mgr
         .get(&entity_id)
+        .await
         .map_err(|e| GatewayError::InternalError(format!("Failed to get entity: {e}")))?
         .ok_or_else(|| GatewayError::NotFound(format!("Entity not found: {entity_id}")))?;
 
     // Check caller has permission to add members
-    require_entity_write_access(&entity_mgr, &entity_id, &caller_id)?;
+    require_entity_write_access(&entity_mgr, &entity_id, &caller_id).await?;
 
     // Parse member ID (can be DID or EntityId)
     let member_id = if body.member_id.starts_with("did:") {
@@ -834,6 +845,7 @@ pub async fn add_membership(
         let individual_entity = CooperativeEntity::individual(&did, &body.member_id);
         let _ = entity_mgr
             .ensure_entity_exists(individual_entity)
+            .await
             .map_err(|e| {
                 GatewayError::InternalError(format!(
                     "Failed to auto-register individual entity: {e}"
@@ -879,6 +891,7 @@ pub async fn add_membership(
 
     entity_mgr
         .add_membership(membership.clone())
+        .await
         .map_err(|e| GatewayError::InternalError(format!("Failed to add membership: {e}")))?;
 
     // Record audit trail - fail the request if audit logging fails for compliance
@@ -900,7 +913,7 @@ pub async fn add_membership(
             "Failed to record member addition audit - rolling back"
         );
         // Rollback: remove the membership we just added
-        if let Err(rollback_err) = entity_mgr.remove_membership(&entity_id, &member_id) {
+        if let Err(rollback_err) = entity_mgr.remove_membership(&entity_id, &member_id).await {
             gateway_metrics::entity_audit_rollback_failure_inc("add_membership");
             tracing::error!(
                 entity_id = %entity_id,
@@ -961,18 +974,20 @@ pub async fn remove_membership(
     // Check caller has permission to remove members (founders/board) or is the member themselves
     let is_self_removal = caller_id == member_id;
     if !is_self_removal {
-        require_entity_write_access(&entity_mgr, &entity_id, &caller_id)?;
+        require_entity_write_access(&entity_mgr, &entity_id, &caller_id).await?;
     }
 
     // Verify entity exists
     let _entity = entity_mgr
         .get(&entity_id)
+        .await
         .map_err(|e| GatewayError::InternalError(format!("Failed to get entity: {e}")))?
         .ok_or_else(|| GatewayError::NotFound(format!("Entity not found: {entity_id}")))?;
 
     // Get current members to check if removing last founder
     let members = entity_mgr
         .get_members(&entity_id)
+        .await
         .map_err(|e| GatewayError::InternalError(format!("Failed to get members: {e}")))?;
 
     // Find the membership being removed
@@ -1006,6 +1021,7 @@ pub async fn remove_membership(
 
     entity_mgr
         .remove_membership(&entity_id, &member_id)
+        .await
         .map_err(|e| GatewayError::InternalError(format!("Failed to remove membership: {e}")))?;
 
     // Record audit trail - fail the request if audit logging fails for compliance
@@ -1033,7 +1049,7 @@ pub async fn remove_membership(
         );
         // Rollback: restore the membership we just removed
         if let Some(membership) = removed_membership {
-            if let Err(rollback_err) = entity_mgr.add_membership(membership) {
+            if let Err(rollback_err) = entity_mgr.add_membership(membership).await {
                 gateway_metrics::entity_audit_rollback_failure_inc("remove_membership");
                 tracing::error!(
                     entity_id = %entity_id,
@@ -1125,6 +1141,7 @@ pub async fn get_entity_audit(
     // Verify entity exists
     let _entity = entity_mgr
         .get(&entity_id)
+        .await
         .map_err(|e| GatewayError::InternalError(format!("Failed to get entity: {e}")))?
         .ok_or_else(|| GatewayError::NotFound(format!("Entity not found: {entity_id}")))?;
 
@@ -1148,6 +1165,7 @@ pub async fn get_entity_audit(
 
         let members = entity_mgr
             .get_members(&entity_id)
+            .await
             .map_err(|e| GatewayError::InternalError(format!("Failed to get members: {e}")))?;
 
         let is_member = members.iter().any(|m| m.member_id == caller_id);
