@@ -1,4 +1,15 @@
-//! Connection handling for the network actor
+//! QUIC connection handling for the network actor
+//!
+//! This module manages the lifecycle of incoming QUIC connections:
+//!
+//! - **Connection acceptance**: Listens for new connections via the session manager
+//! - **Stream processing**: Handles bidirectional streams for message exchange
+//! - **Rate limiting**: Enforces per-DID and per-personhood-anchor limits for Sybil resistance
+//! - **Byzantine detection**: Reports misbehavior to the misbehavior detector
+//! - **Blob announcements**: Extracts and registers blob availability from incoming messages
+//!
+//! Each connection spawns a dedicated handler task that processes messages until
+//! the peer disconnects or a shutdown signal is received.
 
 use anyhow::Result;
 use icn_identity::{Did, IdentityBundle};

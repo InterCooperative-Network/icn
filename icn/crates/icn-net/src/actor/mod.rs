@@ -1255,7 +1255,7 @@ impl NetworkActor {
     }
 }
 
-// Tests remain in parent module for backward compatibility
+// Tests for NetworkActor and NetworkHandle functionality
 #[cfg(test)]
 mod tests {
     use super::*;

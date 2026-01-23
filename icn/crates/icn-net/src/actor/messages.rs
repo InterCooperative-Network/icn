@@ -1,4 +1,19 @@
 //! Message handling for the network actor
+//!
+//! This module implements the message dispatch logic for [`NetworkActor`].
+//! It handles incoming [`NetworkMsg`] commands from the actor's mailbox,
+//! including:
+//!
+//! - Peer discovery queries (`GetPeers`, `GetConnectedPeers`)
+//! - Connection management (`Dial`, `Disconnect`)
+//! - Message sending (`Send`, `Broadcast`)
+//! - State queries (`GetBlobRegistry`, `GetPeerConnectionInfo`)
+//!
+//! Messages are processed sequentially in the actor's event loop.
+//! Timeouts are applied to prevent resource exhaustion:
+//! - `DIAL_TIMEOUT`: 30 seconds for establishing new connections
+//! - `SEND_TIMEOUT`: 10 seconds for sending messages to peers
+//! - `PEER_TIMEOUT`: 5 seconds for peer lookup operations
 
 use anyhow::{Context, Result};
 use icn_identity::Did;
