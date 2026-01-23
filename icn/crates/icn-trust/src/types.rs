@@ -179,9 +179,181 @@ impl Default for ScoringWeights {
     }
 }
 
+/// A trust score in the range [0.0, 1.0]
+///
+/// This newtype wrapper provides compile-time type safety for trust scores,
+/// preventing them from being mixed with arbitrary floats. All trust scores
+/// are validated to be in the valid range and not NaN.
+///
+/// # Examples
+///
+/// ```
+/// use icn_trust::TrustScore;
+///
+/// // Create a valid trust score
+/// let score = TrustScore::new(0.8).unwrap();
+/// assert_eq!(score.value(), 0.8);
+///
+/// // Convert to trust class
+/// let class = score.to_class();
+///
+/// // Invalid scores are rejected
+/// assert!(TrustScore::new(1.5).is_err());
+/// assert!(TrustScore::new(-0.1).is_err());
+/// assert!(TrustScore::new(f64::NAN).is_err());
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+pub struct TrustScore(f64);
+
+impl TrustScore {
+    /// The minimum valid trust score
+    pub const MIN: f64 = 0.0;
+    /// The maximum valid trust score
+    pub const MAX: f64 = 1.0;
+
+    /// Create a new trust score with validation
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - `value` is less than 0.0
+    /// - `value` is greater than 1.0
+    /// - `value` is NaN
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use icn_trust::TrustScore;
+    ///
+    /// assert!(TrustScore::new(0.5).is_ok());
+    /// assert!(TrustScore::new(1.5).is_err());
+    /// assert!(TrustScore::new(-0.1).is_err());
+    /// ```
+    pub fn new(value: f64) -> Result<Self, String> {
+        if value.is_nan() {
+            Err("Trust score cannot be NaN".to_string())
+        } else if value < Self::MIN || value > Self::MAX {
+            Err(format!(
+                "Trust score must be in range [{}, {}], got {}",
+                Self::MIN,
+                Self::MAX,
+                value
+            ))
+        } else {
+            Ok(Self(value))
+        }
+    }
+
+    /// Create a trust score without validation (for constants and trusted sources)
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure the value is in range [0.0, 1.0] and not NaN.
+    /// This is intended for use with constants where the value is known to be valid.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use icn_trust::TrustScore;
+    ///
+    /// const PARTNER_TRUST: TrustScore = TrustScore::unchecked(0.4);
+    /// ```
+    pub const fn unchecked(value: f64) -> Self {
+        Self(value)
+    }
+
+    /// Get the inner f64 value
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use icn_trust::TrustScore;
+    ///
+    /// let score = TrustScore::new(0.7).unwrap();
+    /// assert_eq!(score.value(), 0.7);
+    /// ```
+    pub fn value(&self) -> f64 {
+        self.0
+    }
+
+    /// Convert this score to a trust class
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use icn_trust::{TrustScore, TrustClass};
+    ///
+    /// let score = TrustScore::new(0.5).unwrap();
+    /// assert_eq!(score.to_class(), TrustClass::Partner);
+    /// ```
+    pub fn to_class(&self) -> crate::TrustClass {
+        crate::TrustClass::from_score(self.0)
+    }
+
+    /// Check if this score meets the isolated threshold (>= 0.0)
+    pub fn is_isolated_or_better(&self) -> bool {
+        self.0 >= 0.0
+    }
+
+    /// Check if this score meets the known threshold (>= 0.1)
+    pub fn is_known_or_better(&self) -> bool {
+        self.0 >= 0.1
+    }
+
+    /// Check if this score meets the partner threshold (>= 0.4)
+    pub fn is_partner_or_better(&self) -> bool {
+        self.0 >= 0.4
+    }
+
+    /// Check if this score meets the federated threshold (>= 0.7)
+    pub fn is_federated(&self) -> bool {
+        self.0 >= 0.7
+    }
+}
+
+impl fmt::Display for TrustScore {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:.2}", self.0)
+    }
+}
+
+impl From<TrustScore> for f64 {
+    fn from(score: TrustScore) -> Self {
+        score.0
+    }
+}
+
+impl TryFrom<f64> for TrustScore {
+    type Error = String;
+
+    fn try_from(value: f64) -> Result<Self, Self::Error> {
+        Self::new(value)
+    }
+}
+
+impl Serialize for TrustScore {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_f64(self.0)
+    }
+}
+
+impl<'de> Deserialize<'de> for TrustScore {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = f64::deserialize(deserializer)?;
+        TrustScore::new(value).map_err(serde::de::Error::custom)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::TrustClass;
 
     #[test]
     fn test_trust_graph_type_all() {
@@ -303,5 +475,134 @@ mod tests {
                 "{graph_type:?} weights sum to {sum} instead of 1.0"
             );
         }
+    }
+
+    // TrustScore tests
+    #[test]
+    fn test_trust_score_valid_range() {
+        // Valid scores
+        assert!(TrustScore::new(0.0).is_ok());
+        assert!(TrustScore::new(0.5).is_ok());
+        assert!(TrustScore::new(1.0).is_ok());
+
+        // Invalid scores
+        assert!(TrustScore::new(-0.1).is_err());
+        assert!(TrustScore::new(1.1).is_err());
+        assert!(TrustScore::new(f64::NAN).is_err());
+        assert!(TrustScore::new(f64::INFINITY).is_err());
+        assert!(TrustScore::new(f64::NEG_INFINITY).is_err());
+    }
+
+    #[test]
+    fn test_trust_score_value() {
+        let score = TrustScore::new(0.7).unwrap();
+        assert_eq!(score.value(), 0.7);
+    }
+
+    #[test]
+    fn test_trust_score_to_class() {
+        assert_eq!(
+            TrustScore::new(0.0).unwrap().to_class(),
+            TrustClass::Isolated
+        );
+        assert_eq!(
+            TrustScore::new(0.05).unwrap().to_class(),
+            TrustClass::Isolated
+        );
+        assert_eq!(
+            TrustScore::new(0.2).unwrap().to_class(),
+            TrustClass::Known
+        );
+        assert_eq!(
+            TrustScore::new(0.5).unwrap().to_class(),
+            TrustClass::Partner
+        );
+        assert_eq!(
+            TrustScore::new(0.9).unwrap().to_class(),
+            TrustClass::Federated
+        );
+    }
+
+    #[test]
+    fn test_trust_score_threshold_checks() {
+        let isolated = TrustScore::new(0.0).unwrap();
+        assert!(isolated.is_isolated_or_better());
+        assert!(!isolated.is_known_or_better());
+        assert!(!isolated.is_partner_or_better());
+        assert!(!isolated.is_federated());
+
+        let known = TrustScore::new(0.2).unwrap();
+        assert!(known.is_isolated_or_better());
+        assert!(known.is_known_or_better());
+        assert!(!known.is_partner_or_better());
+        assert!(!known.is_federated());
+
+        let partner = TrustScore::new(0.5).unwrap();
+        assert!(partner.is_isolated_or_better());
+        assert!(partner.is_known_or_better());
+        assert!(partner.is_partner_or_better());
+        assert!(!partner.is_federated());
+
+        let federated = TrustScore::new(0.9).unwrap();
+        assert!(federated.is_isolated_or_better());
+        assert!(federated.is_known_or_better());
+        assert!(federated.is_partner_or_better());
+        assert!(federated.is_federated());
+    }
+
+    #[test]
+    fn test_trust_score_display() {
+        let score = TrustScore::new(0.7).unwrap();
+        assert_eq!(format!("{}", score), "0.70");
+
+        let score = TrustScore::new(0.123).unwrap();
+        assert_eq!(format!("{}", score), "0.12");
+    }
+
+    #[test]
+    fn test_trust_score_from_into() {
+        let score = TrustScore::new(0.8).unwrap();
+        let val: f64 = score.into();
+        assert_eq!(val, 0.8);
+    }
+
+    #[test]
+    fn test_trust_score_try_from() {
+        let result: Result<TrustScore, _> = 0.5.try_into();
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().value(), 0.5);
+
+        let result: Result<TrustScore, _> = 1.5.try_into();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_trust_score_serde() {
+        let score = TrustScore::new(0.6).unwrap();
+        let json = serde_json::to_string(&score).unwrap();
+        assert_eq!(json, "0.6");
+
+        let deserialized: TrustScore = serde_json::from_str("0.6").unwrap();
+        assert_eq!(deserialized.value(), 0.6);
+
+        // Invalid values should fail deserialization
+        let result: Result<TrustScore, _> = serde_json::from_str("1.5");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_trust_score_ordering() {
+        let low = TrustScore::new(0.3).unwrap();
+        let high = TrustScore::new(0.7).unwrap();
+
+        assert!(low < high);
+        assert!(high > low);
+        assert_eq!(low, low);
+    }
+
+    #[test]
+    fn test_trust_score_unchecked() {
+        const PARTNER_TRUST: TrustScore = TrustScore::unchecked(0.4);
+        assert_eq!(PARTNER_TRUST.value(), 0.4);
     }
 }
