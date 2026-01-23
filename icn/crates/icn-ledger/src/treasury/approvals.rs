@@ -206,7 +206,7 @@ impl VelocityWindow {
 
 /// Helper function to determine approval priority level
 /// Get priority value for approval types (higher = more strict)
-pub fn approval_type_priority(approval: ApprovalType) -> u8 {
+pub(super) fn approval_type_priority(approval: ApprovalType) -> u8 {
     match approval {
         ApprovalType::None => 0,
         ApprovalType::SimpleMajority => 1,
@@ -441,7 +441,11 @@ impl super::TreasuryManager {
     }
 
     /// Persist spending rule to storage (internal helper)
-    pub(super) fn persist_spending_rule(&self, rule: &SpendingRule, store: &Arc<dyn Store>) -> Result<()> {
+    pub(super) fn persist_spending_rule(
+        &self,
+        rule: &SpendingRule,
+        store: &Arc<dyn Store>,
+    ) -> Result<()> {
         let key = format!("{}{}", SPENDING_RULE_PREFIX, rule.id);
         let value = serde_json::to_vec(rule)?;
         store.put(key.as_bytes(), &value)?;
@@ -449,7 +453,11 @@ impl super::TreasuryManager {
     }
 
     /// Persist velocity limit to storage (internal helper)
-    pub(super) fn persist_velocity_limit(&self, limit: &VelocityLimit, store: &Arc<dyn Store>) -> Result<()> {
+    pub(super) fn persist_velocity_limit(
+        &self,
+        limit: &VelocityLimit,
+        store: &Arc<dyn Store>,
+    ) -> Result<()> {
         let key = format!("{}vlimit:{}", TREASURY_PREFIX, limit.id);
         let value = serde_json::to_vec(limit)?;
         store.put(key.as_bytes(), &value)?;

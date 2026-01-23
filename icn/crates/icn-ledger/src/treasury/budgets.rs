@@ -391,7 +391,11 @@ impl super::TreasuryManager {
     }
 
     /// Persist budget to storage (internal helper)
-    pub(super) fn persist_budget(&self, budget: &TreasuryBudget, store: &Arc<dyn Store>) -> Result<()> {
+    pub(super) fn persist_budget(
+        &self,
+        budget: &TreasuryBudget,
+        store: &Arc<dyn Store>,
+    ) -> Result<()> {
         let key = format!("{}{}", BUDGET_PREFIX, budget.id);
         let value = serde_json::to_vec(budget)?;
         store.put(key.as_bytes(), &value)?;
@@ -402,17 +406,11 @@ impl super::TreasuryManager {
     pub(super) fn persist_budget_index(
         &self,
         treasury_did: &Did,
-        _budget_id: &str,
+        budget_id: &str,
         store: &Arc<dyn Store>,
     ) -> Result<()> {
-        let key = format!("{}{}", TREASURY_IDX_BUDGETS_PREFIX, treasury_did);
-        let budget_ids: Vec<String> = self
-            .treasury_budgets
-            .get(treasury_did)
-            .cloned()
-            .unwrap_or_default();
-        let value = serde_json::to_vec(&budget_ids)?;
-        store.put(key.as_bytes(), &value)?;
+        let key = format!("{TREASURY_IDX_BUDGETS_PREFIX}{treasury_did}:{budget_id}");
+        store.put(key.as_bytes(), budget_id.as_bytes())?;
         Ok(())
     }
 }

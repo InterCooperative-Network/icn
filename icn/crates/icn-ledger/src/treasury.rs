@@ -70,15 +70,13 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::info;
 
-// Submodules
-pub mod approvals;
-pub mod audit;
-pub mod budgets;
+// Submodules (private - types are re-exported below)
+mod approvals;
+mod audit;
+mod budgets;
 
 // Re-export types from submodules
-pub use approvals::{
-    approval_type_priority, ApprovalType, SpendingRule, VelocityLimit, VelocityWindow,
-};
+pub use approvals::{ApprovalType, SpendingRule, VelocityLimit, VelocityWindow};
 pub use audit::{PaginatedAuditTrail, TreasuryAuditRecord, TreasuryOperation};
 pub use budgets::{BudgetStatus, TreasuryBudget};
 
@@ -1049,6 +1047,7 @@ fn uuid_simple() -> String {
 
 #[cfg(test)]
 mod tests {
+    use super::approvals::approval_type_priority;
     use super::*;
     use crate::types::ContentHash;
     use icn_identity::KeyPair;
