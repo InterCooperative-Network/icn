@@ -61,30 +61,26 @@
 //! ```
 
 // Module structure
-pub mod state;
 pub mod inmemory;
 pub mod sled;
+pub mod state;
 
 // Re-export public API
 pub use state::{
-    InMemoryParameterStore, 
-    ParameterStoreError, 
-    ProtocolParameterStore, 
-    SledParameterStore,
-    MAX_HISTORY_ENTRIES_PER_PARAM,
-    GLOBAL_HISTORY_WARNING_THRESHOLD,
+    InMemoryParameterStore, ParameterStoreError, ProtocolParameterStore, SledParameterStore,
+    GLOBAL_HISTORY_WARNING_THRESHOLD, MAX_HISTORY_ENTRIES_PER_PARAM,
 };
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
-    use state::*;
     use crate::protocol::{
-        ParameterScope, ParameterValue,
-        PendingChangeStatus, PendingParameterChange, ProtocolParameter,
+        ParameterScope, ParameterValue, PendingChangeStatus, PendingParameterChange,
+        ProtocolParameter,
     };
     use icn_entity::EntityId;
+    use state::*;
 
     fn test_param(id: &str, value: i64) -> ProtocolParameter {
         ProtocolParameter::new(
@@ -196,7 +192,11 @@ mod tests {
         let mut updated = test_param("test.value", 2);
         updated.version = 0;
         store
-            .set(updated, Some("prop-1".to_string()), Some("alice".to_string()))
+            .set(
+                updated,
+                Some("prop-1".to_string()),
+                Some("alice".to_string()),
+            )
             .unwrap();
 
         let history = store.get_history("test.value").unwrap();
@@ -303,7 +303,9 @@ mod tests {
         // Set federation override
         let coop_id: EntityId = "entity:icn:cooperative:test-coop".parse().unwrap();
         let mut fed_override = test_param("test.value", 200);
-        fed_override.scope = ParameterScope::Cooperative { id: coop_id.clone() };
+        fed_override.scope = ParameterScope::Cooperative {
+            id: coop_id.clone(),
+        };
         fed_override.constraints.allow_override = true;
         store.set(fed_override, None, None).unwrap();
 
@@ -610,7 +612,11 @@ mod tests {
         let mut updated = test_param("test.value", 2);
         updated.version = 0;
         store
-            .set(updated, Some("prop-1".to_string()), Some("alice".to_string()))
+            .set(
+                updated,
+                Some("prop-1".to_string()),
+                Some("alice".to_string()),
+            )
             .unwrap();
 
         let history = store.get_history("test.value").unwrap();
@@ -717,7 +723,9 @@ mod tests {
         // Set federation override
         let coop_id: EntityId = "entity:icn:cooperative:test-coop".parse().unwrap();
         let mut coop_override = test_param("test.value", 200);
-        coop_override.scope = ParameterScope::Cooperative { id: coop_id.clone() };
+        coop_override.scope = ParameterScope::Cooperative {
+            id: coop_id.clone(),
+        };
         coop_override.constraints.allow_override = true;
         store.set(coop_override, None, None).unwrap();
 
