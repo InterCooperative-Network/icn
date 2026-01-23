@@ -2,9 +2,13 @@
 //!
 //! # Coop Isolation
 //!
-//! TODO(#769): Add `ctx.require_coop()` enforcement when multi-coop ledgers are implemented.
-//! Currently the ledger is global. When per-coop ledgers exist, handlers should:
-//! 1. Require `ctx` to be `Some` for all operations
+//! Ledger handlers enforce coop isolation when a coop_id parameter is provided.
+//! Currently the ledger is global, but handlers validate that any coop_id in
+//! parameters matches the caller's token coop_id. This prepares for future
+//! per-coop ledgers and prevents information leakage across cooperatives.
+//!
+//! When per-coop ledgers are implemented:
+//! 1. Handlers will require `ctx` to be `Some` for all operations
 //! 2. Call `ctx.require_coop(requested_coop_id)` to validate access
 //! 3. Route requests to the appropriate coop-scoped ledger
 
@@ -118,6 +122,8 @@ pub async fn handle_ledger_balance(
     struct BalanceParams {
         account_id: String,
         currency: Option<String>,
+        #[serde(default)]
+        coop_id: Option<String>,
     }
 
     let balance_params: BalanceParams = match serde_json::from_value(params.clone()) {
@@ -126,6 +132,13 @@ pub async fn handle_ledger_balance(
             return RpcResponse::error(id, INVALID_PARAMS, format!("Invalid params: {e}"));
         }
     };
+
+    // SECURITY: Enforce coop isolation if coop_id is provided
+    if let Some(ctx) = ctx {
+        if let Err(err_code) = ctx.require_coop_if_provided(balance_params.coop_id.as_deref()) {
+            return err_code.to_context_response(id);
+        }
+    }
 
     let account_did = match serde_json::from_value(serde_json::Value::String(
         balance_params.account_id.clone(),

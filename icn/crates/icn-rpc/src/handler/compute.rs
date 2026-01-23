@@ -2,11 +2,9 @@
 //!
 //! # Coop Isolation
 //!
-//! TODO(#769): Verify `ctx.coop_id` matches the task's `coop_id` for all operations.
-//! Currently compute tasks include coop_id for attribution. Handlers should:
-//! 1. Require `ctx` to be `Some` for task submission
-//! 2. Validate that submitted task's coop_id matches ctx.coop_id
-//! 3. Restrict task queries to the caller's coop scope
+//! Compute handlers enforce coop isolation by validating that submitted tasks'
+//! coop_id matches the caller's token coop_id. This prevents cross-coop task
+//! submission and ensures compute resources are properly attributed.
 
 use std::sync::Arc;
 
@@ -53,10 +51,21 @@ pub async fn handle_compute_submit(
         .unwrap_or_else(|| "rpc:anonymous".to_string());
 
     // Get coop_id: prefer request, fallback to ctx
-    let coop_id = request
+    let task_coop_id = request
         .coop_id
         .clone()
         .or_else(|| ctx.and_then(|c| c.coop_id.clone()));
+
+    // SECURITY: Enforce coop isolation if caller has a coop_id in their token
+    // This prevents users from submitting tasks to other cooperatives
+    if let Some(ctx) = ctx {
+        if let Some(ref requested_coop) = task_coop_id {
+            // Validate that the task's coop_id matches the caller's token coop_id
+            if let Err(err_code) = ctx.require_coop(requested_coop) {
+                return err_code.to_context_response(id);
+            }
+        }
+    }
 
     // Convert resource_profile from request to compute ResourceProfile
     let resource_profile = request.resource_profile.as_ref().map(|rp| {
@@ -131,7 +140,7 @@ pub async fn handle_compute_submit(
     let task = icn_compute::ComputeTask {
         id: request.task_id,
         submitter, // Authenticated DID from JWT claims
-        coop_id,   // From request or JWT claims
+        coop_id: task_coop_id,   // From request (validated against JWT) or JWT claims
         code: task_code,
         inputs,
         fuel_limit: icn_compute::FuelLimit(request.fuel_limit),

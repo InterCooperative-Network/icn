@@ -40,6 +40,11 @@ impl RpcContext {
     /// - The caller has no coop_id in their token (AuthenticationRequired)
     /// - The caller's coop_id doesn't match the requested coop_id (CoopAccessDenied)
     ///
+    /// # Security
+    ///
+    /// This function logs all cross-coop access attempts for security audit.
+    /// Successful access is logged at DEBUG level, denied access at WARN level.
+    ///
     /// # Example
     ///
     /// ```ignore
@@ -50,9 +55,74 @@ impl RpcContext {
     /// ```
     pub fn require_coop(&self, coop_id: &str) -> Result<(), RpcErrorCode> {
         match &self.coop_id {
-            Some(c) if c == coop_id => Ok(()),
-            Some(_) => Err(RpcErrorCode::CoopAccessDenied),
-            None => Err(RpcErrorCode::AuthenticationRequired),
+            Some(c) if c == coop_id => {
+                // Access granted - log for audit trail
+                tracing::debug!(
+                    caller = %self.caller_did,
+                    coop_id = coop_id,
+                    "Coop access granted"
+                );
+                Ok(())
+            }
+            Some(caller_coop) => {
+                // Cross-coop access attempt blocked - log security event
+                tracing::warn!(
+                    caller = %self.caller_did,
+                    caller_coop = caller_coop,
+                    requested_coop = coop_id,
+                    "Cross-coop access denied: token is for different cooperative"
+                );
+                // Increment security metric
+                metrics::counter!(
+                    "icn_rpc_coop_access_denied_total",
+                    "caller_coop" => caller_coop.clone(),
+                    "requested_coop" => coop_id.to_string()
+                )
+                .increment(1);
+                Err(RpcErrorCode::CoopAccessDenied)
+            }
+            None => {
+                // No coop_id in token - log security event
+                tracing::warn!(
+                    caller = %self.caller_did,
+                    requested_coop = coop_id,
+                    "Coop access denied: token missing coop_id claim"
+                );
+                // Increment security metric
+                metrics::counter!(
+                    "icn_rpc_coop_auth_required_total",
+                    "requested_coop" => coop_id.to_string()
+                )
+                .increment(1);
+                Err(RpcErrorCode::AuthenticationRequired)
+            }
+        }
+    }
+
+    /// Verify the caller has access to the specified cooperative (if coop_id is provided).
+    ///
+    /// This is a convenience wrapper for `require_coop` that only enforces isolation
+    /// when a coop_id is actually provided. Use this for operations that can be
+    /// either global or coop-scoped.
+    ///
+    /// Returns Ok(()) if:
+    /// - No coop_id was provided (allows global access)
+    /// - The coop_id matches the caller's token coop_id
+    ///
+    /// Returns an error if coop_id is provided but doesn't match.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// // Ledger operations can be global or coop-scoped
+    /// if let Err(e) = ctx.require_coop_if_provided(params.coop_id.as_deref()) {
+    ///     return e.to_default_response(id);
+    /// }
+    /// ```
+    pub fn require_coop_if_provided(&self, coop_id: Option<&str>) -> Result<(), RpcErrorCode> {
+        match coop_id {
+            Some(id) => self.require_coop(id),
+            None => Ok(()), // No coop_id specified, allow global access
         }
     }
 
@@ -145,6 +215,28 @@ mod tests {
         let ctx = RpcContext::new(test_did(), None, vec![]);
         let result = ctx.require_coop("coop-123");
         assert!(matches!(result, Err(RpcErrorCode::AuthenticationRequired)));
+    }
+
+    #[test]
+    fn test_require_coop_if_provided_none() {
+        let ctx = RpcContext::new(test_did(), Some("coop-123".to_string()), vec![]);
+        // No coop_id provided - should allow access
+        assert!(ctx.require_coop_if_provided(None).is_ok());
+    }
+
+    #[test]
+    fn test_require_coop_if_provided_match() {
+        let ctx = RpcContext::new(test_did(), Some("coop-123".to_string()), vec![]);
+        // Matching coop_id - should allow access
+        assert!(ctx.require_coop_if_provided(Some("coop-123")).is_ok());
+    }
+
+    #[test]
+    fn test_require_coop_if_provided_mismatch() {
+        let ctx = RpcContext::new(test_did(), Some("coop-123".to_string()), vec![]);
+        // Non-matching coop_id - should deny access
+        let result = ctx.require_coop_if_provided(Some("coop-456"));
+        assert!(matches!(result, Err(RpcErrorCode::CoopAccessDenied)));
     }
 
     #[test]

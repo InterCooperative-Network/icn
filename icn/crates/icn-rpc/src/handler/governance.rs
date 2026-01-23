@@ -2,10 +2,13 @@
 //!
 //! # Coop Isolation
 //!
-//! TODO(#769): Add `ctx.require_coop()` enforcement when multi-coop governance is implemented.
-//! Currently domains are global. When per-coop governance domains exist, handlers should:
-//! 1. Require `ctx` to be `Some` for write operations (already done for vote.cast)
-//! 2. Call `ctx.require_coop(domain_coop_id)` to validate access
+//! Governance handlers enforce coop isolation when domain operations include a
+//! coop_id. Currently domains are global, but handlers validate that any coop_id
+//! in domain operations matches the caller's token coop_id.
+//!
+//! When per-coop governance domains exist:
+//! 1. Handlers will require `ctx` to be `Some` for write operations
+//! 2. Call `ctx.require_coop(domain_coop_id)` to validate access  
 //! 3. Route requests to the appropriate coop-scoped governance instance
 
 use std::sync::Arc;

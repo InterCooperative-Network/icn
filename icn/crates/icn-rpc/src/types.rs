@@ -364,6 +364,84 @@ impl RpcResponse {
             "Internal server error".to_string(),
         )
     }
+
+    /// Sanitize an error response by replacing detailed messages with generic ones.
+    ///
+    /// This should be used for errors that might expose internal implementation
+    /// details or sensitive information. The full error is logged for debugging.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// // Before sanitization (leaks internal details)
+    /// let err_response = RpcResponse::error(
+    ///     1,
+    ///     -31000,
+    ///     format!("Ledger error: sled::Error::Io(...)"),
+    /// );
+    ///
+    /// // After sanitization (generic message)
+    /// let sanitized = err_response.sanitize();
+    /// // Returns: "Ledger operation failed"
+    /// ```
+    pub fn sanitize(self) -> Self {
+        if let Some(error) = &self.error {
+            // Log the original error for debugging
+            tracing::warn!(
+                code = error.code,
+                message = %error.message,
+                "Sanitizing RPC error response"
+            );
+
+            // Map error codes to generic user-facing messages
+            let sanitized_message = match error.code {
+                // Standard JSON-RPC errors (already generic, leave as-is)
+                -32700..=-32600 => error.message.clone(),
+                
+                // Server errors - provide generic messages
+                crate::error_codes::RESOURCE_NOT_AVAILABLE => {
+                    "Resource temporarily unavailable".to_string()
+                }
+                
+                // Application errors - generic messages
+                crate::error_codes::LEDGER_ERROR => "Ledger operation failed".to_string(),
+                crate::error_codes::TRUST_ERROR => "Trust graph operation failed".to_string(),
+                crate::error_codes::GOVERNANCE_ERROR => "Governance operation failed".to_string(),
+                crate::error_codes::CONTRACT_ERROR => "Contract execution failed".to_string(),
+                crate::error_codes::COMPUTE_ERROR => "Compute operation failed".to_string(),
+                crate::error_codes::NETWORK_ERROR => "Network operation failed".to_string(),
+                crate::error_codes::IDENTITY_ERROR => "Identity operation failed".to_string(),
+                crate::error_codes::FEDERATION_ERROR => "Federation operation failed".to_string(),
+                crate::error_codes::RECOVERY_ERROR => "Recovery operation failed".to_string(),
+                crate::error_codes::DISPUTE_ERROR => "Dispute operation failed".to_string(),
+                
+                // For other errors, use the existing message if it looks generic,
+                // otherwise use a fallback based on the code range
+                _ => {
+                    if error.message.len() < 50 && !error.message.contains("::") {
+                        // Looks generic enough
+                        error.message.clone()
+                    } else {
+                        // Too detailed, use generic message
+                        "Operation failed".to_string()
+                    }
+                }
+            };
+
+            RpcResponse {
+                jsonrpc: self.jsonrpc,
+                result: None,
+                error: Some(RpcError {
+                    code: error.code,
+                    message: sanitized_message,
+                }),
+                id: self.id,
+            }
+        } else {
+            // No error to sanitize
+            self
+        }
+    }
 }
 
 // ============================================================================
