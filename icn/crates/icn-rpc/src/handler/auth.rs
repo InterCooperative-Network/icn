@@ -161,8 +161,10 @@ pub async fn handle_auth_verify(
             None, // Don't embed coop_id yet
         ) {
             Ok(_temp_token) => {
-                // Signature verified! Now we can safely check membership
-                // (The temp_token is discarded - we'll issue a new one with coop_id)
+                // Signature verified! Now we can safely check membership.
+                // The temp_token is discarded because it lacks the coop_id claim.
+                // We'll issue a new token with coop_id after membership validation
+                // using issue_token_for_did() which doesn't require a challenge.
             }
             Err(e) => {
                 counter!("icn_rpc_auth_failures_total", "reason" => "verification_failed")

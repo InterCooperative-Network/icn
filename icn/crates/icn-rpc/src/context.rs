@@ -90,8 +90,18 @@ impl RpcContext {
 ///
 /// This provides a consistent way to convert context validation errors
 /// into RPC responses with appropriate error codes and messages.
+///
+/// Primarily intended for coop-related errors from `RpcContext::require_coop()`:
+/// - `CoopAccessDenied` - Cross-coop isolation violation
+/// - `AuthenticationRequired` - Token missing coop_id claim
+/// - `CoopNotFound` - Invalid cooperative reference
+///
+/// Other error codes fall back to their default messages via `default_message()`.
 impl RpcErrorCode {
     /// Convert to an RPC error response with a context-appropriate message.
+    ///
+    /// For coop-related errors, provides user-friendly messages explaining
+    /// the access control failure. For other errors, uses the default message.
     pub fn to_context_response(&self, id: u64) -> RpcResponse {
         let message = match self {
             RpcErrorCode::CoopAccessDenied => {
