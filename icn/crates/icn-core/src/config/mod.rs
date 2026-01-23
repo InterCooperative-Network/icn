@@ -423,7 +423,8 @@ mod tests {
 
     #[test]
     fn test_repository_config_files() {
-        // Test that the actual config files in the repository parse correctly
+        // Golden integration test: validates that actual config files in the repository
+        // parse correctly AND pass validation checks
         // CARGO_MANIFEST_DIR is always set during cargo test and points to the crate directory
         let manifest_dir = std::env::var("CARGO_MANIFEST_DIR")
             .expect("CARGO_MANIFEST_DIR should be set during cargo test");
@@ -449,6 +450,19 @@ mod tests {
             assert!(alpha.rate_limiting.enabled);
             assert_eq!(alpha.rate_limiting.isolated.max_messages_per_second, 10);
             assert_eq!(alpha.rate_limiting.federated.max_messages_per_second, 200);
+            
+            // Validate configuration - should have zero fatal errors
+            let validation = alpha.validate();
+            match validation {
+                Ok(warnings) => {
+                    // Warnings are acceptable for example configs (e.g., missing JWT secret)
+                    // but we want to ensure there are no fatal errors
+                    eprintln!("icn-alpha.toml validation warnings: {:?}", warnings);
+                }
+                Err(errors) => {
+                    panic!("icn-alpha.toml has fatal validation errors: {:?}", errors);
+                }
+            }
         }
 
         // Test icn-beta.toml
@@ -458,6 +472,17 @@ mod tests {
             assert_eq!(beta.network.listen_addr, "0.0.0.0:7778");
             assert_eq!(beta.observability.metrics_port, 9101);
             assert!(beta.rate_limiting.enabled);
+            
+            // Validate configuration
+            let validation = beta.validate();
+            match validation {
+                Ok(warnings) => {
+                    eprintln!("icn-beta.toml validation warnings: {:?}", warnings);
+                }
+                Err(errors) => {
+                    panic!("icn-beta.toml has fatal validation errors: {:?}", errors);
+                }
+            }
         }
 
         // Test icn.toml.example
@@ -466,6 +491,20 @@ mod tests {
             let example = Config::from_file(&example_path).unwrap();
             assert!(example.rate_limiting.enabled);
             assert_eq!(example.rate_limiting.partner.max_messages_per_second, 100);
+            
+            // Validate configuration - example file should be production-ready
+            let validation = example.validate();
+            match validation {
+                Ok(warnings) => {
+                    // Document expected warnings for the example config
+                    // Example configs may have warnings (e.g., missing JWT secret, 0.0.0.0 binding)
+                    // but should have zero fatal errors
+                    eprintln!("icn.toml.example validation warnings: {:?}", warnings);
+                }
+                Err(errors) => {
+                    panic!("icn.toml.example has fatal validation errors: {:?}", errors);
+                }
+            }
         }
     }
 
