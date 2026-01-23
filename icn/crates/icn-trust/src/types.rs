@@ -316,9 +316,10 @@ impl TrustScore {
     /// let test_score = TrustScore::unchecked(0.8);
     ///
     /// // Good: After explicit clamping
-    /// let raw_value: f64 = some_calculation();
+    /// let raw_value: f64 = 1.5; // e.g., from some calculation
     /// let clamped = raw_value.clamp(0.0, 1.0);
     /// let score = TrustScore::unchecked(clamped);
+    /// assert_eq!(score.value(), 1.0);
     /// ```
     pub const fn unchecked(value: f64) -> Self {
         Self(value)
