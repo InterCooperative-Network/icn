@@ -65,6 +65,7 @@ pub mod fx;
 pub mod hash;
 pub mod labor_shares;
 pub mod ledger;
+mod ledger_impl; // Internal implementation modules
 pub mod membership;
 pub mod merge;
 pub mod oracle;
