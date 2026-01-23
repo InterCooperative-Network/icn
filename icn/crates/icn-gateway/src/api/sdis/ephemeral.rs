@@ -181,7 +181,7 @@ impl EphemeralProof {
         let mut payload = Vec::with_capacity(128);
         payload.push(self.v);
         payload
-            .extend_from_slice(&icn_encoding::encode_bincode_legacy(&self.t).unwrap_or_default());
+            .extend_from_slice(&icn_encoding::encode(&self.t).unwrap_or_default());
         payload.extend_from_slice(&self.a);
         payload.extend_from_slice(&self.k);
         payload.extend_from_slice(&self.x.to_le_bytes());
@@ -277,7 +277,7 @@ impl EphemeralBinding {
 
         // Store the serialized hybrid signature
         binding.hybrid_signature =
-            icn_encoding::encode_bincode_legacy(&hybrid_sig).unwrap_or_default();
+            icn_encoding::encode(&hybrid_sig).unwrap_or_default();
 
         // Extract classical signature for compatibility
         binding.signature = hybrid_sig.classical.clone();

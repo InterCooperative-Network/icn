@@ -174,8 +174,8 @@ impl ZkProver {
         let private = NonRevocationPrivate {
             credential_id,
             witness: crate::circuit::non_revocation::NonMembershipWitness {
-                a: icn_encoding::encode_bincode_legacy(&witness.a).unwrap_or_default(),
-                b: icn_encoding::encode_bincode_legacy(&witness.d).unwrap_or_default(),
+                a: icn_encoding::encode(&witness.a).unwrap_or_default(),
+                b: icn_encoding::encode(&witness.d).unwrap_or_default(),
                 aux: credential_id,
                 merkle_proof: None,
             },
@@ -233,21 +233,21 @@ impl ZkProver {
         let attribute_proof = match &proof_type {
             ProofType::AgeAtLeast { threshold } => {
                 let age_att: AgeAttestation =
-                    icn_encoding::decode_bincode_legacy(&attestation.payload).map_err(|e| {
+                    icn_encoding::decode(&attestation.payload).map_err(|e| {
                         ProverError::InvalidAttestation(format!("age attestation: {e}"))
                     })?;
                 self.prove_age(*threshold, &age_att, issuer_pk, &context)?
             }
             ProofType::Citizenship { country_code } => {
                 let cit_att: CitizenshipAttestation =
-                    icn_encoding::decode_bincode_legacy(&attestation.payload).map_err(|e| {
+                    icn_encoding::decode(&attestation.payload).map_err(|e| {
                         ProverError::InvalidAttestation(format!("citizenship attestation: {e}"))
                     })?;
                 self.prove_citizenship(*country_code, &cit_att, issuer_pk, &context)?
             }
             ProofType::Membership { org_did } => {
                 let mem_att: MembershipAttestation =
-                    icn_encoding::decode_bincode_legacy(&attestation.payload).map_err(|e| {
+                    icn_encoding::decode(&attestation.payload).map_err(|e| {
                         ProverError::InvalidAttestation(format!("membership attestation: {e}"))
                     })?;
                 // Pad subject_anchor to 32 bytes for DID creation

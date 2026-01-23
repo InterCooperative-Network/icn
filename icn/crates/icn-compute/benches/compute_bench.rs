@@ -116,14 +116,14 @@ fn bench_task_operations(c: &mut Criterion) {
     // Benchmark bincode legacy encoding (backward compatibility)
     group.bench_function("serialize_task_bincode_legacy", |b| {
         let task = create_test_task(1);
-        b.iter(|| icn_encoding::encode_bincode_legacy(black_box(&task)).unwrap());
+        b.iter(|| icn_encoding::encode(black_box(&task)).unwrap());
     });
 
-    let serialized_bincode = icn_encoding::encode_bincode_legacy(&task).unwrap();
+    let serialized_bincode = icn_encoding::encode(&task).unwrap();
 
     group.bench_function("deserialize_task_bincode_legacy", |b| {
         b.iter(|| {
-            icn_encoding::decode_bincode_legacy::<ComputeTask>(black_box(&serialized_bincode))
+            icn_encoding::decode::<ComputeTask>(black_box(&serialized_bincode))
                 .unwrap()
         });
     });

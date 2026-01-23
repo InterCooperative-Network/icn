@@ -66,12 +66,12 @@ pub enum ContractRegistryMessage {
 impl ContractRegistryMessage {
     /// Serialize message to bytes
     pub fn to_bytes(&self) -> Result<Vec<u8>, icn_encoding::Error> {
-        icn_encoding::encode_bincode_legacy(self)
+        icn_encoding::encode(self)
     }
 
     /// Deserialize message from bytes
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, icn_encoding::Error> {
-        icn_encoding::decode_bincode_legacy(bytes)
+        icn_encoding::decode(bytes)
     }
 
     /// Get the message type name for logging

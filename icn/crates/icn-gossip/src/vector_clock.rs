@@ -430,10 +430,10 @@ mod tests {
         clock.increment(&node_b);
 
         // Serialize
-        let bytes = icn_encoding::encode_bincode_legacy(&clock).unwrap();
+        let bytes = icn_encoding::encode(&clock).unwrap();
 
         // Deserialize back
-        let restored: VectorClock = icn_encoding::decode_bincode_legacy(&bytes).unwrap();
+        let restored: VectorClock = icn_encoding::decode(&bytes).unwrap();
 
         // Verify equality (compares counts, not last_seen)
         assert_eq!(clock, restored);

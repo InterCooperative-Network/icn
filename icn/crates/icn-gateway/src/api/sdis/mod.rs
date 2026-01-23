@@ -224,7 +224,7 @@ pub async fn verify_level2(
             base64::Engine::decode(&base64::engine::general_purpose::STANDARD, binding_b64)
                 .map_err(|e| GatewayError::BadRequest(format!("Invalid binding base64: {e}")))?;
 
-        let binding: EphemeralBinding = icn_encoding::decode_bincode_legacy(&binding_bytes)
+        let binding: EphemeralBinding = icn_encoding::decode(&binding_bytes)
             .map_err(|e| GatewayError::BadRequest(format!("Invalid binding: {e}")))?;
 
         state.verifier.verify_level2(&proof, &binding)
@@ -471,7 +471,7 @@ mod tests {
         let qr_data = encode_for_qr(&proof).unwrap();
         let qr_b64 = base64::engine::general_purpose::STANDARD.encode(&qr_data);
 
-        let binding_bytes = icn_encoding::encode_bincode_legacy(&binding).unwrap();
+        let binding_bytes = icn_encoding::encode(&binding).unwrap();
         let binding_b64 = base64::engine::general_purpose::STANDARD.encode(&binding_bytes);
 
         let req = test::TestRequest::post()

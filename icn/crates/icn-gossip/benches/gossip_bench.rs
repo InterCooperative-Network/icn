@@ -84,14 +84,14 @@ fn bench_gossip_entry_serialization(c: &mut Criterion) {
 
     // Benchmark bincode legacy encoding (backward compatibility)
     group.bench_function("serialize_bincode_legacy", |b| {
-        b.iter(|| icn_encoding::encode_bincode_legacy(black_box(&entry)).unwrap());
+        b.iter(|| icn_encoding::encode(black_box(&entry)).unwrap());
     });
 
-    let serialized_bincode = icn_encoding::encode_bincode_legacy(&entry).unwrap();
+    let serialized_bincode = icn_encoding::encode(&entry).unwrap();
 
     group.bench_function("deserialize_bincode_legacy", |b| {
         b.iter(|| {
-            icn_encoding::decode_bincode_legacy::<GossipEntry>(black_box(&serialized_bincode))
+            icn_encoding::decode::<GossipEntry>(black_box(&serialized_bincode))
                 .unwrap()
         });
     });

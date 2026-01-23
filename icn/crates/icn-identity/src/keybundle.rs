@@ -238,7 +238,7 @@ impl KeyBundle {
             new_x25519_public: new_bundle.x25519_public,
         };
 
-        let message_bytes = icn_encoding::encode_bincode_legacy(&rotation_message)?;
+        let message_bytes = icn_encoding::encode(&rotation_message)?;
         let signature = self.sign(&message_bytes);
 
         Ok(RotationRequest {
@@ -377,7 +377,7 @@ impl KeyBundlePublic {
             new_x25519_public: request.new_public.x25519_public,
         };
 
-        let message_bytes = icn_encoding::encode_bincode_legacy(&rotation_message)?;
+        let message_bytes = icn_encoding::encode(&rotation_message)?;
 
         Ok(self.verify(&message_bytes, &request.old_signature))
     }

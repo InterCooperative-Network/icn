@@ -54,14 +54,14 @@ fn bench_message_serialization(c: &mut Criterion) {
     // Benchmark bincode legacy encoding (backward compatibility)
     group.bench_function("serialize_ping_bincode_legacy", |b| {
         let msg = create_ping_message(1);
-        b.iter(|| icn_encoding::encode_bincode_legacy(black_box(&msg)).unwrap());
+        b.iter(|| icn_encoding::encode(black_box(&msg)).unwrap());
     });
 
-    let bincode_bytes = icn_encoding::encode_bincode_legacy(&msg).unwrap();
+    let bincode_bytes = icn_encoding::encode(&msg).unwrap();
 
     group.bench_function("deserialize_ping_bincode_legacy", |b| {
         b.iter(|| {
-            icn_encoding::decode_bincode_legacy::<NetworkMessage>(black_box(&bincode_bytes))
+            icn_encoding::decode::<NetworkMessage>(black_box(&bincode_bytes))
                 .unwrap()
         });
     });
@@ -222,7 +222,7 @@ fn bench_message_sizes(c: &mut Criterion) {
     group.bench_function("measure_ping_size_bincode_legacy", |b| {
         let msg = create_ping_message(1);
         b.iter(|| {
-            let bytes = icn_encoding::encode_bincode_legacy(black_box(&msg)).unwrap();
+            let bytes = icn_encoding::encode(black_box(&msg)).unwrap();
             bytes.len()
         });
     });

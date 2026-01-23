@@ -3,12 +3,11 @@ name = "icn-encoding"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Encoding abstraction layer for ICN serialization (bincode → postcard migration)"
+description = "Encoding abstraction layer for ICN serialization using postcard"
 
 [dependencies]
 # Serialization
 serde = { workspace = true }
-bincode = { workspace = true }
 postcard = { workspace = true }
 
 # Error handling
