@@ -155,7 +155,7 @@ mod tests {
         assert_eq!(config.max_concurrent_tasks, 10);
         assert!(!config.actor_model_enabled);
         assert_eq!(config.max_actors, 100);
-        
+
         assert_eq!(config.verification.low_value_threshold, 100);
         assert_eq!(config.verification.medium_value_threshold, 1000);
         assert_eq!(config.verification.high_value_threshold, 10000);
@@ -197,7 +197,7 @@ mod tests {
         assert_eq!(deserialized.max_concurrent_tasks, 20);
         assert!(deserialized.actor_model_enabled);
         assert_eq!(deserialized.max_actors, 200);
-        
+
         assert_eq!(deserialized.verification.low_value_threshold, 200);
         assert_eq!(deserialized.verification.medium_value_threshold, 2000);
         assert_eq!(deserialized.verification.high_value_threshold, 20000);
@@ -216,11 +216,11 @@ low_value_threshold = 150
 "#;
 
         let config: ComputeConfig = toml::from_str(toml_str).unwrap();
-        
+
         // Explicitly set values
         assert_eq!(config.max_concurrent_tasks, 15);
         assert_eq!(config.verification.low_value_threshold, 150);
-        
+
         // Default values
         assert!(!config.actor_model_enabled);
         assert_eq!(config.max_actors, 100);
@@ -240,7 +240,7 @@ low_value_threshold = 150
         };
 
         let compute_config = config.to_compute_config();
-        
+
         assert_eq!(compute_config.low_value_threshold, 250);
         assert_eq!(compute_config.medium_value_threshold, 2500);
         assert_eq!(compute_config.high_value_threshold, 25000);
@@ -252,7 +252,7 @@ low_value_threshold = 150
     #[test]
     fn test_verification_config_value_thresholds() {
         let config = VerificationConfig::default();
-        
+
         // Verify thresholds are in ascending order
         assert!(config.low_value_threshold < config.medium_value_threshold);
         assert!(config.medium_value_threshold < config.high_value_threshold);
@@ -261,7 +261,7 @@ low_value_threshold = 150
     #[test]
     fn test_verification_config_consensus_threshold_valid_range() {
         let config = VerificationConfig::default();
-        
+
         // Consensus threshold should be between 0 and 1
         assert!(config.consensus_threshold > 0.0);
         assert!(config.consensus_threshold <= 1.0);

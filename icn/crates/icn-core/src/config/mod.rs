@@ -450,7 +450,7 @@ mod tests {
             assert!(alpha.rate_limiting.enabled);
             assert_eq!(alpha.rate_limiting.isolated.max_messages_per_second, 10);
             assert_eq!(alpha.rate_limiting.federated.max_messages_per_second, 200);
-            
+
             // Validate configuration - should have zero fatal errors
             let validation = alpha.validate();
             match validation {
@@ -472,7 +472,7 @@ mod tests {
             assert_eq!(beta.network.listen_addr, "0.0.0.0:7778");
             assert_eq!(beta.observability.metrics_port, 9101);
             assert!(beta.rate_limiting.enabled);
-            
+
             // Validate configuration
             let validation = beta.validate();
             match validation {
@@ -491,7 +491,7 @@ mod tests {
             let example = Config::from_file(&example_path).unwrap();
             assert!(example.rate_limiting.enabled);
             assert_eq!(example.rate_limiting.partner.max_messages_per_second, 100);
-            
+
             // Validate configuration - example file should be production-ready
             let validation = example.validate();
             match validation {

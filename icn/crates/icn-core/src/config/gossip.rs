@@ -175,7 +175,7 @@ mod tests {
         assert_eq!(config.replication.health_check_interval_secs, 60);
         assert_eq!(config.replication.stale_threshold_secs, 300);
         assert_eq!(config.replication.unreachable_threshold_secs, 900);
-        
+
         assert_eq!(config.partition.silence_threshold_secs, 300);
         assert_eq!(config.partition.check_interval_secs, 30);
         assert!(config.partition.auto_heal_enabled);
@@ -227,7 +227,7 @@ mod tests {
         assert_eq!(deserialized.replication.health_check_interval_secs, 120);
         assert_eq!(deserialized.replication.stale_threshold_secs, 600);
         assert_eq!(deserialized.replication.unreachable_threshold_secs, 1800);
-        
+
         assert_eq!(deserialized.partition.silence_threshold_secs, 600);
         assert_eq!(deserialized.partition.check_interval_secs, 60);
         assert!(!deserialized.partition.auto_heal_enabled);
@@ -245,11 +245,11 @@ silence_threshold_secs = 400
 "#;
 
         let config: GossipConfig = toml::from_str(toml_str).unwrap();
-        
+
         // Explicitly set values
         assert_eq!(config.replication.target_replicas, 4);
         assert_eq!(config.partition.silence_threshold_secs, 400);
-        
+
         // Default values
         assert_eq!(config.replication.min_replica_trust.value(), 0.4);
         assert_eq!(config.replication.health_check_interval_secs, 60);
@@ -268,9 +268,12 @@ silence_threshold_secs = 400
         };
 
         let manager_config = config.to_manager_config();
-        
+
         assert_eq!(manager_config.target_replicas, 5);
-        assert_eq!(manager_config.min_trust_class, icn_trust::TrustClass::Federated);
+        assert_eq!(
+            manager_config.min_trust_class,
+            icn_trust::TrustClass::Federated
+        );
         assert_eq!(manager_config.health_check_interval_secs, 90);
         assert_eq!(manager_config.stale_threshold_secs, 450);
         assert_eq!(manager_config.unreachable_threshold_secs, 1200);
@@ -286,7 +289,7 @@ silence_threshold_secs = 400
         };
 
         let gossip_config = config.to_gossip_config();
-        
+
         assert_eq!(gossip_config.partition_threshold.as_secs(), 600);
         assert_eq!(gossip_config.check_interval.as_secs(), 45);
     }
