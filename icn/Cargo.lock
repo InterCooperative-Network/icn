@@ -2741,6 +2741,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "icn-api"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "base64 0.22.1",
+ "hex",
+ "icn-compute",
+ "icn-identity",
+ "icn-time",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "icn-ccl"
 version = "0.1.0"
 dependencies = [
@@ -3267,6 +3284,7 @@ dependencies = [
  "http-body-util",
  "hyper",
  "hyper-util",
+ "icn-api",
  "icn-ccl",
  "icn-compute",
  "icn-coop",

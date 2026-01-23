@@ -28,6 +28,7 @@ members = [
     "crates/icn-zkp", "crates/icn-community", "crates/icn-coop",
     "crates/icn-entity",
     "crates/icn-encoding",
+    "crates/icn-api",
 ]
 
 [workspace.package]
@@ -130,6 +131,7 @@ icn-steward = { path = "crates/icn-steward" }
 icn-zkp = { path = "crates/icn-zkp" }
 icn-encoding = { path = "crates/icn-encoding" }
 icn-coop = { path = "crates/icn-coop" }
+icn-api = { path = "crates/icn-api" }
 
 [workspace.lints.clippy]
 # Error handling - warn for now, will be upgraded to deny after cleanup
