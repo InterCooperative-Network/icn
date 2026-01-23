@@ -1,4 +1,12 @@
 //! Ledger-related RPC handlers
+//!
+//! # Coop Isolation
+//!
+//! TODO(#769): Add `ctx.require_coop()` enforcement when multi-coop ledgers are implemented.
+//! Currently the ledger is global. When per-coop ledgers exist, handlers should:
+//! 1. Require `ctx` to be `Some` for all operations
+//! 2. Call `ctx.require_coop(requested_coop_id)` to validate access
+//! 3. Route requests to the appropriate coop-scoped ledger
 
 use std::sync::Arc;
 

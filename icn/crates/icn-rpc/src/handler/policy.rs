@@ -1,4 +1,12 @@
 //! Policy and quota-related RPC handlers
+//!
+//! # Coop Isolation
+//!
+//! TODO(#769): Add `ctx.require_coop()` enforcement for policy operations.
+//! Policies are inherently coop-scoped. Handlers should:
+//! 1. Require `ctx` to be `Some` for all operations
+//! 2. Call `ctx.require_coop(policy_coop_id)` to validate access
+//! 3. Restrict policy queries/modifications to the caller's coop
 
 use std::sync::Arc;
 

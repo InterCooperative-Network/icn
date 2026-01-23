@@ -1,4 +1,12 @@
 //! Dispute-related RPC handlers
+//!
+//! # Coop Isolation
+//!
+//! TODO(#769): Add `ctx.require_coop()` enforcement for coop-scoped disputes.
+//! When per-coop dispute resolution exists, handlers should:
+//! 1. Require `ctx` to be `Some` for all operations
+//! 2. Call `ctx.require_coop(dispute_coop_id)` to validate access
+//! 3. Restrict dispute queries to the caller's coop scope
 
 use icn_time;
 use std::sync::Arc;

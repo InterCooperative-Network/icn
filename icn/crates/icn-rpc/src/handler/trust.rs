@@ -1,4 +1,12 @@
 //! Trust-related RPC handlers
+//!
+//! # Coop Isolation
+//!
+//! TODO(#769): Add `ctx.require_coop()` enforcement when multi-coop trust graphs are implemented.
+//! Currently the trust graph is global. When per-coop trust graphs exist, handlers should:
+//! 1. Require `ctx` to be `Some` for write operations
+//! 2. Call `ctx.require_coop(requested_coop_id)` to validate access
+//! 3. Route requests to the appropriate coop-scoped trust graph
 
 use std::sync::Arc;
 

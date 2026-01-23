@@ -1,4 +1,12 @@
 //! Recovery-related RPC handlers
+//!
+//! # Coop Isolation
+//!
+//! TODO(#769): Add `ctx.require_coop()` enforcement when recovery is coop-scoped.
+//! When per-coop recovery processes exist, handlers should:
+//! 1. Require `ctx` to be `Some` for all operations
+//! 2. Validate recovery requests against the caller's coop membership
+//! 3. Restrict recovery queries to the caller's coop scope
 
 use std::sync::Arc;
 

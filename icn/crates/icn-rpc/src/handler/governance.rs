@@ -1,4 +1,12 @@
 //! Governance-related RPC handlers
+//!
+//! # Coop Isolation
+//!
+//! TODO(#769): Add `ctx.require_coop()` enforcement when multi-coop governance is implemented.
+//! Currently domains are global. When per-coop governance domains exist, handlers should:
+//! 1. Require `ctx` to be `Some` for write operations (already done for vote.cast)
+//! 2. Call `ctx.require_coop(domain_coop_id)` to validate access
+//! 3. Route requests to the appropriate coop-scoped governance instance
 
 use std::sync::Arc;
 
@@ -535,19 +543,44 @@ pub async fn handle_governance_proposal_open(
 }
 
 /// Handle governance.vote.cast RPC call - cast a vote on a proposal
+///
+/// Requires scope: `governance:vote` or `governance:*`
 pub async fn handle_governance_vote_cast(
     id: u64,
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
     ctx: Option<&RpcContext>,
 ) -> RpcResponse {
-    if let Some(ctx) = ctx {
-        tracing::debug!(
+    // Require authentication with governance:vote scope
+    let ctx = match ctx {
+        Some(c) => c,
+        None => {
+            return RpcResponse::error(
+                id,
+                crate::error_codes::AUTHENTICATION_REQUIRED,
+                "Authentication required to cast votes".to_string(),
+            );
+        }
+    };
+
+    // Verify caller has required scope
+    if !ctx.has_scope("governance:vote") {
+        tracing::warn!(
             caller = %ctx.caller_did,
-            coop_id = ?ctx.coop_id,
-            "governance.vote.cast called"
+            "Vote attempt denied: missing governance:vote scope"
+        );
+        return RpcResponse::error(
+            id,
+            crate::error_codes::SCOPE_INSUFFICIENT,
+            "Insufficient scope: governance:vote required".to_string(),
         );
     }
+
+    tracing::debug!(
+        caller = %ctx.caller_did,
+        coop_id = ?ctx.coop_id,
+        "governance.vote.cast called"
+    );
 
     let governance_handle = match state.governance_handle() {
         Some(handle) => handle,

@@ -1,4 +1,12 @@
 //! Contract-related RPC handlers
+//!
+//! # Coop Isolation
+//!
+//! TODO(#769): Add `ctx.require_coop()` enforcement for coop-scoped contracts.
+//! When per-coop contract storage exists, handlers should:
+//! 1. Require `ctx` to be `Some` for all operations
+//! 2. Call `ctx.require_coop(contract_coop_id)` to validate access
+//! 3. Route requests to the appropriate coop-scoped contract registry
 
 use icn_time;
 use std::sync::Arc;

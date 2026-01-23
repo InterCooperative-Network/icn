@@ -1,4 +1,12 @@
 //! Compute-related RPC handlers
+//!
+//! # Coop Isolation
+//!
+//! TODO(#769): Verify `ctx.coop_id` matches the task's `coop_id` for all operations.
+//! Currently compute tasks include coop_id for attribution. Handlers should:
+//! 1. Require `ctx` to be `Some` for task submission
+//! 2. Validate that submitted task's coop_id matches ctx.coop_id
+//! 3. Restrict task queries to the caller's coop scope
 
 use std::sync::Arc;
 
